@@ -24,8 +24,7 @@ const ASSETS_TO_CACHE = [
   "/static-web/alj-members-sync.js",
   "/manifest.webmanifest",
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
-  "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js",
-  "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"
+  "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"
 ];
 
 // Installation : mise en cache des ressources statiques

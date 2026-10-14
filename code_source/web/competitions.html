@@ -15,7 +15,6 @@
 <script src="/static-web/alj-vue.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="/runtime-config.js"></script>
 <script src="/static-web/alj-firebase.js"></script>
 <script src="/static-web/alj-sync.js"></script>
@@ -164,7 +163,7 @@
     <small id="sync-info">Connexion à Firebase…</small>
   </div>
   <a class="icon-btn" id="annuaire-link" href="/index?vue=pwa" title="Annuaire des adhérents" style="display:none;align-items:center;text-decoration:none">📇</a>
-  <button class="icon-btn" id="refresh-btn" title="Recharger depuis Firestore">🔄</button>
+  <button class="icon-btn" id="refresh-btn" title="Recharger les données">🔄</button>
   <button class="icon-btn" id="config-btn" title="Compte / Configuration">⚙️</button>
 </header>
 
@@ -585,7 +584,7 @@
 /* ===================== Firebase (sign-in) ===================== */
 // Project configuration and emulator (dev): /static-web/alj-firebase.js. Firebase only signs
 // the user in (ID token); every read and write goes through the API (/api/competitions…).
-const { auth, db: fsdb } = ALJFirebase.init();
+const { auth } = ALJFirebase.init();
 
 let user = null;                 // compte Firebase Auth connecté
 let comps = [];                  // documents de la collection "competitions"
@@ -914,7 +913,7 @@ function isSetupPageActive() {
   return !a || a.id === "page-setup";
 }
 
-/* ===================== Accès aux données (Firestore) ===================== */
+/* ===================== Accès aux données ===================== */
 function findComp(compId) {
   if (!compId) return null;
   return comps.find(c => String(c.id) === String(compId) || String(c.docId) === String(compId)) || null;
@@ -2511,10 +2510,6 @@ async function forceWebUpdate() {
   checkWebVersion();
 
   wireEvents();
-
-  // Cache hors-ligne Firestore (les écritures en attente sont renvoyées dès le retour du réseau)
-  try { await fsdb.enablePersistence({ synchronizeTabs: true }); }
-  catch (e) { console.warn("Persistance Firestore indisponible :", e); }
 
   // Retour de Google après la redirection OAuth : access_token dans le fragment (#…)
   // → connexion Firebase avec le credential Google (pas de domaine tiers impliqué)
