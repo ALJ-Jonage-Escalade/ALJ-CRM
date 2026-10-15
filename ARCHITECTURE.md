@@ -16,7 +16,7 @@ Le dépôt contient **une seule base de code Python** (`code_source/`) qui produ
 | Techno | PySide6 (Qt) + serveur FastAPI embarqué | HTML/JS statique (sans build) servi par FastAPI |
 | Où ça tourne | Poste Windows du bureau (portable zip + auto-update GitHub) | Google Cloud Run (`europe-west1`, 0→2 instances) |
 | Point d'entrée | `src/app.py` | `src/server.py` (`uvicorn server:app`) |
-| Données | Cache SQLite local (`data/database.db`) synchronisé avec Firestore | Firestore directement (navigateur) + cache SQLite éphémère côté serveur |
+| Données | Cache SQLite local (`data/database.db`) synchronisé avec Firestore | Uniquement via l'API (`/api/*`) ; le serveur lit Firestore (compétitions) et un cache SQLite éphémère (adhérents). Le navigateur n'utilise Firebase que pour la connexion. |
 | Utilisateurs | Administrateurs/bureau | Coachs et admins (PWA smartphone + portail bureau) |
 
 Le lien entre les deux : **Firestore** (projet GCP `smart-amplifier-510811-n6`) est la source de vérité.
@@ -89,7 +89,7 @@ ALJ-CRM/                         ← racine du dépôt
   - `sqlite_repository.py` : lecture/écriture (`get_members()` typé recommandé, `load_direct_data()` legacy).
   - `cloud_database.py` : réplication SQLite ⇄ Firestore (collections `crm_<table>`, triggers `_fs_*`, flush toutes les 15 s, pull toutes les 2 min, merge champ par champ).
   - `firestore_client.py` : client REST Firestore (sans gRPC) ; `competition_firestore_repository.py` : compétitions.
-  - `api_auth.py` : middleware Firebase (rôles `readonly < coach < admin`, miroir de `firestore.rules`).
+  - `api_auth.py` : middleware Firebase (rôles `readonly < coach < admin`). Seul juge des droits : `firestore.rules` refuse tout accès client.
   - `email_dispatch_service.py`, `email_repository.py`, `helloasso_webhook_service.py`, `secret_store.py`, `google_*_client.py`.
 - **`presentation/`** — Qt uniquement. Pages : Adhérents, Attestations, Communications, Exports, Import Data, Créneaux, Compétitions, Outils, Paramètres, Aide, Logs. Les opérations longues passent par `workers.py` (QThread).
 
@@ -127,15 +127,16 @@ Particularités à connaître :
 | HelloAsso | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync` |
 
 **Auth** : `ALJ_API_AUTH=required` (Docker) ou présence de `K_SERVICE` (Cloud Run) → jeton Firebase obligatoire, fail-closed.
-Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protégées. Les listes d'e-mails admin/coach sont **codées en dur** dans `api_auth.py` *et* `firestore.rules` (un test vérifie la cohérence — modifier les deux).
+Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protégées. Les listes d'e-mails admin/coach sont **codées en dur** dans `api_auth.py`, recopiées pour l'affichage seulement dans `alj-core.js`, `competitions.html` et `index.html` (un test vérifie la cohérence — modifier les quatre). `firestore.rules` ne contient plus de rôle : il refuse tout client.
 
 ---
 
 ## 5. Front web
 
-- **Aucun framework ni build** : HTML + JS ES modules + CSS, Firebase SDK, `fetch` via `apiFetch` (`alj-core.js`, ajoute le jeton Bearer).
+- **Aucun framework ni build** : HTML + JS ES modules + CSS, Firebase Auth (connexion seulement), `fetch` via `apiFetch` (`alj-core.js`, ajoute le jeton Bearer).
+- **Toutes les données passent par l'API** (plan `code_source/docs/plan_api_only_front.md`) : aucune page ne charge le SDK Firestore. Les écrans se mettent à jour par interrogation (`alj-sync.js`, `alj-members-sync.js` : toutes les 20 s quand la page est visible, ETag/304). Hors ligne, seule la PWA compétitions affiche une copie en lecture seule ; l'annuaire nécessite le réseau. `alj-firebase.js` efface au démarrage l'ancien cache Firestore (IndexedDB) des téléphones.
 - **Deux « vues »** : PWA smartphone (`/competitions`, `/index`) et portail bureau (`/bureau/*`). `alj-vue.js` redirige automatiquement les écrans ≥ 1024 px vers `/bureau/` (`?vue=mobile` pour forcer la PWA).
-- **Un seul numéro de version web** à garder synchronisé : `<meta alj-web-version>`, `<title>`, badge, et `CACHE_NAME` de `sw.js` (le test `test_mobile_pwa` le vérifie). Chaque déploiement visible = version web +1 (actuellement v19).
+- **Un seul numéro de version web** à garder synchronisé : `<meta alj-web-version>`, `<title>`, badge, et `CACHE_NAME` de `sw.js` (le test `test_mobile_pwa` le vérifie). Chaque déploiement visible = version web +1 (actuellement v23).
 - Rôles : coach/readonly = lecture ; admin = envoi e-mail/attestation, écritures.
 - Plan et décisions du portail : `code_source/docs/plan_pages_web_bureau.md`.
 
@@ -259,8 +260,8 @@ docker build -t alj . && docker run -p 8080:8080 -e ALJ_API_AUTH=off -e MEMBER_B
 - `ALJ_DATA_DIR` : dossier du cache SQLite `database.db` (défaut : `<racine du dépôt>/data`), créé vide au premier accès.
 - `MEMBER_BACKEND` : `firestore` par défaut. **Hors mode dev**, `firestore` pousse les écritures du serveur local vers le
   **Firestore de production** (`CloudDatabase.after_write`) ; `drive` = SQLite local seul.
-- ⚠️ Hors mode dev, les pages web lisent et écrivent **le Firestore de production** directement depuis le navigateur
-  (compétitions, coachs, éléments HelloAsso…), quel que soit `MEMBER_BACKEND`.
+- ⚠️ Hors mode dev, le serveur local lit et écrit **le Firestore de production** pour les compétitions, coachs et
+  éléments HelloAsso (les pages passent par l'API), quel que soit `MEMBER_BACKEND`.
 
 Desktop (Windows) : `install.bat` puis `run_pipeline.bat` / `Lancer_ALJ.vbs` (→ `src/app.py`).
 
@@ -275,7 +276,7 @@ QT_QPA_PLATFORM=offscreen python -m pytest tests/presentation/test_presentation_
 ```
 La CI lance les tests Qt **en processus séparés** (crashs natifs sinon) ; `ruff check src tests` et `mypy` (limité à `schema_v2.py` et `constants.py`) sont bloquants. Les tests de la couche web/API (`test_bureau_web`, `test_mobile_pwa`, `test_api_security`, `test_cloud_run_lot4`, `test_helloasso_webhook`) ne nécessitent pas Qt — ce sont les plus utiles pour la migration. `test_ffme_golden_master` nécessite un fichier de référence local non versionné.
 
-**Déploiement web** : `code_source/deploy_cloud_run.sh` (ou `.bat`) → `gcloud run deploy alj-escalade-api --source . --memory 1Gi --min-instances 0 --max-instances 2 --session-affinity --timeout 300 --allow-unauthenticated` (l'auth est applicative). Règles Firestore : `firebase deploy --only firestore:rules` (`firebase.json`). Guide : `docs/guide_deploiement_cloud_run_helloasso.md`.
+**Déploiement web** : `code_source/deploy_cloud_run.sh` (ou `.bat`) → `gcloud run deploy alj-escalade-api --source . --memory 1Gi --min-instances 0 --max-instances 2 --session-affinity --timeout 300 --allow-unauthenticated` (l'auth est applicative). Règles Firestore : `firebase deploy --only firestore:rules` (`firebase.json`), manuel et **séparé** du déploiement de l'application : refus total des clients, à déployer au moins une semaine après la version web qui ne lit plus Firestore (ordre et retour arrière : plan `plan_api_only_front.md`, S1). Guide : `docs/guide_deploiement_cloud_run_helloasso.md`.
 
 **Release desktop** : tag `vX.Y.Z` → GitHub Actions (Windows) → zip portable + `SHA256SUMS`. Le tag, `VERSION` et `APP_VERSION` doivent être identiques (`build_release_assets.py --check-tag`).
 
@@ -286,7 +287,7 @@ La CI lance les tests Qt **en processus séparés** (crashs natifs sinon) ; `ruf
 - **Documentation partiellement périmée** : `GEMINI.md` (racine et `code_source/`) décrit encore Tkinter, un fonctionnement 100 % Windows/Excel/Drive et des chemins de l'ancien poste. `docs/architecture_actuelle.md` et `docs/plan_migration.md` datent de la migration Tkinter→PySide6. `plan_architecture_cloud_mobile.md` annonce `APP_VERSION 2.3.0`, `512Mi`. `pyproject.toml` dit `2.0.5`. **Faire confiance au code et à `VERSION`, puis `base_firestore.md` et `plan_pages_web_bureau.md` (les plus récents).**
 - `GEMINI.md` impose une convention utile : scripts de diagnostic jetables dans `scripts_temporaires/` (ignoré par git), jamais à la racine.
 - **Duplication du front** : `competitions.html` (2700 lignes) et `index.html` dupliquent historiquement auth/style ; le portail `bureau/` utilise `shared/`. Ne pas dupliquer davantage.
-- **Admins codés en dur** (`api_auth.py` + `firestore.rules`) : à terme, passer par une collection de rôles.
+- **Admins codés en dur** (`api_auth.py` + copies d'affichage en JS) : à terme, passer par les custom claims Firebase.
 - **Qt/GC** : conserver des références Python sur les `QGraphicsTextItem` (`_text_items`) dans `PlanningWeekView`.
 - **Word COM** : toujours `Quit()` dans un `finally` (uniquement tant que le desktop existe).
 - **Exports FFME** : CSV strict (`;`, dates `jj/mm/aaaa`) ; le golden master doit rester vert ou être renouvelé avec accord du club.

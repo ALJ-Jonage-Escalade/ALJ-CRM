@@ -141,4 +141,9 @@ affichée. Le prochain déploiement en production renvoie le trafic sur la nouve
 - `firestore.rules` n'est **pas** déployé par ce script (`firebase deploy --only firestore:rules`) :
   les règles s'appliquent immédiatement à toute la production. Historique et retour arrière dans la
   console Firebase > Firestore > Rules.
+- Depuis la version web v23, `firestore.rules` **refuse tout client** (les pages passent par l'API).
+  Ne le déployer qu'**au moins une semaine après** la mise en production de la v23, et après avoir
+  vérifié dans la console GCP que les requêtes Firestore évaluées par les règles sont tombées à ~0 ;
+  sinon les PWA encore en v22 ou moins perdent l'accès. Retour arrière :
+  `git checkout <commit précédent> -- firestore.rules && firebase deploy --only firestore:rules`.
 - `deploy_cloud_run.bat` (Windows) ne fait qu'un déploiement en production, sans `--test` ni `--rollback`.

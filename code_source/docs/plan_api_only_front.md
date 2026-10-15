@@ -34,13 +34,14 @@ The plan file is updated with any decisions taken during a review. Nothing is co
 | 2 | Done (approved) | See « Phase 2 — as built » below. |
 | 3 | Done, awaiting review | Code only; nothing deployed. See « Phase 3 — as built » below for the deploy order. |
 | 4 | Not started | Cleanup backlog, filled during reviews |
+| 5 | Not started | Offline storage on the phone. O2 and O4 decided; O1 to confirm; O3 accepted in principle, conflict handling to analyse first (see « Phase 5 »). |
 
 ## Decisions taken (from review Q&A)
 
 | # | Decision | Consequence |
 |---|---|---|
 | D1 | **Updates:** polling with refetch, no Firestore listeners | Each screen polls every 20 s while visible, refetches on tab focus and right after the user's own write. ETag + 304 makes unchanged polls cheap. Other coaches' changes show up within about 20 s instead of instantly. |
-| D2 | **Offline:** read-only snapshot of **competitions + participants** only | Stored in `localStorage` per user, wiped on logout or loss of role. Write controls are disabled offline. The `/index` member directory becomes **online-only** (today it works offline). |
+| D2 | **Offline:** read-only snapshot of **competitions + participants** only | Stored in `localStorage` per user, wiped on logout or loss of role. Write controls are disabled offline. The `/index` member directory becomes **online-only** (today it works offline). **Reopened by phase 5** (offline must stay possible on the phone): D2 stays the rule for phases 0–3, and phase 5 extends it once O1–O4 are decided. |
 | D3 | **Cloud Run stays at min-instances 0** | A cold start rebuilds the SQLite cache before the first member-data answer. Competition routes are taken out of the SQLite middleware so they don't pay for it (see Side effects S3). |
 | D4 | **Pass-through fields:** `lieu`, `type` (competition) and `present` (participant) are kept, stored as-is, migrated later | The API accepts and stores them without validation. Tracked in **Appendix B**. |
 | D5 | **Competition writes need the coach role** | Bureau page checks that are admin-only today (create, edit, delete, "Participe", ✕) are relaxed to coach, matching the mobile page and the current rules. |
@@ -305,6 +306,147 @@ Consequences:
 - **Order.** Today "Coach 1" may implicitly mean the lead coach. Check with the club. If it matters, keep `position` / array order and show it. If not, drop `position`.
 
 **Out of scope until decided.** A lead-coach role, or other per-link attributes (e.g. driver, judge). These would justify Firestore link documents instead of an id array.
+
+### Phase 5 — Offline storage on the phone (after phase 3)
+
+**Why.** The phone pages must keep working without network: in a gym, at a competition venue, in a car. Up to v22 the Firestore SDK handled this on its own: an IndexedDB copy of every collection, and writes queued and sent when the network came back. Phase 3 removes the SDK and wipes that copy. D2 then keeps only a small read-only snapshot. This phase gives the phone a deliberate local store in its place, with clear limits on what is kept.
+
+**Offline today, after phase 3.**
+
+| Data | Stored on the phone | Without network |
+|---|---|---|
+| Competitions + participants (`/api/competitions`) | `localStorage` snapshot (`alj_snapshot:competitions`), per user, wiped on logout | Shown, read-only |
+| Coaches (`/api/coaches`) | same (`alj_snapshot:coaches`) | Shown |
+| Competition member list (`/api/competition-members`) | **No** | Search and "add a member" are empty. Participant names still show, because they are copied into the participants. |
+| HelloAsso items (`/api/helloasso/items`, coach) | **No** | Matching screen empty |
+| Member directory (`/index`, `/api/members`) | **No** (D2) | Page unusable |
+| Writes (select, present, payment, cancel…) | — | **Refused** with a toast (`apiWrite`) |
+
+**Lost compared with v22:**
+- The directory offline.
+- The competition member list and HelloAsso items offline.
+- Changes made offline, which the SDK used to send later.
+
+**Limits of the current snapshot:**
+- `localStorage` is synchronous and holds strings only.
+- It is capped at about 5 MB per origin, shared by every resource. A failed save is silently ignored (`quota exceeded`), so old data stays on screen.
+- There is no maximum age.
+- Nothing is stored when the user loses their role while offline, because the 401/403 only arrives online.
+
+#### Decisions
+
+| # | Question | Options | Recommendation / decision |
+|---|---|---|---|
+| O1 | What does the phone keep? | (a) As D2: competitions + coaches. (b) Plus the competition member list (names, licence, category) and HelloAsso items for coaches. (c) Plus the directory, active season only. | Recommended: **(b), plus (c) with a reduced field set** (see O2). (b) restores the competition workflow offline at little privacy cost. **To confirm.** The O2 answer (emergency numbers offline) implies (c), the directory offline. Whether (b) is wanted is not yet stated. |
+| O2 | Which member fields go into the offline directory? | (a) Everything `/api/members` returns, including health, emergency contacts and addresses of minors. (b) Contact fields only: name, phone, e-mail, slot group, emergency contacts. (c) Names and slot group only. | **Decided (2026-10-15): (b), emergency numbers included.** Offline fields: `last_name`, `first_name`, `phone`, `email_primary`, `creneau_groupe`, `emergency1_name`, `emergency1_phone`, `emergency2_name`, `emergency2_phone`. Emergency contacts are the main reason to look someone up in a gym. Health data (`health_commitment`, `document_sante`) and addresses stay online only. The server returns this subset through `GET /api/members?season=&view=offline`, so the phone never receives the other fields. |
+| O3 | Offline writes? | (a) None: read-only offline, as today. (b) A queue for **participant flags only** (selection, presence), sent when the network returns. (c) A queue for every write. | **(b).** These are the actions a coach takes at a venue. They set a value, so a resend repeats the same result. Payments, cancellations, HelloAsso links and competition edits stay online only: they carry money, or rules (`already_paid`, `already_linked`) that need the current server state. **Accepted in principle (2026-10-15), not ready to implement:** conflict handling must be analysed first. See « Conflict handling — notes for later analysis » below. |
+| O4 | How long does local data live? | (a) Until logout. (b) Plus a maximum age. | **Decided (2026-10-15): (b), 30 days**, then the store is dropped and the page asks to reconnect. Limits what a lost phone exposes. |
+
+#### Design (decided points, plus the recommendations still open)
+
+1. **Store: IndexedDB instead of `localStorage`.** New classic script `web/shared/alj-store.js` (`window.ALJStore`), with no library:
+   - It is asynchronous, holds structured data, and its quota is far larger than `localStorage`.
+   - One database `alj-offline`, with three object stores:
+     - `resources`: key `name`, value `{uid, savedAt, etag, data}`;
+     - `outbox`: the queued writes (see 3);
+     - `meta`: the store version and the `uid` of the owner.
+   - API: `load(name, uid)`, `save(name, uid, data, etag)`, `clearAll()`, `ageOf(name)`. The interface stays close to `ALJSync.snapshot` so callers barely change.
+   - `ALJSync.poll` saves the ETag with the data. A page can then restart from the store and send `If-None-Match` on its first poll.
+   - Migration: on first start, read the old `alj_snapshot:*` keys into IndexedDB, then delete them.
+   - Fallback: if IndexedDB is unavailable (some private windows), nothing is stored and the page behaves as online-only, as `localStorage` failures do today.
+2. **What is stored.**
+   - PWA competitions page: `competitions`, `coaches`, `competition-members`, and `helloasso` for coaches (O1 b).
+   - Directory: one entry per season viewed, `members:<season>`, using the reduced view (O2 b).
+   - Both pages show the « 📴 Hors ligne — données du … » banner with the age of the data.
+3. **Offline write queue (O3 b).** Only `PATCH /api/competitions/{id}/participants/{aid}` with `{selectionne}` or `{present}`:
+   - ⚠️ Pending the conflict analysis below. The steps here assume last writer wins, except for K4. Option 2 (compare-and-set) would add `expected` to each queued entry and a `409 conflict` case.
+   - Offline, `apiWrite` updates the screen at once and adds `{id, method, url, body, queuedAt, uid}` to `outbox`.
+   - A second change to the same participant and flag **replaces** the queued one. Only the last value is sent.
+   - The header shows « ⏳ N modification(s) à envoyer », like the desktop app.
+   - When back online (the `online` event, or the first poll that succeeds), the queue is sent oldest first, then the page reloads (`syncNow`).
+   - On a `409 already_paid`, the queued unselect is dropped and the user is told. Paid participants go through the cancel flow, which needs the network.
+   - On another 4xx, the change is dropped and shown in a list of « modifications refusées ».
+   - On 5xx or no network, the change stays queued and is retried later.
+   - Server: no change needed for these two flags. If other writes join the queue later, the API needs an `Idempotency-Key` header, so a request that was sent but whose answer was lost isn't applied twice (manual payment, for example).
+   - Every other write keeps today's offline refusal.
+4. **Lifecycle and privacy.**
+   - Wipe the whole store (resources and outbox) in each of these cases:
+     - logout;
+     - a 401 or 403 on a poll (loss of role);
+     - a different `uid` signing in on the same phone;
+     - data older than 30 days (O4).
+   - Before wiping a non-empty outbox, warn: « N modification(s) non envoyée(s) seront perdues ».
+   - Call `navigator.storage.persist()` once after sign-in. It asks the browser not to evict the store under storage pressure; the browser may refuse.
+   - **iOS Safari** deletes script-written storage of a site after 7 days without a visit, unless the PWA was added to the home screen. Document in the user help: « ajouter à l'écran d'accueil » for coaches who need offline access.
+   - The service worker keeps caching only the app shell. API answers are never cached by the SW (`no-store`), so personal data lives only in the store, where it can be wiped.
+   - Bureau pages (desktop) keep no offline store.
+5. **Tests.**
+   - **Python static tests:**
+     - only `alj-store.js` opens IndexedDB;
+     - no `alj_snapshot:` write is left after the migration;
+     - the outbox accepts only the participant flag route;
+     - logout and 401/403 call `ALJStore.clearAll()`.
+   - **API tests:**
+     - `view=offline` returns only the agreed fields;
+     - replaying the same flag `PATCH` twice gives the same result;
+     - `409 already_paid` on a replayed unselect.
+   - **Manual tests on a phone** (DevTools offline mode, then a real Android and iPhone):
+     - start offline after a first online visit;
+     - make changes offline, come back online, and check they arrive;
+     - the conflict case;
+     - logout wipes everything;
+     - data older than 30 days;
+     - 7 days without a visit on iOS, with and without the home-screen install.
+6. **Docs.** `ARCHITECTURE.md` §5, `docs/base_firestore.md` (directory), the user help on the phone pages, and S9 (personal data) in this plan.
+
+**Side effects.**
+- **Personal data on phones comes back, on purpose and limited.** It is the active season's contact fields only, not every season with health data as in v22. It is wiped on logout, on loss of role and after 30 days. Record it in the club's GDPR register.
+- **Conflicts.** Without extra work, a queued flag sent hours later overwrites a change made online in the meantime (last writer wins, as for competition metadata today, S5). This is not settled: see the notes below.
+- **D2 changes.** Once O1 and O3 are settled, rewrite D2 in the decisions table.
+
+#### Conflict handling — notes for later analysis
+
+To settle before implementing the queue (O3). Nothing here is decided.
+
+**Situations to cover.** Coach A changes a flag offline at 10:00. The queue is sent at 14:00. Meanwhile:
+
+| # | What happened on the server | Today (if the queue just sends the value) | Wanted (to confirm) |
+|---|---|---|---|
+| K1 | Nothing | Applied | Applied |
+| K2 | Coach B set the **same** value | Applied, no visible effect | Applied, silently |
+| K3 | Coach B set the **opposite** value (on the phone, the bureau page or the desktop app) | A's older change silently overwrites B's newer one (**lost update**) | Detect it and ask A (keep mine / keep the server's) |
+| K4 | The participant paid (HelloAsso webhook, manual payment) and A's queued change unselects them | 409 `already_paid` (refuse rule of `set_selection`) | Drop it, show « payé entre-temps : passer par l'annulation » |
+| K5 | The participant was removed, or the competition deleted | 404 | Drop it, list it under « modifications refusées » |
+| K6 | The competition was archived or closed | Applied (the API doesn't check) | Decide: refuse writes on a closed competition? |
+| K7 | A lost the coach role | 403 | Drop the queue and wipe the store (see design §4) |
+| K8 | A queued the same flag on two of their own devices | Last one sent wins | Same as K3 between the two devices |
+| K9 | The request reached the server but the answer was lost (network cut) | Resent; harmless for a flag | Harmless for flags; other writes would need `Idempotency-Key` |
+
+**Options to compare:**
+1. **Last writer wins.** No server change. K3 loses B's change without anyone knowing. This is the simplest, and it is what v22 did with the Firestore SDK queue.
+2. **Compare-and-set on the flag value** (leading candidate).
+   - The queued entry keeps the value A saw: `{selectionne: false, expected: true}`.
+   - The server applies the change only if the current value still equals `expected`. It is a no-op if the value already equals the new one (K2). Otherwise it answers `409 conflict` with the current value and who changed it (K3).
+   - It fits the existing optimistic lock (`_update_participant`, `updateTime` precondition and retries): the check happens inside the `change` callback.
+   - `expected` is optional, so online writes and the desktop app keep today's behaviour.
+3. **Version per participant.** Each participant row gets `rev` (or `modified_at`). The queue sends `If-Match: <rev>` and any change to the row is a conflict, even on another field.
+   - Stricter, but a payment arriving on the same row would block an unrelated presence flag (false conflict).
+   - It needs `rev` maintained by every writer, including old desktop builds that write Firestore directly.
+4. **Field-level merge or CRDT.** Overkill for two booleans.
+5. **Client timestamps** (« the most recent change wins »). Rejected: phone clocks are unreliable, and the change made later on the server is not necessarily the newer one.
+
+**Open questions:**
+- **Data.** Store `modified_at` / `modified_by` per participant flag, so a conflict can show « changé par B à 11:20 »? That needs every writer to set them; the desktop app writes Firestore directly (S2).
+- **Desktop app.** It writes Firestore directly and would not send `expected`. Is last-writer-wins acceptable for its changes, or does the check move into the repository so every writer gets it?
+- **UX.**
+  - Where conflicts are shown: a banner « N modification(s) en conflit », with a screen listing each one and « garder la mienne / garder celle du serveur »?
+  - What happens if the user never resolves them?
+  - When the queue is sent: automatically, or with a confirmation if it is older than X hours?
+- **Order and batching.** Send oldest first, one request per entry? A batch route (`POST /api/competitions/{id}/participants:batch`) would cut round trips on venue networks, but the server must then report a result per entry.
+- **Other writes later.** If cancellations or payments ever join the queue, they need `Idempotency-Key` (K9) and conflict rules of their own (money). Out of scope for now.
+- **Club usage.** How often do two coaches really work on the same competition at the same time? If rarely, option 2 with a simple « refusée : valeur changée entre-temps » message may be enough, without a resolve screen.
+- **Tests to plan.** One API test per situation K1–K9. On a phone: two devices offline making opposite changes, then back online in both orders.
+- **Order.** Independent of the rules lockdown (phase 3, step 7). It can ship before or after the rules deploy. Shipping it first shortens the time phones spend without an offline directory.
 
 ## Front-end changes per page
 
