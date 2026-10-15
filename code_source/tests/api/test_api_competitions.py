@@ -15,8 +15,7 @@ class TestCompetitions(ApiTestCase):
         self.fake.upsert_document("coaches", "7", {"id": 7, "nom": "Alice"})
         doc = self.create(id_ffme="18846", date_competition="2026-03-15", prix=15,
                           coach_ids=[7], lieu="Lyon", type="Bloc")
-        self.assertEqual(doc["coaches"], ["Alice"])
-        self.assertEqual(doc["coach1_id"], 7)
+        self.assertEqual((doc["coach_ids"], doc["coaches"]), ([7], ["Alice"]))
         self.assertEqual((doc["lieu"], doc["type"]), ("Lyon", "Bloc"))  # pass-through fields
         self.assertEqual(doc["participants"], [])
         self.assertNotIn("_update_time", doc)
@@ -27,8 +26,18 @@ class TestCompetitions(ApiTestCase):
         again = self.client.get("/api/competitions", headers={"If-None-Match": r.headers["etag"]})
         self.assertEqual(again.status_code, 304)
 
+    def test_any_number_of_coaches(self):
+        """No 3-coach limit; duplicates dropped, order kept (plan cleanup C2)."""
+        for i in range(1, 6):
+            self.fake.upsert_document("coaches", str(i), {"id": i, "nom": f"Coach {i}"})
+        doc = self.create(coach_ids=[5, 1, 4, 1, 2, 3])
+        self.assertEqual(doc["coach_ids"], [5, 1, 4, 2, 3])
+        self.assertEqual(doc["coaches"], ["Coach 5", "Coach 1", "Coach 4", "Coach 2", "Coach 3"])
+        r = self.client.patch(f"/api/competitions/{doc['id']}", json={"coach_ids": [3]})
+        self.assertEqual(r.json()["coach_ids"], [3])
+
     def test_create_validation(self):
-        for body in ({"nom": "  "}, {"nom": "A", "coach_ids": [1, 2, 3, 4]},
+        for body in ({"nom": "  "}, {"nom": "A", "coach_ids": ["x"]},
                      {"nom": "A", "statut": "inconnu"}, {"nom": "A", "date_competition": "15/03/2026"},
                      {"nom": "A", "prix": -1}, {"nom": "A", "champ_inconnu": 1}):
             self.assertEqual(self.client.post("/api/competitions", json=body).status_code, 422, body)

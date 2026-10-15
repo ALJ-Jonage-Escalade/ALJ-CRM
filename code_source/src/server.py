@@ -1398,11 +1398,11 @@ def get_email_status():
 @app.post("/api/send-email")
 def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
     """Déclenche l'envoi d'e-mails sécurisé via Gmail API ou SMTP avec injection de variables."""
-    from infrastructure.api_auth import has_role
+    from infrastructure.api_auth import Role, has_role
     claims = getattr(request.state, "user", None)  # None: token check off (local desktop server)
     reason = EmailDispatchService.unauthorized_send_reason(
         data.get("recipients"), data.get("sender_email"),
-        is_admin=claims is None or has_role(claims, "admin"))
+        is_admin=claims is None or has_role(claims, Role.ADMIN))
     if reason:
         return JSONResponse(status_code=403, content={"status": "error", "message": reason})
     try:

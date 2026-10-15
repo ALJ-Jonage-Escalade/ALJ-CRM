@@ -60,6 +60,7 @@ def prepare_firestore_data(season_filter: Optional[str] = None) -> Dict[str, Dic
         # A. Compétitions et Participants
         comps = conn_comp.execute("SELECT * FROM competitions ORDER BY date_competition DESC, id DESC").fetchall()
         coaches_dict = {r["id"]: r["nom"] for r in conn_comp.execute("SELECT id, nom FROM coaches").fetchall()}
+        coach_ids_by_comp = CompetitionRepository.coach_ids_by_competition(conn_comp)
 
         # Référentiel des coachs (collection dédiée pour l'édition PWA)
         coaches_docs: Dict[str, Dict[str, Any]] = {}
@@ -113,8 +114,7 @@ def prepare_firestore_data(season_filter: Optional[str] = None) -> Dict[str, Dic
         competitions_docs: Dict[str, Dict[str, Any]] = {}
         for c in comps:
             cid = c["id"]
-            c_keys = c.keys()
-            coach_ids = [c[f"coach{i}_id"] for i in (1, 2, 3) if f"coach{i}_id" in c_keys and c[f"coach{i}_id"]]
+            coach_ids = coach_ids_by_comp.get(cid, [])
             coach_names = [coaches_dict.get(cid_) for cid_ in coach_ids]
 
             parts = parts_by_comp.get(cid, [])

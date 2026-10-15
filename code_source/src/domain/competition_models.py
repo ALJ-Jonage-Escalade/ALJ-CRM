@@ -4,13 +4,35 @@ Modèles métier du module de gestion des compétitions (base partagée Firestor
 Ces modèles sont purs (aucune dépendance Qt / réseau) afin d'être réutilisables
 par l'application de bureau, le serveur web et les tests unitaires.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any, List, Mapping
 
 # Statuts possibles d'une compétition (cycle de vie)
 STATUT_EN_PREPARATION = "en_preparation"
 STATUT_EN_COURS = "en_cours"
 STATUT_CLOSE = "close"
 STATUTS_COMPETITION = (STATUT_EN_PREPARATION, STATUT_EN_COURS, STATUT_CLOSE)
+
+# Coach slots written by versions before plan cleanup C2. Still read, so documents and
+# rows written by an older desktop build keep their coaches; still written to Firestore
+# for those builds until every club PC runs the new version (plan C2, step B).
+LEGACY_COACH_SLOTS = ("coach1_id", "coach2_id", "coach3_id")
+
+
+def coach_ids_of(row: Mapping[str, Any]) -> List[int]:
+    """Ordered, distinct coach ids of a stored competition: `coach_ids`, or else the
+    legacy slots `coach1_id..coach3_id`."""
+    raw = row.get("coach_ids") or [row.get(slot) for slot in LEGACY_COACH_SLOTS]
+    ids: List[int] = []
+    for cid in raw:
+        try:
+            cid = int(cid)
+        except (TypeError, ValueError):
+            continue
+        if cid not in ids:
+            ids.append(cid)
+    return ids
+
 
 LIBELLES_STATUT_COMPETITION = {
     STATUT_EN_PREPARATION: "En préparation",
@@ -82,9 +104,7 @@ class Competition:
     helloasso_ref: str = ""          # slug ou URL de la campagne HelloAsso dédiée
     created_at: str = ""
     updated_at: str = ""
-    coach1_id: int = None
-    coach2_id: int = None
-    coach3_id: int = None
+    coach_ids: List[int] = field(default_factory=list)  # ordered, no length limit
     url_resultats: str = ""
     resultats_synced_at: str = ""
     whatsapp_link: str = ""          # Lien d'invitation au groupe WhatsApp de la compétition
@@ -104,9 +124,7 @@ class Competition:
             "helloasso_ref": self.helloasso_ref,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
-            "coach1_id": self.coach1_id,
-            "coach2_id": self.coach2_id,
-            "coach3_id": self.coach3_id,
+            "coach_ids": list(self.coach_ids),
             "url_resultats": self.url_resultats,
             "resultats_synced_at": self.resultats_synced_at,
             "whatsapp_link": self.whatsapp_link,
@@ -125,9 +143,7 @@ class Competition:
             helloasso_ref=str(row.get("helloasso_ref") or ""),
             created_at=str(row.get("created_at") or ""),
             updated_at=str(row.get("updated_at") or ""),
-            coach1_id=row.get("coach1_id"),
-            coach2_id=row.get("coach2_id"),
-            coach3_id=row.get("coach3_id"),
+            coach_ids=coach_ids_of(row),
             url_resultats=str(row.get("url_resultats") or ""),
             resultats_synced_at=str(row.get("resultats_synced_at") or ""),
             whatsapp_link=str(row.get("whatsapp_link") or ""),

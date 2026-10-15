@@ -63,11 +63,26 @@ class TestCompetitionsCrud(FirestoreRepoTestCase):
         self.assertEqual(Repo.get_competition(comp_id).statut, "en_cours")
 
     def test_coach_fields_roundtrip(self):
-        cid = Repo.save_coach("Adrien BERGER")
-        comp_id = Repo.save_competition(Competition(nom="Épreuve", coach1_id=cid))
-        got = Repo.get_competition(comp_id)
-        self.assertEqual(got.coach1_id, cid)
-        self.assertIsNone(got.coach2_id)
+        ids = [1, 2, 3, 4]  # fixed ids: _new_id() repeats within a millisecond (A30)
+        for cid, nom in zip(ids, "ABCD", strict=True):
+            Repo.save_coach(nom, coach_id=cid)
+        comp_id = Repo.save_competition(Competition(nom="Épreuve", coach_ids=ids[::-1]))
+        self.assertEqual(Repo.get_competition(comp_id).coach_ids, ids[::-1])  # no limit, order kept
+        doc = self.fake.store["competitions"][str(comp_id)]
+        # Copies for desktop builds older than plan C2: first three slots and the names
+        self.assertEqual((doc["coach1_id"], doc["coach2_id"], doc["coach3_id"]), tuple(ids[::-1][:3]))
+        self.assertEqual(doc["coaches"], ["D", "C", "B", "A"])
+
+    def test_legacy_coach_slots_read(self):
+        """A document from an older version, with only coach1_id..coach3_id."""
+        a, b = Repo.save_coach("A", coach_id=1), Repo.save_coach("B", coach_id=2)
+        self.fake.upsert_document("competitions", "5", {"id": 5, "nom": "Ancienne",
+                                                        "coach1_id": b, "coach2_id": None, "coach3_id": a,
+                                                        "coaches": ["nom périmé"]})
+        self.assertEqual(Repo.get_competition(5).coach_ids, [b, a])
+        doc = Repo.get_competition_doc(5)
+        self.assertEqual((doc["coach_ids"], doc["coaches"]), ([b, a], ["B", "A"]))  # names resolved
+        self.assertEqual([c.id for c in Repo.list_competitions_for_coach(a)], [5])
 
     def test_legacy_doc_normalized_on_read(self):
         """Un document hérité (ID Firestore aléatoire) est recopié vers str(id)."""
@@ -205,7 +220,7 @@ class TestCoaches(FirestoreRepoTestCase):
         self.assertEqual(Repo.get_coach(cid)["nom"], "Adrien BERGER")
         self.assertEqual([c["nom"] for c in Repo.list_coaches()], ["Adrien BERGER"])
 
-        comp_id = Repo.save_competition(Competition(nom="Épreuve", coach1_id=cid))
+        comp_id = Repo.save_competition(Competition(nom="Épreuve", coach_ids=[cid]))
         self.assertEqual([c.id for c in Repo.list_competitions_for_coach(cid)], [comp_id])
         self.assertEqual([c.id for c in Repo.list_competitions_for_coach(9999)], [])
 
@@ -216,7 +231,8 @@ class TestCoaches(FirestoreRepoTestCase):
         self.assertTrue(Repo.delete_coach(cid))
         comp_doc = self.fake.store["competitions"][str(comp_id)]
         self.assertEqual(comp_doc["coach_ids"], [])
-        self.assertEqual(Repo.get_competition(comp_id).coach1_id, None)
+        self.assertEqual(Repo.get_competition(comp_id).coach_ids, [])
+        self.assertIsNone(comp_doc["coach1_id"])
 
 
 class TestHelloAssoMirror(FirestoreRepoTestCase):

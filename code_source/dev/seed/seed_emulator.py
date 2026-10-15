@@ -276,7 +276,8 @@ def seed_competitions(coach_ids):
     base_id = int(datetime.datetime(today.year, today.month, today.day).timestamp() * 1000)
     for i, (name, date, price, status, ha_ref, coach1, coach2) in enumerate(specs):
         comp = Competition(id=base_id + i, nom=name, date_competition=date.isoformat(), prix=price,
-                           statut=status, helloasso_ref=ha_ref, coach1_id=coach1, coach2_id=coach2)
+                           statut=status, helloasso_ref=ha_ref,
+                           coach_ids=[c for c in (coach1, coach2) if c is not None])
         comp_id = Repo.save_competition(comp)
         for member_id in rng.sample(competitors, k=min(len(competitors), rng.randint(4, 9))):
             Repo.add_participant(comp_id, member_id, selectionne=rng.random() < 0.8)

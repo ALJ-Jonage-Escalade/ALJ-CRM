@@ -27,6 +27,7 @@ from fastapi.testclient import TestClient
 
 import helloasso_api
 from infrastructure import api_auth
+from infrastructure.api_auth import Role
 from infrastructure.helloasso_webhook_service import HelloAssoWebhookService
 from server import app
 
@@ -84,46 +85,52 @@ class TestRoles(unittest.TestCase):
         self.assertIsNone(r("OPTIONS", "/api/send-email"))
         for path in ("/api/send-email", "/api/helloasso/sync", "/api/email-status", "/api/dashboard",
                      "/map", "/pivot", "/docs", "/openapi.json", "/api/une-route-future"):
-            self.assertEqual(r("GET", path), "coach", path)
-        self.assertEqual(r("POST", "/api/planning"), "admin")
-        self.assertEqual(r("GET", "/api/planning"), "coach")
-        self.assertEqual(r("GET", "/annuaire-pirate"), "coach")
+            self.assertEqual(r("GET", path), Role.COACH, path)
+        self.assertEqual(r("POST", "/api/planning"), Role.ADMIN)
+        self.assertEqual(r("GET", "/api/planning"), Role.COACH)
+        self.assertEqual(r("GET", "/annuaire-pirate"), Role.COACH)
 
     def test_readonly_reads(self):
         """Competition views are readable by readonly; their writes and every other route are not."""
         r = api_auth.required_role
         for path in ("/api/competitions", "/api/competitions/123", "/api/coaches",
                      "/api/competition-members"):
-            self.assertEqual(r("GET", path), "readonly", path)
-            self.assertEqual(r("HEAD", path), "readonly", path)
+            self.assertEqual(r("GET", path), Role.READONLY, path)
+            self.assertEqual(r("HEAD", path), Role.READONLY, path)
         for method in ("POST", "PUT", "PATCH", "DELETE"):
-            self.assertEqual(r(method, "/api/competitions/123"), "coach", method)
-            self.assertEqual(r(method, "/api/coaches"), "coach", method)
+            self.assertEqual(r(method, "/api/competitions/123"), Role.COACH, method)
+            self.assertEqual(r(method, "/api/coaches"), Role.COACH, method)
         for path in ("/api/competitions-pirate", "/api/members", "/api/helloasso/items",
                      "/api/email-templates"):
-            self.assertEqual(r("GET", path), "coach", path)
+            self.assertEqual(r("GET", path), Role.COACH, path)
         for method, path in (("POST", "/api/competitions/archive-past"),
                              ("POST", "/api/competitions/1/participants/2/cancel"),
                              ("POST", "/api/competitions/1/load-group"),
                              ("PUT", "/api/helloasso/items/5/link"),
                              ("PUT", "/api/helloasso/items/5/ignore")):
-            self.assertEqual(r(method, path), "coach", path)
+            self.assertEqual(r(method, path), Role.COACH, path)
 
-    def test_roles_for_claims(self):
-        f = api_auth.roles_for_claims
-        self.assertEqual(f({"email": "Bureau@ALJ-Escalade.fr", "email_verified": True}),
-                         {"admin", "coach"})
-        self.assertEqual(f({"email": "lopez.dav@gmail.com", "email_verified": True}), {"admin", "coach"})
-        self.assertEqual(f({"email": "stephane.loridant@orange.fr", "email_verified": True}), {"coach"})
-        self.assertEqual(f({"email": "muah.did@gmail.com", "email_verified": True}), {"readonly"})
-        self.assertEqual(f({"email": "inconnu@gmail.com", "email_verified": True}), set())
+    def test_role_for_claims(self):
+        f = api_auth.role_for_claims
+        self.assertEqual(f({"email": "Bureau@ALJ-Escalade.fr", "email_verified": True}), Role.ADMIN)
+        self.assertEqual(f({"email": "lopez.dav@gmail.com", "email_verified": True}), Role.ADMIN)
+        self.assertEqual(f({"email": "stephane.loridant@orange.fr", "email_verified": True}), Role.COACH)
+        self.assertEqual(f({"email": "muah.did@gmail.com", "email_verified": True}), Role.READONLY)
+        self.assertIsNone(f({"email": "inconnu@gmail.com", "email_verified": True}))
         # Adresse non vérifiée : aucun rôle par e-mail
-        self.assertEqual(f({"email": "x@alj-escalade.fr", "email_verified": False}), set())
-        # Custom claims
-        self.assertEqual(f({"email": "a@b.c", "coach": True}), {"coach"})
-        self.assertEqual(f({"admin": True}), {"admin", "coach"})
-        self.assertTrue(api_auth.has_role({"admin": True}, "coach"))
-        self.assertFalse(api_auth.has_role({"readonly": True}, "coach"))
+        self.assertIsNone(f({"email": "x@alj-escalade.fr", "email_verified": False}))
+        # Custom claims; the highest level wins
+        self.assertEqual(f({"email": "a@b.c", "coach": True}), Role.COACH)
+        self.assertEqual(f({"admin": True}), Role.ADMIN)
+        self.assertEqual(f({"readonly": True, "coach": True}), Role.COACH)
+
+    def test_has_role_follows_the_hierarchy(self):
+        self.assertTrue(api_auth.has_role({"admin": True}, Role.COACH))
+        self.assertTrue(api_auth.has_role({"coach": True}, Role.READONLY))
+        self.assertFalse(api_auth.has_role({"readonly": True}, Role.COACH))
+        self.assertFalse(api_auth.has_role({"email": "inconnu@gmail.com", "email_verified": True}, Role.READONLY))
+        self.assertLess(Role.READONLY, Role.COACH)
+        self.assertLess(Role.COACH, Role.ADMIN)
 
     def test_rules_hold_no_role_list(self):
         """firestore.rules denies every client: roles live in api_auth.py only (plan phase 3)."""

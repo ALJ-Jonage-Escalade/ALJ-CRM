@@ -246,25 +246,9 @@
         </div>
       </div>
       
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top:2px">
-        <div>
-          <label class="fld">Coach 1</label>
-          <select id="f-coach1">
-            <option value="">Aucun</option>
-          </select>
-        </div>
-        <div>
-          <label class="fld">Coach 2</label>
-          <select id="f-coach2">
-            <option value="">Aucun</option>
-          </select>
-        </div>
-        <div>
-          <label class="fld">Coach 3</label>
-          <select id="f-coach3">
-            <option value="">Aucun</option>
-          </select>
-        </div>
+      <div style="margin-top:2px">
+        <label class="fld">Coachs</label>
+        <div id="f-coaches" style="display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:4px"></div>
       </div>
       <div class="btn-row" id="f-btns" style="display:none">
         <button class="btn btn-primary" id="f-update">💾 Mettre à jour</button>
@@ -1025,15 +1009,18 @@ const PAIEMENT_BADGE = {
   annule_perdu: "#DC2626", annule_reporte: "#7C3AED"
 };
 
-function populateCoachDropdowns() {
-  const sorted = coaches.slice().sort((a, b) => String(a.nom || "").localeCompare(String(b.nom || ""), "fr"));
-  const options = '<option value="">Aucun</option>' + sorted.map(c => `<option value="${c.id}">${esc(c.nom)}</option>`).join("");
-  // Rebuilt on every Firestore snapshot (renderAll): keep the choice of an open form, unless that coach is gone
-  for (const id of ["#f-coach1", "#f-coach2", "#f-coach3"]) {
-    const sel = $(id), kept = sel.value;
-    sel.innerHTML = options;
-    if (coaches.some(c => String(c.id) === kept)) sel.value = kept;
-  }
+/* Coach checkboxes, any number (plan cleanup C2): the competition's coaches first, in
+   their saved order (kept on save), then the others by name. */
+function populateCoachChoices(selectedIds = []) {
+  const byId = new Map(coaches.map(c => [String(c.id), c]));
+  const selected = selectedIds.map(String).filter(id => byId.has(id));
+  const others = coaches.filter(c => !selected.includes(String(c.id)))
+    .sort((a, b) => String(a.nom || "").localeCompare(String(b.nom || ""), "fr"));
+  const box = (c, checked) => `<label style="display:flex; align-items:center; gap:5px; font-size:13px">`
+    + `<input type="checkbox" class="f-coach" value="${esc(c.id)}"${checked ? " checked" : ""}> ${esc(c.nom)}</label>`;
+  $("#f-coaches").innerHTML = selected.map(id => box(byId.get(id), true)).join("")
+    + others.map(c => box(c, false)).join("")
+    || '<span class="muted" style="font-size:12.5px">Aucun coach enregistré.</span>';
 }
 function currentCompId() {
   const sel = $("#p-comp-select");
@@ -1134,11 +1121,7 @@ function openEdit(id) {
   $("#f-prix").value = c.prix != null ? c.prix : 0;
   $("#f-statut").value = c.statut || "en_preparation";
   $("#f-whatsapp").value = c.whatsapp_link || "";
-  populateCoachDropdowns();
-  const ids = c.coach_ids || [];
-  $("#f-coach1").value = ids[0] != null ? String(ids[0]) : "";
-  $("#f-coach2").value = ids[1] != null ? String(ids[1]) : "";
-  $("#f-coach3").value = ids[2] != null ? String(ids[2]) : "";
+  populateCoachChoices(c.coach_ids || []);
   $("#f-btns").style.display = "flex";
   $("#f-btns-new").style.display = "none";
   setCompFormOpen(true);
@@ -1196,18 +1179,13 @@ function resetCompForm() {
   $("#f-form-title").textContent = "➕ Nouvelle compétition";
   $("#f-nom").value = ""; $("#f-idffme").value = ""; $("#f-date").value = ""; $("#f-date-fin").value = ""; finAuto = true;
   $("#f-prix").value = ""; $("#f-statut").value = "en_preparation"; $("#f-whatsapp").value = "";
-  populateCoachDropdowns();
-  $("#f-coach1").value = "";
-  $("#f-coach2").value = "";
-  $("#f-coach3").value = "";
+  populateCoachChoices();
   $("#f-btns").style.display = "none";
   $("#f-btns-new").style.display = "flex";
   setCompFormOpen(false);
 }
 function readCoachSelection() {
-  return ["#f-coach1", "#f-coach2", "#f-coach3"]
-    .map(sel => $(sel).value ? Number($(sel).value) : null)
-    .filter(v => v !== null);
+  return Array.from(document.querySelectorAll("#f-coaches input.f-coach:checked"), el => Number(el.value));
 }
 function compFormBody() {
   return {
@@ -1560,7 +1538,7 @@ function renderCoachesPage() {
     </div>
   `).join("") || `<div class="empty">Aucun coach enregistré.</div>`;
   
-  populateCoachDropdowns();
+  populateCoachChoices(readCoachSelection());  // a poll must not untick the open form
 }
 
 function openEditCoach(id) {

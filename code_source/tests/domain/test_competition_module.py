@@ -415,14 +415,21 @@ class TestCompetitionRepository(unittest.TestCase):
         self.assertEqual(coach["nom"], "Coach Modifie")
 
         # Assign coaches to competition
-        comp = Competition(nom="Compet Coachs", coach1_id=1, coach2_id=2, coach3_id=coach_id)
+        # Any number of coaches, in the order given (plan cleanup C2)
+        coach_4 = self.repo.save_coach("Quatrième Coach")
+        comp = Competition(nom="Compet Coachs", coach_ids=[coach_id, 1, 2, coach_4])
         comp_id = self.repo.save_competition(comp)
         self.assertTrue(comp_id)
 
         loaded = self.repo.get_competition(comp_id)
-        self.assertEqual(loaded.coach1_id, 1)
-        self.assertEqual(loaded.coach2_id, 2)
-        self.assertEqual(loaded.coach3_id, coach_id)
+        self.assertEqual(loaded.coach_ids, [coach_id, 1, 2, coach_4])
+        self.assertEqual([c.nom for c in self.repo.list_competitions()], ["Compet Coachs"])
+        self.assertEqual(self.repo.list_competitions()[0].coach_ids, [coach_id, 1, 2, coach_4])
+
+        # Saving again replaces the list
+        loaded.coach_ids = [2, coach_id]
+        self.repo.save_competition(loaded)
+        self.assertEqual(self.repo.get_competition(comp_id).coach_ids, [2, coach_id])
 
         # List competitions for coach
         comps_for_coach = self.repo.list_competitions_for_coach(coach_id)
@@ -431,11 +438,33 @@ class TestCompetitionRepository(unittest.TestCase):
 
         # Delete coach
         self.assertTrue(self.repo.delete_coach(coach_id))
-        self.assertEqual(len(self.repo.list_coaches()), 3)
+        self.assertEqual(len(self.repo.list_coaches()), 4)
 
-        # Verify coach3_id is set to null in the competition (foreign key ON DELETE SET NULL)
-        loaded_after_delete = self.repo.get_competition(comp_id)
-        self.assertIsNone(loaded_after_delete.coach3_id)
+        # The link goes with the coach (foreign key ON DELETE CASCADE)
+        self.assertEqual(self.repo.get_competition(comp_id).coach_ids, [2])
+        self.assertEqual(self.repo.list_competitions_for_coach(coach_id), [])
+
+    def test_legacy_coach_columns_migrated_once(self):
+        """coach1_id..coach3_id of an older database move to competition_coaches, then are
+        emptied, so a coach removed afterwards doesn't come back."""
+        self.repo.setup_database()
+        conn = self.repo.get_connection()
+        try:
+            conn.execute("INSERT INTO competitions (nom, coach1_id, coach3_id) VALUES ('Ancienne', 2, 1)")
+            conn.commit()
+            comp_id = conn.execute("SELECT id FROM competitions WHERE nom = 'Ancienne'").fetchone()[0]
+        finally:
+            conn.close()
+        self.repo._database_setup_done = False
+        self.repo.setup_database()
+        self.assertEqual(self.repo.get_competition(comp_id).coach_ids, [2, 1])
+
+        comp = self.repo.get_competition(comp_id)
+        comp.coach_ids = [1]
+        self.repo.save_competition(comp)
+        self.repo._database_setup_done = False
+        self.repo.setup_database()
+        self.assertEqual(self.repo.get_competition(comp_id).coach_ids, [1])
 
     def test_sync_adherents_from_main(self):
         self._seed_main_db()

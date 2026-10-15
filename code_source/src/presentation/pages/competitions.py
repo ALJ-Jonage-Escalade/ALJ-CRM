@@ -886,30 +886,15 @@ class CompetitionsPage(QWidget):
         row2.addLayout(col_wa, 2)
         form.addLayout(row2)
 
-        row_coaches = QHBoxLayout()
-        
-        col_coach1 = QVBoxLayout()
-        col_coach1.addWidget(field_label("Coach 1"))
-        self.input_coach1 = QComboBox()
-        self.input_coach1.setStyleSheet("QComboBox { border: 1px solid #CBD5E1; border-radius: 6px; padding: 7px; }")
-        col_coach1.addWidget(self.input_coach1)
-        row_coaches.addLayout(col_coach1, 1)
-
-        col_coach2 = QVBoxLayout()
-        col_coach2.addWidget(field_label("Coach 2"))
-        self.input_coach2 = QComboBox()
-        self.input_coach2.setStyleSheet("QComboBox { border: 1px solid #CBD5E1; border-radius: 6px; padding: 7px; }")
-        col_coach2.addWidget(self.input_coach2)
-        row_coaches.addLayout(col_coach2, 1)
-
-        col_coach3 = QVBoxLayout()
-        col_coach3.addWidget(field_label("Coach 3"))
-        self.input_coach3 = QComboBox()
-        self.input_coach3.setStyleSheet("QComboBox { border: 1px solid #CBD5E1; border-radius: 6px; padding: 7px; }")
-        col_coach3.addWidget(self.input_coach3)
-        row_coaches.addLayout(col_coach3, 1)
-        
-        form.addLayout(row_coaches)
+        # Coaches: any number, ticked in a list (plan cleanup C2). The competition's
+        # coaches come first, in their saved order, so saving keeps that order.
+        form.addWidget(field_label("Coachs"))
+        self.input_coaches = QListWidget()
+        self.input_coaches.setStyleSheet(
+            "QListWidget { border: 1px solid #CBD5E1; border-radius: 6px; padding: 4px; }"
+            "QListWidget::item { padding: 3px; }")
+        self.input_coaches.setMaximumHeight(120)
+        form.addWidget(self.input_coaches)
 
         form.addStretch()
 
@@ -1269,18 +1254,7 @@ class CompetitionsPage(QWidget):
         )
         self.input_whatsapp.setText(c.whatsapp_link or "")
         
-        self._populate_coach_dropdowns()
-        
-        def select_coach(combo, coach_id):
-            for i in range(combo.count()):
-                if combo.itemData(i) == coach_id:
-                    combo.setCurrentIndex(i)
-                    return
-            combo.setCurrentIndex(0)
-            
-        select_coach(self.input_coach1, c.coach1_id)
-        select_coach(self.input_coach2, c.coach2_id)
-        select_coach(self.input_coach3, c.coach3_id)
+        self._populate_coach_list(c.coach_ids)
         
         self.details_hint.setText(f"Édition de « {c.nom} » (ID interne #{c.id}).")
 
@@ -1297,10 +1271,7 @@ class CompetitionsPage(QWidget):
         self.input_statut.setCurrentIndex(0)
         self.input_whatsapp.clear()
         
-        self._populate_coach_dropdowns()
-        self.input_coach1.setCurrentIndex(0)
-        self.input_coach2.setCurrentIndex(0)
-        self.input_coach3.setCurrentIndex(0)
+        self._populate_coach_list()
         
         self.details_hint.setText("Sélectionnez une épreuve à gauche ou créez-en une nouvelle.")
 
@@ -1331,9 +1302,7 @@ class CompetitionsPage(QWidget):
         comp.prix = round(self.input_prix.value(), 2)
         comp.statut = list(LIBELLES_STATUT_COMPETITION.keys())[self.input_statut.currentIndex()]
         comp.whatsapp_link = self.input_whatsapp.text().strip()
-        comp.coach1_id = self.input_coach1.currentData()
-        comp.coach2_id = self.input_coach2.currentData()
-        comp.coach3_id = self.input_coach3.currentData()
+        comp.coach_ids = self._checked_coach_ids()
         # NB : helloasso_ref n'est plus éditable ici — la campagne HelloAsso est
         # désormais annuelle et se configure dans l'onglet global « HelloAsso ».
         comp_id = self._guard_modal(CompetitionRepository.save_competition, comp, title="Enregistrement")
@@ -2308,19 +2277,30 @@ class CompetitionsPage(QWidget):
         layout.addWidget(right_box, 1)
         return container
 
-    def _populate_coach_dropdowns(self):
+    def _populate_coach_list(self, selected_ids=()):
+        """Fills the coach list: `selected_ids` ticked and first (saved order), then the
+        other coaches by name. Ids of deleted coaches are dropped."""
         try:
             coaches = CompetitionRepository.list_coaches()
         except Exception as e:
             print(f"⚠️ [COMPETITIONS] Lecture des coachs impossible : {e}")
             coaches = []
-        for combo in [self.input_coach1, self.input_coach2, self.input_coach3]:
-            combo.blockSignals(True)
-            combo.clear()
-            combo.addItem("Aucun", None)
-            for c in coaches:
-                combo.addItem(c["nom"], c["id"])
-            combo.blockSignals(False)
+        by_id = {c["id"]: c for c in coaches}
+        selected = [by_id[cid] for cid in selected_ids if cid in by_id]
+        others = [c for c in coaches if c["id"] not in set(selected_ids)]
+        self.input_coaches.blockSignals(True)
+        self.input_coaches.clear()
+        for c, checked in [(c, True) for c in selected] + [(c, False) for c in others]:
+            item = QListWidgetItem(c["nom"])
+            item.setData(Qt.UserRole, c["id"])
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+            self.input_coaches.addItem(item)
+        self.input_coaches.blockSignals(False)
+
+    def _checked_coach_ids(self) -> list:
+        items = (self.input_coaches.item(i) for i in range(self.input_coaches.count()))
+        return [it.data(Qt.UserRole) for it in items if it.checkState() == Qt.Checked]
 
     def reload_coaches_list(self):
         self.coaches_list.blockSignals(True)
@@ -2340,7 +2320,7 @@ class CompetitionsPage(QWidget):
         self.btn_delete_coach.setEnabled(False)
         self.coach_comps_list.clear()
         self.coach_comps_lbl.setText("Sélectionnez un coach pour voir ses compétitions.")
-        self._populate_coach_dropdowns()
+        self._populate_coach_list(self._checked_coach_ids())  # keeps the form's ticks
 
     def on_coach_selected(self, row: int):
         item = self.coaches_list.item(row)

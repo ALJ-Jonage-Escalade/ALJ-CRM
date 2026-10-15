@@ -29,6 +29,7 @@ import os
 import re
 import threading
 import time
+from enum import IntEnum
 from typing import Any, Dict, Optional
 
 import requests
@@ -42,7 +43,8 @@ FIREBASE_CERTS_URL = (
 )
 
 # ---------------------------------------------------------------------------
-# Rôles : miroir de firestore.rules (un test vérifie la cohérence des listes).
+# Rôles : seul juge des droits (firestore.rules refuse tout client). Les pages web en
+# gardent une copie pour l'affichage (un test vérifie la cohérence des listes).
 # ---------------------------------------------------------------------------
 ADMIN_EMAIL_DOMAINS = ("alj-escalade.fr",)
 ADMIN_EMAILS = frozenset({
@@ -57,7 +59,13 @@ READONLY_EMAILS = frozenset({
     "delphine0910@gmail.com",
 })
 
-ROLE_LEVELS = {"readonly": 1, "coach": 2, "admin": 3}
+
+
+class Role(IntEnum):
+    """Access levels, lowest to highest: a higher level includes the lower ones."""
+    READONLY = 1
+    COACH = 2
+    ADMIN = 3
 
 # Routes accessibles sans authentification (pages statiques, santé, version,
 # webhook HelloAsso qui dispose de sa propre vérification).
@@ -114,7 +122,7 @@ def firebase_project_id() -> str:
     )
 
 
-def required_role(method: str, path: str) -> Optional[str]:
+def required_role(method: str, path: str) -> Optional[Role]:
     """Rôle minimal exigé pour une requête (None = route publique)."""
     method = (method or "GET").upper()
     if method == "OPTIONS":  # pré-vol CORS
@@ -127,58 +135,53 @@ def required_role(method: str, path: str) -> Optional[str]:
         return None
     if method in ("GET", "HEAD") and any(path == ro_prefix or path.startswith(ro_prefix + "/")
                                          for ro_prefix in READONLY_READ_PREFIXES):
-        return "readonly"
+        return Role.READONLY
     if path == "/api/planning" and method not in ("GET", "HEAD"):
-        return "admin"  # firestore.rules : planning modifiable par les admins
+        return Role.ADMIN  # planning modifiable par les admins
     if path.startswith("/api/attestations"):
-        return "admin"  # attestations réservées aux administrateurs
+        return Role.ADMIN  # attestations réservées aux administrateurs
     if path.startswith("/api/members") and method not in ("GET", "HEAD"):
-        return "admin"  # modification des fiches réservée aux administrateurs
+        return Role.ADMIN  # modification des fiches réservée aux administrateurs
     if path.startswith("/api/email-templates") and method not in ("GET", "HEAD"):
-        return "admin"  # modification des templates d'emails réservée aux administrateurs
+        return Role.ADMIN  # modification des templates d'emails réservée aux administrateurs
     if path.startswith("/api/whatsapp-template") and method not in ("GET", "HEAD"):
-        return "admin"  # modification du template WhatsApp réservée aux administrateurs
+        return Role.ADMIN  # modification du template WhatsApp réservée aux administrateurs
     if path.startswith("/api/settings") and method not in ("GET", "HEAD"):
-        return "admin"  # modification des paramètres généraux réservée aux administrateurs
+        return Role.ADMIN  # modification des paramètres généraux réservée aux administrateurs
     if path.startswith("/api/ffme") and method not in ("GET", "HEAD"):
-        return "admin"  # imports et modifications FFME réservés aux administrateurs
+        return Role.ADMIN  # imports et modifications FFME réservés aux administrateurs
     if path == "/api/auth/google/update-token" and method not in ("GET", "HEAD"):
-        return "admin"  # mise à jour manuelle des identifiants Google réservée aux administrateurs
-    return "coach"
+        return Role.ADMIN  # mise à jour manuelle des identifiants Google réservée aux administrateurs
+    return Role.COACH
 
 
 # ---------------------------------------------------------------------------
 # Rôles
 # ---------------------------------------------------------------------------
-def roles_for_claims(claims: Dict[str, Any]) -> set:
-    """Rôles d'un utilisateur, mêmes règles que firestore.rules."""
-    roles = set()
+def role_for_claims(claims: Dict[str, Any]) -> Optional[Role]:
+    """Highest role of a user (None: no access)."""
     email = str(claims.get("email") or "").strip().lower()
     # Les règles basées sur l'adresse ne valent que pour une adresse vérifiée
     # (toujours le cas pour une connexion Google).
     email_ok = bool(email) and claims.get("email_verified") is True
 
-    is_admin = claims.get("admin") is True or (
+    if claims.get("admin") is True or (
         email_ok and (
             any(email.endswith("@" + d) for d in ADMIN_EMAIL_DOMAINS)
             or email in ADMIN_EMAILS
         )
-    )
-    is_coach = is_admin or claims.get("coach") is True or (email_ok and email in COACH_EMAILS)
-    is_readonly = claims.get("readonly") is True or (email_ok and email in READONLY_EMAILS)
-
-    if is_admin:
-        roles.add("admin")
-    if is_coach:
-        roles.add("coach")
-    if is_readonly:
-        roles.add("readonly")
-    return roles
+    ):
+        return Role.ADMIN
+    if claims.get("coach") is True or (email_ok and email in COACH_EMAILS):
+        return Role.COACH
+    if claims.get("readonly") is True or (email_ok and email in READONLY_EMAILS):
+        return Role.READONLY
+    return None
 
 
-def has_role(claims: Dict[str, Any], role: str) -> bool:
-    needed = ROLE_LEVELS[role]
-    return any(ROLE_LEVELS[r] >= needed for r in roles_for_claims(claims))
+def has_role(claims: Dict[str, Any], needed: Role) -> bool:
+    role = role_for_claims(claims)
+    return role is not None and role >= needed
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +278,7 @@ def authorize_request(method: str, path: str, authorization: Optional[str]) -> O
         raise AuthError(401, "Authentification requise : connectez-vous avec votre compte Google")
     claims = verify_firebase_token(token)
     if not has_role(claims, role):
-        raise AuthError(403, f"Accès refusé : rôle « {role} » requis pour {claims.get('email') or 'ce compte'}")
+        raise AuthError(403, f"Accès refusé : rôle « {role.name.lower()} » requis pour {claims.get('email') or 'ce compte'}")
     return claims
 
 

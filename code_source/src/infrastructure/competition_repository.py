@@ -180,6 +180,26 @@ class CompetitionRepository:
                 conn.execute("ALTER TABLE competitions ADD COLUMN coach2_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL")
             if "coach3_id" not in comp_cols:
                 conn.execute("ALTER TABLE competitions ADD COLUMN coach3_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL")
+            # Coaches of a competition: many-to-many link (plan cleanup C2). The old
+            # columns coach1_id..coach3_id are copied once, then emptied, so a coach removed
+            # later never comes back from them. SQLite can't drop a column that carries a
+            # foreign key: the emptied columns stay, unused.
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS competition_coaches (
+                competition_id INTEGER NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+                coach_id       INTEGER NOT NULL REFERENCES coaches(id) ON DELETE CASCADE,
+                position       INTEGER NOT NULL DEFAULT 0,   -- display order
+                PRIMARY KEY (competition_id, coach_id)
+            )""")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_competition_coaches_coach "
+                         "ON competition_coaches(coach_id)")
+            for position, slot in enumerate(("coach1_id", "coach2_id", "coach3_id")):
+                conn.execute(f"""INSERT OR IGNORE INTO competition_coaches (competition_id, coach_id, position)
+                                 SELECT id, {slot}, {position} FROM competitions
+                                 WHERE {slot} IS NOT NULL
+                                   AND {slot} IN (SELECT id FROM coaches)""")
+            conn.execute("UPDATE competitions SET coach1_id = NULL, coach2_id = NULL, coach3_id = NULL "
+                         "WHERE coach1_id IS NOT NULL OR coach2_id IS NOT NULL OR coach3_id IS NOT NULL")
             if "url_resultats" not in comp_cols:
                 conn.execute("ALTER TABLE competitions ADD COLUMN url_resultats TEXT DEFAULT ''")
             if "resultats_synced_at" not in comp_cols:
@@ -382,9 +402,24 @@ class CompetitionRepository:
             rows = conn.execute(
                 "SELECT * FROM competitions ORDER BY date_competition DESC, id DESC"
             ).fetchall()
+            return cls._competitions_from_rows(conn, rows)
         finally:
             conn.close()
-        return [Competition.from_row(dict(r)) for r in rows]
+
+    @staticmethod
+    def coach_ids_by_competition(conn) -> dict:
+        """{competition_id: [coach_id, ...]} in display order."""
+        out: dict = {}
+        for r in conn.execute("SELECT competition_id, coach_id FROM competition_coaches "
+                              "ORDER BY competition_id, position, coach_id"):
+            out.setdefault(r["competition_id"], []).append(r["coach_id"])
+        return out
+
+    @classmethod
+    def _competitions_from_rows(cls, conn, rows) -> list:
+        coach_ids = cls.coach_ids_by_competition(conn)
+        return [Competition.from_row({**dict(r), "coach_ids": coach_ids.get(r["id"], [])})
+                for r in rows]
 
     @classmethod
     def get_competition(cls, competition_id: int):
@@ -394,9 +429,9 @@ class CompetitionRepository:
             r = conn.execute(
                 "SELECT * FROM competitions WHERE id = ?", (competition_id,)
             ).fetchone()
+            return cls._competitions_from_rows(conn, [r])[0] if r else None
         finally:
             conn.close()
-        return Competition.from_row(dict(r)) if r else None
 
     @classmethod
     def save_competition(cls, comp: Competition) -> int:
@@ -409,24 +444,28 @@ class CompetitionRepository:
             if comp.id:
                 cur.execute(
                     """UPDATE competitions SET id_ffme=?, nom=?, date_competition=?, date_fin=?, prix=?,
-                       statut=?, helloasso_ref=?, coach1_id=?, coach2_id=?, coach3_id=?,
-                       url_resultats=?, resultats_synced_at=?, whatsapp_link=?, updated_at=? WHERE id=?""",
+                       statut=?, helloasso_ref=?, url_resultats=?, resultats_synced_at=?, whatsapp_link=?,
+                       updated_at=? WHERE id=?""",
                     (comp.id_ffme, comp.nom, comp.date_competition, comp.date_fin, comp.prix,
-                     comp.statut, comp.helloasso_ref, comp.coach1_id, comp.coach2_id, comp.coach3_id,
-                     comp.url_resultats, comp.resultats_synced_at, comp.whatsapp_link, now, comp.id),
+                     comp.statut, comp.helloasso_ref, comp.url_resultats, comp.resultats_synced_at,
+                     comp.whatsapp_link, now, comp.id),
                 )
                 comp_id = comp.id
             else:
                 cur.execute(
                     """INSERT INTO competitions (id_ffme, nom, date_competition, date_fin, prix,
-                       statut, helloasso_ref, coach1_id, coach2_id, coach3_id,
-                       url_resultats, resultats_synced_at, whatsapp_link, created_at, updated_at)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       statut, helloasso_ref, url_resultats, resultats_synced_at, whatsapp_link,
+                       created_at, updated_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (comp.id_ffme, comp.nom, comp.date_competition, comp.date_fin, comp.prix,
-                     comp.statut, comp.helloasso_ref, comp.coach1_id, comp.coach2_id, comp.coach3_id,
-                     comp.url_resultats, comp.resultats_synced_at, comp.whatsapp_link, now, now),
+                     comp.statut, comp.helloasso_ref, comp.url_resultats, comp.resultats_synced_at,
+                     comp.whatsapp_link, now, now),
                 )
                 comp_id = cur.lastrowid
+            cur.execute("DELETE FROM competition_coaches WHERE competition_id = ?", (comp_id,))
+            cur.executemany(
+                "INSERT OR IGNORE INTO competition_coaches (competition_id, coach_id, position) VALUES (?,?,?)",
+                [(comp_id, cid, pos) for pos, cid in enumerate(comp.coach_ids)])
             conn.commit()
         finally:
             conn.close()
@@ -974,14 +1013,15 @@ class CompetitionRepository:
         conn = cls.get_connection()
         try:
             rows = conn.execute(
-                """SELECT * FROM competitions 
-                   WHERE coach1_id = ? OR coach2_id = ? OR coach3_id = ?
-                   ORDER BY date_competition DESC, id DESC""",
-                (coach_id, coach_id, coach_id)
+                """SELECT c.* FROM competitions c
+                   JOIN competition_coaches cc ON cc.competition_id = c.id
+                   WHERE cc.coach_id = ?
+                   ORDER BY c.date_competition DESC, c.id DESC""",
+                (coach_id,)
             ).fetchall()
+            return cls._competitions_from_rows(conn, rows)
         finally:
             conn.close()
-        return [Competition.from_row(dict(r)) for r in rows]
 
     @classmethod
     def save_item_comment(cls, id_item: int, comment: str) -> bool:

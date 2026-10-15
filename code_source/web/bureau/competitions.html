@@ -230,31 +230,16 @@ function seasonOfDate(dStr) {
   }
 }
 
+/* Coach names of a competition: the API resolves them from coach_ids (plan cleanup C2);
+   the coaches list is a fallback for a coach added since the last poll. */
 function getCompCoachNames(comp, allCoaches = []) {
   if (!comp) return [];
-  const names = [];
-  if (Array.isArray(comp.coaches) && comp.coaches.length > 0) {
-    comp.coaches.forEach(c => {
-      const n = String(c || "").trim();
-      if (n && !names.includes(n)) names.push(n);
-    });
+  const names = (comp.coaches || []).map(n => String(n || "").trim()).filter(Boolean);
+  for (const cid of comp.coach_ids || []) {
+    const found = allCoaches.find(co => String(co.id) === String(cid));
+    const n = found && String(found.nom || "").trim();
+    if (n && !names.includes(n)) names.push(n);
   }
-  if (Array.isArray(comp.coach_ids) && comp.coach_ids.length > 0) {
-    comp.coach_ids.forEach(cid => {
-      const found = allCoaches.find(co => String(co.id) === String(cid));
-      if (found && found.nom && !names.includes(found.nom.trim())) {
-        names.push(found.nom.trim());
-      }
-    });
-  }
-  [comp.coach1_id, comp.coach2_id, comp.coach3_id].forEach(cid => {
-    if (cid != null && String(cid).trim()) {
-      const found = allCoaches.find(co => String(co.id) === String(cid));
-      if (found && found.nom && !names.includes(found.nom.trim())) {
-        names.push(found.nom.trim());
-      }
-    }
-  });
   return names;
 }
 
@@ -2390,8 +2375,14 @@ const shell = startBureau({
       }
       const selIdsSet = new Set(selectedIds.map(String));
       const selNamesSet = new Set(selectedNames.map(s => String(s).toLowerCase().trim()));
+      // The competition's coaches first, in their saved order, so saving keeps that order
+      const rank = id => { const i = selectedIds.map(String).indexOf(id); return i < 0 ? Infinity : i; };
+      const ordered = allCoaches.slice().sort((a, b) => {  // stable: the others keep their order
+        const ra = rank(String(a.id)), rb = rank(String(b.id));
+        return ra === rb ? 0 : (ra < rb ? -1 : 1);
+      });
 
-      box.innerHTML = allCoaches.map(co => {
+      box.innerHTML = ordered.map(co => {
         const id = String(co.id);
         const name = String(co.nom || "");
         const checked = selIdsSet.has(id) || selNamesSet.has(name.toLowerCase().trim());
@@ -2463,10 +2454,6 @@ const shell = startBureau({
 
       if (!nom || !date) {
         toast("⚠️ Nom et date obligatoires.");
-        return;
-      }
-      if (selectedCoachIds.length > 3) {
-        toast("⚠️ 3 coachs au maximum par compétition.");
         return;
       }
 

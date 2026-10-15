@@ -18,11 +18,6 @@ COMPETITION_FIELDS = ("nom", "id_ffme", "date_competition", "date_fin", "prix", 
                       "helloasso_ref", "url_resultats", "whatsapp_link")
 
 
-def _apply_coaches(comp: Competition, coach_ids):
-    ids = list(coach_ids) + [None] * 3
-    comp.coach1_id, comp.coach2_id, comp.coach3_id = ids[0], ids[1], ids[2]
-
-
 def _extra(fields: Dict[str, Any]) -> Dict[str, Any]:
     return {k: fields[k] for k in PASS_THROUGH_FIELDS if k in fields}
 
@@ -39,7 +34,7 @@ class CompetitionService:
     def create_competition(fields: Dict[str, Any]) -> dict:
         """`fields`: validated body (api.schemas.competitions.CompetitionCreate)."""
         comp = Competition(**{k: fields[k] for k in COMPETITION_FIELDS if k in fields})
-        _apply_coaches(comp, fields.get("coach_ids") or [])
+        comp.coach_ids = list(fields.get("coach_ids") or [])
         new_id = Repo.save_competition(comp, _extra(fields))
         return Repo.get_competition_doc(new_id)
 
@@ -54,7 +49,7 @@ class CompetitionService:
             if fields.get(field) is not None:
                 setattr(comp, field, fields[field])
         if "coach_ids" in fields:
-            _apply_coaches(comp, fields["coach_ids"] or [])
+            comp.coach_ids = list(fields["coach_ids"] or [])
         Repo.save_competition(comp, _extra(fields))
         return Repo.get_competition_doc(competition_id)
 

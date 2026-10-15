@@ -21,6 +21,7 @@ if _src_dir not in sys.path:
 from fastapi.testclient import TestClient
 
 from infrastructure import api_auth
+from infrastructure.api_auth import Role
 from server import (
     app, get_bureau_home, get_bureau_page, get_competitions_page, get_annuaire_page,
     get_sw, get_web_version,
@@ -388,8 +389,8 @@ class TestBureauFiles(unittest.TestCase):
     def test_attestation_endpoints_require_admin_role(self):
         """Les endpoints /api/attestations exigent le rôle admin."""
         from infrastructure.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/attestations/preview"), "admin")
-        self.assertEqual(required_role("POST", "/api/attestations/send"), "admin")
+        self.assertEqual(required_role("POST", "/api/attestations/preview"), Role.ADMIN)
+        self.assertEqual(required_role("POST", "/api/attestations/send"), Role.ADMIN)
 
     def test_send_attestation_records_email_sent_date(self):
         """send_attestation_api enregistre la date d'envoi dans SQLite et utilise le modèle par défaut."""
@@ -490,8 +491,8 @@ class TestBureauFiles(unittest.TestCase):
     def test_member_add_requires_admin_role(self):
         """Les endpoints de création manuelle d'adhérents exigent le rôle admin."""
         from infrastructure.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/members/create"), "admin")
-        self.assertEqual(required_role("POST", "/api/members/add"), "admin")
+        self.assertEqual(required_role("POST", "/api/members/create"), Role.ADMIN)
+        self.assertEqual(required_role("POST", "/api/members/add"), Role.ADMIN)
 
     def test_member_add_endpoint_and_sqlite_persistence(self):
         """add_member_api persiste le nouvel adhérent, la commande et l'achat dans SQLite."""
@@ -595,7 +596,7 @@ class TestBureauFiles(unittest.TestCase):
     def test_member_update_requires_admin_role(self):
         """L'endpoint /api/members/update exige le rôle admin."""
         from infrastructure.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/members/update"), "admin")
+        self.assertEqual(required_role("POST", "/api/members/update"), Role.ADMIN)
 
     def test_member_update_endpoint_and_sqlite_persistence(self):
         """update_member_api persiste les badges, emails, téléphone et créneau dans SQLite."""
@@ -773,9 +774,9 @@ class TestBureauFiles(unittest.TestCase):
     def test_ffme_auth_roles(self):
         """Les routes de modification/import FFME exigent le rôle admin."""
         from infrastructure.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/ffme/preview"), "admin")
-        self.assertEqual(required_role("POST", "/api/ffme/import"), "admin")
-        self.assertEqual(required_role("GET", "/api/ffme/export"), "coach")
+        self.assertEqual(required_role("POST", "/api/ffme/preview"), Role.ADMIN)
+        self.assertEqual(required_role("POST", "/api/ffme/import"), Role.ADMIN)
+        self.assertEqual(required_role("GET", "/api/ffme/export"), Role.COACH)
 
     def test_ffme_preview_and_apply_api(self):
         """preview_ffme_import_api et apply_ffme_import_api fonctionnent de bout en bout avec un fichier Excel FFME."""
@@ -1077,10 +1078,10 @@ class TestBureauFiles(unittest.TestCase):
     def test_email_template_write_requires_admin_role(self):
         """Les modifications de templates d'emails exigent le rôle admin."""
         from infrastructure.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/email-templates"), "admin")
-        self.assertEqual(required_role("DELETE", "/api/email-templates/Test"), "admin")
-        self.assertEqual(required_role("POST", "/api/whatsapp-template"), "admin")
-        self.assertEqual(required_role("GET", "/api/email-templates"), "coach")
+        self.assertEqual(required_role("POST", "/api/email-templates"), Role.ADMIN)
+        self.assertEqual(required_role("DELETE", "/api/email-templates/Test"), Role.ADMIN)
+        self.assertEqual(required_role("POST", "/api/whatsapp-template"), Role.ADMIN)
+        self.assertEqual(required_role("GET", "/api/email-templates"), Role.COACH)
 
     def test_apply_template_variables_adherents_extension(self):
         """Les variables {tarif} et {season} sont correctement résolues pour les adhérents."""
@@ -1192,7 +1193,7 @@ class TestBureauAccess(unittest.TestCase):
         r = api_auth.required_role
         for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres", "/static-web/alj-core.js"):
             self.assertIsNone(r("GET", path), path)
-        self.assertEqual(r("GET", "/api/email-status"), "coach")
+        self.assertEqual(r("GET", "/api/email-status"), Role.COACH)
 
 
 class TestSingleFirebaseInit(unittest.TestCase):

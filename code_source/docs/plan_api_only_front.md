@@ -32,8 +32,8 @@ The plan file is updated with any decisions taken during a review. Nothing is co
 | 0 | Done (approved) | Cold-start measurement still to do against production (needs a deploy). ETag responses use `Cache-Control: no-store`: the page keeps the last body and sends `If-None-Match` itself (`alj-sync.js`), so personal data never lands in the browser's HTTP cache. |
 | 1 | Done (approved) | See « Phase 1 — as built » below. |
 | 2 | Done (approved) | See « Phase 2 — as built » below. |
-| 3 | Done, awaiting review | Code only; nothing deployed. See « Phase 3 — as built » below for the deploy order. |
-| 4 | Not started | Cleanup backlog, filled during reviews |
+| 3 | Done (approved) | Code only; nothing deployed. See « Phase 3 — as built » below for the deploy order. |
+| 4 | Done, awaiting review | C1 done; C2 step A done (step B waits for every club PC to run the new desktop version). See « Phase 4 — as built » below. |
 | 5 | Not started | Offline storage on the phone. O2 and O4 decided; O1 to confirm; O3 accepted in principle, conflict handling to analyse first (see « Phase 5 »). |
 
 ## Decisions taken (from review Q&A)
@@ -307,6 +307,58 @@ Consequences:
 
 **Out of scope until decided.** A lead-coach role, or other per-link attributes (e.g. driver, judge). These would justify Firestore link documents instead of an id array.
 
+#### Phase 4 — as built (deviations and notes for review)
+
+**C1 — `Role` enum (as planned).**
+- `api_auth.Role(IntEnum)`: `READONLY < COACH < ADMIN`. `ROLE_LEVELS` is gone.
+- `required_role() -> Optional[Role]`; `None` still means a public route.
+- `roles_for_claims() -> set` is replaced by `role_for_claims() -> Optional[Role]`, which returns the highest level. A readonly-listed account with a `coach` claim is a coach.
+- `has_role(claims, Role.X)`.
+- The 403 message is unchanged (« rôle « admin » requis… », from `role.name.lower()`).
+- Callers: `server.py` (`/api/send-email`) and the tests, which compare against `Role.X` instead of strings.
+- New test: `test_has_role_follows_the_hierarchy`.
+
+**C2 — step A done: `coach_ids` is the only model, the old shape is still written for old desktop builds.**
+- **Domain.** `Competition.coach_ids: List[int]` (ordered, no limit) replaces `coach1_id..coach3_id`.
+  - `competition_models.coach_ids_of(row)` reads `coach_ids`, or else the legacy slots. It drops duplicates and ids that aren't numbers, and keeps the order.
+  - `LEGACY_COACH_SLOTS` names the old fields.
+- **Firestore repository.**
+  - Reads go through `coach_ids_of`. A document written only with slots by an old version still works: there is one such document in the dev emulator, and the test `test_legacy_coach_slots_read` covers it.
+  - The API shape (`list_competition_docs`, `get_competition_doc` via `_api_doc`) normalizes `coach_ids` and **resolves `coaches` from the `coaches` collection on every read**, so a failed rename cascade no longer shows on the web pages.
+  - **Compatibility writes (step A):** every write still fills `coach1_id..coach3_id` (first three coaches) and the stored `coaches` names (`_legacy_coach_fields`), and a rename still refreshes those names (`_refresh_coach_names`). Both are marked "remove with step B".
+- **SQLite (legacy desktop database).**
+  - Join table `competition_coaches (competition_id, coach_id, position)`, with `ON DELETE CASCADE` on both sides and an index on `coach_id`, as planned.
+  - Migration in `setup_database`: the old columns are copied into the table, then **emptied** (`NULL`), so a coach removed later doesn't come back on the next start.
+  - Deviation: the columns are not dropped. SQLite refuses `DROP COLUMN` on a column that carries a foreign key, and rebuilding the table isn't worth it for a database the desktop app no longer uses for competitions (it reads and writes them in Firestore). It also isn't needed: nothing reads the columns any more.
+  - `list_competitions_for_coach` is now one join. `firestore_sync.py` (legacy import) reads the join table.
+- **API.**
+  - `MAX_COACHES`, `max_length` and `_apply_coaches` are gone. `coach_ids` is de-duplicated with the order kept.
+  - Deviation: responses keep **`coaches` as a list of names**, resolved at read, rather than `[{id, nom}]`. Both pages already read it that way and `coach_ids` carries the ids. Switch to objects if a page needs id/name pairs.
+- **Clients.**
+  - Desktop: a checkable list replaces the three combo boxes. The competition's coaches come first in their saved order, then the others by name. Reloading the coach tab keeps the ticks of the open form.
+  - PWA (`competitions.html`): checkboxes replace the three selects, with the same ordering. A poll no longer resets the ticks of an open form; it used to reset the selects every 20 s.
+  - Bureau page: the « 3 coachs au maximum » check is removed, and the saved order comes first. `getCompCoachNames` no longer reads the slots.
+- **Order (open question of C2).** The order is kept everywhere (array order in Firestore, `position` in SQLite, list order in the UIs). Nothing gives it a meaning yet; whether « coach 1 » means the lead coach is still to ask the club.
+- **Tests.**
+  - Firestore repository: more than three coaches, order, and the compatibility fields; reading a legacy-only document.
+  - API: five coaches, duplicates and order, PATCH.
+  - SQLite: four coaches, replacing the list, the cascade on coach delete, and the one-time column migration.
+  - New Qt test `tests/presentation/test_competition_coaches_form.py`, also added as its own step in `.github/workflows/tests.yml`.
+
+**⚠️ Until step B, don't put more than three coaches on a competition from the new versions.**
+- A desktop build older than C2 reads the slots first, so it shows only the first three.
+- If it saves the competition, it rewrites `coach_ids` from those three slots, and the other coaches are dropped.
+- Old v22 phone pages are unaffected: they will lose Firestore access at the rules lockdown anyway.
+
+**C2 step B (later, not started).** Once every club PC runs a desktop version with C2:
+1. Stop writing `coach1_id..coach3_id` and the stored `coaches`. Delete `_legacy_coach_fields` and `_refresh_coach_names`; a rename then rewrites no competition, which fixes A10 for renames.
+2. A one-off script removes the old fields from existing documents (readers accept both shapes, so the order doesn't matter).
+3. Remove the slot fallback in `coach_ids_of`, and `LEGACY_COACH_SLOTS`.
+
+**Not verified:** the desktop app by hand (only the Qt test of the form); the two web pages in a browser.
+
+**Not done in this phase** (mentioned in earlier reviews, not part of C1/C2): moving `fetch-results` into the service layer (A27), and removing the SQLite competition repository.
+
 ### Phase 5 — Offline storage on the phone (after phase 3)
 
 **Why.** The phone pages must keep working without network: in a gym, at a competition venue, in a car. Up to v22 the Firestore SDK handled this on its own: an IndexedDB copy of every collection, and writes queued and sent when the network came back. Phase 3 removes the SDK and wipes that copy. D2 then keeps only a small read-only snapshot. This phase gives the phone a deliberate local store in its place, with clear limits on what is kept.
@@ -551,6 +603,7 @@ To settle before implementing the queue (O3). Nothing here is decided.
 | A27 | `server.py` `POST /api/competitions/{id}/fetch-results` (main, 3ea9078 series) | Reads the competition, adds the MyCompet results to its participants, then rewrites the whole `participants` array with no precondition. A participant change made in between (coach, webhook payment) is lost. It also bypasses the service layer. | **Still present.** Fix: move it to `ParticipantService` and write per participant through `_update_participant` (optimistic lock). |
 | A28 | `api_auth.LOCAL_HOSTS` (main) | `"testserver"` (the FastAPI TestClient's host) was added to the hosts accepted by the local server without authentication. Production code is relaxed to suit tests: a local server then also accepts requests sent with `Host: testserver`. Tests should set `base_url="http://127.0.0.1"` instead. | **Still present.** Low risk (local server only), review with the author. |
 | A29 | `api_auth.PUBLIC_PATHS` (main, 635109d) | `POST /api/competitions/cron/fetch-results` is public: anyone can start the MyCompet scraping batch, and the `email` query parameter sends the summary e-mail to any address. **Security, prioritize.** | **Still present.** Fix: require a Cloud Scheduler OIDC token (or a shared secret header) instead of a public path, and drop or whitelist `email`. |
+| A30 | `CompetitionFirestoreRepository._new_id` | Ids of new competitions and coaches are `int(time.time() * 1000)`. Two creations in the same millisecond (two coaches on a busy API, a script, tests) get the same id, and the second **silently overwrites** the first (`upsert_document`). Found while writing the C2 tests. | **Still present.** Fix: create with a precondition (`exists=false`) and retry with the next id, or use a Firestore-generated id. |
 
 ## Appendix B — Fields to migrate later (D4)
 

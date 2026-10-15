@@ -9,13 +9,17 @@ from api.schemas.base import RequestBody
 from domain.competition_models import STATUT_EN_PREPARATION, STATUTS_COMPETITION
 
 _ISO_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})?$")
-MAX_COACHES = 3  # the domain model stores coach1_id..coach3_id (plan cleanup C2)
 
 
 def _check_statut(value):
     if value is not None and value not in STATUTS_COMPETITION:
         raise ValueError(f"statut must be one of {', '.join(STATUTS_COMPETITION)}")
     return value
+
+
+def _distinct(value):
+    """Coach ids in the order given, duplicates dropped (no length limit, plan C2)."""
+    return None if value is None else list(dict.fromkeys(value))
 
 
 def _check_date(value):
@@ -31,7 +35,7 @@ class CompetitionCreate(RequestBody):
     date_fin: str = ""
     prix: float = Field(0.0, ge=0)
     statut: str = STATUT_EN_PREPARATION
-    coach_ids: List[int] = Field(default_factory=list, max_length=MAX_COACHES)
+    coach_ids: List[int] = Field(default_factory=list)
     helloasso_ref: str = ""
     url_resultats: str = ""  # MyCompet results page, also found by the fetch-results route
     whatsapp_link: str = ""
@@ -41,6 +45,7 @@ class CompetitionCreate(RequestBody):
 
     _statut = field_validator("statut")(_check_statut)
     _dates = field_validator("date_competition", "date_fin")(_check_date)
+    _coaches = field_validator("coach_ids")(_distinct)
 
 
 class CompetitionUpdate(RequestBody):
@@ -51,7 +56,7 @@ class CompetitionUpdate(RequestBody):
     date_fin: Optional[str] = None
     prix: Optional[float] = Field(None, ge=0)
     statut: Optional[str] = None
-    coach_ids: Optional[List[int]] = Field(None, max_length=MAX_COACHES)
+    coach_ids: Optional[List[int]] = None
     helloasso_ref: Optional[str] = None
     url_resultats: Optional[str] = None
     whatsapp_link: Optional[str] = None
@@ -60,3 +65,4 @@ class CompetitionUpdate(RequestBody):
 
     _statut = field_validator("statut")(_check_statut)
     _dates = field_validator("date_competition", "date_fin")(_check_date)
+    _coaches = field_validator("coach_ids")(_distinct)

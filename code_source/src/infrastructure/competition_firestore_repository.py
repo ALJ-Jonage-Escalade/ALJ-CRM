@@ -27,8 +27,10 @@ import re
 from typing import Dict, Any, List, Optional
 
 from domain.competition_models import (
+    LEGACY_COACH_SLOTS,
     Competition,
     Participant,
+    coach_ids_of,
     PAIEMENT_EN_ATTENTE,
     PAIEMENT_NON_INVITE,
     PAIEMENT_ANNULE_PERDU,
@@ -168,19 +170,29 @@ class CompetitionFirestoreRepository:
         return matches[0] if matches else None
 
     @staticmethod
-    def _coach_slots(coach_ids: List[int]) -> Dict[str, Optional[int]]:
-        """coach1_id..coach3_id from an ordered id list (see plan cleanup C2)."""
-        ids = list(coach_ids) + [None] * 3
-        return {"coach1_id": ids[0], "coach2_id": ids[1], "coach3_id": ids[2]}
-
-    @staticmethod
     def _coach_names(coach_ids, coaches: Dict[int, str]) -> List[str]:
         return [coaches[cid] for cid in coach_ids if cid is not None and cid in coaches]
 
     @classmethod
+    def _legacy_coach_fields(cls, coach_ids: List[int], coaches: Dict[int, str]) -> Dict[str, Any]:
+        """Copies of `coach_ids` kept for desktop builds older than plan C2, which read
+        `coach1_id..coach3_id` (first three coaches) and the stored `coaches` names.
+        Remove with plan C2 step B, once every club PC runs the new version."""
+        ids = list(coach_ids)[:len(LEGACY_COACH_SLOTS)]
+        ids += [None] * (len(LEGACY_COACH_SLOTS) - len(ids))
+        return {**dict(zip(LEGACY_COACH_SLOTS, ids, strict=True)), "coaches": cls._coach_names(coach_ids, coaches)}
+
+    @classmethod
+    def _api_doc(cls, doc: Dict[str, Any], coaches: Dict[int, str]) -> Dict[str, Any]:
+        """Document for the web pages: `coach_ids` normalized (legacy slots read too) and
+        `coaches` resolved from the coaches collection, never the stored copy."""
+        out = cls._clean_doc(doc)
+        out["coach_ids"] = coach_ids_of(doc)
+        out["coaches"] = cls._coach_names(out["coach_ids"], coaches)
+        return out
+
+    @classmethod
     def _comp_from_doc(cls, doc: Dict[str, Any]) -> Competition:
-        coach_ids = [int(cid) for cid in (doc.get("coach_ids") or []) if cid is not None]
-        from_list = cls._coach_slots(coach_ids)
         row = {
             "id": doc.get("id"),
             "id_ffme": doc.get("id_ffme"),
@@ -194,22 +206,18 @@ class CompetitionFirestoreRepository:
             "resultats_synced_at": doc.get("resultats_synced_at"),
             "created_at": doc.get("created_at"),
             "updated_at": doc.get("updated_at"),
-            "url_resultats": doc.get("url_resultats"),
-            "resultats_synced_at": doc.get("resultats_synced_at"),
             "whatsapp_link": doc.get("whatsapp_link"),
             "_doc_id": doc.get("_doc_id"),
+            "coach_ids": doc.get("coach_ids"),
+            **{slot: doc.get(slot) for slot in LEGACY_COACH_SLOTS},
         }
-        for slot, fallback in from_list.items():
-            row[slot] = doc.get(slot) or fallback
         return Competition.from_row(row)
 
     @classmethod
     def _build_comp_doc(cls, doc: Optional[Dict[str, Any]], comp: Competition,
-                        coach_names: List[str]) -> Dict[str, Any]:
+                        coaches: Dict[int, str]) -> Dict[str, Any]:
         """Document complet prêt à être écrit (participants préservés)."""
         parts = (doc or {}).get("participants") or []
-        coach_ids = [cid for cid in (comp.coach1_id, comp.coach2_id, comp.coach3_id)
-                     if cid is not None]
         now = cls._now_iso()
         new_doc = {
             "id": comp.id,
@@ -222,14 +230,9 @@ class CompetitionFirestoreRepository:
             "helloasso_ref": comp.helloasso_ref or "",
             "url_resultats": comp.url_resultats or "",
             "resultats_synced_at": comp.resultats_synced_at or "",
-            "coaches": coach_names,
-            "coach_ids": coach_ids,
-            "coach1_id": comp.coach1_id,
-            "coach2_id": comp.coach2_id,
-            "coach3_id": comp.coach3_id,
-            "url_resultats": comp.url_resultats or "",
-            "resultats_synced_at": comp.resultats_synced_at or "",
             "whatsapp_link": comp.whatsapp_link or "",
+            "coach_ids": list(comp.coach_ids),
+            **cls._legacy_coach_fields(comp.coach_ids, coaches),
             "participants": parts,
             "created_at": (doc or {}).get("created_at") or now,
             "updated_at": now,
@@ -509,14 +512,15 @@ class CompetitionFirestoreRepository:
     def list_competition_docs(cls) -> List[Dict[str, Any]]:
         """Competition documents as stored (participants and counters included), most
         recent first: the shape the web pages use."""
-        docs = [cls._clean_doc(d) for d in cls._list_comp_docs()]
+        coaches = cls._coaches_map()
+        docs = [cls._api_doc(d, coaches) for d in cls._list_comp_docs()]
         docs.sort(key=lambda d: cls._comp_sort_key(d.get("date_competition"), d.get("id")), reverse=True)
         return docs
 
     @classmethod
     def get_competition_doc(cls, competition_id: int) -> Optional[Dict[str, Any]]:
         doc = cls._load_comp_doc(competition_id)
-        return cls._clean_doc(doc) if doc else None
+        return cls._api_doc(doc, cls._coaches_map()) if doc else None
 
     @classmethod
     def archive_past_competitions(cls, today_iso: str) -> List[int]:
@@ -542,9 +546,7 @@ class CompetitionFirestoreRepository:
         existing = cls._load_comp_doc(comp.id) if comp.id else None
         if comp.id is None:
             comp.id = cls._new_id()
-        coaches = cls._coaches_map()
-        coach_names = cls._coach_names((comp.coach1_id, comp.coach2_id, comp.coach3_id), coaches)
-        doc = cls._build_comp_doc(existing, comp, coach_names)
+        doc = cls._build_comp_doc(existing, comp, cls._coaches_map())
         doc.update(extra or {})
         if existing and (existing.get("_doc_id") or str(comp.id)) == str(comp.id):
             # Épreuve existante : mise à jour partielle des seules informations de
@@ -1276,13 +1278,14 @@ class CompetitionFirestoreRepository:
 
         def patch(ids):
             new_ids = [cid for cid in ids if cid != coach_id]
-            return {"coach_ids": new_ids, **cls._coach_slots(new_ids),
-                    "coaches": cls._coach_names(new_ids, coaches)}
+            return {"coach_ids": new_ids, **cls._legacy_coach_fields(new_ids, coaches)}
         cls._patch_competitions_of_coach(coach_id, patch, "Retrait du coach")
         return existed
 
     @classmethod
     def _refresh_coach_names(cls, coach_id: int, nom: str):
+        """Only for the stored `coaches` copy read by older desktop builds: the API resolves
+        names when it reads. Remove with plan C2 step B (fixes A10 for renames)."""
         coaches = {**cls._coaches_map(), coach_id: nom}
         cls._patch_competitions_of_coach(
             coach_id, lambda ids: {"coaches": cls._coach_names(ids, coaches)},
@@ -1293,7 +1296,7 @@ class CompetitionFirestoreRepository:
         """Applies `make_patch(coach_ids)` to every competition of the coach. One write per
         competition, no rollback: a failure is logged and the others still go through (A10)."""
         for doc in cls._list_comp_docs():
-            ids = doc.get("coach_ids") or []
+            ids = coach_ids_of(doc)
             if coach_id not in ids:
                 continue
             try:
@@ -1305,5 +1308,4 @@ class CompetitionFirestoreRepository:
 
     @classmethod
     def list_competitions_for_coach(cls, coach_id: int) -> List[Competition]:
-        return [c for c in cls.list_competitions()
-                if coach_id in (c.coach1_id, c.coach2_id, c.coach3_id)]
+        return [c for c in cls.list_competitions() if coach_id in c.coach_ids]
