@@ -25,9 +25,10 @@ def add_participant(competition_id: int, body: ParticipantAdd) -> Doc:
 @router.patch("/participants/{adherent_id}")
 def update_participant(competition_id: int, adherent_id: int, body: ParticipantUpdate) -> Doc:
     """409 `already_paid` when unselecting a participant who paid: the page then asks the
-    coach whether the money is lost or carried over (cancel route)."""
-    return Service.update_participant(competition_id, adherent_id,
-                                      selectionne=body.selectionne, present=body.present)
+    coach whether the money is lost or carried over (cancel route). With `unchanged_since`
+    (offline queue): 409 `changed` or `competition_closed`, see the service."""
+    return Service.update_participant(competition_id, adherent_id, selectionne=body.selectionne,
+                                      present=body.present, unchanged_since=body.unchanged_since)
 
 
 @router.post("/participants/{adherent_id}/manual-payment")

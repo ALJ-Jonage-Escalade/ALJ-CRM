@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from api.schemas.base import RequestBody
 from domain.competition_models import PAIEMENT_ANNULE_PERDU, PAIEMENT_ANNULE_REPORTE
@@ -21,6 +21,16 @@ class ParticipantAdd(RequestBody):
 class ParticipantUpdate(RequestBody):
     selectionne: Optional[bool] = None
     present: Optional[bool] = None  # pass-through field (plan appendix B)
+    # Change queued offline (plan phase 5b): the participant's `updated_at` the phone saw.
+    # Refused (409 `changed`) when the participant changed since. One flag per request, as
+    # the first write would change `updated_at` for the second.
+    unchanged_since: Optional[str] = Field(default=None, max_length=64)
+
+    @model_validator(mode="after")
+    def _one_flag_when_queued(self) -> ParticipantUpdate:
+        if self.unchanged_since is not None and (self.selectionne is None) == (self.present is None):
+            raise ValueError("unchanged_since needs exactly one of selectionne, present")
+        return self
 
 
 class ManualPayment(RequestBody):

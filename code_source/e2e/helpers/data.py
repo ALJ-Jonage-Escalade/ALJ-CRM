@@ -172,6 +172,11 @@ result = cid
         self._run("Repo.apply_helloasso_payment(args['cid'], args['aid'], args['amount'], order_ref=args['ref'])\n"
                   "result = True", cid=competition_id, aid=adherent_id, amount=amount, ref=order_ref)
 
+    def set_selection(self, competition_id: int, adherent_id: int, selectionne: bool) -> None:
+        """« Participe » changed elsewhere (desktop app, another coach): same repository call."""
+        self._run("Repo.set_selection(args['cid'], args['aid'], args['value'])\nresult = True",
+                  cid=competition_id, aid=adherent_id, value=selectionne)
+
     def competition(self, competition_id: int):
         """The competition document as stored (participants embedded), or None."""
         return self._run("result = Repo._load_comp_doc(args['cid'])", cid=competition_id)

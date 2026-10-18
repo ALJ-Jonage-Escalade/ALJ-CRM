@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- Version de la page web : à incrémenter à chaque modification, en même temps que CACHE_NAME dans sw.js -->
-<meta name="alj-web-version" content="24">
-<title>ALJ Escalade — Gestion des Compétitions (v24)</title>
+<meta name="alj-web-version" content="25">
+<title>ALJ Escalade — Gestion des Compétitions (v25)</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#1E293B">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -160,7 +160,7 @@
 
 <header>
   <div class="title">
-    <b>🏆 ALJ Escalade — Compétitions <span class="web-version" id="web-version">v24</span></b>
+    <b>🏆 ALJ Escalade — Compétitions <span class="web-version" id="web-version">v25</span></b>
     <small id="sync-info">Connexion à Firebase…</small>
   </div>
   <a class="icon-btn" id="annuaire-link" href="/index?vue=pwa" title="Annuaire des adhérents" style="display:none;align-items:center;text-decoration:none">📇</a>
@@ -196,8 +196,10 @@
         </div>
 
         <p style="font-size:12.5px; line-height:1.5;">📴 <b>Sans réseau</b> (salle, compétition) : les épreuves,
-           les compétiteurs et leurs contacts d'urgence restent consultables en lecture seule, s'ils ont été
-           chargés en ligne au cours des 30 derniers jours. Ils sont effacés à la déconnexion. Sur iPhone,
+           les compétiteurs et leurs contacts d'urgence restent consultables, s'ils ont été chargés en ligne au
+           cours des 30 derniers jours. Seule la case « Participe » peut être changée : la modification
+           (⏳ à envoyer) part au retour du réseau, et elle est refusée si le compétiteur a été modifié
+           entre-temps ailleurs. Tout est effacé à la déconnexion. Sur iPhone,
            ajoutez la page à l'écran d'accueil (Partager → « Sur l'écran d'accueil ») : sinon Safari efface
            ces données après 7 jours sans visite.</p>
         <div class="btn-row">
@@ -586,7 +588,9 @@ let pollsByName = {};            // the same, by resource name (SYNC_SOURCES)
 let syncRun = 0;                 // startSync generation: a newer start or a stop cancels an older one
 let loaded = new Set();          // resources received at least once (or read from the store)
 let lastSyncAt = null;
-let isOffline = false;           // last poll failed for lack of network: writes are refused
+let isOffline = false;           // last poll failed for lack of network: writes are refused or queued
+let outbox = new Map();          // changes made offline, not sent yet (plan phase 5b): key -> entry
+let syncMsg = "";                // sync status shown in the header, before the outbox count
 let editCompId = null;           // id de la compétition en cours d'édition
 let editSourcePage = null;       // page d'où l'édition a été déclenchée
 let helloassoItems = [];         // documents de la collection "helloasso_items"
@@ -755,7 +759,11 @@ function showPage(name) {
     renderHelloAssoPage();
   }
 }
-function setSyncInfo(msg) { $("#sync-info").textContent = msg; }
+function setSyncInfo(msg) {
+  syncMsg = msg;
+  const n = outbox.size;
+  $("#sync-info").textContent = msg + (n ? ` · ⏳ ${n} modification${n > 1 ? "s" : ""} à envoyer` : "");
+}
 
 /* ===================== Authentification Firebase ===================== */
 /* Flux : OAuth Google implicite (même origine, client 796572126711) puis
@@ -780,6 +788,9 @@ function login() {
   location.assign(url);
 }
 function logout() {
+  const n = outbox.size;
+  if (n && !confirm(`${n} modification${n > 1 ? "s" : ""} faite${n > 1 ? "s" : ""} hors ligne `
+      + `pas encore envoyée${n > 1 ? "s" : ""} ser${n > 1 ? "ont" : "a"} perdue${n > 1 ? "s" : ""}. Se déconnecter ?`)) return;
   auth.signOut().catch(() => {});
 }
 function readOauthFragment() {
@@ -821,7 +832,8 @@ auth.onAuthStateChanged(async u => {
     startSync();
   } else {
     stopSync();
-    ALJStore.clearAll();  // no participant data left on the phone after logout
+    ALJStore.clearAll();  // no participant data (nor unsent change) left on the phone after logout
+    outbox = new Map();
     $("#setup-not-logged").style.display = "block";
     $("#setup-logged").style.display = "none";
     loaded = new Set();
@@ -857,6 +869,9 @@ async function startSync() {
   lastSyncAt = null;
   const uid = user && user.uid;
   await ALJStore.start(uid);
+  const queued = await ALJStore.queued(uid);
+  if (run !== syncRun) return;
+  outbox = new Map(queued.map(e => [e.key, e]));
   const needed = resourcesNeeded();
   const etags = {};
   for (const name of STORED_RESOURCES.filter(n => needed.includes(n))) {
@@ -909,21 +924,126 @@ function onSyncStatus(name, status, info) {
     isOffline = false;
     lastSyncAt = new Date();
     setSyncInfo("☁️ À jour — " + fmtDate(lastSyncAt.toISOString()));
+    flushOutbox();  // network back: the changes made offline are sent
     return;
   }
   if (status === "offline") {
     isOffline = true;
     const since = lastSyncAt ? " — données du " + fmtDate(lastSyncAt.toISOString()) : "";
-    setSyncInfo("📴 Hors ligne" + since + " (lecture seule)");
+    setSyncInfo("📴 Hors ligne" + since);
     return;
   }
   console.error("API " + name + " :", info);
   if (info && (info.status === 401 || info.status === 403)) {
-    ALJStore.clearAll();  // role lost: nothing kept on the phone (plan phase 5)
+    roleLost();
     setSyncInfo("🔒 Accès restreint (" + name + ")");
   }
   else setSyncInfo("⚠️ Serveur injoignable — nouvel essai automatique");
 }
+/* Role lost (401/403): nothing kept on the phone (plan phase 5), unsent changes included. */
+function roleLost() {
+  ALJStore.clearAll();
+  outbox = new Map();
+  setSyncInfo(syncMsg);
+}
+
+/* ===================== Changes made offline (plan phase 5b) ===================== */
+/* Without network, a coach can still switch « Participe » on a competitor already listed:
+   the change shows at once, is kept in the phone's outbox (ALJStore) and is sent when the
+   network comes back, with the participant's `updated_at` the coach saw. The server
+   refuses it when the participant changed meanwhile (another coach, the bureau page, the
+   desktop app, a payment) or the competition was archived: the change is then dropped and
+   the coach told, never merged. Every other change needs the network. */
+const QUEUED_URL = /^\/api\/competitions\/\d+\/participants\/\d+$/;
+const QUEUED_FLAGS = ["selectionne"];
+let flushing = false;
+
+function outboxKey(compId, adherentId, flag) {
+  return compId + ":" + adherentId + ":" + flag;
+}
+function isOnline() {
+  return !isOffline && navigator.onLine !== false;
+}
+/* A second change of the same flag replaces the first; switching back to the value the
+   server has cancels it. */
+async function queueFlag(c, p, flag, value) {
+  const key = outboxKey(c.id, p.adherent_id, flag);
+  const prev = outbox.get(key);
+  const uid = user && user.uid;
+  if (value === !!p[flag]) {
+    outbox.delete(key);
+    await ALJStore.unqueue(key);
+  } else {
+    const entry = {
+      key, uid, flag, value,
+      url: compUrl(c.id, "/participants/" + Number(p.adherent_id)),
+      unchanged_since: String(p.updated_at || ""),
+      label: `${p.nom || ""} ${p.prenom || ""} (${c.nom || "compétition"})`.trim(),
+      queuedAt: prev ? prev.queuedAt : Date.now()
+    };
+    outbox.set(key, entry);
+    await ALJStore.queue(uid, entry);
+  }
+  setSyncInfo(syncMsg);
+  renderAll();
+  toast("⏳ Hors ligne : modification gardée sur le téléphone, envoyée au retour du réseau.", 6000);
+}
+function refusalText(e) {
+  if (e.code === "changed") return "modifié entre-temps sur un autre appareil";
+  if (e.code === "already_paid") return "a payé entre-temps : passez par l'annulation";
+  if (e.code === "competition_closed") return "compétition archivée";
+  if (e.status === 404) return "n'est plus inscrit à cette compétition";
+  return e.message || ("HTTP " + e.status);
+}
+async function dropQueued(entry) {
+  if (outbox.get(entry.key) !== entry) return;  // changed again meanwhile: the new one stays
+  outbox.delete(entry.key);
+  await ALJStore.unqueue(entry.key);
+}
+/* Sends the outbox, oldest first. Refused changes are dropped and listed; without network
+   or with the server down, what is left stays for the next try. */
+async function flushOutbox() {
+  if (flushing || !outbox.size || !user || !isOnline()) return;
+  flushing = true;
+  const run = syncRun;
+  const uid = user.uid;
+  const refused = [];
+  let done = 0;
+  try {
+    for (const entry of [...outbox.values()].sort((a, b) => a.queuedAt - b.queuedAt)) {
+      if (run !== syncRun) return;
+      // Only the route and flag the queue allows, for this account (the store is local data)
+      if (entry.uid === uid && QUEUED_URL.test(entry.url) && QUEUED_FLAGS.includes(entry.flag)
+          && typeof entry.value === "boolean") {
+        try {
+          await ALJSync.request(apiFetch, "PATCH", entry.url,
+            { [entry.flag]: entry.value, unchanged_since: String(entry.unchanged_since || "") });
+        } catch (e) {
+          if (e.status === undefined || e.status >= 500 || e.status === 429) break;  // kept for later
+          if (e.status === 401 || e.status === 403) { roleLost(); return; }
+          refused.push(entry.label + " : " + refusalText(e));
+        }
+      } else {
+        refused.push((entry.label || "?") + " : modification non valide, non envoyée");
+      }
+      await dropQueued(entry);
+      done++;
+    }
+  } finally {
+    flushing = false;
+    if (run === syncRun) setSyncInfo(syncMsg);
+  }
+  if (run !== syncRun || !done) return;
+  if (refused.length) {
+    toast(`⚠️ ${refused.length} modification${refused.length > 1 ? "s" : ""} faite${refused.length > 1 ? "s" : ""} `
+      + "hors ligne refusée" + (refused.length > 1 ? "s" : "") + " : " + refused.join(" ; "), 15000);
+  } else {
+    toast("☁️ Modifications faites hors ligne envoyées.");
+  }
+  renderAll();
+  syncNow();
+}
+
 /* Page active absente (premier rendu) ou page de connexion : la liste des
    compétitions doit s'afficher dès que l'utilisateur est reconnu (F5). */
 function isSetupPageActive() {
@@ -975,8 +1095,8 @@ function compUrl(compId, suffix = "") {
   return "/api/competitions/" + encodeURIComponent(String(compId)) + suffix;
 }
 async function apiWrite(method, url, body) {
-  if (isOffline || navigator.onLine === false) {
-    toast("📴 Hors ligne : modification impossible (lecture seule).", 6000);
+  if (!isOnline()) {
+    toast("📴 Hors ligne : seule la case « Participe » d'un compétiteur inscrit peut être modifiée.", 6000);
     throw new Error("offline");
   }
   let data;
@@ -1315,8 +1435,11 @@ function competitionAdherents(compId) {
   return (c.participants || []).map(p => {
     const adh = findAdherent(p.adherent_id) || {};
     const contact = findCompetitor(p.adherent_id) || {};
+    const queued = outbox.get(outboxKey(c.id, p.adherent_id, "selectionne"));
     return Object.assign({}, p, {
       competition_id: c.id,
+      selectionne: queued ? queued.value : p.selectionne,
+      queued: !!queued,
       tarif: adh.tarif || p.tarif || "",
       phone: contact.phone || p.phone || "",
       groupe: adh.creneau_groupe || contact.creneau_groupe || "",
@@ -1417,6 +1540,7 @@ function renderParticipants() {
         </label>
         <div style="flex:1;min-width:0">
           <div class="m-name">${esc(p.nom)} ${esc(p.prenom)}</div>
+          ${p.queued ? `<div class="queued-flag" title="Modifié hors ligne : sera envoyé au retour du réseau" style="font-size:11px; font-weight:700; color:#B45309;">⏳ à envoyer</div>` : ""}
           <div class="m-sub">🪪 ${esc(p.num_licence || "sans licence")} · ${esc(p.tarif || "—")}${p.commande_helloasso && isCoach ? ` · 🧾 ${esc(p.commande_helloasso)}` : ""}${p.date_synchro_helloasso && isCoach ? ` · 🔄 ${esc(p.date_synchro_helloasso)}` : ""}${p.note_paiement && isCoach ? ` · 📝 ${esc(p.note_paiement)}` : ""}</div>
           ${p.phone && isCoach ? `<div style="margin-top:4px"><a href="tel:${esc(p.phone)}" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; border-radius:6px; padding:2px 8px;">📞 ${esc(p.phone)}</a></div>` : ""}
           ${isCoach ? emergencyContacts(p).map(([nom, tel]) => `<div style="margin-top:4px"><a href="tel:${esc(tel)}" title="Contact d'urgence" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; background:#FEF2F2; color:#B91C1C; border:1px solid #FECACA; border-radius:6px; padding:2px 8px;">🚨 ${esc(nom || "Urgence")} · ${esc(tel)}</a></div>`).join("") : ""}
@@ -1444,6 +1568,10 @@ async function toggleSelection(compId, adherentId, checked) {
     openCancelModal(compId, adherentId, c);
     return;
   }
+  if (existing && !isOnline()) {
+    await queueFlag(c, existing, "selectionne", !!checked);  // sent when the network comes back
+    return;
+  }
   try {
     if (existing) {
       await apiWrite("PATCH", compUrl(c.id, "/participants/" + Number(adherentId)), { selectionne: !!checked });
@@ -1455,6 +1583,10 @@ async function toggleSelection(compId, adherentId, checked) {
       // Paid meanwhile (HelloAsso webhook): the coach decides what happens to the money
       await syncNow();
       openCancelModal(compId, adherentId, findComp(compId) || c);
+      return;
+    }
+    if (e.message === "offline" && existing) {  // the network dropped during the request
+      await queueFlag(c, existing, "selectionne", !!checked);
       return;
     }
     writeFailed(e);

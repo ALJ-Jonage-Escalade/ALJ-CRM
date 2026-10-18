@@ -8,8 +8,12 @@
      MAX_AGE_DAYS: the whole store is then wiped).
    - save(name, uid, data, etag); touch(name, uid) when the server confirmed the data (304):
      only a small "confirmed:<name>" record in meta is written, not the data again.
-   - clearAll(): logout, loss of role (401/403). Writes of a start/save/touch begun before it
-     are dropped, so a cleared store is not filled again by work still in progress.
+   - Outbox of the changes made offline (plan phase 5b), sent by the page when the network
+     comes back: queue(uid, entry) adds or replaces entry.key, queued(uid) lists this user's
+     entries, unqueue(key) removes one.
+   - clearAll(): logout, loss of role (401/403); the outbox goes too. Writes of a start/save/
+     touch/queue begun before it are dropped, so a cleared store is not filled again by work
+     still in progress.
 
    Every failure (IndexedDB missing or blocked, private window, quota) only means "no
    offline copy": the page then behaves as online-only. Calls never reject. */
@@ -17,7 +21,7 @@
   "use strict";
 
   const DB_NAME = "alj-offline";
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;  // 2: outbox (phase 5b)
   const MAX_AGE_DAYS = 30;  // plan O4: limits what a lost phone exposes
   const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 3600 * 1000;
   const LEGACY_PREFIX = "alj_snapshot:";  // phase 0-4 snapshots in localStorage
@@ -35,6 +39,7 @@
           const db = req.result;
           if (!db.objectStoreNames.contains("resources")) db.createObjectStore("resources", { keyPath: "name" });
           if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
+          if (!db.objectStoreNames.contains("outbox")) db.createObjectStore("outbox", { keyPath: "key" });
         };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => resolve(null);
@@ -132,10 +137,26 @@
     await put(epoch, "meta", { key: "confirmed:" + name, uid, at: Date.now() });
   }
 
+  async function queue(uid, entry) {
+    if (!uid || !entry || !entry.key) return;
+    await put(epoch, "outbox", Object.assign({}, entry, { uid }));
+  }
+
+  async function queued(uid) {
+    if (!uid) return [];
+    const all = await run("outbox", "readonly", s => s.getAll());
+    return (all || []).filter(e => e && e.uid === uid);
+  }
+
+  async function unqueue(key) {
+    await run("outbox", "readwrite", s => s.delete(key));
+  }
+
   async function clearAll() {
     epoch++;
     await run("resources", "readwrite", s => s.clear());
     await run("meta", "readwrite", s => s.clear());
+    await run("outbox", "readwrite", s => s.clear());
     const ls = legacyStorage();
     try {
       const keys = [];
@@ -147,5 +168,5 @@
     } catch (e) { /* nothing stored */ }
   }
 
-  window.ALJStore = Object.freeze({ start, load, save, touch, clearAll, MAX_AGE_DAYS });
+  window.ALJStore = Object.freeze({ start, load, save, touch, queue, queued, unqueue, clearAll, MAX_AGE_DAYS });
 })();

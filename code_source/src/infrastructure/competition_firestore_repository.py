@@ -24,7 +24,7 @@ import time
 import datetime
 import json
 import re
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Callable, Dict, Any, List, Optional, Tuple
 
 from domain.competition_models import (
     LEGACY_COACH_SLOTS,
@@ -70,6 +70,31 @@ _MAX_WRITE_ATTEMPTS = 5
 class ParticipantAlreadyPaid(Exception):
     """Unselecting a participant who already paid requires the coach's cancellation
     decision (money lost or carried over), not a plain toggle."""
+
+
+class ParticipantChanged(Exception):
+    """The participant row changed since the client read it (its `updated_at` differs): a
+    change queued offline is refused rather than overwrite a newer one (plan phase 5b)."""
+
+
+# Row guard of _update_participant: False leaves the row as it is, an exception refuses the write
+RowGuard = Callable[[Dict[str, Any]], bool]
+
+
+def unchanged_since_guard(field: str, value: bool, seen_updated_at: Optional[str]) -> Optional[RowGuard]:
+    """Guard of a flag change sent with the row's `updated_at` the client saw. Flag already at
+    `value`: nothing to write (so a replayed request is harmless). Otherwise the row must not
+    have changed since: ParticipantChanged. None (no guard) when `seen_updated_at` is None."""
+    if seen_updated_at is None:
+        return None
+
+    def guard(p: Dict[str, Any]) -> bool:
+        if bool(p.get(field)) == bool(value):
+            return False
+        if str(p.get("updated_at") or "") != seen_updated_at:
+            raise ParticipantChanged(field)
+        return True
+    return guard
 
 
 class ItemAlreadyLinked(Exception):
@@ -693,9 +718,12 @@ class CompetitionFirestoreRepository:
 
     @classmethod
     def _update_participant(cls, competition_id: int, adherent_id: int, change,
-                            add_missing: Optional[bool] = None) -> Optional[Dict[str, Any]]:
+                            add_missing: Optional[bool] = None,
+                            guard: Optional[RowGuard] = None) -> Optional[Dict[str, Any]]:
         """Applies `change(p)` to the member's participant row(s), stamping `updated_at`
         first (`change` may override it). `change` returns False to leave a row as it was.
+        `guard(p)` sees the row before the stamp: False skips it, an exception refuses the
+        write (checked again on every retry of the optimistic lock).
 
         Member not listed: a new row is added with `selectionne=add_missing`, or nothing is
         written when `add_missing` is None. Returns the written document, or None when
@@ -706,6 +734,8 @@ class CompetitionFirestoreRepository:
                 if p.get("adherent_id") != adherent_id:
                     continue
                 found = True
+                if guard is not None and not guard(p):
+                    continue
                 before = dict(p)
                 p["updated_at"] = cls._now_iso()
                 if change(p) is False:
@@ -763,11 +793,13 @@ class CompetitionFirestoreRepository:
 
     @classmethod
     def set_selection_doc(cls, competition_id: int, adherent_id: int, selectionne: bool,
-                          refuse_unselect_paid: bool = False) -> Optional[Dict[str, Any]]:
+                          refuse_unselect_paid: bool = False,
+                          unchanged_since: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """`refuse_unselect_paid`: raise ParticipantAlreadyPaid instead of unselecting a
         participant who paid (checked on the fresh document, so a payment recorded
-        meanwhile by the webhook is seen). None: unknown competition, or unselecting a
-        member not listed (nothing to write)."""
+        meanwhile by the webhook is seen). `unchanged_since`: see unchanged_since_guard; the
+        member must then be listed already. None: unknown competition, member not listed
+        where that applies, or nothing to change."""
         def change(p):
             if (refuse_unselect_paid and not selectionne
                     and (p.get("statut_paiement") or "") == PAIEMENT_PAYE):
@@ -776,13 +808,18 @@ class CompetitionFirestoreRepository:
             nouveau = statut_paiement_apres_bascule(p.get("statut_paiement"), selectionne)
             if nouveau:
                 p["statut_paiement"] = nouveau
-        return cls._update_participant(competition_id, adherent_id, change, add_missing=selectionne)
+        guard = unchanged_since_guard("selectionne", selectionne, unchanged_since)
+        return cls._update_participant(competition_id, adherent_id, change,
+                                       add_missing=selectionne if guard is None else None, guard=guard)
 
     @classmethod
-    def set_present_doc(cls, competition_id: int, adherent_id: int, present: bool) -> Optional[Dict[str, Any]]:
-        """Attendance flag (pass-through field of the bureau page, appendix B of the plan)."""
+    def set_present_doc(cls, competition_id: int, adherent_id: int, present: bool,
+                        unchanged_since: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Attendance flag (pass-through field of the bureau page, appendix B of the plan).
+        `unchanged_since`: see unchanged_since_guard."""
         return cls._update_participant(competition_id, adherent_id,
-                                       lambda p: p.update(present=bool(present)))
+                                       lambda p: p.update(present=bool(present)),
+                                       guard=unchanged_since_guard("present", present, unchanged_since))
 
     @classmethod
     def set_present(cls, competition_id: int, adherent_id: int, present: bool) -> bool:

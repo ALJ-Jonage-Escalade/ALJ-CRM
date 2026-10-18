@@ -34,8 +34,8 @@ The plan file is updated with any decisions taken during a review. Nothing is co
 | 2 | Done (approved) | See « Phase 2 — as built » below. |
 | 3 | Done (approved) | Code only; nothing deployed. See « Phase 3 — as built » below for the deploy order. |
 | 4 | Done (approved) | C1 done; C2 step A done (step B waits for every club PC to run the new desktop version). See « Phase 4 — as built » below. |
-| 5a | Done, awaiting review | Offline storage on the phone, read-only: IndexedDB store, competitions + coaches + competitor contacts (O1, O2 decided 2026-10-18), 30 days (O4). See « Phase 5a — as built ». |
-| 5b | Not started | Offline write queue (O3): waits for the conflict analysis. |
+| 5a | Done (approved) | Offline storage on the phone, read-only: IndexedDB store, competitions + coaches + competitor contacts (O1, O2 decided 2026-10-18), 30 days (O4). See « Phase 5a — as built ». |
+| 5b | Done, awaiting review | Offline queue of « Participe », refused when the participant changed meanwhile (decided 2026-10-18). See « Phase 5b — as built ». |
 
 ## Decisions taken (from review Q&A)
 
@@ -392,7 +392,7 @@ Consequences:
 |---|---|---|---|
 | O1 | What does the phone keep? | (a) As D2: competitions + coaches. (b) Plus the competition member list (names, licence, category) and HelloAsso items for coaches. (c) Plus the directory, active season only. | **Decided (2026-10-18): (a) plus the contacts of the competitors** (participants of competitions that are not archived), for coaches only. The phone is used by coaches during competitions. The directory, the competition member list and the HelloAsso items stay online only (they serve writes, which are refused offline anyway). |
 | O2 | Which member fields are kept offline? | (a) Everything `/api/members` returns, including health, emergency contacts and addresses of minors. (b) Contact fields only: name, phone, e-mail, slot group, emergency contacts. (c) Names and slot group only. | **Decided (2026-10-15), scope narrowed 2026-10-18: (b) for competitors only.** Offline fields: `adherent_id`, `last_name`, `first_name`, `phone`, `creneau_groupe`, `emergency1_name`, `emergency1_phone`, `emergency2_name`, `emergency2_phone`. Health fields are **not** kept: `health_commitment` and `document_sante` only record that the FFME form was done, which is of no use at a venue. Addresses and e-mails stay online only. The server returns this subset through `GET /api/members/competitors` (coach), so the phone never receives the other fields. |
-| O3 | Offline writes? (phase 5b) | (a) None: read-only offline, as today. (b) A queue for **participant flags only** (selection, presence), sent when the network returns. (c) A queue for every write. | **(b).** These are the actions a coach takes at a venue. They set a value, so a resend repeats the same result. Payments, cancellations, HelloAsso links and competition edits stay online only: they carry money, or rules (`already_paid`, `already_linked`) that need the current server state. **Accepted in principle (2026-10-15), not ready to implement:** conflict handling must be analysed first. See « Conflict handling — notes for later analysis » below. |
+| O3 | Offline writes? (phase 5b) | (a) None: read-only offline, as today. (b) A queue for **participant flags only** (selection, presence), sent when the network returns. (c) A queue for every write. | **(b).** These are the actions a coach takes at a venue. They set a value, so a resend repeats the same result. Payments, cancellations, HelloAsso links and competition edits stay online only: they carry money, or rules (`already_paid`, `already_linked`) that need the current server state. **Decided (2026-10-18), kept simple:** two or three coaches per competition, rarely all offline at once. A queued change is **refused** when the participant changed since the phone read it, never merged; no resolve screen. See « Phase 5b — as built ». |
 | O4 | How long does local data live? | (a) Until logout. (b) Plus a maximum age. | **Decided (2026-10-15): (b), 30 days**, then the store is dropped and the page asks to reconnect. Limits what a lost phone exposes. |
 
 #### Design (decided points, plus the recommendations still open)
@@ -462,7 +462,7 @@ Consequences:
 Read-only offline. The write queue (O3) is phase 5b.
 
 - **Server.** `GET /api/members/competitors` (`api/members.py` → `MemberService.list_competitors`), coach only (default role of `/api/members`; it is not in `READONLY_READ_PREFIXES`).
-  - Competitors = every participant (selected or not) of a competition whose `statut` is not `close`.
+  - Competitors = every participant (selected or not) of a competition whose `statut` is not `close`. **Confirmed 2026-10-18:** all competitors, not only the selected ones.
   - Fields: `adherent_id` plus `member_view.COMPETITOR_FIELDS` (`last_name`, `first_name`, `phone`, `creneau_groupe`, `emergency1/2_name`, `emergency1/2_phone`), formatted like the directory. Read from the SQLite cache, active season; a participant with no purchase in the active season is left out, and the page then falls back to the copy in the participant (`phone`, `urgence_nom`/`urgence_tel`, first contact only).
   - Same ETag / `no-store` handling as the other GET routes.
 - **Store.** `web/shared/alj-store.js` (`window.ALJStore`): IndexedDB `alj-offline`, stores `resources` and `meta` (the `outbox` comes with 5b). `start(uid)`, `load`, `save`, `touch`, `clearAll`.
@@ -483,9 +483,38 @@ Read-only offline. The write queue (O3) is phase 5b.
 - **e2e failures not caused by this phase** (same on HEAD before it): `test_helloasso.py` ×2, `bureau/test_competitions.py` (`test_coach_cannot_edit_in_office`, `test_withdrawal_of_paid_competitor` ×2, `test_season_balance` flaky), `mobile/test_coaches_balance.py::test_coach_changes_reach_competitions`, `mobile/test_competitions.py::test_archive_past_competitions` (passes alone: the 5 s server cache of the competition list hides a competition the test wrote straight to Firestore).
 - **Not verified:** a real Android phone and iPhone (iOS 7-day eviction, `persist()` answer).
 
-#### Conflict handling — notes for later analysis
+#### Phase 5b — as built (deviations and notes for review)
 
-To settle before implementing the queue (O3). Nothing here is decided.
+**Rule.** A change made offline is applied only if nothing touched the participant since the phone read it. Otherwise it is dropped and the coach is told. Nothing is merged, and there is no resolve screen.
+
+- **Why `updated_at`, not the flag value (option 2 of the notes below, changed).** For a yes/no flag, comparing the value never sees a conflict. Coach B unselecting then selecting again leaves the value A saw, and A's older change would overwrite B's newer decision. So the phone sends the participant row's `updated_at`, which every writer stamps (API, desktop app, webhook, all through `_update_participant`). This is close to option 3, with the row's existing timestamp instead of a new `rev`.
+  - Consequence: a payment or any other change of the row meanwhile also refuses the queued change (false conflict: the coach does it again online). **Accepted 2026-10-18.**
+  - `updated_at` has a one-second resolution. Two writes in the same second as the phone's read would not be told apart; negligible for a change made offline.
+- **Server.** `PATCH /api/competitions/{id}/participants/{aid}` takes `unchanged_since` (the `updated_at` the phone saw, at most 64 characters), with exactly one flag (422 otherwise: the first write would change `updated_at` for the second).
+  - Repository: `unchanged_since_guard` → `guard` of `_update_participant`, checked on the fresh row inside the optimistic lock, so on every retry.
+  - Flag already at the new value: 200, nothing written (K2, and a replay is harmless: K9).
+  - Row changed: 409 `changed` (K3, K8). Paid meanwhile: 409 `changed` (the payment changed the row) or `already_paid` (K4). Participant removed or competition deleted: 404, and the participant is never re-added (K5). Archived competition: 409 `competition_closed` (K6, queued changes only; online changes are unchanged). Role lost: 401/403 (K7).
+  - Without `unchanged_since`, nothing changes (desktop app, bureau page, online PWA).
+- **Phone.**
+  - Queued: only « Participe » of a competitor already listed (`QUEUED_URL`, `QUEUED_FLAGS`). Adding a member, payments, cancellation (a paid competitor's unselect opens the cancel dialog, which needs the network), competition and coach edits, HelloAsso: still refused offline.
+  - Also queued when the network drops during the request.
+  - `ALJStore` gets an `outbox` object store (database version 2), wiped by `clearAll` with the rest. Entries carry the `uid` and are sent only for that account; an entry that does not match the allowed route and flag is reported as refused, never sent.
+  - A second change of the same flag replaces the first; switching back to the server value cancels it.
+  - Shown at once with « ⏳ à envoyer » on the card and « ⏳ N modification(s) à envoyer » in the header; kept across a restart.
+  - Sent oldest first on the first successful poll after the network is back, one request each. No network, 5xx or 429: kept for later. 401/403: everything wiped. Other refusals: dropped and listed in one toast with the reason.
+  - Logout with unsent changes asks for confirmation.
+  - Not done: `present` is accepted by the server but the phone has no presence switch; `Idempotency-Key` (not needed for flags); a batch route.
+- **Tests.**
+  - API: `tests/api/test_api_offline_queue.py`, one test per situation K1-K9, plus online writes unchanged and the 422 cases.
+  - Static: `test_mobile_pwa.py::test_offline_queue`.
+  - e2e (`e2e/test_offline.py`): a change made offline survives a restart and arrives when back online; a change made offline after which the participant was unselected and selected again elsewhere is refused and the server value kept; other writes still refused offline.
+- **Found while testing:** the flush's account check dropped a fresh entry (only the stored copy carried the `uid`) and still announced « envoyées ». Fixed, and a failed check now counts as refused.
+- **e2e failures not caused by this phase** (also on HEAD `9456694`): the seven of 5a, plus `bureau/test_competitions.py::test_register_a_member` and `mobile/test_coaches_balance.py::test_balance_of_an_athlete`, which passed during 5a.
+- **Not verified:** real phones, as for 5a.
+
+#### Conflict handling — analysis notes (settled by phase 5b above)
+
+Kept for reference; the decision is « Phase 5b — as built ».
 
 **Situations to cover.** Coach A changes a flag offline at 10:00. The queue is sent at 14:00. Meanwhile:
 

@@ -104,13 +104,34 @@ class TestMobilePWA(unittest.TestCase):
         on_logout = html[html.index("auth.onAuthStateChanged"):html.index("/* ===================== Synchronisation")]
         self.assertIn("ALJStore.clearAll()", on_logout)
         on_denied = html[html.index("info.status === 401 || info.status === 403"):]
-        self.assertLess(on_denied.index("ALJStore.clearAll()"), on_denied.index("setSyncInfo("))
+        self.assertLess(on_denied.index("roleLost()"), on_denied.index("setSyncInfo("))  # wipes the store
         with open(get_sw().path, "r", encoding="utf-8") as f:
             self.assertIn('"/static-web/alj-store.js"', f.read())
         with open(os.path.join(web_dir, "shared", "alj-store.js"), "r", encoding="utf-8") as f:
             store = f.read()
         self.assertIn("const MAX_AGE_DAYS = 30;", store)
         self.assertIn("navigator.storage.persist()", store)
+        self.assertIn('await run("outbox", "readwrite", s => s.clear());', store)  # clearAll empties the outbox
+
+    def test_offline_queue(self):
+        """Phase 5b: only « Participe » on a listed competitor is queued offline, sent with the
+        participant's updated_at (the server refuses it if the participant changed), and the
+        outbox is wiped with the store."""
+        with open(get_competitions_page().path, "r", encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn(r"const QUEUED_URL = /^\/api\/competitions\/\d+\/participants\/\d+$/;", html)
+        self.assertIn('const QUEUED_FLAGS = ["selectionne"];', html)
+        self.assertEqual(html.count("queueFlag(c, existing,"), 2)  # offline before the request, or cut during it
+        self.assertIn('unchanged_since: String(entry.unchanged_since || "")', html)
+        flush = html[html.index("async function flushOutbox()"):html.index("/* Page active absente")]
+        self.assertIn('"PATCH"', flush)
+        self.assertIn("entry.uid === uid && QUEUED_URL.test(entry.url)", flush)
+        self.assertIn("roleLost()", flush)  # 401/403 while sending
+        role_lost = html[html.index("function roleLost()"):html.index("/* =====", html.index("function roleLost()"))]
+        self.assertIn("ALJStore.clearAll()", role_lost)
+        self.assertIn("outbox = new Map()", role_lost)
+        logout = html[html.index("function logout()"):html.index("function readOauthFragment()")]
+        self.assertIn("confirm(", logout)  # unsent changes: warned before they are lost
 
     def test_competitions_html_pwa_and_email_features(self):
         resp = get_competitions_page()

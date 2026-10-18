@@ -1,6 +1,7 @@
-"""Mobile app without network (docs/plan_api_only_front.md, phase 5a): the last data received is kept
-in IndexedDB (web/shared/alj-store.js) and shown read-only; writes are refused. Competitors' emergency
-contacts are kept for coaches only, and the store is wiped on logout.
+"""Mobile app without network (docs/plan_api_only_front.md, phase 5): the last data received is kept
+in IndexedDB (web/shared/alj-store.js). Competitors' emergency contacts are kept for coaches only, and
+the store is wiped on logout. Offline, only « Participe » can be changed (5b): kept in the outbox and
+sent when the network comes back, refused if the participant changed meanwhile.
 
 Service workers are blocked in the e2e contexts, so "offline" is simulated by making every API call fail
 while the page itself still loads."""
@@ -27,13 +28,13 @@ def stored(page, name):
     return page.evaluate(_STORED, name)
 
 
-def wait_stored(page, name, check=lambda data: True):
+def wait_stored(page, name, check=lambda data: True, timeout=None):
     """The page saves after rendering: retried until the record is there and passes `check`."""
     def ready():
         data = stored(page, name)
         assert data is not None and check(data), data
         return data
-    return eventually(ready)
+    return eventually(ready, timeout=timeout)
 
 
 @pytest.fixture
@@ -47,6 +48,27 @@ def competition(test_data):
 
 def emergency_links(page, member):
     return participant_card(page, member).locator("a[title=\"Contact d'urgence\"]")
+
+
+def go_offline(page, mobile_context, competition) -> None:
+    """Page restarted from the store with the API unreachable, then the network cut."""
+    # Up to one poll (20 s): the server caches the competition list for 5 s
+    wait_stored(page, "competitions", lambda data: any(c["id"] == competition["id"] for c in data), timeout=30)
+    mobile_context.route("**/api/**", lambda route: route.abort("internetdisconnected"))
+    page.reload()
+    expect(competition_card(page, competition["nom"])).to_be_visible()
+    mobile_context.set_offline(True)
+    expect(page.locator("#sync-info")).to_contain_text("Hors ligne")
+
+
+def go_online(page, mobile_context) -> None:
+    mobile_context.unroute("**/api/**")
+    mobile_context.set_offline(False)
+
+
+def participe(test_data, competition) -> bool:
+    doc = test_data.competition(competition["id"])
+    return next(p for p in doc["participants"] if p["adherent_id"] == competition["member"]["id"])["selectionne"]
 
 
 def test_competitors_shown_offline_read_only(mobile_page, mobile_context, competition):
@@ -72,10 +94,62 @@ def test_competitors_shown_offline_read_only(mobile_page, mobile_context, compet
         expect(page.locator("#sync-info")).to_contain_text("Hors ligne")
         open_participants(page, competition["nom"])
         expect(emergency_links(page, member)).to_have_count(1)
-        participant_card(page, member).locator(".switch").click()
-        expect(toast(page)).to_contain_text("Hors ligne : modification impossible")
+        page.locator("#p-load-group").click()  # any other change needs the network
+        expect(toast(page)).to_contain_text("Hors ligne : seule la case « Participe »")
     finally:
         mobile_context.set_offline(False)
+
+
+def test_change_made_offline_is_sent_later(mobile_page, mobile_context, test_data, competition):
+    member = competition["member"]
+    page = open_app(mobile_page)
+    go_offline(page, mobile_context, competition)
+    try:
+        open_participants(page, competition["nom"])
+        participant_card(page, member).locator(".switch").click()
+        expect(participant_card(page, member)).to_contain_text("à envoyer")
+        expect(page.locator("#sync-info")).to_contain_text("1 modification à envoyer")
+        expect(page.locator("#p-kpi-participe")).to_have_text("0")
+        assert participe(test_data, competition) is True  # not sent yet
+        # Kept on the phone: still there after a restart without network (the page itself
+        # needs the network to load here: service workers are blocked)
+        mobile_context.set_offline(False)
+        page.reload()
+        mobile_context.set_offline(True)
+        open_participants(page, competition["nom"])
+        expect(participant_card(page, member)).to_contain_text("à envoyer")
+    finally:
+        go_online(page, mobile_context)
+    page.evaluate("() => window.dispatchEvent(new Event('online'))")
+    expect(toast(page)).to_contain_text("Modifications faites hors ligne envoyées", timeout=30_000)
+
+    def sent():
+        assert participe(test_data, competition) is False
+    eventually(sent)
+    expect(participant_card(page, member)).not_to_contain_text("à envoyer")
+
+
+def test_change_made_offline_is_refused_when_changed_elsewhere(mobile_page, mobile_context, test_data,
+                                                              competition):
+    """Coach A unselects offline; meanwhile the desktop app unselects and selects again: A's older
+    change must not overwrite that newer decision."""
+    member = competition["member"]
+    page = open_app(mobile_page)
+    go_offline(page, mobile_context, competition)
+    try:
+        open_participants(page, competition["nom"])
+        participant_card(page, member).locator(".switch").click()
+        expect(participant_card(page, member)).to_contain_text("à envoyer")
+        test_data.set_selection(competition["id"], member["id"], False)
+        test_data.set_selection(competition["id"], member["id"], True)
+    finally:
+        go_online(page, mobile_context)
+    page.evaluate("() => window.dispatchEvent(new Event('online'))")
+    expect(toast(page)).to_contain_text("refusée", timeout=30_000)
+    expect(toast(page)).to_contain_text("modifié entre-temps sur un autre appareil")
+    assert participe(test_data, competition) is True
+    expect(participant_card(page, member)).not_to_contain_text("à envoyer")
+    expect(page.locator("#p-kpi-participe")).to_have_text("1")
 
 
 def test_logout_wipes_the_store(mobile_page, competition):
