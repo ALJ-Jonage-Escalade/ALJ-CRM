@@ -16,8 +16,9 @@ sudo apt install libpango-1.0-0 libpangoft2-1.0-0   # + Docker
 # uv : https://docs.astral.sh/uv/getting-started/installation/  (Windows : winget install astral-sh.uv)
 cd code_source
 uv sync --group web          # crée .venv/ aux versions exactes de uv.lock (profil web + outils de dev)
-source .venv/bin/activate    # ou préfixer les commandes par « uv run »
 ```
+
+Toutes les commandes Python se lancent ensuite avec `uv run <commande>` (inutile d'activer le venv).
 
 `uv sync --group desktop` ajoute le client lourd (PySide6, pywin32…). Sans uv, `pip install -r requirements-docker.txt
 -r requirements-dev.txt` reste possible : ces fichiers sont générés à partir de `uv.lock`.
@@ -30,8 +31,8 @@ source .venv/bin/activate    # ou préfixer les commandes par « uv run »
 ```bash
 cd code_source
 # 1. modifier les dépendances dans pyproject.toml (ou `uv add <paquet>` / `uv add --group dev <paquet>`)
-uv lock                              # met à jour uv.lock
-python dev/export_requirements.py    # régénère requirements*.txt
+uv lock                                     # met à jour uv.lock
+uv run python dev/export_requirements.py    # régénère requirements*.txt
 ```
 
 ### Démarrage
@@ -39,10 +40,9 @@ python dev/export_requirements.py    # régénère requirements*.txt
 ```bash
 cd code_source
 docker compose -f dev/docker-compose.yml up -d    # émulateur Firebase + Mailpit
-source venv/bin/activate
 set -a && source dev/dev.env && set +a
-python dev/seed/seed_emulator.py                   # (ré)initialise les données fictives
-dev/run_server.sh                                  # serveur FastAPI avec rechargement auto
+uv run python dev/seed/seed_emulator.py            # (ré)initialise les données fictives
+uv run dev/run_server.sh                           # serveur FastAPI avec rechargement auto
 ```
 
 Arrêt : `Ctrl+C` pour le serveur, `docker compose -f dev/docker-compose.yml down` pour les conteneurs
@@ -80,9 +80,10 @@ Arrêt : `Ctrl+C` pour le serveur, `docker compose -f dev/docker-compose.yml dow
 ## Tests
 
 ```bash
-cd code_source && source venv/bin/activate
-python -m pytest tests --ignore=tests/presentation   # voir .github/workflows pour la liste de la CI
-ruff check src tests
+cd code_source
+uv run pytest tests --ignore=tests/presentation   # voir .github/workflows pour la liste de la CI
+uv run ruff check src tests
+uv run mypy                                       # fichiers listés dans [tool.mypy] de pyproject.toml
 ```
 
 ## Déployer sur Cloud Run

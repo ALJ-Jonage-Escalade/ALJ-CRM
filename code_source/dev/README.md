@@ -7,15 +7,14 @@ le mode dev sur Cloud Run. Détails et architecture : `ARCHITECTURE.md` §7.
 
 ## Démarrage
 
-Prérequis : Docker, et le venv du projet (`requirements-docker.txt` + `requirements-dev.txt`).
+Prérequis : Docker et [uv](https://docs.astral.sh/uv/) (`uv sync --group web` crée `.venv/` depuis `uv.lock`).
 
 ```bash
 cd code_source
 docker compose -f dev/docker-compose.yml up -d     # émulateur (UI :4000) + Mailpit (UI :8025)
-source venv/bin/activate
 set -a && source dev/dev.env && set +a
-python dev/seed/seed_emulator.py                    # réinitialise + données fictives
-dev/run_server.sh                                   # http://localhost:8080/bureau/
+uv run python dev/seed/seed_emulator.py             # réinitialise + données fictives
+uv run dev/run_server.sh                            # http://localhost:8080/bureau/
 ```
 
 Connexion : le bouton « Se connecter » ouvre le sélecteur de comptes de l'émulateur.
