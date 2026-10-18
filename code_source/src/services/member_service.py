@@ -34,14 +34,17 @@ class MemberService:
 
     @staticmethod
     def list_competitors() -> List[Dict[str, Any]]:
-        """Contacts of the participants of the competitions that are not archived (active
-        season), the only member data a coach's phone keeps offline (plan phase 5)."""
+        """Contacts of the participants of the competitions that are not archived, the only
+        member data a coach's phone keeps offline (plan phase 5). Taken from the active season,
+        else from the participant's latest season (not registered again yet)."""
         ids = {p.get("adherent_id")
                for c in CompetitionService.list_competitions() if c.get("statut") != STATUT_CLOSE
-               for p in c.get("participants") or []}
+               for p in c.get("participants") or []} - {None}
         if not ids:
             return []
-        season = SeasonService.list_seasons()["active"]
+        seasons = SeasonService.list_seasons()
+        order = [seasons["active"]] + [s for s in seasons["seasons"] if s != seasons["active"]]
+        rank = {s: i for i, s in enumerate(order)}
+        rows = sorted(SqliteRepository.list_member_rows_of_users(ids), key=lambda r: rank.get(r["season_name"], len(rank)))
         planning = SqliteRepository.load_planning_data(log_debug=False)
-        members = member_view.build_members(SqliteRepository.list_member_rows(season), planning, season)
-        return member_view.competitor_contacts(members, ids)
+        return member_view.competitor_contacts(rows, planning, seasons["active"])

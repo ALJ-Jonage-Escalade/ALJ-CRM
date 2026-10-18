@@ -6,8 +6,10 @@
      old localStorage snapshots (alj_snapshot:*) in, and asks the browser not to evict it.
    - load(name, uid) -> { data, etag, savedAt } or null (none, other user, or older than
      MAX_AGE_DAYS: the whole store is then wiped).
-   - save(name, uid, data, etag); touch(name, uid) when the server confirmed the data (304).
-   - clearAll(): logout, loss of role (401/403).
+   - save(name, uid, data, etag); touch(name, uid) when the server confirmed the data (304):
+     only a small "confirmed:<name>" record in meta is written, not the data again.
+   - clearAll(): logout, loss of role (401/403). Writes of a start/save/touch begun before it
+     are dropped, so a cleared store is not filled again by work still in progress.
 
    Every failure (IndexedDB missing or blocked, private window, quota) only means "no
    offline copy": the page then behaves as online-only. Calls never reject. */
@@ -19,8 +21,10 @@
   const MAX_AGE_DAYS = 30;  // plan O4: limits what a lost phone exposes
   const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 3600 * 1000;
   const LEGACY_PREFIX = "alj_snapshot:";  // phase 0-4 snapshots in localStorage
+  const OPEN_TIMEOUT_MS = 3000;  // some WebKit versions never answer indexedDB.open
 
   let dbPromise = null;
+  let epoch = 0;  // bumped by clearAll: writes started before it are dropped
 
   function openDb() {
     if (!dbPromise) {
@@ -35,6 +39,7 @@
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => resolve(null);
         req.onblocked = () => resolve(null);
+        setTimeout(() => resolve(null), OPEN_TIMEOUT_MS);  // no answer: online only
       });
     }
     return dbPromise;
@@ -56,14 +61,16 @@
   }
 
   const get = (storeName, key) => run(storeName, "readonly", s => s.get(key));
-  const put = (storeName, value) => run(storeName, "readwrite", s => s.put(value));
+  /* Write begun at epoch e: skipped once clearAll ran since. The check happens when the
+     transaction is created, and IndexedDB runs readwrite transactions in creation order. */
+  const put = (e, storeName, value) => run(storeName, "readwrite", s => (e === epoch ? s.put(value) : null));
 
   function legacyStorage() {
     try { return window.localStorage; } catch (e) { return null; }
   }
 
   /* Old snapshots of this user go into the store, every old key is removed. */
-  async function migrateLegacy(uid) {
+  async function migrateLegacy(uid, e) {
     const ls = legacyStorage();
     if (!ls) return;
     let entries = [];
@@ -77,19 +84,25 @@
       try {
         const v = JSON.parse(raw || "null");
         if (v && v.uid === uid && !(await get("resources", k.slice(LEGACY_PREFIX.length)))) {
-          await put("resources", { name: k.slice(LEGACY_PREFIX.length), uid, savedAt: v.savedAt, etag: null, data: v.data });
+          await put(e, "resources", { name: k.slice(LEGACY_PREFIX.length), uid, savedAt: v.savedAt, etag: null, data: v.data });
         }
-      } catch (e) { /* unreadable: dropped */ }
-      try { ls.removeItem(k); } catch (e) { /* blocked storage */ }
+      } catch (err) { /* unreadable: dropped */ }
+      if (e !== epoch) return;  // cleared meanwhile: clearAll removes the old keys itself
+      try { ls.removeItem(k); } catch (err) { /* blocked storage */ }
     }
   }
 
   async function start(uid) {
     if (!uid) return;
+    let e = epoch;
     const owner = await get("meta", "owner");
-    if (owner && owner.uid !== uid) await clearAll();  // another account signs in on this phone
-    await put("meta", { key: "owner", uid });
-    await migrateLegacy(uid);
+    if (owner && owner.uid !== uid) {
+      await clearAll();  // another account signs in on this phone
+      if (e + 1 !== epoch) return;  // cleared by someone else too (logout): stop here
+      e = epoch;
+    }
+    await put(e, "meta", { key: "owner", uid });
+    await migrateLegacy(uid, e);
     try {
       if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     } catch (e) { /* not supported */ }
@@ -99,24 +112,28 @@
     if (!uid) return null;
     const rec = await get("resources", name);
     if (!rec || rec.uid !== uid) return null;
-    if (!(Date.now() - rec.savedAt <= MAX_AGE_MS)) {
+    const confirmed = await get("meta", "confirmed:" + name);
+    const savedAt = confirmed && confirmed.uid === uid ? Math.max(rec.savedAt, confirmed.at) : rec.savedAt;
+    if (!(Date.now() - savedAt <= MAX_AGE_MS)) {
       await clearAll();
       return null;
     }
-    return { data: rec.data, etag: rec.etag || null, savedAt: rec.savedAt };
+    return { data: rec.data, etag: rec.etag || null, savedAt };
   }
 
   async function save(name, uid, data, etag) {
     if (!uid) return;
-    await put("resources", { name, uid, savedAt: Date.now(), etag: etag || null, data });
+    await put(epoch, "resources", { name, uid, savedAt: Date.now(), etag: etag || null, data });
   }
 
+  /* The data is not read nor rewritten: load() takes the later of the two dates. */
   async function touch(name, uid) {
-    const rec = await get("resources", name);
-    if (rec && rec.uid === uid) await put("resources", Object.assign(rec, { savedAt: Date.now() }));
+    if (!uid) return;
+    await put(epoch, "meta", { key: "confirmed:" + name, uid, at: Date.now() });
   }
 
   async function clearAll() {
+    epoch++;
     await run("resources", "readwrite", s => s.clear());
     await run("meta", "readwrite", s => s.clear());
     const ls = legacyStorage();

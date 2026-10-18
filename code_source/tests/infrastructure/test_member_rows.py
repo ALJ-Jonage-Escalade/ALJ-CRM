@@ -16,6 +16,17 @@ class TestMemberRows(MemberDbTestCase):
         self.assertTrue(all(r["purchase_id"] for r in rows))
         self.assertEqual({r["season_name"] for r in rows}, {"2026-2027"})
 
+    def test_rows_of_users_every_season(self):
+        self.seed("1", "Léo", "MARTIN", "Loisir")
+        self.seed("2", "Zoé", "DURAND", "Adultes")
+        self.seed("3", "Max", "PETIT", "Loisir", season="2025-2026")
+        ids = {r["first_name"]: r["user_id"] for r in SqliteRepository.list_member_rows("2026-2027")}
+        (max_id,) = [r["user_id"] for r in SqliteRepository.list_member_rows("2025-2026")]
+        rows = SqliteRepository.list_member_rows_of_users([ids["Léo"], max_id])
+        self.assertEqual(sorted((r["first_name"], r["season_name"]) for r in rows),
+                         [("Léo", "2026-2027"), ("Max", "2025-2026")])
+        self.assertEqual(SqliteRepository.list_member_rows_of_users([]), [])
+
     def test_same_people_as_the_legacy_view(self):
         self.seed("1", "Léo", "MARTIN", "Loisir")
         self.seed("2", "Zoé", "DURAND", "Adultes")

@@ -59,5 +59,21 @@ class TestCompetitors(MemberDbTestCase, ApiTestCase):
         for field in ("health_commitment", "document_sante", "address", "email_primary", "birth_date"):
             self.assertNotIn(field, contact)
 
+    def test_participant_not_registered_again_keeps_last_season_contacts(self):
+        self.seed("9", "Inès", "ROUX", "Compétition U18", season="2025-2026", **EMERGENCY)
+        (ines,) = [r["user_id"] for r in SqliteRepository.list_member_rows("2025-2026")]
+        Repo.add_participant(self.create()["id"], ines)
+        (contact,) = self.client.get("/api/members/competitors").json()
+        self.assertEqual((contact["adherent_id"], contact["first_name"], contact["emergency2_phone"]),
+                         (ines, "Inès", "06 22 22 22 22"))
+
+    def test_active_season_row_preferred(self):
+        self.seed("10", "Léo", "MARTIN", "Ancien tarif", season="2025-2026", **EMERGENCY)
+        rows = SqliteRepository.list_member_rows_of_users([self.leo])
+        self.assertEqual({r["season_name"] for r in rows}, {"2025-2026", "2026-2027"})
+        Repo.add_participant(self.create()["id"], self.leo)
+        (contact,) = self.client.get("/api/members/competitors").json()
+        self.assertEqual(contact["creneau_groupe"], "Compétition U18")
+
     def test_no_competition(self):
         self.assertEqual(self.client.get("/api/members/competitors").json(), [])

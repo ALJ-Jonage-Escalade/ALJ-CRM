@@ -189,14 +189,22 @@ COMPETITOR_FIELDS = ("last_name", "first_name", "phone", "creneau_groupe", "emer
                      "emergency1_phone", "emergency2_name", "emergency2_phone")
 
 
-def competitor_contacts(members: Iterable[Dict[str, Any]], adherent_ids) -> List[Dict[str, Any]]:
-    """Contacts of the members whose id is in `adherent_ids`, one per member (a member with
-    several purchases keeps the first one that has a slot group)."""
+def competitor_contacts(rows: Iterable[Dict[str, Any]], planning: Iterable[Dict[str, Any]],
+                        season: str) -> List[Dict[str, Any]]:
+    """Contacts of the members of `rows` (member rows of any season, most wanted season first),
+    one per member: a member keeps a row of the first season it has, the first one with a slot
+    group. Only these rows are formatted, unlike build_members."""
+    slots = tarif_slots(planning)
+    ref_date = get_season_start_date(season)
     by_id: Dict[Any, Dict[str, Any]] = {}
-    for m in members:
-        uid = m.get("user_id")
-        if uid not in adherent_ids:
+    season_of: Dict[Any, Any] = {}
+    for r in rows:
+        uid = r.get("user_id")
+        if season_of.setdefault(uid, r.get("season_name")) != r.get("season_name"):
             continue
-        if uid not in by_id or (not by_id[uid]["creneau_groupe"] and m["creneau_groupe"]):
+        if uid in by_id and by_id[uid]["creneau_groupe"]:
+            continue
+        m = member_row(r, slots, ref_date)
+        if uid not in by_id or m["creneau_groupe"]:
             by_id[uid] = {"adherent_id": uid, **{k: m[k] for k in COMPETITOR_FIELDS}}
     return list(by_id.values())
