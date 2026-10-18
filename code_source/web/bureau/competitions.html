@@ -727,11 +727,15 @@ const shell = startBureau({
     function compUrl(compId, suffix = "") {
       return "/api/competitions/" + encodeURIComponent(String(compId)) + suffix;
     }
+    /* When the answer carries the updated competition (participant writes, competition
+       edits) it is shown at once and nothing else is reloaded: such a write changes no other
+       resource of this page, and others' changes come with the 20 s polls. */
     async function apiWrite(method, url, body) {
       const data = await ALJSync.request(apiFetch, method, url, body);
-      if (data && data.id != null && Array.isArray(data.participants)) applyComp(data);
-      else if (data && data.competition) applyComp(data.competition);
-      syncNow();
+      const comp = data && data.id != null && Array.isArray(data.participants) ? data
+                 : data && data.competition ? data.competition : null;
+      if (comp) applyComp(comp);
+      else syncNow();
       return data;
     }
     function writeFailed(err) {

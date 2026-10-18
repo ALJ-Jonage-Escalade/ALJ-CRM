@@ -582,6 +582,7 @@ let coaches = [];                // documents de la collection "coaches"
 let adherents = [];              // documents de la collection "adherents"
 let competitors = [];            // contacts of the competitors (coach, kept offline)
 let polls = [];                  // API polls (ALJSync), stopped on logout
+let pollsByName = {};            // the same, by resource name (SYNC_SOURCES)
 let syncRun = 0;                 // startSync generation: a newer start or a stop cancels an older one
 let loaded = new Set();          // resources received at least once (or read from the store)
 let lastSyncAt = null;
@@ -872,7 +873,7 @@ async function startSync() {
   for (const name of needed) {
     const src = SYNC_SOURCES[name];
     const stored = STORED_RESOURCES.includes(name);
-    polls.push(ALJSync.poll(src.url, {
+    polls.push(pollsByName[name] = ALJSync.poll(src.url, {
       fetch: apiFetch,
       etag: etags[name],
       onData: (data, etag) => {
@@ -895,10 +896,13 @@ function stopSync() {
   syncRun++;
   polls.forEach(p => p.stop());
   polls = [];
+  pollsByName = {};
 }
-/* Reloads everything now (after the user's own change): others' changes come with it. */
-function syncNow() {
-  return Promise.all(polls.map(p => p.refresh()));
+/* Reloads now the resources named (all of them by default): after the user's own change,
+   others' changes come with it. */
+function syncNow(names) {
+  const list = names ? names.map(n => pollsByName[n]).filter(Boolean) : polls;
+  return Promise.all(list.map(p => p.refresh()));
 }
 function onSyncStatus(name, status, info) {
   if (status === "ok") {
@@ -964,7 +968,9 @@ function sortedCompetitions() {
 /* ===================== Écritures par l'API ===================== */
 /* Every change goes through the API: validation, roles and concurrent edits (another
    coach, the desktop app, the HelloAsso webhook) are handled by the server. When the
-   answer carries the updated competition it is shown at once; everything is then reloaded. */
+   answer carries the updated competition (participant writes, competition edits) it is
+   shown at once and only the competitors' contacts, built from the participants, are
+   reloaded; otherwise everything is. Others' changes still come with the 20 s polls. */
 function compUrl(compId, suffix = "") {
   return "/api/competitions/" + encodeURIComponent(String(compId)) + suffix;
 }
@@ -983,9 +989,14 @@ async function apiWrite(method, url, body) {
     }
     throw e;
   }
-  if (data && data.id != null && Array.isArray(data.participants)) applyCompDoc(data);
-  else if (data && data.competition) applyCompDoc(data.competition);
-  syncNow();
+  const comp = data && data.id != null && Array.isArray(data.participants) ? data
+             : data && data.competition ? data.competition : null;
+  if (comp) {
+    applyCompDoc(comp);
+    syncNow(["competitors"]);
+  } else {
+    syncNow();
+  }
   return data;
 }
 /* Toast for a failed write (the offline case was already announced by apiWrite). */

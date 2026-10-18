@@ -24,7 +24,7 @@ import time
 import datetime
 import json
 import re
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from domain.competition_models import (
     LEGACY_COACH_SLOTS,
@@ -262,6 +262,7 @@ class CompetitionFirestoreRepository:
             cls.COLLECTION_COMPETITIONS, doc.get("_doc_id") or str(doc.get("id")), patch,
             expected_update_time=doc.get("_update_time"),
         )
+        return patch
 
     # ------------------------------------------------------------------
     # Compatibilité avec l'ancien référentiel SQLite
@@ -526,7 +527,13 @@ class CompetitionFirestoreRepository:
     @classmethod
     def get_competition_doc(cls, competition_id: int) -> Optional[Dict[str, Any]]:
         doc = cls._load_comp_doc(competition_id)
-        return cls._api_doc(doc, cls._coaches_map()) if doc else None
+        return cls.competition_api_doc(doc) if doc else None
+
+    @classmethod
+    def competition_api_doc(cls, doc: Dict[str, Any]) -> Dict[str, Any]:
+        """Shape of get_competition_doc for a document already read or just written (the
+        participant writes below return it): saves reading it again."""
+        return cls._api_doc(doc, cls._coaches_map())
 
     @classmethod
     def archive_past_competitions(cls, today_iso: str) -> List[int]:
@@ -680,8 +687,7 @@ class CompetitionFirestoreRepository:
             new_parts = mutate(parts)
             if new_parts is None:
                 return None
-            cls._save_parts(doc, new_parts)
-            doc["participants"] = new_parts
+            doc.update(cls._save_parts(doc, new_parts))  # participants, counters, updated_at
             return doc
         return cls._with_retries(f"Épreuve #{competition_id}", attempt)
 
@@ -713,17 +719,24 @@ class CompetitionFirestoreRepository:
             return parts if changed else None
         return cls._mutate_participants(competition_id, mutate)
 
+    # The *_doc writes below return the competition document as written (None: unknown
+    # competition, or member not listed where that applies); see competition_api_doc.
     @classmethod
-    def add_participant(cls, competition_id: int, adherent_id: int,
-                        selectionne: bool = True) -> int:
-        """Ajoute un adhérent à une compétition (idempotent) ; retourne l'identifiant
-        de la ligne participant (existante ou nouvelle)."""
+    def add_participant_doc(cls, competition_id: int, adherent_id: int,
+                            selectionne: bool = True) -> Optional[Dict[str, Any]]:
         def change(p):
             if selectionne:
                 p["selectionne"] = True
                 if (p.get("statut_paiement") or "") in PAIEMENT_STATUTS_ANNULES:
                     p["statut_paiement"] = PAIEMENT_PAYE   # réactivation : l'argent est déjà là
-        doc = cls._update_participant(competition_id, adherent_id, change, add_missing=selectionne)
+        return cls._update_participant(competition_id, adherent_id, change, add_missing=selectionne)
+
+    @classmethod
+    def add_participant(cls, competition_id: int, adherent_id: int,
+                        selectionne: bool = True) -> int:
+        """Ajoute un adhérent à une compétition (idempotent) ; retourne l'identifiant
+        de la ligne participant (existante ou nouvelle)."""
+        doc = cls.add_participant_doc(competition_id, adherent_id, selectionne)
         if doc is None:
             return 0
         for p in doc.get("participants") or []:
@@ -732,18 +745,29 @@ class CompetitionFirestoreRepository:
         return adherent_id
 
     @classmethod
-    def remove_participant(cls, competition_id: int, adherent_id: int) -> bool:
+    def remove_participant_doc(cls, competition_id: int, adherent_id: int) -> Optional[Dict[str, Any]]:
         def mutate(parts):
             kept = [p for p in parts if p.get("adherent_id") != adherent_id]
             return kept if len(kept) != len(parts) else None
-        return cls._mutate_participants(competition_id, mutate) is not None
+        return cls._mutate_participants(competition_id, mutate)
+
+    @classmethod
+    def remove_participant(cls, competition_id: int, adherent_id: int) -> bool:
+        return cls.remove_participant_doc(competition_id, adherent_id) is not None
 
     @classmethod
     def set_selection(cls, competition_id: int, adherent_id: int, selectionne: bool,
                       refuse_unselect_paid: bool = False) -> bool:
+        cls.set_selection_doc(competition_id, adherent_id, selectionne, refuse_unselect_paid)
+        return True
+
+    @classmethod
+    def set_selection_doc(cls, competition_id: int, adherent_id: int, selectionne: bool,
+                          refuse_unselect_paid: bool = False) -> Optional[Dict[str, Any]]:
         """`refuse_unselect_paid`: raise ParticipantAlreadyPaid instead of unselecting a
         participant who paid (checked on the fresh document, so a payment recorded
-        meanwhile by the webhook is seen)."""
+        meanwhile by the webhook is seen). None: unknown competition, or unselecting a
+        member not listed (nothing to write)."""
         def change(p):
             if (refuse_unselect_paid and not selectionne
                     and (p.get("statut_paiement") or "") == PAIEMENT_PAYE):
@@ -752,14 +776,17 @@ class CompetitionFirestoreRepository:
             nouveau = statut_paiement_apres_bascule(p.get("statut_paiement"), selectionne)
             if nouveau:
                 p["statut_paiement"] = nouveau
-        cls._update_participant(competition_id, adherent_id, change, add_missing=selectionne)
-        return True
+        return cls._update_participant(competition_id, adherent_id, change, add_missing=selectionne)
+
+    @classmethod
+    def set_present_doc(cls, competition_id: int, adherent_id: int, present: bool) -> Optional[Dict[str, Any]]:
+        """Attendance flag (pass-through field of the bureau page, appendix B of the plan)."""
+        return cls._update_participant(competition_id, adherent_id,
+                                       lambda p: p.update(present=bool(present)))
 
     @classmethod
     def set_present(cls, competition_id: int, adherent_id: int, present: bool) -> bool:
-        """Attendance flag (pass-through field of the bureau page, appendix B of the plan)."""
-        return cls._update_participant(competition_id, adherent_id,
-                                       lambda p: p.update(present=bool(present))) is not None
+        return cls.set_present_doc(competition_id, adherent_id, present) is not None
 
     @classmethod
     def set_payment_status(cls, competition_id: int, adherent_id: int, statut_paiement: str) -> bool:
@@ -767,17 +794,27 @@ class CompetitionFirestoreRepository:
                                        lambda p: p.update(statut_paiement=statut_paiement)) is not None
 
     @classmethod
-    def record_manual_payment(cls, competition_id: int, adherent_id: int, montant: float) -> bool:
+    def record_manual_payment_doc(cls, competition_id: int, adherent_id: int,
+                                  montant: float) -> Optional[Dict[str, Any]]:
         """Payment received outside HelloAsso (cheque, cash): the participant is selected and
-        paid. Returns False when the member is not listed on the competition."""
+        paid. None when the member is not listed on the competition."""
         def change(p):
             p.update(selectionne=True, statut_paiement=PAIEMENT_PAYE,
                      montant_paye=float(montant), commande_helloasso=MANUAL_PAYMENT_REF)
-        return cls._update_participant(competition_id, adherent_id, change) is not None
+        return cls._update_participant(competition_id, adherent_id, change)
+
+    @classmethod
+    def record_manual_payment(cls, competition_id: int, adherent_id: int, montant: float) -> bool:
+        return cls.record_manual_payment_doc(competition_id, adherent_id, montant) is not None
 
     @classmethod
     def mark_cancelled(cls, competition_id: int, adherent_id: int,
                        statut_annulation: str, note: str = "") -> bool:
+        return cls.mark_cancelled_doc(competition_id, adherent_id, statut_annulation, note) is not None
+
+    @classmethod
+    def mark_cancelled_doc(cls, competition_id: int, adherent_id: int,
+                           statut_annulation: str, note: str = "") -> Optional[Dict[str, Any]]:
         """Annule la participation d'un compétiteur ayant payé.
 
         - `statut_annulation` : 'annule_perdu' (argent encaissé définitivement)
@@ -792,7 +829,7 @@ class CompetitionFirestoreRepository:
             p["statut_paiement"] = statut_annulation
             if note:
                 p["note_paiement"] = str(note)
-        return cls._update_participant(competition_id, adherent_id, change) is not None
+        return cls._update_participant(competition_id, adherent_id, change)
 
     @classmethod
     def apply_helloasso_payment(cls, competition_id: int, adherent_id: int,
@@ -840,6 +877,11 @@ class CompetitionFirestoreRepository:
     @classmethod
     def load_competition_group_into(cls, competition_id: int) -> int:
         """Pré-remplit la liste des participants avec le groupe « Compétition »."""
+        return cls.load_competition_group_doc(competition_id)[0]
+
+    @classmethod
+    def load_competition_group_doc(cls, competition_id: int) -> Tuple[int, Optional[Dict[str, Any]]]:
+        """(number added, document written); the document is None when nobody was added."""
         groupe = cls.list_adherents(competition_only=True)
         added = {"count": 0}
 
@@ -855,9 +897,8 @@ class CompetitionFirestoreRepository:
                 parts.append(p)
                 added["count"] += 1
             return parts if added["count"] else None
-        if cls._mutate_participants(competition_id, mutate) is None:
-            return 0
-        return added["count"]
+        doc = cls._mutate_participants(competition_id, mutate)
+        return (added["count"], doc) if doc is not None else (0, None)
 
     # ------------------------------------------------------------------
     # Bilan de fin d'année

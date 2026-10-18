@@ -71,6 +71,7 @@ class TestSqliteCacheScope(unittest.TestCase):
                 patch.object(server.CloudDatabase, "ensure_fresh") as fresh, \
                 patch.object(server.CloudDatabase, "after_write") as after, \
                 patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.list_competition_docs", return_value=[]), \
+                patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.add_participant_doc", return_value=None), \
                 patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.get_competition_doc", return_value=None):
             client.get("/api/competitions")
             client.post("/api/competitions/1/participants", json={"adherent_id": 2})
