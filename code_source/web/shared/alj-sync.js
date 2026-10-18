@@ -7,7 +7,8 @@
      demand (refresh() right after the user's own write). Sends If-None-Match so an
      unchanged poll is a 304 without body. Responses are never put in the HTTP cache.
      opts.etag: ETag of data the page already has (offline store, alj-store.js), so the
-     first poll can be a 304 too; onData(data, etag) gets the new one.
+     first poll can be a 304 too; onData(data, etag) gets the new one. After stop(), an
+     answer still on its way is dropped: neither onData nor onStatus is called.
    - request(fetchFn, method, url, body): JSON call for a write; rejects with an Error
      carrying the server's message, its HTTP `status` and machine `code` (e.g.
      "already_paid"). Without a `status`, the request never reached the server. */
@@ -38,13 +39,15 @@
       try {
         res = await o.fetch(url, { headers, cache: "no-store" });
       } catch (error) {
-        o.onStatus(navigator.onLine === false ? "offline" : "error", { error });
+        if (!stopped) o.onStatus(navigator.onLine === false ? "offline" : "error", { error });
         return;
       }
+      if (stopped) return;  // stopped while loading (logout, other season): answer dropped
       if (res.status === 304) { o.onStatus("ok", { changed: false }); return; }
       if (!res.ok) { o.onStatus("error", { status: res.status }); return; }
       let data;
-      try { data = await res.json(); } catch (error) { o.onStatus("error", { error }); return; }
+      try { data = await res.json(); } catch (error) { if (!stopped) o.onStatus("error", { error }); return; }
+      if (stopped) return;
       etag = res.headers.get("ETag");
       o.onData(data, etag);
       o.onStatus("ok", { changed: true });

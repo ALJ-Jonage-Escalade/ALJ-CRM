@@ -41,16 +41,16 @@ class CompetitionService:
     @staticmethod
     @write
     def update_competition(competition_id: int, fields: Dict[str, Any]) -> dict:
-        """Partial update: only the fields given are changed (participants untouched)."""
-        comp = Repo.get_competition(competition_id)
-        if comp is None:
+        """Partial update: only the fields given are changed (participants untouched), on the
+        version of the document read (a concurrent write to other fields is kept)."""
+        def change(comp: Competition) -> None:
+            for field in COMPETITION_FIELDS:
+                if fields.get(field) is not None:
+                    setattr(comp, field, fields[field])
+            if "coach_ids" in fields:
+                comp.coach_ids = list(fields["coach_ids"] or [])
+        if not Repo.update_competition(competition_id, change, _extra(fields)):
             raise competition_not_found()
-        for field in COMPETITION_FIELDS:
-            if fields.get(field) is not None:
-                setattr(comp, field, fields[field])
-        if "coach_ids" in fields:
-            comp.coach_ids = list(fields["coach_ids"] or [])
-        Repo.save_competition(comp, _extra(fields))
         return Repo.get_competition_doc(competition_id)
 
     @staticmethod

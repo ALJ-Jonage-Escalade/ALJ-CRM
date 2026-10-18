@@ -1238,6 +1238,7 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
     Authenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles
     auprès de l'API HelloAsso (voir HelloAssoWebhookService.handle_notification).
     """
+    from infrastructure.firestore_client import FirestoreError
     from infrastructure.helloasso_webhook_service import WebhookRejected
     if not isinstance(token, str):  # appel direct de la fonction (tests)
         token = None
@@ -1246,6 +1247,10 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
     except WebhookRejected as e:
         print(f"⛔ [WEBHOOK_HELLOASSO] Notification refusée ({e.status_code}) : {e.message}")
         return JSONResponse({"status": "rejected", "message": e.message}, status_code=e.status_code)
+    except FirestoreError as e:
+        # Firestore unreadable (member list, competitions): nothing could be matched nor
+        # recorded. An error status, not 200, so that the failure shows on HelloAsso's side.
+        return JSONResponse({"status": "error", "message": internal_error(e, "webhook_helloasso")}, status_code=503)
     except Exception as e:
         return {"status": "error", "message": internal_error(e, "webhook_helloasso")}
 

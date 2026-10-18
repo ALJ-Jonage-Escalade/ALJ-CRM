@@ -5,6 +5,7 @@ from unittest.mock import patch
 from support.api_case import ApiTestCase
 
 from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore_client import FirestoreClient, FirestoreError
 from infrastructure.helloasso_webhook_service import HelloAssoWebhookService
 
 REPO = "infrastructure.competition_firestore_repository.CompetitionFirestoreRepository"
@@ -67,3 +68,19 @@ class TestWebhookPayments(ApiTestCase):
         with patch(f"{REPO}.sync_helloasso_mirror", side_effect=RuntimeError("Firestore indisponible")):
             self.receive(payment_item(7777, 9999, 1500))
         self.assertEqual(self.payment(), (True, "paye", 15.0, ["9999"]))
+
+    def test_member_list_unreadable_answers_an_error(self):
+        """Without the member list the payment cannot be matched: the webhook answers an error
+        status (not 200), so the failure shows on HelloAsso's side, and records nothing."""
+        real = FirestoreClient.list_documents
+
+        def adherents_down(collection, *args, **kwargs):
+            if collection == Repo.COLLECTION_ADHERENTS:
+                raise FirestoreError("down")
+            return real(collection, *args, **kwargs)
+        with patch.object(FirestoreClient, "list_documents", side_effect=adherents_down):
+            r = self.client.post("/webhooks/helloasso", json={"eventType": "Payment", "data": payment_item(7777, 9999, 1500)})
+        self.assertEqual(r.status_code, 503, r.text)
+        self.assertEqual(r.json()["status"], "error")
+        self.assertEqual(self.fake.list_documents("helloasso_items"), [])
+        self.assertEqual(Repo.get_competition_doc(self.comp)["participants"], [])

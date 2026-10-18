@@ -59,6 +59,35 @@ class TestCompetitions(ApiTestCase):
         r = self.client.patch(f"/api/competitions/{doc['id']}", json={"prix": 20})
         self.assertEqual(r.json()["url_resultats"], "https://mycompet.ffme.fr/resultat/resultat_13660")
 
+    def test_update_keeps_a_field_written_meanwhile(self):
+        """The results batch writes the results URL between the PATCH's read and its write: the
+        write is refused on the stale version, the PATCH re-reads and keeps the URL."""
+        doc = self.create(nom="Coupe", prix=15)
+
+        def batch_writes_results(collection, doc_id):
+            self.fake.before_conditional_write = None
+            self.fake.update_fields("competitions", doc_id, {"url_resultats": "https://mycompet.ffme.fr/resultat/42",
+                                                            "resultats_synced_at": "2026-10-18T07:00:00"})
+        self.fake.before_conditional_write = batch_writes_results
+        r = self.client.patch(f"/api/competitions/{doc['id']}", json={"nom": "Coupe du Rhône"})
+        self.assertEqual(r.status_code, 200, r.text)
+        stored = Repo.get_competition_doc(doc["id"])
+        self.assertEqual((stored["nom"], stored["prix"], stored["url_resultats"], stored["resultats_synced_at"]),
+                         ("Coupe du Rhône", 15.0, "https://mycompet.ffme.fr/resultat/42", "2026-10-18T07:00:00"))
+
+    def test_update_keeps_participants_added_meanwhile(self):
+        self.seed_adherent(1)
+        doc = self.create()
+
+        def coach_adds_participant(collection, doc_id):
+            self.fake.before_conditional_write = None
+            Repo.add_participant(doc["id"], 1)
+        self.fake.before_conditional_write = coach_adds_participant
+        self.assertEqual(self.client.patch(f"/api/competitions/{doc['id']}", json={"prix": 20}).status_code, 200)
+        stored = Repo.get_competition_doc(doc["id"])
+        self.assertEqual(([p["adherent_id"] for p in stored["participants"]], stored["nb_participants"], stored["prix"]),
+                         ([1], 1, 20.0))
+
     def test_update_keeps_participants(self):
         self.seed_adherent(1)
         doc = self.create()

@@ -34,15 +34,22 @@
     function pollMembers() {
       if (membersPoll) membersPoll.stop();
       const url = "/api/members" + (season ? "?season=" + encodeURIComponent(season) : "");
-      membersPoll = ALJSync.poll(url, {
+      const poll = ALJSync.poll(url, {
         fetch: o.fetch, intervalMs: o.intervalMs,
         onStatus: (status, info) => {
+          if (poll !== membersPoll) return;  // poll of a season left meanwhile
           // A season that no longer exists: fall back to the active one
           if (status === "error" && info && info.status === 404 && season) { setSeason(""); return; }
           o.onStatus(status, info);
         },
-        onData: data => { current = data; season = data.season; emit(); }
+        onData: data => {
+          // Answer for a season left meanwhile (it was loading during setSeason): dropped,
+          // so that it neither shows its members nor switches the season back
+          if (poll !== membersPoll) return;
+          current = data; season = data.season; emit();
+        }
       });
+      membersPoll = poll;
     }
 
     const seasonsPoll = ALJSync.poll("/api/seasons", {

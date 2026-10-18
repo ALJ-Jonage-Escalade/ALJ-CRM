@@ -429,13 +429,19 @@ class CompetitionFirestoreRepository:
 
     @classmethod
     def _adherents_raw(cls) -> List[Dict[str, Any]]:
+        """The `adherents` directory, cached _ADHERENTS_CACHE_TTL seconds. A failed read keeps
+        serving the last copy; with none yet, FirestoreError is raised (never an empty
+        directory: it would look like a club without members, and is not cached)."""
         now = time.time()
         if cls._adherents_cache is None or (now - cls._adherents_cache_at) > _ADHERENTS_CACHE_TTL:
             try:
                 cls._adherents_cache = FirestoreClient.list_documents(cls.COLLECTION_ADHERENTS)
             except Exception as e:
                 print(f"⚠️ [FIRESTORE] Lecture de l'annuaire adhérents impossible : {e}")
-                cls._adherents_cache = cls._adherents_cache or []
+                if cls._adherents_cache is None:
+                    if isinstance(e, FirestoreError):
+                        raise
+                    raise FirestoreError(f"Lecture de l'annuaire adhérents impossible : {e}") from e
             cls._adherents_cache_at = now
         return cls._adherents_cache
 
@@ -549,18 +555,37 @@ class CompetitionFirestoreRepository:
         doc = cls._build_comp_doc(existing, comp, cls._coaches_map())
         doc.update(extra or {})
         if existing and (existing.get("_doc_id") or str(comp.id)) == str(comp.id):
-            # Épreuve existante : mise à jour partielle des seules informations de
-            # l'épreuve. Le tableau des participants et ses compteurs ne sont pas
-            # réécrits, pour ne pas écraser une modification concurrente.
-            skip = {"participants", "nb_participants", "nb_selectionnes",
-                    "nb_payes", "total_collecte"}
-            FirestoreClient.update_fields(
-                cls.COLLECTION_COMPETITIONS, str(comp.id),
-                {k: v for k, v in doc.items() if k not in skip},
-            )
+            FirestoreClient.update_fields(cls.COLLECTION_COMPETITIONS, str(comp.id), cls._info_fields(doc))
         else:
             FirestoreClient.upsert_document(cls.COLLECTION_COMPETITIONS, str(comp.id), doc)
         return comp.id
+
+    @staticmethod
+    def _info_fields(doc: Dict[str, Any]) -> Dict[str, Any]:
+        """Competition information only: the participants array and its counters are not
+        rewritten, so as not to overwrite a concurrent change to them."""
+        skip = {"participants", "nb_participants", "nb_selectionnes", "nb_payes", "total_collecte"}
+        return {k: v for k, v in doc.items() if k not in skip}
+
+    @classmethod
+    def update_competition(cls, competition_id: int, change, extra: Optional[Dict[str, Any]] = None) -> bool:
+        """Partial update of an existing competition: `change(comp)` edits the Competition read
+        from the document, written back on the version read (optimistic lock). On conflict
+        (results batch, webhook, another coach) the document is read again and `change`
+        replayed, so a field it does not set keeps the value written meanwhile.
+        Returns False when the competition does not exist."""
+        def attempt():
+            existing = cls._load_comp_doc(competition_id)
+            if not existing:
+                return False
+            comp = cls._comp_from_doc(existing)
+            change(comp)
+            doc = cls._build_comp_doc(existing, comp, cls._coaches_map())
+            doc.update(extra or {})
+            FirestoreClient.update_fields(cls.COLLECTION_COMPETITIONS, existing.get("_doc_id") or str(comp.id),
+                                          cls._info_fields(doc), expected_update_time=existing.get("_update_time"))
+            return True
+        return bool(cls._with_retries(f"Épreuve #{competition_id}", attempt))
 
     @classmethod
     def set_competition_status(cls, competition_id: int, statut: str) -> bool:
