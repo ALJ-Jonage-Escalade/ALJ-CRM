@@ -79,7 +79,38 @@ class TestMobilePWA(unittest.TestCase):
         for url in ("/api/competitions", "/api/coaches", "/api/competition-members",
                     "/api/helloasso/items"):
             self.assertIn(f'"{url}"', html, url)
-        self.assertIn("ALJSync.snapshot.clearAll()", html)  # nothing left on the phone after logout
+        self.assertIn('<script src="/static-web/alj-store.js"></script>', html)
+
+    def test_offline_store(self):
+        """Phase 5: the phone keeps competitions, coaches and competitors' contacts in
+        IndexedDB (alj-store.js only), wiped on logout and on loss of role."""
+        web_dir = os.path.join(os.path.dirname(_tests_dir), "web")
+        for root, _, files in os.walk(web_dir):
+            for name in files:
+                if not name.endswith((".html", ".js")):
+                    continue
+                path = os.path.join(root, name)
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                if name != "alj-store.js":
+                    # alj-firebase.js deletes the old Firestore SDK copy (firestore/*) only
+                    self.assertNotIn("indexedDB.open(", content, path)
+                    self.assertNotIn("alj_snapshot:", content, path)  # old localStorage snapshots
+        with open(get_competitions_page().path, "r", encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn('const STORED_RESOURCES = ["competitions", "coaches", "competitors"];', html)
+        self.assertIn('"/api/members/competitors"', html)
+        self.assertIn('names.concat("competitors", "helloasso")', html)  # coaches only
+        on_logout = html[html.index("auth.onAuthStateChanged"):html.index("/* ===================== Synchronisation")]
+        self.assertIn("ALJStore.clearAll()", on_logout)
+        on_denied = html[html.index("info.status === 401 || info.status === 403"):]
+        self.assertLess(on_denied.index("ALJStore.clearAll()"), on_denied.index("setSyncInfo("))
+        with open(get_sw().path, "r", encoding="utf-8") as f:
+            self.assertIn('"/static-web/alj-store.js"', f.read())
+        with open(os.path.join(web_dir, "shared", "alj-store.js"), "r", encoding="utf-8") as f:
+            store = f.read()
+        self.assertIn("const MAX_AGE_DAYS = 30;", store)
+        self.assertIn("navigator.storage.persist()", store)
 
     def test_competitions_html_pwa_and_email_features(self):
         resp = get_competitions_page()

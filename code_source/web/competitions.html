@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- Version de la page web : à incrémenter à chaque modification, en même temps que CACHE_NAME dans sw.js -->
-<meta name="alj-web-version" content="23">
-<title>ALJ Escalade — Gestion des Compétitions (v23)</title>
+<meta name="alj-web-version" content="24">
+<title>ALJ Escalade — Gestion des Compétitions (v24)</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#1E293B">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,6 +18,7 @@
 <script src="/runtime-config.js"></script>
 <script src="/static-web/alj-firebase.js"></script>
 <script src="/static-web/alj-sync.js"></script>
+<script src="/static-web/alj-store.js"></script>
 <style>
   :root {
     --bg: #F1F5F9; --card: #FFFFFF; --ink: #1E293B; --muted: #64748B;
@@ -159,7 +160,7 @@
 
 <header>
   <div class="title">
-    <b>🏆 ALJ Escalade — Compétitions <span class="web-version" id="web-version">v23</span></b>
+    <b>🏆 ALJ Escalade — Compétitions <span class="web-version" id="web-version">v24</span></b>
     <small id="sync-info">Connexion à Firebase…</small>
   </div>
   <a class="icon-btn" id="annuaire-link" href="/index?vue=pwa" title="Annuaire des adhérents" style="display:none;align-items:center;text-decoration:none">📇</a>
@@ -194,6 +195,11 @@
           </p>
         </div>
 
+        <p style="font-size:12.5px; line-height:1.5;">📴 <b>Sans réseau</b> (salle, compétition) : les épreuves,
+           les compétiteurs et leurs contacts d'urgence restent consultables en lecture seule, s'ils ont été
+           chargés en ligne au cours des 30 derniers jours. Ils sont effacés à la déconnexion. Sur iPhone,
+           ajoutez la page à l'écran d'accueil (Partager → « Sur l'écran d'accueil ») : sinon Safari efface
+           ces données après 7 jours sans visite.</p>
         <div class="btn-row">
           <button class="btn btn-muted" id="logout-btn-page" style="flex:2">🚪 Se déconnecter</button>
         </div>
@@ -574,8 +580,10 @@ let user = null;                 // compte Firebase Auth connecté
 let comps = [];                  // documents de la collection "competitions"
 let coaches = [];                // documents de la collection "coaches"
 let adherents = [];              // documents de la collection "adherents"
+let competitors = [];            // contacts of the competitors (coach, kept offline)
 let polls = [];                  // API polls (ALJSync), stopped on logout
-let loaded = new Set();          // resources received at least once (or read from the snapshot)
+let syncRun = 0;                 // startSync generation: a newer start or a stop cancels an older one
+let loaded = new Set();          // resources received at least once (or read from the store)
 let lastSyncAt = null;
 let isOffline = false;           // last poll failed for lack of network: writes are refused
 let editCompId = null;           // id de la compétition en cours d'édition
@@ -812,11 +820,11 @@ auth.onAuthStateChanged(async u => {
     startSync();
   } else {
     stopSync();
-    ALJSync.snapshot.clearAll();  // no participant data left on the phone after logout
+    ALJStore.clearAll();  // no participant data left on the phone after logout
     $("#setup-not-logged").style.display = "block";
     $("#setup-logged").style.display = "none";
     loaded = new Set();
-    comps = []; coaches = []; adherents = []; helloassoItems = [];
+    comps = []; coaches = []; adherents = []; competitors = []; helloassoItems = [];
     applyRolePermissions();
     setSyncInfo("Non connecté");
     showPage("setup");
@@ -825,47 +833,66 @@ auth.onAuthStateChanged(async u => {
 
 /* ===================== Synchronisation par l'API (polling) ===================== */
 /* Each resource is reloaded every 20 s while the page is visible, when it becomes visible
-   again, and right after the user's own changes (syncNow). Competitions and coaches are
-   also kept on the phone (ALJSync.snapshot) for read-only viewing without network. */
-const SNAPSHOT_RESOURCES = ["competitions", "coaches"];
+   again, and right after the user's own changes (syncNow). Competitions, coaches and the
+   competitors' contacts are also kept on the phone (ALJStore, IndexedDB, 30 days) for
+   read-only viewing without network (plan phase 5). The directory, the member list and
+   the HelloAsso items are online only: they serve writes, refused offline anyway. */
+const STORED_RESOURCES = ["competitions", "coaches", "competitors"];
 const SYNC_SOURCES = {
   competitions: { url: "/api/competitions", set: d => { comps = d; } },
   coaches: { url: "/api/coaches", set: d => { coaches = d; } },
   members: { url: "/api/competition-members", set: d => { adherents = d; } },
+  competitors: { url: "/api/members/competitors", set: d => { competitors = d; } },
   helloasso: { url: "/api/helloasso/items", set: d => { helloassoItems = d; } }
 };
 function resourcesNeeded() {
   const names = ["competitions", "coaches", "members"];
-  return isCoachUser() ? names.concat("helloasso") : names;
+  return isCoachUser() ? names.concat("competitors", "helloasso") : names;
 }
-function startSync() {
+async function startSync() {
   stopSync();
+  const run = syncRun;
   loaded = new Set();
+  lastSyncAt = null;
   const uid = user && user.uid;
-  for (const name of SNAPSHOT_RESOURCES) {
-    const snap = ALJSync.snapshot.load(name, uid);
-    if (!snap) continue;
-    SYNC_SOURCES[name].set(snap.data);
+  await ALJStore.start(uid);
+  const needed = resourcesNeeded();
+  const etags = {};
+  for (const name of STORED_RESOURCES.filter(n => needed.includes(n))) {
+    const rec = await ALJStore.load(name, uid);
+    if (run !== syncRun) return;  // signed out or restarted meanwhile
+    if (!rec) continue;
+    SYNC_SOURCES[name].set(rec.data);
+    etags[name] = rec.etag;
     loaded.add(name);
-    lastSyncAt = new Date(snap.savedAt);
+    if (!lastSyncAt || rec.savedAt < lastSyncAt.getTime()) lastSyncAt = new Date(rec.savedAt);
   }
+  if (run !== syncRun) return;
   if (loaded.size) renderAll();
-  for (const name of resourcesNeeded()) {
+  for (const name of needed) {
     const src = SYNC_SOURCES[name];
+    const stored = STORED_RESOURCES.includes(name);
     polls.push(ALJSync.poll(src.url, {
       fetch: apiFetch,
-      onData: data => {
+      etag: etags[name],
+      onData: (data, etag) => {
+        if (run !== syncRun) return;  // answer to a poll stopped meanwhile (logout): not kept
         src.set(data);
-        if (SNAPSHOT_RESOURCES.includes(name)) ALJSync.snapshot.save(name, uid, data);
+        if (stored) ALJStore.save(name, uid, data, etag);
         loaded.add(name);
         renderAll();
         if (isSetupPageActive() && isAuthorizedUser()) showPage("comps");
       },
-      onStatus: (status, info) => onSyncStatus(name, status, info)
+      onStatus: (status, info) => {
+        if (run !== syncRun) return;
+        if (stored && status === "ok" && !info.changed) ALJStore.touch(name, uid);
+        onSyncStatus(name, status, info);
+      }
     }));
   }
 }
 function stopSync() {
+  syncRun++;
   polls.forEach(p => p.stop());
   polls = [];
 }
@@ -887,7 +914,10 @@ function onSyncStatus(name, status, info) {
     return;
   }
   console.error("API " + name + " :", info);
-  if (info && (info.status === 401 || info.status === 403)) setSyncInfo("🔒 Accès restreint (" + name + ")");
+  if (info && (info.status === 401 || info.status === 403)) {
+    ALJStore.clearAll();  // role lost: nothing kept on the phone (plan phase 5)
+    setSyncInfo("🔒 Accès restreint (" + name + ")");
+  }
   else setSyncInfo("⚠️ Serveur injoignable — nouvel essai automatique");
 }
 /* Page active absente (premier rendu) ou page de connexion : la liste des
@@ -904,6 +934,18 @@ function findComp(compId) {
 }
 function findAdherent(adherentId) {
   return adherents.find(a => String(a.id) === String(adherentId)) || null;
+}
+function findCompetitor(adherentId) {
+  return competitors.find(c => String(c.adherent_id) === String(adherentId)) || null;
+}
+/* [name, phone] of a competitor's emergency contacts: from /api/members/competitors (kept
+   offline), otherwise the copy taken when the participant was added (first contact only). */
+function emergencyContacts(p) {
+  const c = findCompetitor(p.adherent_id);
+  const list = c
+    ? [[c.emergency1_name, c.emergency1_phone], [c.emergency2_name, c.emergency2_phone]]
+    : [[p.urgence_nom, p.urgence_tel]];
+  return list.filter(([, tel]) => tel);
 }
 function getCoachesMap() {
   const map = {};
@@ -1261,10 +1303,12 @@ function competitionAdherents(compId) {
   if (!c) return [];
   return (c.participants || []).map(p => {
     const adh = findAdherent(p.adherent_id) || {};
+    const contact = findCompetitor(p.adherent_id) || {};
     return Object.assign({}, p, {
       competition_id: c.id,
       tarif: adh.tarif || p.tarif || "",
-      groupe: adh.creneau_groupe || "",
+      phone: contact.phone || p.phone || "",
+      groupe: adh.creneau_groupe || contact.creneau_groupe || "",
       date_synchro_helloasso: p.updated_at || ""
     });
   });
@@ -1364,6 +1408,7 @@ function renderParticipants() {
           <div class="m-name">${esc(p.nom)} ${esc(p.prenom)}</div>
           <div class="m-sub">🪪 ${esc(p.num_licence || "sans licence")} · ${esc(p.tarif || "—")}${p.commande_helloasso && isCoach ? ` · 🧾 ${esc(p.commande_helloasso)}` : ""}${p.date_synchro_helloasso && isCoach ? ` · 🔄 ${esc(p.date_synchro_helloasso)}` : ""}${p.note_paiement && isCoach ? ` · 📝 ${esc(p.note_paiement)}` : ""}</div>
           ${p.phone && isCoach ? `<div style="margin-top:4px"><a href="tel:${esc(p.phone)}" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; border-radius:6px; padding:2px 8px;">📞 ${esc(p.phone)}</a></div>` : ""}
+          ${isCoach ? emergencyContacts(p).map(([nom, tel]) => `<div style="margin-top:4px"><a href="tel:${esc(tel)}" title="Contact d'urgence" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; background:#FEF2F2; color:#B91C1C; border:1px solid #FECACA; border-radius:6px; padding:2px 8px;">🚨 ${esc(nom || "Urgence")} · ${esc(tel)}</a></div>`).join("") : ""}
         </div>
         <span class="badge" style="background:${PAIEMENT_BADGE[p.statut_paiement] || "#94A3B8"}"
               title="Statut de paiement">${PAIEMENT_LABELS[p.statut_paiement] || esc(p.statut_paiement)}</span>
@@ -2520,4 +2565,4 @@ async function forceWebUpdate() {
 })();
 </script>
 </body>
-</html>
+</html>

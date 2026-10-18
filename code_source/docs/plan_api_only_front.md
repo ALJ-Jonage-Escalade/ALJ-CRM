@@ -33,15 +33,16 @@ The plan file is updated with any decisions taken during a review. Nothing is co
 | 1 | Done (approved) | See « Phase 1 — as built » below. |
 | 2 | Done (approved) | See « Phase 2 — as built » below. |
 | 3 | Done (approved) | Code only; nothing deployed. See « Phase 3 — as built » below for the deploy order. |
-| 4 | Done, awaiting review | C1 done; C2 step A done (step B waits for every club PC to run the new desktop version). See « Phase 4 — as built » below. |
-| 5 | Not started | Offline storage on the phone. O2 and O4 decided; O1 to confirm; O3 accepted in principle, conflict handling to analyse first (see « Phase 5 »). |
+| 4 | Done (approved) | C1 done; C2 step A done (step B waits for every club PC to run the new desktop version). See « Phase 4 — as built » below. |
+| 5a | Done, awaiting review | Offline storage on the phone, read-only: IndexedDB store, competitions + coaches + competitor contacts (O1, O2 decided 2026-10-18), 30 days (O4). See « Phase 5a — as built ». |
+| 5b | Not started | Offline write queue (O3): waits for the conflict analysis. |
 
 ## Decisions taken (from review Q&A)
 
 | # | Decision | Consequence |
 |---|---|---|
 | D1 | **Updates:** polling with refetch, no Firestore listeners | Each screen polls every 20 s while visible, refetches on tab focus and right after the user's own write. ETag + 304 makes unchanged polls cheap. Other coaches' changes show up within about 20 s instead of instantly. |
-| D2 | **Offline:** read-only snapshot of **competitions + participants** only | Stored in `localStorage` per user, wiped on logout or loss of role. Write controls are disabled offline. The `/index` member directory becomes **online-only** (today it works offline). **Reopened by phase 5** (offline must stay possible on the phone): D2 stays the rule for phases 0–3, and phase 5 extends it once O1–O4 are decided. |
+| D2 | **Offline:** read-only copy of **competitions + participants**, plus (phase 5a) the **competitors' contacts** for coaches | Stored in IndexedDB (`alj-store.js`) per user, at most 30 days, wiped on logout or loss of role. Writes are refused offline until phase 5b (O3). The `/index` member directory is **online-only**. |
 | D3 | **Cloud Run stays at min-instances 0** | A cold start rebuilds the SQLite cache before the first member-data answer. Competition routes are taken out of the SQLite middleware so they don't pay for it (see Side effects S3). |
 | D4 | **Pass-through fields:** `lieu`, `type` (competition) and `present` (participant) are kept, stored as-is, migrated later | The API accepts and stores them without validation. Tracked in **Appendix B**. |
 | D5 | **Competition writes need the coach role** | Bureau page checks that are admin-only today (create, edit, delete, "Participe", ✕) are relaxed to coach, matching the mobile page and the current rules. |
@@ -389,9 +390,9 @@ Consequences:
 
 | # | Question | Options | Recommendation / decision |
 |---|---|---|---|
-| O1 | What does the phone keep? | (a) As D2: competitions + coaches. (b) Plus the competition member list (names, licence, category) and HelloAsso items for coaches. (c) Plus the directory, active season only. | Recommended: **(b), plus (c) with a reduced field set** (see O2). (b) restores the competition workflow offline at little privacy cost. **To confirm.** The O2 answer (emergency numbers offline) implies (c), the directory offline. Whether (b) is wanted is not yet stated. |
-| O2 | Which member fields go into the offline directory? | (a) Everything `/api/members` returns, including health, emergency contacts and addresses of minors. (b) Contact fields only: name, phone, e-mail, slot group, emergency contacts. (c) Names and slot group only. | **Decided (2026-10-15): (b), emergency numbers included.** Offline fields: `last_name`, `first_name`, `phone`, `email_primary`, `creneau_groupe`, `emergency1_name`, `emergency1_phone`, `emergency2_name`, `emergency2_phone`. Emergency contacts are the main reason to look someone up in a gym. Health data (`health_commitment`, `document_sante`) and addresses stay online only. The server returns this subset through `GET /api/members?season=&view=offline`, so the phone never receives the other fields. |
-| O3 | Offline writes? | (a) None: read-only offline, as today. (b) A queue for **participant flags only** (selection, presence), sent when the network returns. (c) A queue for every write. | **(b).** These are the actions a coach takes at a venue. They set a value, so a resend repeats the same result. Payments, cancellations, HelloAsso links and competition edits stay online only: they carry money, or rules (`already_paid`, `already_linked`) that need the current server state. **Accepted in principle (2026-10-15), not ready to implement:** conflict handling must be analysed first. See « Conflict handling — notes for later analysis » below. |
+| O1 | What does the phone keep? | (a) As D2: competitions + coaches. (b) Plus the competition member list (names, licence, category) and HelloAsso items for coaches. (c) Plus the directory, active season only. | **Decided (2026-10-18): (a) plus the contacts of the competitors** (participants of competitions that are not archived), for coaches only. The phone is used by coaches during competitions. The directory, the competition member list and the HelloAsso items stay online only (they serve writes, which are refused offline anyway). |
+| O2 | Which member fields are kept offline? | (a) Everything `/api/members` returns, including health, emergency contacts and addresses of minors. (b) Contact fields only: name, phone, e-mail, slot group, emergency contacts. (c) Names and slot group only. | **Decided (2026-10-15), scope narrowed 2026-10-18: (b) for competitors only.** Offline fields: `adherent_id`, `last_name`, `first_name`, `phone`, `creneau_groupe`, `emergency1_name`, `emergency1_phone`, `emergency2_name`, `emergency2_phone`. Health fields are **not** kept: `health_commitment` and `document_sante` only record that the FFME form was done, which is of no use at a venue. Addresses and e-mails stay online only. The server returns this subset through `GET /api/members/competitors` (coach), so the phone never receives the other fields. |
+| O3 | Offline writes? (phase 5b) | (a) None: read-only offline, as today. (b) A queue for **participant flags only** (selection, presence), sent when the network returns. (c) A queue for every write. | **(b).** These are the actions a coach takes at a venue. They set a value, so a resend repeats the same result. Payments, cancellations, HelloAsso links and competition edits stay online only: they carry money, or rules (`already_paid`, `already_linked`) that need the current server state. **Accepted in principle (2026-10-15), not ready to implement:** conflict handling must be analysed first. See « Conflict handling — notes for later analysis » below. |
 | O4 | How long does local data live? | (a) Until logout. (b) Plus a maximum age. | **Decided (2026-10-15): (b), 30 days**, then the store is dropped and the page asks to reconnect. Limits what a lost phone exposes. |
 
 #### Design (decided points, plus the recommendations still open)
@@ -407,10 +408,10 @@ Consequences:
    - Migration: on first start, read the old `alj_snapshot:*` keys into IndexedDB, then delete them.
    - Fallback: if IndexedDB is unavailable (some private windows), nothing is stored and the page behaves as online-only, as `localStorage` failures do today.
 2. **What is stored.**
-   - PWA competitions page: `competitions`, `coaches`, `competition-members`, and `helloasso` for coaches (O1 b).
-   - Directory: one entry per season viewed, `members:<season>`, using the reduced view (O2 b).
-   - Both pages show the « 📴 Hors ligne — données du … » banner with the age of the data.
-3. **Offline write queue (O3 b).** Only `PATCH /api/competitions/{id}/participants/{aid}` with `{selectionne}` or `{present}`:
+   - PWA competitions page: `competitions`, `coaches`, and `competitors` for coaches (O1, O2).
+   - Directory (`/index`): nothing, it stays online-only (O1).
+   - The page shows the « 📴 Hors ligne — données du … » banner with the age of the data.
+3. **Offline write queue (O3 b, phase 5b).** Only `PATCH /api/competitions/{id}/participants/{aid}` with `{selectionne}` or `{present}`:
    - ⚠️ Pending the conflict analysis below. The steps here assume last writer wins, except for K4. Option 2 (compare-and-set) would add `expected` to each queued entry and a `409 conflict` case.
    - Offline, `apiWrite` updates the screen at once and adds `{id, method, url, body, queuedAt, uid}` to `outbox`.
    - A second change to the same participant and flag **replaces** the queued one. Only the last value is sent.
@@ -452,9 +453,35 @@ Consequences:
 6. **Docs.** `ARCHITECTURE.md` §5, `docs/base_firestore.md` (directory), the user help on the phone pages, and S9 (personal data) in this plan.
 
 **Side effects.**
-- **Personal data on phones comes back, on purpose and limited.** It is the active season's contact fields only, not every season with health data as in v22. It is wiped on logout, on loss of role and after 30 days. Record it in the club's GDPR register.
+- **Personal data on phones comes back, on purpose and limited.** It is the contacts of the competitors of open competitions only, on coaches' phones, not every member of every season with health data as in v22. It is wiped on logout, on loss of role and after 30 days. Record it in the club's GDPR register.
 - **Conflicts.** Without extra work, a queued flag sent hours later overwrites a change made online in the meantime (last writer wins, as for competition metadata today, S5). This is not settled: see the notes below.
 - **D2 changes.** Once O1 and O3 are settled, rewrite D2 in the decisions table.
+
+#### Phase 5a — as built (deviations and notes for review)
+
+Read-only offline. The write queue (O3) is phase 5b.
+
+- **Server.** `GET /api/members/competitors` (`api/members.py` → `MemberService.list_competitors`), coach only (default role of `/api/members`; it is not in `READONLY_READ_PREFIXES`).
+  - Competitors = every participant (selected or not) of a competition whose `statut` is not `close`.
+  - Fields: `adherent_id` plus `member_view.COMPETITOR_FIELDS` (`last_name`, `first_name`, `phone`, `creneau_groupe`, `emergency1/2_name`, `emergency1/2_phone`), formatted like the directory. Read from the SQLite cache, active season; a participant with no purchase in the active season is left out, and the page then falls back to the copy in the participant (`phone`, `urgence_nom`/`urgence_tel`, first contact only).
+  - Same ETag / `no-store` handling as the other GET routes.
+- **Store.** `web/shared/alj-store.js` (`window.ALJStore`): IndexedDB `alj-offline`, stores `resources` and `meta` (the `outbox` comes with 5b). `start(uid)`, `load`, `save`, `touch`, `clearAll`.
+  - Deviation: `start(uid)` (owner check, migration of `alj_snapshot:*`, `navigator.storage.persist()`) and `touch` (a 304 renews the 30 days) were added; `ageOf` was not needed.
+  - 30 days (O4): an older record wipes the whole store on read. The page then shows no offline data; there is no separate « reconnect » prompt, since the next online poll refills it.
+  - `ALJSync.snapshot` is removed; `ALJSync.poll` takes `opts.etag` (from the store) and passes the new ETag to `onData`.
+- **PWA (`competitions.html`).** Stored: `competitions`, `coaches`, and `competitors` (coaches only). Not stored: competition member list, HelloAsso items (O1).
+  - Coaches see the emergency contacts as 🚨 `tel:` links on each competitor card, online and offline.
+  - Wipe: logout, a 401/403 on any poll, another account signing in. A poll answer arriving after logout is ignored (it used to be able to write the snapshot again).
+  - Help text on the sign-in page: offline use, 30 days, iOS home-screen install.
+  - Web version v24 (`sw.js` precaches `alj-store.js`).
+- **Not changed.** Directory `/index` (online only), bureau pages (no store).
+- **Tests.**
+  - API: `tests/api/test_api_competitors.py` (open competitions only, the agreed fields only, 304, empty); role in `test_api_security.py`.
+  - Static: `test_mobile_pwa.py::test_offline_store` (only `alj-store.js` opens IndexedDB, no `alj_snapshot:` left, wipe on logout and 401/403, precache, 30 days).
+  - e2e: `e2e/test_offline.py` rewritten (it still expected offline writes to be sent later): contacts shown and stored, page restarted without API then offline, write refused; logout wipes the store; readonly keeps no contacts.
+- **Found while testing (phase 4 leftovers, fixed):** `e2e/helpers/data.py` still built `Competition(coach1_id=…)` (every e2e test creating a competition crashed), and `e2e/mobile/test_competitions.py` still used the `#f-coach1` selects.
+- **e2e failures not caused by this phase** (same on HEAD before it): `test_helloasso.py` ×2, `bureau/test_competitions.py` (`test_coach_cannot_edit_in_office`, `test_withdrawal_of_paid_competitor` ×2, `test_season_balance` flaky), `mobile/test_coaches_balance.py::test_coach_changes_reach_competitions`, `mobile/test_competitions.py::test_archive_past_competitions` (passes alone: the 5 s server cache of the competition list hides a competition the test wrote straight to Firestore).
+- **Not verified:** a real Android phone and iPhone (iOS 7-day eviction, `persist()` answer).
 
 #### Conflict handling — notes for later analysis
 
@@ -532,7 +559,7 @@ To settle before implementing the queue (O3). Nothing here is decided.
 - **S6 — Firestore read costs from polling.** Each competition poll reads every competition doc. Mitigation: 5 s per-instance cache + ETag. Old competitions accumulate over seasons; if costs grow, add `?include_archived=false` (follow-up).
 - **S7 — Cloud Run cost.** Polling keeps an instance warm only while someone has a page visible (pause when hidden). Expected impact is small; watch billing for the first month.
 - **S8 — Readonly role.** Without D6's readonly GET set, readonly users would lose access entirely, because the API refuses them on every route today. Covered in phase 0.
-- **S9 — Personal data.** Phones stop caching all members (all seasons). The remaining offline snapshot holds participant contacts for competitions only (D2), wiped on logout. The old Firestore IndexedDB cache is deleted (phase 3 step 2).
+- **S9 — Personal data.** Phones stop caching all members (all seasons). The remaining offline store holds competitions and, on coaches' phones, the contacts (phone, emergency contacts, slot group) of the competitors of open competitions (D2, phase 5a): no health data, address or e-mail. It is wiped on logout, on loss of role and after 30 days. To record in the club's GDPR register. The old Firestore IndexedDB cache is deleted (phase 3 step 2).
 - **S10 — Behaviour inherited from the server repository (D7).** These replace JS behaviour:
   - HelloAsso link: the amount is **set**, not added (no more double counting, but multi-order payments keep only the last order).
   - Deleting a coach clears `coach1..3_id`.

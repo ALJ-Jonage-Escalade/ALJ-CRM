@@ -100,8 +100,9 @@ class TestRoles(unittest.TestCase):
         for method in ("POST", "PUT", "PATCH", "DELETE"):
             self.assertEqual(r(method, "/api/competitions/123"), Role.COACH, method)
             self.assertEqual(r(method, "/api/coaches"), Role.COACH, method)
-        for path in ("/api/competitions-pirate", "/api/members", "/api/helloasso/items",
-                     "/api/email-templates"):
+        # /api/members/competitors carries emergency contacts: coach only, like the directory
+        for path in ("/api/competitions-pirate", "/api/members", "/api/members/competitors",
+                     "/api/helloasso/items", "/api/email-templates"):
             self.assertEqual(r("GET", path), Role.COACH, path)
         for method, path in (("POST", "/api/competitions/archive-past"),
                              ("POST", "/api/competitions/1/participants/2/cancel"),

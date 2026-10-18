@@ -6,21 +6,18 @@
      reloads when the page becomes visible again, when the network comes back, and on
      demand (refresh() right after the user's own write). Sends If-None-Match so an
      unchanged poll is a 304 without body. Responses are never put in the HTTP cache.
-   - snapshot: last data kept in localStorage for read-only offline viewing, tied to the
-     signed-in user; clearAll() on logout. Only for data the plan allows offline
-     (competitions and participants), never the member directory.
+     opts.etag: ETag of data the page already has (offline store, alj-store.js), so the
+     first poll can be a 304 too; onData(data, etag) gets the new one.
    - request(fetchFn, method, url, body): JSON call for a write; rejects with an Error
      carrying the server's message, its HTTP `status` and machine `code` (e.g.
      "already_paid"). Without a `status`, the request never reached the server. */
 (function () {
   "use strict";
 
-  const SNAPSHOT_PREFIX = "alj_snapshot:";
-
   function poll(url, opts) {
     const o = Object.assign({ intervalMs: 20000, onData() {}, onStatus() {} }, opts || {});
     if (typeof o.fetch !== "function") throw new Error("ALJSync.poll: opts.fetch is required");
-    let etag = null;
+    let etag = o.etag || null;
     let timer = null;
     let inFlight = null;
     let again = false;
@@ -49,7 +46,7 @@
       let data;
       try { data = await res.json(); } catch (error) { o.onStatus("error", { error }); return; }
       etag = res.headers.get("ETag");
-      o.onData(data);
+      o.onData(data, etag);
       o.onStatus("ok", { changed: true });
     }
 
@@ -105,43 +102,5 @@
     return data;
   }
 
-  /* localStorage can be missing or throw (private window, blocked site data): every access
-     is guarded and a failure only means "no offline copy". */
-  function storage() {
-    try { return window.localStorage; } catch (e) { return null; }
-  }
-
-  const snapshot = Object.freeze({
-    save(name, uid, data) {
-      const s = storage();
-      if (!s || !uid) return false;
-      try {
-        s.setItem(SNAPSHOT_PREFIX + name, JSON.stringify({ uid, savedAt: Date.now(), data }));
-        return true;
-      } catch (e) { return false; }  // quota exceeded
-    },
-    /* Returns { data, savedAt } or null (none, unreadable, or saved by another user). */
-    load(name, uid) {
-      const s = storage();
-      if (!s || !uid) return null;
-      try {
-        const v = JSON.parse(s.getItem(SNAPSHOT_PREFIX + name) || "null");
-        return v && v.uid === uid ? { data: v.data, savedAt: v.savedAt } : null;
-      } catch (e) { return null; }
-    },
-    clearAll() {
-      const s = storage();
-      if (!s) return;
-      try {
-        const keys = [];
-        for (let i = 0; i < s.length; i++) {
-          const k = s.key(i);
-          if (k && k.startsWith(SNAPSHOT_PREFIX)) keys.push(k);
-        }
-        keys.forEach(k => s.removeItem(k));
-      } catch (e) { /* nothing stored */ }
-    }
-  });
-
-  window.ALJSync = Object.freeze({ poll, request, snapshot });
+  window.ALJSync = Object.freeze({ poll, request });
 })();

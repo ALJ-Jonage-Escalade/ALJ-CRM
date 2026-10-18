@@ -181,3 +181,22 @@ def build_members(rows: Iterable[Dict[str, Any]], planning: Iterable[Dict[str, A
     members = [member_row(r, slots, ref_date) for r in rows]
     members.sort(key=lambda m: (normalize_string(m["last_name"]), normalize_string(m["first_name"])))
     return members
+
+
+# What a coach's phone keeps offline about a competitor (plan phase 5, O2): contacts only,
+# no health, address or e-mail.
+COMPETITOR_FIELDS = ("last_name", "first_name", "phone", "creneau_groupe", "emergency1_name",
+                     "emergency1_phone", "emergency2_name", "emergency2_phone")
+
+
+def competitor_contacts(members: Iterable[Dict[str, Any]], adherent_ids) -> List[Dict[str, Any]]:
+    """Contacts of the members whose id is in `adherent_ids`, one per member (a member with
+    several purchases keeps the first one that has a slot group)."""
+    by_id: Dict[Any, Dict[str, Any]] = {}
+    for m in members:
+        uid = m.get("user_id")
+        if uid not in adherent_ids:
+            continue
+        if uid not in by_id or (not by_id[uid]["creneau_groupe"] and m["creneau_groupe"]):
+            by_id[uid] = {"adherent_id": uid, **{k: m[k] for k in COMPETITOR_FIELDS}}
+    return list(by_id.values())
