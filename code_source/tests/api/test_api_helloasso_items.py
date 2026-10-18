@@ -36,6 +36,68 @@ class TestHelloAssoItems(ApiTestCase):
         self.link(competition_id=self.comp, adherent_id=1)
         self.assertEqual(self.participant(self.comp, 1)["montant_paye"], 15.0)
 
+    def payment(self, adherent_id):
+        p = self.participant(self.comp, adherent_id)
+        return (p["selectionne"], p["statut_paiement"], p["montant_paye"], p["commande_helloasso"])
+
+    def add_item(self, id_item, order_id, montant, etat="Processed", **link):
+        self.fake.upsert_document("helloasso_items", str(id_item), {
+            "id_item": id_item, "order_id": order_id, "montant": montant, "etat": etat,
+            "date_item": "2026-03-02", "competition_id": None, "adherent_id": None,
+            "source": None, "commentaire": "", **link})
+
+    def test_unpaid_item_adds_the_member_without_payment(self):
+        """A refunded or pending item is not money received (same rule as the automatic link)."""
+        for etat in ("Refunded", "Pending"):
+            with self.subTest(etat=etat):
+                self.fake.upsert_document("helloasso_items", "55", dict(Repo.get_item(55), etat=etat))
+                self.assertEqual(self.link(competition_id=self.comp, adherent_id=1).status_code, 200)
+                self.assertEqual(self.payment(1), (True, "en_attente", 0.0, ""))
+
+    def test_amounts_of_all_linked_items_add_up(self):
+        self.add_item(56, 9002, 5.0, competition_id=self.comp, adherent_id=1, source="auto")
+        self.add_item(57, 9003, 30.0, etat="Refunded", competition_id=self.comp, adherent_id=1, source="auto")
+        Repo.apply_links_to_participants()
+        self.assertEqual(self.payment(1), (True, "paye", 5.0, "9002"))
+        self.link(competition_id=self.comp, adherent_id=1)
+        selectionne, statut, montant, orders = self.payment(1)
+        self.assertEqual((selectionne, statut, montant), (True, "paye", 20.0))
+        self.assertEqual(sorted(orders.split(", ")), ["9001", "9002"])
+
+    def test_relinking_moves_the_payment(self):
+        self.seed_adherent(2)
+        self.link(competition_id=self.comp, adherent_id=1)
+        self.assertEqual(self.link(competition_id=self.comp, adherent_id=2).status_code, 200)
+        self.assertEqual(self.payment(2), (True, "paye", 15.0, "9001"))
+        self.assertEqual(self.payment(1), (True, "en_attente", 0.0, ""))
+
+    def test_relinking_keeps_the_other_items_of_the_previous_member(self):
+        self.seed_adherent(2)
+        self.add_item(56, 9002, 5.0, competition_id=self.comp, adherent_id=1, source="auto")
+        self.link(competition_id=self.comp, adherent_id=1)
+        self.link(competition_id=self.comp, adherent_id=2)
+        self.assertEqual(self.payment(1), (True, "paye", 5.0, "9002"))
+
+    def test_partial_relink_undoes_the_payment(self):
+        self.link(competition_id=self.comp, adherent_id=1)
+        self.link(competition_id=self.comp)
+        self.assertEqual(self.payment(1), (True, "en_attente", 0.0, ""))
+
+    def test_relinking_keeps_a_cancellation(self):
+        self.seed_adherent(2)
+        self.link(competition_id=self.comp, adherent_id=1)
+        Repo.mark_cancelled(self.comp, 1, "annule_reporte")
+        self.link(competition_id=self.comp, adherent_id=2)
+        self.assertEqual(self.participant(self.comp, 1)["statut_paiement"], "annule_reporte")
+        self.assertEqual(self.payment(2), (True, "paye", 15.0, "9001"))
+
+    def test_relinking_keeps_a_manual_payment_recorded_since(self):
+        self.seed_adherent(2)
+        self.link(competition_id=self.comp, adherent_id=1)
+        Repo.record_manual_payment(self.comp, 1, 12.0)  # the coach got a cheque instead
+        self.link(competition_id=self.comp, adherent_id=2)
+        self.assertEqual(self.payment(1), (True, "paye", 12.0, "Règlement manuel"))
+
     def test_partial_link_and_errors(self):
         self.assertEqual(self.link(competition_id=self.comp).status_code, 200)
         item = Repo.get_item(55)

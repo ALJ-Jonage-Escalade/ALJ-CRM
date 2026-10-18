@@ -29,20 +29,23 @@ class HelloAssoItemService:
     def link_item(id_item: int, competition_id: Optional[int], adherent_id: Optional[int],
                   commentaire: str) -> bool:
         """Saves the coach's link. When both a competition and a member are chosen, the member
-        is (re)selected for the competition and the item's amount recorded as paid.
+        is (re)selected for the competition and their payment recomputed from all the paid
+        items linked to them (a refunded or pending item adds nothing). The participant the
+        item was linked to before has theirs recomputed too: the item no longer pays for them.
         Returns whether the item is now linked to a participant."""
         item = Repo.get_item(id_item)
         if item is None:
             raise _item_not_found()
         if competition_id is not None and Repo.get_competition_doc(competition_id) is None:
             raise competition_not_found()
+        before = (item.get("competition_id"), item.get("adherent_id"))
         Repo.save_manual_link(id_item, competition_id, adherent_id, commentaire)
         linked = competition_id is not None and adherent_id is not None
         if linked:
             Repo.add_participant(competition_id, adherent_id, selectionne=True)
-            Repo.apply_helloasso_payment(competition_id, adherent_id,
-                                         float(item.get("montant") or 0.0),
-                                         order_ref=str(item.get("order_id") or ""))
+            Repo.refresh_helloasso_payment(competition_id, adherent_id)
+        if None not in before and before != (competition_id, adherent_id):
+            Repo.refresh_helloasso_payment(*before)
         return linked
 
     @staticmethod

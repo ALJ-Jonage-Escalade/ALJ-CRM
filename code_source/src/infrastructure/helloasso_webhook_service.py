@@ -291,12 +291,14 @@ class HelloAssoWebhookService:
             nom_p, _, prenom_p = payer_name.partition(" ")
             campagne_slug = str((raw.get("order") or {}).get("formSlug") or raw.get("formSlug") or "")
 
+            mirrored = False
             try:
                 CompetitionRepository.sync_helloasso_mirror(
                     summarized=[sm],
                     raw_items=[raw],
                     campagne_slug=campagne_slug
                 )
+                mirrored = True
             except Exception as save_err:
                 print(f"⚠️ [WEBHOOK_HELLOASSO] Erreur sauvegarde miroir item #{id_item} : {save_err}")
 
@@ -315,14 +317,20 @@ class HelloAssoWebhookService:
                         source="webhook"
                     )
 
-                    # Enregistrer le paiement dans la table participants
-                    updated = CompetitionRepository.apply_helloasso_payment(
-                        competition_id=cid,
-                        adherent_id=aid,
-                        montant_paye=montant,
-                        order_ref=order_ref,
-                        date_synchro=date_item
-                    )
+                    # Enregistrer le paiement dans la table participants : somme de tous les
+                    # articles payés rattachés à ce participant (un 2e paiement s'ajoute au 1er).
+                    # Article absent du miroir (écriture échouée) : son seul montant.
+                    def record_payment(cid=cid, aid=aid):
+                        if mirrored:
+                            return CompetitionRepository.refresh_helloasso_payment(cid, aid)
+                        return CompetitionRepository.apply_helloasso_payment(
+                            competition_id=cid,
+                            adherent_id=aid,
+                            montant_paye=montant,
+                            order_ref=order_ref,
+                            date_synchro=date_item
+                        )
+                    updated = record_payment()
 
                     # Si le participant n'était pas encore enregistré pour cette compétition,
                     # l'ajouter comme participant sélectionné et payé
@@ -332,13 +340,7 @@ class HelloAssoWebhookService:
                             adherent_id=aid,
                             selectionne=True
                         )
-                        CompetitionRepository.apply_helloasso_payment(
-                            competition_id=cid,
-                            adherent_id=aid,
-                            montant_paye=montant,
-                            order_ref=order_ref,
-                            date_synchro=date_item
-                        )
+                        record_payment()
 
                     affected_competition_ids.add(cid)
 

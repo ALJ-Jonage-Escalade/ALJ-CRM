@@ -786,6 +786,33 @@ class CompetitionFirestoreRepository:
         return cls._update_participant(competition_id, adherent_id, change) is not None
 
     @classmethod
+    def refresh_helloasso_payment(cls, competition_id: int, adherent_id: int) -> bool:
+        """Recomputes a participant's HelloAsso payment from the paid items linked to them
+        (rule of apply_links_to_participants): sum of their amounts, their orders. With none
+        left (item linked elsewhere or not paid), a payment that came from HelloAsso is undone:
+        back to waiting for payment (or not invited when unselected). Cancellations and manual
+        payments are kept. Returns whether the participant row was written."""
+        linked = [it for it in cls._items_map().values()
+                  if it.get("competition_id") == competition_id and it.get("adherent_id") == adherent_id
+                  and cls._is_paid_item(it)]
+        montant = round(sum(float(it.get("montant") or 0.0) for it in linked), 2)
+        orders = ", ".join(str(it["order_id"]) for it in linked if it.get("order_id"))
+
+        def change(p):
+            statut = p.get("statut_paiement") or ""
+            if statut in PAIEMENT_STATUTS_ANNULES:
+                return False  # the coach's cancellation is never overwritten
+            if linked:
+                p.update(statut_paiement=PAIEMENT_PAYE, montant_paye=montant, commande_helloasso=orders)
+                return None
+            if statut != PAIEMENT_PAYE or (p.get("commande_helloasso") or "") in ("", MANUAL_PAYMENT_REF):
+                return False
+            p.update(statut_paiement=PAIEMENT_EN_ATTENTE if p.get("selectionne") else PAIEMENT_NON_INVITE,
+                     montant_paye=0.0, commande_helloasso="")
+            return None
+        return cls._update_participant(competition_id, adherent_id, change) is not None
+
+    @classmethod
     def load_competition_group_into(cls, competition_id: int) -> int:
         """Pré-remplit la liste des participants avec le groupe « Compétition »."""
         groupe = cls.list_adherents(competition_only=True)
