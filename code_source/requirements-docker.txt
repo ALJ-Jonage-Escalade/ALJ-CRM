@@ -49,7 +49,7 @@ numpy==2.5.4 ; python_full_version >= '3.12'
     # via pandas
 openpyxl==3.1.5
     # via alj-escalade-manager
-pandas==3.0.3
+pandas==3.0.6
     # via alj-escalade-manager
 pillow==12.3.0
     # via
