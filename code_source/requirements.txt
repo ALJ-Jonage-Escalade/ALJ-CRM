@@ -47,7 +47,7 @@ jeepney==0.9.0 ; sys_platform == 'linux'
     #   keyring
     #   secretstorage
 keyring==25.7.0
-lxml==6.1.1
+lxml==6.1.3
     # via
     #   alj-escalade-manager
     #   python-docx
