@@ -119,7 +119,7 @@ tzdata==2026.5 ; sys_platform == 'emscripten' or sys_platform == 'win32'
     # via pandas
 urllib3==2.8.0
     # via requests
-uvicorn==0.51.0
+uvicorn==0.54.0
     # via alj-escalade-manager
 zipp==4.1.1 ; python_full_version < '3.12'
     # via importlib-metadata
