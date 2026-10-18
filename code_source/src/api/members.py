@@ -4,9 +4,12 @@ offline by the phone (coach).
 Member writes stay on the existing routes (/api/members/update, /api/attestations/*).
 """
 
+from __future__ import annotations
+
 from typing import Optional
 
 from fastapi import APIRouter, Request
+from fastapi.responses import Response
 
 from api.responses import json_with_etag
 from services.member_service import MemberService as Service
@@ -15,10 +18,10 @@ router = APIRouter(prefix="/api/members")
 
 
 @router.get("")
-def list_members(request: Request, season: Optional[str] = None):
+def list_members(request: Request, season: Optional[str] = None) -> Response:
     return json_with_etag(request, Service.list_members(season))
 
 
 @router.get("/competitors")
-def list_competitors(request: Request):
+def list_competitors(request: Request) -> Response:
     return json_with_etag(request, Service.list_competitors())

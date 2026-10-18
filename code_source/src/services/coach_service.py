@@ -3,6 +3,8 @@
 Knows nothing about HTTP: failures are raised as services.errors.
 """
 
+from __future__ import annotations
+
 from typing import List
 
 from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
@@ -10,7 +12,7 @@ from services.competition_store import storage, write
 from services.errors import NotFound
 
 
-def _require_coach(coach_id: int):
+def _require_coach(coach_id: int) -> None:
     if Repo.get_coach(coach_id) is None:
         raise NotFound("Coach introuvable.")
 

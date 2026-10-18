@@ -5,12 +5,15 @@ webhook, so all three write with the same rules). Knows nothing about HTTP: fail
 raised as services.errors.
 """
 
+from __future__ import annotations
+
 import datetime
 from typing import Any, Dict, List
 
 from domain.competition_models import Competition
 from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
-from services.competition_store import cached_competitions, competition_not_found, storage, write
+from services.competition_store import cached_competitions, competition_not_found, require_competition, storage, write
+from services.documents import Doc
 
 # Fields stored as given, outside the domain model (plan appendix B)
 PASS_THROUGH_FIELDS = ("lieu", "type")
@@ -26,21 +29,21 @@ class CompetitionService:
 
     @staticmethod
     @storage
-    def list_competitions() -> List[dict]:
+    def list_competitions() -> List[Doc]:
         return cached_competitions(Repo.list_competition_docs)
 
     @staticmethod
     @write
-    def create_competition(fields: Dict[str, Any]) -> dict:
+    def create_competition(fields: Dict[str, Any]) -> Doc:
         """`fields`: validated body (api.schemas.competitions.CompetitionCreate)."""
         comp = Competition(**{k: fields[k] for k in COMPETITION_FIELDS if k in fields})
         comp.coach_ids = list(fields.get("coach_ids") or [])
         new_id = Repo.save_competition(comp, _extra(fields))
-        return Repo.get_competition_doc(new_id)
+        return require_competition(new_id)
 
     @staticmethod
     @write
-    def update_competition(competition_id: int, fields: Dict[str, Any]) -> dict:
+    def update_competition(competition_id: int, fields: Dict[str, Any]) -> Doc:
         """Partial update: only the fields given are changed (participants untouched), on the
         version of the document read (a concurrent write to other fields is kept)."""
         def change(comp: Competition) -> None:
@@ -51,7 +54,7 @@ class CompetitionService:
                 comp.coach_ids = list(fields["coach_ids"] or [])
         if not Repo.update_competition(competition_id, change, _extra(fields)):
             raise competition_not_found()
-        return Repo.get_competition_doc(competition_id)
+        return require_competition(competition_id)
 
     @staticmethod
     @write

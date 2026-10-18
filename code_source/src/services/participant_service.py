@@ -4,6 +4,8 @@ Every write goes through the repository's optimistic lock (re-read and retried o
 concurrent change). Knows nothing about HTTP: failures are raised as services.errors.
 """
 
+from __future__ import annotations
+
 from typing import Optional, Tuple
 
 from infrastructure.competition_firestore_repository import (

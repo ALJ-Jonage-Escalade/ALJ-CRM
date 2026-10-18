@@ -3,6 +3,8 @@
 Knows nothing about HTTP: failures are raised as services.errors.
 """
 
+from __future__ import annotations
+
 from typing import List, Optional
 
 from infrastructure.competition_firestore_repository import (
@@ -10,6 +12,7 @@ from infrastructure.competition_firestore_repository import (
     ItemAlreadyLinked,
 )
 from services.competition_store import competition_not_found, storage, write
+from services.documents import Doc
 from services.errors import Conflict, InvalidRequest, NotFound
 
 
@@ -21,7 +24,7 @@ class HelloAssoItemService:
 
     @staticmethod
     @storage
-    def list_items() -> List[dict]:
+    def list_items() -> List[Doc]:
         return Repo.list_item_docs()
 
     @staticmethod
@@ -38,14 +41,16 @@ class HelloAssoItemService:
             raise _item_not_found()
         if competition_id is not None and Repo.get_competition_doc(competition_id) is None:
             raise competition_not_found()
-        before = (item.get("competition_id"), item.get("adherent_id"))
+        prev_comp, prev_adherent = item.get("competition_id"), item.get("adherent_id")
         Repo.save_manual_link(id_item, competition_id, adherent_id, commentaire)
-        linked = competition_id is not None and adherent_id is not None
-        if linked:
+        linked = False
+        if competition_id is not None and adherent_id is not None:
+            linked = True
             Repo.add_participant(competition_id, adherent_id, selectionne=True)
             Repo.refresh_helloasso_payment(competition_id, adherent_id)
-        if None not in before and before != (competition_id, adherent_id):
-            Repo.refresh_helloasso_payment(*before)
+        if (prev_comp is not None and prev_adherent is not None
+                and (prev_comp, prev_adherent) != (competition_id, adherent_id)):
+            Repo.refresh_helloasso_payment(prev_comp, prev_adherent)
         return linked
 
     @staticmethod

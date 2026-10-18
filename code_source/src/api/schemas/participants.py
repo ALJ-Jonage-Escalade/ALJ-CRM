@@ -1,5 +1,7 @@
 """Bodies of the participant routes (api.participants)."""
 
+from __future__ import annotations
+
 from typing import Optional
 
 from pydantic import Field, field_validator
@@ -32,7 +34,7 @@ class ParticipantCancel(RequestBody):
 
     @field_validator("mode")
     @classmethod
-    def _mode(cls, value):
+    def _mode(cls, value: str) -> str:
         if value not in CANCEL_MODES:
             raise ValueError(f"mode must be one of {', '.join(CANCEL_MODES)}")
         return value

@@ -22,8 +22,9 @@ class TestCompetitionService(FirestoreRepoTestCase):
 
     def test_firestore_errors_become_service_errors(self):
         with patch.object(Repo, "list_competition_docs", side_effect=FirestoreError("down")):
-            with self.assertRaises(StorageUnavailable):
+            with self.assertRaises(StorageUnavailable), self.assertLogs("alj", "ERROR") as logs:
                 Service.list_competitions()
+        self.assertIn("CompetitionService.list_competitions", logs.output[0])
         with patch.object(Repo, "delete_competition", side_effect=FirestoreConflictError("race")):
             with self.assertRaises(Conflict) as ctx:
                 Service.delete_competition(1)

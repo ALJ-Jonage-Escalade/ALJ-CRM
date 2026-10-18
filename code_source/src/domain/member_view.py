@@ -4,12 +4,17 @@ web/shared/alj-members.js, which rebuilt it in the browser from the crm_* collec
 Pure functions: rows in, dicts out (no database access).
 """
 
+from __future__ import annotations
+
+import datetime
 import json
 import re
 from typing import Any, Dict, Iterable, List, Optional
 
 from domain.age_rules import age_at, get_season_start_date, parse_birth_date
 from domain.utils import normalize_string
+
+# Rows (SQLite) and members (JSON for the pages) are Dict[str, Any]: mixed column types.
 
 STATUS_MAP = {
     "processed": "Traité", "validated": "Validé", "validé": "Validé", "valide": "Validé",
@@ -18,12 +23,12 @@ STATUS_MAP = {
 }
 
 
-def normalize_status(status) -> str:
+def normalize_status(status: object) -> str:
     raw = str(status or "").strip()
     return STATUS_MAP.get(raw.lower(), raw)
 
 
-def normalize_gender(value) -> str:
+def normalize_gender(value: object) -> str:
     s = str(value or "").strip().lower()
     if s in ("f", "femme", "féminin", "feminin"):
         return "Femme"
@@ -37,18 +42,18 @@ _CITY_PARTICLES = frozenset({"de", "des", "du", "d", "en", "sur", "sous", "les",
 _DIGIT_PAIR = re.compile(r"([0-9]{2})(?=[0-9])")
 
 
-def fmt_last_name(name) -> str:
+def fmt_last_name(name: object) -> str:
     """Last names in capitals: "de lima" -> "DE LIMA"."""
     return str(name or "").strip().upper()
 
 
-def fmt_first_name(name) -> str:
+def fmt_first_name(name: object) -> str:
     """Each word capitalized, compound names included: "JEAN-PIERRE" -> "Jean-Pierre"."""
     s = str(name or "").strip().lower()
     return _FIRST_NAME_WORD.sub(lambda m: m.group(1) + m.group(2).upper(), s)
 
 
-def fmt_city(city) -> str:
+def fmt_city(city: object) -> str:
     """Words capitalized, French particles lower case except first:
     "VILLETTE D'ANTHON" -> "Villette d'Anthon"."""
     s = re.sub(r"\s+", " ", str(city or "").strip().replace("’", "'").replace("‘", "'"))
@@ -71,7 +76,7 @@ def fmt_city(city) -> str:
     return "".join(out)
 
 
-def fmt_phone(phone) -> str:
+def fmt_phone(phone: object) -> str:
     """Digits by pairs, +33/0033 turned into 0: "+33619984329" -> "06 19 98 43 29"."""
     s = re.sub(r"^(\+33|0033)\s*", "0", str(phone or "").strip())
     digits = re.sub(r"[^0-9]", "", s)
@@ -135,7 +140,7 @@ def creneaux(planning: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def member_row(row: Dict[str, Any], slots: Dict[str, Dict[str, str]],
-               ref_date) -> Dict[str, Any]:
+               ref_date: datetime.date) -> Dict[str, Any]:
     """One member of a season (one purchase) as the pages use it."""
     tarif = row.get("tarif_name") or ""
     slot: Optional[Dict[str, str]] = slots.get(normalize_string(tarif))

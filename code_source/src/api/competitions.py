@@ -6,36 +6,40 @@ by the auth middleware (infrastructure.api_auth.required_role): reads are open t
 readonly, writes need coach.
 """
 
+from __future__ import annotations
+
 from fastapi import APIRouter, Request
+from fastapi.responses import Response
 
 from api.responses import SUCCESS, json_with_etag
 from api.schemas.competitions import CompetitionCreate, CompetitionUpdate
 from services.competition_service import CompetitionService as Service
+from services.documents import Doc
 
 router = APIRouter(prefix="/api/competitions")
 
 
 @router.get("")
-def list_competitions(request: Request):
+def list_competitions(request: Request) -> Response:
     return json_with_etag(request, Service.list_competitions())
 
 
 @router.post("", status_code=201)
-def create_competition(body: CompetitionCreate):
+def create_competition(body: CompetitionCreate) -> Doc:
     return Service.create_competition(body.model_dump(exclude_none=True))
 
 
 @router.patch("/{competition_id}")
-def update_competition(competition_id: int, body: CompetitionUpdate):
+def update_competition(competition_id: int, body: CompetitionUpdate) -> Doc:
     return Service.update_competition(competition_id, body.model_dump(exclude_unset=True))
 
 
 @router.delete("/{competition_id}")
-def delete_competition(competition_id: int):
+def delete_competition(competition_id: int) -> Doc:
     Service.delete_competition(competition_id)
     return SUCCESS
 
 
 @router.post("/archive-past")
-def archive_past_competitions():
+def archive_past_competitions() -> Doc:
     return {**SUCCESS, "archived": Service.archive_past_competitions()}

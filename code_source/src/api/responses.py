@@ -1,8 +1,10 @@
 """HTTP helpers shared by the API routers."""
 
+from __future__ import annotations
+
 import hashlib
 import json
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
@@ -20,7 +22,7 @@ def _etag_matches(header: str, etag: str) -> bool:
     return "*" in candidates or etag in candidates or f"W/{etag}" in candidates
 
 
-def json_with_etag(request: Request, payload: Any) -> Response:
+def json_with_etag(request: Request, payload: Any) -> Response:  # Any: any JSON-serializable value
     """JSON response with a strong ETag (hash of the body); 304 when the client already has it."""
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str).encode("utf-8")
     etag = '"' + hashlib.sha1(body).hexdigest() + '"'
@@ -31,12 +33,12 @@ def json_with_etag(request: Request, payload: Any) -> Response:
 
 
 # Body of a write that has nothing else to return
-SUCCESS = {"status": "success"}
+SUCCESS: Dict[str, str] = {"status": "success"}
 
 
 def error(status: int, message: str, code: Optional[str] = None) -> JSONResponse:
     """Same error shape as the other API routes ({status, message}), plus a machine code."""
-    body = {"status": "error", "message": message}
+    body: Dict[str, str] = {"status": "error", "message": message}
     if code:
         body["code"] = code
     return JSONResponse(body, status_code=status)

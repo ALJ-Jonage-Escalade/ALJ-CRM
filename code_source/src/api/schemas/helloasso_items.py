@@ -1,5 +1,7 @@
 """Bodies of the HelloAsso item routes (api.helloasso_items)."""
 
+from __future__ import annotations
+
 from typing import Optional
 
 from api.schemas.base import RequestBody

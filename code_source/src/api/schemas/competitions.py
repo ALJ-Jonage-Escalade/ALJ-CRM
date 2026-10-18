@@ -1,5 +1,7 @@
 """Bodies of the competition routes (api.competitions)."""
 
+from __future__ import annotations
+
 import re
 from typing import List, Optional
 
@@ -11,18 +13,18 @@ from domain.competition_models import STATUT_EN_PREPARATION, STATUTS_COMPETITION
 _ISO_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})?$")
 
 
-def _check_statut(value):
+def _check_statut(value: Optional[str]) -> Optional[str]:
     if value is not None and value not in STATUTS_COMPETITION:
         raise ValueError(f"statut must be one of {', '.join(STATUTS_COMPETITION)}")
     return value
 
 
-def _distinct(value):
+def _distinct(value: Optional[List[int]]) -> Optional[List[int]]:
     """Coach ids in the order given, duplicates dropped (no length limit, plan C2)."""
     return None if value is None else list(dict.fromkeys(value))
 
 
-def _check_date(value):
+def _check_date(value: Optional[str]) -> Optional[str]:
     if value is not None and not _ISO_DATE.match(value):
         raise ValueError("date must be YYYY-MM-DD or empty")
     return value

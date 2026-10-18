@@ -3,15 +3,22 @@
 Knows nothing about HTTP: failures are raised as services.errors.
 """
 
-from typing import Dict, List
+from __future__ import annotations
+
+from typing import List, TypedDict
 
 from infrastructure.sqlite_repository import SqliteRepository
+
+
+class Seasons(TypedDict):
+    seasons: List[str]  # names, most recent first
+    active: str
 
 
 class SeasonService:
 
     @staticmethod
-    def list_seasons() -> Dict[str, object]:
+    def list_seasons() -> Seasons:
         """{seasons: names most recent first, active: the active season}. Without a season
         flagged active, the most recent one is."""
         seasons: List[dict] = SqliteRepository.list_seasons()

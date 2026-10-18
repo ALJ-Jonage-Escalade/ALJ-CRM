@@ -5,12 +5,15 @@ come from domain.member_view. Knows nothing about HTTP: failures are raised as
 services.errors.
 """
 
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
+
+from typing import List, Optional
 
 from domain import member_view
 from domain.competition_models import STATUT_CLOSE
 from infrastructure.sqlite_repository import SqliteRepository
 from services.competition_service import CompetitionService
+from services.documents import Doc
 from services.errors import NotFound
 from services.season_service import SeasonService
 
@@ -18,22 +21,22 @@ from services.season_service import SeasonService
 class MemberService:
 
     @staticmethod
-    def list_members(season: Optional[str] = None) -> Dict[str, Any]:
+    def list_members(season: Optional[str] = None) -> Doc:
         """{season, members, creneaux} for `season` (the active season when not given)."""
         seasons = SeasonService.list_seasons()
-        season = (season or "").strip() or seasons["active"]
-        if season not in seasons["seasons"]:
-            raise NotFound(f"Saison inconnue : {season}.")
+        name = (season or "").strip() or seasons["active"]
+        if name not in seasons["seasons"]:
+            raise NotFound(f"Saison inconnue : {name}.")
         planning = SqliteRepository.load_planning_data(log_debug=False)
-        rows = SqliteRepository.list_member_rows(season)
+        rows = SqliteRepository.list_member_rows(name)
         return {
-            "season": season,
-            "members": member_view.build_members(rows, planning, season),
+            "season": name,
+            "members": member_view.build_members(rows, planning, name),
             "creneaux": member_view.creneaux(planning),
         }
 
     @staticmethod
-    def list_competitors() -> List[Dict[str, Any]]:
+    def list_competitors() -> List[Doc]:
         """Contacts of the participants of the competitions that are not archived, the only
         member data a coach's phone keeps offline (plan phase 5). Taken from the active season,
         else from the participant's latest season (not registered again yet)."""

@@ -1,5 +1,7 @@
 """Bodies of the coach routes (api.coaches)."""
 
+from __future__ import annotations
+
 from pydantic import Field
 
 from api.schemas.base import RequestBody

@@ -1,5 +1,7 @@
 """Base of every request body: unknown fields refused, surrounding spaces stripped."""
 
+from __future__ import annotations
+
 from pydantic import BaseModel, ConfigDict
 
 
