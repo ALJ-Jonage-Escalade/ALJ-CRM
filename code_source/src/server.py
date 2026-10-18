@@ -46,20 +46,23 @@ app = FastAPI(title="Admin Escalade API")
 # Access control (Firebase token + firestore.rules roles): enforced on Cloud Run and in the
 # Docker image (ALJ_API_AUTH=required), off for the desktop app's local server, which is
 # protected by local_guard_middleware instead (loopback hosts, same-origin writes).
+import re
+from fastapi.routing import APIRoute
 from infrastructure.cloud_database import CloudDatabase
 from starlette.concurrency import run_in_threadpool
 
 
-# Routes that only read/write Firestore collections (competitions, coaches, projections,
-# HelloAsso mirror) through CompetitionFirestoreRepository: they never touch the SQLite
-# cache, so they must not wait for its refresh (a full rebuild after a cold start).
-FIRESTORE_ONLY_PREFIXES = ("/api/competitions", "/api/coaches", "/api/competition-members",
-                           "/api/helloasso/items")
+# Paths of the routes that only read/write Firestore collections (competitions, coaches,
+# projections, HelloAsso mirror) through CompetitionFirestoreRepository: they never touch the
+# SQLite cache, so they must not wait for its refresh (a full rebuild after a cold start).
+# Filled from their routers once included (below). Exact routes, not path prefixes: the old
+# routes of this file under /api/competitions (results batch, check-all-paid) use the cache.
+FIRESTORE_ONLY_PATHS: List[re.Pattern[str]] = []
 
 
 def uses_sqlite_cache(path: str) -> bool:
     """True for the data routes served from the SQLite cache of the crm_* collections."""
-    if any(path == p or path.startswith(p + "/") for p in FIRESTORE_ONLY_PREFIXES):
+    if any(p.match(path) for p in FIRESTORE_ONLY_PATHS):
         return False
     return path.startswith("/api/") or path in ("/map", "/pivot")
 
@@ -107,6 +110,8 @@ from services.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
              members, seasons):
     app.include_router(_api.router)
+FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items)
+                            for r in _api.router.routes if isinstance(r, APIRoute))
 app.add_exception_handler(ServiceError, service_error_handler)
 
 GENERIC_ERROR = "Erreur interne du serveur (détails dans les journaux)."
