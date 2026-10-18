@@ -114,6 +114,7 @@ def prepare_firestore_data(season_filter: Optional[str] = None) -> Dict[str, Dic
         competitions_docs: Dict[str, Dict[str, Any]] = {}
         for c in comps:
             cid = c["id"]
+            c_keys = c.keys()
             coach_ids = coach_ids_by_comp.get(cid, [])
             coach_names = [coaches_dict.get(cid_) for cid_ in coach_ids]
 
