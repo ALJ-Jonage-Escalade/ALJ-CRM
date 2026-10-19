@@ -32,6 +32,9 @@ dist/
 archive/
 attestation/
 exports/
+# ...but not the code packages with the same names (src/exports, src/domain/attestation)
+!src/exports/
+!src/domain/attestation/
 import/
 scripts_temporaires/
 *.spec

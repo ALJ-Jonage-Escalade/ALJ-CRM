@@ -41,6 +41,8 @@ EXCLUDED_DIRS = {
     ".mypy_cache", "build", "dist", "archive", "attestation", "node_modules",
     ".git", ".github", "downloads",
 }
+# Code packages named like an excluded folder ("attestation" = generated PDFs): kept
+INCLUDED_DIRS = {os.path.join("src", "domain", "attestation")}
 # Fichiers exclus (secrets, données locales, journaux, artefacts générés)
 EXCLUDED_FILE_SUFFIXES = (
     ".env", ".db", ".db-wal", ".db-shm", ".log", ".pyc",
@@ -50,7 +52,9 @@ EXCLUDED_FILE_NAMES = {
 }
 
 
-def _is_excluded_dir(dirname: str) -> bool:
+def _is_excluded_dir(dirname: str, rel_root: str = ".") -> bool:
+    if os.path.normpath(os.path.join(rel_root, dirname)) in INCLUDED_DIRS:
+        return False
     return dirname in EXCLUDED_DIRS
 
 
@@ -72,7 +76,7 @@ def stage_source_tree(code_source_dir: str, staging_dir: str) -> str:
     for root, dirs, files in os.walk(code_source_dir):
         rel_root = os.path.relpath(root, code_source_dir)
         # Filtrer les dossiers exclus (en place pour que os.walk ne descende pas)
-        dirs[:] = [d for d in dirs if not _is_excluded_dir(d) and not d.startswith(".")]
+        dirs[:] = [d for d in dirs if not _is_excluded_dir(d, rel_root) and not d.startswith(".")]
         for name in files:
             if _is_excluded_file(name):
                 continue
