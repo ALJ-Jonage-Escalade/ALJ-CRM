@@ -102,7 +102,7 @@ class TestSqliteCacheScope(unittest.TestCase):
         """The cron reads the notification address and writes last_run/status in the SQLite cache."""
         r = self._assert_cache_around(
             "POST", "/api/competitions/cron/fetch-results",
-            "services.competition_results_batch_service.CompetitionResultsBatchService.run_daily_batch",
+            "services.competitions.results_batch.CompetitionResultsBatchService.run_daily_batch",
             {"status": "success"})
         self.assertEqual(r.json(), {"status": "success"})
 

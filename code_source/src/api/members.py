@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from api.responses import json_with_etag
-from services.member_service import MemberService as Service
+from services.members.members import MemberService as Service
 
 router = APIRouter(prefix="/api/members")
 

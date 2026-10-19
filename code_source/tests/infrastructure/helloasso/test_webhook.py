@@ -184,7 +184,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
              patch(f"{Repo}.list_participants", return_value=[p1, p2, p3]), \
              patch(f"{Repo}.get_app_setting", side_effect=mock_get_setting), \
              patch(f"{Repo}.save_app_setting", side_effect=mock_save_setting), \
-             patch("services.competition_results_batch_service.CompetitionResultsBatchService.get_notification_email", return_value="coach@alj-escalade.fr"), \
+             patch("services.competitions.results_batch.CompetitionResultsBatchService.get_notification_email", return_value="coach@alj-escalade.fr"), \
              patch("infrastructure.mail.repository.EmailRepository.send_email", return_value=True) as mock_send:
 
             res = HelloAssoWebhookService.check_and_notify_all_paid(10)

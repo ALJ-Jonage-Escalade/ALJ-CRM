@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from api.responses import SUCCESS, json_with_etag
 from api.schemas.helloasso_items import ItemIgnore, ItemLink
 from services.documents import Doc
-from services.helloasso_item_service import HelloAssoItemService as Service
+from services.competitions.helloasso_items import HelloAssoItemService as Service
 
 router = APIRouter(prefix="/api/helloasso/items")
 

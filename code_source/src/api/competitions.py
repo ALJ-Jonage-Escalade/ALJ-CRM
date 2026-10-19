@@ -13,7 +13,7 @@ from fastapi.responses import Response
 
 from api.responses import SUCCESS, json_with_etag
 from api.schemas.competitions import CompetitionCreate, CompetitionUpdate
-from services.competition_service import CompetitionService as Service
+from services.competitions.competitions import CompetitionService as Service
 from services.documents import Doc
 
 router = APIRouter(prefix="/api/competitions")

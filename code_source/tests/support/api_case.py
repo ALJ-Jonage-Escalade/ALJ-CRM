@@ -9,7 +9,7 @@ from support.fake_firestore import FirestoreRepoTestCase
 
 import server
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
-from services import competition_store
+from services.competitions import store as competition_store
 
 
 class ApiTestCase(FirestoreRepoTestCase):

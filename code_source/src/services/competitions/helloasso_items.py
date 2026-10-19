@@ -11,7 +11,7 @@ from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as Repo,
     ItemAlreadyLinked,
 )
-from services.competition_store import competition_not_found, storage, write
+from services.competitions.store import competition_not_found, storage, write
 from services.documents import Doc
 from services.errors import Conflict, InvalidRequest, NotFound
 

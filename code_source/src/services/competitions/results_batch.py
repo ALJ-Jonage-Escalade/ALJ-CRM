@@ -17,7 +17,7 @@ import datetime
 from typing import List, Dict, Any, Optional, Tuple
 
 # Injection du dossier src dans sys.path si nécessaire
-_src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_src_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 

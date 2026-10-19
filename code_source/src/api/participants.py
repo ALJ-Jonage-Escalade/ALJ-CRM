@@ -12,7 +12,7 @@ from api.schemas.participants import (
     ParticipantUpdate,
 )
 from services.documents import Doc
-from services.participant_service import ParticipantService as Service
+from services.competitions.participants import ParticipantService as Service
 
 router = APIRouter(prefix="/api/competitions/{competition_id}")
 

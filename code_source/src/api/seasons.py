@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from api.responses import json_with_etag
-from services.season_service import SeasonService as Service
+from services.members.seasons import SeasonService as Service
 
 router = APIRouter(prefix="/api/seasons")
 

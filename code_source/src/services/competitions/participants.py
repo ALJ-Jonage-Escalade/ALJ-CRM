@@ -14,7 +14,7 @@ from infrastructure.firestore.competition_repository import (
     ParticipantAlreadyPaid,
     ParticipantChanged,
 )
-from services.competition_store import require_competition, write
+from services.competitions.store import require_competition, write
 from services.errors import Conflict, NotFound
 
 

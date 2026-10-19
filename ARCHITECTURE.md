@@ -54,7 +54,7 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── server.py            ← entrée WEB/API (FastAPI, ~1400 lignes)
 │   │   ├── paths.py             ← CODE_ROOT / ROOT_DIR / DATA_ROOT (à utiliser, ne jamais recalculer)
 │   │   ├── domain/              ← Python pur : members/, competitions/, attestation/ + constants, utils, validators
-│   │   ├── services/ api/       ← cas d'usage + routeurs FastAPI (compétitions)
+│   │   ├── services/ api/       ← cas d'usage (competitions/, members/) + routeurs FastAPI
 │   │   ├── infrastructure/      ← accès externes, un dossier par système : security/ (auth API, secrets),
 │   │   │                          sqlite/ (+ migrations/), firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/
 │   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME, Excel adhérents),

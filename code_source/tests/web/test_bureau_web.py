@@ -142,7 +142,7 @@ class TestBureauFiles(unittest.TestCase):
         update_competitions_results_settings_api({"notification_email": "david.lopez@alj-jonage.fr"})
 
         # 3. POST /api/competitions/cron/fetch-results
-        with patch("services.competition_results_batch_service.CompetitionResultsBatchService.run_daily_batch") as mock_batch:
+        with patch("services.competitions.results_batch.CompetitionResultsBatchService.run_daily_batch") as mock_batch:
             mock_batch.return_value = {
                 "status": "success",
                 "competitions_checked": 0,

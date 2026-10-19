@@ -15,7 +15,7 @@ if exist "venv\Scripts\python.exe" (
     set "PYTHON_EXE=python"
 )
 
-"%PYTHON_EXE%" -c "import sys; sys.path.insert(0, 'src'); from services.competition_results_batch_service import CompetitionResultsBatchService; res = CompetitionResultsBatchService.run_daily_batch(); print('\nStatut final :', res.get('status'))"
+"%PYTHON_EXE%" -c "import sys; sys.path.insert(0, 'src'); from services.competitions.results_batch import CompetitionResultsBatchService; res = CompetitionResultsBatchService.run_daily_batch(); print('\nStatut final :', res.get('status'))"
 
 echo.
 echo Batch termine.

@@ -12,7 +12,7 @@ from typing import Any, Dict, List
 
 from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
-from services.competition_store import cached_competitions, competition_not_found, require_competition, storage, write
+from services.competitions.store import cached_competitions, competition_not_found, require_competition, storage, write
 from services.documents import Doc
 
 # Fields stored as given, outside the domain model (plan appendix B)

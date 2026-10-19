@@ -1240,7 +1240,7 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
     """
     from infrastructure.firestore.client import FirestoreError
     from infrastructure.helloasso.webhook import WebhookRejected
-    from services.competition_store import invalidate_cache
+    from services.competitions.store import invalidate_cache
     if not isinstance(token, str):  # appel direct de la fonction (tests)
         token = None
     try:
@@ -1438,7 +1438,7 @@ def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
 @app.post("/api/helloasso/sync")
 def sync_helloasso_api():
     """Synchronise la campagne annuelle HelloAsso vers Firestore."""
-    from services.competition_store import invalidate_cache
+    from services.competitions.store import invalidate_cache
     try:
         from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
         from domain.competitions import matching as competition_matching
@@ -1493,8 +1493,8 @@ async def api_cron_fetch_competition_results(
     et envoie un e-mail de synthèse si des résultats sont découverts.
     Conçu pour être appelé par Google Cloud Scheduler (ex: tous les jours à 07h00) ou manuellement.
     """
-    from services.competition_results_batch_service import CompetitionResultsBatchService
-    from services.competition_store import invalidate_cache
+    from services.competitions.results_batch import CompetitionResultsBatchService
+    from services.competitions.store import invalidate_cache
     try:
         return await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
     finally:
@@ -1590,7 +1590,7 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
         except Exception as e:
             print(f"⚠️ [MYCOMPET] Erreur mise à jour Firestore : {e}")
         finally:
-            from services.competition_store import invalidate_cache
+            from services.competitions.store import invalidate_cache
             invalidate_cache()  # results visible on the next poll of the competition pages
 
     # Sauvegarde miroir dans la base SQLite locale si disponible
@@ -1635,7 +1635,7 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
 @app.get("/api/settings/competitions-results")
 def get_competitions_results_settings_api():
     """Retourne la configuration et l'état du batch quotidien de résultats."""
-    from services.competition_results_batch_service import CompetitionResultsBatchService
+    from services.competitions.results_batch import CompetitionResultsBatchService
     return {
         "status": "success",
         **CompetitionResultsBatchService.get_batch_status()
@@ -1645,7 +1645,7 @@ def get_competitions_results_settings_api():
 @app.post("/api/settings/competitions-results")
 def update_competitions_results_settings_api(data: Dict[str, Any] = Body(...)):
     """Met à jour l'adresse e-mail de notification des résultats."""
-    from services.competition_results_batch_service import CompetitionResultsBatchService
+    from services.competitions.results_batch import CompetitionResultsBatchService
     email = str(data.get("notification_email") or "").strip()
     if not email or "@" not in email or "." not in email:
         raise HTTPException(status_code=400, detail="Adresse e-mail de notification invalide.")

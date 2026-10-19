@@ -12,12 +12,12 @@ from unittest.mock import patch
 
 # Injection du chemin src
 _tests_dir = os.path.dirname(os.path.abspath(__file__))
-_code_root = os.path.dirname(os.path.dirname(_tests_dir))
+_code_root = os.path.dirname(os.path.dirname(os.path.dirname(_tests_dir)))
 _src_dir = os.path.join(_code_root, "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from services.competition_results_batch_service import (
+from services.competitions.results_batch import (
     CompetitionResultsBatchService,
     DEFAULT_NOTIFICATION_EMAIL
 )
@@ -129,7 +129,7 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
         self.assertIn("https://mycompet.ffme.fr/resultat/resultat_13660", html)
         self.assertTrue("batch quotidien ALJ Escalade" in html)
 
-    @patch("services.competition_results_batch_service.EmailRepository.send_email")
+    @patch("services.competitions.results_batch.EmailRepository.send_email")
     def test_run_daily_batch_sends_email_when_results_found(self, mock_send_email):
         """Le batch quotidien envoie un e-mail dès que des résultats sont découverts."""
         mock_send_email.return_value = True

@@ -12,10 +12,10 @@ from typing import List, Optional
 from domain.members import view as member_view
 from domain.competitions.models import STATUT_CLOSE
 from infrastructure.sqlite.repository import SqliteRepository
-from services.competition_service import CompetitionService
+from services.competitions.competitions import CompetitionService
 from services.documents import Doc
 from services.errors import NotFound
-from services.season_service import SeasonService
+from services.members.seasons import SeasonService
 
 
 class MemberService:

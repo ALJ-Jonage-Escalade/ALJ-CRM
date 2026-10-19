@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from api.responses import json_with_etag
-from services.competition_member_service import CompetitionMemberService as Service
+from services.competitions.members import CompetitionMemberService as Service
 
 router = APIRouter(prefix="/api/competition-members")
 

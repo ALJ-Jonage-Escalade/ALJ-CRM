@@ -586,7 +586,7 @@ class HelloAssoWebhookService:
             return False
 
         # Récupération de l'e-mail de notification
-        from services.competition_results_batch_service import CompetitionResultsBatchService
+        from services.competitions.results_batch import CompetitionResultsBatchService
         recipient = CompetitionResultsBatchService.get_notification_email()
         if not recipient or "@" not in recipient:
             print(f"⚠️ [WEBHOOK_HELLOASSO] Adresse de notification invalide ou non configurée : '{recipient}'")

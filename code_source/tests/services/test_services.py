@@ -7,9 +7,9 @@ from support.fake_firestore import FirestoreRepoTestCase
 from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from infrastructure.firestore.client import FirestoreConflictError, FirestoreError
-from services import competition_store
-from services.competition_service import CompetitionService as Service
-from services.helloasso_item_service import HelloAssoItemService
+from services.competitions import store as competition_store
+from services.competitions.competitions import CompetitionService as Service
+from services.competitions.helloasso_items import HelloAssoItemService
 from services.errors import Conflict, InvalidRequest, NotFound, StorageUnavailable
 
 
