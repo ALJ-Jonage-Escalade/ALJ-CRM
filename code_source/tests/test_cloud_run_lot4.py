@@ -26,7 +26,7 @@ class TestCloudRunLot4(unittest.TestCase):
         with open(version_file, "r", encoding="utf-8") as f:
             v_content = f.read().strip()
         self.assertEqual(APP_VERSION, v_content, "La version dans constants.py et VERSION doivent correspondre.")
-        self.assertEqual(APP_VERSION, "2.7.7")
+        self.assertEqual(APP_VERSION, "2.7.8")
 
     def test_web_profile_excludes_desktop_dependencies(self):
         """Source de vérité (pyproject.toml + uv.lock) : le profil web exclut le client lourd Windows."""

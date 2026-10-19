@@ -7,6 +7,7 @@ from domain.models import Member
 from paths import ROOT_DIR
 from infrastructure.google_drive_client import GoogleDriveClient
 from infrastructure.email_repository import EmailRepository
+from infrastructure.qrcodes import get_group_qrcode
 
 class SyncHelloAssoWorker(QThread):
     """
@@ -335,30 +336,12 @@ class SendEmailCampaignWorker(QThread):
                             msg_body += formatted_text
                             html_template += formatted_text
                             
-                            # Télécharger / Générer le QRCode du groupe WhatsApp si absent
-                            import urllib.parse
-                            safe_group = "".join([c for c in group_name if c.isalnum() or c in (" ", "-", "_")]).strip()
-                            qrcodes_dir = os.path.join(ROOT_DIR, "exports", "qrcodes")
-                            os.makedirs(qrcodes_dir, exist_ok=True)
-                            qr_path = os.path.join(qrcodes_dir, f"QRCode_WhatsApp_{safe_group}.png")
-                            
-                            if not os.path.exists(qr_path):
-                                try:
-                                    import requests
-                                    api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={urllib.parse.quote(whatsapp_link)}"
-                                    res = requests.get(api_url, timeout=10)
-                                    if res.status_code == 200:
-                                        with open(qr_path, "wb") as f:
-                                            f.write(res.content)
-                                        qr_status_msg = f"🟢 QRCode joint avec succès ({group_name})"
-                                    else:
-                                        qr_status_msg = f"❌ QRCode non joint ({group_name} : Échec API, code HTTP {res.status_code})"
-                                        qr_path = None
-                                except Exception:
-                                    qr_status_msg = f"❌ QRCode non joint ({group_name} : Erreur de téléchargement)"
-                                    qr_path = None
-                            else:
+                            # Générer le QRCode du groupe WhatsApp s'il n'est pas déjà en cache
+                            qr_path = get_group_qrcode(whatsapp_link, group_name)
+                            if qr_path:
                                 qr_status_msg = f"🟢 QRCode joint avec succès ({group_name})"
+                            else:
+                                qr_status_msg = f"❌ QRCode non joint ({group_name} : Échec de la génération)"
                         else:
                             group_desc = group_name or m.tarif_name
                             qr_status_msg = f"⚠️ QRCode non joint (Lien WhatsApp absent pour le groupe '{group_desc}')"
