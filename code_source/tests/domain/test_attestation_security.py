@@ -70,6 +70,14 @@ class TestAttestationEscaping(unittest.TestCase):
         self.assertTrue(_pdf_contains(pdf, b"O'FLAHERTY & CO"))
         self.assertFalse(_pdf_contains(pdf, b"&amp;"))
 
+    def test_fallback_renderer_links_page_resources(self):
+        html = build_attestation({"first_name": "Harry", "last_name": "Potter", "amount": 150},
+                                 season="2026-2027", date_jour="1 September 2026")
+        pdf = _render_minimal_pdf_with_pydyf(html)
+        self.assertNotIn(b"None", pdf)
+        self.assertRegex(pdf, rb"/Contents \d+ 0 R")
+        self.assertTrue(_pdf_contains(pdf, b"150,00 EUR"))
+
 
 @unittest.skipUnless(_weasyprint_available(), "WeasyPrint (Pango) not available")
 class TestAttestationRendering(unittest.TestCase):
