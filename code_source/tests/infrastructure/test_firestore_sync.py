@@ -4,6 +4,7 @@ Tests unitaires pour le module de synchronisation Google Cloud Firestore (firest
 
 import os
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -12,12 +13,14 @@ _src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
+from infrastructure.competition_repository import CompetitionRepository
 from infrastructure.firestore_sync import (
     dict_to_firestore_fields,
     firestore_fields_to_dict,
     prepare_firestore_data,
     FirestoreSyncService
 )
+from infrastructure.sqlite_repository import SqliteRepository
 
 
 class TestFirestoreSync(unittest.TestCase):
@@ -81,6 +84,30 @@ class TestFirestoreSync(unittest.TestCase):
             self.assertIn("nom", first_adh)
             self.assertIn("prenom", first_adh)
             self.assertIn("licence_ffme", first_adh)
+
+    def test_prepare_firestore_data_with_a_competition(self):
+        """Les colonnes optionnelles (date_fin, whatsapp_link…) d'une compétition sont lues."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        for repo in (SqliteRepository, CompetitionRepository):
+            original = repo.get_db_path()
+            self.addCleanup(setattr, repo, "_database_setup_done", False)
+            self.addCleanup(repo.set_db_path, original)
+        SqliteRepository.set_db_path(os.path.join(tmp.name, "main.db"))
+        CompetitionRepository.set_db_path(os.path.join(tmp.name, "comp.db"))
+        SqliteRepository.setup_database()
+        CompetitionRepository.setup_database()
+        conn = CompetitionRepository.get_connection()
+        try:
+            conn.execute("INSERT INTO competitions (nom, date_competition, date_fin, prix, statut, whatsapp_link)"
+                         " VALUES ('Coupe Rhône', '2026-11-01', '2026-11-02', 15, 'ouverte', 'https://chat.example/x')")
+            conn.commit()
+        finally:
+            conn.close()
+
+        (comp,) = prepare_firestore_data("2026-2027")["competitions"].values()
+        self.assertEqual((comp["nom"], comp["date_fin"], comp["whatsapp_link"], comp["url_resultats"]),
+                         ("Coupe Rhône", "2026-11-02", "https://chat.example/x", ""))
 
     @patch("requests.patch")
     def test_push_collection_rest(self, mock_patch):
@@ -161,10 +188,10 @@ class TestFirestoreSync(unittest.TestCase):
         with open(rules_path, "r", encoding="utf-8") as f:
             content = f.read()
         self.assertIn("rules_version = '2';", content)
-        self.assertIn("match /competitions/{competitionId}", content)
-        self.assertIn("match /participants/{participantId}", content)
-        self.assertIn("match /adherents/{adherentId}", content)
-        self.assertIn("match /planning/{creneauId}", content)
+        # Deny-all: the only rule matches every document and allows nothing (plan phase 3)
+        rules = [line.strip() for line in content.splitlines() if line.strip().startswith(("match ", "allow "))]
+        self.assertEqual(rules, ["match /databases/{database}/documents {", "match /{document=**} {",
+                                 "allow read, write: if false;"])
 
 
 if __name__ == "__main__":

@@ -158,9 +158,8 @@ result = len(set(collect.addresses))
                            selected=(), coach_ids=(), id_ffme: str = "") -> int:
         """Creates a competition; `participants` are member ids, those in `selected` participate."""
         return self._run("""
-ids = list(args['coach_ids']) + [None] * 3
 comp = Competition(nom=args['nom'], date_competition=args['date'], prix=args['prix'], id_ffme=args['id_ffme'],
-                   coach1_id=ids[0], coach2_id=ids[1], coach3_id=ids[2])
+                   coach_ids=list(args['coach_ids']))
 cid = Repo.save_competition(comp)
 for aid in args['participants']:
     Repo.add_participant(cid, aid, selectionne=aid in args['selected'])
@@ -172,6 +171,11 @@ result = cid
         """Records a HelloAsso payment (same call as the webhook)."""
         self._run("Repo.apply_helloasso_payment(args['cid'], args['aid'], args['amount'], order_ref=args['ref'])\n"
                   "result = True", cid=competition_id, aid=adherent_id, amount=amount, ref=order_ref)
+
+    def set_selection(self, competition_id: int, adherent_id: int, selectionne: bool) -> None:
+        """« Participe » changed elsewhere (desktop app, another coach): same repository call."""
+        self._run("Repo.set_selection(args['cid'], args['aid'], args['value'])\nresult = True",
+                  cid=competition_id, aid=adherent_id, value=selectionne)
 
     def competition(self, competition_id: int):
         """The competition document as stored (participants embedded), or None."""

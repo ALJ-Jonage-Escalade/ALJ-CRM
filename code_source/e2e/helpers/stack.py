@@ -32,9 +32,10 @@ STACK_SERVICES = {"Firestore emulator": f"http://{FIRESTORE_HOST}/", "Auth emula
 STACK_ENV = {
     "FIRESTORE_EMULATOR_HOST": FIRESTORE_HOST,
     "FIREBASE_AUTH_EMULATOR_HOST": AUTH_HOST,
-    "ALJ_PUBLIC_FIRESTORE_EMULATOR": FIRESTORE_HOST,
     "ALJ_PUBLIC_AUTH_EMULATOR": f"http://{AUTH_HOST}",
     "SMTP_PORT": str(SMTP_PORT),
+    # The fixtures (helpers/data.py) write straight to Firestore: no server-side list cache hiding them
+    "ALJ_COMPETITIONS_CACHE_SECONDS": "0",
 }
 
 

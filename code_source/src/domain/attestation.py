@@ -214,16 +214,19 @@ def _render_minimal_pdf_with_pydyf(html: str) -> bytes:
 
     season_match = re.search(r"Saison\s*:\s*<strong>(.*?)</strong>", html, re.I)
     season_val = season_match.group(1).strip() if season_match else ""
-
+    
     def clean(txt):
         import unicodedata
-        return unicodedata.normalize("NFKD", _html.unescape(str(txt or ""))).encode("ascii", "ignore").decode("ascii").replace("(", "[").replace(")", "]")
+        return unicodedata.normalize("NFKD", _html.unescape(str(txt or "")).replace("€", "EUR")).encode("ascii", "ignore").decode("ascii").replace("(", "[").replace(")", "]")
 
     pdf = pydyf.PDF()
     font = pydyf.Dictionary({"Type": "/Font", "Subtype": "/Type1", "BaseFont": "/Helvetica"})
     font_bold = pydyf.Dictionary({"Type": "/Font", "Subtype": "/Type1", "BaseFont": "/Helvetica-Bold"})
-    font_ref = pdf.add_object(font)
-    font_b_ref = pdf.add_object(font_bold)
+    # add_object() returns None: the indirect reference is read from the object afterwards
+    pdf.add_object(font)
+    pdf.add_object(font_bold)
+    font_ref = font.reference
+    font_b_ref = font_bold.reference
 
     stream_cmds = [
         b"BT",
@@ -242,7 +245,8 @@ def _render_minimal_pdf_with_pydyf(html: str) -> bytes:
     ]
 
     stream = pydyf.Stream([b"\n".join(stream_cmds)])
-    stream_ref = pdf.add_object(stream)
+    pdf.add_object(stream)
+    stream_ref = stream.reference
 
     page = pydyf.Dictionary({
         "Type": "/Page",

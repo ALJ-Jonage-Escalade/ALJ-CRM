@@ -56,15 +56,82 @@ class TestMobilePWA(unittest.TestCase):
         self.assertIn(f"(v{version})</title>", ann)
         self.assertIn(f'id="web-version">v{version}<', ann)
 
-    def test_annuaire_reads_firestore(self):
-        """L'annuaire lit la base principale dans Firestore (plus de database.db sur Drive)."""
+    def test_annuaire_uses_members_api(self):
+        """The directory loads members from the API (one season), never Firestore directly."""
         with open(get_annuaire_page().path, "r", encoding="utf-8") as f:
             html = f.read()
-        self.assertIn("firebase-firestore-compat.js", html)
-        for col in ("crm_users", "crm_orders", "crm_purchases", "crm_seasons", "crm_planning"):
-            self.assertIn(f'"{col}"', html)
+        for firestore_call in (".collection(", "onSnapshot", "crm_purchases"):
+            self.assertNotIn(firestore_call, html, firestore_call)
+        for script in ("alj-sync.js", "alj-members-sync.js"):
+            self.assertIn(f'<script src="/static-web/{script}"></script>', html)
+        self.assertIn("ALJMembersSync.start(", html)
+        self.assertIn("membersSync.setSeason(", html)
         self.assertNotIn("sql-wasm", html)
         self.assertNotIn("drive.readonly", html)
+
+    def test_competitions_page_uses_api_only(self):
+        """Competition data is read and written through the API, never Firestore directly."""
+        with open(get_competitions_page().path, "r", encoding="utf-8") as f:
+            html = f.read()
+        for firestore_call in (".collection(", "onSnapshot", "runTransaction"):
+            self.assertNotIn(firestore_call, html, firestore_call)
+        self.assertIn('<script src="/static-web/alj-sync.js"></script>', html)
+        for url in ("/api/competitions", "/api/coaches", "/api/competition-members",
+                    "/api/helloasso/items"):
+            self.assertIn(f'"{url}"', html, url)
+        self.assertIn('<script src="/static-web/alj-store.js"></script>', html)
+
+    def test_offline_store(self):
+        """Phase 5: the phone keeps competitions, coaches and competitors' contacts in
+        IndexedDB (alj-store.js only), wiped on logout and on loss of role."""
+        web_dir = os.path.join(os.path.dirname(_tests_dir), "web")
+        for root, _, files in os.walk(web_dir):
+            for name in files:
+                if not name.endswith((".html", ".js")):
+                    continue
+                path = os.path.join(root, name)
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                if name != "alj-store.js":
+                    # alj-firebase.js deletes the old Firestore SDK copy (firestore/*) only
+                    self.assertNotIn("indexedDB.open(", content, path)
+                    self.assertNotIn("alj_snapshot:", content, path)  # old localStorage snapshots
+        with open(get_competitions_page().path, "r", encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn('const STORED_RESOURCES = ["competitions", "coaches", "competitors"];', html)
+        self.assertIn('"/api/members/competitors"', html)
+        self.assertIn('names.concat("competitors", "helloasso")', html)  # coaches only
+        on_logout = html[html.index("auth.onAuthStateChanged"):html.index("/* ===================== Synchronisation")]
+        self.assertIn("ALJStore.clearAll()", on_logout)
+        on_denied = html[html.index("info.status === 401 || info.status === 403"):]
+        self.assertLess(on_denied.index("roleLost()"), on_denied.index("setSyncInfo("))  # wipes the store
+        with open(get_sw().path, "r", encoding="utf-8") as f:
+            self.assertIn('"/static-web/alj-store.js"', f.read())
+        with open(os.path.join(web_dir, "shared", "alj-store.js"), "r", encoding="utf-8") as f:
+            store = f.read()
+        self.assertIn("const MAX_AGE_DAYS = 30;", store)
+        self.assertIn("navigator.storage.persist()", store)
+        self.assertIn('await run("outbox", "readwrite", s => s.clear());', store)  # clearAll empties the outbox
+
+    def test_offline_queue(self):
+        """Phase 5b: only « Participe » on a listed competitor is queued offline, sent with the
+        participant's updated_at (the server refuses it if the participant changed), and the
+        outbox is wiped with the store."""
+        with open(get_competitions_page().path, "r", encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn(r"const QUEUED_URL = /^\/api\/competitions\/\d+\/participants\/\d+$/;", html)
+        self.assertIn('const QUEUED_FLAGS = ["selectionne"];', html)
+        self.assertEqual(html.count("queueFlag(c, existing,"), 2)  # offline before the request, or cut during it
+        self.assertIn('unchanged_since: String(entry.unchanged_since || "")', html)
+        flush = html[html.index("async function flushOutbox()"):html.index("/* Page active absente")]
+        self.assertIn('"PATCH"', flush)
+        self.assertIn("entry.uid === uid && QUEUED_URL.test(entry.url)", flush)
+        self.assertIn("roleLost()", flush)  # 401/403 while sending
+        role_lost = html[html.index("function roleLost()"):html.index("/* =====", html.index("function roleLost()"))]
+        self.assertIn("ALJStore.clearAll()", role_lost)
+        self.assertIn("outbox = new Map()", role_lost)
+        logout = html[html.index("function logout()"):html.index("function readOauthFragment()")]
+        self.assertIn("confirm(", logout)  # unsent changes: warned before they are lost
 
     def test_competitions_html_pwa_and_email_features(self):
         resp = get_competitions_page()
@@ -88,9 +155,8 @@ class TestMobilePWA(unittest.TestCase):
         # Vérifications Appel 1-clic téléphone
         self.assertIn('href="tel:', html)
 
-        # Vérifications Chargement Groupe Compétition (non sélectionné + non invité)
-        self.assertIn('parts.push(newParticipant(a.id, false, "non_invite"))', html)
-        self.assertIn('statut || (isSelected ? "en_attente" : "non_invite")', html)
+        # Loading the « Compétition » group goes through the API (rule tested in tests/api)
+        self.assertIn('compUrl(c.id, "/load-group")', html)
 
         # Vérifications Édition Compétition (navigation showPage, réinitialisation et retour)
         self.assertIn('showPage("comps");', html)

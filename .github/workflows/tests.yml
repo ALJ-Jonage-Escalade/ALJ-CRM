@@ -60,11 +60,12 @@ jobs:
       # avoid native crashes caused by Qt state leaking from one test file to the
       # next.
       run: |
-        uv run --no-sync pytest tests --ignore=tests/presentation/test_app_smoke.py --ignore=tests/presentation/test_communication_sender.py --ignore=tests/presentation/test_member_email_shortcut.py --ignore=tests/presentation/test_presentation_lot3.py --ignore=tests/presentation/test_presentation_lot4.py --ignore=tests/presentation/test_presentation_lot5.py --ignore=tests/presentation/test_tarif_update.py &&
+        uv run --no-sync pytest tests --ignore=tests/presentation/test_app_smoke.py --ignore=tests/presentation/test_communication_sender.py --ignore=tests/presentation/test_member_email_shortcut.py --ignore=tests/presentation/test_presentation_lot3.py --ignore=tests/presentation/test_presentation_lot4.py --ignore=tests/presentation/test_presentation_lot5.py --ignore=tests/presentation/test_tarif_update.py --ignore=tests/presentation/test_competition_coaches_form.py &&
         uv run --no-sync pytest tests/presentation/test_app_smoke.py tests/presentation/test_member_email_shortcut.py tests/presentation/test_tarif_update.py tests/presentation/test_presentation_lot3.py &&
         uv run --no-sync pytest tests/presentation/test_communication_sender.py &&
         uv run --no-sync pytest tests/presentation/test_presentation_lot4.py &&
-        uv run --no-sync pytest tests/presentation/test_presentation_lot5.py
+        uv run --no-sync pytest tests/presentation/test_presentation_lot5.py &&
+        uv run --no-sync pytest tests/presentation/test_competition_coaches_form.py
 
   e2e:
     # Browser tests (Playwright) against a throwaway stack started by the tests: Firebase emulator +

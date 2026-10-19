@@ -74,5 +74,40 @@ ignore = [
 ignore_missing_imports = true
 check_untyped_defs = false
 exclude = ["tests", "build", "dist"]
+# Modules imported as the app imports them (src/ on the path: domain.x, services.x…)
+mypy_path = "src"
+explicit_package_bases = true
+# Only the listed files report errors: the modules they import are read for their types
+follow_imports = "silent"
 # Fichiers migrés récemment (le reste du code sert de baseline progressive) :
-files = ["src/infrastructure/schema_v2.py", "src/domain/constants.py", "src/infrastructure/qrcodes/__init__.py", "src/infrastructure/qrcodes/cache.py"]
+files = [
+    "src/infrastructure/schema_v2.py",
+    "src/domain/constants.py",
+    "src/api/__init__.py",
+    "src/api/coaches.py",
+    "src/api/competition_members.py",
+    "src/api/competitions.py",
+    "src/api/helloasso_items.py",
+    "src/api/members.py",
+    "src/api/participants.py",
+    "src/api/responses.py",
+    "src/api/schemas/__init__.py",
+    "src/api/schemas/base.py",
+    "src/api/schemas/coaches.py",
+    "src/api/schemas/competitions.py",
+    "src/api/schemas/helloasso_items.py",
+    "src/api/schemas/participants.py",
+    "src/api/seasons.py",
+    "src/domain/member_view.py",
+    "src/services/__init__.py",
+    "src/services/coach_service.py",
+    "src/services/competition_member_service.py",
+    "src/services/competition_service.py",
+    "src/services/competition_store.py",
+    "src/services/documents.py",
+    "src/services/errors.py",
+    "src/services/helloasso_item_service.py",
+    "src/services/member_service.py",
+    "src/services/participant_service.py",
+    "src/services/season_service.py",
+]

@@ -46,16 +46,32 @@ app = FastAPI(title="Admin Escalade API")
 # Access control (Firebase token + firestore.rules roles): enforced on Cloud Run and in the
 # Docker image (ALJ_API_AUTH=required), off for the desktop app's local server, which is
 # protected by local_guard_middleware instead (loopback hosts, same-origin writes).
+import re
+from fastapi.routing import APIRoute
 from infrastructure.cloud_database import CloudDatabase
 from starlette.concurrency import run_in_threadpool
+
+
+# Paths of the routes that only read/write Firestore collections (competitions, coaches,
+# projections, HelloAsso mirror) through CompetitionFirestoreRepository: they never touch the
+# SQLite cache, so they must not wait for its refresh (a full rebuild after a cold start).
+# Filled from their routers once included (below). Exact routes, not path prefixes: the old
+# routes of this file under /api/competitions (results batch, check-all-paid) use the cache.
+FIRESTORE_ONLY_PATHS: List[re.Pattern[str]] = []
+
+
+def uses_sqlite_cache(path: str) -> bool:
+    """True for the data routes served from the SQLite cache of the crm_* collections."""
+    if any(p.match(path) for p in FIRESTORE_ONLY_PATHS):
+        return False
+    return path.startswith("/api/") or path in ("/map", "/pivot")
 
 
 async def cloud_db_middleware(request, call_next):
     """Base principale dans Firestore : le cache SQLite du serveur est mis à jour
     avant les routes de données, et les écritures sont envoyées juste après.
     Enregistré avant le contrôle d'accès : il ne s'exécute qu'après lui."""
-    path = request.url.path
-    relevant = path.startswith("/api/") or path in ("/map", "/pivot")
+    relevant = uses_sqlite_cache(request.url.path)
     # Cloud Run, or local dev on the emulator: the cache follows Firestore as in production
     server_mode = os.environ.get("K_SERVICE") or runtime_env.is_dev()
     if relevant and server_mode and CloudDatabase.is_enabled():
@@ -85,6 +101,18 @@ async def security_headers_middleware(request, call_next):
 
 
 app.middleware("http")(security_headers_middleware)  # outermost
+
+# Data routes of the web front end (competitions, coaches, HelloAsso links, members): src/api/
+from api import (coaches, competition_members, competitions, helloasso_items, members,
+                 participants, seasons)
+from api.responses import service_error_handler
+from services.errors import ServiceError
+for _api in (competitions, participants, coaches, competition_members, helloasso_items,
+             members, seasons):
+    app.include_router(_api.router)
+FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items)
+                            for r in _api.router.routes if isinstance(r, APIRoute))
+app.add_exception_handler(ServiceError, service_error_handler)
 
 GENERIC_ERROR = "Erreur interne du serveur (détails dans les journaux)."
 
@@ -1210,7 +1238,9 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
     Authenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles
     auprès de l'API HelloAsso (voir HelloAssoWebhookService.handle_notification).
     """
+    from infrastructure.firestore_client import FirestoreError
     from infrastructure.helloasso_webhook_service import WebhookRejected
+    from services.competition_store import invalidate_cache
     if not isinstance(token, str):  # appel direct de la fonction (tests)
         token = None
     try:
@@ -1218,8 +1248,14 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
     except WebhookRejected as e:
         print(f"⛔ [WEBHOOK_HELLOASSO] Notification refusée ({e.status_code}) : {e.message}")
         return JSONResponse({"status": "rejected", "message": e.message}, status_code=e.status_code)
+    except FirestoreError as e:
+        # Firestore unreadable (member list, competitions): nothing could be matched nor
+        # recorded. An error status, not 200, so that the failure shows on HelloAsso's side.
+        return JSONResponse({"status": "error", "message": internal_error(e, "webhook_helloasso")}, status_code=503)
     except Exception as e:
         return {"status": "error", "message": internal_error(e, "webhook_helloasso")}
+    finally:
+        invalidate_cache()  # payments recorded on competition documents directly
 
 
 @app.post("/api/competitions/{comp_id}/check-all-paid")
@@ -1375,11 +1411,11 @@ def get_email_status():
 @app.post("/api/send-email")
 def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
     """Déclenche l'envoi d'e-mails sécurisé via Gmail API ou SMTP avec injection de variables."""
-    from infrastructure.api_auth import has_role
+    from infrastructure.api_auth import Role, has_role
     claims = getattr(request.state, "user", None)  # None: token check off (local desktop server)
     reason = EmailDispatchService.unauthorized_send_reason(
         data.get("recipients"), data.get("sender_email"),
-        is_admin=claims is None or has_role(claims, "admin"))
+        is_admin=claims is None or has_role(claims, Role.ADMIN))
     if reason:
         return JSONResponse(status_code=403, content={"status": "error", "message": reason})
     try:
@@ -1402,6 +1438,7 @@ def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
 @app.post("/api/helloasso/sync")
 def sync_helloasso_api():
     """Synchronise la campagne annuelle HelloAsso vers Firestore."""
+    from services.competition_store import invalidate_cache
     try:
         from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
         from domain import competition_matching
@@ -1439,6 +1476,8 @@ def sync_helloasso_api():
         }
     except Exception as e:
         return {"status": "error", "message": internal_error(e, "sync_helloasso_api")}
+    finally:
+        invalidate_cache()  # payments recorded on competition documents directly
 
 
 # --------------------------------------------------------------------------
@@ -1455,8 +1494,11 @@ async def api_cron_fetch_competition_results(
     Conçu pour être appelé par Google Cloud Scheduler (ex: tous les jours à 07h00) ou manuellement.
     """
     from infrastructure.competition_results_batch_service import CompetitionResultsBatchService
-    res = await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
-    return res
+    from services.competition_store import invalidate_cache
+    try:
+        return await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
+    finally:
+        invalidate_cache()  # the batch writes competition documents directly
 
 
 @app.post("/api/competitions/{comp_id}/fetch-results")
@@ -1547,6 +1589,9 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
             })
         except Exception as e:
             print(f"⚠️ [MYCOMPET] Erreur mise à jour Firestore : {e}")
+        finally:
+            from services.competition_store import invalidate_cache
+            invalidate_cache()  # results visible on the next poll of the competition pages
 
     # Sauvegarde miroir dans la base SQLite locale si disponible
     try:

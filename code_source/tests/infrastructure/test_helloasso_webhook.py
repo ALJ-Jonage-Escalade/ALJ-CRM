@@ -60,7 +60,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         self.assertEqual(items[0]["amount"], 1800)
 
     @patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.get_app_setting", return_value="")
-    @patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.apply_helloasso_payment")
+    @patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.refresh_helloasso_payment")
     @patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.set_item_link")
     @patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.sync_helloasso_mirror")
     @patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.list_helloasso_links", return_value={})
@@ -73,7 +73,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         mock_list_links,
         mock_sync_mirror,
         mock_set_link,
-        mock_apply_payment,
+        mock_refresh_payment,
         mock_get_setting
     ):
         """Vérifie le rapprochement complet d'un item avec mise à jour du paiement."""
@@ -84,7 +84,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         mock_list_adhs.return_value = [
             {"id": 101, "num_licence": "654321", "nom": "MARTIN", "prenom": "Lucas"}
         ]
-        mock_apply_payment.return_value = True
+        mock_refresh_payment.return_value = True
 
         payload = {
             "eventType": "Payment",
@@ -111,7 +111,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         self.assertEqual(match["adherent_id"], 101)
         self.assertEqual(match["montant"], 15.0)
 
-        mock_apply_payment.assert_called_once()
+        mock_refresh_payment.assert_called_once_with(10, 101)
         mock_set_link.assert_called_once()
 
     def test_items_of_other_forms_are_ignored(self):

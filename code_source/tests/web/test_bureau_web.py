@@ -21,6 +21,7 @@ if _src_dir not in sys.path:
 from fastapi.testclient import TestClient
 
 from infrastructure import api_auth
+from infrastructure.api_auth import Role
 from server import (
     app, get_bureau_home, get_bureau_page, get_competitions_page, get_annuaire_page,
     get_sw, get_web_version,
@@ -46,7 +47,7 @@ class TestBureauFiles(unittest.TestCase):
         for name in ("index.html", "adherents.html", "outils.html"):
             self.assertTrue(os.path.exists(os.path.join(BUREAU, name)), name)
         for name in ("alj.css", "alj-core.js", "alj-shell.js", "alj-vue.js",
-                      "alj-members.js", "alj-filters.js"):
+                      "alj-members.js", "alj-filters.js", "alj-sync.js"):
             self.assertTrue(os.path.exists(os.path.join(SHARED, name)), name)
 
     def test_routes_serve_only_known_pages(self):
@@ -58,12 +59,12 @@ class TestBureauFiles(unittest.TestCase):
         self.assertEqual(get_bureau_page("inconnue").status_code, 404)
 
     def test_pages_are_static_shells_without_member_data(self):
-        """Les pages n'embarquent aucune donnée : elles chargent le socle et lisent Firestore après connexion."""
+        """Les pages n'embarquent aucune donnée : elles chargent le socle et lisent l'API après connexion."""
         for name in ("index.html", "adherents.html", "outils.html"):
             html = _read(os.path.join(BUREAU, name))
             self.assertIn('href="/static-web/alj.css"', html, name)
             self.assertIn('import { startBureau } from "/static-web/alj-shell.js"', html, name)
-            self.assertIn("firebase-firestore-compat.js", html, name)
+            self.assertNotIn("firebase-firestore-compat.js", html, name)
             self.assertNotIn("crm_users", html, name)
             self.assertNotIn("crm_orders", html, name)
 
@@ -82,7 +83,8 @@ class TestBureauFiles(unittest.TestCase):
         for asset in ("/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres",
                       "/static-web/alj.css", "/static-web/alj-core.js",
                       "/static-web/alj-shell.js", "/static-web/alj-vue.js",
-                      "/static-web/alj-members.js", "/static-web/alj-filters.js"):
+                      "/static-web/alj-members.js", "/static-web/alj-filters.js",
+                      "/static-web/alj-sync.js"):
             self.assertIn(f'"{asset}"', sw)
 
     def test_planning_file_structure(self):
@@ -274,13 +276,12 @@ class TestBureauFiles(unittest.TestCase):
     def test_adherents_page_elements(self):
         """La page adherents.html contient le tableau, les filtres et le panneau de détail."""
         html = _read(os.path.join(BUREAU, "adherents.html"))
-        members_js = _read(os.path.join(SHARED, "alj-members.js"))
         filters_js = _read(os.path.join(SHARED, "alj-filters.js"))
         for elem in ("members-table", "members-tbody", "detail-pane", "search-input",
                       "season-select", "export-csv-btn", "status-chips", "filter-box"):
             self.assertIn(f'id="{elem}"', html)
         self.assertIn("Attestation envoyée", html)
-        self.assertIn("email_sent_date", members_js)
+        self.assertIn("email_sent_date", html)
         self.assertIn('data-sort="order_date"', html)
         self.assertIn("Date d'inscription", html)
         self.assertIn("order_date", filters_js)
@@ -317,6 +318,18 @@ class TestBureauFiles(unittest.TestCase):
         self.assertIn("export function getMemberDiplomes", members_js)
         self.assertIn("diplome", filters_js)
         self.assertIn("ville", filters_js)
+
+    def test_member_pages_use_members_api(self):
+        """Members and seasons come from the API, never Firestore directly (plan phase 2)."""
+        adherents = _read(os.path.join(BUREAU, "adherents.html"))
+        outils = _read(os.path.join(BUREAU, "outils.html"))
+        members_js = _read(os.path.join(SHARED, "alj-members.js"))
+        for name, text in (("adherents", adherents), ("outils", outils), ("alj-members.js", members_js)):
+            for firestore_call in (".collection(", "onSnapshot", "crm_"):
+                self.assertNotIn(firestore_call, text, f"{name}: {firestore_call}")
+        self.assertIn('<script src="/static-web/alj-members-sync.js"></script>', adherents)
+        self.assertIn("ALJMembersSync.start(", adherents)
+        self.assertIn('apiFetch("/api/seasons")', outils)
 
     def test_adherents_email_modal_and_api_wiring(self):
         """L'Étape 2 intègre la modale d'e-mail et le câblage aux endpoints d'e-mail."""
@@ -376,8 +389,8 @@ class TestBureauFiles(unittest.TestCase):
     def test_attestation_endpoints_require_admin_role(self):
         """Les endpoints /api/attestations exigent le rôle admin."""
         from infrastructure.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/attestations/preview"), "admin")
-        self.assertEqual(required_role("POST", "/api/attestations/send"), "admin")
+        self.assertEqual(required_role("POST", "/api/attestations/preview"), Role.ADMIN)
+        self.assertEqual(required_role("POST", "/api/attestations/send"), Role.ADMIN)
 
     def test_send_attestation_records_email_sent_date(self):
         """send_attestation_api enregistre la date d'envoi dans SQLite et utilise le modèle par défaut."""
@@ -478,8 +491,8 @@ class TestBureauFiles(unittest.TestCase):
     def test_member_add_requires_admin_role(self):
         """Les endpoints de création manuelle d'adhérents exigent le rôle admin."""
         from infrastructure.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/members/create"), "admin")
-        self.assertEqual(required_role("POST", "/api/members/add"), "admin")
+        self.assertEqual(required_role("POST", "/api/members/create"), Role.ADMIN)
+        self.assertEqual(required_role("POST", "/api/members/add"), Role.ADMIN)
 
     def test_member_add_endpoint_and_sqlite_persistence(self):
         """add_member_api persiste le nouvel adhérent, la commande et l'achat dans SQLite."""
@@ -583,7 +596,7 @@ class TestBureauFiles(unittest.TestCase):
     def test_member_update_requires_admin_role(self):
         """L'endpoint /api/members/update exige le rôle admin."""
         from infrastructure.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/members/update"), "admin")
+        self.assertEqual(required_role("POST", "/api/members/update"), Role.ADMIN)
 
     def test_member_update_endpoint_and_sqlite_persistence(self):
         """update_member_api persiste les badges, emails, téléphone et créneau dans SQLite."""
@@ -761,9 +774,9 @@ class TestBureauFiles(unittest.TestCase):
     def test_ffme_auth_roles(self):
         """Les routes de modification/import FFME exigent le rôle admin."""
         from infrastructure.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/ffme/preview"), "admin")
-        self.assertEqual(required_role("POST", "/api/ffme/import"), "admin")
-        self.assertEqual(required_role("GET", "/api/ffme/export"), "coach")
+        self.assertEqual(required_role("POST", "/api/ffme/preview"), Role.ADMIN)
+        self.assertEqual(required_role("POST", "/api/ffme/import"), Role.ADMIN)
+        self.assertEqual(required_role("GET", "/api/ffme/export"), Role.COACH)
 
     def test_ffme_preview_and_apply_api(self):
         """preview_ffme_import_api et apply_ffme_import_api fonctionnent de bout en bout avec un fichier Excel FFME."""
@@ -1065,10 +1078,10 @@ class TestBureauFiles(unittest.TestCase):
     def test_email_template_write_requires_admin_role(self):
         """Les modifications de templates d'emails exigent le rôle admin."""
         from infrastructure.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/email-templates"), "admin")
-        self.assertEqual(required_role("DELETE", "/api/email-templates/Test"), "admin")
-        self.assertEqual(required_role("POST", "/api/whatsapp-template"), "admin")
-        self.assertEqual(required_role("GET", "/api/email-templates"), "coach")
+        self.assertEqual(required_role("POST", "/api/email-templates"), Role.ADMIN)
+        self.assertEqual(required_role("DELETE", "/api/email-templates/Test"), Role.ADMIN)
+        self.assertEqual(required_role("POST", "/api/whatsapp-template"), Role.ADMIN)
+        self.assertEqual(required_role("GET", "/api/email-templates"), Role.COACH)
 
     def test_apply_template_variables_adherents_extension(self):
         """Les variables {tarif} et {season} sont correctement résolues pour les adhérents."""
@@ -1116,6 +1129,16 @@ class TestBureauFiles(unittest.TestCase):
         self.assertTrue(names)
         for name in names:
             self.assertRegex(core, rf"export (function|const|async function) {name}\b", name)
+
+    def test_competitions_bureau_uses_api_only(self):
+        """The bureau competitions page reads and writes through the API, never Firestore directly."""
+        html = _read(os.path.join(BUREAU, "competitions.html"))
+        for firestore_call in (".collection(", "onSnapshot", "initFirebase"):
+            self.assertNotIn(firestore_call, html, firestore_call)
+        self.assertIn('<script src="/static-web/alj-sync.js"></script>', html)
+        for url in ("/api/competitions", "/api/coaches", "/api/competition-members",
+                    "/api/helloasso/items"):
+            self.assertIn(f'"{url}"', html, url)
 
     def test_bureau_imports_exist_in_core(self):
         """Every name imported from alj-core.js by the bureau pages and shared modules is exported."""
@@ -1170,7 +1193,7 @@ class TestBureauAccess(unittest.TestCase):
         r = api_auth.required_role
         for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres", "/static-web/alj-core.js"):
             self.assertIsNone(r("GET", path), path)
-        self.assertEqual(r("GET", "/api/email-status"), "coach")
+        self.assertEqual(r("GET", "/api/email-status"), Role.COACH)
 
 
 class TestSingleFirebaseInit(unittest.TestCase):
@@ -1181,7 +1204,7 @@ class TestSingleFirebaseInit(unittest.TestCase):
         os.path.join(BUREAU, n) for n in sorted(os.listdir(BUREAU)) if n.endswith(".html")]
 
     def test_pages_load_config_then_init(self):
-        sdk = '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>'
+        sdk = '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>'
         for path in self.PAGES:
             html = _read(path)
             i_sdk = html.index(sdk)
@@ -1189,6 +1212,24 @@ class TestSingleFirebaseInit(unittest.TestCase):
             i_init = html.index('<script src="/static-web/alj-firebase.js"></script>')
             self.assertLess(i_sdk, i_cfg, path)
             self.assertLess(i_cfg, i_init, path)
+
+    def test_no_client_firestore_access(self):
+        """Firebase signs in only: no Firestore SDK, query or offline cache left (plan phase 3)."""
+        files = self.PAGES + [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
+        files.append(get_sw().path)
+        for path in files:
+            text = _read(path)
+            for needle in ("firestore-compat", "firebase.firestore(", ".collection(", "onSnapshot",
+                           "enablePersistence", "runTransaction"):
+                self.assertNotIn(needle, text, f"{os.path.basename(path)}: {needle}")
+
+    def test_old_firestore_cache_is_wiped(self):
+        """alj-firebase.js deletes the IndexedDB copy kept by the pages up to v22."""
+        js = _read(os.path.join(SHARED, "alj-firebase.js"))
+        self.assertIn('FIRESTORE_DB_PREFIX = "firestore/"', js)
+        self.assertIn("indexedDB.deleteDatabase(name)", js)
+        self.assertIn('"firestore/[DEFAULT]/" + FIREBASE_CONFIG.projectId + "/main"', js)
+        self.assertRegex(js, r"wipeFirestoreCache\(\);\s*services = \{ auth \};")
 
     def test_firebase_config_defined_once(self):
         files = self.PAGES + [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]

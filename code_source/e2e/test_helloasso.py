@@ -14,8 +14,6 @@ from helpers.mobile import go_to, open_app, open_participants, participant_card
 
 # One fake HelloAsso state for the whole server: these tests run one after another (conftest.py)
 pytestmark = pytest.mark.xdist_group("helloasso")
-KNOWN_BUG_A6 = pytest.mark.xfail(strict=True, reason="bug A6: the office page stores the ids as strings and "
-                                                      "reads the order reference from `order.id`")
 
 
 @pytest.fixture
@@ -219,7 +217,6 @@ def test_office_manual_link(page, test_data, setup):
     eventually(paid)
 
 
-@KNOWN_BUG_A6
 def test_office_manual_link_is_stored_like_the_phone(page, test_data, setup):
     member = setup["members"][1]
     _office_attach(page, setup, member)

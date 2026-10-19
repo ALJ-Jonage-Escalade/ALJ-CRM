@@ -11,6 +11,11 @@ def _iso(days: int) -> str:
     return (datetime.date.today() + datetime.timedelta(days=days)).isoformat()
 
 
+def tick_coach(page, nom: str) -> None:
+    """Coach checkboxes of the form (plan cleanup C2: any number of coaches)."""
+    page.locator("#f-coaches label").filter(has_text=nom).locator("input.f-coach").check()
+
+
 def test_create_competition(mobile_page, test_data):
     page = open_app(mobile_page)
     nom = unique_name("E2E Create")
@@ -21,15 +26,16 @@ def test_create_competition(mobile_page, test_data):
     page.locator("#btn-2jours").click()
     expect(page.locator("#f-date-fin")).to_have_value("2027-03-15")
     page.locator("#f-prix").fill("18")
-    page.locator("#f-coach1").select_option(label="Severus Snape")
-    page.locator("#f-coach2").select_option(label="Minerva McGonagall")
+    tick_coach(page, "Severus Snape")
+    tick_coach(page, "Minerva McGonagall")
     page.locator("#f-create").click()
 
     card = competition_card(page, nom)
     expect(card).to_contain_text("EVT-E2E-1")
     expect(card).to_contain_text("14/03/2027 → 15/03/2027")
     expect(card).to_contain_text("18.00 €")
-    expect(card).to_contain_text("Coachs : Severus Snape, Minerva McGonagall")
+    # Boxes of a new competition are listed by name, and the coaches are saved in that order
+    expect(card).to_contain_text("Coachs : Minerva McGonagall, Severus Snape")
     expect(page.locator("#comp-form-card")).to_be_hidden()
 
     def stored():
@@ -58,7 +64,7 @@ def test_edit_and_delete_competition(mobile_page, test_data):
     renamed = unique_name("E2E Edited")
     page.locator("#f-nom").fill(renamed)
     page.locator("#f-prix").fill("22.5")
-    page.locator("#f-coach1").select_option(label="Filius Flitwick")
+    tick_coach(page, "Filius Flitwick")
     page.locator("#f-update").click()
 
     card = competition_card(page, renamed)
