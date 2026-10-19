@@ -5,13 +5,13 @@ import datetime
 import docx
 
 # Ajustement du chemin pour importer les modules depuis 'src'
-_test_dir = os.path.dirname(os.path.abspath(__file__))
+_test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from paths import CODE_ROOT
-from attestation_generator import (
+from exports.attestation_word import (
     get_french_date,
     extract_season_from_filename,
     get_safe_filename
@@ -86,7 +86,7 @@ class TestAttestationGenerator(unittest.TestCase):
 
     def test_create_excel_mappings_and_helpers(self):
         """Vérifie que la colonne de date d'envoi d'e-mail est correctement mappée et que les helpers fonctionnent."""
-        from create_excel import parse_date_to_datetime
+        from exports.membership_excel import parse_date_to_datetime
         from domain.constants import CORRECTIVE_MAP
         
         # Vérifier la présence du nouveau mapping d'email
@@ -106,7 +106,7 @@ class TestAttestationGenerator(unittest.TestCase):
 
     def test_age_calculation(self):
         """Vérifie le calcul correct de l'âge d'un adhérent en fonction de sa date de naissance."""
-        from create_excel import parse_date_to_datetime
+        from exports.membership_excel import parse_date_to_datetime
         dob_str = "15/07/1990"
         dt_dob = parse_date_to_datetime(dob_str)
         self.assertIsInstance(dt_dob, datetime.datetime)

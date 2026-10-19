@@ -486,7 +486,7 @@ class DocumentsPage(QWidget):
             )
             
             # 3. Filtre d'attestation générée
-            from attestation_generator import get_safe_filename
+            from exports.attestation_word import get_safe_filename
             filename = get_safe_filename(m.user_last_name, m.user_first_name, m.order_ref)
             pdf_path = os.path.join(ROOT_DIR, "exports", "attestation", filename.replace(".docx", ".pdf"))
             has_pdf = os.path.exists(pdf_path)
@@ -614,7 +614,7 @@ class DocumentsPage(QWidget):
             user_first = str(member.get("first_name") or member.get("user_firstName") or "").strip().capitalize()
             order_ref = member.get("order_ref") or ""
             
-            from attestation_generator import get_safe_filename
+            from exports.attestation_word import get_safe_filename
             filename_docx = get_safe_filename(user_last.upper(), user_first.capitalize(), order_ref)
             
             fmt_idx = self.format_combo.currentIndex()

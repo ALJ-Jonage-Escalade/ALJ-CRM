@@ -5,7 +5,7 @@ Source unique de vérité pour :
 - le DDL des tables v2 (migration et écritures applicatives),
 - les normalisations (statuts, dates, textes legacy NULL/'' ),
 - la table de priorité des statuts (centralisée, anciennement dupliquée dans
-  sqlite_repository.py et create_excel.py),
+  sqlite_repository.py et exports/membership_excel.py),
 - les upserts users / orders / purchases / purchase_options.
 
 Importé par sqlite_repository (écritures miroir phase 3) et migrate_schema_v2.

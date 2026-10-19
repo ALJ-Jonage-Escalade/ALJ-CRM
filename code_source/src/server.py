@@ -1036,7 +1036,7 @@ def export_planning_api(mode: str = Query("grid"), season: Optional[str] = Query
     import tempfile
     import shutil
     from infrastructure.sqlite_repository import SqliteRepository
-    from infrastructure.planning_excel_export import export_planning_excel, export_planning_list_excel
+    from exports.planning_excel import export_planning_excel, export_planning_list_excel
     from domain.constants import get_active_season
 
     target_season = season or get_active_season()
@@ -1789,7 +1789,7 @@ def get_presence_config():
         from infrastructure.sqlite_repository import SqliteRepository
         from domain.planning_groups import is_autonome_creneau
         from domain.constants import get_active_season
-        from presence_sheet_generator import SEASON_COURSE_START, SEASON_COURSE_END
+        from exports.presence_sheets import SEASON_COURSE_START, SEASON_COURSE_END
 
         season = get_active_season()
         creneaux = SqliteRepository.load_creneaux_groups()
@@ -1904,7 +1904,7 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
     import shutil
     import tempfile
     import zipfile
-    from presence_sheet_generator import generate_presence_sheets
+    from exports.presence_sheets import generate_presence_sheets
     from infrastructure.sqlite_repository import SqliteRepository
     from domain.planning_groups import is_autonome_creneau
     from domain.constants import get_active_season
@@ -2008,7 +2008,7 @@ def get_ffme_stats_api(season: Optional[str] = None):
         import datetime
         from infrastructure.sqlite_repository import SqliteRepository
         from domain.constants import get_active_season
-        from create_excel import parse_date_to_datetime, clean_digits_only
+        from exports.membership_excel import parse_date_to_datetime, clean_digits_only
 
         target_season = season or get_active_season()
         participants = SqliteRepository.load_direct_data(season_filter=target_season)
@@ -2088,7 +2088,7 @@ def export_ffme_api(season: Optional[str] = None, include_termine: bool = Query(
     import datetime
     from infrastructure.sqlite_repository import SqliteRepository
     from domain.constants import get_active_season
-    from create_excel import generate_ffme_csv
+    from exports.membership_excel import generate_ffme_csv
 
     try:
         target_season = season or get_active_season()

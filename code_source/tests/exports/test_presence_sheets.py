@@ -5,13 +5,13 @@ import sys
 import tempfile
 
 # Ajustement du chemin pour importer les modules depuis 'src'
-_test_dir = os.path.dirname(os.path.abspath(__file__))
+_test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from infrastructure.sqlite_repository import SqliteRepository
-from presence_sheet_generator import clean_filename, format_encadrants
+from exports.presence_sheets import clean_filename, format_encadrants
 
 
 def _member(order_ref, last, first, tarif):
@@ -121,7 +121,7 @@ class TestPresenceSheetGenerator(unittest.TestCase):
         with open(unwritable_root, "w", encoding="utf-8"):
             pass
         client = TestClient(app, base_url="http://localhost")
-        with mock.patch("presence_sheet_generator.ROOT_DIR", unwritable_root), \
+        with mock.patch("exports.presence_sheets.ROOT_DIR", unwritable_root), \
                 mock.patch("paths.ROOT_DIR", unwritable_root), \
                 mock.patch("tempfile.tempdir", self._tmpdir), \
                 mock.patch("requests.get") as http_get:

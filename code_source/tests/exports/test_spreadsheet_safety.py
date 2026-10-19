@@ -19,7 +19,7 @@ if _src_dir not in sys.path:
 import openpyxl  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from infrastructure.spreadsheet_safety import (  # noqa: E402
+from exports.spreadsheet_safety import (  # noqa: E402
     csv_safe,
     neutralize_formulas,
     safe_to_excel,

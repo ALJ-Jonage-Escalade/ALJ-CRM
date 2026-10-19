@@ -11,7 +11,7 @@ if _src_dir not in sys.path:
 from domain.models import Member
 from domain.validators import validate_amount, validate_email
 from domain.constants import get_active_season, get_drive_temp_filename
-from attestation_generator import get_safe_filename
+from exports.attestation_word import get_safe_filename
 
 class TestDomainLot1(unittest.TestCase):
 

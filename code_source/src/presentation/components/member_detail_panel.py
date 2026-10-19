@@ -466,7 +466,7 @@ class MemberDetailPanel(QFrame):
         sender_name = template.get("sender_name") or "Amicale Laïque Jonage - Inscriptions"
 
         # Nom de fichier PDF généré
-        from attestation_generator import get_safe_filename
+        from exports.attestation_word import get_safe_filename
         filename_docx = get_safe_filename(
             member.user_last_name,
             member.user_first_name,

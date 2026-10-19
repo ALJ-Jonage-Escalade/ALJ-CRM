@@ -129,7 +129,7 @@ def scrape_mycompet(progress_callback=None) -> str:
     # Enregistrer le résultat
     dest_file = os.path.join(ROOT_DIR, "exports", "MyCompet.xlsx")
     os.makedirs(os.path.dirname(dest_file), exist_ok=True)
-    from infrastructure.spreadsheet_safety import safe_to_excel
+    from exports.spreadsheet_safety import safe_to_excel
     safe_to_excel(df, dest_file, index=False)  # scraped data must never become a formula
     
     # Rendre l'ajustement automatique des colonnes avec openpyxl pour faire un joli rendu Excel !

@@ -2067,7 +2067,7 @@ class CompetitionsPage(QWidget):
         out_dir = os.path.join(ROOT_DIR, "exports")
         os.makedirs(out_dir, exist_ok=True)
         path = os.path.join(out_dir, f"bilan_competitions_{season}.csv")
-        from infrastructure.spreadsheet_safety import csv_safe
+        from exports.spreadsheet_safety import csv_safe
         with open(path, "w", newline="", encoding="utf-8-sig") as f:
             writer = csv.writer(f, delimiter=";")
             writer.writerow(["Bilan des compétitions - Saison", season])

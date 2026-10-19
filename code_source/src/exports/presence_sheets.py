@@ -8,7 +8,7 @@ from openpyxl.worksheet.properties import PageSetupProperties
 from openpyxl.worksheet.page import PageMargins
 from openpyxl.worksheet.pagebreak import Break
 from paths import ROOT_DIR, find_doc_template
-from infrastructure.spreadsheet_safety import neutralize_formulas, template_formulas
+from exports.spreadsheet_safety import neutralize_formulas, template_formulas
 from infrastructure.qrcodes import find_group_qrcode, get_group_qrcode
 
 # Pictogramme compact remplaçant le mot "Autonomes" dans la colonne "Autorisation" (votre demande !)

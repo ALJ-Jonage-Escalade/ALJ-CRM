@@ -619,7 +619,7 @@ class GroupsPage(QWidget):
         """Exporte le planning hebdomadaire en Excel (grille Lundi → Samedi, 9h-22h,
         blocs colorés par type, encadrants — initiales si la place est insuffisante)."""
         try:
-            from infrastructure.planning_excel_export import export_planning_excel
+            from exports.planning_excel import export_planning_excel
             from domain.constants import get_active_season
 
             self.flatten_groups_data()
@@ -636,7 +636,7 @@ class GroupsPage(QWidget):
     def on_export_planning_list_excel(self):
         """Exporte le planning au format liste : une ligne par créneau, comme la BDD."""
         try:
-            from infrastructure.planning_excel_export import export_planning_list_excel
+            from exports.planning_excel import export_planning_list_excel
             from domain.constants import get_active_season
 
             self.flatten_groups_data()

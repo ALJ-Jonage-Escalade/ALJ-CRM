@@ -43,7 +43,7 @@ docker compose -f dev/docker-compose.yml down     # stop (emulator data kept in 
 
 ## Data & domain rules
 - Firestore is the source of truth (`crm_<table>` collections); `database.db` is a SQLite cache rebuilt from it (`infrastructure/cloud_database.py`). Write routes must go through `SqliteRepository` so changes are replicated
-- FFME CSV export (`create_excel.generate_ffme_csv`): strict format (`;` separator, `dd/mm/yyyy` dates); `tests/test_ffme_golden_master.py` must stay byte-identical, or the reference is renewed with the club's approval
+- FFME CSV export (`exports/membership_excel.generate_ffme_csv`): strict format (`;` separator, `dd/mm/yyyy` dates); `tests/exports/test_ffme_golden_master.py` must stay byte-identical, or the reference is renewed with the club's approval
 - HelloAsso `customFields`: the value can be in `answer` or `value` — always read both
 - Name matching: use `normalize_string` / `normalize_name` from `domain/utils.py`; never rebuild paths by hand, import `CODE_ROOT` / `ROOT_DIR` / `DATA_ROOT` from `src/paths.py`
 - SQLite backups: use the SQLite backup API (`SqliteRepository.create_db_backup`), never a raw file copy (WAL)

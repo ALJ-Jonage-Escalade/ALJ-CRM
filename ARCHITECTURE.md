@@ -55,10 +55,11 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── paths.py             ← CODE_ROOT / ROOT_DIR / DATA_ROOT (à utiliser, ne jamais recalculer)
 │   │   ├── domain/              ← Python pur : modèles, règles d'âge, attestation (HTML), rapprochement compétitions…
 │   │   ├── infrastructure/      ← accès externes : SQLite, Firestore, HelloAsso, Gmail, Drive, auth API…
+│   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME, Excel adhérents),
+│   │   │                          presence_sheets, presence_cours, emergency_contacts, planning_excel,
+│   │   │                          attestation_word (Word COM), spreadsheet_safety
 │   │   ├── presentation/        ← UI Qt UNIQUEMENT (pages/, components/, workers.py, main_window.py)
-│   │   └── *.py (racine src/)   ← générateurs/legacy : create_excel, attestation_generator (Word COM),
-│   │                              presence_sheet_generator, urgency_contact_generator, fill_presence_cours,
-│   │                              mycompet_scraper, helloasso_api, email_sender, migrate_*…
+│   │   └── *.py (racine src/)   ← legacy : mycompet_scraper, helloasso_api, gmail_auth_helper, email_html, migrate_*…
 │   ├── web/
 │   │   ├── index.html           ← PWA « annuaire » (smartphone)
 │   │   ├── competitions.html    ← PWA « compétitions » (smartphone, 2700 lignes)
@@ -66,7 +67,7 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── bureau/              ← portail ordinateur : index, adherents, communications, competitions, outils
 │   │   └── shared/              ← alj-firebase.js (init Firebase unique + émulateur dev), alj-core.js (login/apiFetch), alj-shell.js (menu), alj-members.js,
 │   │                              alj-filters.js, alj-vue.js (redirection bureau/mobile), alj.css
-│   ├── tests/                   ← tests pytest/unittest, rangés comme le code testé : domain/, infrastructure/, presentation/ (Qt), launcher/, web/ ; modules racine de src/ à la racine
+│   ├── tests/                   ← tests pytest/unittest, rangés comme le code testé : domain/, exports/, infrastructure/, presentation/ (Qt), launcher/, web/ ; modules racine de src/ à la racine
 │   ├── dev/                     ← mode dev local : émulateur Firebase (Docker), dev.env, run_server.sh, seed/ (données fictives)
 │   ├── docs/                    ← docs d'architecture/plan (partiellement obsolètes, voir §8)
 │   ├── doc/template/            ← modèles Word/Excel (non versionné en partie)
@@ -151,7 +152,7 @@ Correspondance entre les pages du client lourd et ce qui existe déjà sur le we
 | 👥 Adhérents | `bureau/adherents.html` | Partiel | Liste, filtre sous-catégories, détail, e-mail, attestation, mise à jour via `/api/members/update`. Pas d'ajout d'adhérent ni d'édition de tarif **(à vérifier)** ; plan initial : « lecture seule ». |
 | 📄 Attestations | bouton par adhérent | Partiel | Unitaire seulement (WeasyPrint). Pas de génération en lot / ZIP. Word/COM n'existe pas côté web. |
 | ✉️ Communications | `bureau/communications.html` | Partiel/Avancé | CRUD des modèles + envoi unitaire. Envoi groupé, historique d'envoi, quotas Gmail : à construire. |
-| 📦 Exports | — | **Absent** | Export CSV FFME (`create_excel.generate_ffme_csv`, golden master), fiches de présence (Excel/openpyxl), cahier d'urgence A4, anciens adhérents, MyCompet. |
+| 📦 Exports | — | **Absent** | Export CSV FFME (`exports/membership_excel.generate_ffme_csv`, golden master), fiches de présence (Excel/openpyxl), cahier d'urgence A4, anciens adhérents, MyCompet. |
 | 📥 Import Data | — | **Absent** | Imports FFME / autonomes / saison + rapprochement manuel (`ManualMatchDialog`). Nécessite upload de fichiers. |
 | 🧗 Créneaux (groupes) | — (`/api/planning` seulement) | **Absent** (UI) | Édition groupes/créneaux, vue semaine, export planning Excel, QR codes. |
 | 🏆 Compétitions | `bureau/competitions.html` + PWA | Avancé | Participants, e-mails, HelloAsso. Le rapprochement manuel et le bilan de saison étaient « bureau only » dans la doc **(à vérifier)**. |
@@ -162,8 +163,8 @@ Correspondance entre les pages du client lourd et ce qui existe déjà sur le we
 
 ### Obstacles techniques récurrents
 
-1. **Dépendances Windows/desktop** hors `presentation/` : `attestation_generator.py` (Word COM, `pywin32`), `secret_store.py` et `google_drive_client.py` (`keyring`), `app.py`. Le Docker les exclut volontairement (`requirements-docker.txt`).
-2. **Logique métier coincée dans des fichiers legacy ou des workers Qt** : `create_excel.py` (exports FFME, ~590 lignes restantes), `presentation/workers.py` (1234 lignes), générateurs Excel de `src/`. À extraire vers `domain/` + `infrastructure/` puis exposer en routes FastAPI avant de construire l'écran web.
+1. **Dépendances Windows/desktop** hors `presentation/` : `exports/attestation_word.py` (Word COM, `pywin32`), `secret_store.py` et `google_drive_client.py` (`keyring`), `app.py`. Le Docker les exclut volontairement (`requirements-docker.txt`).
+2. **Logique métier coincée dans des fichiers legacy ou des workers Qt** : `exports/membership_excel.py` (exports FFME, ~590 lignes restantes), `presentation/workers.py` (1234 lignes), générateurs Excel de `exports/`. À extraire vers `domain/` + `infrastructure/` puis exposer en routes FastAPI avant de construire l'écran web.
 3. **Système de fichiers** : le desktop lit/écrit dans `data/`, `exports/`, `archive/`. Cloud Run est éphémère → génération **en mémoire** puis téléchargement (comme les attestations), jamais de persistance locale.
 4. **Cache SQLite côté serveur** : reconstruit depuis Firestore au premier appel de données (`CloudDatabase.ensure_fresh`, 30 s) et flush après chaque écriture. Une route d'écriture doit passer par `SqliteRepository` pour être répliquée.
 5. **Durée des requêtes** : timeout Cloud Run 300 s, mémoire 1 GiB (Pandas/WeasyPrint) ; les traitements lourds (géocodage Nominatim à 1,5 s/adresse) doivent rester en tâche de fond.

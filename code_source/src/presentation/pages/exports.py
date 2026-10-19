@@ -314,7 +314,7 @@ class ExportsPage(QWidget):
         try:
             from infrastructure.sqlite_repository import SqliteRepository
             import datetime
-            from create_excel import parse_date_to_datetime
+            from exports.membership_excel import parse_date_to_datetime
             
             participants = SqliteRepository.load_direct_data(season_filter="2026-2027")
             
@@ -399,7 +399,7 @@ class ExportsPage(QWidget):
         """Résumé pré-export de la fiche de présence autonome : adultes / mineurs par
         sous-catégorie (tarifs HelloAsso des créneaux autonomes sélectionnés), puis les
         jeunes mineurs autorisés (parentale Autonomes / Famille) qui seront ajoutés des
-        autres groupes. Reproduit la logique du générateur (presence_sheet_generator)
+        autres groupes. Reproduit la logique du générateur (exports.presence_sheets)
         pour refléter exactement le contenu futur du fichier Excel."""
         try:
             import datetime
@@ -509,7 +509,7 @@ class ExportsPage(QWidget):
         groupes de créneaux du planning (un créneau peut regrouper plusieurs tarifs).
         Les options techniques sont préconfigurées selon la variante : seul le choix
         des groupes (pour les cours) et la période restent à la charge de l'utilisateur.
-        Le code de génération (ExportWorker / presence_sheet_generator) reste identique."""
+        Le code de génération (ExportWorker / exports.presence_sheets) reste identique."""
         try:
             creneaux = self._load_presence_creneaux()
             if not creneaux:

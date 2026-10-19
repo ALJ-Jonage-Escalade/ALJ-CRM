@@ -7,7 +7,7 @@ import openpyxl
 from openpyxl.styles import Border, Side, PatternFill, Font, Alignment
 
 from paths import ROOT_DIR, CODE_ROOT
-from infrastructure.spreadsheet_safety import neutralize_formulas, template_formulas
+from exports.spreadsheet_safety import neutralize_formulas, template_formulas
 
 # Configuration paths
 TEMPLATE_DIR = os.path.join(CODE_ROOT, "doc", "template")

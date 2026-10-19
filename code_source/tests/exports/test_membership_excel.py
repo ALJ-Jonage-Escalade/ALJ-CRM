@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from unittest.mock import patch
 
-_test_dir = os.path.dirname(os.path.abspath(__file__))
+_test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
@@ -49,10 +49,10 @@ class TestSyncPipeline(unittest.TestCase):
         from unittest.mock import MagicMock
         self._mock_upload = MagicMock()
         self._patches = [
-            patch("create_excel.load_env_variables",
+            patch("exports.membership_excel.load_env_variables",
                   return_value={"GOOGLE_DRIVE_DB_ID": "TEST_DB_ID", "GOOGLE_DRIVE_FILE_ID": ""}),
-            patch("create_excel.download_file_from_drive", return_value=True),
-            patch("create_excel.upload_file_to_drive", self._mock_upload),
+            patch("exports.membership_excel.download_file_from_drive", return_value=True),
+            patch("exports.membership_excel.upload_file_to_drive", self._mock_upload),
         ]
         for pt in self._patches:
             pt.start()
@@ -63,8 +63,8 @@ class TestSyncPipeline(unittest.TestCase):
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def _run_sync(self, items):
-        with patch("create_excel.get_helloasso_data", return_value=items):
-            from create_excel import update_membership_excel
+        with patch("exports.membership_excel.get_helloasso_data", return_value=items):
+            from exports.membership_excel import update_membership_excel
             return update_membership_excel()
 
     def test_nouvelle_adhesion_inseree_en_bdd(self):

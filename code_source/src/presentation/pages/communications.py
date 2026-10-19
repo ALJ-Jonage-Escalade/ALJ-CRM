@@ -1943,7 +1943,7 @@ class CommunicationsPage(QWidget):
         # 4. Pièce jointe attestation + bloc WhatsApp / QRCode (identique à l'envoi réel)
         attachments_lines = []
         if self.attach_pdf_checkbox.isChecked():
-            from attestation_generator import get_safe_filename
+            from exports.attestation_word import get_safe_filename
             filename_pdf = get_safe_filename(
                 first_member.user_last_name, first_member.user_first_name, first_member.order_ref
             ).replace(".docx", ".pdf")
@@ -1965,7 +1965,7 @@ class CommunicationsPage(QWidget):
                         found_item = item
                         break
                 if not found_item:
-                    from presence_sheet_generator import find_planning_match_dynamically
+                    from exports.presence_sheets import find_planning_match_dynamically
                     match_info = find_planning_match_dynamically(first_member.tarif_name, planning_data)
                     if match_info:
                         target_group_name = match_info.get("groupe_planning")

@@ -14,7 +14,7 @@ from infrastructure.google_drive_client import GoogleDriveClient
 from domain.utils import normalize_name
 
 # S'assurer que le répertoire de travail et le répertoire du script sont dans le chemin de recherche
-script_dir = os.path.dirname(os.path.abspath(__file__))
+script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # src/
 if script_dir not in sys.path:
     sys.path.append(script_dir)
 if CODE_ROOT not in sys.path:
@@ -567,7 +567,7 @@ def generate_ffme_csv(participants_data, output_path=None, include_termine=False
         ]
         csv_rows.append(row)
         
-    from infrastructure.spreadsheet_safety import csv_safe
+    from exports.spreadsheet_safety import csv_safe
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter=";")
         writer.writerow(headers)

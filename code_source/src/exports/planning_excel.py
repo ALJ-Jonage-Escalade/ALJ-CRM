@@ -17,7 +17,7 @@ encadrants_text / assign_lanes, puis export_planning_excel (openpyxl).
 import math
 import re
 
-from infrastructure.spreadsheet_safety import neutralize_formulas
+from exports.spreadsheet_safety import neutralize_formulas
 
 DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]
 GRID_START = 9 * 60    # 9h00

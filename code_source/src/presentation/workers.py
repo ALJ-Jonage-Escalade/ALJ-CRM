@@ -26,7 +26,7 @@ class SyncHelloAssoWorker(QThread):
             self.progress.emit("Démarrage de la synchronisation HelloAsso...", 10)
             self.progress.emit("Synchronisation Firestore et intégration en arrière-plan...", 50)
             
-            from create_excel import update_membership_excel
+            from exports.membership_excel import update_membership_excel
             success, new_participants, result = update_membership_excel()
             
             if success:
@@ -243,7 +243,7 @@ class SendEmailCampaignWorker(QThread):
             pdf_path = None
             if self.attach_pdf:
                 # 1. Vérifier si l'attestation PDF existe
-                from attestation_generator import get_safe_filename
+                from exports.attestation_word import get_safe_filename
                 filename_docx = get_safe_filename(m.user_last_name, m.user_first_name, m.order_ref)
                 filename_pdf = filename_docx.replace(".docx", ".pdf")
                 pdf_path = os.path.join(ROOT_DIR, "exports", "attestation", filename_pdf)
@@ -296,7 +296,7 @@ class SendEmailCampaignWorker(QThread):
                             
                     # 2.2 Si aucune correspondance configurée, utiliser le rapprochement sémantique d'origine
                     if not found_item:
-                        from presence_sheet_generator import find_planning_match_dynamically
+                        from exports.presence_sheets import find_planning_match_dynamically
                         match_info = find_planning_match_dynamically(m.tarif_name, planning_data)
                         if match_info:
                             # Retrouver le créneau réel du planning qui correspond au groupe trouvé par l'algorithme sémantique
@@ -494,7 +494,7 @@ class ExportWorker(QThread):
             
             if self.export_type == "ffme":
                 self.progress.emit("Génération du fichier CSV d'import FFME...", 60)
-                from create_excel import generate_ffme_csv
+                from exports.membership_excel import generate_ffme_csv
                 ignored_members = generate_ffme_csv(raw_data)
                 
                 # S'il y a des ignorés, les afficher de manière très visible dans les logs de la console
@@ -514,7 +514,7 @@ class ExportWorker(QThread):
                 
             elif self.export_type == "presence":
                 self.progress.emit("Génération des fiches de présence d'activité...", 50)
-                from presence_sheet_generator import generate_presence_sheets
+                from exports.presence_sheets import generate_presence_sheets
                 
                 # Utiliser les groupes sélectionnés par l'utilisateur ou charger tous les groupes par défaut
                 groups_to_gen = self.selected_groups
@@ -572,7 +572,7 @@ class ExportWorker(QThread):
                 
                 dest_file = os.path.join(ROOT_DIR, "exports", "Anciens_Adherents_Non_Reinscrits.xlsx")
                 os.makedirs(os.path.dirname(dest_file), exist_ok=True)
-                from infrastructure.spreadsheet_safety import safe_to_excel
+                from exports.spreadsheet_safety import safe_to_excel
                 safe_to_excel(df, dest_file, index=False)  # member data must never become a formula
                 
                 self.progress.emit("Liste des anciens adhérents exportée avec succès !", 100)
@@ -580,7 +580,7 @@ class ExportWorker(QThread):
                     
             elif self.export_type == "urgency":
                 self.progress.emit("Génération du cahier des contacts d'urgence (A4)...", 60)
-                from urgency_contact_generator import generate_urgency_contacts_sheet
+                from exports.emergency_contacts import generate_urgency_contacts_sheet
                 success, filename = generate_urgency_contacts_sheet(raw_data)
                 if success:
                     file_path = os.path.join(ROOT_DIR, "exports", filename)
@@ -601,7 +601,7 @@ class ExportWorker(QThread):
                     
             elif self.export_type == "cours":
                 self.progress.emit("Alimentation et rapprochement automatique du tableur Cours.xlsx...", 50)
-                from fill_presence_cours import main as fill_cours_main
+                from exports.presence_cours import main as fill_cours_main
                 stats = fill_cours_main()
                 
                 # Compiler le résumé statistique

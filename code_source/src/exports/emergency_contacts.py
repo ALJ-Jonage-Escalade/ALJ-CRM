@@ -2,7 +2,7 @@ import os
 import openpyxl
 from openpyxl.styles import Border, Side, PatternFill, Font, Alignment
 from paths import ROOT_DIR
-from infrastructure.spreadsheet_safety import neutralize_formulas
+from exports.spreadsheet_safety import neutralize_formulas
 
 def clean_filename(name):
     """Nettoie le nom d'un groupe pour en faire un nom de fichier valide."""

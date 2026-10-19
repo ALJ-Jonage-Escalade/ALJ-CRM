@@ -9,7 +9,7 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.planning_excel_export import (
+from exports.planning_excel import (
     parse_horaire, clean_group_label, _initiales, encadrants_text,
     assign_lanes, export_planning_excel, export_planning_list_excel,
     fill_for_item,
