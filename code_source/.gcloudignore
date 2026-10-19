@@ -36,6 +36,8 @@ import/
 scripts_temporaires/
 *.spec
 *.xlsx
+# ...except the Excel templates read at runtime (presence sheets, courses)
+!doc/template/*.xlsx
 
 # Git, tests, outils
 .git/

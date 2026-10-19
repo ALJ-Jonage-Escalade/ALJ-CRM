@@ -105,7 +105,8 @@ def planning_items(coaches):
     """Season slots (birth-date bounds consistent with age_rules)."""
     snape, mcgonagall, flitwick, sprout, lupin, hagrid = coaches
     # `type` and `jour` values are parsed by the app (planning Excel export, presence sheets):
-    # they keep the application's French vocabulary. Everything else is English.
+    # they keep the application's French vocabulary. Everything else is English, except
+    # « Autonome » in autonomous slot names/tariffs: `is_autonome_creneau` looks for that word.
     items = [
         ("Leisure - Children 2017-2019", "cours", "U8-U10", "Mercredi", "14:00-15:30",
          [hagrid, sprout], ["Leisure - Children born 2017, 2018, 2019"], "2017-01-01", "2019-12-31"),
@@ -121,10 +122,10 @@ def planning_items(coaches):
          "2008-01-01", "2013-12-31"),
         ("Leisure - Adult beginners", "cours", "Adults", "Mardi", "20:00-22:00",
          [mcgonagall], ["Adult beginners course"], "", ""),
-        ("Independent", "autonome", "Adults", "Lundi / Jeudi", "20:00-22:30",
-         [], ["Independent adults"], "", ""),
-        ("Independent Bouldering", "autonome", "Adults", "Samedi", "10:00-12:00",
-         [], ["Independent bouldering"], "", ""),
+        ("Autonome", "autonome", "Adults", "Lundi / Jeudi", "20:00-22:30",
+         [], ["Autonome adults"], "", ""),
+        ("Autonome Bloc", "autonome", "Adults", "Samedi", "10:00-12:00",
+         [], ["Autonome bouldering"], "", ""),
     ]
     return [
         {"id": i, "groupe": group, "type": kind, "categorie_age": age_cat, "jour": day, "horaires": hours,
@@ -180,6 +181,13 @@ def member_record(fake, rng, person, season, order_no):
     order_date = fake.date_between_dates(datetime.date(start_year, 6, 20), datetime.date(start_year, 9, 30))
     incomplete = rng.random() < 0.12      # a few incomplete records (real-world cases to test)
     insured = rng.random() < 0.8
+    autonomous = group["type"] == "autonome"
+    # Club autonomy validations (normally imported from Autonomes_*.xlsx) and, for some minors,
+    # the parental authorisations that add them to the autonomous attendance sheet.
+    red_badge = rng.random() < (0.7 if autonomous else 0.15)
+    bouldering = rng.random() < (0.8 if autonomous else 0.2)
+    auth_autonomous = person["minor"] and rng.random() < 0.15
+    auth_family = person["minor"] and rng.random() < 0.1
     return {
         "order_ref": f"DEV-{season[:4]}-{order_no:04d}",
         "order_date": order_date.strftime("%d/%m/%Y"),
@@ -208,6 +216,10 @@ def member_record(fake, rng, person, season, order_no):
         "champ_Je m'engage à compléter mon questionnaire de santé": "" if incomplete else "Oui",
         "opt_Assurance Base": "Oui" if insured else "Non",
         "opt_Montant Assurance Base": 10.0 if insured else 0.0,
+        "badge_rouge": "Oui" if red_badge else "Non",
+        "autonomie_bloc": "Oui" if bouldering else "Non",
+        "parental_auth_autonomous": "Oui" if auth_autonomous else "Non",
+        "parental_auth_family": "Oui" if auth_family else "Non",
     }
 
 

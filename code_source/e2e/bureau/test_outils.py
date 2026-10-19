@@ -108,9 +108,6 @@ def test_course_attendance_sheets(page, tmp_path):
     assert len(names) == len(courses) and all(n.endswith(".xlsx") for n in names)
 
 
-@pytest.mark.xfail(strict=True, reason="domain.planning_groups.is_autonome_creneau ignores the slot type "
-                                       "(`autonome`) and only looks for « autonome » in the group/tariff names; "
-                                       "the seeded names are English (« Independent »)")
 def test_autonomous_attendance_sheet(page, tmp_path):
     _open_tab(page, "presence")
     expect(page.locator("#presence-autonome-summary")).not_to_contain_text("Total adhérents : 0")
