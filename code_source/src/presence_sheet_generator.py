@@ -9,6 +9,7 @@ from openpyxl.worksheet.page import PageMargins
 from openpyxl.worksheet.pagebreak import Break
 from paths import ROOT_DIR, find_doc_template
 from infrastructure.spreadsheet_safety import neutralize_formulas, template_formulas
+from infrastructure.qrcodes import find_group_qrcode, get_group_qrcode
 
 # Pictogramme compact remplaçant le mot "Autonomes" dans la colonne "Autorisation" (votre demande !)
 PICTO_AUTONOME = "🧗"
@@ -104,60 +105,6 @@ def is_course_day(day: datetime.date) -> bool:
         if c_start <= day <= c_end:
             return False
     return True
-
-def find_group_qrcode(*candidate_names):
-    """Cherche le QRCode WhatsApp d'un groupe dans exports/qrcodes.
-    Retourne le chemin du fichier .png ou None si introuvable."""
-    qrcodes_dir = os.path.join(ROOT_DIR, "exports", "qrcodes")
-    if not os.path.isdir(qrcodes_dir):
-        return None
-    for name in candidate_names:
-        if not name:
-            continue
-        safe = "".join([c for c in str(name) if c.isalnum() or c in (" ", "-", "_")]).strip()
-        if not safe:
-            continue
-        path = os.path.join(qrcodes_dir, f"QRCode_WhatsApp_{safe}.png")
-        if os.path.exists(path):
-            return path
-    return None
-
-def ensure_group_qrcode(whatsapp_link: str, group_name: str, fallback_dir: str | None = None) -> str | None:
-    """Génère le QRCode WhatsApp du groupe (API qrserver.com) s'il n'existe pas déjà
-    dans exports/qrcodes. Retourne le chemin du fichier .png, ou None si indisponible.
-    Si exports/qrcodes n'est pas accessible en écriture (Cloud Run : ROOT_DIR vaut « / »),
-    le PNG est écrit dans `fallback_dir` (dossier temporaire de l'export)."""
-    if not whatsapp_link or not group_name:
-        return None
-    safe = "".join([c for c in str(group_name) if c.isalnum() or c in (" ", "-", "_")]).strip()
-    if not safe:
-        return None
-    qrcodes_dir = os.path.join(ROOT_DIR, "exports", "qrcodes")
-    try:
-        os.makedirs(qrcodes_dir, exist_ok=True)
-    except OSError as dir_err:
-        if not fallback_dir:
-            print(f"[ATTENTION PRESENCE] Dossier des QRCodes inaccessible ({dir_err}) pour le groupe : {group_name}")
-            return None
-        qrcodes_dir = fallback_dir
-        os.makedirs(qrcodes_dir, exist_ok=True)
-    qr_path = os.path.join(qrcodes_dir, f"QRCode_WhatsApp_{safe}.png")
-    if os.path.exists(qr_path):
-        return qr_path
-    try:
-        import urllib.parse
-        import requests
-        api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={urllib.parse.quote(whatsapp_link)}"
-        res = requests.get(api_url, timeout=10)
-        if res.status_code == 200:
-            with open(qr_path, "wb") as f:
-                f.write(res.content)
-            print(f"[PRESENCE] QRCode WhatsApp généré automatiquement : {os.path.basename(qr_path)}")
-            return qr_path
-        print(f"[ATTENTION PRESENCE] Échec de l'API QRCode (HTTP {res.status_code}) pour le groupe : {group_name}")
-    except Exception as qr_err:
-        print(f"[ATTENTION PRESENCE] Impossible de générer le QRCode du groupe {group_name} : {qr_err}")
-    return None
 
 def clean_filename(name):
     """Nettoie le nom d'un groupe pour en faire un nom de fichier valide."""
@@ -874,7 +821,7 @@ def generate_presence_sheets(selected_groups, participants_data, start_date_str=
                 c_cell.border = no_border
 
         # 6b. QRCode WhatsApp du groupe, placé SOUS le tableau en colonne A.
-        # Si le PNG n'existe pas encore dans exports/qrcodes, il est généré automatiquement
+        # Si le PNG n'est pas encore en cache (infrastructure.qrcodes), il est généré localement
         # à partir du lien WhatsApp du créneau de planning correspondant (votre demande !).
         qr_candidates = [
             match_info.get("groupe_planning") if match_info else None,
@@ -896,7 +843,7 @@ def generate_presence_sheets(selected_groups, participants_data, start_date_str=
             for item in planning_items:
                 wa_link = str(item.get("whatsapp_link") or "").strip()
                 wa_group = str(item.get("groupe") or "").strip()
-                qr_path = ensure_group_qrcode(wa_link, wa_group, fallback_dir=os.path.join(output_dir, "qrcodes"))
+                qr_path = get_group_qrcode(wa_link, wa_group)
                 if qr_path:
                     break
             if not qr_path:

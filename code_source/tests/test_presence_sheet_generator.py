@@ -104,7 +104,9 @@ class TestPresenceSheetGenerator(unittest.TestCase):
 
     def test_presence_api_export_readonly_root_dir(self):
         """Cloud Run : ROOT_DIR (« / ») n'est pas accessible en écriture ; le QRCode WhatsApp
-        du créneau est alors écrit dans le dossier temporaire de l'export."""
+        du créneau est alors généré localement dans le dossier temporaire, sans appel réseau."""
+        import io
+        import zipfile
         from unittest import mock
 
         from fastapi.testclient import TestClient
@@ -118,22 +120,15 @@ class TestPresenceSheetGenerator(unittest.TestCase):
         unwritable_root = os.path.join(self._tmpdir, "not_a_dir")
         with open(unwritable_root, "w", encoding="utf-8"):
             pass
-        png = mock.Mock(status_code=200, content=_PNG_1PX)
         client = TestClient(app, base_url="http://localhost")
         with mock.patch("presence_sheet_generator.ROOT_DIR", unwritable_root), \
-                mock.patch("requests.get", return_value=png) as qr_api:
+                mock.patch("paths.ROOT_DIR", unwritable_root), \
+                mock.patch("tempfile.tempdir", self._tmpdir), \
+                mock.patch("requests.get") as http_get:
             resp = client.post("/api/presence/export", json={"variant": "cours", "selected_groups": ["Loisir WhatsApp"]})
         self.assertEqual(resp.status_code, 200, resp.text)
-        qr_api.assert_called_once()
+        http_get.assert_not_called()
         self.assertTrue(os.path.isfile(unwritable_root))
-
-
-# Smallest valid PNG (1x1 pixel), returned by the mocked QRCode API
-_PNG_1PX = bytes.fromhex(
-    "89504e470d0a1a0a0000000d4948445200000001000000010806000000"
-    "1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082"
-)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        self.assertTrue(os.path.isfile(os.path.join(self._tmpdir, "alj_qrcodes", "QRCode_WhatsApp_Loisir WhatsApp.png")))
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as xlsx:
+            self.assertTrue(any(name.startswith("xl/media/") for name in xlsx.namelist()))

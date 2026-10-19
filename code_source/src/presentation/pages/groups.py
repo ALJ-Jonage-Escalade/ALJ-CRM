@@ -1,5 +1,4 @@
 import os
-import requests
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout,
     QFrame, QTableWidget, QTableWidgetItem, QMessageBox, QDialog,
@@ -10,6 +9,7 @@ from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QColor
 from paths import ROOT_DIR
 from domain.age_rules import extract_birth_years
+from infrastructure.qrcodes import get_group_qrcode
 
 class GroupsPage(QWidget):
     """
@@ -601,36 +601,19 @@ class GroupsPage(QWidget):
             )
             return
 
-        # Dossier d'export pour les QRCodes
-        qrcodes_dir = os.path.join(ROOT_DIR, "exports", "qrcodes")
-        os.makedirs(qrcodes_dir, exist_ok=True)
-        
-        # Télécharger l'image depuis l'API libre qrserver.com
-        api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={whatsapp_link}"
-        
-        try:
-            res = requests.get(api_url, timeout=10)
-            if res.status_code == 200:
-                safe_group_name = "".join([c for c in group_name if c.isalnum() or c in (" ", "-", "_")]).strip()
-                file_path = os.path.join(qrcodes_dir, f"QRCode_WhatsApp_{safe_group_name}.png")
-                
-                with open(file_path, "wb") as f:
-                    f.write(res.content)
-                    
-                # Afficher la boîte de dialogue avec le QPixmap
-                dialog = QRCodeDisplayDialog(self, file_path, group_name, whatsapp_link)
-                dialog.exec()
-            else:
-                QMessageBox.critical(
-                    self, "Erreur API",
-                    f"Impossible de générer le QRCode (Code HTTP {res.status_code})"
-                )
-        except Exception as e:
+        # Génération locale ; force=True régénère le PNG (seul moyen de rafraîchir le cache)
+        file_path = get_group_qrcode(whatsapp_link, group_name, force=True)
+        if not file_path:
             QMessageBox.critical(
-                self, "Erreur réseau",
-                f"Impossible de se connecter au service de génération de QRCode. "
-                f"Veuillez vérifier votre connexion Internet.\n\nDétail : {e}"
+                self, "Erreur",
+                f"Impossible de générer le QRCode du groupe '{group_name}'.\n\n"
+                f"Consultez le journal de l'application pour le détail."
             )
+            return
+
+        # Afficher la boîte de dialogue avec le QPixmap
+        dialog = QRCodeDisplayDialog(self, file_path, group_name, whatsapp_link)
+        dialog.exec()
 
     def on_export_planning_excel(self):
         """Exporte le planning hebdomadaire en Excel (grille Lundi → Samedi, 9h-22h,
