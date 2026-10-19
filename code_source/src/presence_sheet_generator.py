@@ -122,16 +122,25 @@ def find_group_qrcode(*candidate_names):
             return path
     return None
 
-def ensure_group_qrcode(whatsapp_link, group_name):
+def ensure_group_qrcode(whatsapp_link: str, group_name: str, fallback_dir: str | None = None) -> str | None:
     """Génère le QRCode WhatsApp du groupe (API qrserver.com) s'il n'existe pas déjà
-    dans exports/qrcodes. Retourne le chemin du fichier .png, ou None si indisponible."""
+    dans exports/qrcodes. Retourne le chemin du fichier .png, ou None si indisponible.
+    Si exports/qrcodes n'est pas accessible en écriture (Cloud Run : ROOT_DIR vaut « / »),
+    le PNG est écrit dans `fallback_dir` (dossier temporaire de l'export)."""
     if not whatsapp_link or not group_name:
         return None
     safe = "".join([c for c in str(group_name) if c.isalnum() or c in (" ", "-", "_")]).strip()
     if not safe:
         return None
     qrcodes_dir = os.path.join(ROOT_DIR, "exports", "qrcodes")
-    os.makedirs(qrcodes_dir, exist_ok=True)
+    try:
+        os.makedirs(qrcodes_dir, exist_ok=True)
+    except OSError as dir_err:
+        if not fallback_dir:
+            print(f"[ATTENTION PRESENCE] Dossier des QRCodes inaccessible ({dir_err}) pour le groupe : {group_name}")
+            return None
+        qrcodes_dir = fallback_dir
+        os.makedirs(qrcodes_dir, exist_ok=True)
     qr_path = os.path.join(qrcodes_dir, f"QRCode_WhatsApp_{safe}.png")
     if os.path.exists(qr_path):
         return qr_path
@@ -887,7 +896,7 @@ def generate_presence_sheets(selected_groups, participants_data, start_date_str=
             for item in planning_items:
                 wa_link = str(item.get("whatsapp_link") or "").strip()
                 wa_group = str(item.get("groupe") or "").strip()
-                qr_path = ensure_group_qrcode(wa_link, wa_group)
+                qr_path = ensure_group_qrcode(wa_link, wa_group, fallback_dir=os.path.join(output_dir, "qrcodes"))
                 if qr_path:
                     break
             if not qr_path:

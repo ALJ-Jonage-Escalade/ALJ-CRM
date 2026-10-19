@@ -102,5 +102,38 @@ class TestPresenceSheetGenerator(unittest.TestCase):
         self.assertIn("attachment", resp.headers.get("content-disposition", ""))
         self.assertGreater(len(resp.content), 1000)
 
+    def test_presence_api_export_readonly_root_dir(self):
+        """Cloud Run : ROOT_DIR (« / ») n'est pas accessible en écriture ; le QRCode WhatsApp
+        du créneau est alors écrit dans le dossier temporaire de l'export."""
+        from unittest import mock
+
+        from fastapi.testclient import TestClient
+        from server import app
+        SqliteRepository.save_planning_item({"groupe": "Loisir WhatsApp", "jour": "Jeudi", "horaires": "18h-20h",
+                                             "helloasso_tarifs": ["Loisir WhatsApp"],
+                                             "whatsapp_link": "https://chat.whatsapp.com/exemple"})
+        SqliteRepository.upsert_members([_member("ORD-3", "PETIT", "Noe", "Loisir WhatsApp")], "2026-2027")
+        # A regular file as ROOT_DIR makes os.makedirs fail on every OS
+        # (chmod 0o555 does not prevent creating subfolders on Windows).
+        unwritable_root = os.path.join(self._tmpdir, "not_a_dir")
+        with open(unwritable_root, "w", encoding="utf-8"):
+            pass
+        png = mock.Mock(status_code=200, content=_PNG_1PX)
+        client = TestClient(app, base_url="http://localhost")
+        with mock.patch("presence_sheet_generator.ROOT_DIR", unwritable_root), \
+                mock.patch("requests.get", return_value=png) as qr_api:
+            resp = client.post("/api/presence/export", json={"variant": "cours", "selected_groups": ["Loisir WhatsApp"]})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        qr_api.assert_called_once()
+        self.assertTrue(os.path.isfile(unwritable_root))
+
+
+# Smallest valid PNG (1x1 pixel), returned by the mocked QRCode API
+_PNG_1PX = bytes.fromhex(
+    "89504e470d0a1a0a0000000d4948445200000001000000010806000000"
+    "1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082"
+)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -72,7 +72,7 @@ def test_create_edit_delete_slot(page, planning):
     page.locator("#slot-horaires").fill("14:00 - 16:00")
     page.locator("#slot-type").select_option("perfectionnement")
     page.locator("#slot-encadrants").fill("Remus Lupin, Rubeus Hagrid")
-    page.locator("#slot-tarifs-checkboxes label").filter(has_text="Independent bouldering").locator("input").check()
+    page.locator("#slot-tarifs-checkboxes label").filter(has_text="Autonome bouldering").locator("input").check()
     page.locator("#btn-save-modal").click()
     expect(page.locator("#toast")).to_contain_text(f"Créneau « {groupe} » enregistré")
     expect(page.locator(".day-column[data-day='Samedi'] .plan-slot-card").filter(has_text=groupe)).to_be_visible()
@@ -80,7 +80,7 @@ def test_create_edit_delete_slot(page, planning):
     page.locator("#tab-btn-table").click()
     row = _row(page, groupe)
     expect(row).to_contain_text("Remus Lupin, Rubeus Hagrid")
-    expect(row).to_contain_text("Independent bouldering")
+    expect(row).to_contain_text("Autonome bouldering")
     stored = next(s for s in page.request.get("/api/planning").json() if s["groupe"] == groupe)
     assert (stored["jour"], stored["horaires"], stored["type"]) == ("Samedi", "14:00 - 16:00", "perfectionnement")
 
