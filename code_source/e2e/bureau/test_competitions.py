@@ -22,9 +22,6 @@ PAST_SEEDED = "Diagon Alley Bouldering Cup"
 # with the wrong field names (last_name/first_name/email_primary instead of nom/prenom/email), so
 # member search and e-mail recipients come back empty. Fixed by the API rewrite of the page:
 # strict, so these tests fail (XPASS) once the fix is merged, as a reminder to drop the marker.
-KNOWN_BUG_A6 = pytest.mark.xfail(strict=True, reason="bug A6: wrong field names on the `adherents` projection")
-
-
 def _iso(days: int) -> str:
     return (datetime.date.today() + datetime.timedelta(days=days)).isoformat()
 
@@ -124,7 +121,6 @@ def test_competitors_selection_and_attendance(page, test_data, members):
     eventually(stored)
 
 
-@KNOWN_BUG_A6
 def test_register_a_member(page, test_data, members):
     outsider = members[2]
     nom = unique_name("E2E Office register")
@@ -199,13 +195,14 @@ def test_coaches_tab(page, test_data):
     expect(page.locator("#comp-workspace")).to_contain_text(SEEDED_COMPETITION)
 
 
-def test_coach_cannot_edit_in_office(page):
+def test_coach_can_edit_in_office(page):
+    """Competition writes are open to coaches, as on the phone (readonly never gets in: test_auth.py)."""
     open_competitions(page, role="coach")
-    expect(page.locator("#btn-add-comp")).to_have_count(0)
+    expect(page.locator("#btn-add-comp")).to_be_visible()
     workspace = select_competition(page, SEEDED_COMPETITION)
-    expect(workspace.locator("#btn-edit-comp")).to_have_count(0)
-    expect(workspace.locator("#btn-del-comp")).to_have_count(0)
-    expect(page.locator("#parts-tbody .part-select-chk").first).to_be_disabled()
+    expect(workspace.locator("#btn-edit-comp")).to_be_visible()
+    expect(workspace.locator("#btn-del-comp")).to_be_visible()
+    expect(page.locator("#parts-tbody .part-select-chk").first).to_be_enabled()
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +273,7 @@ def test_paid_competitor_cannot_be_removed(page, workflow):
 def test_withdrawal_of_paid_competitor(page, test_data, workflow, dialogs, decision, badge):
     open_competitions(page)
     select_competition(page, workflow["nom"])
+    dialogs["text"] = "Injured"   # the withdrawal reason is required
     participant_row(page, workflow["paid"]).locator(".part-action-select").select_option(decision)
     row = participant_row(page, workflow["paid"])
     expect(row).to_contain_text(badge)

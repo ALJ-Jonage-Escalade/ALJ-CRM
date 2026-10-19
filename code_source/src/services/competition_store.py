@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import os
 import threading
 import time
 from typing import Callable, List, ParamSpec, TypeVar
@@ -25,8 +26,9 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 # Writes through the services drop the cache at once; writes made elsewhere (desktop app,
-# webhook, other instance) show up after CACHE_SECONDS.
-CACHE_SECONDS = 5.0
+# webhook, other instance) show up after CACHE_SECONDS (0 in the e2e tests, whose fixtures
+# write straight to Firestore).
+CACHE_SECONDS = float(os.environ.get("ALJ_COMPETITIONS_CACHE_SECONDS", "5"))
 _cache_lock = threading.Lock()
 _competitions_cache: dict = {"at": 0.0, "docs": None}  # {"at": time, "docs": List[Doc] or None}
 

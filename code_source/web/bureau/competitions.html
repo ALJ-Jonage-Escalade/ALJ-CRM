@@ -2357,6 +2357,7 @@ const shell = startBureau({
         if (res.ok) {
           const data = await res.json();
           toast(`✅ Synchronisation réussie : ${data.stats?.nb_items || 0} articles traités.`);
+          syncNow();  // new items and payments (participants marked paid) without waiting for the polls
         } else {
           toast("❌ Échec de synchronisation HelloAsso.", 8000);
         }

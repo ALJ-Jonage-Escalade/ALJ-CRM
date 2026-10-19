@@ -1240,6 +1240,7 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
     """
     from infrastructure.firestore_client import FirestoreError
     from infrastructure.helloasso_webhook_service import WebhookRejected
+    from services.competition_store import invalidate_cache
     if not isinstance(token, str):  # appel direct de la fonction (tests)
         token = None
     try:
@@ -1253,6 +1254,8 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
         return JSONResponse({"status": "error", "message": internal_error(e, "webhook_helloasso")}, status_code=503)
     except Exception as e:
         return {"status": "error", "message": internal_error(e, "webhook_helloasso")}
+    finally:
+        invalidate_cache()  # payments recorded on competition documents directly
 
 
 @app.post("/api/competitions/{comp_id}/check-all-paid")
@@ -1435,6 +1438,7 @@ def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
 @app.post("/api/helloasso/sync")
 def sync_helloasso_api():
     """Synchronise la campagne annuelle HelloAsso vers Firestore."""
+    from services.competition_store import invalidate_cache
     try:
         from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
         from domain import competition_matching
@@ -1472,6 +1476,8 @@ def sync_helloasso_api():
         }
     except Exception as e:
         return {"status": "error", "message": internal_error(e, "sync_helloasso_api")}
+    finally:
+        invalidate_cache()  # payments recorded on competition documents directly
 
 
 # --------------------------------------------------------------------------

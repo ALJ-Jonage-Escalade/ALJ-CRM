@@ -2225,6 +2225,7 @@ async function triggerHelloAssoSync() {
       if (data.status === "success") {
         const stats = data.stats || {};
         toast(`✅ Synchro terminée : ${stats.nb_items || 0} article(s), ${stats.nb_auto || 0} auto, ${stats.nb_unlinked || 0} en attente.`);
+        syncNow();  // new items and payments (participants marked paid) without waiting for the polls
       } else {
         toast("❌ " + (data.message || "Erreur lors de la synchronisation."));
       }
