@@ -10,10 +10,10 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.secret_store import SecretStore
-from infrastructure.email_repository import EmailRepository
+from infrastructure.security.secret_store import SecretStore
+from infrastructure.mail.repository import EmailRepository
 from infrastructure.excel_repository import ExcelRepository
-from infrastructure.sqlite_repository import SqliteRepository
+from infrastructure.sqlite.repository import SqliteRepository
 
 class TestInfrastructureLot2(unittest.TestCase):
 
@@ -358,10 +358,10 @@ class TestInfrastructureLot2(unittest.TestCase):
     def test_google_contacts_client_methods(self):
         """Vérifie le fonctionnement du GoogleContactsClient en mockant les requêtes HTTP."""
         from unittest.mock import patch, MagicMock
-        from infrastructure.google_contacts_client import GoogleContactsClient
+        from infrastructure.google.contacts import GoogleContactsClient
         
         # Mocker l'access token
-        with patch("infrastructure.google_contacts_client.GoogleContactsClient.get_access_token", return_value="mock_access_token"):
+        with patch("infrastructure.google.contacts.GoogleContactsClient.get_access_token", return_value="mock_access_token"):
             
             # 1. Tester get_or_create_group (quand le groupe existe déjà)
             mock_res_get = MagicMock()
@@ -428,9 +428,9 @@ class TestInfrastructureLot2(unittest.TestCase):
         SqliteRepository.setup_database()
         
         # Mocker le client Google Contacts pour éviter les requêtes API
-        with patch("infrastructure.google_contacts_client.GoogleContactsClient.get_or_create_group", return_value="contactGroups/123"), \
-             patch("infrastructure.google_contacts_client.GoogleContactsClient.find_contact_by_email", return_value="people/c1"), \
-             patch("infrastructure.google_contacts_client.GoogleContactsClient.add_members_to_group", return_value=True):
+        with patch("infrastructure.google.contacts.GoogleContactsClient.get_or_create_group", return_value="contactGroups/123"), \
+             patch("infrastructure.google.contacts.GoogleContactsClient.find_contact_by_email", return_value="people/c1"), \
+             patch("infrastructure.google.contacts.GoogleContactsClient.add_members_to_group", return_value=True):
              
             # Nettoyer la table adherents pour s'assurer du nombre exact d'adhérents de test (évite l'héritage d'autres tests)
             conn = SqliteRepository.get_connection()

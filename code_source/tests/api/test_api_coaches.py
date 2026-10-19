@@ -2,7 +2,7 @@
 
 from support.api_case import ApiTestCase
 
-from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 
 
 class TestCoaches(ApiTestCase):

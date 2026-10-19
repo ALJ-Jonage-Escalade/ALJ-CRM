@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from domain.competition_models import Competition  # noqa: E402
-from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo  # noqa: E402
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo  # noqa: E402
 from support.fake_firestore import FirestoreRepoTestCase  # noqa: E402
 
 _app = QApplication.instance() or QApplication([])

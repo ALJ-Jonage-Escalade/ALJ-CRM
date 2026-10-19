@@ -16,7 +16,7 @@ if _src_dir not in sys.path:
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from infrastructure.api_auth import local_request_error  # noqa: E402
+from infrastructure.security.api_auth import local_request_error  # noqa: E402
 
 LOCAL = "127.0.0.1:8000"
 
@@ -89,7 +89,7 @@ class TestResponseHardening(unittest.TestCase):
 
     def test_internal_errors_are_generic(self):
         secret_detail = "sqlite3 at /srv/app/data/database.db: no such table"
-        with patch("infrastructure.email_dispatch_service.EmailDispatchService.list_templates",
+        with patch("infrastructure.mail.dispatch.EmailDispatchService.list_templates",
                    side_effect=RuntimeError(secret_detail)):
             body = self.client.get("/api/email-templates").json()
         self.assertNotIn(secret_detail, str(body))

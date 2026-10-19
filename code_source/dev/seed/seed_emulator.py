@@ -67,7 +67,7 @@ def reset_emulator(host: str, project: str) -> None:
 def drop_server_cache() -> None:
     """Deletes the dev server's SQLite cache (ALJ_DATA_DIR): the reset leaves no deletions
     to sync, and the server rebuilds its cache from the emulator."""
-    from infrastructure.sqlite_repository import SqliteRepository
+    from infrastructure.sqlite.repository import SqliteRepository
     if not os.environ.get("ALJ_DATA_DIR"):
         # Without a dedicated folder, the default path would be this machine's database (data/): leave it alone.
         print("ℹ️  ALJ_DATA_DIR not set: dev server cache kept.")
@@ -169,7 +169,7 @@ def member_record(fake, rng, person, season, order_no):
     Keys, the "Validé" status and "Oui"/"Non" answers are the HelloAsso form's own
     (French) values, matched by the app; every other value is English."""
     from hp_names import PARENTS
-    from infrastructure.schema_v2 import DOB_COLUMN
+    from infrastructure.sqlite.schema_v2 import DOB_COLUMN
     first, last, group = person["first"], person["last"], person["group"]
     email = f"{ascii_slug(first)}.{ascii_slug(last)}@{EMAIL_DOMAIN}"
     if person["minor"]:
@@ -237,7 +237,7 @@ EMAIL_TEMPLATES = [
 # Writing
 # --------------------------------------------------------------------------
 def build_sqlite(path, fake, rng, coach_names):
-    from infrastructure.sqlite_repository import SqliteRepository
+    from infrastructure.sqlite.repository import SqliteRepository
     SqliteRepository.set_db_path(path)
     SqliteRepository.setup_database(force=True)
 
@@ -258,7 +258,7 @@ def build_sqlite(path, fake, rng, coach_names):
 
 def seed_competitions(coach_ids):
     from domain.competition_models import STATUT_CLOSE, STATUT_EN_COURS, STATUT_EN_PREPARATION, Competition
-    from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
+    from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 
     snape, mcgonagall, flitwick = coach_ids[0], coach_ids[1], coach_ids[2]
     today = datetime.date.today()
@@ -290,8 +290,8 @@ def main() -> int:
 
     from faker import Faker
     from hp_names import COACHES
-    from infrastructure import cloud_database as cdb
-    from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
+    from infrastructure.firestore import cloud_database as cdb
+    from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 
     Faker.seed(SEED)
     fake = Faker("en_GB")

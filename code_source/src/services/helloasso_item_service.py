@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from infrastructure.competition_firestore_repository import (
+from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as Repo,
     ItemAlreadyLinked,
 )

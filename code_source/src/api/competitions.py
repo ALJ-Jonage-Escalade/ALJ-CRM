@@ -2,7 +2,7 @@
 
 Controllers in src/api handle HTTP in and out only: business rules are in src/services,
 whose errors become HTTP errors in api.responses.service_error_handler. Roles are checked
-by the auth middleware (infrastructure.api_auth.required_role): reads are open to
+by the auth middleware (infrastructure.security.api_auth.required_role): reads are open to
 readonly, writes need coach.
 """
 

@@ -14,8 +14,8 @@ from PIL import Image, ImageDraw
 
 from paths import CODE_ROOT
 from domain.models import Member
-from infrastructure.sqlite_repository import SqliteRepository, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
-from infrastructure.competition_firestore_repository import (
+from infrastructure.sqlite.repository import SqliteRepository, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as CompetitionRepository,
 )
 from domain.competition_models import (
@@ -25,7 +25,7 @@ from domain.competition_models import (
     PAIEMENT_NON_INVITE,
 )
 from domain.utils import normalize_name
-from infrastructure.schema_v2 import normalize_status
+from infrastructure.sqlite.schema_v2 import normalize_status
 from presentation.workers import SendEmailCampaignWorker
 from presentation.pages.members import (
     SubCategoryDialog, CANCELLED_STATUS, WAITING_LIST_TARIF,
@@ -1075,7 +1075,7 @@ class CommunicationsPage(QWidget):
         """Entoure la sélection (ou insère une paire vide) avec la balise <tag>…</tag>.
 
         Le corps reste du texte brut : les balises saisies (<b>, <i>, <u>, <a href>…)
-        sont rendues à l'envoi par text_to_html (email_html.py).
+        sont rendues à l'envoi par text_to_html (infrastructure/mail/html_body.py).
         """
         cursor = self.body_input.textCursor()
         open_tag, close_tag = f"<{tag}>", f"</{tag}>"
@@ -1225,7 +1225,7 @@ class CommunicationsPage(QWidget):
         BDD, pour afficher le groupe de la personne entre parenthèses dans la
         liste des destinataires."""
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             creneaux = SqliteRepository.load_creneaux_groups()
         except Exception:
             return {}
@@ -1838,7 +1838,7 @@ class CommunicationsPage(QWidget):
     def on_view_html_clicked(self):
         """Ouvre une fenêtre affichant le code HTML exact du courriel qui sera envoyé."""
         try:
-            from email_html import build_email_html
+            from infrastructure.mail.html_body import build_email_html
             html_code = build_email_html(
                 self.body_input.toPlainText(),
                 add_signature=self.signature_yes_radio.isChecked(),
@@ -1952,7 +1952,7 @@ class CommunicationsPage(QWidget):
         if self.attach_whatsapp_checkbox.isChecked():
             planning_data = []
             try:
-                from infrastructure.sqlite_repository import SqliteRepository
+                from infrastructure.sqlite.repository import SqliteRepository
                 planning_data = SqliteRepository.load_planning_data()
             except Exception:
                 planning_data = []
@@ -2004,7 +2004,7 @@ class CommunicationsPage(QWidget):
 
         # 5. Rendu HTML (signature selon le bouton radio choisi)
         try:
-            from email_html import build_email_html
+            from infrastructure.mail.html_body import build_email_html
             html_body = build_email_html(
                 msg_body,
                 add_signature=self.signature_yes_radio.isChecked(),
@@ -2117,7 +2117,7 @@ class CommunicationsPage(QWidget):
             self.template_selector.clear()
             
             # Récupérer les templates de BDD
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             self.email_templates = SqliteRepository.get_email_templates()
             
             # Ajouter au sélecteur
@@ -2198,7 +2198,7 @@ class CommunicationsPage(QWidget):
             )
             return
         
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         success = SqliteRepository.save_email_template(current_name, subject, body, sender_email=sender_email, sender_name=sender_name)
         if success:
             self.remember_sender_email(sender_email, sender_name)
@@ -2233,7 +2233,7 @@ class CommunicationsPage(QWidget):
         sender_email = self.get_current_sender_email()
         sender_name = self.get_current_sender_name()
         
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         # Vérifier si existe déjà
         templates = SqliteRepository.get_email_templates()
         if any(t["name"].lower() == name.lower() for t in templates):
@@ -2266,7 +2266,7 @@ class CommunicationsPage(QWidget):
         if reply != QMessageBox.Yes:
             return
             
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         success = SqliteRepository.delete_email_template(current_name)
         if success:
             self.log_area.append(f"🗑️ [MODÈLE] Modèle d'e-mail '{current_name}' supprimé de la BDD.")

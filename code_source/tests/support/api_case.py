@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from support.fake_firestore import FirestoreRepoTestCase
 
 import server
-from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from services import competition_store
 
 

@@ -11,7 +11,7 @@ from typing import List, Optional
 
 from domain import member_view
 from domain.competition_models import STATUT_CLOSE
-from infrastructure.sqlite_repository import SqliteRepository
+from infrastructure.sqlite.repository import SqliteRepository
 from services.competition_service import CompetitionService
 from services.documents import Doc
 from services.errors import NotFound

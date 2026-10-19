@@ -21,9 +21,9 @@ class TestGoogleAuthWeb(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app, raise_server_exceptions=False)
 
-    @patch("infrastructure.secret_store.SecretStore.get_secret")
-    @patch("infrastructure.google_drive_client.GoogleDriveClient.get_client_credentials")
-    @patch("infrastructure.google_drive_client.GoogleDriveClient.get_access_token")
+    @patch("infrastructure.security.secret_store.SecretStore.get_secret")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_access_token")
     def test_status_disconnected(self, mock_get_tok, mock_creds, mock_secret):
         mock_creds.return_value = (None, None)
         mock_secret.return_value = None
@@ -34,9 +34,9 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertFalse(data["valid"])
         self.assertFalse(data["configured"])
 
-    @patch("infrastructure.secret_store.SecretStore.get_secret")
-    @patch("infrastructure.google_drive_client.GoogleDriveClient.get_client_credentials")
-    @patch("infrastructure.google_drive_client.GoogleDriveClient.get_access_token")
+    @patch("infrastructure.security.secret_store.SecretStore.get_secret")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_access_token")
     def test_status_expired(self, mock_get_tok, mock_creds, mock_secret):
         mock_creds.return_value = ("mock_cid", "mock_sec")
         def fake_secret(k):
@@ -56,9 +56,9 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertTrue(data["configured"])
         self.assertIn("invalid_grant", data["error"])
 
-    @patch("infrastructure.secret_store.SecretStore.get_secret")
-    @patch("infrastructure.google_drive_client.GoogleDriveClient.get_client_credentials")
-    @patch("infrastructure.google_drive_client.GoogleDriveClient.get_access_token")
+    @patch("infrastructure.security.secret_store.SecretStore.get_secret")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_access_token")
     def test_status_connected(self, mock_get_tok, mock_creds, mock_secret):
         mock_creds.return_value = ("mock_cid", "mock_sec")
         def fake_secret(k):
@@ -78,7 +78,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertTrue(data["configured"])
         self.assertEqual(data["user_email"], "test@alj-escalade.fr")
 
-    @patch("infrastructure.google_drive_client.GoogleDriveClient.get_client_credentials")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
     def test_login_redirects_to_google(self, mock_creds):
         mock_creds.return_value = ("client_id_test.apps.googleusercontent.com", "secret_test")
         resp = self.client.get("/api/auth/google/login?return_to=/bureau/outils", follow_redirects=False)
@@ -101,11 +101,11 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Code d'autorisation manquant", resp.text)
 
-    @patch("infrastructure.cloud_database.CloudDatabase.sync")
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync")
     @patch("requests.post")
     @patch("requests.get")
-    @patch("infrastructure.secret_store.SecretStore.set_secret")
-    @patch("infrastructure.google_drive_client.GoogleDriveClient.get_client_credentials")
+    @patch("infrastructure.security.secret_store.SecretStore.set_secret")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
     def test_callback_success(self, mock_creds, mock_set_secret, mock_get, mock_post, mock_sync):
         mock_creds.return_value = ("mock_cid", "mock_sec")
 
@@ -136,8 +136,8 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertEqual(calls.get("GMAIL_REFRESH_TOKEN"), "new_refresh_token_456")
         self.assertEqual(calls.get("GMAIL_USER_EMAIL"), "club@alj-escalade.fr")
 
-    @patch("infrastructure.google_drive_client.GoogleDriveClient.get_access_token")
-    @patch("infrastructure.cloud_database.CloudDatabase.is_enabled")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_access_token")
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.is_enabled")
     @patch("requests.get")
     def test_test_endpoint_success(self, mock_get, mock_db_enabled, mock_get_tok):
         mock_get_tok.return_value = "access_token_ok"
@@ -156,11 +156,11 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertTrue(data["results"]["database"]["ok"])
         self.assertTrue(data["results"]["gmail"]["ok"])
 
-    @patch("infrastructure.cloud_database.CloudDatabase.sync")
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync")
     @patch("requests.post")
     @patch("requests.get")
-    @patch("infrastructure.secret_store.SecretStore.set_secret")
-    @patch("infrastructure.google_drive_client.GoogleDriveClient.get_client_credentials")
+    @patch("infrastructure.security.secret_store.SecretStore.set_secret")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
     def test_update_token_success(self, mock_creds, mock_set_secret, mock_get, mock_post, mock_sync):
         mock_creds.return_value = ("cid", "sec")
         post_mock = MagicMock()
@@ -184,8 +184,8 @@ class TestGoogleAuthWeb(unittest.TestCase):
     @patch("builtins.open")
     def test_get_client_credentials_prefer_web(self, mock_open, mock_glob):
         """Vérifie que prefer_web privilégie la configuration 'web' sur 'installed'."""
-        from infrastructure.google_drive_client import GoogleDriveClient
-        from infrastructure.secret_store import SecretStore
+        from infrastructure.google.drive import GoogleDriveClient
+        from infrastructure.security.secret_store import SecretStore
         mock_glob.return_value = ["fake_client_secret.json"]
         fake_data = {
             "web": {"client_id": "mock_web_cid", "client_secret": "mock_web_sec"},

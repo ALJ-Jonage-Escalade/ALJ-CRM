@@ -39,7 +39,7 @@ from domain.competition_models import (
     PAIEMENT_EN_ATTENTE,
     PAIEMENT_NON_INVITE,
 )
-from infrastructure.competition_firestore_repository import (
+from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as CompetitionRepository,
 )
 from domain import competition_matching
@@ -75,7 +75,7 @@ class FirestoreImportWorker(QThread):
         result = {"report": {}, "message": ""}
         try:
             self.progress.emit("Connexion à Firestore...", 20)
-            from infrastructure.firestore_sync import FirestoreSyncService
+            from infrastructure.firestore.sync import FirestoreSyncService
             self.progress.emit("Import de l'ancienne base (fusion, sans écrasement)...", 60)
             report = FirestoreSyncService.import_sqlite_into_firestore()
             result["report"] = report
@@ -118,7 +118,7 @@ class AnnualHelloAssoSyncWorker(QThread):
                 return
 
             self.progress.emit("Connexion à l'API HelloAsso...", 30)
-            from helloasso_api import get_items
+            from infrastructure.helloasso.api import get_items
             items = get_items(ident["form_type"], ident["slug"]) or []
             summarized = competition_matching.summarize_items(items)
 
@@ -1373,7 +1373,7 @@ class CompetitionsPage(QWidget):
         # U11-U13…) ; les tarifs non rapprochés vont dans la catégorie « Non identifiés ».
         planning = []
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             planning = SqliteRepository.load_planning_data(log_debug=False)
         except Exception as e:
             print(f"⚠️ [COMPETITIONS] Planning indisponible pour le regroupement : {e}")

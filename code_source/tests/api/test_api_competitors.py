@@ -5,8 +5,8 @@ from support.api_case import ApiTestCase
 from support.member_db import MemberDbTestCase
 
 from domain.member_view import COMPETITOR_FIELDS
-from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
-from infrastructure.sqlite_repository import SqliteRepository
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.sqlite.repository import SqliteRepository
 
 EMERGENCY = {
     "champ_Téléphone ": "+33612345678",

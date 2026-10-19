@@ -249,7 +249,7 @@ def main():
         
     # 4. Charger les adhérents directement depuis la base SQLite locale
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         db_path = SqliteRepository.get_db_path()
         raw_data = SqliteRepository.load_direct_data(season_filter="2026-2027")
         df_db = pd.DataFrame(raw_data)

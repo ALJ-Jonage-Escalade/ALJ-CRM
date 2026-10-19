@@ -4,7 +4,7 @@ import os
 import tempfile
 import unittest
 
-from infrastructure.sqlite_repository import SqliteRepository
+from infrastructure.sqlite.repository import SqliteRepository
 
 BASE_MEMBER = {
     "order_date": "2026-09-01T10:00:00",

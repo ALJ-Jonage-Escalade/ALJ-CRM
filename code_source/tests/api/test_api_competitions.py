@@ -5,8 +5,8 @@ from unittest.mock import patch
 from support.api_case import ApiTestCase
 
 from domain.competition_models import Competition
-from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
-from infrastructure.firestore_client import FirestoreError
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.client import FirestoreError
 
 
 class TestCompetitions(ApiTestCase):

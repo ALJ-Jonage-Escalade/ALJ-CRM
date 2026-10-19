@@ -10,8 +10,8 @@ from PySide6.QtCore import Qt, QSortFilterProxyModel, QDate, Signal, QTimer
 from PySide6.QtGui import QFont
 
 from domain.models import Member
-from infrastructure.sqlite_repository import SqliteRepository
-from infrastructure.schema_v2 import normalize_status
+from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.schema_v2 import normalize_status
 from presentation.components.member_table_model import MemberTableModel
 from presentation.components.member_detail_panel import MemberDetailPanel
 
@@ -566,7 +566,7 @@ def build_creneau_filter_blocks(members_list):
     rubrique « Autres tarifs » pour les tarifs non rattachés à un créneau.
     Les payloads sont limités aux tarifs réellement présents chez les adhérents.
     Réutilisée par les onglets Adhérents et Communications."""
-    from infrastructure.sqlite_repository import SqliteRepository
+    from infrastructure.sqlite.repository import SqliteRepository
     from domain.planning_groups import build_creneau_items, prune_empty_sections
     creneaux = SqliteRepository.load_creneaux_groups()
     tarifs_map = {c["groupe"]: c["tarifs"] for c in creneaux}
@@ -911,7 +911,7 @@ class MembersPage(QWidget):
         liste chargée) demande une confirmation avant enregistrement."""
         from domain.constants import get_active_season
         from domain.utils import normalize_name
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
 
         season = get_active_season()
         tarifs = SqliteRepository.get_season_tarifs(season)

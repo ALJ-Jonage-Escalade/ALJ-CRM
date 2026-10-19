@@ -8,7 +8,7 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.sqlite_repository import SqliteRepository
+from infrastructure.sqlite.repository import SqliteRepository
 
 try:
     from PySide6.QtCore import Qt
@@ -85,7 +85,7 @@ class TestMemberEmailShortcut(unittest.TestCase):
     def test_communications_focus_on_member_filters_list(self):
         """focus_on_member remplit la recherche avec le nom et ne laisse visible que la personne."""
         from presentation.pages.communications import CommunicationsPage
-        from infrastructure.sqlite_repository import SqliteRepository as Repo
+        from infrastructure.sqlite.repository import SqliteRepository as Repo
 
         base_member = {
             "order_ref": "99999",

@@ -2,7 +2,7 @@
 Fake HelloAsso API v5 for the e2e tests: the server reaches it through HELLOASSO_API_BASE_URL /
 HELLOASSO_OAUTH_URL (honoured in dev mode only, see infrastructure/runtime_env.py).
 
-Serves the endpoints used by src/helloasso_api.py, from data each test loads with
+Serves the endpoints used by src/infrastructure/helloasso/api.py, from data each test loads with
 PUT /_e2e/state {"forms": [...], "items": [...]} (HelloAsso v5 item objects). The response shapes
 follow the real API (data + pagination, amounts in cents).
 
@@ -15,7 +15,7 @@ _state = {"forms": [], "items": []}
 
 
 def _page(data: list) -> dict:
-    # No continuation token: helloasso_api.fetch_all_pages stops after this page
+    # No continuation token: infrastructure.helloasso.api.fetch_all_pages stops after this page
     return {"data": data, "pagination": {"pageSize": 100, "totalCount": len(data), "pageIndex": 1}}
 
 

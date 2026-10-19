@@ -9,7 +9,7 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.sqlite_repository import SqliteRepository
+from infrastructure.sqlite.repository import SqliteRepository
 
 try:
     from PySide6.QtWidgets import QApplication, QDialog

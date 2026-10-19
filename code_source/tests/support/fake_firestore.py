@@ -3,9 +3,9 @@
 import unittest
 from unittest.mock import patch
 
-from infrastructure.firestore_client import FirestoreClient
-from infrastructure import firestore_client as fc
-from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.client import FirestoreClient
+from infrastructure.firestore import client as fc
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 
 
 class FakeFirestore:

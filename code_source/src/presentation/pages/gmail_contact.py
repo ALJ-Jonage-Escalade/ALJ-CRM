@@ -280,7 +280,7 @@ class GmailContactPage(QWidget):
         """Charge les groupes de créneaux depuis la table planning de la BDD,
         avec compteurs d'adhérents calculés depuis les tarifs HelloAsso mappés."""
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             from domain.constants import get_active_season
             SqliteRepository.setup_database()
             members = SqliteRepository.load_direct_data(season_filter=get_active_season())

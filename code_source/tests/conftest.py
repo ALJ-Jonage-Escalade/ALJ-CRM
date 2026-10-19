@@ -38,5 +38,5 @@ def _test_client_host(monkeypatch):
     src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
     if src not in sys.path:
         sys.path.insert(0, src)
-    from infrastructure import api_auth
+    from infrastructure.security import api_auth
     monkeypatch.setattr(api_auth, "LOCAL_HOSTS", api_auth.LOCAL_HOSTS | {"testserver"})

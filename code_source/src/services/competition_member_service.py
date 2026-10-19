@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import List
 
-from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from services.competition_store import storage
 from services.documents import Doc
 

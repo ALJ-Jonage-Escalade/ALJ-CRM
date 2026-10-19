@@ -1,0 +1,2186 @@
+from __future__ import annotations
+import os
+import sqlite3
+import datetime
+import pandas as pd
+import json
+from typing import Iterable, Optional, Tuple, List, Dict
+from paths import CODE_ROOT, ROOT_DIR, DATA_ROOT, LEGACY_DB_PATH
+from domain.constants import CORRECTIVE_MAP
+from infrastructure.sqlite import schema_v2
+
+EXTRA_COLUMNS = {
+    "is_modified": "TEXT DEFAULT 'Non'",
+    "commentaires_correctif": "TEXT DEFAULT ''",
+    "badge_rouge": "TEXT DEFAULT 'Non'",
+    "autonomie_bloc": "TEXT DEFAULT 'Non'",
+    "raw_passports": "TEXT DEFAULT ''",
+    "raw_diplomas": "TEXT DEFAULT ''",
+    "parental_auth_autonomous": "TEXT DEFAULT 'Non'", # Nouveau !
+    "parental_auth_family": "TEXT DEFAULT 'Non'",     # Nouveau !
+}
+
+# Phase 0 — Versionnement du schéma (PRAGMA user_version) :
+#   1 = schéma legacy (adherents / adherents_seasons)
+#   2 = schéma cible (users / orders / purchases / purchase_options, voir infrastructure/sqlite/migrations/migrate_schema_v2.py)
+SCHEMA_VERSION = 1
+
+# Adresse d'expédition par défaut des e-mails de la Communication (choisissable/sauvegardable dans l'IHM)
+DEFAULT_SENDER_EMAIL = "inscription@alj-escalade.fr"
+
+# Nom d'affichage de l'expéditeur (visible dans la colonne « De » des messageries)
+DEFAULT_SENDER_NAME = "Amicale Laïque Jonage - Inscriptions"
+
+# Phase 2 - vue de compatibilite : definie dans infrastructure/sqlite/schema_v2.py (COMPAT_VIEW_SQL)
+
+class SqliteRepository:
+    """
+    Gère la persistance locale ultra-légère dans une base de données SQLite des adhérents.
+    """
+    _db_path = os.path.join(DATA_ROOT, "database.db")
+    _db_path_overridden = False  # True dès que set_db_path() est appelé (tests, snapshot)
+    _database_setup_done = False
+    _startup_db_hash = None
+
+    @classmethod
+    def get_db_path(cls) -> str:
+        return cls._db_path
+
+    @classmethod
+    def set_db_path(cls, path: str):
+        cls._db_path = path
+        cls._db_path_overridden = True
+        cls._database_setup_done = False
+        cls._startup_db_hash = None
+
+    @classmethod
+    def _migrate_legacy_db_if_needed(cls):
+        """Premier démarrage après le déplacement du cache SQLite : si la base n'existe
+        pas encore dans data/ mais qu'elle est présente à l'ancien emplacement (racine
+        du projet), la copier (avec ses fichiers WAL) pour ne perdre aucune donnée.
+        Ignorée quand un chemin personnalisé est actif (tests, snapshots)."""
+        if cls._db_path_overridden or os.path.exists(cls._db_path) or not os.path.exists(LEGACY_DB_PATH):
+            return
+        try:
+            os.makedirs(os.path.dirname(cls._db_path), exist_ok=True)
+            for suffix in ("", "-wal", "-shm"):
+                src = LEGACY_DB_PATH + suffix
+                if os.path.exists(src):
+                    import shutil
+                    shutil.copy2(src, cls._db_path + suffix)
+            print(f"📦 [SQLITE] Cache local migré automatiquement : {LEGACY_DB_PATH} -> {cls._db_path}")
+        except Exception as me:
+            print(f"⚠️ [SQLITE] Échec de la migration du cache local depuis {LEGACY_DB_PATH} : {me}")
+
+    @classmethod
+    def get_file_hash(cls) -> str:
+        """Calcule le hash SHA-256 du fichier de base de données SQLite courant."""
+        import hashlib
+        if not os.path.exists(cls._db_path):
+            return ""
+        sha = hashlib.sha256()
+        try:
+            with open(cls._db_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha.update(chunk)
+            return sha.hexdigest()
+        except Exception:
+            return ""
+
+    @classmethod
+    def get_connection(cls):
+        conn = sqlite3.connect(cls._db_path, timeout=30.0)
+        conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.OperationalError:
+            pass
+        # Les lignes écrasées par INSERT OR REPLACE déclenchent aussi les
+        # déclencheurs de suppression (suivi des modifications pour Firestore).
+        conn.execute("PRAGMA recursive_triggers=ON")
+        return conn
+
+    @classmethod
+    def setup_database(cls, force: bool = False):
+        """Initialise la base de données et crée les tables requises."""
+        if not force and cls._database_setup_done:
+            return
+        cls._migrate_legacy_db_if_needed()
+        print(f"🔧 [SQLITE] Initialisation de la BDD à l'emplacement : {cls._db_path}")
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+
+        # Phase 5 — schéma v2 natif : users / orders / purchases / purchase_options
+        # (les tables legacy adherents / adherents_seasons ne sont plus créées)
+        schema_v2.ensure_v2_schema(cursor)
+
+        # Création des tables de saisons
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS seasons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            is_active INTEGER DEFAULT 0
+        );
+        """)
+
+        # Insérer les saisons par défaut
+        cursor.execute("INSERT OR IGNORE INTO seasons (name, is_active) VALUES ('2025-2026', 0)")
+        cursor.execute("INSERT OR IGNORE INTO seasons (name, is_active) VALUES ('2026-2027', 1)")
+        
+        # Création de la table de cache géocodage
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS geocache (
+            address TEXT PRIMARY KEY,
+            lat REAL,
+            lon REAL
+        );
+        """)
+
+        # Création de la table de planning
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS planning (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            groupe TEXT NOT NULL,
+            type TEXT,
+            categorie_age TEXT,
+            whatsapp_link TEXT,
+            jour TEXT,
+            horaires TEXT,
+            encadrants TEXT,
+            helloasso_tarifs TEXT DEFAULT '[]',
+            naissance_min TEXT DEFAULT '',
+            naissance_max TEXT DEFAULT ''
+        );
+        """)
+        
+        # S'assurer de la présence de la colonne helloasso_tarifs pour les BDD existantes (migration auto)
+        try:
+            cursor.execute("SELECT helloasso_tarifs FROM planning LIMIT 1")
+        except sqlite3.OperationalError:
+            print("🔧 [SQLITE] Ajout de la colonne 'helloasso_tarifs' à la table planning...")
+            cursor.execute("ALTER TABLE planning ADD COLUMN helloasso_tarifs TEXT DEFAULT '[]'")
+            conn.commit()
+
+        # S'assurer de la présence des bornes de date de naissance par groupe (migration auto)
+        # Utilisées pour le contrôle d'âge : un adulte (18 ans révolus au 01/09) ne peut pas
+        # souscrire à un groupe enfants / collège / lycée, et l'année de naissance doit
+        # correspondre aux années du tarif HelloAsso (ex : « jeunes nés en 2011, 2012... »).
+        for _dob_col in ("naissance_min", "naissance_max"):
+            try:
+                cursor.execute(f"SELECT {_dob_col} FROM planning LIMIT 1")
+            except sqlite3.OperationalError:
+                print(f"🔧 [SQLITE] Ajout de la colonne '{_dob_col}' à la table planning...")
+                cursor.execute(f"ALTER TABLE planning ADD COLUMN {_dob_col} TEXT DEFAULT ''")
+                conn.commit()
+        
+        # S'assurer de la présence de la colonne document_sante (Document de santé FFME)
+        # pour les BDD existantes (migration auto). Information associée à une personne
+        # pour une saison donnée : stockée au niveau de l'achat (purchases).
+        try:
+            cursor.execute("SELECT document_sante FROM purchases LIMIT 1")
+        except sqlite3.OperationalError:
+            print("🔧 [SQLITE] Ajout de la colonne 'document_sante' à la table purchases...")
+            cursor.execute("ALTER TABLE purchases ADD COLUMN document_sante TEXT DEFAULT ''")
+            conn.commit()
+
+        # Création de la table de templates d'email (Nouveau !)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            subject TEXT NOT NULL,
+            body TEXT NOT NULL,
+            sender_email TEXT DEFAULT '',
+            sender_name TEXT DEFAULT ''
+        );
+        """)
+
+        # S'assurer de la présence de la colonne sender_email (adresse d'expédition) pour les BDD existantes (migration auto)
+        try:
+            cursor.execute("SELECT sender_email FROM email_templates LIMIT 1")
+        except sqlite3.OperationalError:
+            print("🔧 [SQLITE] Ajout de la colonne 'sender_email' à la table email_templates...")
+            cursor.execute("ALTER TABLE email_templates ADD COLUMN sender_email TEXT DEFAULT ''")
+            conn.commit()
+
+        # S'assurer de la présence de la colonne sender_name (nom d'affichage de l'expéditeur) pour les BDD existantes (migration auto)
+        try:
+            cursor.execute("SELECT sender_name FROM email_templates LIMIT 1")
+        except sqlite3.OperationalError:
+            print("🔧 [SQLITE] Ajout de la colonne 'sender_name' à la table email_templates...")
+            cursor.execute("ALTER TABLE email_templates ADD COLUMN sender_name TEXT DEFAULT ''")
+            conn.commit()
+
+        # Renseigner l'adresse d'expédition par défaut sur les modèles qui n'en ont pas encore
+        cursor.execute("SELECT COUNT(*) FROM email_templates WHERE sender_email IS NULL OR TRIM(sender_email) = ''")
+        if cursor.fetchone()[0] > 0:
+            cursor.execute("UPDATE email_templates SET sender_email = ? WHERE sender_email IS NULL OR TRIM(sender_email) = ''", (DEFAULT_SENDER_EMAIL,))
+            conn.commit()
+
+        # Renseigner le nom d'affichage par défaut sur les modèles qui n'en ont pas encore
+        cursor.execute("SELECT COUNT(*) FROM email_templates WHERE sender_name IS NULL OR TRIM(sender_name) = ''")
+        if cursor.fetchone()[0] > 0:
+            cursor.execute("UPDATE email_templates SET sender_name = ? WHERE sender_name IS NULL OR TRIM(sender_name) = ''", (DEFAULT_SENDER_NAME,))
+            conn.commit()
+
+        # Seed des templates par défaut si vides (Nouveau !)
+        cursor.execute("SELECT COUNT(*) FROM email_templates")
+        cnt_tmpl = cursor.fetchone()[0]
+        if cnt_tmpl == 0:
+            default_templates = [
+                ("Attestation standard", "Attestation de paiement escalade - Amicale Laïque de Jonage",
+                 "Bonjour {first_name},\n\nNous avons le plaisir de vous transmettre en pièce jointe l'attestation de paiement pour votre adhésion ou celle de votre enfant à la section escalade de l'Amicale Laïque de Jonage pour la saison.\n\nSportivement,\nL'équipe ALJ Escalade",
+                 DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME),
+                ("Relance inscription", "Rappel : Finalisation de votre inscription ALJ Escalade",
+                 "Bonjour {first_name},\n\nSauf erreur de notre part, il nous manque encore certains éléments pour finaliser votre dossier d'adhésion pour la saison.\nNous vous invitons à vous connecter sur votre espace licencié pour vérifier le statut de votre certificat médical.\n\nSportivement,\nL'équipe ALJ Escalade",
+                 DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME)
+            ]
+            cursor.executemany("""
+                INSERT INTO email_templates (name, subject, body, sender_email, sender_name) VALUES (?, ?, ?, ?, ?)
+            """, default_templates)
+            conn.commit()
+
+        # S'assurer de la présence du modèle d'email "Attestation échéance" (Nouveau !)
+        try:
+            cursor.execute("SELECT COUNT(*) FROM email_templates WHERE name = 'Attestation échéance' OR name = 'Attestation echéance' OR name = 'Attestation echeance'")
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("""
+                    INSERT INTO email_templates (name, subject, body, sender_email, sender_name)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    "Attestation échéance",
+                    "Attestation de paiement et d'échéance - Amicale Laïque de Jonage",
+                    "Bonjour {first_name},\n\nNous avons le plaisir de vous transmettre en pièce jointe l'attestation de paiement pour votre adhésion ou celle de votre enfant à la section escalade de l'Amicale Laïque de Jonage.\n\nSportivement,\nL'équipe ALJ Escalade",
+                    DEFAULT_SENDER_EMAIL,
+                    DEFAULT_SENDER_NAME
+                ))
+                conn.commit()
+        except Exception as e:
+            print(f"⚠️ [SQLITE] Impossible de s'assurer de la présence du modèle d'email 'Attestation échéance' : {e}")
+
+        # S'assurer de la présence des modèles d'e-mails de compétition
+        comp_templates = [
+            (
+                "Compétition - 1er Inscription",
+                "[ALJ] Inscription Compétition {name_competition} du {date_competition}",
+                "Bonjour,\nComme {first_name} l'a vu avec son entraineur, notre équipe encadrante lui propose de participer à la prochaine compétition d'escalade {name_competition} !\nCette compétition se déroule à la date du : {date_competition}.\nAfin de finaliser et régulariser son inscription, nous vous invitons à effectuer le règlement via notre page HelloAsso.\nVoici la démarche à suivre :\nRendez-vous sur le site HelloAsso <a href=\"https://www.helloasso.com/associations/amicale-laique-de-jonage/evenements/regularisation-inscription-competiteurs-2026-2027\">helloasso.com/</a>\n1- Procédez au règlement d'un montant de {montant_competition} €.\n2- Indiquer le nom de la compétition {name_competition}\n3- Indiquez le numéro de la compétition : {no_competition}\n4- Saisissez le numéro de licence de votre enfant : {num_licence}\n\n{bloc_whatsapp}\n\nMerci de réaliser cette démarche dans les meilleurs délais afin que l'inscription de votre enfant soit validée à temps auprès des organisateurs.\nSi vous rencontrez le moindre problème ou si vous avez des questions, n'hésitez pas à nous contacter en répondant à ce message.\nSportivement,\nL'équipe d'encadrement",
+                DEFAULT_SENDER_EMAIL,
+                DEFAULT_SENDER_NAME
+            ),
+            (
+                "Compétition - relance",
+                "[ALJ] Inscription Compétition {name_competition} du {date_competition} [Relance]",
+                "Bonjour,\nComme {first_name} l'a vu avec son entraineur, notre équipe encadrante lui propose de participer à la prochaine compétition d'escalade {name_competition} !\nCette compétition se déroule à la date du : {date_competition}.\nAfin de finaliser et régulariser son inscription, nous vous invitons à effectuer le règlement via notre page HelloAsso.\nVoici la démarche à suivre :\nRendez-vous sur le site HelloAsso <a href=\"https://www.helloasso.com/associations/amicale-laique-de-jonage/evenements/regularisation-inscription-competiteurs-2026-2027\">helloasso.com/</a>\n1- Procédez au règlement d'un montant de {montant_competition} €.\n2- Indiquer le nom de la compétition {name_competition}\n3- Indiquez le numéro de la compétition : {no_competition}\n4- Saisissez le numéro de licence de votre enfant : {num_licence}\n\n{bloc_whatsapp}\n\nMerci de réaliser cette démarche dans les meilleurs délais afin que l'inscription de votre enfant soit validée à temps auprès des organisateurs.\nSi vous rencontrez le moindre problème ou si vous avez des questions, n'hésitez pas à nous contacter en répondant à ce message.\n\nSportivement,\nL'équipe d'encadrement",
+                DEFAULT_SENDER_EMAIL,
+                DEFAULT_SENDER_NAME
+            )
+        ]
+        for cname, csubj, cbody, cmail, cnom in comp_templates:
+            try:
+                cursor.execute("SELECT COUNT(*) FROM email_templates WHERE name = ?", (cname,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("""
+                        INSERT INTO email_templates (name, subject, body, sender_email, sender_name)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (cname, csubj, cbody, cmail, cnom))
+                    conn.commit()
+            except Exception as e:
+                print(f"⚠️ [SQLITE] Impossible d'assurer la présence du modèle '{cname}' : {e}")
+        
+        # Création de la table de réglages applicatifs (clé/valeur) : texte WhatsApp, etc. (Nouveau !)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """)
+        
+        # Phase 0/5 — Gestion de la version du schéma (PRAGMA user_version)
+        cursor.execute("PRAGMA user_version")
+        current_version = cursor.fetchone()[0]
+        if current_version == 1:
+            # Ancienne base legacy (v1) : auto-migration vers v2 au démarrage.
+            # Le drapeau est posé avant l'appel pour éviter toute récursion (migrate
+            # appelle setup_database lui-même).
+            cls._database_setup_done = True
+            conn.commit()
+            conn.close()
+            print("🔁 [SQLITE] Base legacy (v1) détectée : lancement de la migration v2...")
+            from infrastructure.sqlite.migrations import migrate_schema_v2
+            migrate_schema_v2.migrate(skip_excel=False)
+            if cls._startup_db_hash is None:
+                cls._startup_db_hash = cls.get_file_hash()
+            return
+        if current_version == 0:
+            cursor.execute(f"PRAGMA user_version = {schema_v2.SCHEMA_TARGET_VERSION}")
+            print(f"🔖 [SQLITE] Base neuve taguée en version {schema_v2.SCHEMA_TARGET_VERSION} (schéma v2 natif).")
+        # Vue de compatibilité : recréée à chaque démarrage pour suivre la définition du code
+        schema_v2.recreate_compat_view(cursor)
+        print("🔗 [SQLITE] Vue de compatibilité v_adherents_legacy vérifiée.")
+
+        # Harmonisation du genre (Femme / Homme) dans la table users
+        try:
+            cursor.execute("""
+                UPDATE users
+                SET gender = 'Femme'
+                WHERE LOWER(TRIM(gender)) IN ('f', 'femme', 'féminin', 'feminin')
+            """)
+            cursor.execute("""
+                UPDATE users
+                SET gender = 'Homme'
+                WHERE LOWER(TRIM(gender)) IN ('h', 'm', 'homme', 'masculin')
+            """)
+        except Exception:
+            pass
+
+        conn.commit()
+        conn.close()
+        print("✅ [SQLITE] Initialisation et vérification du schéma d'adhérents accomplies.")
+        
+        # Tenter la migration du JSON s'il existe
+        cls.migrate_json_geocache()
+        cls.migrate_json_planning()
+        
+        cls._database_setup_done = True
+        
+        # Enregistrer le hash initial après la première initialisation de la BDD
+        if cls._startup_db_hash is None:
+            cls._startup_db_hash = cls.get_file_hash()
+
+    @classmethod
+    def get_geocache(cls) -> dict:
+        """Récupère tout le cache géocodage sous forme de dictionnaire {adresse: [lat, lon]}."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT address, lat, lon FROM geocache")
+            rows = cursor.fetchall()
+            return {row["address"]: [row["lat"], row["lon"]] for row in rows}
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors du chargement du geocache : {e}")
+            return {}
+        finally:
+            conn.close()
+
+    @classmethod
+    def save_geocode(cls, address: str, lat: float, lon: float):
+        """Sauvegarde ou met à jour les coordonnées d'une adresse dans la table de cache."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO geocache (address, lat, lon)
+                VALUES (?, ?, ?)
+                ON CONFLICT(address) DO UPDATE SET
+                    lat = excluded.lat,
+                    lon = excluded.lon
+            """, (address, lat, lon))
+            conn.commit()
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de la sauvegarde du géocodage de '{address}' : {e}")
+            conn.rollback()
+        finally:
+            conn.close()
+
+    @classmethod
+    def migrate_json_geocache(cls):
+        """Migre les données du fichier historique doc/geo_cache.json vers la table geocache."""
+        json_path = os.path.join(ROOT_DIR, "doc", "geo_cache.json")
+        if not os.path.exists(json_path):
+            # Essayer aussi dans CODE_ROOT / "doc"
+            json_path = os.path.join(CODE_ROOT, "doc", "geo_cache.json")
+            if not os.path.exists(json_path):
+                # Essayer directement dans ROOT_DIR
+                json_path = os.path.join(ROOT_DIR, "geo_cache.json")
+                if not os.path.exists(json_path):
+                    return
+
+        # Vérifier si la table est déjà peuplée pour éviter une migration inutile
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT COUNT(*) as cnt FROM geocache")
+            count = cursor.fetchone()["cnt"]
+            if count > 0:
+                return # Déjà migré ou déjà peuplé
+        except Exception:
+            return
+        finally:
+            conn.close()
+
+        print(f"📦 [SQLITE] Migration du cache géographique historique depuis {json_path}...")
+        conn = None
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            conn = cls.get_connection()
+            cursor = conn.cursor()
+            inserted = 0
+            for addr, coords in data.items():
+                if isinstance(coords, list) and len(coords) == 2:
+                    lat, lon = coords[0], coords[1]
+                    cursor.execute("""
+                        INSERT INTO geocache (address, lat, lon)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(address) DO UPDATE SET lat=excluded.lat, lon=excluded.lon
+                    """, (addr, lat, lon))
+                    inserted += 1
+            conn.commit()
+            print(f"✅ [SQLITE] Migration réussie de {inserted} adresses géocodées.")
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de la migration du fichier json geocache : {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    @classmethod
+    def create_db_backup(cls):
+        """Crée une sauvegarde de sécurité horodatée de la base de données dans archive/db avec rétention de 10 jours (Nouveau !)."""
+        import glob
+        import datetime
+        import time
+        
+        db_path = cls.get_db_path()
+        if not os.path.exists(db_path):
+            return
+            
+        backup_dir = os.path.join(ROOT_DIR, "archive", "db")
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Éviter de sur-sauvegarder si la base n'a pas changé ou si la dernière sauvegarde a moins de 5 secondes
+        backups = glob.glob(os.path.join(backup_dir, "database_backup_*.db"))
+        if backups:
+            backups.sort(key=os.path.getmtime, reverse=True)
+            latest_backup = backups[0]
+            # Si la base de données n'a pas été modifiée depuis le dernier backup, on ignore la sauvegarde
+            if os.path.getmtime(db_path) <= os.path.getmtime(latest_backup):
+                return
+            if time.time() - os.path.getmtime(latest_backup) < 5:
+                return
+        
+        now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = os.path.join(backup_dir, f"database_backup_{now_str}.db")
+
+        try:
+            # API backup SQLite : snapshot cohérent (inclut le journal WAL), contrairement
+            # à une copie fichier brute qui peut capturer un état incohérent.
+            src_conn = cls.get_connection()
+            dst_conn = sqlite3.connect(backup_path)
+            src_conn.backup(dst_conn)
+            dst_conn.close()
+            src_conn.close()
+            print(f"💾 [SQLITE] Sauvegarde de BDD créée : {os.path.basename(backup_path)}")
+            
+            # Gérer la rétention : conserver toutes les sauvegardes des 10 derniers jours (Nouveau !)
+            backups = glob.glob(os.path.join(backup_dir, "database_backup_*.db"))
+            cutoff_date = datetime.datetime.now() - datetime.timedelta(days=10)
+            
+            for bk in backups:
+                try:
+                    mtime = os.path.getmtime(bk)
+                    file_date = datetime.datetime.fromtimestamp(mtime)
+                    if file_date < cutoff_date:
+                        os.remove(bk)
+                        print(f"🗑️ [SQLITE] Sauvegarde BDD expirée (>10 jours) purgée : {os.path.basename(bk)}")
+                except Exception as pe:
+                    print(f"⚠️ [SQLITE] Impossible de purger l'ancien backup {bk} : {pe}")
+                    
+        except Exception as e:
+            print(f"⚠️ [SQLITE] Impossible de créer la sauvegarde de BDD : {e}")
+
+    @classmethod
+    def load_direct_data(cls, season_filter: str = "2026-2027") -> list:
+        """
+        Charge les données d'adhérents depuis la vue de compatibilité (schéma v2)
+        pour une saison spécifique ou un filtre comparatif.
+        """
+        # Résolution pour la rétrocompatibilité (si un chemin de fichier Excel .xlsx est passé)
+        if isinstance(season_filter, str) and (season_filter.endswith(".xlsx") or "\\" in season_filter or "/" in season_filter):
+            season_filter = "2026-2027" # Par défaut
+
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            return cls._load_data_from_compat_view(conn, season_filter)
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors du chargement des données : {e}")
+            return []
+        finally:
+            conn.close()
+
+    @classmethod
+    def _load_data_from_compat_view(cls, conn, season_filter: str) -> list:
+        """Phase 2 — Chargement via v_adherents_legacy (schéma cible v2). Mêmes clés que le chemin legacy."""
+        cursor = conn.cursor()
+        if season_filter in ("Tous", "Toutes les saisons", "Toutes les saisons confondues"):
+            cursor.execute('SELECT * FROM v_adherents_legacy ORDER BY "id" DESC')
+        elif season_filter in ("Non réinscrits", "Anciens (25-26) non réinscrits en 26-27", "Anciens non réinscrits (Présents en 25/26 mais pas en 26/27)"):
+            cursor.execute("""
+                SELECT * FROM v_adherents_legacy
+                WHERE season_name = '2025-2026'
+                  AND "user_id" NOT IN (
+                      SELECT "user_id" FROM v_adherents_legacy WHERE season_name = '2026-2027'
+                  )
+                ORDER BY "id" DESC
+            """)
+        else:
+            cursor.execute('SELECT * FROM v_adherents_legacy WHERE season_name = ? ORDER BY "id" DESC', (season_filter,))
+
+        rows = cursor.fetchall()
+        participants_data = []
+        for row in rows:
+            row_dict = dict(row)
+            # Supprimer le champ d'identifiant interne (comme le chemin legacy)
+            row_dict.pop("id", None)
+            participants_data.append(row_dict)
+        return participants_data
+
+    @classmethod
+    def get_members(cls, season_filter: str = "2026-2027") -> list:
+        """
+        Phase 4 — Lecture typée canonique : retourne des objets Member construits
+        depuis la lecture bilingue (vue de compatibilité + Member.from_dict).
+        API recommandée pour les nouveaux consommateurs.
+        """
+        from domain.models import Member
+        return [Member.from_dict(row) for row in cls.load_direct_data(season_filter=season_filter)]
+
+    @classmethod
+    def list_seasons(cls) -> list:
+        """Seasons as [{name, is_active}], most recent first."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            rows = conn.execute("SELECT name, is_active FROM seasons WHERE name IS NOT NULL AND name != ''"
+                                " ORDER BY name DESC").fetchall()
+            return [{"name": r["name"], "is_active": bool(r["is_active"])} for r in rows]
+        finally:
+            conn.close()
+
+    # One row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), the fields of the web member pages
+    _MEMBER_ROWS_SQL = """
+        SELECT u.id AS user_id, p.id AS purchase_id,
+               u.last_name, u.first_name, u.birth_date, u.gender,
+               u.address, u.zip_code, u.city, u.phone, u.email_primary, u.email_secondary,
+               u.emergency1_name, u.emergency1_phone, u.emergency2_name, u.emergency2_phone,
+               u.licence_ffme, u.health_commitment, u.photo_auth, u.badge_rouge, u.autonomie_bloc,
+               u.raw_passports, u.raw_diplomas,
+               o.payer_first_name, o.payer_last_name, o.payer_email, o.order_ref, o.order_date,
+               p.tarif_name, p.amount, p.status, p.document_sante, p.email_sent_date,
+               p.commentaires_correctif,
+               s.name AS season_name
+        FROM purchases p
+        JOIN users u ON u.id = p.user_id
+        JOIN orders o ON o.id = p.order_id
+        JOIN seasons s ON s.id = o.season_id
+    """
+
+    @classmethod
+    def _query_member_rows(cls, where: str, params: tuple) -> list:
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            return [dict(r) for r in conn.execute(f"{cls._MEMBER_ROWS_SQL} WHERE {where}", params).fetchall()]
+        finally:
+            conn.close()
+
+    @classmethod
+    def list_member_rows(cls, season_name: str) -> list:
+        """One row per purchase of the season (users ⨝ orders ⨝ purchases), with the fields of
+        the web member pages. Unlike v_adherents_legacy, carries `purchase_id` (needed by
+        /api/members/update) and skips the insurance-option subqueries."""
+        return cls._query_member_rows("s.name = ?", (season_name,))
+
+    @classmethod
+    def list_member_rows_of_users(cls, user_ids: Iterable[int]) -> list:
+        """Rows of list_member_rows for these users only, every season."""
+        ids = tuple(user_ids)
+        if not ids:
+            return []
+        return cls._query_member_rows(f"u.id IN ({', '.join('?' * len(ids))})", ids)
+
+    @classmethod
+    def export_to_excel(cls, file_path: str) -> bool:
+        """
+        Phase 9 — Exporte les adhérents de la saison active vers un fichier Excel,
+        via Member.to_dict() (adaptateur vers le format colonnes historique).
+        """
+        cls.setup_database()
+        members = cls.get_members(season_filter="2026-2027")
+
+        excel_rows = []
+        for m in members:
+            d = m.to_dict()
+            excel_row = {}
+            # Reconstituer toutes les colonnes d'origine de CORRECTIVE_MAP
+            for excel_col, cache_key in CORRECTIVE_MAP.items():
+                excel_row[excel_col] = d.get(cache_key, "")
+
+            # Ajouter les colonnes supplémentaires indispensables
+            for col_key in EXTRA_COLUMNS.keys():
+                excel_row[col_key] = d.get(col_key, "")
+
+            excel_rows.append(excel_row)
+
+        try:
+            df = pd.DataFrame(excel_rows)
+            # S'assurer que le dossier parent existe
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            from exports.spreadsheet_safety import safe_to_excel
+            safe_to_excel(df, file_path, index=False)  # member data must never become a formula
+            print(f"💾 [SQLITE] Base de données exportée avec succès vers Excel : {file_path}")
+            return True
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de l'exportation de la base de données vers Excel : {e}")
+            return False
+
+    @classmethod
+    def upsert_members(cls, members: list, season_name: str = "2026-2027") -> int:
+        """
+        Phase 5 - Insere ou met a jour un lot d'adherents dans le schema v2
+        (users / orders / purchases / purchase_options).
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        inserted_count = 0
+        try:
+            cursor = conn.cursor()
+            stats = schema_v2.sync_members_to_v2(cursor, members, season_name)
+            inserted_count = stats["purchases"]
+            conn.commit()
+            print(f"[SQLITE] Synchro reussie : {inserted_count} adhesions enregistrees/mises a jour "
+                  f"pour la saison {season_name}. (v2: {stats})")
+        except Exception as e:
+            print(f"[SQLITE] Erreur lors de l'upsert des adherents : {e}")
+            conn.rollback()
+        finally:
+            conn.close()
+        return inserted_count
+
+    @classmethod
+    def update_member_in_db(cls, original_order_ref: str, original_last_name: str, original_first_name: str, updated_fields: dict, comment_text: str):
+        """
+        Phase 5 - Met a jour un adherent dans le schema v2 :
+        champs personnels -> users, champs de saison -> purchases (avec options).
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            from domain.utils import normalize_name
+            cursor.execute("""
+                SELECT p.user_id FROM purchases p
+                JOIN orders o ON o.id = p.order_id
+                WHERE o.order_ref = ?
+            """, (original_order_ref.strip(),))
+            rows = cursor.fetchall()
+            user_id = None
+            if rows:
+                t_last = normalize_name(original_last_name)
+                t_first = normalize_name(original_first_name)
+                for r in rows:
+                    u = cursor.execute("SELECT last_name, first_name FROM users WHERE id=?", (r["user_id"],)).fetchone()
+                    if u and normalize_name(u["last_name"]) == t_last and normalize_name(u["first_name"]) == t_first:
+                        user_id = r["user_id"]
+                        break
+                if user_id is None:
+                    # Fallback famille : premier utilisateur de la commande
+                    user_id = rows[0]["user_id"]
+            if user_id is None:
+                conn.close()
+                return False, f"Aucun adherent correspondant trouve pour {original_last_name} {original_first_name}."
+            schema_v2.apply_member_update(cursor, user_id, original_order_ref, updated_fields, comment_text)
+            conn.commit()
+            print(f"[SQLITE] Adherent {original_last_name} {original_first_name} mis a jour avec succes (v2).")
+            return True, ""
+        except Exception as e:
+            print(f"[SQLITE] Erreur lors de la mise a jour de l'adherent : {e}")
+            conn.rollback()
+            return False, str(e)
+        finally:
+            conn.close()
+
+    @classmethod
+    def add_manual_member(cls, fields: dict, season_name: str = "2026-2027") -> tuple:
+        """
+        Ajoute manuellement un adhérent dans le schéma v2 (users + orders + purchases),
+        en synthétisant une commande « MANUEL-... » équivalente à une inscription HelloAsso.
+        Champs attendus : last_name, first_name, birth_date ('JJ/MM/AAAA' ou ISO), gender,
+        phone, email_primary, address, zip_code, city, tarif_name, status, amount.
+        Retourne (True, order_ref) ou (False, message d'erreur).
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            import datetime as _dt
+            from infrastructure.sqlite.schema_v2 import DOB_COLUMN
+
+            now = _dt.datetime.now()
+            order_ref = f"MANUEL-{now.strftime('%Y%m%d-%H%M%S')}"
+            payer_email = str(fields.get("email_primary") or "").strip()
+
+            rec = {
+                "order_ref": order_ref,
+                "order_date": now.strftime("%Y-%m-%d"),
+                "status": str(fields.get("status") or "Validé").strip(),
+                "tarif_name": str(fields.get("tarif_name") or "").strip(),
+                "amount": float(fields.get("amount") or 0.0),
+                "user_lastName": str(fields.get("last_name") or "").strip(),
+                "user_firstName": str(fields.get("first_name") or "").strip(),
+                DOB_COLUMN: str(fields.get("birth_date") or "").strip(),
+                "champ_Sexe": str(fields.get("gender") or "").strip(),
+                "champ_Téléphone ": str(fields.get("phone") or "").strip(),
+                "champ_Adresse mail pour la réception des informations du club": payer_email,
+                "champ_Adresse : numéro et nom de rue": str(fields.get("address") or "").strip(),
+                "champ_Code postal": str(fields.get("zip_code") or "").strip(),
+                "champ_Ville": str(fields.get("city") or "").strip(),
+                "champ_Pays": "France",
+                "payer_lastName": str(fields.get("payer_lastName") or fields.get("payer_last_name") or fields.get("last_name") or "").strip(),
+                "payer_firstName": str(fields.get("payer_firstName") or fields.get("payer_first_name") or fields.get("first_name") or "").strip(),
+                "payer_email": str(fields.get("payer_email") or payer_email).strip(),
+                "is_modified": "Non",
+            }
+
+            if "email_secondary" in fields:
+                rec["champ_Deuxième adresse mail pour la réception des informations du club"] = str(fields.get("email_secondary") or "").strip()
+            if "licence_ffme" in fields:
+                rec["champ_Numéro de Licence FFME (6 chiffres)"] = str(fields.get("licence_ffme") or "").strip()
+            if "badge_rouge" in fields:
+                rec["badge_rouge"] = str(fields.get("badge_rouge") or "Non").strip()
+            if "autonomie_bloc" in fields:
+                rec["autonomie_bloc"] = str(fields.get("autonomie_bloc") or "Non").strip()
+            if "emergency1_name" in fields:
+                rec["champ_Personne à prévenir en cas d'urgence - NOM  et PRENOM en majuscule"] = str(fields.get("emergency1_name") or "").strip()
+            if "emergency1_phone" in fields:
+                rec["champ_Personne à prévenir en cas d'urgence - Téléphone"] = str(fields.get("emergency1_phone") or "").strip()
+            comment = fields.get("commentaires_correctif") if "commentaires_correctif" in fields else fields.get("commentaire")
+            if comment is not None:
+                rec["commentaires_correctif"] = str(comment).strip()
+
+            cursor = conn.cursor()
+            stats = schema_v2.sync_members_to_v2(cursor, [rec], season_name)
+            if not stats.get("purchases"):
+                conn.rollback()
+                msg = ("Une inscription plus prioritaire existe déjà pour cet adhérent "
+                       "cette saison (statut/montant supérieurs).")
+                print(f"[SQLITE] Ajout manuel refusé : {msg}")
+                return False, msg
+            conn.commit()
+            print(f"[SQLITE] Adhérent manuel ajouté : {rec['user_lastName']} {rec['user_firstName']} "
+                  f"({order_ref}, saison {season_name}).")
+            return True, order_ref
+        except Exception as e:
+            print(f"[SQLITE] Erreur lors de l'ajout manuel de l'adherent : {e}")
+            conn.rollback()
+            return False, str(e)
+        finally:
+            conn.close()
+    @classmethod
+    def get_season_tarifs(cls, season_name: str = "2026-2027") -> list:
+        """Retourne la liste triée des tarifs HelloAsso distincts d'une saison (groupes disponibles)."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT p.tarif_name
+                FROM purchases p
+                JOIN orders o ON o.id = p.order_id
+                JOIN seasons s ON s.id = o.season_id
+                WHERE s.name = ? AND p.tarif_name IS NOT NULL AND TRIM(p.tarif_name) != ''
+                ORDER BY p.tarif_name ASC
+            """, (season_name,))
+            db_tarifs = [r["tarif_name"].strip() for r in cursor.fetchall()]
+            from domain.constants import DEFAULT_EXTRA_TARIFS
+            combined = set(db_tarifs) | set(DEFAULT_EXTRA_TARIFS)
+            return sorted(combined)
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors du chargement des tarifs de la saison {season_name} : {e}")
+            from domain.constants import DEFAULT_EXTRA_TARIFS
+            return list(DEFAULT_EXTRA_TARIFS)
+        finally:
+            conn.close()
+
+    @classmethod
+    def get_all_tarifs(cls) -> list:
+        """Sorted distinct HelloAsso tarif names across every season."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            rows = conn.execute("""
+                SELECT DISTINCT tarif_name FROM purchases
+                WHERE tarif_name IS NOT NULL AND tarif_name != ''
+                ORDER BY tarif_name ASC
+            """).fetchall()
+            return [r["tarif_name"].strip() for r in rows]
+        finally:
+            conn.close()
+
+    @classmethod
+    def list_contact_emails(cls) -> set:
+        """Every member and payer address in the database (lower-cased)."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            emails = set()
+            for sql in ("SELECT email_primary, email_secondary FROM users", "SELECT payer_email FROM orders"):
+                for row in conn.execute(sql).fetchall():
+                    emails.update(str(v).strip().lower() for v in tuple(row) if v)
+            emails.discard("")
+            return emails
+        finally:
+            conn.close()
+
+    @classmethod
+    def get_users_by_ids(cls, ids: List[int]) -> Dict[int, dict]:
+        """Contact details of the given users, keyed by id (unknown ids are omitted)."""
+        ids = list(dict.fromkeys(ids or []))
+        if not ids:
+            return {}
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            placeholders = ",".join("?" * len(ids))
+            rows = conn.execute(
+                "SELECT id, first_name, last_name, email_primary, email_secondary, phone, licence_ffme "
+                f"FROM users WHERE id IN ({placeholders})",
+                ids,
+            ).fetchall()
+            return {row["id"]: dict(row) for row in rows}
+        finally:
+            conn.close()
+
+    @classmethod
+    def correct_member_address(cls, first_name: str, last_name: str, address: str, zip_code: str,
+                               city: str, geocode: Optional[Tuple[str, float, float]] = None):
+        """Overwrite a member's address (matched by name) and optionally cache its
+        (full_address, lat, lon) geocode, in a single transaction."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            conn.execute(
+                "UPDATE users SET address = ?, zip_code = ?, city = ? "
+                "WHERE UPPER(TRIM(first_name)) = UPPER(TRIM(?)) "
+                "AND UPPER(TRIM(last_name)) = UPPER(TRIM(?))",
+                (address, zip_code, city, first_name, last_name),
+            )
+            if geocode:
+                conn.execute("""
+                    INSERT INTO geocache (address, lat, lon) VALUES (?, ?, ?)
+                    ON CONFLICT(address) DO UPDATE SET lat = excluded.lat, lon = excluded.lon
+                """, geocode)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @classmethod
+    def check_readable(cls) -> Optional[str]:
+        """None when the database file exists and can be queried, else the reason."""
+        if not os.path.exists(cls._db_path):
+            return "database file not found"
+        try:
+            conn = sqlite3.connect(cls._db_path)
+            try:
+                conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+            finally:
+                conn.close()
+            return None
+        except Exception as e:
+            return str(e)
+
+    @classmethod
+    def update_member_tarif(cls, order_ref: str, last_name: str, first_name: str, new_tarif: str):
+        """Change le tarif (groupe) d'un adhérent : met à jour purchases.tarif_name.
+
+        Retourne (succès, message_erreur).
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            from domain.utils import normalize_name
+            new_tarif_clean = str(new_tarif or "").strip()
+            if not new_tarif_clean:
+                return False, "Le nouveau tarif ne peut pas être vide."
+
+            cursor.execute("""
+                SELECT p.user_id FROM purchases p
+                JOIN orders o ON o.id = p.order_id
+                WHERE o.order_ref = ?
+            """, (str(order_ref or "").strip(),))
+            rows = cursor.fetchall()
+            user_id = None
+            t_last = normalize_name(last_name)
+            t_first = normalize_name(first_name)
+            for r in rows:
+                u = cursor.execute("SELECT last_name, first_name FROM users WHERE id=?", (r["user_id"],)).fetchone()
+                if u and normalize_name(u["last_name"]) == t_last and normalize_name(u["first_name"]) == t_first:
+                    user_id = r["user_id"]
+                    break
+            if user_id is None and rows:
+                # Fallback famille : premier utilisateur de la commande
+                user_id = rows[0]["user_id"]
+            if user_id is None:
+                return False, f"Aucun adhérent correspondant trouvé pour {last_name} {first_name}."
+
+            now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+            cursor.execute("""
+                UPDATE purchases
+                SET tarif_name = ?, is_modified = 'Oui', updated_at = ?
+                WHERE user_id = ? AND order_id IN (SELECT id FROM orders WHERE order_ref = ?)
+            """, (new_tarif_clean, now_iso, user_id, str(order_ref or "").strip()))
+            if cursor.rowcount == 0:
+                conn.rollback()
+                return False, "Aucune inscription trouvée pour cet adhérent et cette commande."
+            conn.commit()
+            print(f"[SQLITE] Tarif de {last_name} {first_name} changé en '{new_tarif_clean}' (commande {order_ref}).")
+            return True, ""
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors du changement de tarif : {e}")
+            conn.rollback()
+            return False, str(e)
+        finally:
+            conn.close()
+
+    @classmethod
+    def update_email_sent_date(cls, order_ref: str, last_name: str, first_name: str, date_str: str, purchase_id: Optional[int] = None) -> bool:
+        """Phase 5 - Met a jour la date d'envoi d'e-mail sur les achats v2 de la commande."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            if purchase_id:
+                cursor.execute("""
+                    UPDATE purchases
+                    SET email_sent_date = ?
+                    WHERE id = ?
+                """, (date_str, int(purchase_id)))
+                if cursor.rowcount > 0:
+                    conn.commit()
+                    print(f"[SQLITE] Date d'envoi d'e-mail enregistree pour l'achat #{purchase_id} : {date_str}")
+                    return True
+
+            cursor.execute("""
+                UPDATE purchases
+                SET email_sent_date = ?
+                WHERE order_id IN (SELECT id FROM orders WHERE order_ref = ?)
+                  AND user_id IN (
+                      SELECT id FROM users
+                      WHERE UPPER(TRIM(last_name)) = ? AND LOWER(TRIM(first_name)) = ?
+                  )
+            """, (date_str, str(order_ref or "").strip(),
+                  str(last_name or "").strip().upper(), str(first_name or "").strip().lower()))
+            rows_affected = cursor.rowcount
+            if rows_affected == 0 and order_ref:
+                cursor.execute("""
+                    UPDATE purchases
+                    SET email_sent_date = ?
+                    WHERE order_id IN (SELECT id FROM orders WHERE order_ref = ?)
+                """, (date_str, str(order_ref).strip()))
+                rows_affected = cursor.rowcount
+            conn.commit()
+            if rows_affected > 0:
+                print(f"[SQLITE] Date d'envoi d'e-mail enregistree pour la commande {order_ref} : {date_str}")
+                return True
+            print(f"[SQLITE] Aucun achat trouve pour la commande {order_ref} (achat #{purchase_id})")
+            return False
+        except Exception as e:
+            print(f"[SQLITE] Erreur lors de la mise a jour de la date d'envoi d'e-mail : {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    @classmethod
+    def update_member_fields(
+        cls,
+        user_id: Optional[int] = None,
+        fields: Optional[dict] = None,
+        purchase_id: Optional[int] = None,
+        order_ref: Optional[str] = None
+    ) -> Tuple[bool, str]:
+        """
+        Met à jour de manière ciblée les informations d'un adhérent :
+        - Table users : badge_rouge, autonomie_bloc, email_primary, email_secondary, phone.
+        - Table purchases : tarif_name.
+        Retourne (succès: bool, message: str).
+        """
+        if not fields:
+            return False, "Aucun champ à mettre à jour."
+
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+
+            # Résolution de user_id si absent
+            resolved_uid = user_id
+            if resolved_uid is None and purchase_id:
+                row = cursor.execute("SELECT user_id FROM purchases WHERE id = ?", (int(purchase_id),)).fetchone()
+                if row:
+                    resolved_uid = row["user_id"]
+
+            if resolved_uid is None and order_ref:
+                row = cursor.execute("""
+                    SELECT p.user_id FROM purchases p
+                    JOIN orders o ON o.id = p.order_id
+                    WHERE o.order_ref = ?
+                    LIMIT 1
+                """, (str(order_ref).strip(),)).fetchone()
+                if row:
+                    resolved_uid = row["user_id"]
+
+            # 1. Mise à jour de la table users
+            user_updates = {}
+            if "badge_rouge" in fields:
+                user_updates["badge_rouge"] = str(fields["badge_rouge"] or "Non").strip()
+            if "autonomie_bloc" in fields:
+                user_updates["autonomie_bloc"] = str(fields["autonomie_bloc"] or "Non").strip()
+            if "email_primary" in fields:
+                user_updates["email_primary"] = str(fields["email_primary"] or "").strip()
+            if "email_secondary" in fields:
+                user_updates["email_secondary"] = str(fields["email_secondary"] or "").strip()
+            if "phone" in fields:
+                user_updates["phone"] = str(fields["phone"] or "").strip()
+            if "licence_ffme" in fields:
+                user_updates["licence_ffme"] = str(fields["licence_ffme"] or "").strip()
+            if "address" in fields:
+                user_updates["address"] = str(fields["address"] or "").strip()
+            if "zip_code" in fields:
+                user_updates["zip_code"] = str(fields["zip_code"] or "").strip()
+            if "city" in fields:
+                user_updates["city"] = str(fields["city"] or "").strip()
+
+            if user_updates and resolved_uid is not None:
+                sets = [f'"{col}" = ?' for col in user_updates.keys()]
+                sets.append('updated_at = ?')
+                params = list(user_updates.values()) + [now_iso, int(resolved_uid)]
+                cursor.execute(f'UPDATE users SET {", ".join(sets)} WHERE id = ?', params)
+
+            # 2. Mise à jour de la table purchases (créneau / tarif)
+            if "tarif_name" in fields:
+                new_tarif = str(fields["tarif_name"] or "").strip()
+                if new_tarif:
+                    if purchase_id:
+                        cursor.execute("""
+                            UPDATE purchases
+                            SET tarif_name = ?, updated_at = ?, is_modified = 'Oui'
+                            WHERE id = ?
+                        """, (new_tarif, now_iso, int(purchase_id)))
+                    elif order_ref and resolved_uid:
+                        cursor.execute("""
+                            UPDATE purchases
+                            SET tarif_name = ?, updated_at = ?, is_modified = 'Oui'
+                            WHERE user_id = ? AND order_id IN (SELECT id FROM orders WHERE order_ref = ?)
+                        """, (new_tarif, now_iso, int(resolved_uid), str(order_ref).strip()))
+                    elif resolved_uid:
+                        cursor.execute("""
+                            UPDATE purchases
+                            SET tarif_name = ?, updated_at = ?, is_modified = 'Oui'
+                            WHERE user_id = ?
+                        """, (new_tarif, now_iso, int(resolved_uid)))
+
+            # 3. Mise à jour du statut de l'adhésion (purchases & orders)
+            if "status" in fields:
+                new_status = str(fields["status"] or "").strip()
+                if new_status:
+                    norm = "Validé" if new_status.lower() in ("processed", "validated", "validé", "valide") else ("Annulé" if new_status.lower() in ("annulé", "annule", "canceled", "cancelled") else new_status.title())
+                    if purchase_id:
+                        cursor.execute("""
+                            UPDATE purchases
+                            SET status = ?, status_normalized = ?, updated_at = ?, is_modified = 'Oui'
+                            WHERE id = ?
+                        """, (new_status, norm, now_iso, int(purchase_id)))
+                    elif order_ref and resolved_uid:
+                        cursor.execute("""
+                            UPDATE purchases
+                            SET status = ?, status_normalized = ?, updated_at = ?, is_modified = 'Oui'
+                            WHERE user_id = ? AND order_id IN (SELECT id FROM orders WHERE order_ref = ?)
+                        """, (new_status, norm, now_iso, int(resolved_uid), str(order_ref).strip()))
+                    elif resolved_uid:
+                        cursor.execute("""
+                            UPDATE purchases
+                            SET status = ?, status_normalized = ?, updated_at = ?, is_modified = 'Oui'
+                            WHERE user_id = ?
+                        """, (new_status, norm, now_iso, int(resolved_uid)))
+
+                    if order_ref:
+                        cursor.execute("""
+                            UPDATE orders
+                            SET status = ?, status_normalized = ?, updated_at = ?
+                            WHERE order_ref = ?
+                        """, (new_status, norm, now_iso, str(order_ref).strip()))
+                    elif purchase_id:
+                        cursor.execute("""
+                            UPDATE orders
+                            SET status = ?, status_normalized = ?, updated_at = ?
+                            WHERE id = (SELECT order_id FROM purchases WHERE id = ?)
+                        """, (new_status, norm, now_iso, int(purchase_id)))
+
+            # 4. Mise à jour des commentaires / correctifs (purchases)
+            comment_val = None
+            if "commentaires_correctif" in fields:
+                comment_val = fields["commentaires_correctif"]
+            elif "commentaire" in fields:
+                comment_val = fields["commentaire"]
+            elif "comment" in fields:
+                comment_val = fields["comment"]
+
+            if comment_val is not None:
+                new_comment = str(comment_val or "").strip()
+                if purchase_id:
+                    cursor.execute("""
+                        UPDATE purchases
+                        SET commentaires_correctif = ?, updated_at = ?, is_modified = 'Oui'
+                        WHERE id = ?
+                    """, (new_comment, now_iso, int(purchase_id)))
+                elif order_ref and resolved_uid:
+                    cursor.execute("""
+                        UPDATE purchases
+                        SET commentaires_correctif = ?, updated_at = ?, is_modified = 'Oui'
+                        WHERE user_id = ? AND order_id IN (SELECT id FROM orders WHERE order_ref = ?)
+                    """, (new_comment, now_iso, int(resolved_uid), str(order_ref).strip()))
+                elif resolved_uid:
+                    cursor.execute("""
+                        UPDATE purchases
+                        SET commentaires_correctif = ?, updated_at = ?, is_modified = 'Oui'
+                        WHERE user_id = ?
+                    """, (new_comment, now_iso, int(resolved_uid)))
+
+            conn.commit()
+            print(f"[SQLITE] Adhérent #{resolved_uid} mis à jour avec succès : {list(fields.keys())}")
+            return True, ""
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de la mise à jour de l'adhérent : {e}")
+            conn.rollback()
+            return False, str(e)
+        finally:
+            conn.close()
+    @classmethod
+    def prepare_ffme_licensees(cls, excel_path: str) -> dict:
+        """
+        Phase A de l'import FFME — lit le fichier Excel, charge les utilisateurs et
+        applique le rapprochement automatique (N° de licence puis Nom/Prénom).
+        Ne modifie PAS la base. Retourne :
+          {
+            "updates":   [(match_type, licence, passeports, diplomas, document_sante, user_id), ...],
+            "unmatched": [{"nom", "prenom", "licence", "birth_date", "passeports", "diplomes",
+                           "document_sante"}, ...],
+            "users":     [{"id", "last_name", "first_name", "licence_ffme", "birth_date"}, ...],
+            "stats":     {"total_processed", "matched_by_licence", "matched_by_name", "errors"},
+          }
+        """
+        import pandas as pd
+        from domain.utils import normalize_name
+
+        prep = {"updates": [], "unmatched": [], "users": [],
+                "stats": {"total_processed": 0, "matched_by_licence": 0,
+                          "matched_by_name": 0, "errors": []}}
+        stats = prep["stats"]
+
+        if not os.path.exists(excel_path):
+            stats["errors"].append(f"Fichier introuvable : {excel_path}")
+            return prep
+        try:
+            df = pd.read_excel(excel_path)
+            required_cols = ["Nom", "Pr\u00e9nom", "N\u00b0 de licence"]
+            if not all(col in df.columns for col in required_cols):
+                try:
+                    df_h1 = pd.read_excel(excel_path, header=1)
+                    if all(col in df_h1.columns for col in required_cols):
+                        df = df_h1
+                except Exception:
+                    pass
+        except Exception as e:
+            stats["errors"].append(f"Erreur de lecture Excel : {e}")
+            return prep
+
+        required_cols = ["Nom", "Pr\u00e9nom", "N\u00b0 de licence"]
+        for col in required_cols:
+            if col not in df.columns:
+                stats["errors"].append(f"Colonne requise manquante dans le fichier Excel : {col}")
+                return prep
+
+        def _clean_licence(val):
+            """Extrait le N° de licence numérique : retire l'enrobage formule Excel
+            ('=\"636947\"'), le suffixe float ('636947.0') et tout caractère non numérique.
+            La mise à jour du N° de licence utilise cette valeur nettoyée (cohérente avec
+            l'index users_by_licence)."""
+            s = str(val or "").strip()
+            if s.endswith(".0"):
+                s = s[:-2]
+            return "".join(c for c in s if c.isdigit())
+
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            cursor = conn.cursor()
+
+            # Secours lecture des N° de licence : les exports FFME récents stockent la
+            # colonne « N° de licence » en formule Excel ('=\"636947\"') SANS valeur
+            # cachée — pandas la lit alors comme NaN. openpyxl (data_only=False) permet
+            # de relire le texte de la formule et d'en extraire le numéro.
+            openpyxl_licences = {}
+            try:
+                import openpyxl as _openpyxl
+                _wb = _openpyxl.load_workbook(excel_path, read_only=True, data_only=False)
+                _ws = _wb.active
+                _rows = list(_ws.iter_rows(values_only=True))
+                _wb.close()
+                if _rows:
+                    _headers = [str(h or "").strip() for h in _rows[0]]
+                    if "N\u00b0 de licence" in _headers:
+                        _ci = _headers.index("N\u00b0 de licence")
+                        for _r in _rows[1:]:
+                            _nom = str(_r[0] or "").strip() if len(_r) > 0 else ""
+                            _prenom = str(_r[1] or "").strip() if len(_r) > 1 else ""
+                            _val = _r[_ci] if _ci < len(_r) else None
+                            openpyxl_licences[(_nom, _prenom)] = "" if _val is None else str(_val)
+            except Exception:
+                openpyxl_licences = {}
+
+            cursor.execute("""
+                SELECT id, last_name, first_name, licence_ffme,
+                       COALESCE(birth_date, birth_date_raw, '') AS birth_date
+                FROM users
+            """)
+            users = [dict(row) for row in cursor.fetchall()]
+            prep["users"] = [
+                {"id": u["id"], "last_name": u["last_name"], "first_name": u["first_name"],
+                 "licence_ffme": u["licence_ffme"], "birth_date": u["birth_date"]}
+                for u in users
+            ]
+
+            users_by_licence = {}
+            users_by_name = {}
+            for u in users:
+                clean_lic = _clean_licence(u["licence_ffme"])
+                if clean_lic:
+                    users_by_licence[clean_lic] = u
+                nk = normalize_name(u["last_name"])
+                fk = normalize_name(u["first_name"])
+                if nk and fk:
+                    users_by_name[(nk, fk)] = u
+
+            def _cell_str(row, key):
+                val = row.get(key)
+                if val is None or (isinstance(val, float) and pd.isna(val)):
+                    return ""
+                return str(val).strip() if not hasattr(val, "strftime") else val.strftime("%d/%m/%Y")
+
+            has_sante_col = "Document de sant\u00e9" in df.columns
+
+            for idx, row in df.iterrows():
+                stats["total_processed"] += 1
+                nom = str(row["Nom"] or "").strip()
+                prenom = str(row["Pr\u00e9nom"] or "").strip()
+                raw_lic = row["N\u00b0 de licence"]
+                lic_str = "" if pd.isna(raw_lic) else _clean_licence(raw_lic)
+                if not lic_str:
+                    # Secours openpyxl : formules '=\"636947\"' sans valeur cachée
+                    lic_str = _clean_licence(openpyxl_licences.get((nom, prenom), ""))
+
+                matched = None
+                if lic_str and lic_str in users_by_licence:
+                    matched = users_by_licence[lic_str]
+                    match_type = "licence"
+                if not matched and nom and prenom:
+                    key = (normalize_name(nom), normalize_name(prenom))
+                    if key in users_by_name:
+                        matched = users_by_name[key]
+                        match_type = "name"
+                if matched:
+                    # Le N° de licence du fichier FFME (nettoyé) fait foi ; on conserve
+                    # la licence existante uniquement si le fichier n'en fournit pas.
+                    final_lic = lic_str if lic_str else _clean_licence(matched["licence_ffme"])
+                    passports_str = _cell_str(row, "Passeports")
+                    if passports_str.lower() in ("nan", "none", ""):
+                        passports_str = ""
+                    diplomas_str = _cell_str(row, "Dipl\u00f4mes")
+                    if diplomas_str.lower() in ("nan", "none", ""):
+                        diplomas_str = ""
+                    sante_str = _cell_str(row, "Document de sant\u00e9") if has_sante_col else ""
+                    if sante_str.lower() in ("nan", "none"):
+                        sante_str = ""
+                    prep["updates"].append(("Terminé", final_lic, passports_str, diplomas_str, sante_str, matched["id"]))
+                    if match_type == "licence":
+                        stats["matched_by_licence"] += 1
+                    else:
+                        stats["matched_by_name"] += 1
+                else:
+                    prep["unmatched"].append({
+                        "nom": nom, "prenom": prenom, "licence": lic_str,
+                        "birth_date": _cell_str(row, "Date de naissance"),
+                        "passeports": _cell_str(row, "Passeports"),
+                        "diplomes": _cell_str(row, "Dipl\u00f4mes"),
+                        "document_sante": _cell_str(row, "Document de sant\u00e9") if has_sante_col else "",
+                    })
+        except Exception as e:
+            stats["errors"].append(f"Erreur lors du rapprochement FFME : {e}")
+        finally:
+            conn.close()
+        return prep
+
+    @classmethod
+    def apply_ffme_matches(cls, updates: list, season_name: str = None) -> bool:
+        """
+        Phase B de l'import FFME — écrit en base les associations validées :
+        updates = [(match_type, licence, passeports, diplomas, document_sante, user_id), ...]
+        Met à jour la licence/passeports/diplômes de l'utilisateur, écrit le Document de
+        santé (associé à la personne pour la saison active, via purchases) et bascule
+        ses achats de la saison active en statut "Terminé" (licence FFME confirmée).
+        """
+        if not updates:
+            return True
+        cls.create_db_backup()
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            from domain.constants import get_active_season
+            target_season = str(season_name or get_active_season()).strip()
+
+            for u in updates:
+                lic = str(u[1] or "").strip()
+                passp = str(u[2] or "").strip()
+                dipl = str(u[3] or "").strip()
+                uid = int(u[5])
+
+                if passp and dipl:
+                    cursor.execute("""
+                        UPDATE users
+                        SET licence_ffme = ?, raw_passports = ?, raw_diplomas = ?
+                        WHERE id = ?
+                    """, (lic, passp, dipl, uid))
+                elif passp:
+                    cursor.execute("""
+                        UPDATE users
+                        SET licence_ffme = ?, raw_passports = ?
+                        WHERE id = ?
+                    """, (lic, passp, uid))
+                elif dipl:
+                    cursor.execute("""
+                        UPDATE users
+                        SET licence_ffme = ?, raw_diplomas = ?
+                        WHERE id = ?
+                    """, (lic, dipl, uid))
+                else:
+                    cursor.execute("""
+                        UPDATE users
+                        SET licence_ffme = ?
+                        WHERE id = ?
+                    """, (lic, uid))
+
+            cursor.executemany("""
+                UPDATE purchases
+                SET status = ?, status_normalized = ?, document_sante = ?, updated_at = ?
+                WHERE user_id = ? AND order_id IN (
+                    SELECT id FROM orders
+                    WHERE season_id = (SELECT id FROM seasons WHERE name = ? OR is_active = 1 LIMIT 1)
+                )
+            """, [(u[0], schema_v2.normalize_status(u[0]), u[4],
+                   datetime.datetime.now().isoformat(timespec="seconds"), u[5], target_season) for u in updates])
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"[SQLITE] Erreur lors de la fusion FFME en BDD : {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    @classmethod
+    def merge_ffme_licensees(cls, excel_path: str) -> dict:
+        """
+        Import FFME non interactif (rétrocompatibilité / scripts) :
+        rapprochement automatique + écriture directe, sans association manuelle.
+        """
+        prep = cls.prepare_ffme_licensees(excel_path)
+        stats = prep["stats"]
+        if not stats["errors"]:
+            if not cls.apply_ffme_matches(prep["updates"]):
+                stats["errors"].append("Erreur lors de la fusion en BDD.")
+        stats["not_found"] = len(prep["unmatched"])
+        return stats
+
+    @classmethod
+    def merge_autonomes_data(cls, excel_path: str) -> dict:
+        """
+        Phase 5 - Importe la liste d'autonomie (Autonomes_*.xlsx) et la fusionne avec
+        les utilisateurs du schema v2 (badge rouge, autonomie bloc, passeports).
+        """
+        cls.create_db_backup()
+        import pandas as pd
+        from domain.utils import normalize_name
+
+        stats = {"total_processed": 0, "matched": 0, "not_found": 0, "errors": []}
+
+        if not os.path.exists(excel_path):
+            stats["errors"].append(f"Fichier introuvable : {excel_path}")
+            return stats
+        try:
+            df = pd.read_excel(excel_path, header=1)
+            df = df.fillna("")
+        except Exception as e:
+            stats["errors"].append(f"Erreur de lecture Excel : {e}")
+            return stats
+
+        required_cols = ["N\u00b0 de licence", "Badge rouge diff", "Autonomie Bloc"]
+        for col in required_cols:
+            if col not in df.columns:
+                stats["errors"].append(f"Colonne requise manquante dans le fichier Excel : {col}")
+                return stats
+
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT id, last_name, first_name, licence_ffme, raw_passports FROM users")
+            users = [dict(row) for row in cursor.fetchall()]
+
+            users_by_licence = {}
+            for u in users:
+                lic = str(u["licence_ffme"] or "").strip()
+                if lic.endswith(".0"):
+                    lic = lic[:-2]
+                clean_lic = "".join(c for c in lic if c.isdigit())
+                if clean_lic:
+                    users_by_licence[clean_lic] = u
+
+            users_by_name = {}
+            for u in users:
+                nk = normalize_name(u["last_name"])
+                fk = normalize_name(u["first_name"])
+                if nk and fk:
+                    users_by_name[(nk, fk)] = u
+
+            updates = []  # (badge_rouge, autonomie_bloc, raw_passports, user_id)
+            file_badge_rouge_count = 0
+
+            for idx, row in df.iterrows():
+                stats["total_processed"] += 1
+                raw_lic = str(row.get("N\u00b0 de licence", "")).strip()
+                if raw_lic.endswith(".0"):
+                    raw_lic = raw_lic[:-2]
+                lic_num = "".join(c for c in raw_lic if c.isdigit())
+
+                badge_rouge_raw = str(row.get("Badge rouge diff", "")).strip().upper()
+                autonomie_bloc_raw = str(row.get("Autonomie Bloc", "")).strip().upper()
+                if badge_rouge_raw == "X":
+                    file_badge_rouge_count += 1
+                badge_rouge = "Oui" if badge_rouge_raw == "X" else ("Non" if not badge_rouge_raw else row.get("Badge rouge diff", ""))
+                autonomie_bloc = "Oui" if autonomie_bloc_raw == "X" else ("Non" if not autonomie_bloc_raw else row.get("Autonomie Bloc", ""))
+
+                has_orange_raw = str(row.get("Passeport Orange", "")).strip().upper()
+                orange_passport_val = "Escalade - Passeport orange" if has_orange_raw == "X" else ""
+
+                matched = None
+                if lic_num and lic_num in users_by_licence:
+                    matched = users_by_licence[lic_num]
+                if not matched:
+                    nom_raw = str(row.get("NOM", "")).strip()
+                    prenom_raw = str(row.get("Pr\u00e9nom", "")).strip()
+                    if nom_raw and prenom_raw:
+                        key = (normalize_name(nom_raw), normalize_name(prenom_raw))
+                        if key in users_by_name:
+                            matched = users_by_name[key]
+
+                if matched:
+                    existing_passports = str(matched.get("raw_passports") or "").strip()
+                    if orange_passport_val and "orange" not in existing_passports.lower():
+                        new_passports = f"{existing_passports}, {orange_passport_val}" if existing_passports else orange_passport_val
+                    else:
+                        new_passports = existing_passports
+                    updates.append((badge_rouge, autonomie_bloc, new_passports, matched["id"]))
+                    stats["matched"] += 1
+                else:
+                    stats["not_found"] += 1
+
+            stats["file_badge_rouge_count"] = file_badge_rouge_count
+
+            if updates:
+                cursor.executemany("""
+                    UPDATE users
+                    SET badge_rouge = ?, autonomie_bloc = ?, raw_passports = ?
+                    WHERE id = ?
+                """, updates)
+                conn.commit()
+
+            cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE badge_rouge = 'Oui'")
+            stats["db_total_badge_rouge"] = cursor.fetchone()["cnt"]
+            cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE autonomie_bloc = 'Oui' AND (badge_rouge IS NULL OR badge_rouge != 'Oui')")
+            stats["db_autonomes_without_badge_rouge"] = cursor.fetchone()["cnt"]
+        except Exception as e:
+            conn.rollback()
+            stats["errors"].append(f"Erreur lors de la fusion en BDD : {e}")
+        finally:
+            conn.close()
+        return stats
+
+    def import_old_season_ffme(cls, excel_path: str, season_name: str = "2025-2026") -> dict:
+        """
+        Phase 5 - Importe les licencies d'une ancienne saison depuis un export FFME
+        (.xlsx) et les rattache a la saison specifiee dans le schema v2.
+        Cree les utilisateurs inexistants.
+        """
+        cls.create_db_backup()
+        import pandas as pd
+        from domain.utils import normalize_name
+
+        stats = {"total_processed": 0, "created": 0, "linked": 0, "errors": []}
+
+        if not os.path.exists(excel_path):
+            stats["errors"].append(f"Fichier introuvable : {excel_path}")
+            return stats
+
+        import shutil
+        temp_path = os.path.join(ROOT_DIR, "archive", f"temp_import_{datetime.datetime.now().strftime('%H%M%S')}.xlsx")
+        try:
+            shutil.copy2(excel_path, temp_path)
+            df = pd.read_excel(temp_path)
+            df = df.fillna("")
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"[SQLITE] Erreur de lecture du fichier d'importation (fichier probablement verrouille) : {e}")
+            stats["errors"].append(f"Erreur de lecture du fichier Excel : {e}")
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception:
+                pass
+            return stats
+
+        required_cols = ["Nom", "Pr\u00e9nom"]
+        for col in required_cols:
+            if col not in df.columns:
+                stats["errors"].append(f"Colonne requise manquante dans le fichier Excel : {col}")
+                return stats
+
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT id FROM seasons WHERE name = ?", (season_name,))
+            row_s = cursor.fetchone()
+            if not row_s:
+                cursor.execute("INSERT INTO seasons (name, is_active) VALUES (?, 0)", (season_name,))
+                season_id = cursor.lastrowid
+            else:
+                season_id = row_s["id"]
+
+            cursor.execute("SELECT id, last_name_key, first_name_key, licence_ffme, raw_passports FROM users")
+            users = [dict(row) for row in cursor.fetchall()]
+
+            users_by_licence = {}
+            users_by_name = {}
+            for u in users:
+                lic = str(u["licence_ffme"] or "").strip()
+                if lic.endswith(".0"):
+                    lic = lic[:-2]
+                clean_lic = "".join(c for c in lic if c.isdigit())
+                if clean_lic:
+                    users_by_licence[clean_lic] = u
+
+            for u in users:
+                # Les cles normalisees sont deja en base (last_name_key / first_name_key)
+                if u["last_name_key"] and u["first_name_key"]:
+                    users_by_name[(u["last_name_key"], u["first_name_key"])] = u
+
+            now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+
+            for idx, row in df.iterrows():
+                stats["total_processed"] += 1
+                nom = str(row.get("Nom", "")).strip()
+                prenom = str(row.get("Pr\u00e9nom", "")).strip()
+                if not nom or not prenom:
+                    continue
+
+                raw_lic = str(row.get("N\u00b0 de licence", "")).strip()
+                if raw_lic.endswith(".0"):
+                    raw_lic = raw_lic[:-2]
+                lic_num = "".join(c for c in raw_lic if c.isdigit())
+
+                matched = None
+                if lic_num and lic_num in users_by_licence:
+                    matched = users_by_licence[lic_num]
+                if not matched:
+                    key = (normalize_name(nom), normalize_name(prenom))
+                    if key in users_by_name:
+                        matched = users_by_name[key]
+
+                passports_col = str(row.get("Passeports", "")).strip()
+                has_orange_in_excel = "orange" in passports_col.lower()
+
+                if matched:
+                    user_id = matched["id"]
+                    if lic_num and not str(matched["licence_ffme"] or "").strip():
+                        cursor.execute("UPDATE users SET licence_ffme=?, updated_at=? WHERE id=?",
+                                       (raw_lic, now_iso, user_id))
+                    if has_orange_in_excel:
+                        existing_passports = str(matched.get("raw_passports") or "").strip()
+                        if "orange" not in existing_passports.lower():
+                            new_passports = f"{existing_passports}, Escalade - Passeport orange" if existing_passports else "Escalade - Passeport orange"
+                            cursor.execute("UPDATE users SET raw_passports=? WHERE id=?", (new_passports, user_id))
+                else:
+                    sexe = str(row.get("Sexe", "")).strip()
+                    birth_raw = str(row.get("Date de naissance", "")).strip()
+                    if birth_raw.endswith(" 00:00:00"):
+                        birth_raw = birth_raw[:-9]
+                    address = str(row.get("Adresse", "")).strip()
+                    zip_code = str(row.get("Code postal", "")).strip()
+                    if zip_code.endswith(".0"):
+                        zip_code = zip_code[:-2]
+                    city = str(row.get("Ville", "")).strip()
+                    phone = str(row.get("T\u00e9l\u00e9phone", "")).strip()
+                    email = str(row.get("Email", "")).strip()
+                    passports = str(row.get("Passeports", "")).strip()
+                    if passports.lower() in ("nan", "none", "aucune", ""):
+                        passports = ""
+                    diplomas = str(row.get("Dipl\u00f4mes", "")).strip()
+                    if diplomas.lower() in ("nan", "none", "aucune", ""):
+                        diplomas = ""
+                    if has_orange_in_excel and "orange" not in passports.lower():
+                        passports = f"{passports}, Escalade - Passeport orange" if passports else "Escalade - Passeport orange"
+
+                    cursor.execute("""
+                        INSERT INTO users (
+                            last_name, first_name, last_name_key, first_name_key,
+                            birth_date, birth_date_raw, gender, address, zip_code, city,
+                            phone, email_primary, licence_ffme, raw_passports, raw_diplomas,
+                            badge_rouge, autonomie_bloc, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Non', 'Non', ?, ?)
+                    """, (
+                        nom, prenom,
+                        normalize_name(nom).upper(), normalize_name(prenom).lower(),
+                        schema_v2.parse_iso_date(birth_raw), birth_raw, sexe, address, zip_code, city,
+                        phone, email, raw_lic, passports, diplomas, now_iso, now_iso
+                    ))
+                    user_id = cursor.lastrowid
+                    users_by_licence[lic_num] = {"id": user_id, "licence_ffme": raw_lic, "raw_passports": passports}
+                    users_by_name[(normalize_name(nom), normalize_name(prenom))] = {"id": user_id}
+                    stats["created"] += 1
+
+                # Commande synthetique + achat rattache a la saison importee
+                placeholder_ref = f"IMPORT-FFME-{season_name.replace('-', '')}-{user_id:04d}"
+                cursor.execute("SELECT id FROM orders WHERE order_ref=?", (placeholder_ref,))
+                row_o = cursor.fetchone()
+                if row_o:
+                    order_id = row_o["id"]
+                else:
+                    cursor.execute("""
+                        INSERT INTO orders (order_ref, order_date, status, status_normalized, season_id, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (placeholder_ref, f"{season_name.split('-')[0]}-09-01", "Valid\u00e9", "Valid\u00e9",
+                          season_id, now_iso, now_iso))
+                    order_id = cursor.lastrowid
+
+                tarif_name_val = str(row.get("Type de licence", "")).strip()
+                if not tarif_name_val or tarif_name_val.lower() == "nan":
+                    tarif_name_val = f"Import Historique (Saison {season_name})"
+
+                cursor.execute("""
+                    INSERT OR REPLACE INTO purchases (
+                        order_id, user_id, tarif_name, amount, status, status_normalized,
+                        is_modified, commentaires_correctif, legacy_adherent_id, legacy_season_id,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+                """, (
+                    order_id, user_id, tarif_name_val, 0.0, "Valid\u00e9", "Valid\u00e9",
+                    "Non",
+                    f"Import\u00e9 automatiquement depuis le fichier FFME de la saison {season_name}",
+                    season_id, now_iso, now_iso
+                ))
+                stats["linked"] += 1
+
+            conn.commit()
+            print(f"[SQLITE] Import de la saison {season_name} termine : {stats['created']} utilisateurs crees, {stats['linked']} achats etablis.")
+            return stats
+        except Exception as e:
+            conn.rollback()
+            stats["errors"].append(f"Erreur lors de l'import : {e}")
+            raise
+        finally:
+            conn.close()
+
+    @classmethod
+    def migrate_json_planning(cls):
+        """Migre les données du fichier historique planning.json et tarif_mapping.json vers la table planning de SQLite."""
+        # 1. Vérifier si la table planning est déjà peuplée pour éviter une migration inutile
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT COUNT(*) as cnt FROM planning")
+            count = cursor.fetchone()["cnt"]
+            if count > 0:
+                return # Déjà peuplé
+        except Exception:
+            return
+        finally:
+            conn.close()
+
+        json_path = os.path.join(ROOT_DIR, "planning.json")
+        if not os.path.exists(json_path):
+            # Essayer aussi dans CODE_ROOT
+            json_path = os.path.join(CODE_ROOT, "planning.json")
+            if not os.path.exists(json_path):
+                return
+
+        # Tenter de charger le tarif_mapping.json historique pour fusionner les tarifs HelloAsso
+        tarif_mapping_path = os.path.join(ROOT_DIR, "tarif_mapping.json")
+        if not os.path.exists(tarif_mapping_path):
+            tarif_mapping_path = os.path.join(CODE_ROOT, "tarif_mapping.json")
+
+        slot_to_tarifs = {}
+        if os.path.exists(tarif_mapping_path):
+            try:
+                with open(tarif_mapping_path, "r", encoding="utf-8") as tmf:
+                    tarif_mapping = json.load(tmf)
+                for rate_name, slot_ids_str in tarif_mapping.items():
+                    if slot_ids_str and str(slot_ids_str).strip():
+                        ids = [idx.strip() for idx in str(slot_ids_str).split(";")]
+                        for idx in ids:
+                            if idx not in slot_to_tarifs:
+                                slot_to_tarifs[idx] = []
+                            if rate_name not in slot_to_tarifs[idx]:
+                                slot_to_tarifs[idx].append(rate_name)
+                print(f"📦 [SQLITE] {len(tarif_mapping)} correspondances chargées depuis tarif_mapping.json pour la migration.")
+            except Exception as tme:
+                print(f"⚠️ [SQLITE] Impossible de charger tarif_mapping.json pour la migration : {tme}")
+
+        print(f"📦 [SQLITE] Migration du planning historique depuis {json_path}...")
+        conn = None
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            if not isinstance(data, list):
+                return
+                
+            conn = cls.get_connection()
+            cursor = conn.cursor()
+            inserted = 0
+            for item in data:
+                slot_id = str(item.get("id", ""))
+                enc_json = json.dumps(item.get("encadrants", []), ensure_ascii=False)
+                
+                # Récupérer les tarifs déjà configurés ou utiliser ceux de tarif_mapping.json en repli
+                tarifs = item.get("helloasso_tarifs")
+                if not tarifs:
+                    tarifs = slot_to_tarifs.get(slot_id, [])
+                tarifs_json = json.dumps(tarifs, ensure_ascii=False)
+
+                cursor.execute("""
+                    INSERT OR REPLACE INTO planning (id, groupe, type, categorie_age, whatsapp_link, jour, horaires, encadrants, helloasso_tarifs, naissance_min, naissance_max)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    item.get("id"),
+                    item.get("groupe"),
+                    item.get("type", "cours"),
+                    item.get("categorie_age", ""),
+                    item.get("whatsapp_link", ""),
+                    item.get("jour", "Lundi"),
+                    item.get("horaires", ""),
+                    enc_json,
+                    tarifs_json,
+                    str(item.get("naissance_min") or ""),
+                    str(item.get("naissance_max") or "")
+                ))
+                inserted += 1
+            conn.commit()
+            print(f"✅ [SQLITE] Migration réussie de {inserted} créneaux de planning avec leurs correspondances de tarifs.")
+            
+            # Archiver les fichiers json historiques
+            try:
+                if os.path.exists(json_path):
+                    os.rename(json_path, json_path + ".migrated")
+                    print("📦 [SQLITE] Fichier planning.json archivé en .migrated")
+                if os.path.exists(tarif_mapping_path):
+                    os.rename(tarif_mapping_path, tarif_mapping_path + ".migrated")
+                    print("📦 [SQLITE] Fichier tarif_mapping.json archivé en .migrated")
+            except Exception as re_err:
+                print(f"⚠️ [SQLITE] Impossible d'archiver les fichiers historiques JSON : {re_err}")
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de la migration du fichier json planning : {e}")
+            if conn:
+                conn.rollback()
+        finally:
+            if conn:
+                conn.close()
+
+    @classmethod
+    def load_planning_data(cls, log_debug: bool = True) -> list:
+        """Charge l'ensemble du planning de créneaux depuis SQLite.
+
+        log_debug=False évite l'écriture du journal de debug (appels fréquents IHM).
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM planning ORDER BY id ASC")
+            rows = cursor.fetchall()
+            planning_list = []
+            for row in rows:
+                row_dict = dict(row)
+                
+                # Désérialiser les encadrants
+                encadrants_raw = row_dict.get("encadrants", "[]")
+                if encadrants_raw:
+                    try:
+                        encadrants = json.loads(encadrants_raw)
+                    except Exception:
+                        encadrants = []
+                else:
+                    encadrants = []
+                row_dict["encadrants"] = encadrants
+                
+                # Désérialiser les tarifs HelloAsso mappés
+                tarifs_raw = row_dict.get("helloasso_tarifs", "[]")
+                if tarifs_raw:
+                    try:
+                        tarifs = json.loads(tarifs_raw)
+                    except Exception:
+                        tarifs = []
+                else:
+                    tarifs = []
+                row_dict["helloasso_tarifs"] = tarifs
+                
+                planning_list.append(row_dict)
+
+            # Debug logging
+            if log_debug:
+                debug_log_path = os.path.join(ROOT_DIR, "planning_sync_debug.log")
+                try:
+                    with open(debug_log_path, "a", encoding="utf-8") as lf:
+                        lf.write(f"[{datetime.datetime.now()}] --- CHARGEMENT DU PLANNING ---\n")
+                        lf.write(f"  • CWD : {os.getcwd()}\n")
+                        lf.write(f"  • Chemin de la BDD : {cls._db_path}\n")
+                        lf.write(f"  • Nb créneaux chargés : {len(planning_list)}\n")
+                        for s in planning_list:
+                            lf.write(f"    - ID: {s.get('id')} | Groupe: {s.get('groupe')} | Jour: {s.get('jour')} | Horaires: {s.get('horaires')}\n")
+                        lf.write("\n")
+                except Exception as le:
+                    print(f"⚠️ Erreur d'écriture du log debug : {le}")
+
+            return planning_list
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors du chargement du planning : {e}")
+            return []
+        finally:
+            conn.close()
+
+    @classmethod
+    def load_creneaux_groups(cls) -> list:
+        """Agrège le planning par groupe de créneau unique (un groupe peut posséder
+        plusieurs créneaux horaires et plusieurs tarifs HelloAsso).
+        Retourne une liste de dicts {groupe, tarifs, slots} triée par nom de groupe."""
+        creneaux = {}
+        order = []
+        for item in cls.load_planning_data(log_debug=False):
+            g_name = str(item.get("groupe") or "").strip()
+            if not g_name:
+                continue
+            if g_name not in creneaux:
+                creneaux[g_name] = {"tarifs": [], "slots": []}
+                order.append(g_name)
+            for t in item.get("helloasso_tarifs") or []:
+                t_str = str(t).strip()
+                if t_str and t_str not in creneaux[g_name]["tarifs"]:
+                    creneaux[g_name]["tarifs"].append(t_str)
+            creneaux[g_name]["slots"].append((
+                str(item.get("jour") or "").strip(),
+                str(item.get("horaires") or "").strip()
+            ))
+        return [
+            {"groupe": g, "tarifs": creneaux[g]["tarifs"], "slots": creneaux[g]["slots"]}
+            for g in sorted(order)
+        ]
+
+    @classmethod
+    def save_planning_data(cls, planning_list: list):
+        """Enregistre le planning complet en SQLite et l'exporte sur planning.json pour rétrocompatibilité."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM planning")
+            for item in planning_list:
+                enc_json = json.dumps(item.get("encadrants", []), ensure_ascii=False)
+                tarifs_json = json.dumps(item.get("helloasso_tarifs", []), ensure_ascii=False)
+                cursor.execute("""
+                    INSERT OR REPLACE INTO planning (id, groupe, type, categorie_age, whatsapp_link, jour, horaires, encadrants, helloasso_tarifs, naissance_min, naissance_max)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    item.get("id"),
+                    item.get("groupe"),
+                    item.get("type", "cours"),
+                    item.get("categorie_age", ""),
+                    item.get("whatsapp_link", ""),
+                    item.get("jour", "Lundi"),
+                    item.get("horaires", ""),
+                    enc_json,
+                    tarifs_json,
+                    str(item.get("naissance_min") or ""),
+                    str(item.get("naissance_max") or "")
+                ))
+            conn.commit()
+            print("💾 [SQLITE] Planning enregistré avec succès dans SQLite.")
+            
+            # Debug logging
+            debug_log_path = os.path.join(ROOT_DIR, "planning_sync_debug.log")
+            try:
+                with open(debug_log_path, "a", encoding="utf-8") as lf:
+                    lf.write(f"[{datetime.datetime.now()}] --- ENREGISTREMENT DU PLANNING ---\n")
+                    lf.write(f"  • CWD : {os.getcwd()}\n")
+                    lf.write(f"  • Chemin de la BDD : {cls._db_path}\n")
+                    lf.write(f"  • Nb créneaux reçus : {len(planning_list)}\n")
+                    for s in planning_list:
+                        lf.write(f"    - ID: {s.get('id')} | Groupe: {s.get('groupe')} | Jour: {s.get('jour')} | Horaires: {s.get('horaires')}\n")
+                    lf.write("\n")
+            except Exception as le:
+                print(f"⚠️ Erreur d'écriture du log debug : {le}")
+
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de la sauvegarde du planning : {e}")
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @classmethod
+    def save_planning_item(cls, item: dict) -> dict:
+        """Crée ou met à jour un créneau unique dans la table planning."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            item_id = item.get("id")
+            if not item_id or int(item_id) <= 0:
+                cursor.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM planning")
+                item_id = cursor.fetchone()[0]
+                item["id"] = item_id
+
+            enc_json = json.dumps(item.get("encadrants", []), ensure_ascii=False)
+            tarifs_json = json.dumps(item.get("helloasso_tarifs", []), ensure_ascii=False)
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO planning (id, groupe, type, categorie_age, whatsapp_link, jour, horaires, encadrants, helloasso_tarifs, naissance_min, naissance_max)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                int(item_id),
+                str(item.get("groupe") or "").strip(),
+                str(item.get("type") or "cours").strip(),
+                str(item.get("categorie_age") or "").strip(),
+                str(item.get("whatsapp_link") or "").strip(),
+                str(item.get("jour") or "Lundi").strip(),
+                str(item.get("horaires") or "").strip(),
+                enc_json,
+                tarifs_json,
+                str(item.get("naissance_min") or "").strip(),
+                str(item.get("naissance_max") or "").strip()
+            ))
+            conn.commit()
+            print(f"💾 [SQLITE] Créneau #{item_id} ({item.get('groupe')}) enregistré avec succès.")
+            return item
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de l'enregistrement du créneau : {e}")
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @classmethod
+    def delete_planning_item(cls, item_id: int) -> bool:
+        """Supprime un créneau par son ID."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM planning WHERE id = ?", (int(item_id),))
+            conn.commit()
+            deleted = cursor.rowcount > 0
+            if deleted:
+                print(f"🗑️ [SQLITE] Créneau #{item_id} supprimé avec succès.")
+            return deleted
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de la suppression du créneau #{item_id} : {e}")
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @classmethod
+    def get_email_templates(cls) -> list:
+        """
+        Récupère l'ensemble des templates d'emails enregistrés en BDD.
+        Retourne une liste de dicts : [{"name": ..., "subject": ..., "body": ..., "sender_email": ..., "sender_name": ...}]
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT name, subject, body, sender_email, sender_name FROM email_templates ORDER BY name ASC")
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows]
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de la récupération des templates d'emails : {e}")
+            return []
+        finally:
+            conn.close()
+
+    @classmethod
+    def save_email_template(cls, name: str, subject: str, body: str, sender_email: str = "", sender_name: str = "", old_name: Optional[str] = None) -> bool:
+        """
+        Enregistre ou met à jour un template d'email dans la BDD
+        (avec son adresse et son nom d'affichage d'expédition).
+        Si old_name est fourni et différent de name, le template existant est renommé.
+        Une adresse / un nom vide retombe sur les valeurs par défaut du club.
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            sender = (sender_email or "").strip() or DEFAULT_SENDER_EMAIL
+            sname = (sender_name or "").strip() or DEFAULT_SENDER_NAME
+            new_name = name.strip()
+            clean_old = (old_name or "").strip()
+
+            if clean_old and clean_old != new_name:
+                cursor.execute("""
+                    UPDATE email_templates
+                    SET name = ?, subject = ?, body = ?, sender_email = ?, sender_name = ?
+                    WHERE name = ?
+                """, (new_name, subject.strip(), body.strip(), sender, sname, clean_old))
+                if cursor.rowcount > 0:
+                    conn.commit()
+                    return True
+
+            cursor.execute("""
+                INSERT INTO email_templates (name, subject, body, sender_email, sender_name)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(name) DO UPDATE SET subject = excluded.subject, body = excluded.body,
+                    sender_email = excluded.sender_email, sender_name = excluded.sender_name
+            """, (new_name, subject.strip(), body.strip(), sender, sname))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de l'enregistrement du template d'email '{name}' : {e}")
+            return False
+        finally:
+            conn.close()
+
+    @classmethod
+    def delete_email_template(cls, name: str) -> bool:
+        """
+        Supprime un template d'email de la BDD.
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM email_templates WHERE name = ?", (name.strip(),))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de la suppression du template d'email '{name}' : {e}")
+            return False
+        finally:
+            conn.close()
+
+    @classmethod
+    def get_whatsapp_template(cls) -> str:
+        """
+        Récupère le texte d'invitation WhatsApp personnalisé enregistré en BDD.
+        Retourne None si aucun texte n'a été sauvegardé.
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT value FROM app_settings WHERE key = ?", ("whatsapp_template",))
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            value = row["value"]
+            return value if value and value.strip() else None
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de la récupération du texte WhatsApp : {e}")
+            return None
+        finally:
+            conn.close()
+
+    @classmethod
+    def save_whatsapp_template(cls, text: str) -> bool:
+        """
+        Enregistre ou met à jour le texte d'invitation WhatsApp personnalisé dans la BDD.
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO app_settings (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """, ("whatsapp_template", text))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de l'enregistrement du texte WhatsApp : {e}")
+            return False
+        finally:
+            conn.close()
+
+    @classmethod
+    def get_app_setting(cls, key: str, default: str = None) -> str:
+        """
+        Récupère une valeur générique de réglage applicatif (clé/valeur) depuis la BDD.
+        Retourne `default` si la clé est absente ou vide.
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT value FROM app_settings WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            if row is None:
+                return default
+            value = row["value"]
+            return value if value and str(value).strip() else default
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de la lecture du réglage '{key}' : {e}")
+            return default
+        finally:
+            conn.close()
+
+    @classmethod
+    def save_app_setting(cls, key: str, value: str) -> bool:
+        """
+        Enregistre ou met à jour une valeur générique de réglage applicatif (clé/valeur) dans la BDD.
+        """
+        cls.setup_database()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO app_settings (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """, (key, value))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"❌ [SQLITE] Erreur lors de l'enregistrement du réglage '{key}' : {e}")
+            return False
+        finally:
+            conn.close()

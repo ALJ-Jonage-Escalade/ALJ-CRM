@@ -16,8 +16,8 @@ import threading
 import time
 from typing import Callable, List, ParamSpec, TypeVar
 
-from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
-from infrastructure.firestore_client import FirestoreConflictError, FirestoreError
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.client import FirestoreConflictError, FirestoreError
 from services.documents import Doc
 from services.errors import Conflict, NotFound, StorageUnavailable
 

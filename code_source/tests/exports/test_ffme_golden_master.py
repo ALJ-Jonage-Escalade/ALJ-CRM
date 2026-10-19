@@ -37,7 +37,7 @@ class TestFFMEGoldenMaster(unittest.TestCase):
             )
 
     def test_export_ffme_identique_reference(self):
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from exports.membership_excel import generate_ffme_csv
         from paths import DATA_ROOT
 

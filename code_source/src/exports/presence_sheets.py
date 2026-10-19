@@ -330,7 +330,7 @@ def generate_presence_sheets(selected_groups, participants_data, start_date_str=
         
     # Charger le planning directement depuis SQLite
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         planning_data = SqliteRepository.load_planning_data()
         print(f"[PRESENCE] {len(planning_data)} créneaux de cours chargés depuis la BDD SQLite.")
     except Exception as pe:

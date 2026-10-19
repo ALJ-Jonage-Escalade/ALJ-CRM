@@ -16,10 +16,10 @@ if _script_dir not in sys.path:
 
 # Importer les modules locaux
 try:
-    from infrastructure.secret_store import SecretStore
-    from infrastructure.google_drive_client import GoogleDriveClient
-    from infrastructure.sqlite_repository import SqliteRepository
-    import gmail_auth_helper
+    from infrastructure.security.secret_store import SecretStore
+    from infrastructure.google.drive import GoogleDriveClient
+    from infrastructure.sqlite.repository import SqliteRepository
+    from infrastructure.google import gmail_auth
 except ImportError as ie:
     print(f"❌ Erreur lors du chargement des modules d'ALJ : {ie}")
     sys.exit(1)
@@ -30,7 +30,7 @@ def run_bootstrap():
     print("==========================================================")
     try:
         # Lancer l'assistant d'authentification Google
-        gmail_auth_helper.run_helper()
+        gmail_auth.run_helper()
     except Exception as e:
         print(f"❌ Échec de l'authentification Google : {e}")
         print("Veuillez vérifier vos identifiants Google Client ID et retenter.")

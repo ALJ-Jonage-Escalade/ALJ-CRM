@@ -438,7 +438,7 @@ class MemberDetailPanel(QFrame):
             return
 
         # 1. Charger les modèles d'e-mails pour trouver "Attestation échéance"
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         templates = SqliteRepository.get_email_templates()
         template = None
         for t in templates:
@@ -528,8 +528,8 @@ class MemberDetailPanel(QFrame):
                     return
 
                 # 5. Envoyer l'e-mail
-                from infrastructure.email_repository import EmailRepository
-                from email_html import build_email_html, build_signature_plain, get_inline_images
+                from infrastructure.mail.repository import EmailRepository
+                from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
                 
                 # Construire le corps HTML de l'e-mail (on n'ajoute pas la signature au corps si le modèle est déjà personnalisé)
                 html_body = build_email_html(rendered_body, add_signature=True, image_src_mode="cid")
@@ -858,7 +858,7 @@ class MemberDetailPanel(QFrame):
             comment_text = f"{now_str} {changes_brief}"
 
             # 3. Écrire chirurgicalement les modifications dans la BDD SQLite
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             success, error_msg = SqliteRepository.update_member_in_db(
                 original_order_ref=member.order_ref,
                 original_last_name=member.user_last_name,

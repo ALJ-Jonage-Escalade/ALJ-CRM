@@ -73,11 +73,11 @@ class TestPresentationLot3(unittest.TestCase):
         from unittest.mock import patch
         app = QApplication.instance() or QApplication([])
         
-        with patch("infrastructure.secret_store.SecretStore.get_secret", return_value="test_account@gmail.com"):
+        with patch("infrastructure.security.secret_store.SecretStore.get_secret", return_value="test_account@gmail.com"):
             win = MainWindow()
             self.assertIn("test_account@gmail.com", win.drive_status.text())
             
-        with patch("infrastructure.secret_store.SecretStore.get_secret", return_value="updated_account@gmail.com"):
+        with patch("infrastructure.security.secret_store.SecretStore.get_secret", return_value="updated_account@gmail.com"):
             win.on_nav_changed(1)
             self.assertIn("updated_account@gmail.com", win.drive_status.text())
 

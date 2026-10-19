@@ -9,7 +9,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from domain.models import Member
-from infrastructure.sqlite_repository import SqliteRepository
+from infrastructure.sqlite.repository import SqliteRepository
 
 
 class TestMemberBilingualAdapter(unittest.TestCase):

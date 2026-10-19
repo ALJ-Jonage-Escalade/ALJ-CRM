@@ -10,9 +10,9 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure import competition_repository as cr
-from infrastructure.sqlite_repository import SqliteRepository
-from infrastructure import schema_v2
+from infrastructure.sqlite import competition_repository as cr
+from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite import schema_v2
 from domain.competition_models import Competition, STATUT_EN_COURS
 from domain.competition_matching import (
     parse_campaign_identifier,

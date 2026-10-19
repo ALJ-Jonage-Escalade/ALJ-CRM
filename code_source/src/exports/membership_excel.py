@@ -9,8 +9,8 @@ from paths import CODE_ROOT, ROOT_DIR
 from domain.constants import (
     get_active_season
 )
-from infrastructure.secret_store import SecretStore
-from infrastructure.google_drive_client import GoogleDriveClient
+from infrastructure.security.secret_store import SecretStore
+from infrastructure.google.drive import GoogleDriveClient
 from domain.utils import normalize_name
 
 # S'assurer que le répertoire de travail et le répertoire du script sont dans le chemin de recherche
@@ -21,7 +21,7 @@ if CODE_ROOT not in sys.path:
     sys.path.append(CODE_ROOT)
 
 # Phase 3 — mapping canonique unique (domain.constants), fin de la duplication
-from infrastructure.schema_v2 import purchase_priority_score
+from infrastructure.sqlite.schema_v2 import purchase_priority_score
 
 def download_file_from_drive(file_id, dest_path):
     """Télécharge le fichier Excel d'adhésion depuis Google Drive."""
@@ -155,14 +155,14 @@ def update_membership_excel():
     db_drive_id = env_vars.get("GOOGLE_DRIVE_DB_ID", "").strip()
     excel_drive_id = env_vars.get("GOOGLE_DRIVE_FILE_ID", "").strip()
     
-    from infrastructure.sqlite_repository import SqliteRepository
+    from infrastructure.sqlite.repository import SqliteRepository
     db_local_path = SqliteRepository.get_db_path()
     
     # S'assurer d'avoir la base de données initialisée et téléchargée
     if not db_drive_id and excel_drive_id:
         print("🚀 [MIGRATION AUTOMATIQUE] Première utilisation de SQLite détectée.")
         try:
-            from migrate_excel_to_db import run_migration
+            from infrastructure.sqlite.migrations.migrate_excel_to_db import run_migration
             run_migration(interactive=False) # Mode non interactif
             env_vars = load_env_variables()
             db_drive_id = env_vars.get("GOOGLE_DRIVE_DB_ID", "").strip()
@@ -204,7 +204,7 @@ def update_membership_excel():
         excel_order_counts = Counter() # Compter les occurences par commande dans la BDD !
         existing_member_max_score = {} # (firstName, lastName) -> score maximal du statut existant en BDD
 
-        # Phase 3 — table de priorité des statuts centralisée (infrastructure.schema_v2)
+        # Phase 3 — table de priorité des statuts centralisée (infrastructure.sqlite.schema_v2)
         def get_priority_score(status, tarif_name, amount):
             return purchase_priority_score(status, tarif_name, amount)
         

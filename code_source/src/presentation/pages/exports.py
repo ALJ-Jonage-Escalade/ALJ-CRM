@@ -312,7 +312,7 @@ class ExportsPage(QWidget):
     def update_ffme_stats(self):
         """Calcule et affiche les statistiques de l'export FFME CSV (Lot 5)."""
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             import datetime
             from exports.membership_excel import parse_date_to_datetime
             
@@ -384,7 +384,7 @@ class ExportsPage(QWidget):
     def _load_presence_creneaux(self):
         """Charge les groupes de créneaux depuis la table planning de la BDD.
         Chaque créneau regroupe un ou plusieurs tarifs HelloAsso."""
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         return SqliteRepository.load_creneaux_groups()
 
     def _build_cours_hierarchy(self, creneaux):
@@ -403,7 +403,7 @@ class ExportsPage(QWidget):
         pour refléter exactement le contenu futur du fichier Excel."""
         try:
             import datetime
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             raw = SqliteRepository.load_direct_data(season_filter="2026-2027")
         except Exception as e:
             return f"⚠️ Résumé indisponible : {e}"

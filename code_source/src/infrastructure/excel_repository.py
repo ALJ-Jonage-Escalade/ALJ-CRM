@@ -40,7 +40,7 @@ class ExcelRepository:
         Charge de manière brute le contenu d'un fichier Excel d'adhésion et le renvoie comme liste d'adhérents.
         Utilise SQLite en arrière-plan comme source de vérité.
         """
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         return SqliteRepository.load_direct_data(file_path)
 
     @staticmethod
@@ -111,7 +111,7 @@ class ExcelRepository:
         Met à jour de manière chirurgicale un adhérent dans la base de données.
         Surcharge de update_member_in_excel pour rediriger vers SqliteRepository.
         """
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         return SqliteRepository.update_member_in_excel(
             latest_file, original_order_ref, original_last_name, original_first_name, updated_fields, comment_text
         )

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import List, TypedDict
 
-from infrastructure.sqlite_repository import SqliteRepository
+from infrastructure.sqlite.repository import SqliteRepository
 
 
 class Seasons(TypedDict):

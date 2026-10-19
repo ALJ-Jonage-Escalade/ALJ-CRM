@@ -81,7 +81,7 @@ explicit_package_bases = true
 follow_imports = "silent"
 # Fichiers migrés récemment (le reste du code sert de baseline progressive) :
 files = [
-    "src/infrastructure/schema_v2.py",
+    "src/infrastructure/sqlite/schema_v2.py",
     "src/domain/constants.py",
     "src/api/__init__.py",
     "src/api/coaches.py",
