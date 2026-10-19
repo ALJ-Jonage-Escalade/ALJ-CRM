@@ -545,7 +545,7 @@ class SqliteRepository:
         depuis la lecture bilingue (vue de compatibilité + Member.from_dict).
         API recommandée pour les nouveaux consommateurs.
         """
-        from domain.models import Member
+        from domain.members.models import Member
         return [Member.from_dict(row) for row in cls.load_direct_data(season_filter=season_filter)]
 
     @classmethod

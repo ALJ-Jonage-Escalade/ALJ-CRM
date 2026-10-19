@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 from PIL import Image, ImageDraw
 
 from paths import CODE_ROOT, ROOT_DIR
-from domain.models import Member
+from domain.members.models import Member
 from infrastructure.sqlite.repository import SqliteRepository
 from presentation.workers import GenerateAttestationsWorker
 from presentation.pages.members import (

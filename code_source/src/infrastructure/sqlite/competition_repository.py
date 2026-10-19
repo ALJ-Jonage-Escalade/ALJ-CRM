@@ -11,7 +11,7 @@ import sqlite3
 import datetime
 
 from paths import DATA_ROOT
-from domain.competition_models import (
+from domain.competitions.models import (
     Competition,
     Participant,
     PAIEMENT_EN_ATTENTE,
@@ -863,7 +863,7 @@ class CompetitionRepository:
         """Articles payés sans rattachement complet (compétition ou adhérent manquant),
         au format des lignes de correction manuelle (pré-sélection par licence)."""
         cls.setup_database()
-        from domain.competition_matching import STATUTS_PAYES
+        from domain.competitions.matching import STATUTS_PAYES
         conn = cls.get_connection()
         try:
             rows = conn.execute(
@@ -881,7 +881,7 @@ class CompetitionRepository:
 
         import re
         import json
-        from domain import competition_matching
+        from domain.competitions import matching as competition_matching
         result = []
         for r in rows:
             lic = re.sub(r"\D", "", str(r["licence_saisie"] or ""))
@@ -925,7 +925,7 @@ class CompetitionRepository:
         compétition (si besoin) et marque « Payé » avec le montant cumulé des
         articles Validated liés. Retourne le nombre de (compétition, adhérent) mis à jour."""
         cls.setup_database()
-        from domain.competition_matching import STATUTS_PAYES
+        from domain.competitions.matching import STATUTS_PAYES
         conn = cls.get_connection()
         try:
             rows = conn.execute(

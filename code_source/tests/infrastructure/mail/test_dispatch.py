@@ -53,7 +53,7 @@ class TestEmailDispatchService(unittest.TestCase):
             self.assertIn("<div", preview["body_html"])
 
     def test_get_competition_context_includes_whatsapp_link(self):
-        from domain.competition_models import Competition
+        from domain.competitions.models import Competition
         fake_comp = Competition(
             id=12, nom="Coupe Bugey", id_ffme="12345", prix=15.0,
             date_competition="2026-10-03", whatsapp_link="https://chat.whatsapp.com/abc"

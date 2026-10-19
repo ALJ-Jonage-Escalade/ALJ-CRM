@@ -13,12 +13,12 @@ from PySide6.QtGui import QColor, QTextCursor
 from PIL import Image, ImageDraw
 
 from paths import CODE_ROOT
-from domain.models import Member
+from domain.members.models import Member
 from infrastructure.sqlite.repository import SqliteRepository, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as CompetitionRepository,
 )
-from domain.competition_models import (
+from domain.competitions.models import (
     LIBELLES_STATUT_PAIEMENT,
     LIBELLE_VERS_STATUT_PAIEMENT,
     PAIEMENT_EN_ATTENTE,

@@ -1132,7 +1132,7 @@ function applyCompDoc(doc) {
 
 /* ===================== Rendu : compétitions ===================== */
 const STATUT_LABELS = { en_preparation: "En préparation", en_cours: "En cours", close: "Archivée" };
-/* Archivage : statut « close » (déjà prévu dans le modèle, cf. domain.competition_models). */
+/* Archivage : statut « close » (déjà prévu dans le modèle, cf. domain.competitions.models). */
 const STATUT_ARCHIVE = "close";
 let showArchivedComps = false;
 function isArchivedComp(c) { return (c && c.statut) === STATUT_ARCHIVE; }

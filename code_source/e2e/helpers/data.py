@@ -28,7 +28,7 @@ EVENTUALLY_TIMEOUT = 5.0   # seconds, as Playwright's expect (shortened by conft
 _WORKER = f"""
 import json, sys, traceback
 sys.path.insert(0, "src")
-from domain.competition_models import Competition
+from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 for line in sys.stdin:
     request = json.loads(line)

@@ -257,7 +257,7 @@ def build_sqlite(path, fake, rng, coach_names):
 
 
 def seed_competitions(coach_ids):
-    from domain.competition_models import STATUT_CLOSE, STATUT_EN_COURS, STATUT_EN_PREPARATION, Competition
+    from domain.competitions.models import STATUT_CLOSE, STATUT_EN_COURS, STATUT_EN_PREPARATION, Competition
     from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 
     snape, mcgonagall, flitwick = coach_ids[0], coach_ids[1], coach_ids[2]

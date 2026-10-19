@@ -8,7 +8,7 @@ from typing import List, Optional
 from pydantic import Field, field_validator
 
 from api.schemas.base import RequestBody
-from domain.competition_models import STATUT_EN_PREPARATION, STATUTS_COMPETITION
+from domain.competitions.models import STATUT_EN_PREPARATION, STATUTS_COMPETITION
 
 _ISO_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})?$")
 

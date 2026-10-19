@@ -19,7 +19,7 @@ import datetime
 from typing import Dict, Any, List, Optional
 
 from domain.constants import get_active_season
-from domain.age_rules import parse_birth_date, age_at, get_season_start_date
+from domain.members.age_rules import parse_birth_date, age_at, get_season_start_date
 from domain.utils import normalize_string
 from infrastructure.sqlite.repository import SqliteRepository
 from infrastructure.sqlite.competition_repository import CompetitionRepository

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Optional, Tuple
 
-from domain.competition_models import STATUT_CLOSE
+from domain.competitions.models import STATUT_CLOSE
 from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as Repo,
     ParticipantAlreadyPaid,

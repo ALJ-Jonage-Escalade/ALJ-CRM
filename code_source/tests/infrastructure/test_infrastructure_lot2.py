@@ -529,7 +529,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         loaded_raw = SqliteRepository.load_direct_data("2026-2027")
         self.assertEqual(len(loaded_raw), 2)
         
-        from domain.models import Member
+        from domain.members.models import Member
         members = [Member.from_dict(row) for row in loaded_raw]
         
         carlos = next(m for m in members if m.user_last_name == "MARTINEZ")

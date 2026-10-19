@@ -4,7 +4,7 @@ the plan's conflict table (K1-K9)."""
 
 from support.api_case import ApiTestCase
 
-from domain.competition_models import PAIEMENT_PAYE
+from domain.competitions.models import PAIEMENT_PAYE
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 
 

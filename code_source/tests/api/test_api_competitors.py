@@ -4,7 +4,7 @@
 from support.api_case import ApiTestCase
 from support.member_db import MemberDbTestCase
 
-from domain.member_view import COMPETITOR_FIELDS
+from domain.members.view import COMPETITOR_FIELDS
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from infrastructure.sqlite.repository import SqliteRepository
 

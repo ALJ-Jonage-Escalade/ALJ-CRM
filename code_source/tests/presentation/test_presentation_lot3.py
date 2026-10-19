@@ -86,7 +86,7 @@ class TestPresentationLot3(unittest.TestCase):
         """Vérifie les pop-up tarifs/statuts de l'onglet Communications :
         défaut = tous les tarifs sauf la liste d'attente, tous les statuts sauf Annulé."""
         app = QApplication.instance() or QApplication([])
-        from domain.models import Member
+        from domain.members.models import Member
 
         def make_member(ref, status, tarif, email):
             return Member(

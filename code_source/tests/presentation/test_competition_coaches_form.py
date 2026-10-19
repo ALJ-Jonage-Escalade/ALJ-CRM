@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from domain.competition_models import Competition  # noqa: E402
+from domain.competitions.models import Competition  # noqa: E402
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo  # noqa: E402
 from support.fake_firestore import FirestoreRepoTestCase  # noqa: E402
 

@@ -3,7 +3,7 @@ import glob
 import datetime
 from PySide6.QtCore import QThread, Signal
 
-from domain.models import Member
+from domain.members.models import Member
 from paths import ROOT_DIR
 from infrastructure.google.drive import GoogleDriveClient
 from infrastructure.mail.repository import EmailRepository
@@ -63,7 +63,7 @@ class SyncHelloAssoWorker(QThread):
                 age_rules_ok = True
                 try:
                     from infrastructure.sqlite.repository import SqliteRepository
-                    from domain.age_rules import check_age_conflict, find_planning_item_for_tarif
+                    from domain.members.age_rules import check_age_conflict, find_planning_item_for_tarif
                     planning_data = SqliteRepository.load_planning_data(log_debug=False)
                 except Exception as ac_err:
                     print(f"⚠️ [SYNC_WORKER] Contrôle d'âge impossible : {ac_err}")

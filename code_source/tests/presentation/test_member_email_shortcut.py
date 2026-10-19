@@ -20,7 +20,7 @@ except ImportError:
 
 def make_member(last_name="MARTIN", first_name="Paul", order_ref="12345"):
     """Construit un adhérent de test."""
-    from domain.models import Member
+    from domain.members.models import Member
     return Member(
         order_ref=order_ref, order_date="2026-08-01", status="Validated",
         tarif_name="Adulte", amount=246.0, user_last_name=last_name,

@@ -13,8 +13,8 @@ if _src_dir not in sys.path:
 from infrastructure.sqlite import competition_repository as cr
 from infrastructure.sqlite.repository import SqliteRepository
 from infrastructure.sqlite import schema_v2
-from domain.competition_models import Competition, STATUT_EN_COURS
-from domain.competition_matching import (
+from domain.competitions.models import Competition, STATUT_EN_COURS
+from domain.competitions.matching import (
     parse_campaign_identifier,
     match_items_to_participants,
     extract_competition_number,
@@ -594,7 +594,7 @@ class TestAutoLinkAndMirror(unittest.TestCase):
                 "competition": competition, "etat": etat, "date_item": "2026-09-16"}
 
     def test_auto_link_by_champ_then_licence(self):
-        from domain.competition_matching import auto_link_items
+        from domain.competitions.matching import auto_link_items
         items = [
             self._item(1, licence="123456", competition="EVT-2026-001"),
             self._item(2, licence="789012", competition="Championnat EVT-2026-002"),
@@ -604,7 +604,7 @@ class TestAutoLinkAndMirror(unittest.TestCase):
         self.assertEqual(links[2], {"competition_id": self.c2, "adherent_id": 2, "source": "auto"})
 
     def test_auto_link_no_competition_skipped(self):
-        from domain.competition_matching import auto_link_items
+        from domain.competitions.matching import auto_link_items
         # champ vide ou inconnu : pas de lien automatique (rattachement manuel requis)
         items = [self._item(3, licence="123456", competition=""),
                  self._item(4, licence="123456", competition="Compétition inconnue")]
@@ -612,7 +612,7 @@ class TestAutoLinkAndMirror(unittest.TestCase):
         self.assertEqual(links, {})
 
     def test_auto_link_preserves_manual_and_ignores_invalid_state(self):
-        from domain.competition_matching import auto_link_items
+        from domain.competitions.matching import auto_link_items
         items = [self._item(5, licence="123456", competition="EVT-2026-001"),
                  self._item(6, licence="789012", competition="EVT-2026-002"),
                  self._item(7, etat="Refunded", licence="789012", competition="EVT-2026-001")]
@@ -631,7 +631,7 @@ class TestAutoLinkAndMirror(unittest.TestCase):
         self.assertEqual(links[10]["competition_id"], self.c1)
 
         # replace_auto_links écrase les auto, jamais les manuels
-        from domain.competition_matching import auto_link_items
+        from domain.competitions.matching import auto_link_items
         other = [self._item(11, licence="789012", competition="EVT-2026-002")]
         self.repo.sync_helloasso_mirror(other, [{"id": 11}], "competition-saison")
         auto = auto_link_items(other, self.comps, self.adherents, self.repo.list_helloasso_links())
@@ -704,16 +704,16 @@ class TestMatchAdherentByName(unittest.TestCase):
     ]
 
     def test_exact_and_case_insensitive(self):
-        from domain.competition_matching import match_adherent_by_name
+        from domain.competitions.matching import match_adherent_by_name
         self.assertEqual(match_adherent_by_name("FANJAT Gabin", self.ADHERENTS), 1)
         self.assertEqual(match_adherent_by_name("fanjat gabin", self.ADHERENTS), 1)
 
     def test_reversed_order(self):
-        from domain.competition_matching import match_adherent_by_name
+        from domain.competitions.matching import match_adherent_by_name
         self.assertEqual(match_adherent_by_name("Gabin FANJAT", self.ADHERENTS), 1)
 
     def test_composed_names_and_no_match(self):
-        from domain.competition_matching import match_adherent_by_name
+        from domain.competitions.matching import match_adherent_by_name
         self.assertEqual(match_adherent_by_name("POLSNIELLI ROUSSET Julie", self.ADHERENTS), 3)
         self.assertIsNone(match_adherent_by_name("Inconnu Total", self.ADHERENTS))
         self.assertIsNone(match_adherent_by_name("", self.ADHERENTS))
@@ -730,13 +730,13 @@ class TestGroupForTarif(unittest.TestCase):
     ]
 
     def test_group_found(self):
-        from domain.planning_groups import group_for_tarif
+        from domain.members.planning_groups import group_for_tarif
         self.assertEqual(group_for_tarif("Compétition U11-U13 - jeunes nés 2014-2016", self.PLANNING),
                          "Compétition - U11-U13")
         self.assertEqual(group_for_tarif("ADULTES AUTONOMES", self.PLANNING), "Autonome - adultes")
 
     def test_group_not_found_or_empty(self):
-        from domain.planning_groups import group_for_tarif
+        from domain.members.planning_groups import group_for_tarif
         self.assertEqual(group_for_tarif("Tarif inconnu", self.PLANNING), "")
         self.assertEqual(group_for_tarif("", self.PLANNING), "")
         self.assertEqual(group_for_tarif("Adultes autonomes", None), "")

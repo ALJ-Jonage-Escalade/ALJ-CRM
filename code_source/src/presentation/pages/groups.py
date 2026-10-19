@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QColor
 from paths import ROOT_DIR
-from domain.age_rules import extract_birth_years
+from domain.members.age_rules import extract_birth_years
 from infrastructure.qrcodes import get_group_qrcode
 
 class GroupsPage(QWidget):

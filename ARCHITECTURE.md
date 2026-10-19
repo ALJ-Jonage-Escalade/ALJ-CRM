@@ -53,7 +53,7 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── app.py               ← entrée DESKTOP (QApplication + thread uvicorn)
 │   │   ├── server.py            ← entrée WEB/API (FastAPI, ~1400 lignes)
 │   │   ├── paths.py             ← CODE_ROOT / ROOT_DIR / DATA_ROOT (à utiliser, ne jamais recalculer)
-│   │   ├── domain/              ← Python pur : modèles, règles d'âge, attestation (HTML), rapprochement compétitions…
+│   │   ├── domain/              ← Python pur : members/, competitions/, attestation/ + constants, utils, validators
 │   │   ├── services/ api/       ← cas d'usage + routeurs FastAPI (compétitions)
 │   │   ├── infrastructure/      ← accès externes, un dossier par système : security/ (auth API, secrets),
 │   │   │                          sqlite/ (+ migrations/), firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/
@@ -85,8 +85,9 @@ ALJ-CRM/                         ← racine du dépôt
 ### Couches (code_source/src)
 
 - **`domain/`** — pur Python, sans I/O ni Qt. C'est la partie **directement réutilisable** par le web.
-  Ex. : `attestation.build_attestation()` (HTML → PDF WeasyPrint), `age_rules`, `competition_matching`,
-  `planning_groups`, `validators`, `utils.apply_template_variables`.
+  Rangé en `members/` (modèles, liste web, `age_rules`, `planning_groups`), `competitions/` (modèles,
+  `matching` HelloAsso), `attestation/` (`document.build_attestation()`, HTML → PDF WeasyPrint) ;
+  `constants`, `utils.apply_template_variables`, `validators` restent à la racine.
 - **`infrastructure/`** — adaptateurs, un sous-dossier par système externe. Les plus structurants :
   - `sqlite/schema_v2.py` : DDL SQLite, normalisations, vue de compatibilité `v_adherents_legacy` (**source unique**, recréée à chaque démarrage).
   - `sqlite/repository.py` : lecture/écriture (`get_members()` typé recommandé, `load_direct_data()` legacy).

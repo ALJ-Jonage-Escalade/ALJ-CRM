@@ -18,7 +18,7 @@ from infrastructure.firestore import client as fc
 from infrastructure.firestore import competition_repository as repo_module
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from support.fake_firestore import FakeFirestore, FirestoreRepoTestCase  # noqa: F401
-from domain.competition_models import (
+from domain.competitions.models import (
     Competition,
     statut_paiement_apres_bascule,
     PAIEMENT_NON_INVITE,
@@ -338,7 +338,7 @@ class TestHelloAssoMirror(FirestoreRepoTestCase):
         self.assertEqual(Repo.list_helloasso_links()[500]["source"], "ignore")
 
         # Le moteur automatique ne rattache jamais une ligne ignorée
-        from domain.competition_matching import auto_link_items
+        from domain.competitions.matching import auto_link_items
         links = auto_link_items(
             [{"id_item": 500, "etat": "Validated", "competition": "18846", "licence": "654321"}],
             [{"id": self.comp_id, "id_ffme": "18846", "nom": "Coupe Rhône"}],

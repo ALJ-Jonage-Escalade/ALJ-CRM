@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSortFilterProxyModel, QDate, Signal, QTimer
 from PySide6.QtGui import QFont
 
-from domain.models import Member
+from domain.members.models import Member
 from infrastructure.sqlite.repository import SqliteRepository
 from infrastructure.sqlite.schema_v2 import normalize_status
 from presentation.components.member_table_model import MemberTableModel
@@ -567,7 +567,7 @@ def build_creneau_filter_blocks(members_list):
     Les payloads sont limités aux tarifs réellement présents chez les adhérents.
     Réutilisée par les onglets Adhérents et Communications."""
     from infrastructure.sqlite.repository import SqliteRepository
-    from domain.planning_groups import build_creneau_items, prune_empty_sections
+    from domain.members.planning_groups import build_creneau_items, prune_empty_sections
     creneaux = SqliteRepository.load_creneaux_groups()
     tarifs_map = {c["groupe"]: c["tarifs"] for c in creneaux}
 

@@ -181,7 +181,7 @@ def build_attestation(
         sig_data = _image_to_base64_data_uri(sig_path, "image/jpeg")
     if not sig_data:
         try:
-            from domain.signature_asset import OFFICIAL_SIGNATURE_DATA_URI
+            from domain.attestation.signature_asset import OFFICIAL_SIGNATURE_DATA_URI
             sig_data = OFFICIAL_SIGNATURE_DATA_URI
         except Exception:
             sig_data = None

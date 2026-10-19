@@ -31,7 +31,7 @@ from PySide6.QtGui import QColor
 
 from paths import ROOT_DIR
 from domain.constants import COLOR_ACTION, COLOR_SUCCESS, COLOR_WARNING, COLOR_ERROR
-from domain.competition_models import (
+from domain.competitions.models import (
     Competition,
     LIBELLES_STATUT_COMPETITION,
     LIBELLES_STATUT_PAIEMENT,
@@ -42,14 +42,14 @@ from domain.competition_models import (
 from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as CompetitionRepository,
 )
-from domain import competition_matching
-from domain.competition_models import (
+from domain.competitions import matching as competition_matching
+from domain.competitions.models import (
     PAIEMENT_PAYE,
     PAIEMENT_STATUTS_ANNULES,
     PAIEMENT_ANNULE_PERDU,
     PAIEMENT_ANNULE_REPORTE,
 )
-from domain.planning_groups import group_for_tarif
+from domain.members.planning_groups import group_for_tarif
 from domain.utils import normalize_string
 
 # Catégorie « hors groupe » : compétiteurs dont le tarif ne correspond à aucun
@@ -521,7 +521,7 @@ class ManualCorrectionDialog(QDialog):
 
     def _match_adherent_by_name(self, payer: str):
         """Retrouve un adhérent par nom + prénom (normalisés, ordre inversé accepté)."""
-        from domain.competition_matching import match_adherent_by_name
+        from domain.competitions.matching import match_adherent_by_name
         return match_adherent_by_name(payer, self._adherents())
 
     def _fill_participant_combo(self, combo, competition_id, preferred_adherent_id=None,

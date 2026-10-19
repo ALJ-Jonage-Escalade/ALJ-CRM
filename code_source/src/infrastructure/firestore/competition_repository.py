@@ -26,7 +26,7 @@ import json
 import re
 from typing import Callable, Dict, Any, List, Optional, Tuple
 
-from domain.competition_models import (
+from domain.competitions.models import (
     LEGACY_COACH_SLOTS,
     Competition,
     Participant,
@@ -41,8 +41,8 @@ from domain.competition_models import (
     statut_paiement_apres_bascule,
 )
 from domain.constants import get_active_season
-from domain.age_rules import parse_birth_date, age_at, get_season_start_date
-from domain import member_view
+from domain.members.age_rules import parse_birth_date, age_at, get_season_start_date
+from domain.members import view as member_view
 from domain.utils import normalize_string
 from infrastructure.firestore.client import (
     META_KEYS,
@@ -430,7 +430,7 @@ class CompetitionFirestoreRepository:
     @staticmethod
     def _read_planning_groups(main_conn) -> Dict[str, str]:
         """{tarif normalisé -> groupe de créneau} depuis la table planning (same rule as the
-        member pages, domain.member_view: a tariff in two groups belongs to the first by id)."""
+        member pages, domain.members.view: a tariff in two groups belongs to the first by id)."""
         try:
             rows = [dict(r) for r in main_conn.execute(
                 "SELECT id, groupe, helloasso_tarifs FROM planning").fetchall()]
@@ -1038,7 +1038,7 @@ class CompetitionFirestoreRepository:
 
     @staticmethod
     def _is_paid_item(item: Dict[str, Any]) -> bool:
-        from domain.competition_matching import STATUTS_PAYES
+        from domain.competitions.matching import STATUTS_PAYES
         return str(item.get("etat") or "").lower() in {str(s).lower() for s in STATUTS_PAYES}
 
     @classmethod
@@ -1290,7 +1290,7 @@ class CompetitionFirestoreRepository:
             if raw_json_str:
                 try:
                     raw_data = json.loads(raw_json_str)
-                    from domain import competition_matching
+                    from domain.competitions import matching as competition_matching
                     comp_name_val = competition_matching.extract_competition_name(raw_data)
                     comp_num_val = competition_matching.extract_competition_number(raw_data, fallback=False)
                 except Exception:

@@ -98,7 +98,7 @@ files = [
     "src/api/schemas/helloasso_items.py",
     "src/api/schemas/participants.py",
     "src/api/seasons.py",
-    "src/domain/member_view.py",
+    "src/domain/members/view.py",
     "src/services/__init__.py",
     "src/services/coach_service.py",
     "src/services/competition_member_service.py",

@@ -392,7 +392,7 @@ class ExportsPage(QWidget):
         pour le dialogue : Collège, Enfants (sous-rubriques par tranche d'âge),
         Perfectionnement, Compétition. Les créneaux hors rubrique restent en liste
         plate, en premier. Retourne une liste de (kind, libellé, nom_brut)."""
-        from domain.planning_groups import build_creneau_items
+        from domain.members.planning_groups import build_creneau_items
         return build_creneau_items(creneaux, include_autonome=False)
 
     def _build_autonome_summary(self, selected_creneaux) -> str:
@@ -516,7 +516,7 @@ class ExportsPage(QWidget):
                 QMessageBox.warning(self, "Aucun groupe", "Aucun groupe de créneaux trouvé dans le planning (BDD).")
                 return
 
-            from domain.planning_groups import is_autonome_creneau
+            from domain.members.planning_groups import is_autonome_creneau
 
             tooltips = {}
             for c in creneaux:

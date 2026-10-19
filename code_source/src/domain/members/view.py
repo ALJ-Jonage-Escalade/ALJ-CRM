@@ -11,7 +11,7 @@ import json
 import re
 from typing import Any, Dict, Iterable, List, Optional
 
-from domain.age_rules import age_at, get_season_start_date, parse_birth_date
+from domain.members.age_rules import age_at, get_season_start_date, parse_birth_date
 from domain.utils import normalize_string
 
 # Rows (SQLite) and members (JSON for the pages) are Dict[str, Any]: mixed column types.

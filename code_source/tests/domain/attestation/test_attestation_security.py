@@ -10,12 +10,12 @@ import sys
 import unittest
 import zlib
 
-_tests_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_tests_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from domain.attestation import (  # noqa: E402
+from domain.attestation.document import (  # noqa: E402
     _render_minimal_pdf_with_pydyf,
     build_attestation,
     render_attestation_pdf,

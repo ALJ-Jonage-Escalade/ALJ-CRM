@@ -779,8 +779,8 @@ def get_pivot_table(season: str = "2026-2027"):
     try:
         from infrastructure.sqlite.repository import SqliteRepository
         from domain.constants import get_active_season
-        from domain.age_rules import parse_birth_date, age_at, get_season_start_date
-        from domain.models import normalize_gender
+        from domain.members.age_rules import parse_birth_date, age_at, get_season_start_date
+        from domain.members.models import normalize_gender
         from domain.utils import clean_city_name
         
         target_season = (season or "").strip()
@@ -1441,7 +1441,7 @@ def sync_helloasso_api():
     from services.competition_store import invalidate_cache
     try:
         from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
-        from domain import competition_matching
+        from domain.competitions import matching as competition_matching
 
         slug = Repo.get_app_setting("HELLOASSO_ANNUAL_CAMPAIGN")
         if not (slug or "").strip():
@@ -1665,7 +1665,7 @@ def update_competitions_results_settings_api(data: Dict[str, Any] = Body(...)):
 def preview_attestation_api(data: Dict[str, Any] = Body(...)):
     """Génère l'aperçu PDF d'une attestation de paiement (retourne application/pdf)."""
     try:
-        from domain.attestation import build_attestation, render_attestation_pdf, get_safe_pdf_filename
+        from domain.attestation.document import build_attestation, render_attestation_pdf, get_safe_pdf_filename
         member = data.get("member") or {}
         season = data.get("season")
         date_jour = data.get("date_jour")
@@ -1691,7 +1691,7 @@ def preview_attestation_api(data: Dict[str, Any] = Body(...)):
 def send_attestation_api(data: Dict[str, Any] = Body(...)):
     """Génère une attestation PDF en mémoire, l'envoie par e-mail et met à jour la date d'envoi."""
     try:
-        from domain.attestation import build_attestation, render_attestation_pdf, get_safe_pdf_filename
+        from domain.attestation.document import build_attestation, render_attestation_pdf, get_safe_pdf_filename
         from domain.utils import apply_template_variables
         from infrastructure.mail.repository import EmailRepository
 
@@ -1787,7 +1787,7 @@ def get_presence_config():
     try:
         import datetime
         from infrastructure.sqlite.repository import SqliteRepository
-        from domain.planning_groups import is_autonome_creneau
+        from domain.members.planning_groups import is_autonome_creneau
         from domain.constants import get_active_season
         from exports.presence_sheets import SEASON_COURSE_START, SEASON_COURSE_END
 
@@ -1906,7 +1906,7 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
     import zipfile
     from exports.presence_sheets import generate_presence_sheets
     from infrastructure.sqlite.repository import SqliteRepository
-    from domain.planning_groups import is_autonome_creneau
+    from domain.members.planning_groups import is_autonome_creneau
     from domain.constants import get_active_season
 
     try:

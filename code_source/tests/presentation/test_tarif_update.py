@@ -13,7 +13,7 @@ from infrastructure.sqlite.repository import SqliteRepository
 
 try:
     from PySide6.QtWidgets import QApplication, QDialog
-    from domain.models import Member
+    from domain.members.models import Member
     from presentation.pages.members import TarifEditDialog
     PYSIDE6_AVAILABLE = True
 except ImportError:

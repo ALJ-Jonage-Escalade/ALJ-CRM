@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, List
 
-from domain.competition_models import Competition
+from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from services.competition_store import cached_competitions, competition_not_found, require_competition, storage, write
 from services.documents import Doc

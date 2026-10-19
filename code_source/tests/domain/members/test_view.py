@@ -1,9 +1,9 @@
-"""domain.member_view: the member list the web pages used to compute in the browser."""
+"""domain.members.view: the member list the web pages used to compute in the browser."""
 
 import datetime
 import unittest
 
-from domain import member_view
+from domain.members import view as member_view
 
 PLANNING = [
     {"id": 2, "groupe": "Enfants 2015-2016", "categorie_age": "U11", "type": "Cours",

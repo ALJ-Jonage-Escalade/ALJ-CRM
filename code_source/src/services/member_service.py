@@ -1,7 +1,7 @@
 """Member list of the web pages (SQLite cache of the crm_* collections, one season at a time).
 
 The fields the browser used to compute (age, slot group, category, normalized status…)
-come from domain.member_view. Knows nothing about HTTP: failures are raised as
+come from domain.members.view. Knows nothing about HTTP: failures are raised as
 services.errors.
 """
 
@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from domain import member_view
-from domain.competition_models import STATUT_CLOSE
+from domain.members import view as member_view
+from domain.competitions.models import STATUT_CLOSE
 from infrastructure.sqlite.repository import SqliteRepository
 from services.competition_service import CompetitionService
 from services.documents import Doc

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame
 
-from domain.models import Member
+from domain.members.models import Member
 from infrastructure.sqlite.repository import SqliteRepository
 
 class DashboardPage(QWidget):

@@ -140,7 +140,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
             self.assertEqual(mirror.call_args.kwargs["raw_items"][0]["id"], 42)
 
     def test_summarize_items_uses_order_date(self):
-        from domain.competition_matching import summarize_items
+        from domain.competitions.matching import summarize_items
         rows = summarize_items([{"id": 1, "amount": 100, "order": {"id": 9, "date": "2026-10-07T15:45:10+02:00"}}])
         self.assertEqual(rows[0]["date_item"], "2026-10-07T15:45:10+02:00")
 
@@ -157,7 +157,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
 
     def test_check_and_notify_all_paid_success(self):
         """Vérifie l'envoi d'e-mail récapitulatif lorsque tous les compétiteurs ont réglé."""
-        from domain.competition_models import Competition, Participant
+        from domain.competitions.models import Competition, Participant
         from infrastructure.helloasso.webhook import HelloAssoWebhookService
 
         comp = Competition(id=10, nom="Open Régional Bloc", date_competition="2026-11-20", prix=15.0)
@@ -204,7 +204,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
 
     def test_check_and_notify_all_paid_incomplete(self):
         """Ne déclenche pas d'e-mail si au moins un compétiteur sélectionné n'a pas encore payé."""
-        from domain.competition_models import Competition, Participant
+        from domain.competitions.models import Competition, Participant
         from infrastructure.helloasso.webhook import HelloAssoWebhookService
 
         comp = Competition(id=11, nom="Coupe de France Difficulté", prix=20.0)

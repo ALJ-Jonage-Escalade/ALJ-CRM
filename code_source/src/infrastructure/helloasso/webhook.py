@@ -6,7 +6,7 @@ Permet de :
 2. Extraire les articles vendus (items), leurs montants et champs personnalisés
    (licence FFME, numéro d'épreuve / compétition concernée).
 3. Rapprocher automatiquement chaque article avec une compétition et un participant
-   (via `domain.competition_matching`).
+   (via `domain.competitions.matching`).
 4. Mettre à jour immédiatement la base de données (marquage « payé », montant réglé,
    sauvegarde de l'article dans le miroir HelloAsso).
 
@@ -29,7 +29,7 @@ from infrastructure.helloasso import api as helloasso_api
 from infrastructure.security.api_auth import auth_enforced, constant_time_equals
 from infrastructure.security.secret_store import SecretStore
 
-from domain.competition_matching import (
+from domain.competitions.matching import (
     auto_link_items,
     summarize_items,
 )
@@ -185,7 +185,7 @@ class HelloAssoWebhookService:
     def competition_form_slug(cls) -> str:
         """Slug du formulaire HelloAsso des compétitions (réglage HELLOASSO_ANNUAL_CAMPAIGN)."""
         try:
-            from domain.competition_matching import parse_campaign_identifier
+            from domain.competitions.matching import parse_campaign_identifier
             ref = CompetitionRepository.get_app_setting("HELLOASSO_ANNUAL_CAMPAIGN")
             if not isinstance(ref, str) or not ref.strip():
                 return ""
