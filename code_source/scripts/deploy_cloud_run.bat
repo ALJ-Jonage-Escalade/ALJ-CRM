@@ -1,6 +1,8 @@
 @echo off
 chcp 65001 >nul
 title Déploiement ALJ Escalade API sur Google Cloud Run
+:: Script range dans code_source\scripts\ : --source . doit viser code_source\
+cd /d "%~dp0.."
 
 echo ==============================================================================
 echo 🚀 ALJ ESCALADE — Déploiement Cloud Run (0 € / mois)
@@ -14,7 +16,7 @@ if %errorlevel% neq 0 (
     echo Pour déployer sur Google Cloud Run, deux options s'offrent à vous :
     echo   1. Déployer directement depuis le navigateur via Google Cloud Shell
     echo      (Recommandé : 0 installation locale requise, gcloud pré-installé).
-    echo      Consultez la documentation : docs/guide_deploiement_cloud_run_helloasso.md
+    echo      Consultez la documentation : documentations/guide_deploiement_cloud_run_helloasso.md
     echo   2. Installer le Google Cloud SDK sur votre PC :
     echo      https://cloud.google.com/sdk/docs/install
     echo.

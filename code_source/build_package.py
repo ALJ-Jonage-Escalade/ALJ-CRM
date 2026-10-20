@@ -31,7 +31,7 @@ cmd = [
     "--onefile",
     "--windowed",
     "--name=ALJ_Escalade_Manager",
-    "--icon=logo.ico",
+    "--icon=web/assets/logo.ico",
     "--paths=src",
     "src/app.py"
 ]
@@ -92,7 +92,7 @@ files_to_copy = [
 ]
 
 for filename in files_to_copy:
-    src_file = os.path.join(WORKSPACE_DIR, filename)
+    src_file = os.path.join(CODE_SOURCE_DIR, "web", "assets", filename)
     if os.path.exists(src_file):
         shutil.copy2(src_file, os.path.join(release_dir, filename))
         print(f"  -> Fichier de configuration '{filename}' copié.")

@@ -5,7 +5,7 @@ const ASSETS_TO_CACHE = [
   "/index",
   "/annuaire/competitions.html",
   "/annuaire/index.html",
-  "/annuaire/logo.png",
+  "/annuaire/assets/logo.png",
   "/bureau/",
   "/bureau/adherents",
   "/bureau/communications",

@@ -13,8 +13,8 @@ services:
       - "127.0.0.1:9150:9150"   # Firestore UI websocket ("Requests" tab)
     volumes:
       # firebase.json + firestore.rules (the real production rules are enforced)
-      - ../firebase.json:/workspace/firebase.json:ro
-      - ../firestore.rules:/workspace/firestore.rules:ro
+      - ../firestore/firebase.json:/workspace/firebase.json:ro
+      - ../firestore/firestore.rules:/workspace/firestore.rules:ro
       # Data persisted across restarts (export on shutdown, import on startup)
       # (export/ subfolder: firebase-tools recreates the target folder, which is impossible on a mount point)
       - ./.emulator-data:/persist

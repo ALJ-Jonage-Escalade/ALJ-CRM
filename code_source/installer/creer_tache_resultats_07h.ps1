@@ -3,7 +3,7 @@
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $CodeSourceDir = Resolve-Path "$ScriptDir\.."
-$BatchPath = Join-Path $CodeSourceDir "run_batch_resultats.bat"
+$BatchPath = Join-Path $CodeSourceDir "scripts\run_batch_resultats.bat"
 $TaskName = "ALJ_Escalade_Batch_Resultats_07h"
 
 Write-Host "==========================================================" -ForegroundColor Cyan

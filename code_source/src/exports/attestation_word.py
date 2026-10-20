@@ -274,15 +274,15 @@ def generate_all_attestations(test_mode=False, output_format="pdf", participants
                     from PySide6.QtCore import QEventLoop, QUrl, QMarginsF
                     from PySide6.QtGui import QPageLayout, QPageSize
                     
-                    # Base URL pour résoudre logo.png et doc/signature.jpg (racine applicative en release, code_source en dev)
+                    # Base URL pour résoudre doc/signature.jpg (racine applicative en release, code_source en dev) ;
+                    # le logo vit dans web/assets/ (copié à la racine applicative par build_package.py en release)
                     import sys
-                    if getattr(sys, 'frozen', False):
+                    base_dir = root_dir if getattr(sys, 'frozen', False) else CODE_ROOT
+                    logo_path = os.path.join(CODE_ROOT, "web", "assets", "logo.png")
+                    if not os.path.exists(logo_path):
                         logo_path = os.path.join(root_dir, "logo.png")
-                    else:
-                        logo_path = os.path.join(CODE_ROOT, "logo.png")
-                        if not os.path.exists(logo_path):
-                            logo_path = os.path.join(root_dir, "logo.png")
-                    base_url = QUrl.fromLocalFile(logo_path)
+                    html_content = html_content.replace('src="logo.png"', f'src="{QUrl.fromLocalFile(logo_path).toString()}"')
+                    base_url = QUrl.fromLocalFile(os.path.join(base_dir, "attestation.html"))
                     
                     # The attestation template needs no script: JavaScript disabled for the render
                     from PySide6.QtWebEngineCore import QWebEngineSettings
