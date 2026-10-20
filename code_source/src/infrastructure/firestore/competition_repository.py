@@ -580,7 +580,7 @@ class CompetitionFirestoreRepository:
         """Insère ou met à jour une épreuve ; retourne son identifiant.
 
         `extra`: fields outside the domain model, stored as given (pass-through fields
-        of the bureau page, see docs/plan_api_only_front.md appendix B)."""
+        of the bureau page, see documentations/plan_api_only_front.md appendix B)."""
         existing = cls._load_comp_doc(comp.id) if comp.id else None
         if comp.id is None:
             comp.id = cls._new_id()

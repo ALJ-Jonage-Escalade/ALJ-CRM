@@ -1,6 +1,6 @@
 """Two coaches on two phones: a change made on one shows up on the other without reloading.
 
-Today the pages listen to Firestore; once they poll the API (docs/plan_api_only_front.md, 20 s
+Today the pages listen to Firestore; once they poll the API (documentations/plan_api_only_front.md, 20 s
 interval) the same test checks the polling, hence the generous timeout."""
 import pytest
 from playwright.sync_api import expect

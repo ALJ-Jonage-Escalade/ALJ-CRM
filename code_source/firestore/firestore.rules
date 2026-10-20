@@ -4,7 +4,7 @@ rules_version = '2';
 // write goes through the API (Cloud Run), which checks roles in api_auth.py.
 // The server (service account) and the desktop app (club OAuth token) reach Firestore
 // through IAM, which these rules do not apply to.
-// See docs/plan_api_only_front.md (phase 3) for the deploy order and the rollback.
+// See documentations/plan_api_only_front.md (phase 3) for the deploy order and the rollback.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} {

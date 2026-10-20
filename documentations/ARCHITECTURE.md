@@ -4,7 +4,7 @@
 > Ce document décrit l'état réel du code. Il a été rédigé par lecture du code et des docs existantes ; les points
 > marqués **(à vérifier)** n'ont pas été confirmés en exécutant l'application.
 > Le client lourd Windows (PySide6) a été retiré : les fonctions qui n'existent pas encore sur le web sont listées
-> dans `documentations/desktop_features_missing_in_web.md`.
+> dans `desktop_features_missing_in_web.md`.
 
 ---
 
@@ -110,7 +110,7 @@ Particularités à connaître :
 - Chaque document `crm_*` porte `_modified_at`, `_modified_by`, `_deleted` (tombstone).
 - Les IDs de compétitions sont `str(Date.now())` ; les anciens IDs aléatoires sont normalisés à la lecture.
 - Le web reconstruit `v_adherents_legacy` **en JavaScript** (`web/shared/alj-members.js`) à partir de `crm_*` : toute évolution du schéma/vue SQL doit être répercutée des deux côtés.
-- Détails : `code_source/docs/base_firestore.md`.
+- Détails : `base_firestore.md`.
 
 ---
 
@@ -146,11 +146,11 @@ Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protég
 ## 5. Front web
 
 - **Aucun framework ni build** : HTML + JS ES modules + CSS, Firebase Auth (connexion seulement), `fetch` via `apiFetch` (`alj-core.js`, ajoute le jeton Bearer).
-- **Toutes les données passent par l'API** (plan `code_source/docs/plan_api_only_front.md`) : aucune page ne charge le SDK Firestore. Les écrans se mettent à jour par interrogation (`alj-sync.js`, `alj-members-sync.js` : toutes les 20 s quand la page est visible, ETag/304). Hors ligne, seule la PWA compétitions affiche une copie en lecture seule (`alj-store.js`, IndexedDB `alj-offline` : épreuves, coachs et, pour les coachs, contacts d'urgence des compétiteurs via `GET /api/members/competitors` ; 30 jours au plus, effacée à la déconnexion ou à la perte du rôle) ; l'annuaire nécessite le réseau. Hors ligne, seule la case « Participe » d'un compétiteur inscrit peut changer : la modification est gardée dans la file `outbox` du même magasin et envoyée au retour du réseau avec le `updated_at` du compétiteur vu par le téléphone (`unchanged_since`) ; le serveur la refuse (409 `changed`) si le compétiteur a changé entre-temps, ou si la compétition est archivée (phase 5b du plan). `alj-firebase.js` efface au démarrage l'ancien cache Firestore (IndexedDB) des téléphones.
+- **Toutes les données passent par l'API** (plan `plan_api_only_front.md`) : aucune page ne charge le SDK Firestore. Les écrans se mettent à jour par interrogation (`alj-sync.js`, `alj-members-sync.js` : toutes les 20 s quand la page est visible, ETag/304). Hors ligne, seule la PWA compétitions affiche une copie en lecture seule (`alj-store.js`, IndexedDB `alj-offline` : épreuves, coachs et, pour les coachs, contacts d'urgence des compétiteurs via `GET /api/members/competitors` ; 30 jours au plus, effacée à la déconnexion ou à la perte du rôle) ; l'annuaire nécessite le réseau. Hors ligne, seule la case « Participe » d'un compétiteur inscrit peut changer : la modification est gardée dans la file `outbox` du même magasin et envoyée au retour du réseau avec le `updated_at` du compétiteur vu par le téléphone (`unchanged_since`) ; le serveur la refuse (409 `changed`) si le compétiteur a changé entre-temps, ou si la compétition est archivée (phase 5b du plan). `alj-firebase.js` efface au démarrage l'ancien cache Firestore (IndexedDB) des téléphones.
 - **Deux « vues »** : PWA smartphone (`/competitions`, `/index`) et portail bureau (`/bureau/*`). `alj-vue.js` redirige automatiquement les écrans ≥ 1024 px vers `/bureau/` (`?vue=mobile` pour forcer la PWA).
 - **Un seul numéro de version web** à garder synchronisé : `<meta alj-web-version>`, `<title>`, badge, et `CACHE_NAME` de `sw.js` (le test `test_mobile_pwa` le vérifie). Chaque déploiement visible = version web +1 (actuellement v23).
 - Rôles : coach/readonly = lecture ; admin = envoi e-mail/attestation, écritures.
-- Plan et décisions du portail : `code_source/docs/plan_pages_web_bureau.md`.
+- Plan et décisions du portail : `plan_pages_web_bureau.md`.
 
 ---
 
@@ -158,7 +158,7 @@ Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protég
 
 Le client lourd Windows a été retiré. La liste des fonctions qui n'existent pas (ou pas entièrement) sur le web,
 avec le code backend conservé et le code supprimé (récupérable dans l'historique git), est dans
-`documentations/desktop_features_missing_in_web.md`.
+`desktop_features_missing_in_web.md`.
 
 ### Obstacles techniques récurrents
 
@@ -266,7 +266,7 @@ uv sync --group web && uv run pytest tests
 ```
 La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[tool.mypy] files`) et `pytest tests` ; tous sont bloquants. `test_ffme_golden_master` nécessite un fichier de référence local non versionné.
 
-**Déploiement web** : `../code_source/deploy_cloud_run.sh` (ou `.bat`) → `gcloud run deploy alj-escalade-api --source . --memory 1Gi --min-instances 0 --max-instances 2 --session-affinity --timeout 300 --allow-unauthenticated` (l'auth est applicative). Règles Firestore : `firebase deploy --only firestore:rules` (`firebase.json`), manuel et **séparé** du déploiement de l'application : refus total des clients, à déployer au moins une semaine après la version web qui ne lit plus Firestore (ordre et retour arrière : plan `plan_api_only_front.md`, S1). Guide : `docs/guide_deploiement_cloud_run_helloasso.md`.
+**Déploiement web** : `../code_source/scripts/deploy_cloud_run.sh` (ou `.bat`) → `gcloud run deploy alj-escalade-api --source . --memory 1Gi --min-instances 0 --max-instances 2 --session-affinity --timeout 300 --allow-unauthenticated` (l'auth est applicative). Règles Firestore : `firebase deploy --only firestore:rules` (`firebase.json`), manuel et **séparé** du déploiement de l'application : refus total des clients, à déployer au moins une semaine après la version web qui ne lit plus Firestore (ordre et retour arrière : plan `plan_api_only_front.md`, S1). Guide : `guide_deploiement_cloud_run_helloasso.md`.
 
 **Tâche planifiée** : la tâche Cloud Scheduler `batch-resultats-competitions` (07:00, Europe/Paris) appelle `POST /api/competitions/cron/fetch-results`. Elle a été créée à la main dans GCP (hors dépôt).
 
@@ -276,7 +276,7 @@ La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[too
 
 ## 8. Pièges & dette connue
 
-- **Documentation partiellement périmée** : `../GEMINI.md` (racine et `code_source/`) décrit encore Tkinter, un fonctionnement 100 % Windows/Excel/Drive et des chemins de l'ancien poste. `docs/architecture_actuelle.md` et `docs/plan_migration.md` datent de la migration Tkinter→PySide6. `plan_architecture_cloud_mobile.md` annonce `APP_VERSION 2.3.0`, `512Mi`. `pyproject.toml` dit `2.0.5`. **Faire confiance au code et à `VERSION`, puis `base_firestore.md` et `plan_pages_web_bureau.md` (les plus récents).**
+- **Documentation partiellement périmée** : `../GEMINI.md` (racine et `code_source/`) décrit encore Tkinter, un fonctionnement 100 % Windows/Excel/Drive et des chemins de l'ancien poste. `architecture_actuelle.md` et `plan_migration.md` datent de la migration Tkinter→PySide6. `plan_architecture_cloud_mobile.md` annonce `APP_VERSION 2.3.0`, `512Mi`. `pyproject.toml` dit `2.0.5`. **Faire confiance au code et à `VERSION`, puis `base_firestore.md` et `plan_pages_web_bureau.md` (les plus récents).**
 - `../GEMINI.md` impose une convention utile : scripts de diagnostic jetables dans `scripts_temporaires/` (ignoré par git), jamais à la racine.
 - **Duplication du front** : `competitions.html` (2700 lignes) et `../index.html` dupliquent historiquement auth/style ; le portail `bureau/` utilise `shared/`. Ne pas dupliquer davantage.
 - **Admins codés en dur** (`api_auth.py` + copies d'affichage en JS) : à terme, passer par les custom claims Firebase.
@@ -288,7 +288,7 @@ La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[too
 
 ## 9. Pour commencer concrètement
 
-1. Lire dans l'ordre : ce fichier → `code_source/docs/base_firestore.md` → `code_source/docs/plan_pages_web_bureau.md` → `src/server.py` puis `src/api/` (§4) → `web/shared/alj-core.js` → `web/bureau/adherents.html` (page de référence).
+1. Lire dans l'ordre : ce fichier → `base_firestore.md` → `plan_pages_web_bureau.md` → `src/server.py` puis `src/api/` (§4) → `web/shared/alj-core.js` → `web/bureau/adherents.html` (page de référence).
 2. Lancer le serveur en local et ouvrir `/bureau/` (§7) ; lancer les tests web/API.
-3. Choisir une fonction manquante dans `documentations/desktop_features_missing_in_web.md` (§6).
+3. Choisir une fonction manquante dans `desktop_features_missing_in_web.md` (§6).
 4. Décider des questions ouvertes avec le club : envoi groupé (quotas Gmail, anti-doublon), droit d'écriture sur le web, hébergement des secrets (Secret Manager), sort de `database.db` Drive (retour arrière).

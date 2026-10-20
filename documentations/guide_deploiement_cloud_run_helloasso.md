@@ -55,8 +55,8 @@ Cette méthode ne nécessite **aucune installation** sur votre ordinateur (ni Do
    ```
 5. Rendez le script de déploiement exécutable et lancez-le :
    ```bash
-   chmod +x deploy_cloud_run.sh
-   ./deploy_cloud_run.sh
+   chmod +x scripts/deploy_cloud_run.sh
+   ./scripts/deploy_cloud_run.sh
    ```
 6. Le script compile l'image conteneur via Google Cloud Build et déploie le service sur Cloud Run en région `europe-west1`.
 7. À la fin, l'URL publique de votre service est affichée :
@@ -80,7 +80,7 @@ Si vous préférez déployer depuis votre machine locale :
    ```cmd
    gcloud services enable run.googleapis.com cloudbuild.googleapis.com
    ```
-4. Double-cliquez sur `deploy_cloud_run.bat` à la racine du projet ALJ-CRM (ou dans `../code_source`).
+4. Double-cliquez sur `scripts/deploy_cloud_run.bat` à la racine du projet ALJ-CRM (ou `../code_source/scripts/deploy_cloud_run.bat`).
 5. Confirmez le déploiement en appuyant sur `O`.
 
 ---
@@ -239,7 +239,7 @@ déploiement d'image sans `--set-env-vars` / `--set-secrets` les conserve tels q
 Depuis Cloud Shell, dans `../code_source` :
 
 ```bash
-./deploy_cloud_run.sh --rollback <revision-precedente>
+./scripts/deploy_cloud_run.sh --rollback <revision-precedente>
 ```
 
 Le script reste l'outil pour `--test`, `--rollback` et `--cleanup`. Le push suivant sur `main` renvoie le trafic sur la dernière révision.

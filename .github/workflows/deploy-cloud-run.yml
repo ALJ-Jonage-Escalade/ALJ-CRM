@@ -5,7 +5,7 @@ name: Deploy Cloud Run
 # GitHub variables of the "production" environment, never committed (public repository).
 # Env vars and Secret Manager references are already set on the Cloud Run service: deploying an
 # image without --set-env-vars / --set-secrets keeps them unchanged.
-# Setup and rollback: code_source/docs/guide_deploiement_cloud_run_helloasso.md, section 7.
+# Setup and rollback: documentations/guide_deploiement_cloud_run_helloasso.md, section 7.
 on:
   push:
     branches: [main]
