@@ -700,7 +700,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_planning_item_crud_and_export(self):
         """Vérifie la création, modification, suppression et export Excel des créneaux de planning."""
-        from server import save_planning_item_api, delete_planning_item_api, export_planning_api, get_planning
+        from api.activities.planning import save_planning_item_api, delete_planning_item_api, export_planning_api, get_planning
         
         # 1. Création d'un nouveau créneau
         new_slot = {

@@ -15,8 +15,6 @@ from typing import Optional
 from fastapi import FastAPI, Body, BackgroundTasks, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 
-from infrastructure.sqlite.repository import SqliteRepository
-
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -93,6 +91,7 @@ app.middleware("http")(security_headers_middleware)  # outermost
 from api.competitions import coaches, competitions, helloasso_items, participants
 from api.competitions import members as competition_members
 from api.competitions import payments, results
+from api.activities import planning, presence
 from api.communications import attestations, email, whatsapp
 from api.members import dashboard, members, seasons
 from api.web import health, pages, pwa
@@ -101,6 +100,7 @@ from infrastructure.geocoding import geocode_missing_addresses
 from services.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
              results, payments, members, seasons, dashboard, email, whatsapp, attestations,
+             planning, presence,
              pages, pwa, health):
     app.include_router(_api.router)
 pages.mount_static(app)
@@ -773,88 +773,6 @@ def get_pivot_table(season: str = "2026-2027"):
 """.replace("{PIVOT_DATA_JSON}", pivot_data_json)
     return HTMLResponse(content=html_content)
 
-@app.get("/api/planning")
-def get_planning():
-    """Récupère le planning depuis la BDD SQLite."""
-    try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        return SqliteRepository.load_planning_data(log_debug=False)
-    except Exception as e:
-        return {"error": internal_error(e, "get_planning")}
-
-
-@app.post("/api/planning/item")
-def save_planning_item_api(item: Dict[str, Any] = Body(...)):
-    """Crée ou met à jour un créneau unique dans la table planning."""
-    try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        saved_item = SqliteRepository.save_planning_item(item)
-        return {"status": "success", "message": "Créneau enregistré avec succès.", "item": saved_item}
-    except Exception as e:
-        return JSONResponse(status_code=400, content={"status": "error", "message": internal_error(e, "save_planning_item_api")})
-
-
-@app.delete("/api/planning/item/{item_id}")
-def delete_planning_item_api(item_id: int):
-    """Supprime un créneau de planning par son ID."""
-    try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        ok = SqliteRepository.delete_planning_item(item_id)
-        if not ok:
-            return JSONResponse(status_code=404, content={"status": "error", "message": f"Créneau #{item_id} introuvable."})
-        return {"status": "success", "message": f"Créneau #{item_id} supprimé avec succès."}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "delete_planning_item_api")})
-
-
-@app.get("/api/planning/export")
-def export_planning_api(mode: str = Query("grid"), season: Optional[str] = Query(None)):
-    """Exporte le planning au format Excel (grille visuelle hebdomadaire ou liste tabulaire)."""
-    import os
-    import tempfile
-    import shutil
-    from infrastructure.sqlite.repository import SqliteRepository
-    from exports.planning_excel import export_planning_excel, export_planning_list_excel
-    from domain.constants import get_active_season
-
-    target_season = season or get_active_season()
-    planning_data = SqliteRepository.load_planning_data(log_debug=False)
-
-    tmp_dir = tempfile.mkdtemp(prefix="alj_plan_export_")
-    try:
-        if mode == "list":
-            filename = f"Planning_Liste_{target_season}.xlsx"
-            out_path = os.path.join(tmp_dir, filename)
-            export_planning_list_excel(planning_data, target_season, out_path)
-        else:
-            filename = f"Planning_Grille_{target_season}.xlsx"
-            out_path = os.path.join(tmp_dir, filename)
-            export_planning_excel(planning_data, target_season, out_path)
-
-        with open(out_path, "rb") as f:
-            content_bytes = f.read()
-
-        return Response(
-            content=content_bytes,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Access-Control-Expose-Headers": "Content-Disposition"
-            }
-        )
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-
-
-@app.post("/api/planning")
-def update_planning(planning_data: List[Dict[str, Any]] = Body(...)):
-    """Met à jour le planning dans la BDD SQLite."""
-    try:
-        SqliteRepository.save_planning_data(planning_data)
-        return {"status": "success", "message": "Planning mis à jour"}
-    except Exception as e:
-        return {"error": internal_error(e, "update_planning")}
-
 
 # --------------------------------------------------------------------------
 # Micro-service Cloud & Mobile : Webhooks HelloAsso
@@ -945,226 +863,6 @@ def sync_helloasso_api():
         return {"status": "error", "message": internal_error(e, "sync_helloasso_api")}
     finally:
         invalidate_cache()  # payments recorded on competition documents directly
-
-
-# --------------------------------------------------------------------------
-# Fiches de Présence Excel (Téléchargement direct dans le navigateur)
-# --------------------------------------------------------------------------
-@app.get("/api/presence/config")
-def get_presence_config():
-    """Renvoie les groupes disponibles (autonomes et cours) et leurs statistiques pour l'IHM."""
-    try:
-        import datetime
-        from infrastructure.sqlite.repository import SqliteRepository
-        from domain.members.planning_groups import is_autonome_creneau
-        from domain.constants import get_active_season
-        from exports.presence_sheets import SEASON_COURSE_START, SEASON_COURSE_END
-
-        season = get_active_season()
-        creneaux = SqliteRepository.load_creneaux_groups()
-        raw_data = SqliteRepository.load_direct_data(season_filter=season)
-
-        # 1. Groupes autonomes
-        aut_creneaux = [c for c in creneaux if is_autonome_creneau(c)]
-        aut_tarifs = set()
-        for c in aut_creneaux:
-            for t in (c.get("tarifs") or []):
-                aut_tarifs.add(str(t).strip())
-
-        today = datetime.date.today()
-        def _dob_of(p):
-            s = str(p.get("birth_date") or p.get("champ_Date de naissance de l'adhérent") or "").strip()
-            for fmt, sliced in (("%Y-%m-%d", True), ("%d/%m/%Y", False)):
-                try:
-                    return datetime.datetime.strptime(s[:10] if sliced else s, fmt).date()
-                except ValueError:
-                    continue
-            return None
-
-        # Comptage autonome
-        aut_adultes = 0
-        aut_mineurs = 0
-        counted_keys = set()
-        for p in raw_data:
-            tarif = str(p.get("tarif_name") or "").strip()
-            if tarif not in aut_tarifs or "annul" in str(p.get("status") or "").lower():
-                continue
-            dob = _dob_of(p)
-            ikey = (str(p.get("first_name") or "").strip().lower(), str(p.get("last_name") or "").strip().lower(), dob.isoformat() if dob else "")
-            if ikey in counted_keys:
-                continue
-            counted_keys.add(ikey)
-            if dob:
-                age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-                if age < 18:
-                    aut_mineurs += 1
-                else:
-                    aut_adultes += 1
-            else:
-                aut_adultes += 1
-
-        # Mineurs autorisés ajoutés d'autres groupes
-        added_minors = 0
-        added_seen = set()
-        for p in raw_data:
-            if "annul" in str(p.get("status") or "").lower():
-                continue
-            if not (str(p.get("parental_auth_autonomous") or "").strip() == "Oui" or str(p.get("parental_auth_family") or "").strip() == "Oui"):
-                continue
-            dob = _dob_of(p)
-            ikey = (str(p.get("first_name") or "").strip().lower(), str(p.get("last_name") or "").strip().lower(), dob.isoformat() if dob else "")
-            if ikey in counted_keys or ikey in added_seen:
-                continue
-            if dob:
-                age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-                if age >= 18:
-                    continue
-            added_seen.add(ikey)
-            added_minors += 1
-
-        # 2. Groupes de cours
-        cours_creneaux = [c for c in creneaux if not is_autonome_creneau(c)]
-        cours_list = []
-        for c in cours_creneaux:
-            c_tarifs = set(str(t).strip() for t in (c.get("tarifs") or []))
-            count = 0
-            c_seen = set()
-            for p in raw_data:
-                if "annul" in str(p.get("status") or "").lower():
-                    continue
-                if str(p.get("tarif_name") or "").strip() in c_tarifs:
-                    dob = _dob_of(p)
-                    ikey = (str(p.get("first_name") or "").strip().lower(), str(p.get("last_name") or "").strip().lower(), dob.isoformat() if dob else "")
-                    if ikey not in c_seen:
-                        c_seen.add(ikey)
-                        count += 1
-            slots_str = " · ".join(f"{j} {h}".strip() for j, h in c["slots"] if j or h)
-            cours_list.append({
-                "groupe": c["groupe"],
-                "slots": slots_str,
-                "tarifs": c["tarifs"],
-                "count": count,
-            })
-
-        return {
-            "status": "success",
-            "season": season,
-            "default_dates": {
-                "start": SEASON_COURSE_START.strftime("%d/%m/%Y"),
-                "end": SEASON_COURSE_END.strftime("%d/%m/%Y")
-            },
-            "autonome": {
-                "adultes": aut_adultes,
-                "mineurs": aut_mineurs,
-                "mineurs_autorises": added_minors,
-                "total": aut_adultes + aut_mineurs + added_minors,
-                "groups": [c["groupe"] for c in aut_creneaux],
-            },
-            "cours": cours_list
-        }
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": f"Erreur chargement config présence : {e}"})
-
-
-@app.post("/api/presence/export")
-def export_presence_api(data: Dict[str, Any] = Body(...)):
-    """Génère les fiches de présence au format Excel et les renvoie directement en téléchargement."""
-    import os
-    import shutil
-    import tempfile
-    import zipfile
-    from exports.presence_sheets import generate_presence_sheets
-    from infrastructure.sqlite.repository import SqliteRepository
-    from domain.members.planning_groups import is_autonome_creneau
-    from domain.constants import get_active_season
-
-    try:
-        season = data.get("season") or get_active_season()
-        raw_data = SqliteRepository.load_direct_data(season_filter=season)
-        creneaux = SqliteRepository.load_creneaux_groups()
-
-        variant = (data.get("variant") or "cours").strip().lower()
-        start_date = (data.get("start_date") or "").strip() or None
-        end_date = (data.get("end_date") or "").strip() or None
-        show_health_col = bool(data.get("show_health_col", False))
-
-        if variant == "autonome":
-            aut_creneaux = [c for c in creneaux if is_autonome_creneau(c)]
-            selected_groups = [c["groupe"] for c in aut_creneaux]
-            group_tarifs_map = {c["groupe"]: c["tarifs"] for c in aut_creneaux}
-            merge_groups = True
-            auth_only = True
-            hide_badge_cols = False
-            same_sheet = False
-        else:
-            cours_creneaux = [c for c in creneaux if not is_autonome_creneau(c)]
-            user_groups = data.get("selected_groups") or []
-            if user_groups:
-                selected_groups = [c["groupe"] for c in cours_creneaux if c["groupe"] in user_groups]
-            else:
-                selected_groups = [c["groupe"] for c in cours_creneaux]
-            group_tarifs_map = {c["groupe"]: c["tarifs"] for c in cours_creneaux if c["groupe"] in selected_groups}
-            merge_groups = False
-            auth_only = False
-            hide_badge_cols = True
-            same_sheet = bool(data.get("same_sheet", True))
-
-        if not selected_groups:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Aucun groupe sélectionné pour l'export."})
-
-        tmp_dir = tempfile.mkdtemp(prefix="alj_presence_")
-        try:
-            ok, files = generate_presence_sheets(
-                selected_groups=selected_groups,
-                participants_data=raw_data,
-                start_date_str=start_date,
-                end_date_str=end_date,
-                merge_groups=merge_groups,
-                auth_only=auth_only,
-                hide_badge_cols=hide_badge_cols,
-                same_sheet=same_sheet,
-                group_tarifs_map=group_tarifs_map,
-                show_health_col=show_health_col,
-                output_dir=tmp_dir,
-            )
-            if not ok or not files:
-                return JSONResponse(status_code=400, content={"status": "error", "message": f"Erreur de génération : {files}"})
-
-            if len(files) == 1:
-                filename = files[0]
-                file_path = os.path.join(tmp_dir, filename)
-                with open(file_path, "rb") as f:
-                    content_bytes = f.read()
-                return Response(
-                    content=content_bytes,
-                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    headers={
-                        "Content-Disposition": f'attachment; filename="{filename}"',
-                        "Access-Control-Expose-Headers": "Content-Disposition"
-                    }
-                )
-            else:
-                zip_filename = f"Fiches_Presence_{variant.capitalize()}_{season}.zip"
-                zip_path = os.path.join(tmp_dir, zip_filename)
-                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                    for fname in files:
-                        fpath = os.path.join(tmp_dir, fname)
-                        if os.path.exists(fpath):
-                            zf.write(fpath, arcname=fname)
-                with open(zip_path, "rb") as f:
-                    zip_bytes = f.read()
-                return Response(
-                    content=zip_bytes,
-                    media_type="application/zip",
-                    headers={
-                        "Content-Disposition": f'attachment; filename="{zip_filename}"',
-                        "Access-Control-Expose-Headers": "Content-Disposition"
-                    }
-                )
-        finally:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": f"Erreur serveur lors de la génération : {e}"})
 
 
 # --------------------------------------------------------------------------
