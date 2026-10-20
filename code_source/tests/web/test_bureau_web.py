@@ -222,7 +222,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_pivot_table_configuration_and_fields(self):
         """Vérifie la présence du filtre Âge, des colonnes Statut & Sexe, et de l'exclusion par défaut d'Annulé."""
-        from server import get_pivot_table
+        from api.reports.pivot import get_pivot_table
         from infrastructure.sqlite.repository import SqliteRepository
 
         # Fake data: attribute keys only appear in data rows, so the test must not depend on the local DB.
