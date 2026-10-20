@@ -22,10 +22,9 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
-from server import (
-    app, get_bureau_home, get_bureau_page, get_competitions_page, get_annuaire_page,
-    get_sw, get_web_version,
-)
+from api.web.pages import get_annuaire_page, get_bureau_home, get_bureau_page, get_competitions_page
+from api.web.pwa import get_sw, get_web_version
+from server import app
 
 WEB = os.path.join(_code_root, "web")
 BUREAU = os.path.join(WEB, "bureau")
@@ -120,11 +119,11 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_competitions_results_cron_and_settings_endpoints(self):
         """Vérifie les endpoints de configuration et de cron du batch des résultats MyCompet."""
-        from server import (
-            app,
+        from api.competitions.results import (
             get_competitions_results_settings_api,
             update_competitions_results_settings_api
         )
+        from server import app
 
         # 1. GET /api/settings/competitions-results
         res = get_competitions_results_settings_api()
@@ -157,7 +156,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_cloud_db_status_endpoint(self):
         """Vérifie l'endpoint GET /api/cloud-db/status."""
-        from server import get_cloud_db_status_api
+        from api.integrations.cloud_db import get_cloud_db_status_api
         res = get_cloud_db_status_api()
         self.assertEqual(res.get("status"), "success")
         self.assertIn("db_exists", res)
@@ -180,7 +179,7 @@ class TestBureauFiles(unittest.TestCase):
         import shutil
         import tempfile
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import get_ffme_stats_api, export_ffme_api
+        from api.ffme.ffme import get_ffme_stats_api, export_ffme_api
 
         # Seeded temporary database: never read data/database.db (absent in CI, personal data locally).
         original_db_path = SqliteRepository.get_db_path()
@@ -223,7 +222,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_pivot_table_configuration_and_fields(self):
         """Vérifie la présence du filtre Âge, des colonnes Statut & Sexe, et de l'exclusion par défaut d'Annulé."""
-        from server import get_pivot_table
+        from api.reports.pivot import get_pivot_table
         from infrastructure.sqlite.repository import SqliteRepository
 
         # Fake data: attribute keys only appear in data rows, so the test must not depend on the local DB.
@@ -397,7 +396,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import send_attestation_api
+        from api.communications.attestations import send_attestation_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_attestation.db")
@@ -499,7 +498,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import add_member_api
+        from api.members.members import add_member_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_member_add.db")
@@ -579,7 +578,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_member_add_validation(self):
         """add_member_api rejette les requêtes avec champs obligatoires manquants."""
-        from server import add_member_api
+        from api.members.members import add_member_api
 
         # Nom manquant
         res = add_member_api({"fields": {"first_name": "Jean", "birth_date": "2000-01-01", "tarif_name": "Licence"}})
@@ -603,7 +602,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import update_member_api
+        from api.members.members import update_member_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_member_edit.db")
@@ -684,7 +683,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_sync_cloud_db_endpoint(self):
         """Vérifie l'endpoint POST /api/cloud-db/sync."""
-        from server import sync_cloud_db_api
+        from api.integrations.cloud_db import sync_cloud_db_api
         with patch("infrastructure.firestore.cloud_database.CloudDatabase.is_enabled", return_value=True):
             with patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"status": "ok", "errors": []}):
                 res = sync_cloud_db_api(force=True)
@@ -692,7 +691,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_season_tarifs_endpoint(self):
         """GET /api/season-tarifs retourne les tarifs disponibles de la saison active."""
-        from server import get_season_tarifs_api
+        from api.members.seasons import get_season_tarifs_api
         res = get_season_tarifs_api("2026-2027")
         self.assertEqual(res.get("status"), "success")
         self.assertIn("tarifs", res)
@@ -701,7 +700,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_planning_item_crud_and_export(self):
         """Vérifie la création, modification, suppression et export Excel des créneaux de planning."""
-        from server import save_planning_item_api, delete_planning_item_api, export_planning_api, get_planning
+        from api.activities.planning import save_planning_item_api, delete_planning_item_api, export_planning_api, get_planning
         
         # 1. Création d'un nouveau créneau
         new_slot = {
@@ -785,7 +784,7 @@ class TestBureauFiles(unittest.TestCase):
         import shutil
         import pandas as pd
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import preview_ffme_import_api, apply_ffme_import_api
+        from api.ffme.ffme import preview_ffme_import_api, apply_ffme_import_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_ffme_import.db")
@@ -996,7 +995,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import save_email_template_api, delete_email_template_api, get_email_templates
+        from api.communications.email import save_email_template_api, delete_email_template_api, get_email_templates
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_tpl.db")
@@ -1056,7 +1055,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import get_whatsapp_template_api, save_whatsapp_template_api
+        from api.communications.whatsapp import get_whatsapp_template_api, save_whatsapp_template_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_wa.db")

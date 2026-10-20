@@ -52,7 +52,7 @@ class TestServerPagesEscapeMemberData(unittest.TestCase):
     def test_map_data_and_popups(self):
         point = {"address": PAYLOAD, "lat": 45.8, "lon": 5.05,
                  "members": [f"{PAYLOAD} ({PAYLOAD})"], "groups": [PAYLOAD]}
-        with patch("server.get_sqlite_map_data", return_value=[point]):
+        with patch("api.reports.map.get_sqlite_map_data", return_value=[point]):
             html = self.client.get("/map").text
         self._assert_payload_contained(html)
         self.assertIn("escHtml(point.address)", html)

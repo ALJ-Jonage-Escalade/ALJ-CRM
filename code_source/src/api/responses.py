@@ -44,6 +44,21 @@ def error(status: int, message: str, code: Optional[str] = None) -> JSONResponse
     return JSONResponse(body, status_code=status)
 
 
+GENERIC_ERROR = "Erreur interne du serveur (détails dans les journaux)."
+
+
+def internal_error(e: Exception, where: str) -> str:
+    """Logs the exception server-side; the client only gets a generic message
+    (no paths, SQL or third-party details, notably on the public webhook)."""
+    print(f"❌ [{where}] {type(e).__name__}: {e}")
+    return GENERIC_ERROR
+
+
+def client_error(e: Exception, where: str) -> str:
+    """Validation errors (ValueError) are meant for the user; anything else stays generic."""
+    return str(e) if isinstance(e, ValueError) else internal_error(e, where)
+
+
 SERVICE_ERROR_STATUS = (
     (NotFound, 404),
     (InvalidRequest, 400),

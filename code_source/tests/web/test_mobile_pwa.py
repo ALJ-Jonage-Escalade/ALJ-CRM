@@ -13,7 +13,8 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 
-from server import get_manifest, get_sw, get_competitions_page, get_web_version, get_annuaire_page
+from api.web.pages import get_annuaire_page, get_competitions_page
+from api.web.pwa import get_manifest, get_sw, get_web_version
 
 
 class TestMobilePWA(unittest.TestCase):

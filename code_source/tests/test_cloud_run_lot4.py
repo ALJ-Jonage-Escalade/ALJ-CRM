@@ -13,7 +13,9 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from domain.constants import APP_VERSION, get_active_season
-from server import health_check, webhook_helloasso_ping, root_route
+from api.web.health import health_check
+from api.web.pages import root_route
+from api.integrations.helloasso import webhook_helloasso_ping
 
 
 class TestCloudRunLot4(unittest.TestCase):

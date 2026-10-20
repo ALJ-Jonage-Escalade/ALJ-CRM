@@ -51,10 +51,12 @@ ALJ-CRM/                         ← racine du dépôt
 ├── code_source/                 ← TOUT le code (la racine ne contient que des doublons/raccourcis, voir §9)
 │   ├── src/
 │   │   ├── app.py               ← entrée DESKTOP (QApplication + thread uvicorn)
-│   │   ├── server.py            ← entrée WEB/API (FastAPI, ~1400 lignes)
+│   │   ├── server.py            ← entrée WEB/API : assemble l'app FastAPI (middlewares, routeurs de api/), aucune route
 │   │   ├── paths.py             ← CODE_ROOT / ROOT_DIR / DATA_ROOT (à utiliser, ne jamais recalculer)
 │   │   ├── domain/              ← Python pur : members/, competitions/, attestation/ + constants, utils, validators
-│   │   ├── services/ api/       ← cas d'usage + routeurs FastAPI, rangés pareil : competitions/, members/
+│   │   ├── api/                 ← routeurs FastAPI, un fichier par domaine, rangés par thème (voir §4)
+│   │   ├── services/            ← cas d'usage, rangés comme api/ : competitions/, members/ (les autres thèmes
+│   │   │                          gardent encore leur logique dans le routeur)
 │   │   ├── infrastructure/      ← accès externes, un dossier par système : security/ (auth API, secrets),
 │   │   │                          sqlite/ (+ migrations/), firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/
 │   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME, Excel adhérents),
@@ -118,17 +120,29 @@ Particularités à connaître :
 
 ---
 
-## 4. Backend `server.py` — routes
+## 4. Backend — routes (`src/api/`)
 
-| Catégorie | Routes |
-|---|---|
-| Pages | `/`, `/index`, `/competitions`, `/bureau`, `/bureau/{page}` (liste blanche), `/sw.js`, `/manifest.webmanifest`, `/static-web/*`, `/annuaire` |
-| Santé/version | `/health`, `/api/web-version` |
-| Données | `/api/dashboard`, `/api/planning` (GET/POST), `/api/season-tarifs`, `/api/members/update` |
-| Outils | `/map`, `/pivot` (pages HTML générées côté serveur, chargées en `iframe srcdoc`) |
-| E-mail | `/api/email-templates` (GET/POST/DELETE), `/api/whatsapp-template`, `/api/preview-email`, `/api/send-email`, `/api/email-status` |
-| Attestations | `/api/attestations/preview`, `/api/attestations/send` (PDF en mémoire, admin) |
-| HelloAsso | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync` |
+`server.py` ne contient aucune route : il vérifie l'environnement, installe les middlewares (cache SQLite,
+auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs de `src/api/<thème>/<domaine>.py`.
+
+| Thème (`api/…`) | Fichiers | Routes |
+|---|---|---|
+| `web/` | `pages`, `pwa`, `health` | `/`, `/index`, `/competitions`, `/bureau`, `/bureau/{page}` (liste blanche), `/annuaire` et `/static-web/*` (`mount_static`) · `/sw.js`, `/manifest.webmanifest`, `/runtime-config.js`, `/api/web-version` · `/health` |
+| `members/` | `members`, `seasons`, `dashboard` | `/api/members` (+ `/competitors`, `/update`, `/create`, `/add`) · `/api/seasons`, `/api/season-tarifs` · `/api/dashboard` |
+| `competitions/` | `competitions`, `participants`, `coaches`, `members`, `helloasso_items`, `results`, `payments` | `/api/competitions/*`, `/api/coaches`, `/api/competition-members`, `/api/helloasso/items` · résultats MyCompet (`/api/competitions/cron/fetch-results`, `/{id}/fetch-results`, `/api/settings/competitions-results`) · `/{id}/check-all-paid` |
+| `communications/` | `email`, `whatsapp`, `attestations` | `/api/email-templates` (GET/POST/DELETE), `/api/preview-email`, `/api/email-status`, `/api/send-email` · `/api/whatsapp-template` · `/api/attestations/preview`, `/send` (PDF en mémoire, admin) |
+| `activities/` | `planning`, `presence` | `/api/planning` (GET/POST, `/item`, `/export`) · `/api/presence/config`, `/export` |
+| `reports/` | `map`, `pivot` | `/map`, `/pivot` (pages HTML générées côté serveur, chargées en `iframe srcdoc`) |
+| `ffme/` | `ffme` | `/api/ffme/stats`, `/export` (CSV), `/preview`, `/import` |
+| `integrations/` | `helloasso`, `google_auth`, `cloud_db` | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync` · `/api/auth/google/*` · `/api/cloud-db/status`, `/sync` |
+
+- **Cache SQLite** : les routeurs `competitions`, `participants`, `coaches`, `members` (compétitions) et `helloasso_items`
+  ne lisent que Firestore et sautent le rafraîchissement du cache (`FIRESTORE_ONLY_PATHS`). Une route qui lit ou écrit le
+  cache va dans un autre routeur, même sous `/api/competitions` (`results`, `payments`).
+- **URL appelées de l'extérieur, à ne pas changer** : Cloud Scheduler (job `batch-resultats-competitions`,
+  `POST /api/competitions/cron/fetch-results` chaque jour à 07h00 — à déclarer avant `/{id}/fetch-results`), webhook
+  HelloAsso, retours OAuth Google (console Google Cloud), `/health` (déploiement). `tests/test_route_inventory.py`
+  fige la liste complète des routes.
 
 **Auth** : `ALJ_API_AUTH=required` (Docker) ou présence de `K_SERVICE` (Cloud Run) → jeton Firebase obligatoire, fail-closed.
 Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protégées. Les listes d'e-mails admin/coach sont **codées en dur** dans `api_auth.py`, recopiées pour l'affichage seulement dans `alj-core.js`, `competitions.html` et `../index.html` (un test vérifie la cohérence — modifier les quatre). `firestore.rules` ne contient plus de rôle : il refuse tout client.
@@ -182,7 +196,7 @@ Correspondance entre les pages du client lourd et ce qui existe déjà sur le we
 5. Incrémenter la version web (meta/title/badge/`sw.js`) et déployer.
 6. Une fois la parité atteinte, retirer la page Qt correspondante.
 
-Fin de parcours : supprimer `presentation/`, `app.py`, `launcher/`, `installer/`, `make_portable.py`, la CI de release Windows, `PySide6`/`pywin32`/`python-docx`/`keyring` de `requirements.txt`, puis convertir `server.py` en simple backend (aujourd'hui il charge `SqliteRepository`, `helloasso_api`, etc. — acceptable).
+Fin de parcours : supprimer `presentation/`, `app.py`, `launcher/`, `installer/`, `make_portable.py`, la CI de release Windows, `PySide6`/`pywin32`/`python-docx`/`keyring` de `requirements.txt`, puis réduire `src/api/` au backend web (aujourd'hui ses routeurs chargent `SqliteRepository`, l'API HelloAsso, etc. — acceptable).
 
 ---
 
@@ -303,7 +317,7 @@ La CI lance les tests Qt **en processus séparés** (crashs natifs sinon) ; `ruf
 
 ## 9. Pour commencer concrètement
 
-1. Lire dans l'ordre : ce fichier → `code_source/docs/base_firestore.md` → `code_source/docs/plan_pages_web_bureau.md` → `src/server.py` → `web/shared/alj-core.js` → `web/bureau/adherents.html` (page de référence).
+1. Lire dans l'ordre : ce fichier → `code_source/docs/base_firestore.md` → `code_source/docs/plan_pages_web_bureau.md` → `src/server.py` puis `src/api/` (§4) → `web/shared/alj-core.js` → `web/bureau/adherents.html` (page de référence).
 2. Lancer le serveur en local et ouvrir `/bureau/` (§7) ; lancer les tests web/API.
 3. Choisir une page « Absent » du tableau §6 — le meilleur premier candidat est **Exports** (FFME CSV + fiches de présence) : forte valeur, logique isolée, golden master déjà en place pour sécuriser le refactor.
 4. Décider des questions ouvertes avec le club : envoi groupé (quotas Gmail, anti-doublon), droit d'écriture sur le web, hébergement des secrets (Secret Manager), sort de `database.db` Drive (retour arrière).

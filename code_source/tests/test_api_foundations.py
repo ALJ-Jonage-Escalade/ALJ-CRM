@@ -32,6 +32,19 @@ def api_routes(*routers):
     return [r for router in routers for r in router.routes if isinstance(r, APIRoute)]
 
 
+def app_routes(routes):
+    """APIRoutes of the app, including those of the included routers (recent FastAPI keeps
+    each included router as one node instead of copying its routes into the app)."""
+    found = []
+    for r in routes:
+        included = getattr(r, "original_router", None)
+        if included is not None:
+            found += app_routes(included.routes)
+        elif isinstance(r, APIRoute):
+            found.append(r)
+    return found
+
+
 class TestSqliteCacheScope(unittest.TestCase):
 
     def test_uses_sqlite_cache(self):
@@ -42,7 +55,7 @@ class TestSqliteCacheScope(unittest.TestCase):
             self.assertFalse(f(path), path)
         for path in ("/api/members", "/api/email-templates", "/api/helloasso/sync",
                      "/api/competitions-x", "/map", "/pivot",
-                     # old routes of server.py under the Firestore prefixes: they use the cache
+                     # cache-backed routes under the Firestore prefixes (results batch, check-all-paid)
                      "/api/competitions/cron/fetch-results", "/api/competitions/12/check-all-paid",
                      "/api/competitions/12/fetch-results"):
             self.assertTrue(f(path), path)
@@ -56,12 +69,16 @@ class TestSqliteCacheScope(unittest.TestCase):
         for r in api_routes(members.router, seasons.router):  # served from the SQLite cache
             self.assertTrue(server.uses_sqlite_cache(concrete(r.path)), r.path)
 
-    def test_every_api_route_of_server_py_uses_cache(self):
-        """The routes left in server.py read the SQLite cache (app settings, members…), whatever
-        their prefix: a new Firestore-only route belongs in a router of src/api/."""
-        routes = [r for r in server.app.routes if isinstance(r, APIRoute)
-                  and r.endpoint.__module__ == "server" and r.path.startswith("/api/")]
+    def test_every_other_api_route_uses_cache(self):
+        """Outside the Firestore-only routers, every /api/ route reads the SQLite cache (app
+        settings, members…), whatever its prefix: the results batch and check-all-paid live
+        under /api/competitions in routers that must not join the Firestore-only list."""
+        firestore_only = set(map(id, api_routes(competitions.router, participants.router, coaches.router,
+                                                competition_members.router, helloasso_items.router)))
+        routes = [r for r in app_routes(server.app.routes)
+                  if id(r) not in firestore_only and r.path.startswith("/api/")]
         self.assertIn("/api/competitions/cron/fetch-results", [r.path for r in routes])
+        self.assertIn("/api/competitions/{comp_id}/check-all-paid", [r.path for r in routes])
         for r in routes:
             self.assertTrue(server.uses_sqlite_cache(concrete(r.path)), r.path)
 
