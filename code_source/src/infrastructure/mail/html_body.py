@@ -83,6 +83,47 @@ def build_signature_html(image_src_mode: str = "cid") -> str:
     )
 
 
+_LINK_OPEN = '&lt;a href="'
+_LINK_HREF_END = '"&gt;'
+_LINK_CLOSE = "&lt;/a&gt;"
+
+
+def _link_html(url: str, link_text: str) -> str:
+    if re.match(r"(?i)^(https?://|mailto:)", url):
+        return f'<a href="{url}" target="_blank" style="color:#2563EB;">{link_text}</a>'
+    return link_text  # schéma non autorisé : on garde le texte du lien seul
+
+
+def _restore_links(escaped: str) -> str:
+    """Restores the escaped <a href="…">…</a> links: same matches as the regex
+    &lt;a href="([^"]*)"&gt;(.*?)&lt;/a&gt;, in one left-to-right scan (the regex was
+    quadratic on many unclosed links, CodeQL py/polynomial-redos)."""
+    out = []
+    pos = 0
+    while True:
+        start = escaped.find(_LINK_OPEN, pos)
+        if start < 0:
+            break
+        url_start = start + len(_LINK_OPEN)
+        url_end = escaped.find('"', url_start)
+        if url_end < 0:
+            break
+        if not escaped.startswith(_LINK_HREF_END, url_end):
+            # quote not closing the tag: not a link, look for the next one
+            out.append(escaped[pos:url_start])
+            pos = url_start
+            continue
+        text_start = url_end + len(_LINK_HREF_END)
+        text_end = escaped.find(_LINK_CLOSE, text_start)
+        if text_end < 0:
+            break
+        out.append(escaped[pos:start])
+        out.append(_link_html(escaped[url_start:url_end], escaped[text_start:text_end]))
+        pos = text_end + len(_LINK_CLOSE)
+    out.append(escaped[pos:])
+    return "".join(out)
+
+
 def text_to_html(text: str) -> str:
     """Convertit le texte brut saisi par l'utilisateur en HTML sûr (échappement + sauts de ligne).
 
@@ -94,15 +135,7 @@ def text_to_html(text: str) -> str:
     for tag in ("b", "i", "u"):
         escaped = escaped.replace(f"&lt;{tag}&gt;", f"<{tag}>").replace(f"&lt;/{tag}&gt;", f"</{tag}>")
     escaped = escaped.replace("&lt;br&gt;", "<br>").replace("&lt;br /&gt;", "<br>")
-
-    def _restore_link(match):
-        url, link_text = match.group(1), match.group(2)
-        if re.match(r"(?i)^(https?://|mailto:)", url):
-            return f'<a href="{url}" target="_blank" style="color:#2563EB;">{link_text}</a>'
-        return link_text  # schéma non autorisé : on garde le texte du lien seul
-
-    escaped = re.sub(r'&lt;a href="([^"]*)"&gt;(.*?)&lt;/a&gt;', _restore_link, escaped, flags=re.S)
-    return escaped.replace("\r\n", "\n").replace("\n", "<br>")
+    return _restore_links(escaped).replace("\r\n", "\n").replace("\n", "<br>")
 
 
 def build_email_html(body_text: str, add_signature: bool = True, image_src_mode: str = "cid") -> str:

@@ -5,9 +5,25 @@ import os
 
 # Ajustement du chemin d'import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src")))
-from domain.utils import normalize_string, normalize_name, normalize_key_part, clean_city_name
+from domain.utils import normalize_string, normalize_name, normalize_key_part, clean_city_name, is_helloasso_url
 
 class TestDomainUtils(unittest.TestCase):
+    def test_is_helloasso_url(self):
+        cases = {
+            "https://www.helloasso.com/associations/alj/evenements/x": True,
+            "www.helloasso.com/associations/alj/evenements/x": True,
+            "HTTPS://HelloAsso.com/associations/alj": True,
+            "adhesion-escalade-2026-2027-amicale-laique-escalade-2": False,
+            "Event:competition-u11": False,
+            "https://evil.example/helloasso.com/associations/alj": False,
+            "https://helloasso.com.evil.example/associations/alj": False,
+            "https://evilhelloasso.com/associations/alj": False,
+            "": False,
+        }
+        for value, expected in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(is_helloasso_url(value), expected)
+
     def test_clean_city_name(self):
         # Variations de Villette d'Anthon
         variations = [

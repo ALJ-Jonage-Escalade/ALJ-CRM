@@ -16,7 +16,7 @@ automatiquement : il est retourné dans `manual_review` pour correction manuelle
 """
 import re
 
-from domain.utils import normalize_name, normalize_string
+from domain.utils import is_helloasso_url, normalize_name, normalize_string
 
 # États HelloAsso consideres comme un paiement valide
 STATUTS_PAYES = {"processed", "validated", "registered"}
@@ -48,7 +48,7 @@ def parse_campaign_identifier(ref: str) -> dict:
     if not raw:
         raise ValueError("Aucun identifiant de campagne HelloAsso fourni.")
 
-    if "helloasso.com" in raw.lower():
+    if is_helloasso_url(raw):
         path = re.split(r"associations/[^/]+/+", raw, maxsplit=1, flags=re.IGNORECASE)
         segments = [s.strip("/ ") for s in path[-1].split("/")]
         segments = [s for s in segments if s]
