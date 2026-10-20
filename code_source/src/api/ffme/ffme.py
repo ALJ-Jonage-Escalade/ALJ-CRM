@@ -189,14 +189,12 @@ def apply_ffme_import_api(data: Dict[str, Any] = Body(...)):
     import tempfile
     from infrastructure.sqlite.repository import SqliteRepository
     from domain.constants import get_active_season
-    from paths import ROOT_DIR
 
     try:
         season = str(data.get("season") or get_active_season()).strip()
         updates = list(data.get("updates") or [])
         manual_matches = list(data.get("manual_matches") or [])
         content_b64 = data.get("content_base64")
-        filename = str(data.get("filename") or "import_ffme.xlsx").strip()
 
         # Si pas d'updates fournis mais content_b64 fourni : préparer automatiquement
         stats = {
@@ -251,18 +249,6 @@ def apply_ffme_import_api(data: Dict[str, Any] = Body(...)):
         ok = SqliteRepository.apply_ffme_matches(updates, season_name=season)
         if not ok:
             return JSONResponse(status_code=500, content={"status": "error", "message": "Échec de l'écriture des associations en base de données."})
-
-        # Sauvegarde éventuelle d'une copie dans import/ffme/
-        if content_b64:
-            try:
-                dest_dir = os.path.join(ROOT_DIR, "import", "ffme")
-                os.makedirs(dest_dir, exist_ok=True)
-                dest_path = os.path.join(dest_dir, filename)
-                file_bytes = base64.b64decode(content_b64)
-                with open(dest_path, "wb") as f:
-                    f.write(file_bytes)
-            except Exception as se:
-                print(f"[FFME IMPORT] Copie locale du fichier non critique : {se}")
 
         from infrastructure.firestore.cloud_database import CloudDatabase
         if CloudDatabase.is_enabled():

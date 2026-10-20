@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse, Response
 
-from api.responses import internal_error
+from api.responses import error, internal_error
 from infrastructure.sqlite.repository import SqliteRepository
 
 router = APIRouter()
@@ -55,20 +55,21 @@ def export_planning_api(mode: str = Query("grid"), season: Optional[str] = Query
     import shutil
     from infrastructure.sqlite.repository import SqliteRepository
     from exports.planning_excel import export_planning_excel, export_planning_list_excel
-    from domain.constants import get_active_season
+    from domain.constants import get_active_season, is_valid_season
 
     target_season = season or get_active_season()
+    if not is_valid_season(target_season):
+        return error(400, "Saison invalide (format attendu : AAAA-AAAA).")
     planning_data = SqliteRepository.load_planning_data(log_debug=False)
 
     tmp_dir = tempfile.mkdtemp(prefix="alj_plan_export_")
+    out_path = os.path.join(tmp_dir, "planning.xlsx")
     try:
         if mode == "list":
             filename = f"Planning_Liste_{target_season}.xlsx"
-            out_path = os.path.join(tmp_dir, filename)
             export_planning_list_excel(planning_data, target_season, out_path)
         else:
             filename = f"Planning_Grille_{target_season}.xlsx"
-            out_path = os.path.join(tmp_dir, filename)
             export_planning_excel(planning_data, target_season, out_path)
 
         with open(out_path, "rb") as f:

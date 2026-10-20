@@ -54,11 +54,6 @@ def internal_error(e: Exception, where: str) -> str:
     return GENERIC_ERROR
 
 
-def client_error(e: Exception, where: str) -> str:
-    """Validation errors (ValueError) are meant for the user; anything else stays generic."""
-    return str(e) if isinstance(e, ValueError) else internal_error(e, where)
-
-
 SERVICE_ERROR_STATUS = (
     (NotFound, 404),
     (InvalidRequest, 400),

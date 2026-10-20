@@ -69,6 +69,47 @@ def _find_image_path(name: str) -> Optional[str]:
     return None
 
 
+def _member_field(member: Any, key: str, alt: Optional[str] = None) -> Any:  # Any: dict or member object, any field type
+    """Reads a field from a dict or an object, falling back to `alt` when it is missing."""
+    if isinstance(member, dict):
+        val = member.get(key)
+        return val if val is not None else (member.get(alt) if alt else None)
+    val = getattr(member, key, None)
+    return val if val is not None else (getattr(member, alt, None) if alt else None)
+
+
+def _parse_amount(amount_raw: Any) -> Optional[float]:  # Any: amount as typed (str, int, float, None)
+    try:
+        return float(str(amount_raw).replace(",", "."))
+    except (ValueError, TypeError):
+        return None
+
+
+def attestation_error(member: Any) -> Optional[str]:  # Any: dict or member object
+    """Message explaining why no attestation can be issued for this member, None if it can.
+
+    Routes call it before build_attestation so the message shown to the user is a plain
+    string, never the text of an exception.
+    """
+    status = str(_member_field(member, "status_norm", "status") or "").strip().lower()
+    if "annul" in status or "cancel" in status:
+        return "Impossible de générer une attestation pour une commande annulée."
+
+    amount_raw = _member_field(member, "amount")
+    if amount_raw is None or str(amount_raw).strip() == "":
+        return "Le montant de la cotisation est manquant."
+    amount_val = _parse_amount(amount_raw)
+    if amount_val is None:
+        return "Montant de cotisation invalide."
+    if amount_val <= 0:
+        return "Le montant de la cotisation doit être supérieur à zéro."
+
+    if not str(_member_field(member, "first_name", "user_first_name") or "").strip() \
+            and not str(_member_field(member, "last_name", "user_last_name") or "").strip():
+        return "L'adhérent doit avoir un nom ou prénom renseigné."
+    return None
+
+
 def build_attestation(
     member: Any,
     season: Optional[str] = None,
@@ -76,45 +117,27 @@ def build_attestation(
 ) -> str:
     """Génère le code HTML complet et autonome d'une attestation de paiement.
 
-    Règles conservées :
-    - Montant > 0 obligatoire (lève ValueError si montant nul ou manquant).
-    - Commandes annulées ignorées (lève ValueError si statut annulé).
+    Règles conservées (voir attestation_error, lève ValueError si l'une n'est pas respectée) :
+    - Montant > 0 obligatoire.
+    - Commandes annulées ignorées.
     - Payeur par défaut = l'adhérent lui-même si non renseigné.
     - Images embarquées en base64 (rendu indépendant du système de fichiers).
     """
     # 1. Extraction des champs (supporte indifféremment dict ou objet)
     def _get(key, alt=None):
-        if isinstance(member, dict):
-            val = member.get(key)
-            return val if val is not None else (member.get(alt) if alt else None)
-        val = getattr(member, key, None)
-        return val if val is not None else (getattr(member, alt, None) if alt else None)
+        return _member_field(member, key, alt)
 
-    # 2. Validation du statut (les commandes annulées sont exclues)
-    status = str(_get("status_norm", "status") or "").strip().lower()
-    if "annul" in status or "cancel" in status:
-        raise ValueError("Impossible de générer une attestation pour une commande annulée.")
+    # 2. Validation (statut non annulé, montant > 0, nom renseigné)
+    problem = attestation_error(member)
+    if problem:
+        raise ValueError(problem)
 
-    # 3. Validation et formatage du montant
-    amount_raw = _get("amount")
-    if amount_raw is None or str(amount_raw).strip() == "":
-        raise ValueError("Le montant de la cotisation est manquant.")
-    try:
-        amount_val = float(str(amount_raw).replace(",", "."))
-    except (ValueError, TypeError):
-        raise ValueError(f"Montant de cotisation invalide : {amount_raw}")
-
-    if amount_val <= 0:
-        raise ValueError("Le montant de la cotisation doit être supérieur à zéro.")
-
-    amount_str = f"{amount_val:.2f}".replace(".", ",")
+    # 3. Formatage du montant
+    amount_str = f"{_parse_amount(_get('amount')):.2f}".replace(".", ",")
 
     # 4. Formatage du nom et du prénom de l'adhérent
     user_first = str(_get("first_name", "user_first_name") or "").strip().capitalize()
     user_last = str(_get("last_name", "user_last_name") or "").strip().upper()
-
-    if not user_last and not user_first:
-        raise ValueError("L'adhérent doit avoir un nom ou prénom renseigné.")
 
     # 5. Formatage du payeur (payeur par défaut = l'adhérent)
     payer_first = str(_get("payer_first_name") or "").strip().capitalize()

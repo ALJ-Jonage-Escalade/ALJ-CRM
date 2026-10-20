@@ -6,6 +6,7 @@ The callback URL is registered in the Google Cloud console (see README): keep
 
 from __future__ import annotations
 
+import html
 import json
 import time
 from typing import Any, Dict, Optional
@@ -13,9 +14,21 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Body, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
+from api.responses import internal_error
 from infrastructure.security.secret_store import SecretStore
 
 router = APIRouter()
+
+DEFAULT_RETURN_TO = "/bureau/parametres"
+
+
+def _safe_return_to(value: Optional[str]) -> str:
+    """Page to come back to after the OAuth flow: a path on this site only. The state that
+    carries it is not signed, so anything else (another host, javascript:…) is replaced."""
+    value = str(value or "").strip()
+    if value.startswith("/") and not value.startswith("//") and "\\" not in value:
+        return value
+    return DEFAULT_RETURN_TO
 
 
 @router.get("/api/auth/google/status")
@@ -39,7 +52,8 @@ def get_google_auth_status():
             valid = bool(tok)
         except Exception as e:
             valid = False
-            error_msg = str(e)
+            internal_error(e, "get_google_auth_status")
+            error_msg = "Jeton Google refusé ou expiré : reconnectez le compte Google (détails dans les journaux)."
             
     db_ready = CloudDatabase.cache_ready() if CloudDatabase.is_enabled() else False
 
@@ -59,7 +73,7 @@ def get_google_auth_status():
 
 
 @router.get("/api/auth/google/login")
-def google_auth_login(request: Request, return_to: Optional[str] = "/bureau/parametres", redirect_uri: Optional[str] = None):
+def google_auth_login(request: Request, return_to: Optional[str] = DEFAULT_RETURN_TO, redirect_uri: Optional[str] = None):
     """Initie le flux d'autorisation OAuth2 Google pour renouveler le refresh token."""
     import base64
     import urllib.parse
@@ -87,7 +101,7 @@ def google_auth_login(request: Request, return_to: Optional[str] = "/bureau/para
     # Construire le state
     state_payload = {
         "redirect_uri": redirect_uri,
-        "return_to": return_to or "/bureau/parametres",
+        "return_to": _safe_return_to(return_to),
         "ts": time.time(),
     }
     state = base64.urlsafe_b64encode(json.dumps(state_payload).encode("utf-8")).decode("utf-8")
@@ -126,8 +140,10 @@ def google_auth_callback(
     from infrastructure.google.drive import GoogleDriveClient
     from infrastructure.firestore.cloud_database import CloudDatabase
 
-    def _render_page(title: str, body_html: str, return_url: str = "/bureau/parametres", auto_redirect: bool = False):
-        redirect_script = f"<script>setTimeout(function() {{ window.location.href = '{return_url}'; }}, 3500);</script>" if auto_redirect else ""
+    def _render_page(title: str, body_html: str, return_url: str = DEFAULT_RETURN_TO, auto_redirect: bool = False):
+        # return_url is checked by _safe_return_to; json.dumps + escaped "<" keeps it a JS string
+        js_url = json.dumps(_safe_return_to(return_url)).replace("<", "\\u003c")
+        redirect_script = f"<script>setTimeout(function() {{ window.location.href = {js_url}; }}, 3500);</script>" if auto_redirect else ""
         return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -170,7 +186,7 @@ def google_auth_callback(
         return _render_page(
             "Connexion refusée",
             f"""<h2>❌ Autorisation Google refusée</h2>
-            <div class="badge badge-error">Erreur : {error}</div>
+            <div class="badge badge-error">Erreur : {html.escape(error)}</div>
             <p>La connexion au compte Google a été annulée ou refusée.</p>
             <p><a href="/bureau/parametres" class="btn">Retour aux paramètres</a></p>"""
         )
@@ -185,13 +201,13 @@ def google_auth_callback(
         )
 
     # Récupérer return_to et redirect_uri depuis le state
-    return_to = "/bureau/parametres"
+    return_to = DEFAULT_RETURN_TO
     redirect_uri = ""
     if state:
         try:
             raw_state = base64.urlsafe_b64decode(state.encode("utf-8")).decode("utf-8")
             state_data = json.loads(raw_state)
-            return_to = state_data.get("return_to", "/bureau/parametres")
+            return_to = _safe_return_to(state_data.get("return_to"))
             redirect_uri = state_data.get("redirect_uri", "")
         except Exception:
             pass
@@ -227,16 +243,17 @@ def google_auth_callback(
     try:
         token_resp = requests.post(token_url, data=token_params, timeout=15)
     except Exception as e:
+        internal_error(e, "google_auth_callback")
         return _render_page(
             "Erreur réseau",
-            f"""<h2>❌ Échec de la communication avec Google</h2>
+            """<h2>❌ Échec de la communication avec Google</h2>
             <div class="badge badge-error">Erreur de connexion</div>
-            <p>{str(e)}</p>
+            <p>Le serveur n'a pas pu joindre Google (détails dans les journaux).</p>
             <p><a href="/bureau/outils" class="btn">Retour au bureau</a></p>"""
         )
 
     if token_resp.status_code != 200:
-        err_detail = token_resp.text
+        err_detail = html.escape(token_resp.text)
         return _render_page(
             "Échec d'échange de jeton",
             f"""<h2>❌ Échange de jeton échoué</h2>
@@ -244,7 +261,7 @@ def google_auth_callback(
             <p>Google a refusé l'échange du code d'autorisation :</p>
             <div class="details"><pre style="margin:0; white-space:pre-wrap;">{err_detail}</pre></div>
             <p><b>Vérification conseillée :</b> assurez-vous que l'URI de redirection suivante est bien autorisée dans votre Google Cloud Console :<br>
-            <code>{redirect_uri}</code></p>
+            <code>{html.escape(redirect_uri)}</code></p>
             <p><a href="/bureau/outils" class="btn">Retour au bureau</a></p>"""
         )
 
@@ -287,16 +304,16 @@ def google_auth_callback(
 
     # Déclencher la synchronisation immédiate de la BDD
     sync_ok = True
-    sync_err = ""
     if CloudDatabase.is_enabled():
         try:
             CloudDatabase.sync()
         except Exception as se:
             sync_ok = False
-            sync_err = str(se)
+            internal_error(se, "google_auth_callback sync")
 
-    email_display = f"Compte connecté : <b>{user_email}</b>" if user_email else "Compte Google connecté"
-    sync_display = "✅ Base de données synchronisée avec succès." if sync_ok else f"⚠️ Connexion rétablie, mais synchro en attente : {sync_err}"
+    email_display = f"Compte connecté : <b>{html.escape(user_email)}</b>" if user_email else "Compte Google connecté"
+    sync_display = ("✅ Base de données synchronisée avec succès." if sync_ok
+                    else "⚠️ Connexion rétablie, mais synchro en attente (détails dans les journaux).")
 
     return _render_page(
         "Connexion Réussie",
@@ -307,10 +324,10 @@ def google_auth_callback(
         <details style="margin:16px 0; text-align:left; font-size:12px; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px; padding:10px 12px;">
             <summary style="cursor:pointer; font-weight:600; color:#334155;">🔑 Nouveau Refresh Token (pour Cloud Run)</summary>
             <p style="margin:6px 0 4px; color:#64748B; font-size:11.5px;">Le jeton a été synchronisé. Vous pouvez également copier cette valeur dans Cloud Run (GMAIL_REFRESH_TOKEN) :</p>
-            <input type="text" readonly value="{refresh_token}" style="width:100%; box-sizing:border-box; padding:6px 8px; font-family:monospace; font-size:11px; background:#FFF; border:1px solid #CBD5E1; border-radius:4px;" onclick="this.select();">
+            <input type="text" readonly value="{html.escape(refresh_token)}" style="width:100%; box-sizing:border-box; padding:6px 8px; font-family:monospace; font-size:11px; background:#FFF; border:1px solid #CBD5E1; border-radius:4px;" onclick="this.select();">
         </details>
         <p style="font-size:13px; color:#64748B;">Redirection automatique vers le bureau dans quelques secondes…</p>
-        <p><a href="{return_to}" class="btn">Retourner au bureau immédiatement</a></p>""",
+        <p><a href="{html.escape(return_to)}" class="btn">Retourner au bureau immédiatement</a></p>""",
         return_url=return_to,
         auto_redirect=True
     )
@@ -338,7 +355,8 @@ def test_google_auth():
         else:
             results["oauth_token"]["message"] = "Le jeton d'accès retourné est vide."
     except Exception as e:
-        results["oauth_token"]["message"] = f"Échec de renouvellement OAuth2 : {e}"
+        internal_error(e, "test_google_auth oauth")
+        results["oauth_token"]["message"] = "Échec de renouvellement OAuth2 : jeton refusé ou expiré (détails dans les journaux)."
         results["database"]["message"] = "Test BDD ignoré en raison de l'échec OAuth2."
         results["gmail"]["message"] = "Test Gmail ignoré en raison de l'échec OAuth2."
         return {"status": "error", "all_ok": False, "results": results}
@@ -365,7 +383,8 @@ def test_google_auth():
                 results["database"]["message"] = "Base locale opérationnelle."
     except Exception as e:
         results["database"]["ok"] = False
-        results["database"]["message"] = f"Erreur d'accès à la BDD : {e}"
+        internal_error(e, "test_google_auth database")
+        results["database"]["message"] = "Erreur d'accès à la BDD (détails dans les journaux)."
 
     # 3. Test API Gmail
     gmail_user = SecretStore.get_secret("GMAIL_USER_EMAIL")
@@ -382,7 +401,8 @@ def test_google_auth():
             results["gmail"]["message"] = f"API Gmail HTTP {resp.status_code} : {resp.text}"
     except Exception as e:
         results["gmail"]["ok"] = False
-        results["gmail"]["message"] = f"Erreur lors du test Gmail : {e}"
+        internal_error(e, "test_google_auth gmail")
+        results["gmail"]["message"] = "Erreur lors du test Gmail (détails dans les journaux)."
 
     all_ok = all(r["ok"] for r in results.values())
     return {
@@ -430,8 +450,8 @@ def update_google_token(data: Dict[str, Any] = Body(...)):
         access_tok = r.json().get("access_token")
     except Exception as e:
         return JSONResponse(
-            status_code=400,
-            content={"status": "error", "message": f"Impossible de joindre Google : {e}"}
+            status_code=502,
+            content={"status": "error", "message": f"Impossible de joindre Google : {internal_error(e, 'update_google_token')}"}
         )
 
     if not user_email and access_tok:
