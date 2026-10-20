@@ -15,6 +15,8 @@ if _src_dir not in sys.path:
 from fastapi.testclient import TestClient
 from server import app
 
+XSS = '"><img src=x onerror=alert(1)>'
+
 
 class TestGoogleAuthWeb(unittest.TestCase):
 
@@ -54,7 +56,8 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertEqual(data["status"], "expired")
         self.assertFalse(data["valid"])
         self.assertTrue(data["configured"])
-        self.assertIn("invalid_grant", data["error"])
+        self.assertNotIn("invalid_grant", data["error"])  # Google's detail stays in the server log
+        self.assertIn("journaux", data["error"])
 
     @patch("infrastructure.security.secret_store.SecretStore.get_secret")
     @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
@@ -95,6 +98,61 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Autorisation Google refusée", resp.text)
         self.assertIn("access_denied", resp.text)
+
+    def test_callback_error_is_escaped(self):
+        resp = self.client.get("/api/auth/google/callback", params={"error": XSS})
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn(XSS, resp.text)
+        self.assertNotIn("<img", resp.text)
+        self.assertIn("&lt;img", resp.text)
+
+    @patch("requests.post", side_effect=ConnectionError("proxy 10.0.0.12:3128 refused"))
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials", return_value=("cid", "sec"))
+    def test_callback_network_error_is_generic(self, mock_creds, mock_post):
+        resp = self.client.get("/api/auth/google/callback?code=mock_code")
+        self.assertIn("Échec de la communication avec Google", resp.text)
+        self.assertNotIn("10.0.0.12", resp.text)
+
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.is_enabled", return_value=False)
+    @patch("requests.post")
+    @patch("requests.get")
+    @patch("infrastructure.security.secret_store.SecretStore.set_secret")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials", return_value=("mock_cid", "mock_sec"))
+    def test_callback_rejects_foreign_return_to(self, mock_creds, mock_set_secret, mock_get, mock_post, mock_enabled):
+        mock_post.return_value = MagicMock(status_code=200, json=lambda: {"access_token": "a", "refresh_token": "r"})
+        mock_get.return_value = MagicMock(status_code=200, json=lambda: {"email": XSS})
+        cases = {
+            "javascript:alert(1)": '"/bureau/parametres"',
+            "//evil.example/x": '"/bureau/parametres"',
+            "https://evil.example": '"/bureau/parametres"',
+            # a local path stays, as a JSON string: the quote cannot end it
+            "/x';alert(1);//</script>": '"/x\';alert(1);//\\u003c/script>"',
+        }
+        for return_to, js_literal in cases.items():
+            with self.subTest(return_to=return_to):
+                state = base64.urlsafe_b64encode(json.dumps({"return_to": return_to}).encode()).decode()
+                html = self.client.get(f"/api/auth/google/callback?code=c&state={state}").text
+                self.assertIn("Connexion Google Réussie", html)
+                self.assertIn(f"window.location.href = {js_literal};", html)
+                self.assertNotIn("evil.example", html)
+                self.assertNotIn("javascript:", html)
+                self.assertEqual(html.count("</script>"), 1)
+                self.assertNotIn("<img", html)
+
+    def test_safe_return_to(self):
+        from api.integrations.google_auth import DEFAULT_RETURN_TO, _safe_return_to
+        cases = {
+            "/bureau/outils": "/bureau/outils",
+            None: DEFAULT_RETURN_TO,
+            "": DEFAULT_RETURN_TO,
+            "javascript:alert(1)": DEFAULT_RETURN_TO,
+            "https://evil.example/": DEFAULT_RETURN_TO,
+            "//evil.example/": DEFAULT_RETURN_TO,
+            "/\\evil.example/": DEFAULT_RETURN_TO,
+        }
+        for value, expected in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(_safe_return_to(value), expected)
 
     def test_callback_missing_code(self):
         resp = self.client.get("/api/auth/google/callback")

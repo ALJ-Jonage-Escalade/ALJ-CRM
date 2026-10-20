@@ -8,7 +8,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse, Response
 
-from api.responses import client_error
+from api.responses import error, internal_error
 
 router = APIRouter()
 
@@ -17,10 +17,13 @@ router = APIRouter()
 def preview_attestation_api(data: Dict[str, Any] = Body(...)):
     """Génère l'aperçu PDF d'une attestation de paiement (retourne application/pdf)."""
     try:
-        from domain.attestation.document import build_attestation, render_attestation_pdf, get_safe_pdf_filename
+        from domain.attestation.document import attestation_error, build_attestation, render_attestation_pdf, get_safe_pdf_filename
         member = data.get("member") or {}
         season = data.get("season")
         date_jour = data.get("date_jour")
+        problem = attestation_error(member)
+        if problem:
+            return error(400, problem)
 
         html = build_attestation(member, season=season, date_jour=date_jour)
         pdf_bytes = render_attestation_pdf(html)
@@ -36,14 +39,14 @@ def preview_attestation_api(data: Dict[str, Any] = Body(...)):
             headers={"Content-Disposition": f'inline; filename="{filename}"'}
         )
     except Exception as e:
-        return JSONResponse(status_code=400, content={"status": "error", "message": client_error(e, "preview_attestation_api")})
+        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "preview_attestation_api")})
 
 
 @router.post("/api/attestations/send")
 def send_attestation_api(data: Dict[str, Any] = Body(...)):
     """Génère une attestation PDF en mémoire, l'envoie par e-mail et met à jour la date d'envoi."""
     try:
-        from domain.attestation.document import build_attestation, render_attestation_pdf, get_safe_pdf_filename
+        from domain.attestation.document import attestation_error, build_attestation, render_attestation_pdf, get_safe_pdf_filename
         from domain.utils import apply_template_variables
         from infrastructure.mail.repository import EmailRepository
 
@@ -52,6 +55,9 @@ def send_attestation_api(data: Dict[str, Any] = Body(...)):
         to_email = (data.get("to_email") or member.get("email_primary") or "").strip()
         if not to_email or "@" not in to_email:
             return JSONResponse(status_code=400, content={"status": "error", "message": "Adresse e-mail du destinataire invalide ou manquante."})
+        problem = attestation_error(member)
+        if problem:
+            return error(400, problem)
 
         html = build_attestation(member, season=season)
         pdf_bytes = render_attestation_pdf(html)
@@ -127,4 +133,4 @@ def send_attestation_api(data: Dict[str, Any] = Body(...)):
             "filename": filename_pdf
         }
     except Exception as e:
-        return JSONResponse(status_code=400, content={"status": "error", "message": client_error(e, "send_attestation_api")})
+        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "send_attestation_api")})

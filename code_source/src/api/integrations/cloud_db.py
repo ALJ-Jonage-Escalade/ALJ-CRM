@@ -42,7 +42,7 @@ def get_cloud_db_status_api():
             "db_size_kb": db_size_kb,
             "member_count": member_count,
             "pending": st.get("pending", 0),
-            "last_error": st.get("last_error", ""),
+            "last_error": "Échec de la dernière synchronisation (détails dans les journaux)." if st.get("last_error") else "",
             "last_sync": st.get("last_sync"),
         }
     except Exception as e:
@@ -57,10 +57,24 @@ def sync_cloud_db_api(force: bool = Query(False)):
         if not CloudDatabase.is_enabled():
             return {"status": "skipped", "message": "Mode Firestore non activé (MEMBER_BACKEND != firestore)."}
 
-        result = CloudDatabase.sync(full=force, force_pull_all=force)
-        errors = result.get("errors") if isinstance(result, dict) else []
+        report = CloudDatabase.sync(full=force, force_pull_all=force)
+        if not isinstance(report, dict):
+            report = {}
+        # Only the counters reach the page: the error texts (Firestore, SQLite) stay in the log
+        result = {
+            "pulled": int(report.get("pulled") or 0),
+            "pushed": int(report.get("pushed") or 0),
+            "full": bool(report.get("full")),
+        }
+        errors = report.get("errors") or []
         if errors:
-            return JSONResponse(status_code=500, content={"status": "error", "message": f"Erreur de synchronisation : {'; '.join(errors)}", "result": result})
+            for err in errors:
+                print(f"❌ [CLOUD_DB] Synchronisation : {err}")
+            return JSONResponse(status_code=500, content={
+                "status": "error",
+                "message": f"Erreur de synchronisation ({len(errors)} erreur(s), détails dans les journaux).",
+                "result": result,
+            })
 
         return {
             "status": "success",

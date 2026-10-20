@@ -331,13 +331,14 @@ class EmailDispatchService:
                         "error": "Échec d'envoi EmailRepository"
                     })
             except Exception as ex:
+                print(f"❌ [EMAIL_DISPATCH] Envoi impossible à {to_email} : {type(ex).__name__}: {ex}")
                 errors_count += 1
                 details.append({
                     "id": dest.get("id"),
                     "name": full_name,
                     "email": to_email,
                     "status": "error",
-                    "error": str(ex)
+                    "error": "Erreur lors de l'envoi (détails dans les journaux)."
                 })
 
         first_err = details[0]["error"] if details and "error" in details[0] else "Erreur d'envoi."

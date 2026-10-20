@@ -31,6 +31,10 @@ DEFAULT_SENDER_EMAIL = "inscription@alj-escalade.fr"
 # Nom d'affichage de l'expéditeur (visible dans la colonne « De » des messageries)
 DEFAULT_SENDER_NAME = "Amicale Laïque Jonage - Inscriptions"
 
+# Message renvoyé à l'appelant (et au navigateur) quand une écriture échoue : le détail de
+# l'exception (SQL, chemins) reste dans le journal
+DB_WRITE_ERROR = "Erreur d'enregistrement en base de données (détails dans le journal de l'application)."
+
 # Phase 2 - vue de compatibilite : definie dans infrastructure/sqlite/schema_v2.py (COMPAT_VIEW_SQL)
 
 class SqliteRepository:
@@ -699,7 +703,7 @@ class SqliteRepository:
         except Exception as e:
             print(f"[SQLITE] Erreur lors de la mise a jour de l'adherent : {e}")
             conn.rollback()
-            return False, str(e)
+            return False, DB_WRITE_ERROR
         finally:
             conn.close()
 
@@ -775,7 +779,7 @@ class SqliteRepository:
         except Exception as e:
             print(f"[SQLITE] Erreur lors de l'ajout manuel de l'adherent : {e}")
             conn.rollback()
-            return False, str(e)
+            return False, DB_WRITE_ERROR
         finally:
             conn.close()
     @classmethod
@@ -944,7 +948,7 @@ class SqliteRepository:
         except Exception as e:
             print(f"❌ [SQLITE] Erreur lors du changement de tarif : {e}")
             conn.rollback()
-            return False, str(e)
+            return False, DB_WRITE_ERROR
         finally:
             conn.close()
 
@@ -1160,7 +1164,7 @@ class SqliteRepository:
         except Exception as e:
             print(f"❌ [SQLITE] Erreur lors de la mise à jour de l'adhérent : {e}")
             conn.rollback()
-            return False, str(e)
+            return False, DB_WRITE_ERROR
         finally:
             conn.close()
     @classmethod

@@ -7,6 +7,8 @@ from typing import Any, Dict
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse, Response
 
+from api.responses import error, internal_error
+
 router = APIRouter()
 
 
@@ -123,12 +125,13 @@ def get_presence_config():
             "cours": cours_list
         }
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": f"Erreur chargement config présence : {e}"})
+        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "get_presence_config")})
 
 
 @router.post("/api/presence/export")
 def export_presence_api(data: Dict[str, Any] = Body(...)):
     """Génère les fiches de présence au format Excel et les renvoie directement en téléchargement."""
+    import io
     import os
     import shutil
     import tempfile
@@ -136,14 +139,16 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
     from exports.presence_sheets import generate_presence_sheets
     from infrastructure.sqlite.repository import SqliteRepository
     from domain.members.planning_groups import is_autonome_creneau
-    from domain.constants import get_active_season
+    from domain.constants import get_active_season, is_valid_season
 
     try:
-        season = data.get("season") or get_active_season()
+        season = str(data.get("season") or get_active_season()).strip()
+        if not is_valid_season(season):
+            return error(400, "Saison invalide (format attendu : AAAA-AAAA).")
         raw_data = SqliteRepository.load_direct_data(season_filter=season)
         creneaux = SqliteRepository.load_creneaux_groups()
 
-        variant = (data.get("variant") or "cours").strip().lower()
+        variant = "autonome" if str(data.get("variant") or "").strip().lower() == "autonome" else "cours"
         start_date = (data.get("start_date") or "").strip() or None
         end_date = (data.get("end_date") or "").strip() or None
         show_health_col = bool(data.get("show_health_col", False))
@@ -188,7 +193,8 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
                 output_dir=tmp_dir,
             )
             if not ok or not files:
-                return JSONResponse(status_code=400, content={"status": "error", "message": f"Erreur de génération : {files}"})
+                print(f"❌ [PRESENCE] Génération des fiches impossible : {files}")
+                return error(500, "Erreur de génération des fiches de présence (détails dans les journaux).")
 
             if len(files) == 1:
                 filename = files[0]
@@ -205,16 +211,14 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
                 )
             else:
                 zip_filename = f"Fiches_Presence_{variant.capitalize()}_{season}.zip"
-                zip_path = os.path.join(tmp_dir, zip_filename)
-                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                     for fname in files:
                         fpath = os.path.join(tmp_dir, fname)
                         if os.path.exists(fpath):
                             zf.write(fpath, arcname=fname)
-                with open(zip_path, "rb") as f:
-                    zip_bytes = f.read()
                 return Response(
-                    content=zip_bytes,
+                    content=zip_buffer.getvalue(),
                     media_type="application/zip",
                     headers={
                         "Content-Disposition": f'attachment; filename="{zip_filename}"',
@@ -224,4 +228,4 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": f"Erreur serveur lors de la génération : {e}"})
+        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "export_presence_api")})

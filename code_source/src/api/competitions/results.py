@@ -80,10 +80,10 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
         club_kw = payload.get("club") or "JONAGE"
         scraped_results = await run_in_threadpool(fetch_and_parse_mycompet_results, url, club_kw)
     except Exception as e:
-        print(f"❌ [MYCOMPET] Erreur scraping MyCompet ({url}) : {e}")
+        print(f"❌ [MYCOMPET] Erreur scraping MyCompet ({url}) : {type(e).__name__}: {e}")
         return JSONResponse({
             "status": "error",
-            "message": f"Erreur lors de la récupération des résultats MyCompet : {e}"
+            "message": "Erreur lors de la récupération des résultats MyCompet (détails dans les journaux)."
         }, status_code=502)
 
     matched_count = 0
