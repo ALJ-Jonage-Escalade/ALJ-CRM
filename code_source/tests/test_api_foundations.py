@@ -15,7 +15,9 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 import server
-from api import coaches, competition_members, competitions, helloasso_items, members, participants, seasons
+from api.competitions import coaches, competitions, helloasso_items, participants
+from api.competitions import members as competition_members
+from api.members import members, seasons
 from api.responses import json_with_etag
 
 SERVER_MODE = {"ALJ_API_AUTH": "off", "K_SERVICE": "alj-escalade-api"}

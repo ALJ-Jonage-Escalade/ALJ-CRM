@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from api.schemas.participants import (
+from api.competitions.schemas.participants import (
     CANCEL_MODES,
     ManualPayment,
     ParticipantAdd,

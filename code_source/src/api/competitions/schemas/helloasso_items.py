@@ -1,10 +1,10 @@
-"""Bodies of the HelloAsso item routes (api.helloasso_items)."""
+"""Bodies of the HelloAsso item routes (api.competitions.helloasso_items)."""
 
 from __future__ import annotations
 
 from typing import Optional
 
-from api.schemas.base import RequestBody
+from api.request_body import RequestBody
 
 
 class ItemLink(RequestBody):

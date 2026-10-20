@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from api.responses import SUCCESS, json_with_etag
-from api.schemas.coaches import CoachIn
+from api.competitions.schemas.coaches import CoachIn
 from services.competitions.coaches import CoachService as Service
 from services.documents import Doc
 

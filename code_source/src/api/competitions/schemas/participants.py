@@ -1,4 +1,4 @@
-"""Bodies of the participant routes (api.participants)."""
+"""Bodies of the participant routes (api.competitions.participants)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Optional
 
 from pydantic import Field, field_validator, model_validator
 
-from api.schemas.base import RequestBody
+from api.request_body import RequestBody
 from domain.competitions.models import PAIEMENT_ANNULE_PERDU, PAIEMENT_ANNULE_REPORTE
 
 # Cancellation choice for a participant who already paid -> payment status

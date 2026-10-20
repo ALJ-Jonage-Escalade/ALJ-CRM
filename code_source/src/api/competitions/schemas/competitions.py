@@ -1,4 +1,4 @@
-"""Bodies of the competition routes (api.competitions)."""
+"""Bodies of the competition routes (api.competitions.competitions)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from pydantic import Field, field_validator
 
-from api.schemas.base import RequestBody
+from api.request_body import RequestBody
 from domain.competitions.models import STATUT_EN_PREPARATION, STATUTS_COMPETITION
 
 _ISO_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})?$")

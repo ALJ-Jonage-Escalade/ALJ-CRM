@@ -1,10 +1,10 @@
-"""Bodies of the coach routes (api.coaches)."""
+"""Bodies of the coach routes (api.competitions.coaches)."""
 
 from __future__ import annotations
 
 from pydantic import Field
 
-from api.schemas.base import RequestBody
+from api.request_body import RequestBody
 
 
 class CoachIn(RequestBody):

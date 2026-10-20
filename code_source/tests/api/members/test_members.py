@@ -1,4 +1,4 @@
-"""Routes of src/api/members.py and src/api/seasons.py over a temporary member database
+"""Routes of src/api/members/members.py and src/api/members/seasons.py over a temporary member database
 (auth off, local server)."""
 
 import os

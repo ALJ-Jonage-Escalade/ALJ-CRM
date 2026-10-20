@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from api.responses import SUCCESS, json_with_etag
-from api.schemas.competitions import CompetitionCreate, CompetitionUpdate
+from api.competitions.schemas.competitions import CompetitionCreate, CompetitionUpdate
 from services.competitions.competitions import CompetitionService as Service
 from services.documents import Doc
 

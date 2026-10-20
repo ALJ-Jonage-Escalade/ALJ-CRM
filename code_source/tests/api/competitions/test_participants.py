@@ -1,4 +1,4 @@
-"""Routes of src/api/participants.py over the in-memory Firestore (auth off, local server)."""
+"""Routes of src/api/competitions/participants.py over the in-memory Firestore (auth off, local server)."""
 
 from unittest.mock import patch
 

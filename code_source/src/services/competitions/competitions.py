@@ -35,7 +35,7 @@ class CompetitionService:
     @staticmethod
     @write
     def create_competition(fields: Dict[str, Any]) -> Doc:
-        """`fields`: validated body (api.schemas.competitions.CompetitionCreate)."""
+        """`fields`: validated body (api.competitions.schemas.competitions.CompetitionCreate)."""
         comp = Competition(**{k: fields[k] for k in COMPETITION_FIELDS if k in fields})
         comp.coach_ids = list(fields.get("coach_ids") or [])
         new_id = Repo.save_competition(comp, _extra(fields))

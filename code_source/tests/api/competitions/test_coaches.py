@@ -1,4 +1,4 @@
-"""Routes of src/api/coaches.py over the in-memory Firestore (auth off, local server)."""
+"""Routes of src/api/competitions/coaches.py over the in-memory Firestore (auth off, local server)."""
 
 from support.api_case import ApiTestCase
 
