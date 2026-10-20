@@ -24,6 +24,7 @@ load_dotenv()
 
 from domain.constants import get_active_season, APP_VERSION
 from domain.utils import json_for_script
+from paths import CODE_ROOT
 from infrastructure.security.secret_store import SecretStore
 from infrastructure import runtime_env
 
@@ -106,58 +107,18 @@ app.middleware("http")(security_headers_middleware)  # outermost
 from api.competitions import coaches, competitions, helloasso_items, participants
 from api.competitions import members as competition_members
 from api.members import members, seasons
-from api.responses import service_error_handler
+from api.responses import client_error, internal_error, service_error_handler
+from infrastructure.geocoding import geocode_missing_addresses
 from services.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
              members, seasons):
     app.include_router(_api.router)
+# Every route of these routers skips the SQLite cache refresh: a route that reads or writes the
+# cache (members, app settings, HelloAsso payments…) must live in another router, even under
+# /api/competitions (results batch, check-all-paid).
 FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items)
                             for r in _api.router.routes if isinstance(r, APIRoute))
 app.add_exception_handler(ServiceError, service_error_handler)
-
-GENERIC_ERROR = "Erreur interne du serveur (détails dans les journaux)."
-
-
-def internal_error(e: Exception, where: str) -> str:
-    """Logs the exception server-side; the client only gets a generic message
-    (no paths, SQL or third-party details, notably on the public webhook)."""
-    print(f"❌ [{where}] {type(e).__name__}: {e}")
-    return GENERIC_ERROR
-
-
-def client_error(e: Exception, where: str) -> str:
-    """Validation errors (ValueError) are meant for the user; anything else stays generic."""
-    return str(e) if isinstance(e, ValueError) else internal_error(e, where)
-
-def geocode_missing_addresses(addresses: List[str]):
-    """Géocode les adresses manquantes en tâche de fond avec limitation stricte de débit."""
-    print(f"🌍 [GEOCODING] Début du géocodage en tâche de fond pour {len(addresses)} adresses...")
-    try:
-        from geopy.geocoders import Nominatim
-        geolocator = Nominatim(user_agent="alj_escalade_manager")
-    except Exception as e:
-        print(f"❌ [GEOCODING] Impossible de charger geopy/Nominatim : {e}")
-        return
-
-    for i, address in enumerate(addresses):
-        # Pause de 1.5s entre chaque appel pour respecter les CGU Nominatim
-        time.sleep(1.5)
-        try:
-            print(f"🌍 [GEOCODING] ({i+1}/{len(addresses)}) Recherche de l'adresse : {address}")
-            location = geolocator.geocode(address, timeout=10)
-            if location:
-                lat, lon = location.latitude, location.longitude
-                print(f"✅ [GEOCODING] Trouvé : {lat}, {lon}")
-                SqliteRepository.save_geocode(address, lat, lon)
-            else:
-                print(f"⚠️ [GEOCODING] Adresse non résolue : {address}")
-                # Enregistrer des coordonnées nulles pour éviter de requêter indéfiniment cette mauvaise adresse
-                SqliteRepository.save_geocode(address, None, None)
-        except Exception as e:
-            print(f"❌ [GEOCODING] Erreur lors du géocodage de '{address}' : {e}")
-    if CloudDatabase.is_enabled():
-        CloudDatabase.flush_only()
-    print("🌍 [GEOCODING] Tâche de fond terminée.")
 
 # No CORS: every page calls the API from its own origin. Allowing other origins would let any
 # website read the local (unauthenticated) desktop server.
@@ -1072,7 +1033,7 @@ def export_planning_api(mode: str = Query("grid"), season: Optional[str] = Query
 # L'annuaire lit la base des adhérents dans Firestore (connexion Google du coach).
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-_web_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web")
+_web_dir = os.path.join(CODE_ROOT, "web")
 if os.path.isdir(_web_dir):
     app.mount("/annuaire", StaticFiles(directory=_web_dir, html=True), name="annuaire")
 

@@ -364,7 +364,7 @@ class SqliteRepository:
             conn.close()
 
     @classmethod
-    def save_geocode(cls, address: str, lat: float, lon: float):
+    def save_geocode(cls, address: str, lat: Optional[float], lon: Optional[float]):
         """Sauvegarde ou met à jour les coordonnées d'une adresse dans la table de cache."""
         cls.setup_database()
         conn = cls.get_connection()

@@ -114,4 +114,5 @@ files = [
     "src/services/members/members.py",
     "src/services/competitions/participants.py",
     "src/services/members/seasons.py",
+    "src/infrastructure/geocoding.py",
 ]
