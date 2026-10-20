@@ -156,7 +156,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_cloud_db_status_endpoint(self):
         """Vérifie l'endpoint GET /api/cloud-db/status."""
-        from server import get_cloud_db_status_api
+        from api.integrations.cloud_db import get_cloud_db_status_api
         res = get_cloud_db_status_api()
         self.assertEqual(res.get("status"), "success")
         self.assertIn("db_exists", res)
@@ -683,7 +683,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_sync_cloud_db_endpoint(self):
         """Vérifie l'endpoint POST /api/cloud-db/sync."""
-        from server import sync_cloud_db_api
+        from api.integrations.cloud_db import sync_cloud_db_api
         with patch("infrastructure.firestore.cloud_database.CloudDatabase.is_enabled", return_value=True):
             with patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"status": "ok", "errors": []}):
                 res = sync_cloud_db_api(force=True)

@@ -14,7 +14,7 @@ if _src_dir not in sys.path:
 
 from infrastructure.helloasso.webhook import HelloAssoWebhookService
 import asyncio
-from server import webhook_helloasso
+from api.integrations.helloasso import webhook_helloasso
 
 
 class TestHelloAssoWebhookService(unittest.TestCase):

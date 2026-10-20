@@ -15,7 +15,7 @@ if _src_dir not in sys.path:
 from domain.constants import APP_VERSION, get_active_season
 from api.web.health import health_check
 from api.web.pages import root_route
-from server import webhook_helloasso_ping
+from api.integrations.helloasso import webhook_helloasso_ping
 
 
 class TestCloudRunLot4(unittest.TestCase):
