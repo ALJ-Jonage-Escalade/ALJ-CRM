@@ -16,8 +16,6 @@
     apiKey: "AIzaSyDtwH7A6XokZZjUcyoL83gx9ZjyuN4IJoQ",
     authDomain: "smart-amplifier-510811-n6.firebaseapp.com",
     projectId: "smart-amplifier-510811-n6",
-    storageBucket: "smart-amplifier-510811-n6.firebasestorage.app",
-    messagingSenderId: "796572126711",
     appId: "1:796572126711:web:a827fd60c313ba2c46f2f2"
   });
 
