@@ -137,7 +137,7 @@ Existing member writes (`/api/members/update`, `/api/attestations/*`) are unchan
 - **Age at the start of the requested season.** The JS computed every age at the *active* season's start, even when a past season was displayed. Same result for the active season; past seasons now show the age during that season.
 - **S11 applied everywhere.** A tariff listed under two planning groups belongs to the first row by id, both in `/api/members` and in the Firestore `adherents` projection (`_read_planning_groups` now uses `member_view.tarif_slots`). A13 is resolved.
 - **Front end.**
-  - New classic script `web/shared/alj-members-sync.js` (`ALJMembersSync.start`) polls both routes and switches season on demand. A remembered season that no longer exists falls back to the active one. It is used by `bureau/adherents.html` and `index.html`.
+  - New classic script `web/shared/alj-members-sync.js` (`ALJMembersSync.start`) polls both routes and switches season on demand. A remembered season that no longer exists falls back to the active one. It is used by `bureau/adherents.html` and `../index.html`.
   - `bureau/outils.html` reads `/api/seasons`. Its default season is now the active one, instead of a hard-coded `2026-2027`.
   - `alj-members.js` keeps the display helpers only. Dropped: `buildMembersData`, `startMembersListener`, `calcAge`, `normalizeGender`.
   - The browser now downloads one season instead of every season of the five `crm_*` collections.
@@ -149,7 +149,7 @@ Existing member writes (`/api/members/update`, `/api/attestations/*`) are unchan
 - **Not verified:**
   - In a browser.
   - The cold start on Cloud Run (the first `/api/members` after scale-to-zero waits for the cache rebuild; S3, D3).
-- **Still loaded (removed in phase 3):** the Firestore SDK and `enablePersistence` on `index.html`.
+- **Still loaded (removed in phase 3):** the Firestore SDK and `enablePersistence` on `../index.html`.
 - **Rebase on main (9423f4b).**
   - Main's display formatting moved from `buildMembersData` to `member_view`: `fmt_last_name`, `fmt_first_name`, `fmt_city`, `fmt_phone` (same rules as the JS ones), applied to names, city, phone and emergency contacts. The JS helpers stay in `alj-members.js` for the edit modal.
   - New fields in the member rows: `raw_passports`, `raw_diplomas` (users), `commentaires_correctif` (purchases). `passeport_orange` is always `""`: no such column exists (the JS read it from Firestore, where it doesn't exist either).
@@ -172,7 +172,7 @@ Existing member writes (`/api/members/update`, `/api/attestations/*`) are unchan
 2. **Wipe the existing Firestore offline cache on phones:** on boot, delete IndexedDB databases whose name starts with `firestore/` (`indexedDB.databases()`, falling back to the known name `firestore/[DEFAULT]/smart-amplifier-510811-n6/main`).
 3. `firestore.rules`: `match /{document=**} { allow read, write: if false; }`. Role functions and e-mail lists are removed from the rules.
 4. Tests: update `test_api_security.py:108` (role lists now in `api_auth.py` + display JS only), `test_firestore_rules_emulator.py` (assert deny for every role), `test_firestore_sync.py:160`.
-5. Docs: `ARCHITECTURE.md` §2/§4/§5, `docs/base_firestore.md`, `README.md` (rules deploy step).
+5. Docs: `../ARCHITECTURE.md` §2/§4/§5, `docs/base_firestore.md`, `README.md` (rules deploy step).
 6. Web version bump to the next version (**v23**; main is at v22 since ffdf6f3) (`<meta alj-web-version>`, titles, badge, `CACHE_NAME`).
 7. Deploy order (see S1): app first, rules last, after a waiting period.
 
@@ -181,7 +181,7 @@ Existing member writes (`/api/members/update`, `/api/attestations/*`) are unchan
 - **Front end (v23).**
   - The Firestore SDK (`firebase-firestore-compat.js`) is gone from the 9 pages and from the `sw.js` precache; `CACHE_NAME` is `alj-escalade-v23`.
   - `alj-firebase.js` starts Auth only: `init()` returns `{ auth }`, and dev mode connects the Auth emulator only. `/runtime-config.js` no longer sends `firestoreEmulator`.
-  - `enablePersistence` is removed from `competitions.html` and `index.html`. The unused `initFirebase` import is removed from `bureau/planning.html`.
+  - `enablePersistence` is removed from `competitions.html` and `../index.html`. The unused `initFirebase` import is removed from `bureau/planning.html`.
   - Texts that said "temps réel / Firestore" (directory login box, bureau home, 🔄 tooltip) now describe the API polling.
 - **Old offline cache wiped (step 2).** `alj-firebase.js` runs `wipeFirestoreCache()` on every `init()`:
   - it deletes each IndexedDB database whose name starts with `firestore/` (`indexedDB.databases()`);
@@ -198,7 +198,7 @@ Existing member writes (`/api/members/update`, `/api/attestations/*`) are unchan
   - `test_firestore_sync.test_firestore_rules_file`: asserts the deny-all rule.
   - `test_bureau_web`: a guard test against any `firestore-compat`, `firebase.firestore(`, `.collection(`, `onSnapshot`, `enablePersistence` or `runTransaction` left under `web/`, and a test of the wipe.
   - `test_runtime_env`: no `firestoreEmulator` in the client configuration.
-- **Docs (step 5).** `ARCHITECTURE.md` (§1, §2, §4, §5, §7, §8), `docs/base_firestore.md` (directory and rights), `README.md` (rules deploy order and rollback), `dev/README.md`.
+- **Docs (step 5).** `../ARCHITECTURE.md` (§1, §2, §4, §5, §7, §8), `docs/base_firestore.md` (directory and rights), `README.md` (rules deploy order and rollback), `dev/README.md`.
 - **Deploy order (step 7, S1). Nothing is deployed yet.**
   1. Deploy the application: `deploy_cloud_run.sh --test` (0 % traffic), smoke-test, then promote. This ships phases 1–3 of the front end together and doesn't touch the rules.
   2. Wait **at least one week**. Then check in the GCP console that Firestore requests evaluated by rules are about 0, meaning no v22 client is still active.
@@ -344,7 +344,7 @@ Consequences:
   - Firestore repository: more than three coaches, order, and the compatibility fields; reading a legacy-only document.
   - API: five coaches, duplicates and order, PATCH.
   - SQLite: four coaches, replacing the list, the cascade on coach delete, and the one-time column migration.
-  - New Qt test `tests/presentation/test_competition_coaches_form.py`, also added as its own step in `.github/workflows/tests.yml`.
+  - New Qt test `tests/presentation/test_competition_coaches_form.py`, also added as its own step in `../.github/workflows/tests.yml`.
 
 **⚠️ Until step B, don't put more than three coaches on a competition from the new versions.**
 - A desktop build older than C2 reads the slots first, so it shows only the first three.
@@ -450,7 +450,7 @@ Consequences:
      - logout wipes everything;
      - data older than 30 days;
      - 7 days without a visit on iOS, with and without the home-screen install.
-6. **Docs.** `ARCHITECTURE.md` §5, `docs/base_firestore.md` (directory), the user help on the phone pages, and S9 (personal data) in this plan.
+6. **Docs.** `../ARCHITECTURE.md` §5, `docs/base_firestore.md` (directory), the user help on the phone pages, and S9 (personal data) in this plan.
 
 **Side effects.**
 - **Personal data on phones comes back, on purpose and limited.** It is the contacts of the competitors of open competitions only, on coaches' phones, not every member of every season with health data as in v22. It is wiped on logout, on loss of role and after 30 days. Record it in the club's GDPR register.
@@ -620,7 +620,7 @@ Kept for reference; the decision is « Phase 5b — as built ».
 
 ## Critical files
 
-`src/server.py` (router include, middleware exemption) · `src/api/{competitions,members,schemas}.py` (new) · `src/infrastructure/api_auth.py` · `src/infrastructure/competition_firestore_repository.py` (`set_item_ignored`, pass-through fields) · `src/infrastructure/sqlite_repository.py` + `src/domain/member_view.py` (new) · `web/competitions.html` · `web/index.html` · `web/bureau/{competitions,adherents,outils}.html` · `web/shared/{alj-firebase,alj-members,alj-sync(new)}.js` · `web/sw.js` · `firestore.rules` · `deploy_cloud_run.sh` · tests listed above · `ARCHITECTURE.md`, `docs/base_firestore.md`.
+`src/server.py` (router include, middleware exemption) · `src/api/{competitions,members,schemas}.py` (new) · `src/infrastructure/api_auth.py` · `src/infrastructure/competition_firestore_repository.py` (`set_item_ignored`, pass-through fields) · `src/infrastructure/sqlite_repository.py` + `src/domain/member_view.py` (new) · `web/competitions.html` · `web/index.html` · `web/bureau/{competitions,adherents,outils}.html` · `web/shared/{alj-firebase,alj-members,alj-sync(new)}.js` · `web/sw.js` · `firestore.rules` · `deploy_cloud_run.sh` · tests listed above · `../ARCHITECTURE.md`, `docs/base_firestore.md`.
 
 ---
 
@@ -648,7 +648,7 @@ Kept for reference; the decision is « Phase 5b — as built ».
 | A16 | `src/server.py:1582,1625` | `return_to` and `error` are put into HTML/JS unescaped (open redirect / reflected injection); OAuth `state` is unsigned and not checked. **Security, prioritize.** | **Still present.** |
 | A17 | `/api/auth/google/status` (public) | Exposes the connected account's e-mail without authentication. | **Still present.** |
 | A18 | `web/bureau/competitions.html:797-828` Bilan | Assumes every payment equals `prix`. | **Still present** (client-side computation unchanged). |
-| A19 | GET `/api/planning` (server.py:912) | Appends to `planning_sync_debug.log` on every call. | **Still present.** |
+| A19 | GET `/api/planning` (server.py:912) | Appends to `../planning_sync_debug.log` on every call. | **Still present.** |
 | A20 | `/api/members/update` | Unknown keys in `fields` are silently ignored but echoed back as if applied. | **Still present.** |
 | A21 | `cloud_database._after_sync` (944) | The projection is only marked dirty by local flushes, not by pulled changes, so desktop edits don't trigger a server rebuild. | **Still present.** |
 | A22 | `CloudDatabase.ensure_fresh` (1024) | Freshness is checked outside the lock, so concurrent requests run redundant syncs; while Firestore is down, every request retries. | **Still present.** |

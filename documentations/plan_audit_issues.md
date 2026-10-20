@@ -6,7 +6,7 @@
 
 ## 1. How this was done (and its limits)
 
-**Read:** `ARCHITECTURE.md`, `GEMINI.md`, `server.py` (routes, middleware, OAuth), `api_auth.py`, `firestore.rules`,
+**Read:** `../ARCHITECTURE.md`, `GEMINI.md`, `server.py` (routes, middleware, OAuth), `api_auth.py`, `firestore.rules`,
 `cloud_database.py` (full), `helloasso_webhook_service.py`, `email_dispatch_service.py`, `secret_store.py`,
 `google_drive_client.py`, `launcher/updater_core.py` + `launcher.py`, packaging scripts, CI/deploy workflows, Dockerfile,
 both requirements files. Surveyed (not read line by line): Qt pages (~12k lines), `sqlite_repository.py`, the web pages.
@@ -301,7 +301,7 @@ requirements files, and `pyproject.toml` declares no dependencies. With `uv`:
   for 3.11–3.13 and all existing pins are preserved.
 - *"The desktop package can use it too."* — No. The portable build and the updater run `pip install -r requirements.txt`
   inside an embedded Python on club members' PCs. That path stays on pip, fed by a `requirements.txt` generated from
-  `uv.lock` (`code_source/dev/export_requirements.py`).
+  `uv.lock` (`../code_source/dev/export_requirements.py`).
 
 **Status (migration in the working tree, not committed):** `pyproject.toml` groups + `uv.lock`, generated
 `requirements*.txt` with a CI freshness check, `uv`-based `tests.yml` / `build-executable.yml`, `Dockerfile` using
@@ -348,7 +348,7 @@ public, rewriting history to remove the e-mail addresses is optional and only wo
 ## F9 — Duplicated logic and no parity tests  (P2)
 
 **Evidence.** `alj-members.js` re-implements the SQL view `v_adherents_legacy` in JavaScript, including `calcAge` and
-season logic (`ARCHITECTURE.md` §3 states any schema change must be mirrored by hand). `web/competitions.html` (2.7k
+season logic (`../ARCHITECTURE.md` §3 states any schema change must be mirrored by hand). `web/competitions.html` (2.7k
 lines) and `web/bureau/competitions.html` (1.8k) are two forks of the same feature. Template-variable handling exists
 in `domain/utils.apply_template_variables` and in JS strings. `tests/web` checks versions, routes and role lists; I
 found no test that feeds the same data to the Python and JS implementations.
@@ -376,7 +376,7 @@ both.
 - Qt: `competitions.py` 2,414, `communications.py` 2,267, `groups.py` 1,347, `workers.py` 1,241 lines; one
   *infrastructure* test imports a Qt worker (`test_infrastructure_lot2.py:427`), so some logic lives in `workers.py`.
   **Recommendation: do not refactor Qt wholesale** — the plan is to remove it. Extract only logic that the web needs
-  (that is already the §6 recipe in `ARCHITECTURE.md`).
+  (that is already the §6 recipe in `../ARCHITECTURE.md`).
 - Static analysis is thin by design: ruff `E4,E7,E9,F,B`, mypy on two files. Widen mypy gradually to
   `api_auth.py`, `cloud_database.py`, `domain/`, and add `bandit`/`ruff S` to catch F1-class f-string HTML.
 
@@ -393,7 +393,7 @@ pending count, a Cloud Monitoring alert on 5xx and on sync errors, a per-user ca
 
 ## F12 — Docs and hygiene  (P3)
 
-`ARCHITECTURE.md` says branch `feat/nux_setup`, version 2.5.8, `server.py` ~1,400 lines (actual 2.6.2 and 1,916);
+`../ARCHITECTURE.md` says branch `feat/nux_setup`, version 2.5.8, `server.py` ~1,400 lines (actual 2.6.2 and 1,916);
 `GEMINI.md` still describes Tkinter/Word-COM; `pyproject.toml` says 2.0.5; the repo root holds **diverged copies**
 of `install.bat`, `pytest.ini`, `deploy_cloud_run.bat`, `Lancer_ALJ.vbs`, `GEMINI.md` (diffs of 6-470 lines vs
 `code_source/`); the legacy `build_package.py` still copies a local `.env` into its release folder, contradicting its

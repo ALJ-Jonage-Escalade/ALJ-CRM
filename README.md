@@ -2,7 +2,7 @@
 
 Gestion des adhésions de la section Escalade de l'Amicale Laïque de Jonage : client lourd Windows (PySide6)
 et application web (FastAPI + PWA) sur Google Cloud Run, données dans Firestore.
-Architecture détaillée : [ARCHITECTURE.md](ARCHITECTURE.md).
+Architecture détaillée : [documentations/ARCHITECTURE.md](documentations/ARCHITECTURE.md).
 
 ## Lancer l'application en mode dev local
 
@@ -77,6 +77,23 @@ Arrêt : `Ctrl+C` pour le serveur, `docker compose -f dev/docker-compose.yml dow
 - HelloAsso (`/api/dashboard`, synchro) appelle l'API réelle : en erreur sans identifiants.
 - Plus de détails : [code_source/dev/README.md](code_source/dev/README.md).
 
+### Scripts Windows
+
+Les scripts se lancent d'un double-clic, depuis n'importe quel dossier : chacun se place lui-même
+dans le bon répertoire de travail.
+
+| Script | Rôle |
+|---|---|
+| `scripts/install.bat` | Installation (venv à la racine, dépendances, raccourci bureau) |
+| `scripts/lancer_site_web.bat` | Serveur web local → http://127.0.0.1:8000/bureau/ |
+| `scripts/deploy_cloud_run.bat` | Déploiement en production (appelle `code_source/scripts/deploy_cloud_run.bat`) |
+| `scripts/backup_projet.ps1` | Sauvegarde ZIP du projet (`.\scripts\backup_projet.ps1 [-Destination E:\]`) |
+| `code_source/scripts/install.bat` | Installation (venv dans `code_source/`, dépendances, raccourci bureau) |
+| `code_source/scripts/run_app.bat`, `Lancer_ALJ.vbs` | Client lourd (le `.vbs` lance sans console) |
+| `code_source/scripts/lancer_site_web.bat` | Serveur web local |
+| `code_source/scripts/run_batch_resultats.bat` | Batch quotidien des résultats MyCompet (planifié par `installer/creer_tache_resultats_07h.ps1`) |
+| `code_source/scripts/deploy_cloud_run.sh` / `.bat` | Déploiement Cloud Run (voir plus bas) |
+
 ## Tests
 
 ```bash
@@ -88,14 +105,16 @@ uv run mypy                                       # fichiers listés dans [tool.
 
 ## Déployer sur Cloud Run
 
-Depuis `code_source/` (Google Cloud Shell ou poste avec le Google Cloud SDK) :
+Depuis Google Cloud Shell ou un poste avec le Google Cloud SDK (le script envoie toujours `code_source/`,
+quel que soit le dossier courant) :
 
 ```bash
-./deploy_cloud_run.sh                     # production : la nouvelle version reçoit 100 % du trafic
-./deploy_cloud_run.sh --test              # version de test : 0 % du trafic, URL dédiée
-./deploy_cloud_run.sh --rollback          # retour à la révision précédant celle en ligne
-./deploy_cloud_run.sh --rollback <REV>    # retour à une révision précise
-./deploy_cloud_run.sh --cleanup           # supprime l'URL de test (la révision est conservée)
+cd code_source
+./scripts/deploy_cloud_run.sh                     # production : la nouvelle version reçoit 100 % du trafic
+./scripts/deploy_cloud_run.sh --test              # version de test : 0 % du trafic, URL dédiée
+./scripts/deploy_cloud_run.sh --rollback          # retour à la révision précédant celle en ligne
+./scripts/deploy_cloud_run.sh --rollback <REV>    # retour à une révision précise
+./scripts/deploy_cloud_run.sh --cleanup           # supprime l'URL de test (la révision est conservée)
 ```
 
 Chaque déploiement crée une **révision** Cloud Run immuable ; le script affiche la révision en ligne,
@@ -103,18 +122,18 @@ demande confirmation, puis donne l'URL de l'application à la fin.
 
 ### Tester avant la mise en production
 
-1. `./deploy_cloud_run.sh --test` : la révision est publiée sur une URL du type
+1. `./scripts/deploy_cloud_run.sh --test` : la révision est publiée sur une URL du type
    `https://test---alj-escalade-api-….run.app`, sans recevoir de trafic.
 2. Vérifier sur cette URL : `/health`, connexion, pages modifiées.
 3. Promouvoir sans reconstruire avec la commande `gcloud run services update-traffic … --to-tags test=100`
    affichée par le script (ou relancer un déploiement de production).
-4. `./deploy_cloud_run.sh --cleanup` une fois les tests terminés : l'URL de test, branchée sur les
+4. `./scripts/deploy_cloud_run.sh --cleanup` une fois les tests terminés : l'URL de test, branchée sur les
    données de production, cesse de répondre. Une révision sans trafic ne coûte rien (0 instance au
    repos) ; seules les images Docker s'accumulent dans Artifact Registry (`cloud-run-source-deploy`).
 
 ### Revenir en arrière
 
-`./deploy_cloud_run.sh --rollback` bascule tout le trafic sur une ancienne révision, sans reconstruction,
+`./scripts/deploy_cloud_run.sh --rollback` bascule tout le trafic sur une ancienne révision, sans reconstruction,
 en quelques secondes. Le script liste les dernières révisions : vérifier que la cible n'est pas une
 version de test jamais promue. Après un déploiement en production, la commande de retour exacte est
 affichée. Le prochain déploiement en production renvoie le trafic sur la nouvelle révision.
@@ -138,12 +157,14 @@ affichée. Le prochain déploiement en production renvoie le trafic sur la nouve
 
   La prise en compte par Google peut prendre quelques minutes.
 - Les webhooks HelloAsso arrivent toujours sur l'URL principale, donc sur la révision de production.
-- `firestore.rules` n'est **pas** déployé par ce script (`firebase deploy --only firestore:rules`) :
+- `code_source/firestore/firestore.rules` n'est **pas** déployé par ce script
+  (`cd code_source/firestore && firebase deploy --only firestore:rules`, à côté de `firebase.json`) :
   les règles s'appliquent immédiatement à toute la production. Historique et retour arrière dans la
   console Firebase > Firestore > Rules.
 - Depuis la version web v23, `firestore.rules` **refuse tout client** (les pages passent par l'API).
   Ne le déployer qu'**au moins une semaine après** la mise en production de la v23, et après avoir
   vérifié dans la console GCP que les requêtes Firestore évaluées par les règles sont tombées à ~0 ;
   sinon les PWA encore en v22 ou moins perdent l'accès. Retour arrière :
-  `git checkout <commit précédent> -- firestore.rules && firebase deploy --only firestore:rules`.
-- `deploy_cloud_run.bat` (Windows) ne fait qu'un déploiement en production, sans `--test` ni `--rollback`.
+  `git checkout <commit précédent> -- code_source/firestore/firestore.rules`, puis
+  `cd code_source/firestore && firebase deploy --only firestore:rules`.
+- `scripts/deploy_cloud_run.bat` (Windows) ne fait qu'un déploiement en production, sans `--test` ni `--rollback`.

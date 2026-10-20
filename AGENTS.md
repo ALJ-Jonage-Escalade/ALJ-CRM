@@ -2,7 +2,7 @@
 
 Membership management for the climbing section of the Amicale Laïque de Jonage: a Windows desktop client (PySide6)
 and a web app (FastAPI + PWA) on Google Cloud Run, with data in Firestore.
-User docs: `README.md` · Architecture: `ARCHITECTURE.md` · Local dev stack: `code_source/dev/README.md`.
+User docs: `README.md` · Architecture: `documentations/ARCHITECTURE.md` · Local dev stack: `code_source/dev/README.md`.
 Python conventions (lint, typing, tests): `code_source/AGENTS.md`.
 
 ## Setup
@@ -27,11 +27,12 @@ docker compose -f dev/docker-compose.yml down     # stop (emulator data kept in 
 - e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker; see `dev/README.md`)
 
 ## Deployment — production, ask before running
-- `./deploy_cloud_run.sh --test` — test revision with 0 % traffic, dedicated URL
-- `./deploy_cloud_run.sh` — production (100 % traffic)
-- `./deploy_cloud_run.sh --rollback [<REV>]` — switch traffic back (code only, never data)
-- `./deploy_cloud_run.sh --cleanup` — remove the test URL
-- Firestore rules are deployed separately: `firebase deploy --only firestore:rules` (applies to production immediately)
+Run from `code_source/` (the script always uploads `code_source/`); Windows scripts live in `scripts/` and `code_source/scripts/`
+- `./scripts/deploy_cloud_run.sh --test` — test revision with 0 % traffic, dedicated URL
+- `./scripts/deploy_cloud_run.sh` — production (100 % traffic)
+- `./scripts/deploy_cloud_run.sh --rollback [<REV>]` — switch traffic back (code only, never data)
+- `./scripts/deploy_cloud_run.sh --cleanup` — remove the test URL
+- Firestore rules are deployed separately: `cd code_source/firestore && firebase deploy --only firestore:rules` (applies to production immediately)
 - The test revision uses **production data and secrets**: actions there (e-mails, member edits) are real
 
 ## Rules

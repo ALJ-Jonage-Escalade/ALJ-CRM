@@ -54,7 +54,7 @@ jobs:
 
     - name: Record the live revision (rollback target)
       id: previous
-      # Same query as live_revision() in code_source/deploy_cloud_run.sh
+      # Same query as live_revision() in code_source/scripts/deploy_cloud_run.sh
       run: |
         revision=$(gcloud run services describe "$SERVICE_NAME" --project "$PROJECT_ID" --region "$REGION" \
           --flatten='status.traffic[]' \
@@ -76,7 +76,7 @@ jobs:
       id: deploy
       env:
         IMAGE: ${{ steps.image.outputs.image }}
-      # Same settings as code_source/deploy_cloud_run.sh; no env/secret flags so the service keeps them.
+      # Same settings as code_source/scripts/deploy_cloud_run.sh; no env/secret flags so the service keeps them.
       run: |
         gcloud run deploy "$SERVICE_NAME" --image "$IMAGE" --project "$PROJECT_ID" --region "$REGION" \
           --platform managed --allow-unauthenticated \
@@ -100,6 +100,6 @@ jobs:
           echo "### ❌ Deployment failed"
           echo "Previous live revision: \`$PREVIOUS_REVISION\`. Roll back from code_source/ (Cloud Shell):"
           echo '```'
-          echo "./deploy_cloud_run.sh --rollback $PREVIOUS_REVISION"
+          echo "./scripts/deploy_cloud_run.sh --rollback $PREVIOUS_REVISION"
           echo '```'
         } >> "$GITHUB_STEP_SUMMARY"
