@@ -12,7 +12,7 @@ if _src_dir not in sys.path:
 
 from typing import Optional
 
-from fastapi import FastAPI, Body, BackgroundTasks, HTTPException, Query, Request
+from fastapi import FastAPI, Body, BackgroundTasks, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 
 from infrastructure.sqlite.repository import SqliteRepository
@@ -42,8 +42,8 @@ from starlette.concurrency import run_in_threadpool
 # Paths of the routes that only read/write Firestore collections (competitions, coaches,
 # projections, HelloAsso mirror) through CompetitionFirestoreRepository: they never touch the
 # SQLite cache, so they must not wait for its refresh (a full rebuild after a cold start).
-# Filled from their routers once included (below). Exact routes, not path prefixes: the old
-# routes of this file under /api/competitions (results batch, check-all-paid) use the cache.
+# Filled from their routers once included (below). Exact routes, not path prefixes: other routes
+# under /api/competitions (results batch, check-all-paid) use the cache.
 FIRESTORE_ONLY_PATHS: List[re.Pattern[str]] = []
 
 
@@ -92,13 +92,14 @@ app.middleware("http")(security_headers_middleware)  # outermost
 # Data routes of the web front end (competitions, coaches, HelloAsso links, members): src/api/
 from api.competitions import coaches, competitions, helloasso_items, participants
 from api.competitions import members as competition_members
+from api.competitions import payments, results
 from api.members import dashboard, members, seasons
 from api.web import health, pages, pwa
 from api.responses import client_error, internal_error, service_error_handler
 from infrastructure.geocoding import geocode_missing_addresses
 from services.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
-             members, seasons, dashboard, pages, pwa, health):
+             results, payments, members, seasons, dashboard, pages, pwa, health):
     app.include_router(_api.router)
 pages.mount_static(app)
 # Every route of these routers skips the SQLite cache refresh: a route that reads or writes the
@@ -900,21 +901,6 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
         invalidate_cache()  # payments recorded on competition documents directly
 
 
-@app.post("/api/competitions/{comp_id}/check-all-paid")
-def check_competition_all_paid_api(comp_id: int):
-    """Vérifie si tous les compétiteurs ont payé et envoie l'e-mail récapitulatif si applicable."""
-    try:
-        from infrastructure.helloasso.webhook import HelloAssoWebhookService
-        notified = HelloAssoWebhookService.check_and_notify_all_paid(comp_id)
-        return {
-            "status": "success",
-            "competition_id": comp_id,
-            "notified": notified
-        }
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "check_competition_all_paid_api")})
-
-
 @app.get("/api/email-templates")
 def get_email_templates():
     """Retourne la liste des modèles d'e-mails configurés."""
@@ -1120,184 +1106,6 @@ def sync_helloasso_api():
         return {"status": "error", "message": internal_error(e, "sync_helloasso_api")}
     finally:
         invalidate_cache()  # payments recorded on competition documents directly
-
-
-# --------------------------------------------------------------------------
-# Batch quotidien de récupération des résultats MyCompet FFME & Notifications
-# --------------------------------------------------------------------------
-@app.post("/api/competitions/cron/fetch-results")
-async def api_cron_fetch_competition_results(
-    force: bool = False,
-    email: Optional[str] = None
-):
-    """
-    Exécute le batch de récupération des résultats MyCompet FFME pour les compétitions passées
-    et envoie un e-mail de synthèse si des résultats sont découverts.
-    Conçu pour être appelé par Google Cloud Scheduler (ex: tous les jours à 07h00) ou manuellement.
-    """
-    from services.competitions.results_batch import CompetitionResultsBatchService
-    from services.competitions.store import invalidate_cache
-    try:
-        return await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
-    finally:
-        invalidate_cache()  # the batch writes competition documents directly
-
-
-@app.post("/api/competitions/{comp_id}/fetch-results")
-async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = Body(default={})):
-    """
-    Récupère les résultats officiels depuis MyCompet FFME pour une compétition donnée,
-    extrait les compétiteurs de l'Amicale Laïque de Jonage et met à jour leurs classements.
-    """
-    from infrastructure.mycompet.scraper import fetch_and_parse_mycompet_results, normalize_result_url, find_mycompet_result_url
-    from infrastructure.firestore.client import FirestoreClient
-
-    url = (payload.get("url") or payload.get("result_id") or "").strip()
-
-    comp_doc = None
-    try:
-        comp_doc = FirestoreClient.get_document("competitions", comp_id)
-    except Exception as e:
-        print(f"⚠️ [MYCOMPET] Impossible de lire la compétition {comp_id} sur Firestore : {e}")
-
-    if not url and comp_doc:
-        url = comp_doc.get("url_resultats") or comp_doc.get("id_resultat_ffme") or ""
-
-    # Détection automatique transparente si aucune URL n'est renseignée
-    if not url and comp_doc:
-        nom = comp_doc.get("nom") or ""
-        date = comp_doc.get("date_competition") or ""
-        lieu = comp_doc.get("lieu") or ""
-        id_ffme = comp_doc.get("id_ffme") or ""
-        auto_url = await run_in_threadpool(find_mycompet_result_url, nom, date, lieu, str(id_ffme))
-        if auto_url:
-            url = auto_url
-
-    if not url:
-        return JSONResponse({
-            "status": "needs_url",
-            "message": "Résultats introuvables automatiquement sur MyCompet. Veuillez renseigner l'URL ou le numéro de résultat (ex: https://mycompet.ffme.fr/resultat/resultat_13660 ou 13660)."
-        }, status_code=404)
-
-    try:
-        club_kw = payload.get("club") or "JONAGE"
-        scraped_results = await run_in_threadpool(fetch_and_parse_mycompet_results, url, club_kw)
-    except Exception as e:
-        print(f"❌ [MYCOMPET] Erreur scraping MyCompet ({url}) : {e}")
-        return JSONResponse({
-            "status": "error",
-            "message": f"Erreur lors de la récupération des résultats MyCompet : {e}"
-        }, status_code=502)
-
-    matched_count = 0
-    participants = list((comp_doc.get("participants") if comp_doc else None) or [])
-
-    now_iso = datetime.datetime.now().isoformat()
-    canonical_url = normalize_result_url(url)
-
-    by_licence = {}
-    by_name = {}
-    for r in scraped_results:
-        lic = str(r.get("licence") or "").strip()
-        if lic:
-            by_licence[lic] = r
-        full = f"{r.get('nom', '')} {r.get('prenom', '')}".strip().lower()
-        if full:
-            by_name[full] = r
-
-    for p in participants:
-        p_lic = str(p.get("num_licence") or "").strip()
-        p_name = f"{p.get('nom', '')} {p.get('prenom', '')}".strip().lower()
-
-        match = by_licence.get(p_lic) or by_name.get(p_name)
-        if match:
-            matched_count += 1
-            cl = str(match.get("classement") or "").strip()
-            tot = int(match.get("total_categorie") or 0)
-            p["classement"] = cl
-            p["total_categorie"] = tot
-            suffix = f" / {tot}" if tot > 0 else "e"
-            p["resultat_ffme"] = f"{cl}{suffix}" if cl else ""
-            p["categorie_ffme"] = match.get("categorie") or ""
-            p["performance_ffme"] = match.get("performance") or ""
-            p["resultat_synced_at"] = now_iso
-
-    if comp_doc:
-        try:
-            FirestoreClient.update_fields("competitions", comp_id, {
-                "participants": participants,
-                "url_resultats": canonical_url,
-                "resultats_synced_at": now_iso
-            })
-        except Exception as e:
-            print(f"⚠️ [MYCOMPET] Erreur mise à jour Firestore : {e}")
-        finally:
-            from services.competitions.store import invalidate_cache
-            invalidate_cache()  # results visible on the next poll of the competition pages
-
-    # Sauvegarde miroir dans la base SQLite locale si disponible
-    try:
-        from infrastructure.sqlite.competition_repository import CompetitionRepository
-        if os.path.exists(CompetitionRepository.get_db_path()):
-            CompetitionRepository.setup_database()
-            conn = CompetitionRepository.get_connection()
-            try:
-                conn.execute(
-                    "UPDATE competitions SET url_resultats = ?, resultats_synced_at = ? WHERE id = ? OR id_ffme = ?",
-                    (canonical_url, now_iso, comp_id, comp_id)
-                )
-                for p in participants:
-                    aid = p.get("adherent_id")
-                    if aid:
-                        conn.execute(
-                            """UPDATE participants SET classement = ?, total_categorie = ?, resultat_ffme = ?,
-                               categorie_ffme = ?, performance_ffme = ?, resultat_synced_at = ?
-                               WHERE (competition_id = ? OR competition_id = (SELECT id FROM competitions WHERE id_ffme = ?))
-                               AND adherent_id = ?""",
-                            (p.get("classement") or "", int(p.get("total_categorie") or 0), p.get("resultat_ffme") or "",
-                             p.get("categorie_ffme") or "", p.get("performance_ffme") or "",
-                             now_iso, comp_id, comp_id, aid)
-                        )
-                conn.commit()
-            finally:
-                conn.close()
-    except Exception as e:
-        print(f"⚠️ [SQLITE] Erreur sauvegarde locale des résultats : {e}")
-
-    return {
-        "status": "success",
-        "url": canonical_url,
-        "total_scraped": len(scraped_results),
-        "matched_count": matched_count,
-        "results": scraped_results,
-        "participants": participants
-    }
-
-
-@app.get("/api/settings/competitions-results")
-def get_competitions_results_settings_api():
-    """Retourne la configuration et l'état du batch quotidien de résultats."""
-    from services.competitions.results_batch import CompetitionResultsBatchService
-    return {
-        "status": "success",
-        **CompetitionResultsBatchService.get_batch_status()
-    }
-
-
-@app.post("/api/settings/competitions-results")
-def update_competitions_results_settings_api(data: Dict[str, Any] = Body(...)):
-    """Met à jour l'adresse e-mail de notification des résultats."""
-    from services.competitions.results_batch import CompetitionResultsBatchService
-    email = str(data.get("notification_email") or "").strip()
-    if not email or "@" not in email or "." not in email:
-        raise HTTPException(status_code=400, detail="Adresse e-mail de notification invalide.")
-
-    ok = CompetitionResultsBatchService.set_notification_email(email)
-    return {
-        "status": "success",
-        "notification_email": CompetitionResultsBatchService.get_notification_email(),
-        "saved": ok
-    }
 
 
 # --------------------------------------------------------------------------

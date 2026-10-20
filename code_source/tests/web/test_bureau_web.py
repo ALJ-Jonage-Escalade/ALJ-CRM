@@ -119,11 +119,11 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_competitions_results_cron_and_settings_endpoints(self):
         """Vérifie les endpoints de configuration et de cron du batch des résultats MyCompet."""
-        from server import (
-            app,
+        from api.competitions.results import (
             get_competitions_results_settings_api,
             update_competitions_results_settings_api
         )
+        from server import app
 
         # 1. GET /api/settings/competitions-results
         res = get_competitions_results_settings_api()
