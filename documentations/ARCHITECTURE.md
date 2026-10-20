@@ -1,45 +1,46 @@
 # ALJ-CRM — Architecture & onboarding
 
 > Gestion des adhésions de la section Escalade de l'Amicale Laïque de Jonage (ALJ).
-> Ce document décrit l'état réel du code (branche `feat/nux_setup`, version `2.5.8`) et la trajectoire
-> **« tout migrer vers le web »**. Il a été rédigé par lecture du code et des docs existantes ; les points
+> Ce document décrit l'état réel du code. Il a été rédigé par lecture du code et des docs existantes ; les points
 > marqués **(à vérifier)** n'ont pas été confirmés en exécutant l'application.
+> Le client lourd Windows (PySide6) a été retiré : les fonctions qui n'existent pas encore sur le web sont listées
+> dans `documentations/desktop_features_missing_in_web.md`.
 
 ---
 
 ## 1. En une minute
 
-Le dépôt contient **une seule base de code Python** (`../code_source`) qui produit **deux applications** :
+Le dépôt contient **une seule base de code Python** (`../code_source`) qui produit **une application web** :
 
-| | Client lourd (desktop) | Application web |
-|---|---|---|
-| Techno | PySide6 (Qt) + serveur FastAPI embarqué | HTML/JS statique (sans build) servi par FastAPI |
-| Où ça tourne | Poste Windows du bureau (portable zip + auto-update GitHub) | Google Cloud Run (`europe-west1`, 0→2 instances) |
-| Point d'entrée | `src/app.py` | `src/server.py` (`uvicorn server:app`) |
-| Données | Cache SQLite local (`../data/database.db`) synchronisé avec Firestore | Uniquement via l'API (`/api/*`) ; le serveur lit Firestore (compétitions) et un cache SQLite éphémère (adhérents). Le navigateur n'utilise Firebase que pour la connexion. |
-| Utilisateurs | Administrateurs/bureau | Coachs et admins (PWA smartphone + portail bureau) |
+| | Application web |
+|---|---|
+| Techno | FastAPI + HTML/JS statique (sans build) servi par FastAPI |
+| Où ça tourne | Google Cloud Run (`europe-west1`, 0→2 instances) |
+| Point d'entrée | `src/server.py` (`uvicorn server:app`) |
+| Données | Uniquement via l'API (`/api/*`) ; le serveur lit Firestore (compétitions) et un cache SQLite éphémère (adhérents). Le navigateur n'utilise Firebase que pour la connexion. |
+| Utilisateurs | Coachs et admins (PWA smartphone + portail bureau) |
 
-Le lien entre les deux : **Firestore** (projet GCP `smart-amplifier-510811-n6`) est la source de vérité.
-Le backend `server.py` est *le même fichier* des deux côtés : le desktop le lance en thread sur
-`127.0.0.1:8000-8099` (auth désactivée), Cloud Run le lance dans Docker (auth Firebase obligatoire).
+**Firestore** (projet GCP `smart-amplifier-510811-n6`) est la source de vérité. Cloud Run lance `server.py` dans
+Docker (auth Firebase obligatoire).
 
 ```
-                  HelloAsso ──webhook──┐
-                  HelloAsso ◄──API v5──┤
-                                       ▼
-┌──────────────────────┐     ┌───────────────────────────┐     ┌──────────────────────────┐
-│ DESKTOP (Windows)    │     │ CLOUD RUN — server.py     │     │ NAVIGATEUR               │
-│ PySide6 presentation │     │ FastAPI + API + HTML      │     │ web/ (PWA + portail      │
-│ + server.py en thread│     │ WeasyPrint (PDF)          │◄────┤ bureau), Firebase Auth   │
-│ + cache SQLite       │     │ cache SQLite éphémère     │ API │ lit Firestore en direct  │
-└─────────┬────────────┘     └─────────────┬─────────────┘     └────────────┬─────────────┘
-          │ REST v1 (OAuth club)           │ REST v1 (metadata server)      │ SDK Firebase
-          ▼                                ▼                                ▼
+    HelloAsso ──webhook──┐
+    HelloAsso ◄──API v5──┤
+                         ▼
+          ┌───────────────────────────┐     ┌──────────────────────────┐
+          │ CLOUD RUN — server.py     │     │ NAVIGATEUR               │
+          │ FastAPI + API + HTML      │     │ web/ (PWA + portail      │
+          │ WeasyPrint (PDF)          │◄────┤ bureau), Firebase Auth   │
+          │ cache SQLite éphémère     │ API │ (connexion seulement)    │
+          └─────────────┬─────────────┘     └──────────────────────────┘
+                        │ REST v1 (metadata server)
+                        ▼
                          ┌─────────────────────────────────────┐
                          │ FIRESTORE  crm_* / competitions /   │
                          │ coaches / adherents / planning …    │
                          └─────────────────────────────────────┘
           Gmail API (OAuth2 club)  ·  Google Drive (copie de sauvegarde)  ·  Nominatim (géocodage)
+          Cloud Scheduler (07:00) → POST /api/competitions/cron/fetch-results (résultats MyCompet)
 ```
 
 ---
@@ -50,7 +51,6 @@ Le backend `server.py` est *le même fichier* des deux côtés : le desktop le l
 ALJ-CRM/                         ← racine du dépôt
 ├── code_source/                 ← TOUT le code (la racine ne contient que des doublons/raccourcis, voir §9)
 │   ├── src/
-│   │   ├── app.py               ← entrée DESKTOP (QApplication + thread uvicorn)
 │   │   ├── server.py            ← entrée WEB/API : assemble l'app FastAPI (middlewares, routeurs de api/), aucune route
 │   │   ├── paths.py             ← CODE_ROOT / ROOT_DIR / DATA_ROOT (à utiliser, ne jamais recalculer)
 │   │   ├── domain/              ← Python pur : members/, competitions/, attestation/ + constants, utils, validators
@@ -60,10 +60,7 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── infrastructure/      ← accès externes, un dossier par système : security/ (auth API, secrets),
 │   │   │                          sqlite/ (+ migrations/), firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/
 │   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME, Excel adhérents),
-│   │   │                          presence_sheets, presence_cours, emergency_contacts, planning_excel,
-│   │   │                          attestation_word (Word COM), spreadsheet_safety
-│   │   ├── presentation/        ← UI Qt UNIQUEMENT (pages/, components/, workers.py, main_window.py)
-│   │   └── logger.py, install_bootstrap.py
+│   │   │                          presence_sheets, planning_excel, spreadsheet_safety
 │   ├── web/
 │   │   ├── index.html           ← PWA « annuaire » (smartphone)
 │   │   ├── competitions.html    ← PWA « compétitions » (smartphone, 2700 lignes)
@@ -71,22 +68,20 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── bureau/              ← portail ordinateur : index, adherents, communications, competitions, outils
 │   │   └── shared/              ← alj-firebase.js (init Firebase unique + émulateur dev), alj-core.js (login/apiFetch), alj-shell.js (menu), alj-members.js,
 │   │                              alj-filters.js, alj-vue.js (redirection bureau/mobile), alj.css
-│   ├── tests/                   ← tests pytest/unittest, rangés comme le code testé : domain/, exports/, infrastructure/, presentation/ (Qt), services/, api/, launcher/, web/ ; modules racine de src/ à la racine
+│   ├── tests/                   ← tests pytest/unittest, rangés comme le code testé : domain/, exports/, infrastructure/, services/, api/, web/ ; modules racine de src/ à la racine
 │   ├── dev/                     ← mode dev local : émulateur Firebase (Docker), dev.env, run_server.sh, seed/ (données fictives)
 │   ├── docs/                    ← docs d'architecture/plan (partiellement obsolètes, voir §8)
-│   ├── doc/template/            ← modèles Word/Excel (non versionné en partie)
-│   ├── launcher/ installer/     ← auto-update + installateur du mode portable Windows
+│   ├── doc/template/            ← modèles HTML/Excel (attestation, liste de présence)
 │   ├── Dockerfile, requirements-docker.txt, deploy_cloud_run.{sh,bat}, firestore.rules, firebase.json
-│   ├── requirements.txt         ← deps DESKTOP (PySide6, pywin32, python-docx, keyring…)
 │   ├── VERSION                  ← 2.5.8 (source de vérité, doit == APP_VERSION dans domain/constants.py)
 │   └── GEMINI.md                ← doc historique la plus détaillée (voir §8 pour ses limites)
-├── .github/workflows/           ← release Windows (tag v*) : ruff, mypy, pytest, zip portable
-└── GEMINI.md, *.bat, *.vbs…     ← doublons/raccourcis de la racine
+├── .github/workflows/           ← tests (ruff, mypy, pytest, e2e) + déploiement Cloud Run sur main
+└── GEMINI.md, *.bat…            ← doublons/raccourcis de la racine (deploy_cloud_run.bat, lancer_site_web.bat)
 ```
 
 ### Couches (code_source/src)
 
-- **`domain/`** — pur Python, sans I/O ni Qt. C'est la partie **directement réutilisable** par le web.
+- **`domain/`** — pur Python, sans I/O.
   Rangé en `members/` (modèles, liste web, `age_rules`, `planning_groups`), `competitions/` (modèles,
   `matching` HelloAsso), `attestation/` (`document.build_attestation()`, HTML → PDF WeasyPrint) ;
   `constants`, `utils.apply_template_variables`, `validators` restent à la racine.
@@ -96,8 +91,7 @@ ALJ-CRM/                         ← racine du dépôt
   - `firestore/cloud_database.py` : réplication SQLite ⇄ Firestore (collections `crm_<table>`, triggers `_fs_*`, flush toutes les 15 s, pull toutes les 2 min, merge champ par champ).
   - `firestore/client.py` : client REST Firestore (sans gRPC) ; `firestore/competition_repository.py` : compétitions.
   - `security/api_auth.py` : middleware Firebase (rôles `readonly < coach < admin`). Seul juge des droits : `firestore.rules` refuse tout accès client.
-  - `mail/` (envoi, campagnes, corps HTML), `helloasso/` (API v5, webhook), `security/secret_store.py`, `google/` (Drive, Contacts, OAuth Gmail).
-- **`presentation/`** — Qt uniquement. Pages : Adhérents, Attestations, Communications, Exports, Import Data, Créneaux, Compétitions, Outils, Paramètres, Aide, Logs. Les opérations longues passent par `workers.py` (QThread).
+  - `mail/` (envoi, campagnes, corps HTML), `helloasso/` (API v5, webhook), `security/secret_store.py`, `google/drive.py` (OAuth Google, Drive).
 
 ---
 
@@ -160,49 +154,32 @@ Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protég
 
 ---
 
-## 6. Où en est la migration vers le web
+## 6. Fonctions de l'ancien client lourd à porter sur le web
 
-Correspondance entre les pages du client lourd et ce qui existe déjà sur le web (**estimation d'après le code, à valider fonctionnellement**) :
-
-| Page desktop | Équivalent web | État | Reste à faire / remarques |
-|---|---|---|---|
-| 👥 Adhérents | `bureau/adherents.html` | Partiel | Liste, filtre sous-catégories, détail, e-mail, attestation, mise à jour via `/api/members/update`. Pas d'ajout d'adhérent ni d'édition de tarif **(à vérifier)** ; plan initial : « lecture seule ». |
-| 📄 Attestations | bouton par adhérent | Partiel | Unitaire seulement (WeasyPrint). Pas de génération en lot / ZIP. Word/COM n'existe pas côté web. |
-| ✉️ Communications | `bureau/communications.html` | Partiel/Avancé | CRUD des modèles + envoi unitaire. Envoi groupé, historique d'envoi, quotas Gmail : à construire. |
-| 📦 Exports | — | **Absent** | Export CSV FFME (`exports/membership_excel.generate_ffme_csv`, golden master), fiches de présence (Excel/openpyxl), cahier d'urgence A4, anciens adhérents, MyCompet. |
-| 📥 Import Data | — | **Absent** | Imports FFME / autonomes / saison + rapprochement manuel (`ManualMatchDialog`). Nécessite upload de fichiers. |
-| 🧗 Créneaux (groupes) | — (`/api/planning` seulement) | **Absent** (UI) | Édition groupes/créneaux, vue semaine, export planning Excel, QR codes. |
-| 🏆 Compétitions | `bureau/competitions.html` + PWA | Avancé | Participants, e-mails, HelloAsso. Le rapprochement manuel et le bilan de saison étaient « bureau only » dans la doc **(à vérifier)**. |
-| 🔧 Outils | `bureau/outils.html` | Fait (iframes) | Carte + tableau croisé. Géocodage en lot et sync HelloAsso : `/api/helloasso/sync` existe. |
-| ⚙️ Paramètres | — | **Absent** | Secrets (HelloAsso, Google OAuth, SMTP) via `SecretStore` (keyring) sur desktop, variables d'env./Secret Manager sur Cloud Run. |
-| Gmail Contacts | — | **Absent** | `gmail_contact.py` + `infrastructure/google/contacts.py`. |
-| ❓ Aide / 📋 Logs | — | Absent | Logs : Cloud Logging côté Cloud Run. |
+Le client lourd Windows a été retiré. La liste des fonctions qui n'existent pas (ou pas entièrement) sur le web,
+avec le code backend conservé et le code supprimé (récupérable dans l'historique git), est dans
+`documentations/desktop_features_missing_in_web.md`.
 
 ### Obstacles techniques récurrents
 
-1. **Dépendances Windows/desktop** hors `presentation/` : `exports/attestation_word.py` (Word COM, `pywin32`), `infrastructure/security/secret_store.py` et `infrastructure/google/drive.py` (`keyring`), `app.py`. Le Docker les exclut volontairement (`requirements-docker.txt`).
-2. **Logique métier coincée dans des fichiers legacy ou des workers Qt** : `exports/membership_excel.py` (exports FFME, ~590 lignes restantes), `presentation/workers.py` (1234 lignes), générateurs Excel de `../exports`. À extraire vers `domain/` + `infrastructure/` puis exposer en routes FastAPI avant de construire l'écran web.
-3. **Système de fichiers** : le desktop lit/écrit dans `../data`, `exports/`, `archive/`. Cloud Run est éphémère → génération **en mémoire** puis téléchargement (comme les attestations), jamais de persistance locale.
-4. **Cache SQLite côté serveur** : reconstruit depuis Firestore au premier appel de données (`CloudDatabase.ensure_fresh`, 30 s) et flush après chaque écriture. Une route d'écriture doit passer par `SqliteRepository` pour être répliquée.
-5. **Durée des requêtes** : timeout Cloud Run 300 s, mémoire 1 GiB (Pandas/WeasyPrint) ; les traitements lourds (géocodage Nominatim à 1,5 s/adresse) doivent rester en tâche de fond.
-6. **Données personnelles/RGPD** (santé, urgences, mineurs) : ne jamais committer de BDD/exports ; golden master FFME non versionné (`tests/fixtures/`).
+1. **Logique métier dans des fichiers legacy** : `exports/membership_excel.py` (exports FFME), certaines méthodes de `infrastructure/sqlite/repository.py` sans appelant depuis le retrait du client lourd (`merge_autonomes_data`, `import_old_season_ffme`, `merge_ffme_licensees`). À exposer en routes FastAPI avant de construire l'écran web.
+2. **Système de fichiers** : Cloud Run est éphémère → génération **en mémoire** puis téléchargement (comme les attestations), jamais de persistance locale.
+3. **Cache SQLite côté serveur** : reconstruit depuis Firestore au premier appel de données (`CloudDatabase.ensure_fresh`, 30 s) et flush après chaque écriture. Une route d'écriture doit passer par `SqliteRepository` pour être répliquée.
+4. **Durée des requêtes** : timeout Cloud Run 300 s, mémoire 1 GiB (Pandas/WeasyPrint) ; les traitements lourds (géocodage Nominatim à 1,5 s/adresse) doivent rester en tâche de fond.
+5. **Données personnelles/RGPD** (santé, urgences, mineurs) : ne jamais committer de BDD/exports ; golden master FFME non versionné (`tests/fixtures/`).
 
-### Démarche recommandée pour chaque page à migrer
+### Démarche recommandée pour chaque fonction à porter
 
-1. Sortir la logique de la page Qt / du worker vers `domain/` (pur) ou `infrastructure/`.
+1. Reprendre la logique (historique git du client lourd ou méthode conservée) dans `domain/` (pur) ou `infrastructure/`.
 2. Exposer une route FastAPI (rôle explicite : `admin` pour toute écriture/envoi).
 3. Écrire le test (pytest sur la route, ou test de fonction pure).
 4. Ajouter l'écran dans `web/bureau/` en réutilisant `alj-core.js`, `alj-shell.js`, `alj.css`.
 5. Incrémenter la version web (meta/title/badge/`sw.js`) et déployer.
-6. Une fois la parité atteinte, retirer la page Qt correspondante.
-
-Fin de parcours : supprimer `presentation/`, `app.py`, `launcher/`, `installer/`, `make_portable.py`, la CI de release Windows, `PySide6`/`pywin32`/`python-docx`/`keyring` de `requirements.txt`, puis réduire `src/api/` au backend web (aujourd'hui ses routeurs chargent `SqliteRepository`, l'API HelloAsso, etc. — acceptable).
+6. Mettre à jour `desktop_features_missing_in_web.md`.
 
 ---
 
 ## 7. Démarrer en local
-
-> Environnement cible historique : Windows. Vous êtes sous WSL/Linux : le **backend + le web** tournent bien sous Linux (c'est l'image Docker) ; le **desktop Qt** et `pywin32` non (ou difficilement).
 
 ### 7.1 Installation (une fois)
 
@@ -211,20 +188,18 @@ Fin de parcours : supprimer `presentation/`, `app.py`, `launcher/`, `installer/`
 sudo apt install libpango-1.0-0 libpangoft2-1.0-0
 
 cd code_source
-uv sync --group web          # .venv/ (ignoré par git) : profil « web » (sans Qt/pywin32) + outils de dev + Faker
+uv sync --group web          # .venv/ (ignoré par git) : profil « web » + outils de dev + Faker
 source .venv/bin/activate
 ```
 
 Les dépendances sont déclarées dans `pyproject.toml` et verrouillées dans `uv.lock` (versions exactes, identiques en
 CI, en dev et dans l'image Docker). Les `requirements*.txt` en sont des exports générés
-(`python dev/export_requirements.py`) : le client lourd les installe avec pip dans son runtime Python embarqué.
+(`python dev/export_requirements.py`) pour les installations avec pip (tests e2e).
 
 La version de Python est définie dans `../code_source/.python-version` (version complète, ex. `3.14.8`), lue par
-la CI (`setup-python`), le Python embarqué du mode portable Windows (`make_portable.py`) et les messages de
-`install.bat`. Seul le `FROM python:<version>-slim` du `Dockerfile` la répète : un test
+la CI (`setup-python`) et uv. Seul le `FROM python:<version>-slim` du `Dockerfile` la répète : un test
 (`tests/test_cloud_run_lot4.py`) vérifie que les deux concordent. Pour changer de version, modifier ces **deux
 fichiers** (vérifier d'abord que les roues existent : `pip download --only-binary=:all: --python-version X.Y …`).
-Les postes portables déjà installés gardent leur Python embarqué : la mise à jour automatique ne remplace que `app/`.
 
 ### 7.2 Mode dev sur l'émulateur Firebase (recommandé)
 
@@ -246,7 +221,7 @@ Fonctionnement :
 
 - **Source unique côté serveur** : `src/infrastructure/runtime_env.py`. `ALJ_ENV=dev` redirige l'URL Firestore, le jeton
   (`owner`, admin de l'émulateur) et le projet (`demo-alj`) de `cloud_database.RestStore` et `FirestoreClient` ;
-  active le rafraîchissement du cache comme sur Cloud Run. Sans `ALJ_ENV`, rien ne change (production, client lourd).
+  active le rafraîchissement du cache comme sur Cloud Run. Sans `ALJ_ENV`, rien ne change (production).
 - **E-mails** : aucun code spécifique. `dev.env` dirige le SMTP de l'application (`SMTP_HOST=localhost`,
   `SMTP_PORT=1025`, variables `GMAIL_*` vides) vers **Mailpit** (conteneur de `dev/docker-compose.yml`), qui capture
   tout sans relayer : http://localhost:8025. `dev/check_env.py` (lancé par `run_server.sh`) vérifie la configuration
@@ -255,13 +230,13 @@ Fonctionnement :
 - **Navigateur** : `GET /runtime-config.js` (jamais mis en cache par `sw.js`) définit `window.ALJ_RUNTIME` ;
   `web/shared/alj-firebase.js` est la **seule** initialisation Firebase de toutes les pages (configuration du projet
   comprise) et branche l'émulateur en dev, avec un bandeau « DEV ». La détection ne repose pas sur `localhost` :
-  le serveur embarqué du desktop sert aussi ces pages en local et doit rester en production.
+  un serveur local hors mode dev (`lancer_site_web.bat`, §7.3) sert aussi ces pages et doit rester en production.
 - **Garde-fous** : un projet `demo-*` n'existe pas chez Google (aucun accès réel possible, même mal configuré) ;
   `runtime_env.validate()` refuse le mode dev sur Cloud Run (`K_SERVICE`) ou sans variables d'émulateur ;
   le seed refuse de s'exécuter hors émulateur ; les tests retirent les variables dev (`tests/conftest.py`).
 - L'émulateur applique le vrai `firestore.rules` et conserve ses données dans `dev/.emulator-data/` (ignoré par git).
 - Limites : `/api/dashboard` et la synchro HelloAsso interrogent l'API HelloAsso réelle (lecture) ; sans identifiants,
-  ces écrans sont en erreur. Les attestations Word/COM restent propres au desktop.
+  ces écrans sont en erreur.
 
 ### 7.3 Serveur seul, sans émulateur
 
@@ -274,29 +249,28 @@ ALJ_API_AUTH=off MEMBER_BACKEND=drive ALJ_DATA_DIR=./data-dev \
 docker build -t alj . && docker run -p 8080:8080 -e ALJ_API_AUTH=off -e MEMBER_BACKEND=drive alj
 ```
 
-- `ALJ_API_AUTH=off` : désactive le contrôle du jeton Firebase côté API (mode du serveur embarqué du desktop).
+- `ALJ_API_AUTH=off` : désactive le contrôle du jeton Firebase côté API (serveur local uniquement ; `api_auth.local_request_error` bloque alors les requêtes inter-sites).
 - `ALJ_DATA_DIR` : dossier du cache SQLite `database.db` (défaut : `<racine du dépôt>/data`), créé vide au premier accès.
 - `MEMBER_BACKEND` : `firestore` par défaut. **Hors mode dev**, `firestore` pousse les écritures du serveur local vers le
   **Firestore de production** (`CloudDatabase.after_write`) ; `drive` = SQLite local seul.
 - ⚠️ Hors mode dev, le serveur local lit et écrit **le Firestore de production** pour les compétitions, coachs et
   éléments HelloAsso (les pages passent par l'API), quel que soit `MEMBER_BACKEND`.
 
-Desktop (Windows) : `install.bat` puis `run_pipeline.bat` / `Lancer_ALJ.vbs` (→ `src/app.py`).
-
-**Configuration / secrets** : `../code_source/.env` (non versionné) ou `SecretStore` (keyring) ; sur Cloud Run, variables d'environnement / Secret Manager.
+**Configuration / secrets** : `../code_source/.env` (non versionné) ; sur Cloud Run, variables d'environnement / Secret Manager.
 Clés principales : `HELLOASSO_CLIENT_ID/SECRET/ORG_SLUG`, `CAMPAIGN_SLUG`, `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN/USER_EMAIL`, `SMTP_*`, `GOOGLE_DRIVE_*`, `MEMBER_BACKEND` (`firestore`|`drive`), `ALJ_DATA_DIR`, `ALJ_API_AUTH`. Ne jamais afficher ni committer ces valeurs.
 
 **Tests** (depuis `../code_source`) :
 
 ```bash
-python -m pytest tests --ignore=tests/presentation ...   # voir .github/workflows pour la liste complète
-QT_QPA_PLATFORM=offscreen python -m pytest tests/presentation/test_presentation_lot4.py
+uv sync --group web && uv run pytest tests
 ```
-La CI lance les tests Qt **en processus séparés** (crashs natifs sinon) ; `ruff check src tests` et `mypy` (limité à `schema_v2.py` et `constants.py`) sont bloquants. Les tests de la couche web/API (`test_bureau_web`, `test_mobile_pwa`, `test_api_security`, `test_cloud_run_lot4`, `helloasso/test_webhook`) ne nécessitent pas Qt — ce sont les plus utiles pour la migration. `test_ffme_golden_master` nécessite un fichier de référence local non versionné.
+La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[tool.mypy] files`) et `pytest tests` ; tous sont bloquants. `test_ffme_golden_master` nécessite un fichier de référence local non versionné.
 
 **Déploiement web** : `../code_source/deploy_cloud_run.sh` (ou `.bat`) → `gcloud run deploy alj-escalade-api --source . --memory 1Gi --min-instances 0 --max-instances 2 --session-affinity --timeout 300 --allow-unauthenticated` (l'auth est applicative). Règles Firestore : `firebase deploy --only firestore:rules` (`firebase.json`), manuel et **séparé** du déploiement de l'application : refus total des clients, à déployer au moins une semaine après la version web qui ne lit plus Firestore (ordre et retour arrière : plan `plan_api_only_front.md`, S1). Guide : `docs/guide_deploiement_cloud_run_helloasso.md`.
 
-**Release desktop** : tag `vX.Y.Z` → GitHub Actions (Windows) → zip portable + `SHA256SUMS`. Le tag, `VERSION` et `APP_VERSION` doivent être identiques (`build_release_assets.py --check-tag`).
+**Tâche planifiée** : la tâche Cloud Scheduler `batch-resultats-competitions` (07:00, Europe/Paris) appelle `POST /api/competitions/cron/fetch-results`. Elle a été créée à la main dans GCP (hors dépôt).
+
+**Plus de release desktop** : ne plus pousser de tag `v*`. Les anciens postes installés interrogent encore `releases/latest` ; une nouvelle release sans le client lourd casserait leur mise à jour automatique.
 
 ---
 
@@ -306,11 +280,8 @@ La CI lance les tests Qt **en processus séparés** (crashs natifs sinon) ; `ruf
 - `../GEMINI.md` impose une convention utile : scripts de diagnostic jetables dans `scripts_temporaires/` (ignoré par git), jamais à la racine.
 - **Duplication du front** : `competitions.html` (2700 lignes) et `../index.html` dupliquent historiquement auth/style ; le portail `bureau/` utilise `shared/`. Ne pas dupliquer davantage.
 - **Admins codés en dur** (`api_auth.py` + copies d'affichage en JS) : à terme, passer par les custom claims Firebase.
-- **Qt/GC** : conserver des références Python sur les `QGraphicsTextItem` (`_text_items`) dans `PlanningWeekView`.
-- **Word COM** : toujours `Quit()` dans un `finally` (uniquement tant que le desktop existe).
 - **Exports FFME** : CSV strict (`;`, dates `jj/mm/aaaa`) ; le golden master doit rester vert ou être renouvelé avec accord du club.
 - **Sauvegardes** : API backup SQLite (jamais de copie brute avec WAL), PITR Firestore 7 j, export quotidien 14 j, retour arrière via `MEMBER_BACKEND=drive`.
-- **État git au moment de la rédaction** : `../.gitignore` et `code_source/requirements.txt` modifiés (non committés), `.claude/` non suivi.
 - Le dépôt contient aussi `../.agents`, `.idea/`, `.jolli/` (outillage local).
 
 ---
@@ -319,5 +290,5 @@ La CI lance les tests Qt **en processus séparés** (crashs natifs sinon) ; `ruf
 
 1. Lire dans l'ordre : ce fichier → `code_source/docs/base_firestore.md` → `code_source/docs/plan_pages_web_bureau.md` → `src/server.py` puis `src/api/` (§4) → `web/shared/alj-core.js` → `web/bureau/adherents.html` (page de référence).
 2. Lancer le serveur en local et ouvrir `/bureau/` (§7) ; lancer les tests web/API.
-3. Choisir une page « Absent » du tableau §6 — le meilleur premier candidat est **Exports** (FFME CSV + fiches de présence) : forte valeur, logique isolée, golden master déjà en place pour sécuriser le refactor.
+3. Choisir une fonction manquante dans `documentations/desktop_features_missing_in_web.md` (§6).
 4. Décider des questions ouvertes avec le club : envoi groupé (quotas Gmail, anti-doublon), droit d'écriture sur le web, hébergement des secrets (Secret Manager), sort de `database.db` Drive (retour arrière).

@@ -3,9 +3,8 @@
 All commands run from `code_source/`. Python 3.14 (`.python-version`), `requires-python >= 3.11`.
 
 ## Commands
-- install: `uv sync` (dev group by default); add `--group desktop` for the Qt client and `tests/presentation/` (CI: `uv sync --frozen --group desktop`)
+- install: `uv sync --group web` (dev group by default, `web` adds WeasyPrint for the attestation PDFs and their tests; CI: `uv sync --frozen --group web`)
 - test: `uv run pytest tests` — always pass `tests`: bare `uv run pytest` also collects `e2e/` and fails without Playwright
-- Qt tests: `QT_QPA_PLATFORM=offscreen uv run pytest tests/presentation/<file>.py` — run Qt test files in separate processes (see `.github/workflows/tests.yml`)
 - e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker; see `dev/README.md`)
 - lint: `uv run ruff check src tests`
 - typecheck: `uv run mypy` (no path: checks the files listed under `[tool.mypy] files` in pyproject.toml; `mypy src/` fails on module-path errors)
@@ -13,10 +12,10 @@ All commands run from `code_source/`. Python 3.14 (`.python-version`), `requires
 
 ## Critical Rules
 1. Use `uv run <cmd>` for all commands — never activate venv manually
-2. Add dependencies with `uv add <pkg>` (`--group desktop|web|dev` as needed), not pip install, then run `uv run python dev/export_requirements.py` to regenerate the versioned `requirements*.txt`
+2. Add dependencies with `uv add <pkg>` (`--group web|dev` as needed), not pip install, then run `uv run python dev/export_requirements.py` to regenerate the versioned `requirements*.txt`
 3. Type-annotate new and modified functions and methods
 4. Use pytest to run tests
-5. Log through the `alj` logger (`logging.getLogger("alj")`); `print()` is only tolerated in workers/pages where it is redirected to the application log
+5. Log through the `alj` logger (`logging.getLogger("alj")`); `print()` remains in older server code (stdout goes to Cloud Logging); do not add new ones
 6. Handle errors explicitly — no bare `except: pass`
 
 ## Code Style

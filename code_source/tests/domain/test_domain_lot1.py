@@ -11,7 +11,6 @@ if _src_dir not in sys.path:
 from domain.members.models import Member
 from domain.validators import validate_amount, validate_email
 from domain.constants import get_active_season, get_drive_temp_filename
-from exports.attestation_word import get_safe_filename
 
 class TestDomainLot1(unittest.TestCase):
 
@@ -82,14 +81,6 @@ class TestDomainLot1(unittest.TestCase):
         temp_fn = get_drive_temp_filename()
         self.assertIn(season, temp_fn)
         self.assertTrue(temp_fn.endswith(".xlsx"))
-
-    def test_get_safe_filename_unique(self):
-        """Vérifie que la génération de nom d'attestation prend en compte la référence unique de commande."""
-        fn_simple = get_safe_filename("Dupont", "Jean")
-        self.assertEqual(fn_simple, "Attestation_DUPONT_Jean.docx")
-
-        fn_unique = get_safe_filename("Dupont", "Jean", "ORDER-12345")
-        self.assertEqual(fn_unique, "Attestation_DUPONT_Jean_ORDER-12345.docx")
 
 if __name__ == "__main__":
     unittest.main()

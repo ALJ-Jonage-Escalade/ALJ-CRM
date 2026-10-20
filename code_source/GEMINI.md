@@ -1,4 +1,8 @@
 # 📍 Amicale Laïque de Jonage (ALJ) - Section Escalade
+
+> ⚠️ **Document historique.** Il décrit l'ancien client lourd Windows (scripts `.bat`, `requirements.txt`,
+> `src/presentation/`), qui a été retiré. État actuel : `documentations/ARCHITECTURE.md` et `README.md` (racine du dépôt) ;
+> fonctions non encore portées sur le web : `documentations/desktop_features_missing_in_web.md`.
 > **Pipeline de Gestion des Adhésions, Génération de Documents & Synchronisation Google Drive / HelloAsso**
 
 Ce dépôt contient le code source du pipeline automatisé permettant d'importer, synchroniser, gérer et traiter les adhésions de la section escalade de l'Amicale Laïque de Jonage (ALJ) pour la saison active (par défaut 2026-2027). Il orchestre les flux de données entre **l'API HelloAsso**, **Google Drive** (via l'API Drive/Gmail) et des fichiers Excel/Word locaux pour automatiser les tâches administratives complexes (génération d'attestations, fiches de présence, listes d'urgence).

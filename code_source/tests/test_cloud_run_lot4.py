@@ -22,7 +22,7 @@ class TestCloudRunLot4(unittest.TestCase):
     """Vérifie la conformité des artefacts conteneurisés et des routes de production."""
 
     def test_web_profile_excludes_desktop_dependencies(self):
-        """Source de vérité (pyproject.toml + uv.lock) : le profil web exclut le client lourd Windows."""
+        """Source de vérité (pyproject.toml + uv.lock) : aucun paquet de l'ancien client lourd Windows."""
         import re
         import tomllib
 
@@ -35,9 +35,10 @@ class TestCloudRunLot4(unittest.TestCase):
         web_profile = names(pyproject["project"]["dependencies"]) | names(pyproject["dependency-groups"]["web"])
         for backend in ("fastapi", "uvicorn", "requests", "python-dotenv", "weasyprint"):
             self.assertIn(backend, web_profile)
-        for desktop_only in ("pywin32", "pyside6", "python-docx"):
-            self.assertNotIn(desktop_only, web_profile)
-            self.assertIn(desktop_only, names(pyproject["dependency-groups"]["desktop"]))
+        self.assertNotIn("desktop", pyproject["dependency-groups"])
+        all_groups = set().union(*(names(group) for group in pyproject["dependency-groups"].values()))
+        for desktop_only in ("pywin32", "pyside6", "python-docx", "keyring"):
+            self.assertNotIn(desktop_only, web_profile | all_groups)
         self.assertTrue(os.path.isfile(os.path.join(_code_root, "uv.lock")), "uv.lock doit être versionné.")
 
     def test_requirements_docker(self):
@@ -86,7 +87,7 @@ class TestCloudRunLot4(unittest.TestCase):
         self.assertIn("uv sync --frozen", content)
 
     def test_dockerfile_python_matches_python_version_file(self):
-        """The image runs the Python of .python-version (also read by the CI and make_portable.py)."""
+        """The image runs the Python of .python-version (also read by the CI)."""
         with open(os.path.join(_code_root, ".python-version"), encoding="utf-8") as f:
             expected = f.read().strip()
         with open(os.path.join(_code_root, "Dockerfile"), encoding="utf-8") as f:

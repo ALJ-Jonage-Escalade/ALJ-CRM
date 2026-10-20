@@ -67,10 +67,10 @@ class TestWorkbooks(unittest.TestCase):
         self.assertEqual(ws["A2"].value, INJECTION)
         self.assertEqual(ws["B2"].value, "+33 6 12 34 56 78")
 
-    def test_course_template_formulas_survive(self):
-        path = os.path.join(_code_root, "doc", "template", "Cours - Template-Vide.xlsx")
+    def test_presence_template_formulas_survive(self):
+        path = os.path.join(_code_root, "doc", "template", "Template Export liste adhérents à imprimer.xlsx")
         if not os.path.exists(path):
-            self.skipTest("course template not available")
+            self.skipTest("presence template not available")
         wb = openpyxl.load_workbook(path)
         before = template_formulas(wb)
         neutralize_formulas(wb, before)
