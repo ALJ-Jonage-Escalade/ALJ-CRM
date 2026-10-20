@@ -498,7 +498,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import add_member_api
+        from api.members.members import add_member_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_member_add.db")
@@ -578,7 +578,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_member_add_validation(self):
         """add_member_api rejette les requêtes avec champs obligatoires manquants."""
-        from server import add_member_api
+        from api.members.members import add_member_api
 
         # Nom manquant
         res = add_member_api({"fields": {"first_name": "Jean", "birth_date": "2000-01-01", "tarif_name": "Licence"}})
@@ -602,7 +602,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import update_member_api
+        from api.members.members import update_member_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_member_edit.db")
@@ -691,7 +691,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_season_tarifs_endpoint(self):
         """GET /api/season-tarifs retourne les tarifs disponibles de la saison active."""
-        from server import get_season_tarifs_api
+        from api.members.seasons import get_season_tarifs_api
         res = get_season_tarifs_api("2026-2027")
         self.assertEqual(res.get("status"), "success")
         self.assertIn("tarifs", res)
