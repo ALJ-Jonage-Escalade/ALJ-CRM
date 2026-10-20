@@ -22,10 +22,9 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
-from server import (
-    app, get_bureau_home, get_bureau_page, get_competitions_page, get_annuaire_page,
-    get_sw, get_web_version,
-)
+from api.web.pages import get_annuaire_page, get_bureau_home, get_bureau_page, get_competitions_page
+from api.web.pwa import get_sw, get_web_version
+from server import app
 
 WEB = os.path.join(_code_root, "web")
 BUREAU = os.path.join(WEB, "bureau")

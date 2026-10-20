@@ -22,9 +22,8 @@ from infrastructure.sqlite.repository import SqliteRepository
 from dotenv import load_dotenv
 load_dotenv()
 
-from domain.constants import get_active_season, APP_VERSION
+from domain.constants import get_active_season
 from domain.utils import json_for_script
-from paths import CODE_ROOT
 from infrastructure.security.secret_store import SecretStore
 from infrastructure import runtime_env
 
@@ -107,12 +106,14 @@ app.middleware("http")(security_headers_middleware)  # outermost
 from api.competitions import coaches, competitions, helloasso_items, participants
 from api.competitions import members as competition_members
 from api.members import members, seasons
+from api.web import health, pages, pwa
 from api.responses import client_error, internal_error, service_error_handler
 from infrastructure.geocoding import geocode_missing_addresses
 from services.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
-             members, seasons):
+             members, seasons, pages, pwa, health):
     app.include_router(_api.router)
+pages.mount_static(app)
 # Every route of these routers skips the SQLite cache refresh: a route that reads or writes the
 # cache (members, app settings, HelloAsso payments…) must live in another router, even under
 # /api/competitions (results batch, check-all-paid).
@@ -1029,139 +1030,6 @@ def export_planning_api(mode: str = Query("grid"), season: Optional[str] = Query
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-# Fichiers web statiques (annuaire, logo...) également servis sous /annuaire/.
-# L'annuaire lit la base des adhérents dans Firestore (connexion Google du coach).
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-_web_dir = os.path.join(CODE_ROOT, "web")
-if os.path.isdir(_web_dir):
-    app.mount("/annuaire", StaticFiles(directory=_web_dir, html=True), name="annuaire")
-
-# Ressources communes du portail bureau (CSS, modules JavaScript) : web/shared/.
-_shared_dir = os.path.join(_web_dir, "shared")
-if os.path.isdir(_shared_dir):
-    app.mount("/static-web", StaticFiles(directory=_shared_dir), name="static-web")
-
-_competitions_page_path = os.path.join(_web_dir, "competitions.html")
-_annuaire_page_path = os.path.join(_web_dir, "index.html")
-
-# Portail « bureau » (ordinateur) : pages publiques, les données restent protégées
-# (lecture Firestore avec le compte Google, appels API avec jeton).
-_bureau_dir = os.path.join(_web_dir, "bureau")
-_BUREAU_PAGES = {
-    "": "index.html",
-    "adherents": "adherents.html",
-    "communications": "communications.html",
-    "competitions": "competitions.html",
-    "planning": "planning.html",
-    "outils": "outils.html",
-    "parametres": "parametres.html"
-}
-
-
-def _bureau_file(page: str):
-    name = _BUREAU_PAGES.get(page)
-    p = os.path.join(_bureau_dir, name) if name else ""
-    if p and os.path.exists(p):
-        return FileResponse(p, media_type="text/html")
-    return HTMLResponse("<h1>Page bureau introuvable</h1>", status_code=404)
-
-@app.get("/bureau", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/bureau/", response_class=HTMLResponse, include_in_schema=False)
-def get_bureau_home():
-    """Accueil du portail bureau (ordinateur)."""
-    return _bureau_file("")
-
-@app.get("/bureau/{page}", response_class=HTMLResponse, include_in_schema=False)
-def get_bureau_page(page: str):
-    """Pages du portail bureau : seules les pages de _BUREAU_PAGES sont servies."""
-    return _bureau_file(page)
-
-@app.get("/index", response_class=HTMLResponse)
-def get_annuaire_page():
-    """Annuaire des adhérents (lecture seule) : lit la base principale dans
-    Firestore (collections crm_*) avec le compte Google du coach."""
-    if os.path.exists(_annuaire_page_path):
-        return FileResponse(_annuaire_page_path, media_type="text/html")
-    return HTMLResponse("<h1>Page web/index.html introuvable</h1>", status_code=404)
-
-@app.get("/manifest.webmanifest")
-def get_manifest():
-    """Manifeste PWA pour installation sur smartphone."""
-    p = os.path.join(_web_dir, "manifest.webmanifest")
-    if os.path.exists(p):
-        return FileResponse(p, media_type="application/manifest+json")
-    return HTMLResponse("Not found", status_code=404)
-
-@app.get("/sw.js")
-def get_sw():
-    """Service Worker PWA pour cache hors-ligne."""
-    p = os.path.join(_web_dir, "sw.js")
-    if os.path.exists(p):
-        return FileResponse(p, media_type="application/javascript")
-    return HTMLResponse("Not found", status_code=404)
-
-@app.get("/runtime-config.js", include_in_schema=False)
-def get_runtime_config():
-    """Browser runtime configuration (Firebase emulator in dev, nothing in production)."""
-    payload = json.dumps(runtime_env.client_config(), ensure_ascii=False)
-    return Response(
-        content=f"window.ALJ_RUNTIME = Object.freeze({payload});\n",
-        media_type="application/javascript",
-        headers={"Cache-Control": "no-store"},
-    )
-
-@app.get("/health")
-def health_check():
-    """Vérification de santé (Cloud Run probes, uptime, monitoring)."""
-    return {
-        "status": "healthy",
-        "service": "alj-escalade-api",
-        "version": APP_VERSION,
-        "season": get_active_season(),
-        "timestamp": datetime.datetime.now().isoformat()
-    }
-
-
-@app.get("/")
-def root_route():
-    """Point d'entrée racine : redirige vers la PWA Mobile des compétitions."""
-    if os.path.exists(_competitions_page_path):
-        return RedirectResponse(url="/competitions", status_code=302)
-    return {
-        "service": "ALJ Escalade Cloud API",
-        "version": APP_VERSION,
-        "docs_url": "/docs",
-        "health_url": "/health",
-        "competitions_url": "/competitions",
-        "annuaire_url": "/index"
-    }
-
-
-def _read_web_version() -> str:
-    """Version de la page web (balise <meta name="alj-web-version"> de competitions.html)."""
-    import re
-    try:
-        with open(_competitions_page_path, "r", encoding="utf-8") as f:
-            m = re.search(r'<meta name="alj-web-version" content="([^"]+)"', f.read(4000))
-        return m.group(1) if m else ""
-    except OSError:
-        return ""
-
-
-@app.get("/api/web-version")
-def get_web_version():
-    """Version en ligne de la page web (jamais mise en cache par le service worker)."""
-    return {"web_version": _read_web_version(), "app_version": APP_VERSION}
-
-
-@app.get("/competitions", response_class=HTMLResponse)
-def get_competitions_page():
-    """Page web de gestion des compétitions : données en temps réel depuis
-    Google Cloud Firestore (même base que l'application de bureau)."""
-    if os.path.exists(_competitions_page_path):
-        return FileResponse(_competitions_page_path, media_type="text/html")
-    return HTMLResponse("<h1>Page web/competitions.html introuvable</h1>", status_code=404)
 
 @app.post("/api/planning")
 def update_planning(planning_data: List[Dict[str, Any]] = Body(...)):
