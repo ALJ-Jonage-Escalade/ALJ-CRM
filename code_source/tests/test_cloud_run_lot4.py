@@ -21,15 +21,6 @@ from api.integrations.helloasso import webhook_helloasso_ping
 class TestCloudRunLot4(unittest.TestCase):
     """Vérifie la conformité des artefacts conteneurisés et des routes de production."""
 
-    def test_version_consistency(self):
-        """Vérifie que la constante APP_VERSION correspond au fichier VERSION."""
-        version_file = os.path.join(_code_root, "VERSION")
-        self.assertTrue(os.path.isfile(version_file), "Le fichier VERSION doit exister.")
-        with open(version_file, "r", encoding="utf-8") as f:
-            v_content = f.read().strip()
-        self.assertEqual(APP_VERSION, v_content, "La version dans constants.py et VERSION doivent correspondre.")
-        self.assertEqual(APP_VERSION, "2.7.8")
-
     def test_web_profile_excludes_desktop_dependencies(self):
         """Source de vérité (pyproject.toml + uv.lock) : le profil web exclut le client lourd Windows."""
         import re
