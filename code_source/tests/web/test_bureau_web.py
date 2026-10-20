@@ -179,7 +179,7 @@ class TestBureauFiles(unittest.TestCase):
         import shutil
         import tempfile
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import get_ffme_stats_api, export_ffme_api
+        from api.ffme.ffme import get_ffme_stats_api, export_ffme_api
 
         # Seeded temporary database: never read data/database.db (absent in CI, personal data locally).
         original_db_path = SqliteRepository.get_db_path()
@@ -784,7 +784,7 @@ class TestBureauFiles(unittest.TestCase):
         import shutil
         import pandas as pd
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import preview_ffme_import_api, apply_ffme_import_api
+        from api.ffme.ffme import preview_ffme_import_api, apply_ffme_import_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_ffme_import.db")
