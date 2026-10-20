@@ -12,8 +12,8 @@ services:
       - "127.0.0.1:18081:8081"   # Firestore
       - "127.0.0.1:19099:9099"   # Auth
     volumes:
-      - ../firebase.json:/workspace/firebase.json:ro
-      - ../firestore.rules:/workspace/firestore.rules:ro
+      - ../firestore/firebase.json:/workspace/firebase.json:ro
+      - ../firestore/firestore.rules:/workspace/firestore.rules:ro
     # No --import / --export-on-exit: nothing survives the run
     command: ["firebase", "emulators:start", "--project", "demo-alj", "--only", "auth,firestore"]
 

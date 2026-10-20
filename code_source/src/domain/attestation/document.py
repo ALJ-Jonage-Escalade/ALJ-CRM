@@ -61,7 +61,7 @@ def _find_image_path(name: str) -> Optional[str]:
         os.path.join(CODE_ROOT, name),
         os.path.join(ROOT_DIR, name),
         os.path.join(CODE_ROOT, "doc", name),
-        os.path.join(CODE_ROOT, "web", name)
+        os.path.join(CODE_ROOT, "web", "assets", name)
     ]
     for c in candidates:
         if os.path.exists(c):

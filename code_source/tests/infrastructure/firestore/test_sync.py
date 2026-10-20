@@ -183,7 +183,7 @@ class TestFirestoreSync(unittest.TestCase):
 
     def test_firestore_rules_file(self):
         """Vérifie la présence et la cohérence syntaxique du fichier firestore.rules."""
-        rules_path = os.path.join(os.path.dirname(_tests_dir), "firestore.rules")
+        rules_path = os.path.join(os.path.dirname(_tests_dir), "firestore", "firestore.rules")
         self.assertTrue(os.path.exists(rules_path))
         with open(rules_path, "r", encoding="utf-8") as f:
             content = f.read()

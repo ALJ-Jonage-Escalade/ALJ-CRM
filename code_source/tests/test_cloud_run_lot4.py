@@ -114,13 +114,13 @@ class TestCloudRunLot4(unittest.TestCase):
 
     def test_deploy_scripts_exist(self):
         """Vérifie la présence des scripts de déploiement Cloud Run."""
-        bat_path = os.path.join(_code_root, "deploy_cloud_run.bat")
-        sh_path = os.path.join(_code_root, "deploy_cloud_run.sh")
-        root_bat_path = os.path.join(os.path.dirname(_code_root), "deploy_cloud_run.bat")
+        bat_path = os.path.join(_code_root, "scripts", "deploy_cloud_run.bat")
+        sh_path = os.path.join(_code_root, "scripts", "deploy_cloud_run.sh")
+        root_bat_path = os.path.join(os.path.dirname(_code_root), "scripts", "deploy_cloud_run.bat")
 
-        self.assertTrue(os.path.isfile(bat_path), "deploy_cloud_run.bat doit exister dans code_source.")
-        self.assertTrue(os.path.isfile(sh_path), "deploy_cloud_run.sh doit exister dans code_source.")
-        self.assertTrue(os.path.isfile(root_bat_path), "deploy_cloud_run.bat doit exister à la racine.")
+        self.assertTrue(os.path.isfile(bat_path), "deploy_cloud_run.bat doit exister dans code_source/scripts.")
+        self.assertTrue(os.path.isfile(sh_path), "deploy_cloud_run.sh doit exister dans code_source/scripts.")
+        self.assertTrue(os.path.isfile(root_bat_path), "deploy_cloud_run.bat doit exister dans scripts/ à la racine.")
 
         with open(bat_path, "r", encoding="utf-8") as f:
             bat_content = f.read()

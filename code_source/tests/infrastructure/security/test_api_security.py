@@ -135,7 +135,7 @@ class TestRoles(unittest.TestCase):
 
     def test_rules_hold_no_role_list(self):
         """firestore.rules denies every client: roles live in api_auth.py only (plan phase 3)."""
-        with open(os.path.join(_code_root, "firestore.rules"), encoding="utf-8") as f:
+        with open(os.path.join(_code_root, "firestore", "firestore.rules"), encoding="utf-8") as f:
             rules = f.read()
         self.assertNotIn("@", rules)
         self.assertNotIn("request.auth", rules)

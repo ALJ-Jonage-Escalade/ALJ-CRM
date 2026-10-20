@@ -2,7 +2,8 @@
 chcp 65001 >nul
 title ALJ Escalade - Batch Quotidien Resultats MyCompet
 
-cd /d "%~dp0"
+:: Script range dans code_source\scripts\ : on travaille depuis code_source\
+cd /d "%~dp0.."
 
 echo ========================================================
 echo   ALJ ESCALADE - BATCH QUOTIDIEN RESULTATS MYCOMPET

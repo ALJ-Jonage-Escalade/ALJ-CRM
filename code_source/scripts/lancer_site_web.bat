@@ -1,7 +1,8 @@
 @echo off
 title ALJ Escalade - Serveur Web Local
 chcp 65001 > nul
-cd /d "%~dp0"
+:: Script range dans code_source\scripts\ : on travaille depuis code_source\
+cd /d "%~dp0.."
 
 echo ====================================================
 echo   LANCEMENT DU SERVEUR WEB LOCAL ALJ ESCALADE

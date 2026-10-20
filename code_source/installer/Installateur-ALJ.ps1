@@ -142,7 +142,7 @@ function New-EnvFile {
         $lnk = $ws.CreateShortcut((Join-Path $bureau "ALJ Escalade Manager.lnk"))
         $lnk.TargetPath = Join-Path $DossierCible "Lancer-ALJ.bat"
         $lnk.WorkingDirectory = $DossierCible
-        $ico = Join-Path $DossierCible "app\logo.ico"
+        $ico = Join-Path $DossierCible "app\web\assets\logo.ico"
         if (Test-Path -LiteralPath $ico) { $lnk.IconLocation = $ico }
         $lnk.Save()
         Write-Log "✅ Raccourci bureau créé : ALJ Escalade Manager.lnk"

@@ -1,24 +1,28 @@
 #!/bin/bash
 # ==============================================================================
 # ALJ ESCALADE — Cloud Run deployment (0 € / month)
-# Meant to run from code_source/, e.g. in Google Cloud Shell.
+# Deploys code_source/ wherever it is called from, e.g. in Google Cloud Shell.
 #
-# Usage:
-#   ./deploy_cloud_run.sh                     Deploy to production (100% of traffic)
-#   ./deploy_cloud_run.sh --test              Deploy a test revision (0% of traffic, own URL)
-#   ./deploy_cloud_run.sh --rollback [REV]    Send all traffic back to REV
-#                                             (default: the revision before the live one)
-#   ./deploy_cloud_run.sh --cleanup           Remove the test URL (the revision itself is kept)
+# Usage (from code_source/):
+#   ./scripts/deploy_cloud_run.sh                     Deploy to production (100% of traffic)
+#   ./scripts/deploy_cloud_run.sh --test              Deploy a test revision (0% of traffic, own URL)
+#   ./scripts/deploy_cloud_run.sh --rollback [REV]    Send all traffic back to REV
+#                                                     (default: the revision before the live one)
+#   ./scripts/deploy_cloud_run.sh --cleanup           Remove the test URL (the revision itself is kept)
 # ==============================================================================
 
 set -euo pipefail
+
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+# --source . uploads code_source/ (Dockerfile, .gcloudignore): the parent of scripts/
+cd "$(dirname "$SCRIPT_PATH")/.."
 
 SERVICE_NAME="alj-escalade-api"
 REGION="europe-west1"
 TEST_TAG="test"
 
 usage() {
-    sed -n '6,11p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '6,11p' "$SCRIPT_PATH" | sed 's/^# \{0,1\}//'
 }
 
 MODE="prod"
