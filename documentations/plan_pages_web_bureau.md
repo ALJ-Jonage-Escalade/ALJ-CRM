@@ -53,7 +53,7 @@ web/
 tri simple, 287 lignes tout en mémoire, panneau de détail à droite (fiche complète comme l'annuaire mobile).
 
 **Filtre unique : la sélection des sous-catégories (tarifs)**, reprise telle quelle du panneau « Filtres » de
-`index.html` (saison + cases à cocher par catégorie/sous-catégorie, « tout sauf liste d'attente » par défaut,
+`../index.html` (saison + cases à cocher par catégorie/sous-catégorie, « tout sauf liste d'attente » par défaut,
 code extrait dans `alj-filters.js`). Une recherche texte simple (nom) est conservée, comme dans l'annuaire.
 Pas d'opérateurs ET/OU, pas de négation, pas de filtres enregistrés.
 
@@ -110,7 +110,7 @@ Total : **environ 6,5 jours** (contre 12). Une étape = un déploiement, version
 ## 9. Tests
 
 - Pytest : `build_attestation` (mêmes textes que l'ancien générateur), routes (rôles, 401), version cohérente sur les pages `bureau/*`.
-- Filtre : même nombre de résultats que `index.html` sur la vraie base (264 / 287).
+- Filtre : même nombre de résultats que `../index.html` sur la vraie base (264 / 287).
 - Puppeteer avec faux Firebase (comme l'annuaire) : filtre, fiche, envoi simulé, boutons absents pour un coach.
 - Test PDF : rendu d'une attestation, texte vérifié par `pdftotext`.
 

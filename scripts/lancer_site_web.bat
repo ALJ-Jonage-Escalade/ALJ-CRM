@@ -1,7 +1,7 @@
 @echo off
 title ALJ Escalade - Serveur Web Local
 chcp 65001 > nul
-cd /d "%~dp0code_source"
+cd /d "%~dp0..\code_source"
 
 echo ====================================================
 echo   LANCEMENT DU SERVEUR WEB LOCAL ALJ ESCALADE

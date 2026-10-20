@@ -7,7 +7,7 @@ Ce document présente une analyse détaillée de l'architecture actuelle du proj
 
 ## 1. Cartographie des Modules Actuels
 
-L'application est structurée à plat sous le répertoire `code_source/src/` (les fichiers sources Python ont été récemment regroupés dans `src/` pour séparer le code de la configuration racine).
+L'application est structurée à plat sous le répertoire `../code_source/src` (les fichiers sources Python ont été récemment regroupés dans `src/` pour séparer le code de la configuration racine).
 
 Voici le rôle et les responsabilités de chaque composant de l'application :
 
@@ -99,6 +99,6 @@ Certains éléments référencés dans le code d'origine pointent vers des resso
     *   `doc/template/ATTESTATION DE PAIEMENT_adulte.docx` (modèle d'attestation).
     *   `exports/liste adhérent/Cours.xlsx` (sorties du remplissage des cours).
 *   **Ressources visuelles** :
-    *   `logo.png` (recherché pour agrémenter les feuilles de présence d'un entête visuel).
+    * `web/assets/logo.png` (recherché pour agrémenter les feuilles de présence d'un entête visuel).
 
 *Note d'architecture : L'utilisation de notre utilitaire `paths.py` résout parfaitement la localisation de ces dépendances physiques en pointant dynamiquement vers le dossier parent `Import Export Script` sans nécessiter leur déplacement dans la structure du dépôt de code.*

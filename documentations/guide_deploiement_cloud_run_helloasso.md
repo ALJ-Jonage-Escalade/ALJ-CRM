@@ -80,7 +80,7 @@ Si vous préférez déployer depuis votre machine locale :
    ```cmd
    gcloud services enable run.googleapis.com cloudbuild.googleapis.com
    ```
-4. Double-cliquez sur `deploy_cloud_run.bat` à la racine du projet ALJ-CRM (ou dans `code_source/`).
+4. Double-cliquez sur `deploy_cloud_run.bat` à la racine du projet ALJ-CRM (ou dans `../code_source`).
 5. Confirmez le déploiement en appuyant sur `O`.
 
 ---
@@ -221,10 +221,10 @@ Vérifiez dans la PWA mobile que l'adhérent Lucas MARTIN passe immédiatement e
 
 ## 7. 🔁 Déploiement continu (GitHub Actions)
 
-Chaque push sur `main` lance `.github/workflows/deploy-cloud-run.yml` :
+Chaque push sur `main` lance `../.github/workflows/deploy-cloud-run.yml` :
 
 1. les tests (`tests.yml` : unitaires + e2e) ;
-2. **uniquement s'ils passent** : construction de l'image (`code_source/Dockerfile`), envoi dans Artifact Registry
+2. **uniquement s'ils passent** : construction de l'image (`../code_source/Dockerfile`), envoi dans Artifact Registry
    (`cloud-run-source-deploy/alj-escalade-api:<sha du commit>`), déploiement sur Cloud Run avec 100 % du trafic,
    puis vérification de `/health`.
 
@@ -236,7 +236,7 @@ d'environnement et les secrets de l'application restent configurés sur le servi
 déploiement d'image sans `--set-env-vars` / `--set-secrets` les conserve tels quels.
 
 **Retour arrière** : si le déploiement ou la vérification `/health` échoue, le résumé du job indique la révision précédente.
-Depuis Cloud Shell, dans `code_source/` :
+Depuis Cloud Shell, dans `../code_source` :
 
 ```bash
 ./deploy_cloud_run.sh --rollback <revision-precedente>

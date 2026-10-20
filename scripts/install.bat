@@ -1,7 +1,8 @@
 @echo off
 title Installateur ALJ Escalade Manager
 chcp 65001 > nul
-cd /d "%~dp0"
+:: Script range dans scripts\ : on travaille depuis la racine du projet
+cd /d "%~dp0.."
 
 echo ====================================================
 echo    INSTALLATION DU PIPELINE HELLOASSO FFME
@@ -57,31 +58,24 @@ echo.
 echo ✅ Toutes les bibliothèques ont été installées avec succès !
 echo.
 
-:: 4. Génération de l'icône de l'application (.ico) à partir du logo
-echo 🎨 3. Génération de l'icône de l'application...
-venv\Scripts\python.exe -c "from PIL import Image; import os; logo_path = os.path.abspath('logo.png') if os.path.exists('logo.png') else os.path.abspath('code_source/logo.png') if os.path.exists('code_source/logo.png') else None; (Image.open(logo_path).save('logo.ico', format='ICO', sizes=[(16,16), (32,32), (48,48), (64,64), (128,128), (256,256)]) if logo_path else print('⚠️ Logo non trouvé, l\'icône par défaut sera utilisée.'))" 2>nul
-if exist "logo.ico" (
-    echo ✅ Icône 'logo.ico' générée avec succès à partir du logo !
+:: 4. Icône de l'application (code_source\web\assets\logo.ico)
+echo 🎨 3. Vérification de l'icône de l'application...
+if exist "code_source\web\assets\logo.ico" (
+    echo ✅ Icône 'code_source\web\assets\logo.ico' trouvée.
 ) else (
-    echo ⚠️ Impossible de générer l'icône, le raccourci utilisera l'icône standard de Python.
+    echo ⚠️ Icône introuvable, le raccourci utilisera l'icône standard de Windows.
 )
 echo.
 
 :: 5. Création du raccourci sur le Bureau Windows via Python COM
 echo 🖥️ 4. Création du raccourci sur le Bureau...
-echo Set FSO = CreateObject("Scripting.FileSystemObject") > Lancer_ALJ.vbs
-echo scriptPath = FSO.GetParentFolderName(WScript.ScriptFullName) >> Lancer_ALJ.vbs
-echo Set WshShell = CreateObject("WScript.Shell") >> Lancer_ALJ.vbs
-echo WshShell.CurrentDirectory = scriptPath ^& "\code_source" >> Lancer_ALJ.vbs
-echo WshShell.Run "cmd.exe /c run_app.bat", 0, False >> Lancer_ALJ.vbs
-
 echo import os > create_lnk.py
 echo import win32com.client >> create_lnk.py
 echo current_dir = os.getcwd() >> create_lnk.py
 echo desktop = win32com.client.Dispatch("WScript.Shell").SpecialFolders("Desktop") >> create_lnk.py
 echo shortcut_path = os.path.join(desktop, "ALJ Escalade Manager.lnk") >> create_lnk.py
-echo launcher = os.path.join(current_dir, "Lancer_ALJ.vbs") >> create_lnk.py
-echo icon = os.path.join(current_dir, "logo.ico") >> create_lnk.py
+echo launcher = os.path.join(current_dir, "code_source", "scripts", "Lancer_ALJ.vbs") >> create_lnk.py
+echo icon = os.path.join(current_dir, "code_source", "web", "assets", "logo.ico") >> create_lnk.py
 echo shell = win32com.client.Dispatch("WScript.Shell") >> create_lnk.py
 echo shortcut = shell.CreateShortcut(shortcut_path) >> create_lnk.py
 echo shortcut.TargetPath = launcher >> create_lnk.py

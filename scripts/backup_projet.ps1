@@ -3,15 +3,16 @@
 #  - Exclut les environnements virtuels (venv), caches et builds
 #  - Conserve : code, BDD, .env, logs, imports, exports, docs, .git
 #  Usage :
-#    .\backup_projet.ps1                        -> zip sur le Bureau
-#    .\backup_projet.ps1 -Destination "E:\"     -> zip sur la cle USB
+#    .\scripts\backup_projet.ps1                        -> zip sur le Bureau
+#    .\scripts\backup_projet.ps1 -Destination "E:\"     -> zip sur la cle USB
 # ============================================================
 param(
     [string]$Destination = [Environment]::GetFolderPath('Desktop')
 )
 
 $ErrorActionPreference = 'Stop'
-$ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+# Script range dans scripts\ : la racine du projet est le dossier parent
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
 # --- Verification de la destination ---
 if (-not (Test-Path -LiteralPath $Destination)) {

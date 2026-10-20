@@ -9,14 +9,14 @@
 
 ## 1. En une minute
 
-Le dépôt contient **une seule base de code Python** (`code_source/`) qui produit **deux applications** :
+Le dépôt contient **une seule base de code Python** (`../code_source`) qui produit **deux applications** :
 
 | | Client lourd (desktop) | Application web |
 |---|---|---|
 | Techno | PySide6 (Qt) + serveur FastAPI embarqué | HTML/JS statique (sans build) servi par FastAPI |
 | Où ça tourne | Poste Windows du bureau (portable zip + auto-update GitHub) | Google Cloud Run (`europe-west1`, 0→2 instances) |
 | Point d'entrée | `src/app.py` | `src/server.py` (`uvicorn server:app`) |
-| Données | Cache SQLite local (`data/database.db`) synchronisé avec Firestore | Uniquement via l'API (`/api/*`) ; le serveur lit Firestore (compétitions) et un cache SQLite éphémère (adhérents). Le navigateur n'utilise Firebase que pour la connexion. |
+| Données | Cache SQLite local (`../data/database.db`) synchronisé avec Firestore | Uniquement via l'API (`/api/*`) ; le serveur lit Firestore (compétitions) et un cache SQLite éphémère (adhérents). Le navigateur n'utilise Firebase que pour la connexion. |
 | Utilisateurs | Administrateurs/bureau | Coachs et admins (PWA smartphone + portail bureau) |
 
 Le lien entre les deux : **Firestore** (projet GCP `smart-amplifier-510811-n6`) est la source de vérité.
@@ -131,7 +131,7 @@ Particularités à connaître :
 | HelloAsso | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync` |
 
 **Auth** : `ALJ_API_AUTH=required` (Docker) ou présence de `K_SERVICE` (Cloud Run) → jeton Firebase obligatoire, fail-closed.
-Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protégées. Les listes d'e-mails admin/coach sont **codées en dur** dans `api_auth.py`, recopiées pour l'affichage seulement dans `alj-core.js`, `competitions.html` et `index.html` (un test vérifie la cohérence — modifier les quatre). `firestore.rules` ne contient plus de rôle : il refuse tout client.
+Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protégées. Les listes d'e-mails admin/coach sont **codées en dur** dans `api_auth.py`, recopiées pour l'affichage seulement dans `alj-core.js`, `competitions.html` et `../index.html` (un test vérifie la cohérence — modifier les quatre). `firestore.rules` ne contient plus de rôle : il refuse tout client.
 
 ---
 
@@ -167,8 +167,8 @@ Correspondance entre les pages du client lourd et ce qui existe déjà sur le we
 ### Obstacles techniques récurrents
 
 1. **Dépendances Windows/desktop** hors `presentation/` : `exports/attestation_word.py` (Word COM, `pywin32`), `infrastructure/security/secret_store.py` et `infrastructure/google/drive.py` (`keyring`), `app.py`. Le Docker les exclut volontairement (`requirements-docker.txt`).
-2. **Logique métier coincée dans des fichiers legacy ou des workers Qt** : `exports/membership_excel.py` (exports FFME, ~590 lignes restantes), `presentation/workers.py` (1234 lignes), générateurs Excel de `exports/`. À extraire vers `domain/` + `infrastructure/` puis exposer en routes FastAPI avant de construire l'écran web.
-3. **Système de fichiers** : le desktop lit/écrit dans `data/`, `exports/`, `archive/`. Cloud Run est éphémère → génération **en mémoire** puis téléchargement (comme les attestations), jamais de persistance locale.
+2. **Logique métier coincée dans des fichiers legacy ou des workers Qt** : `exports/membership_excel.py` (exports FFME, ~590 lignes restantes), `presentation/workers.py` (1234 lignes), générateurs Excel de `../exports`. À extraire vers `domain/` + `infrastructure/` puis exposer en routes FastAPI avant de construire l'écran web.
+3. **Système de fichiers** : le desktop lit/écrit dans `../data`, `exports/`, `archive/`. Cloud Run est éphémère → génération **en mémoire** puis téléchargement (comme les attestations), jamais de persistance locale.
 4. **Cache SQLite côté serveur** : reconstruit depuis Firestore au premier appel de données (`CloudDatabase.ensure_fresh`, 30 s) et flush après chaque écriture. Une route d'écriture doit passer par `SqliteRepository` pour être répliquée.
 5. **Durée des requêtes** : timeout Cloud Run 300 s, mémoire 1 GiB (Pandas/WeasyPrint) ; les traitements lourds (géocodage Nominatim à 1,5 s/adresse) doivent rester en tâche de fond.
 6. **Données personnelles/RGPD** (santé, urgences, mineurs) : ne jamais committer de BDD/exports ; golden master FFME non versionné (`tests/fixtures/`).
@@ -205,7 +205,7 @@ Les dépendances sont déclarées dans `pyproject.toml` et verrouillées dans `u
 CI, en dev et dans l'image Docker). Les `requirements*.txt` en sont des exports générés
 (`python dev/export_requirements.py`) : le client lourd les installe avec pip dans son runtime Python embarqué.
 
-La version de Python est définie dans `code_source/.python-version` (version complète, ex. `3.14.8`), lue par
+La version de Python est définie dans `../code_source/.python-version` (version complète, ex. `3.14.8`), lue par
 la CI (`setup-python`), le Python embarqué du mode portable Windows (`make_portable.py`) et les messages de
 `install.bat`. Seul le `FROM python:<version>-slim` du `Dockerfile` la répète : un test
 (`tests/test_cloud_run_lot4.py`) vérifie que les deux concordent. Pour changer de version, modifier ces **deux
@@ -215,7 +215,7 @@ Les postes portables déjà installés gardent leur Python embarqué : la mise �
 ### 7.2 Mode dev sur l'émulateur Firebase (recommandé)
 
 Front + API + Firestore entièrement locaux, sur le projet fictif **`demo-alj`** de l'émulateur Firebase
-(Auth + Firestore), avec des **données fictives** (univers Harry Potter). Mode d'emploi : `code_source/dev/README.md`.
+(Auth + Firestore), avec des **données fictives** (univers Harry Potter). Mode d'emploi : `../code_source/dev/README.md`.
 
 ```bash
 cd code_source
@@ -269,10 +269,10 @@ docker build -t alj . && docker run -p 8080:8080 -e ALJ_API_AUTH=off -e MEMBER_B
 
 Desktop (Windows) : `install.bat` puis `run_pipeline.bat` / `Lancer_ALJ.vbs` (→ `src/app.py`).
 
-**Configuration / secrets** : `code_source/.env` (non versionné) ou `SecretStore` (keyring) ; sur Cloud Run, variables d'environnement / Secret Manager.
+**Configuration / secrets** : `../code_source/.env` (non versionné) ou `SecretStore` (keyring) ; sur Cloud Run, variables d'environnement / Secret Manager.
 Clés principales : `HELLOASSO_CLIENT_ID/SECRET/ORG_SLUG`, `CAMPAIGN_SLUG`, `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN/USER_EMAIL`, `SMTP_*`, `GOOGLE_DRIVE_*`, `MEMBER_BACKEND` (`firestore`|`drive`), `ALJ_DATA_DIR`, `ALJ_API_AUTH`. Ne jamais afficher ni committer ces valeurs.
 
-**Tests** (depuis `code_source/`) :
+**Tests** (depuis `../code_source`) :
 
 ```bash
 python -m pytest tests --ignore=tests/presentation ...   # voir .github/workflows pour la liste complète
@@ -280,7 +280,7 @@ QT_QPA_PLATFORM=offscreen python -m pytest tests/presentation/test_presentation_
 ```
 La CI lance les tests Qt **en processus séparés** (crashs natifs sinon) ; `ruff check src tests` et `mypy` (limité à `schema_v2.py` et `constants.py`) sont bloquants. Les tests de la couche web/API (`test_bureau_web`, `test_mobile_pwa`, `test_api_security`, `test_cloud_run_lot4`, `helloasso/test_webhook`) ne nécessitent pas Qt — ce sont les plus utiles pour la migration. `test_ffme_golden_master` nécessite un fichier de référence local non versionné.
 
-**Déploiement web** : `code_source/deploy_cloud_run.sh` (ou `.bat`) → `gcloud run deploy alj-escalade-api --source . --memory 1Gi --min-instances 0 --max-instances 2 --session-affinity --timeout 300 --allow-unauthenticated` (l'auth est applicative). Règles Firestore : `firebase deploy --only firestore:rules` (`firebase.json`), manuel et **séparé** du déploiement de l'application : refus total des clients, à déployer au moins une semaine après la version web qui ne lit plus Firestore (ordre et retour arrière : plan `plan_api_only_front.md`, S1). Guide : `docs/guide_deploiement_cloud_run_helloasso.md`.
+**Déploiement web** : `../code_source/deploy_cloud_run.sh` (ou `.bat`) → `gcloud run deploy alj-escalade-api --source . --memory 1Gi --min-instances 0 --max-instances 2 --session-affinity --timeout 300 --allow-unauthenticated` (l'auth est applicative). Règles Firestore : `firebase deploy --only firestore:rules` (`firebase.json`), manuel et **séparé** du déploiement de l'application : refus total des clients, à déployer au moins une semaine après la version web qui ne lit plus Firestore (ordre et retour arrière : plan `plan_api_only_front.md`, S1). Guide : `docs/guide_deploiement_cloud_run_helloasso.md`.
 
 **Release desktop** : tag `vX.Y.Z` → GitHub Actions (Windows) → zip portable + `SHA256SUMS`. Le tag, `VERSION` et `APP_VERSION` doivent être identiques (`build_release_assets.py --check-tag`).
 
@@ -288,16 +288,16 @@ La CI lance les tests Qt **en processus séparés** (crashs natifs sinon) ; `ruf
 
 ## 8. Pièges & dette connue
 
-- **Documentation partiellement périmée** : `GEMINI.md` (racine et `code_source/`) décrit encore Tkinter, un fonctionnement 100 % Windows/Excel/Drive et des chemins de l'ancien poste. `docs/architecture_actuelle.md` et `docs/plan_migration.md` datent de la migration Tkinter→PySide6. `plan_architecture_cloud_mobile.md` annonce `APP_VERSION 2.3.0`, `512Mi`. `pyproject.toml` dit `2.0.5`. **Faire confiance au code et à `VERSION`, puis `base_firestore.md` et `plan_pages_web_bureau.md` (les plus récents).**
-- `GEMINI.md` impose une convention utile : scripts de diagnostic jetables dans `scripts_temporaires/` (ignoré par git), jamais à la racine.
-- **Duplication du front** : `competitions.html` (2700 lignes) et `index.html` dupliquent historiquement auth/style ; le portail `bureau/` utilise `shared/`. Ne pas dupliquer davantage.
+- **Documentation partiellement périmée** : `../GEMINI.md` (racine et `code_source/`) décrit encore Tkinter, un fonctionnement 100 % Windows/Excel/Drive et des chemins de l'ancien poste. `docs/architecture_actuelle.md` et `docs/plan_migration.md` datent de la migration Tkinter→PySide6. `plan_architecture_cloud_mobile.md` annonce `APP_VERSION 2.3.0`, `512Mi`. `pyproject.toml` dit `2.0.5`. **Faire confiance au code et à `VERSION`, puis `base_firestore.md` et `plan_pages_web_bureau.md` (les plus récents).**
+- `../GEMINI.md` impose une convention utile : scripts de diagnostic jetables dans `scripts_temporaires/` (ignoré par git), jamais à la racine.
+- **Duplication du front** : `competitions.html` (2700 lignes) et `../index.html` dupliquent historiquement auth/style ; le portail `bureau/` utilise `shared/`. Ne pas dupliquer davantage.
 - **Admins codés en dur** (`api_auth.py` + copies d'affichage en JS) : à terme, passer par les custom claims Firebase.
 - **Qt/GC** : conserver des références Python sur les `QGraphicsTextItem` (`_text_items`) dans `PlanningWeekView`.
 - **Word COM** : toujours `Quit()` dans un `finally` (uniquement tant que le desktop existe).
 - **Exports FFME** : CSV strict (`;`, dates `jj/mm/aaaa`) ; le golden master doit rester vert ou être renouvelé avec accord du club.
 - **Sauvegardes** : API backup SQLite (jamais de copie brute avec WAL), PITR Firestore 7 j, export quotidien 14 j, retour arrière via `MEMBER_BACKEND=drive`.
-- **État git au moment de la rédaction** : `.gitignore` et `code_source/requirements.txt` modifiés (non committés), `.claude/` non suivi.
-- Le dépôt contient aussi `.agents/`, `.idea/`, `.jolli/` (outillage local).
+- **État git au moment de la rédaction** : `../.gitignore` et `code_source/requirements.txt` modifiés (non committés), `.claude/` non suivi.
+- Le dépôt contient aussi `../.agents`, `.idea/`, `.jolli/` (outillage local).
 
 ---
 
