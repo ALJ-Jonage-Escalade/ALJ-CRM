@@ -396,7 +396,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import send_attestation_api
+        from api.communications.attestations import send_attestation_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_attestation.db")
@@ -995,7 +995,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import save_email_template_api, delete_email_template_api, get_email_templates
+        from api.communications.email import save_email_template_api, delete_email_template_api, get_email_templates
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_tpl.db")
@@ -1055,7 +1055,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         from infrastructure.sqlite.repository import SqliteRepository
-        from server import get_whatsapp_template_api, save_whatsapp_template_api
+        from api.communications.whatsapp import get_whatsapp_template_api, save_whatsapp_template_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_wa.db")

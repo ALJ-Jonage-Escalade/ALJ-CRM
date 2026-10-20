@@ -93,13 +93,15 @@ app.middleware("http")(security_headers_middleware)  # outermost
 from api.competitions import coaches, competitions, helloasso_items, participants
 from api.competitions import members as competition_members
 from api.competitions import payments, results
+from api.communications import attestations, email, whatsapp
 from api.members import dashboard, members, seasons
 from api.web import health, pages, pwa
-from api.responses import client_error, internal_error, service_error_handler
+from api.responses import internal_error, service_error_handler
 from infrastructure.geocoding import geocode_missing_addresses
 from services.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
-             results, payments, members, seasons, dashboard, pages, pwa, health):
+             results, payments, members, seasons, dashboard, email, whatsapp, attestations,
+             pages, pwa, health):
     app.include_router(_api.router)
 pages.mount_static(app)
 # Every route of these routers skips the SQLite cache refresh: a route that reads or writes the
@@ -855,10 +857,9 @@ def update_planning(planning_data: List[Dict[str, Any]] = Body(...)):
 
 
 # --------------------------------------------------------------------------
-# Micro-service Cloud & Mobile : Webhooks HelloAsso & Envoi d'Emails
+# Micro-service Cloud & Mobile : Webhooks HelloAsso
 # --------------------------------------------------------------------------
 from infrastructure.helloasso.webhook import HelloAssoWebhookService
-from infrastructure.mail.dispatch import EmailDispatchService
 
 
 @app.get("/webhooks/helloasso")
@@ -899,168 +900,6 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
         return {"status": "error", "message": internal_error(e, "webhook_helloasso")}
     finally:
         invalidate_cache()  # payments recorded on competition documents directly
-
-
-@app.get("/api/email-templates")
-def get_email_templates():
-    """Retourne la liste des modèles d'e-mails configurés."""
-    try:
-        return {"status": "success", "templates": EmailDispatchService.list_templates()}
-    except Exception as e:
-        return {"status": "error", "message": internal_error(e, "get_email_templates")}
-
-
-@app.post("/api/email-templates")
-def save_email_template_api(data: Dict[str, Any] = Body(...)):
-    """Crée ou met à jour un modèle d'e-mail dans la BDD SQLite (synchronisé avec Firestore)."""
-    try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        name = str(data.get("name") or "").strip()
-        old_name = str(data.get("old_name") or "").strip() or None
-        subject = str(data.get("subject") or "").strip()
-        body = str(data.get("body") or "").strip()
-        sender_email = str(data.get("sender_email") or "").strip()
-        sender_name = str(data.get("sender_name") or "").strip()
-
-        if not name:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Le nom du modèle est obligatoire."})
-        if not subject:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Le sujet du modèle est obligatoire."})
-
-        ok = SqliteRepository.save_email_template(
-            name=name,
-            subject=subject,
-            body=body,
-            sender_email=sender_email,
-            sender_name=sender_name,
-            old_name=old_name
-        )
-        if not ok:
-            return JSONResponse(status_code=500, content={"status": "error", "message": f"Impossible d'enregistrer le modèle '{name}'."})
-
-        return {
-            "status": "success",
-            "message": f"Modèle d'e-mail '{name}' enregistré avec succès.",
-            "template": {
-                "name": name,
-                "subject": subject,
-                "body": body,
-                "sender_email": sender_email,
-                "sender_name": sender_name
-            }
-        }
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "save_email_template_api")})
-
-
-@app.delete("/api/email-templates/{template_name}")
-def delete_email_template_api(template_name: str):
-    """Supprime un modèle d'e-mail par son nom."""
-    try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        import urllib.parse
-        clean_name = urllib.parse.unquote(template_name).strip()
-        if not clean_name:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Nom de modèle invalide."})
-
-        ok = SqliteRepository.delete_email_template(clean_name)
-        if not ok:
-            return JSONResponse(status_code=404, content={"status": "error", "message": f"Modèle '{clean_name}' introuvable ou déjà supprimé."})
-
-        return {"status": "success", "message": f"Modèle '{clean_name}' supprimé avec succès."}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "delete_email_template_api")})
-
-
-@app.get("/api/whatsapp-template")
-def get_whatsapp_template_api():
-    """Retourne le texte d'invitation WhatsApp mémorisé."""
-    try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        text = SqliteRepository.get_whatsapp_template()
-        return {"status": "success", "template": text or ""}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "get_whatsapp_template_api")})
-
-
-@app.post("/api/whatsapp-template")
-def save_whatsapp_template_api(data: Dict[str, Any] = Body(...)):
-    """Enregistre le texte d'invitation WhatsApp."""
-    try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        text = str(data.get("template") or "").strip()
-        ok = SqliteRepository.save_whatsapp_template(text)
-        if not ok:
-            return JSONResponse(status_code=500, content={"status": "error", "message": "Impossible d'enregistrer le texte WhatsApp."})
-        return {"status": "success", "message": "Texte WhatsApp enregistré avec succès.", "template": text}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "save_whatsapp_template_api")})
-
-
-@app.post("/api/preview-email")
-def preview_email(data: Dict[str, Any] = Body(...)):
-    """Génère un aperçu fidèle d'un e-mail personnalisé pour un destinataire et une compétition."""
-    try:
-        preview_data = EmailDispatchService.preview(
-            template_name=data.get("template_name"),
-            subject=data.get("subject"),
-            body=data.get("body"),
-            recipient=data.get("recipient"),
-            competition_id=data.get("competition_id"),
-            add_signature=data.get("add_signature", True)
-        )
-        return {"status": "success", "preview": preview_data}
-    except Exception as e:
-        return {"status": "error", "message": internal_error(e, "preview_email")}
-
-
-@app.get("/api/email-status")
-def get_email_status():
-    """Vérifie l'état de la configuration d'envoi d'e-mails (sans exposer de secrets)."""
-    gmail_user = SecretStore.get_secret("GMAIL_USER_EMAIL")
-    gmail_client_id = SecretStore.get_secret("GMAIL_CLIENT_ID")
-    gmail_refresh = SecretStore.get_secret("GMAIL_REFRESH_TOKEN")
-
-    smtp_host = SecretStore.get_secret("SMTP_HOST")
-    smtp_user = SecretStore.get_secret("SMTP_USER")
-    smtp_password = SecretStore.get_secret("SMTP_PASSWORD")
-
-    use_oauth2 = bool(gmail_user and gmail_client_id and gmail_refresh)
-    use_smtp = bool(smtp_host and smtp_user and smtp_password)
-
-    return {
-        "status": "success",
-        "configured": use_oauth2 or use_smtp,
-        "mode": "gmail_oauth2" if use_oauth2 else ("smtp" if use_smtp else "none"),
-        "sender": gmail_user if use_oauth2 else (smtp_user if use_smtp else ""),
-    }
-
-
-@app.post("/api/send-email")
-def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
-    """Déclenche l'envoi d'e-mails sécurisé via Gmail API ou SMTP avec injection de variables."""
-    from infrastructure.security.api_auth import Role, has_role
-    claims = getattr(request.state, "user", None)  # None: token check off (local desktop server)
-    reason = EmailDispatchService.unauthorized_send_reason(
-        data.get("recipients"), data.get("sender_email"),
-        is_admin=claims is None or has_role(claims, Role.ADMIN))
-    if reason:
-        return JSONResponse(status_code=403, content={"status": "error", "message": reason})
-    try:
-        result = EmailDispatchService.dispatch_emails(
-            template_name=data.get("template_name"),
-            subject=data.get("subject"),
-            body=data.get("body"),
-            recipient_ids=data.get("recipient_ids"),
-            recipients=data.get("recipients"),
-            competition_id=data.get("competition_id"),
-            sender_email=data.get("sender_email"),
-            sender_name=data.get("sender_name"),
-            add_signature=data.get("add_signature", True)
-        )
-        return result
-    except Exception as e:
-        return {"status": "error", "message": internal_error(e, "send_email_api")}
 
 
 @app.post("/api/helloasso/sync")
@@ -1106,126 +945,6 @@ def sync_helloasso_api():
         return {"status": "error", "message": internal_error(e, "sync_helloasso_api")}
     finally:
         invalidate_cache()  # payments recorded on competition documents directly
-
-
-# --------------------------------------------------------------------------
-# Attestations de paiement PDF (un adhérent à la fois, admin uniquement)
-# --------------------------------------------------------------------------
-@app.post("/api/attestations/preview")
-def preview_attestation_api(data: Dict[str, Any] = Body(...)):
-    """Génère l'aperçu PDF d'une attestation de paiement (retourne application/pdf)."""
-    try:
-        from domain.attestation.document import build_attestation, render_attestation_pdf, get_safe_pdf_filename
-        member = data.get("member") or {}
-        season = data.get("season")
-        date_jour = data.get("date_jour")
-
-        html = build_attestation(member, season=season, date_jour=date_jour)
-        pdf_bytes = render_attestation_pdf(html)
-
-        last_name = member.get("last_name") or member.get("user_last_name") or "ADHERENT"
-        first_name = member.get("first_name") or member.get("user_first_name") or ""
-        order_ref = member.get("order_ref")
-        filename = get_safe_pdf_filename(last_name, first_name, order_ref)
-
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f'inline; filename="{filename}"'}
-        )
-    except Exception as e:
-        return JSONResponse(status_code=400, content={"status": "error", "message": client_error(e, "preview_attestation_api")})
-
-
-@app.post("/api/attestations/send")
-def send_attestation_api(data: Dict[str, Any] = Body(...)):
-    """Génère une attestation PDF en mémoire, l'envoie par e-mail et met à jour la date d'envoi."""
-    try:
-        from domain.attestation.document import build_attestation, render_attestation_pdf, get_safe_pdf_filename
-        from domain.utils import apply_template_variables
-        from infrastructure.mail.repository import EmailRepository
-
-        member = data.get("member") or {}
-        season = data.get("season")
-        to_email = (data.get("to_email") or member.get("email_primary") or "").strip()
-        if not to_email or "@" not in to_email:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Adresse e-mail du destinataire invalide ou manquante."})
-
-        html = build_attestation(member, season=season)
-        pdf_bytes = render_attestation_pdf(html)
-
-        last_name = member.get("last_name") or member.get("user_last_name") or "ADHERENT"
-        first_name = member.get("first_name") or member.get("user_first_name") or ""
-        order_ref = member.get("order_ref")
-        filename_pdf = get_safe_pdf_filename(last_name, first_name, order_ref)
-
-        template_name = (data.get("template_name") or "Attestation échéance").strip()
-        from infrastructure.mail.dispatch import EmailDispatchService
-        tmpl = EmailDispatchService.get_template_by_name(template_name)
-
-        raw_subject = data.get("subject") or (tmpl.get("subject") if tmpl else None) or "Attestation de paiement et d'échéance - Amicale Laïque de Jonage"
-        raw_body = data.get("body") or (tmpl.get("body") if tmpl else None) or (
-            "Bonjour {first_name},\n\n"
-            "Nous avons le plaisir de vous transmettre en pièce jointe l'attestation de paiement pour votre adhésion ou celle de votre enfant à la section escalade de l'Amicale Laïque de Jonage.\n\n"
-            "Sportivement,\n"
-            "L'équipe ALJ Escalade"
-        )
-        subject = apply_template_variables(raw_subject, member)
-        body = apply_template_variables(raw_body, member)
-
-        sender_email = data.get("sender_email") or (tmpl.get("sender_email") if tmpl else None) or "inscription@alj-escalade.fr"
-        if not EmailDispatchService.is_allowed_sender(sender_email):
-            return JSONResponse(status_code=403, content={
-                "status": "error", "message": f"Adresse d'expédition non autorisée : {sender_email}"})
-        sender_name = data.get("sender_name") or (tmpl.get("sender_name") if tmpl else None) or "Amicale Laïque Jonage - Inscriptions"
-
-        add_signature = data.get("add_signature", True)
-        from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
-        # HTML built from the template, then personalised with escaped values
-        html_body = apply_template_variables(
-            build_email_html(raw_body, add_signature=True, image_src_mode="cid"), member, escape_html=True
-        ) if add_signature else None
-        plain_body = body + ("\n\n" + build_signature_plain() if add_signature else "")
-        inline_images = get_inline_images() if add_signature else []
-
-        ok = EmailRepository.send_email(
-            to_email=to_email,
-            subject=subject,
-            body=plain_body,
-            html_body=html_body,
-            attachment_bytes=pdf_bytes,
-            attachment_filename=filename_pdf,
-            inline_images=inline_images,
-            from_email=sender_email,
-            from_name=sender_name
-        )
-        if not ok:
-            return JSONResponse(status_code=500, content={"status": "error", "message": "Échec d'envoi de l'e-mail."})
-
-        # Enregistrement de la date d'envoi de l'attestation dans SQLite
-        # (CloudDatabase.after_write synchronisera automatiquement la modification vers Firestore)
-        now_str = datetime.datetime.now().strftime("%d/%m/%Y")
-        try:
-            from infrastructure.sqlite.repository import SqliteRepository
-            pid = member.get("purchase_id")
-            SqliteRepository.update_email_sent_date(
-                order_ref=str(order_ref or "").strip(),
-                last_name=str(last_name or "").strip(),
-                first_name=str(first_name or "").strip(),
-                date_str=now_str,
-                purchase_id=int(pid) if pid is not None else None
-            )
-        except Exception as db_err:
-            print(f"⚠️ [ATTESTATION] Erreur enregistrement date d'envoi dans SQLite : {db_err}")
-
-        return {
-            "status": "success",
-            "message": f"Attestation envoyée avec succès à {to_email}.",
-            "email_sent_date": now_str,
-            "filename": filename_pdf
-        }
-    except Exception as e:
-        return JSONResponse(status_code=400, content={"status": "error", "message": client_error(e, "send_attestation_api")})
 
 
 # --------------------------------------------------------------------------

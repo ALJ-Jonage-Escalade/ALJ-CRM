@@ -13,7 +13,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from infrastructure.mail.dispatch import EmailDispatchService
-from server import get_email_templates, preview_email, get_email_status
+from api.communications.email import get_email_templates, preview_email, get_email_status
 
 
 class TestEmailDispatchService(unittest.TestCase):
