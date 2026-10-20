@@ -49,7 +49,8 @@ class GeocodeWorker(QThread):
             for idx, addr in enumerate(self.addresses):
                 percent = int((idx / total) * 100)
                 self.progress.emit(f"🌍 Géocodage ({idx+1}/{total}) : {addr}...", percent)
-                print(f"🌍 [GEOCODING] ({idx+1}/{total}) Recherche de l'adresse : {addr}")
+                # Members' addresses and coordinates are personal data: shown in the dialog, never logged
+                print(f"🌍 [GEOCODING] ({idx+1}/{total}) Recherche d'une adresse…")
                 
                 try:
                     location = geolocator.geocode(addr, timeout=10)
@@ -57,13 +58,13 @@ class GeocodeWorker(QThread):
                         lat, lon = location.latitude, location.longitude
                         SqliteRepository.save_geocode(addr, lat, lon)
                         success_count += 1
-                        print(f"✅ [GEOCODING] Résolution : {lat}, {lon}")
+                        print("✅ [GEOCODING] Adresse localisée.")
                     else:
                         SqliteRepository.save_geocode(addr, None, None)
                         fail_count += 1
                         print("⚠️ [GEOCODING] Adresse introuvable ou non localisée.")
                 except Exception as err:
-                    print(f"❌ [GEOCODING] Erreur technique pour '{addr}' : {err}")
+                    print(f"❌ [GEOCODING] Erreur technique pour l'adresse {idx+1} : {type(err).__name__}")
                     fail_count += 1
                     
                 # Respect du délai d'une seconde pour l'API Nominatim

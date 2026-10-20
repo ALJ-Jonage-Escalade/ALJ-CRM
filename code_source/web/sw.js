@@ -66,8 +66,9 @@ self.addEventListener("fetch", (event) => {
     url.pathname === "/runtime-config.js" ||   // runtime configuration: never cached
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/webhooks/") ||
-    url.hostname.includes("googleapis.com") ||
-    url.hostname.includes("accounts.google.com")
+    url.hostname === "googleapis.com" ||
+    url.hostname.endsWith(".googleapis.com") ||
+    url.hostname === "accounts.google.com"
   ) {
     return;
   }

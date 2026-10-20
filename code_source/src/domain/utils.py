@@ -3,12 +3,23 @@ import json
 import re
 import unicodedata
 from typing import Any
+from urllib.parse import urlparse
 import pandas as pd
 
 
 def sanitize_email_header(value: Any) -> str:
     """E-mail header value without line breaks (header injection from member data)."""
     return " ".join(str(value or "").splitlines()).strip()
+
+
+def is_helloasso_url(value: str) -> bool:
+    """True when the value is a link on helloasso.com (scheme optional, as typed in the settings).
+    The host is compared, not the text: "evil.example/helloasso.com" is not a HelloAsso link."""
+    raw = str(value or "").strip()
+    if "://" not in raw:
+        raw = "https://" + raw
+    host = (urlparse(raw).hostname or "").lower()
+    return host == "helloasso.com" or host.endswith(".helloasso.com")
 
 
 def json_for_script(obj: Any) -> str:

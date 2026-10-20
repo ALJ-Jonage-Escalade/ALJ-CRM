@@ -23,18 +23,19 @@ def geocode_missing_addresses(addresses: List[str]) -> None:
         # Pause de 1.5s entre chaque appel pour respecter les CGU Nominatim
         time.sleep(1.5)
         try:
-            print(f"🌍 [GEOCODING] ({i+1}/{len(addresses)}) Recherche de l'adresse : {address}")
+            # Members' addresses and coordinates are personal data: never in the logs
+            print(f"🌍 [GEOCODING] ({i+1}/{len(addresses)}) Recherche d'une adresse…")
             location = geolocator.geocode(address, timeout=10)
             if location:
                 lat, lon = location.latitude, location.longitude
-                print(f"✅ [GEOCODING] Trouvé : {lat}, {lon}")
+                print("✅ [GEOCODING] Adresse localisée.")
                 SqliteRepository.save_geocode(address, lat, lon)
             else:
-                print(f"⚠️ [GEOCODING] Adresse non résolue : {address}")
+                print("⚠️ [GEOCODING] Adresse non résolue.")
                 # Enregistrer des coordonnées nulles pour éviter de requêter indéfiniment cette mauvaise adresse
                 SqliteRepository.save_geocode(address, None, None)
         except Exception as e:
-            print(f"❌ [GEOCODING] Erreur lors du géocodage de '{address}' : {e}")
+            print(f"❌ [GEOCODING] Erreur lors du géocodage de l'adresse {i+1} : {type(e).__name__}")
     if CloudDatabase.is_enabled():
         CloudDatabase.flush_only()
     print("🌍 [GEOCODING] Tâche de fond terminée.")

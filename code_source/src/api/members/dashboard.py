@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, BackgroundTasks
 
 from domain.constants import get_active_season
+from domain.utils import is_helloasso_url
 from infrastructure.geocoding import geocode_missing_addresses
 from infrastructure.helloasso.api import get_campaigns, get_items
 from infrastructure.security.secret_store import SecretStore
@@ -19,7 +20,7 @@ def get_target_slug():
     slug = (SecretStore.get_secret("CAMPAIGN_SLUG") or "").strip()
     if not slug:
         slug = f"adhesion-escalade-{get_active_season()}-amicale-laique-escalade-2"
-    if "helloasso.com" in slug.lower():
+    if is_helloasso_url(slug):
         slug = [s for s in slug.split("/") if s.strip()][-1]
     return slug
 
