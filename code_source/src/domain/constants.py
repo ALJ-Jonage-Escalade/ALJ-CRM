@@ -51,7 +51,7 @@ COLOR_TEXT_MAIN = "#1E293B"      # Texte principal
 COLOR_TEXT_MUTED = "#64748B"     # Texte secondaire amorti
 
 # Phase 3 — Mapping canonique unique colonnes Excel <-> clés cache (source de vérité unique).
-# Importé par sqlite_repository, excel_repository et create_excel (fin de la triplication).
+# Importé par sqlite_repository, excel_repository et exports/membership_excel (fin de la triplication).
 CORRECTIVE_MAP = {
     "Référence commande": "order_ref",
     "Date de la commande": "order_date",

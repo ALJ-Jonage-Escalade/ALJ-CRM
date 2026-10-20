@@ -312,9 +312,9 @@ class ExportsPage(QWidget):
     def update_ffme_stats(self):
         """Calcule et affiche les statistiques de l'export FFME CSV (Lot 5)."""
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             import datetime
-            from create_excel import parse_date_to_datetime
+            from exports.membership_excel import parse_date_to_datetime
             
             participants = SqliteRepository.load_direct_data(season_filter="2026-2027")
             
@@ -384,7 +384,7 @@ class ExportsPage(QWidget):
     def _load_presence_creneaux(self):
         """Charge les groupes de créneaux depuis la table planning de la BDD.
         Chaque créneau regroupe un ou plusieurs tarifs HelloAsso."""
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         return SqliteRepository.load_creneaux_groups()
 
     def _build_cours_hierarchy(self, creneaux):
@@ -392,18 +392,18 @@ class ExportsPage(QWidget):
         pour le dialogue : Collège, Enfants (sous-rubriques par tranche d'âge),
         Perfectionnement, Compétition. Les créneaux hors rubrique restent en liste
         plate, en premier. Retourne une liste de (kind, libellé, nom_brut)."""
-        from domain.planning_groups import build_creneau_items
+        from domain.members.planning_groups import build_creneau_items
         return build_creneau_items(creneaux, include_autonome=False)
 
     def _build_autonome_summary(self, selected_creneaux) -> str:
         """Résumé pré-export de la fiche de présence autonome : adultes / mineurs par
         sous-catégorie (tarifs HelloAsso des créneaux autonomes sélectionnés), puis les
         jeunes mineurs autorisés (parentale Autonomes / Famille) qui seront ajoutés des
-        autres groupes. Reproduit la logique du générateur (presence_sheet_generator)
+        autres groupes. Reproduit la logique du générateur (exports.presence_sheets)
         pour refléter exactement le contenu futur du fichier Excel."""
         try:
             import datetime
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             raw = SqliteRepository.load_direct_data(season_filter="2026-2027")
         except Exception as e:
             return f"⚠️ Résumé indisponible : {e}"
@@ -509,14 +509,14 @@ class ExportsPage(QWidget):
         groupes de créneaux du planning (un créneau peut regrouper plusieurs tarifs).
         Les options techniques sont préconfigurées selon la variante : seul le choix
         des groupes (pour les cours) et la période restent à la charge de l'utilisateur.
-        Le code de génération (ExportWorker / presence_sheet_generator) reste identique."""
+        Le code de génération (ExportWorker / exports.presence_sheets) reste identique."""
         try:
             creneaux = self._load_presence_creneaux()
             if not creneaux:
                 QMessageBox.warning(self, "Aucun groupe", "Aucun groupe de créneaux trouvé dans le planning (BDD).")
                 return
 
-            from domain.planning_groups import is_autonome_creneau
+            from domain.members.planning_groups import is_autonome_creneau
 
             tooltips = {}
             for c in creneaux:

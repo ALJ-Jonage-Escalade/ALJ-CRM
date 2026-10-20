@@ -12,7 +12,7 @@ import threading
 
 from PySide6.QtCore import QObject
 
-from attestation_generator import generate_all_attestations
+from exports.attestation_word import generate_all_attestations
 
 
 class PdfRenderService(QObject):

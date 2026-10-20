@@ -42,7 +42,7 @@ class TestPresentationLot5(unittest.TestCase):
         from unittest.mock import patch
         from PySide6.QtWidgets import QApplication
         from presentation.pages.documents import DocumentsPage
-        from domain.models import Member
+        from domain.members.models import Member
         
         app = QApplication.instance() or QApplication([])
         page = DocumentsPage()

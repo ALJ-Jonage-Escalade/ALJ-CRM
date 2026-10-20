@@ -4,12 +4,12 @@ from unittest.mock import patch
 
 from support.fake_firestore import FirestoreRepoTestCase
 
-from domain.competition_models import Competition
-from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
-from infrastructure.firestore_client import FirestoreConflictError, FirestoreError
-from services import competition_store
-from services.competition_service import CompetitionService as Service
-from services.helloasso_item_service import HelloAssoItemService
+from domain.competitions.models import Competition
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.client import FirestoreConflictError, FirestoreError
+from services.competitions import store as competition_store
+from services.competitions.competitions import CompetitionService as Service
+from services.competitions.helloasso_items import HelloAssoItemService
 from services.errors import Conflict, InvalidRequest, NotFound, StorageUnavailable
 
 

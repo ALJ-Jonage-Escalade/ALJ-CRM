@@ -8,6 +8,9 @@ client_secret_*.json
 *.db-shm
 import/
 exports/
+# ...but not the code packages named exports
+!src/exports/
+!tests/exports/
 archive/
 code_source/attestation/
 code_source/Adhésions *.xlsx

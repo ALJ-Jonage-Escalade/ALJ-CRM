@@ -16,15 +16,15 @@ from fastapi import FastAPI, Body, BackgroundTasks, HTTPException, Query, Reques
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 
 # Importer les fonctions de notre script existant
-from helloasso_api import get_campaigns, get_items
-from infrastructure.sqlite_repository import SqliteRepository
+from infrastructure.helloasso.api import get_campaigns, get_items
+from infrastructure.sqlite.repository import SqliteRepository
 
 from dotenv import load_dotenv
 load_dotenv()
 
 from domain.constants import get_active_season, APP_VERSION
 from domain.utils import json_for_script
-from infrastructure.secret_store import SecretStore
+from infrastructure.security.secret_store import SecretStore
 from infrastructure import runtime_env
 
 # Inconsistent dev mode (Firebase emulator) or dev mode on Cloud Run: stop immediately.
@@ -48,7 +48,7 @@ app = FastAPI(title="Admin Escalade API")
 # protected by local_guard_middleware instead (loopback hosts, same-origin writes).
 import re
 from fastapi.routing import APIRoute
-from infrastructure.cloud_database import CloudDatabase
+from infrastructure.firestore.cloud_database import CloudDatabase
 from starlette.concurrency import run_in_threadpool
 
 
@@ -84,7 +84,7 @@ async def cloud_db_middleware(request, call_next):
 
 app.middleware("http")(cloud_db_middleware)
 
-from infrastructure.api_auth import auth_middleware, local_guard_middleware
+from infrastructure.security.api_auth import auth_middleware, local_guard_middleware
 app.middleware("http")(auth_middleware)
 # Unauthenticated local server only accepts loopback hosts and same-origin writes
 app.middleware("http")(local_guard_middleware)
@@ -103,8 +103,9 @@ async def security_headers_middleware(request, call_next):
 app.middleware("http")(security_headers_middleware)  # outermost
 
 # Data routes of the web front end (competitions, coaches, HelloAsso links, members): src/api/
-from api import (coaches, competition_members, competitions, helloasso_items, members,
-                 participants, seasons)
+from api.competitions import coaches, competitions, helloasso_items, participants
+from api.competitions import members as competition_members
+from api.members import members, seasons
 from api.responses import service_error_handler
 from services.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
@@ -339,7 +340,7 @@ def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: 
 def get_sqlite_map_data(background_tasks: BackgroundTasks = None) -> List[Dict[str, Any]]:
     """Génère les points cartographiques directement depuis la base SQLite (Source unique de vérité)."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         raw_data = SqliteRepository.load_direct_data()
         
         map_data_dict = {}
@@ -777,10 +778,10 @@ def get_map(background_tasks: BackgroundTasks):
 def get_pivot_table(season: str = "2026-2027"):
     """Renvoie la page du Tableau Croisé Dynamique interactif via PivotTable.js."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from domain.constants import get_active_season
-        from domain.age_rules import parse_birth_date, age_at, get_season_start_date
-        from domain.models import normalize_gender
+        from domain.members.age_rules import parse_birth_date, age_at, get_season_start_date
+        from domain.members.models import normalize_gender
         from domain.utils import clean_city_name
         
         target_season = (season or "").strip()
@@ -999,7 +1000,7 @@ def get_pivot_table(season: str = "2026-2027"):
 def get_planning():
     """Récupère le planning depuis la BDD SQLite."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         return SqliteRepository.load_planning_data(log_debug=False)
     except Exception as e:
         return {"error": internal_error(e, "get_planning")}
@@ -1009,7 +1010,7 @@ def get_planning():
 def save_planning_item_api(item: Dict[str, Any] = Body(...)):
     """Crée ou met à jour un créneau unique dans la table planning."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         saved_item = SqliteRepository.save_planning_item(item)
         return {"status": "success", "message": "Créneau enregistré avec succès.", "item": saved_item}
     except Exception as e:
@@ -1020,7 +1021,7 @@ def save_planning_item_api(item: Dict[str, Any] = Body(...)):
 def delete_planning_item_api(item_id: int):
     """Supprime un créneau de planning par son ID."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         ok = SqliteRepository.delete_planning_item(item_id)
         if not ok:
             return JSONResponse(status_code=404, content={"status": "error", "message": f"Créneau #{item_id} introuvable."})
@@ -1035,8 +1036,8 @@ def export_planning_api(mode: str = Query("grid"), season: Optional[str] = Query
     import os
     import tempfile
     import shutil
-    from infrastructure.sqlite_repository import SqliteRepository
-    from infrastructure.planning_excel_export import export_planning_excel, export_planning_list_excel
+    from infrastructure.sqlite.repository import SqliteRepository
+    from exports.planning_excel import export_planning_excel, export_planning_list_excel
     from domain.constants import get_active_season
 
     target_season = season or get_active_season()
@@ -1214,8 +1215,8 @@ def update_planning(planning_data: List[Dict[str, Any]] = Body(...)):
 # --------------------------------------------------------------------------
 # Micro-service Cloud & Mobile : Webhooks HelloAsso & Envoi d'Emails
 # --------------------------------------------------------------------------
-from infrastructure.helloasso_webhook_service import HelloAssoWebhookService
-from infrastructure.email_dispatch_service import EmailDispatchService
+from infrastructure.helloasso.webhook import HelloAssoWebhookService
+from infrastructure.mail.dispatch import EmailDispatchService
 
 
 @app.get("/webhooks/helloasso")
@@ -1238,9 +1239,9 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
     Authenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles
     auprès de l'API HelloAsso (voir HelloAssoWebhookService.handle_notification).
     """
-    from infrastructure.firestore_client import FirestoreError
-    from infrastructure.helloasso_webhook_service import WebhookRejected
-    from services.competition_store import invalidate_cache
+    from infrastructure.firestore.client import FirestoreError
+    from infrastructure.helloasso.webhook import WebhookRejected
+    from services.competitions.store import invalidate_cache
     if not isinstance(token, str):  # appel direct de la fonction (tests)
         token = None
     try:
@@ -1262,7 +1263,7 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
 def check_competition_all_paid_api(comp_id: int):
     """Vérifie si tous les compétiteurs ont payé et envoie l'e-mail récapitulatif si applicable."""
     try:
-        from infrastructure.helloasso_webhook_service import HelloAssoWebhookService
+        from infrastructure.helloasso.webhook import HelloAssoWebhookService
         notified = HelloAssoWebhookService.check_and_notify_all_paid(comp_id)
         return {
             "status": "success",
@@ -1286,7 +1287,7 @@ def get_email_templates():
 def save_email_template_api(data: Dict[str, Any] = Body(...)):
     """Crée ou met à jour un modèle d'e-mail dans la BDD SQLite (synchronisé avec Firestore)."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         name = str(data.get("name") or "").strip()
         old_name = str(data.get("old_name") or "").strip() or None
         subject = str(data.get("subject") or "").strip()
@@ -1329,7 +1330,7 @@ def save_email_template_api(data: Dict[str, Any] = Body(...)):
 def delete_email_template_api(template_name: str):
     """Supprime un modèle d'e-mail par son nom."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         import urllib.parse
         clean_name = urllib.parse.unquote(template_name).strip()
         if not clean_name:
@@ -1348,7 +1349,7 @@ def delete_email_template_api(template_name: str):
 def get_whatsapp_template_api():
     """Retourne le texte d'invitation WhatsApp mémorisé."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         text = SqliteRepository.get_whatsapp_template()
         return {"status": "success", "template": text or ""}
     except Exception as e:
@@ -1359,7 +1360,7 @@ def get_whatsapp_template_api():
 def save_whatsapp_template_api(data: Dict[str, Any] = Body(...)):
     """Enregistre le texte d'invitation WhatsApp."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         text = str(data.get("template") or "").strip()
         ok = SqliteRepository.save_whatsapp_template(text)
         if not ok:
@@ -1411,7 +1412,7 @@ def get_email_status():
 @app.post("/api/send-email")
 def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
     """Déclenche l'envoi d'e-mails sécurisé via Gmail API ou SMTP avec injection de variables."""
-    from infrastructure.api_auth import Role, has_role
+    from infrastructure.security.api_auth import Role, has_role
     claims = getattr(request.state, "user", None)  # None: token check off (local desktop server)
     reason = EmailDispatchService.unauthorized_send_reason(
         data.get("recipients"), data.get("sender_email"),
@@ -1438,17 +1439,17 @@ def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
 @app.post("/api/helloasso/sync")
 def sync_helloasso_api():
     """Synchronise la campagne annuelle HelloAsso vers Firestore."""
-    from services.competition_store import invalidate_cache
+    from services.competitions.store import invalidate_cache
     try:
-        from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
-        from domain import competition_matching
+        from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+        from domain.competitions import matching as competition_matching
 
         slug = Repo.get_app_setting("HELLOASSO_ANNUAL_CAMPAIGN")
         if not (slug or "").strip():
             return {"status": "error", "message": "Aucune campagne annuelle configurée. Veuillez configurer le slug de la campagne."}
 
         ident = competition_matching.parse_campaign_identifier(slug)
-        from helloasso_api import get_items
+        from infrastructure.helloasso.api import get_items
         items = get_items(ident["form_type"], ident["slug"]) or []
         summarized = competition_matching.summarize_items(items)
 
@@ -1493,8 +1494,8 @@ async def api_cron_fetch_competition_results(
     et envoie un e-mail de synthèse si des résultats sont découverts.
     Conçu pour être appelé par Google Cloud Scheduler (ex: tous les jours à 07h00) ou manuellement.
     """
-    from infrastructure.competition_results_batch_service import CompetitionResultsBatchService
-    from services.competition_store import invalidate_cache
+    from services.competitions.results_batch import CompetitionResultsBatchService
+    from services.competitions.store import invalidate_cache
     try:
         return await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
     finally:
@@ -1507,8 +1508,8 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
     Récupère les résultats officiels depuis MyCompet FFME pour une compétition donnée,
     extrait les compétiteurs de l'Amicale Laïque de Jonage et met à jour leurs classements.
     """
-    from mycompet_scraper import fetch_and_parse_mycompet_results, normalize_result_url, find_mycompet_result_url
-    from infrastructure.firestore_client import FirestoreClient
+    from infrastructure.mycompet.scraper import fetch_and_parse_mycompet_results, normalize_result_url, find_mycompet_result_url
+    from infrastructure.firestore.client import FirestoreClient
 
     url = (payload.get("url") or payload.get("result_id") or "").strip()
 
@@ -1590,12 +1591,12 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
         except Exception as e:
             print(f"⚠️ [MYCOMPET] Erreur mise à jour Firestore : {e}")
         finally:
-            from services.competition_store import invalidate_cache
+            from services.competitions.store import invalidate_cache
             invalidate_cache()  # results visible on the next poll of the competition pages
 
     # Sauvegarde miroir dans la base SQLite locale si disponible
     try:
-        from infrastructure.competition_repository import CompetitionRepository
+        from infrastructure.sqlite.competition_repository import CompetitionRepository
         if os.path.exists(CompetitionRepository.get_db_path()):
             CompetitionRepository.setup_database()
             conn = CompetitionRepository.get_connection()
@@ -1635,7 +1636,7 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
 @app.get("/api/settings/competitions-results")
 def get_competitions_results_settings_api():
     """Retourne la configuration et l'état du batch quotidien de résultats."""
-    from infrastructure.competition_results_batch_service import CompetitionResultsBatchService
+    from services.competitions.results_batch import CompetitionResultsBatchService
     return {
         "status": "success",
         **CompetitionResultsBatchService.get_batch_status()
@@ -1645,7 +1646,7 @@ def get_competitions_results_settings_api():
 @app.post("/api/settings/competitions-results")
 def update_competitions_results_settings_api(data: Dict[str, Any] = Body(...)):
     """Met à jour l'adresse e-mail de notification des résultats."""
-    from infrastructure.competition_results_batch_service import CompetitionResultsBatchService
+    from services.competitions.results_batch import CompetitionResultsBatchService
     email = str(data.get("notification_email") or "").strip()
     if not email or "@" not in email or "." not in email:
         raise HTTPException(status_code=400, detail="Adresse e-mail de notification invalide.")
@@ -1665,7 +1666,7 @@ def update_competitions_results_settings_api(data: Dict[str, Any] = Body(...)):
 def preview_attestation_api(data: Dict[str, Any] = Body(...)):
     """Génère l'aperçu PDF d'une attestation de paiement (retourne application/pdf)."""
     try:
-        from domain.attestation import build_attestation, render_attestation_pdf, get_safe_pdf_filename
+        from domain.attestation.document import build_attestation, render_attestation_pdf, get_safe_pdf_filename
         member = data.get("member") or {}
         season = data.get("season")
         date_jour = data.get("date_jour")
@@ -1691,9 +1692,9 @@ def preview_attestation_api(data: Dict[str, Any] = Body(...)):
 def send_attestation_api(data: Dict[str, Any] = Body(...)):
     """Génère une attestation PDF en mémoire, l'envoie par e-mail et met à jour la date d'envoi."""
     try:
-        from domain.attestation import build_attestation, render_attestation_pdf, get_safe_pdf_filename
+        from domain.attestation.document import build_attestation, render_attestation_pdf, get_safe_pdf_filename
         from domain.utils import apply_template_variables
-        from infrastructure.email_repository import EmailRepository
+        from infrastructure.mail.repository import EmailRepository
 
         member = data.get("member") or {}
         season = data.get("season")
@@ -1710,7 +1711,7 @@ def send_attestation_api(data: Dict[str, Any] = Body(...)):
         filename_pdf = get_safe_pdf_filename(last_name, first_name, order_ref)
 
         template_name = (data.get("template_name") or "Attestation échéance").strip()
-        from infrastructure.email_dispatch_service import EmailDispatchService
+        from infrastructure.mail.dispatch import EmailDispatchService
         tmpl = EmailDispatchService.get_template_by_name(template_name)
 
         raw_subject = data.get("subject") or (tmpl.get("subject") if tmpl else None) or "Attestation de paiement et d'échéance - Amicale Laïque de Jonage"
@@ -1730,7 +1731,7 @@ def send_attestation_api(data: Dict[str, Any] = Body(...)):
         sender_name = data.get("sender_name") or (tmpl.get("sender_name") if tmpl else None) or "Amicale Laïque Jonage - Inscriptions"
 
         add_signature = data.get("add_signature", True)
-        from email_html import build_email_html, build_signature_plain, get_inline_images
+        from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
         # HTML built from the template, then personalised with escaped values
         html_body = apply_template_variables(
             build_email_html(raw_body, add_signature=True, image_src_mode="cid"), member, escape_html=True
@@ -1756,7 +1757,7 @@ def send_attestation_api(data: Dict[str, Any] = Body(...)):
         # (CloudDatabase.after_write synchronisera automatiquement la modification vers Firestore)
         now_str = datetime.datetime.now().strftime("%d/%m/%Y")
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             pid = member.get("purchase_id")
             SqliteRepository.update_email_sent_date(
                 order_ref=str(order_ref or "").strip(),
@@ -1786,10 +1787,10 @@ def get_presence_config():
     """Renvoie les groupes disponibles (autonomes et cours) et leurs statistiques pour l'IHM."""
     try:
         import datetime
-        from infrastructure.sqlite_repository import SqliteRepository
-        from domain.planning_groups import is_autonome_creneau
+        from infrastructure.sqlite.repository import SqliteRepository
+        from domain.members.planning_groups import is_autonome_creneau
         from domain.constants import get_active_season
-        from presence_sheet_generator import SEASON_COURSE_START, SEASON_COURSE_END
+        from exports.presence_sheets import SEASON_COURSE_START, SEASON_COURSE_END
 
         season = get_active_season()
         creneaux = SqliteRepository.load_creneaux_groups()
@@ -1904,9 +1905,9 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
     import shutil
     import tempfile
     import zipfile
-    from presence_sheet_generator import generate_presence_sheets
-    from infrastructure.sqlite_repository import SqliteRepository
-    from domain.planning_groups import is_autonome_creneau
+    from exports.presence_sheets import generate_presence_sheets
+    from infrastructure.sqlite.repository import SqliteRepository
+    from domain.members.planning_groups import is_autonome_creneau
     from domain.constants import get_active_season
 
     try:
@@ -2006,9 +2007,9 @@ def get_ffme_stats_api(season: Optional[str] = None):
     """Calcule et renvoie les statistiques de l'export fédéral FFME."""
     try:
         import datetime
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from domain.constants import get_active_season
-        from create_excel import parse_date_to_datetime, clean_digits_only
+        from exports.membership_excel import parse_date_to_datetime, clean_digits_only
 
         target_season = season or get_active_season()
         participants = SqliteRepository.load_direct_data(season_filter=target_season)
@@ -2086,9 +2087,9 @@ def export_ffme_api(season: Optional[str] = None, include_termine: bool = Query(
     import os
     import tempfile
     import datetime
-    from infrastructure.sqlite_repository import SqliteRepository
+    from infrastructure.sqlite.repository import SqliteRepository
     from domain.constants import get_active_season
-    from create_excel import generate_ffme_csv
+    from exports.membership_excel import generate_ffme_csv
 
     try:
         target_season = season or get_active_season()
@@ -2129,7 +2130,7 @@ def preview_ffme_import_api(data: Dict[str, Any] = Body(...)):
     import base64
     import tempfile
     import os
-    from infrastructure.sqlite_repository import SqliteRepository
+    from infrastructure.sqlite.repository import SqliteRepository
 
     try:
         content_b64 = data.get("content_base64") or ""
@@ -2175,7 +2176,7 @@ def apply_ffme_import_api(data: Dict[str, Any] = Body(...)):
     import base64
     import os
     import tempfile
-    from infrastructure.sqlite_repository import SqliteRepository
+    from infrastructure.sqlite.repository import SqliteRepository
     from domain.constants import get_active_season
     from paths import ROOT_DIR
 
@@ -2252,7 +2253,7 @@ def apply_ffme_import_api(data: Dict[str, Any] = Body(...)):
             except Exception as se:
                 print(f"[FFME IMPORT] Copie locale du fichier non critique : {se}")
 
-        from infrastructure.cloud_database import CloudDatabase
+        from infrastructure.firestore.cloud_database import CloudDatabase
         if CloudDatabase.is_enabled():
             CloudDatabase.after_write()
 
@@ -2272,7 +2273,7 @@ def apply_ffme_import_api(data: Dict[str, Any] = Body(...)):
 def get_season_tarifs_api(season: Optional[str] = None):
     """Retourne la liste des tarifs HelloAsso (groupes disponibles) d'une saison pour l'édition de créneau."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from domain.constants import get_active_season
         target_season = season or get_active_season()
         tarifs = SqliteRepository.get_season_tarifs(target_season)
@@ -2285,7 +2286,7 @@ def get_season_tarifs_api(season: Optional[str] = None):
 def update_member_api(data: Dict[str, Any] = Body(...)):
     """Met à jour les informations d'un adhérent (badge rouge, autonomie bloc, créneau/tarif, e-mails, téléphone)."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         user_id = data.get("user_id")
         purchase_id = data.get("purchase_id")
         order_ref = data.get("order_ref")
@@ -2322,7 +2323,7 @@ def update_member_api(data: Dict[str, Any] = Body(...)):
 def add_member_api(data: Dict[str, Any] = Body(...)):
     """Ajoute manuellement un adhérent dans la base (saison active ou saison spécifiée)."""
     try:
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from domain.constants import get_active_season
 
         fields = data.get("fields") or data
@@ -2353,7 +2354,7 @@ def add_member_api(data: Dict[str, Any] = Body(...)):
         if not success:
             return JSONResponse(status_code=400, content={"status": "error", "message": res})
 
-        from infrastructure.cloud_database import CloudDatabase
+        from infrastructure.firestore.cloud_database import CloudDatabase
         if CloudDatabase.is_enabled():
             CloudDatabase.after_write()
 
@@ -2373,8 +2374,8 @@ def add_member_api(data: Dict[str, Any] = Body(...)):
 @app.get("/api/auth/google/status")
 def get_google_auth_status():
     """Vérifie l'état de la connexion Google OAuth2 et la validité du jeton d'accès pour la BDD et Gmail."""
-    from infrastructure.google_drive_client import GoogleDriveClient
-    from infrastructure.cloud_database import CloudDatabase
+    from infrastructure.google.drive import GoogleDriveClient
+    from infrastructure.firestore.cloud_database import CloudDatabase
     
     client_id, client_secret = GoogleDriveClient.get_client_credentials()
     refresh_token = SecretStore.get_secret("GMAIL_REFRESH_TOKEN")
@@ -2415,7 +2416,7 @@ def google_auth_login(request: Request, return_to: Optional[str] = "/bureau/para
     """Initie le flux d'autorisation OAuth2 Google pour renouveler le refresh token."""
     import base64
     import urllib.parse
-    from infrastructure.google_drive_client import GoogleDriveClient
+    from infrastructure.google.drive import GoogleDriveClient
     
     client_id, _ = GoogleDriveClient.get_client_credentials(prefer_web=True)
     if not client_id:
@@ -2475,8 +2476,8 @@ def google_auth_callback(
     """Réceptionne le code d'autorisation OAuth2 de Google, échange contre le refresh_token et enregistre les identifiants."""
     import base64
     import requests
-    from infrastructure.google_drive_client import GoogleDriveClient
-    from infrastructure.cloud_database import CloudDatabase
+    from infrastructure.google.drive import GoogleDriveClient
+    from infrastructure.firestore.cloud_database import CloudDatabase
 
     def _render_page(title: str, body_html: str, return_url: str = "/bureau/parametres", auto_redirect: bool = False):
         redirect_script = f"<script>setTimeout(function() {{ window.location.href = '{return_url}'; }}, 3500);</script>" if auto_redirect else ""
@@ -2672,8 +2673,8 @@ def google_auth_callback(
 def test_google_auth():
     """Diagnostique en direct la connexion Google OAuth2, l'accès BDD et l'API Gmail."""
     import requests
-    from infrastructure.google_drive_client import GoogleDriveClient
-    from infrastructure.cloud_database import CloudDatabase
+    from infrastructure.google.drive import GoogleDriveClient
+    from infrastructure.firestore.cloud_database import CloudDatabase
     
     results = {
         "oauth_token": {"ok": False, "message": ""},
@@ -2748,8 +2749,8 @@ def test_google_auth():
 def update_google_token(data: Dict[str, Any] = Body(...)):
     """Permet à un administrateur de renseigner ou forcer un refresh token manuellement."""
     import requests
-    from infrastructure.google_drive_client import GoogleDriveClient
-    from infrastructure.cloud_database import CloudDatabase
+    from infrastructure.google.drive import GoogleDriveClient
+    from infrastructure.firestore.cloud_database import CloudDatabase
     
     refresh_token = str(data.get("refresh_token") or "").strip()
     client_id = str(data.get("client_id") or "").strip()
@@ -2821,8 +2822,8 @@ def update_google_token(data: Dict[str, Any] = Body(...)):
 def get_cloud_db_status_api():
     """Retourne l'état détaillé du cache local SQLite et de sa synchronisation Firestore."""
     try:
-        from infrastructure.cloud_database import CloudDatabase
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.firestore.cloud_database import CloudDatabase
+        from infrastructure.sqlite.repository import SqliteRepository
         enabled = CloudDatabase.is_enabled()
         st = CloudDatabase.status() if enabled else {}
         db_path = SqliteRepository.get_db_path()
@@ -2858,7 +2859,7 @@ def get_cloud_db_status_api():
 def sync_cloud_db_api(force: bool = Query(False)):
     """Force la synchronisation bilatérale entre Firestore et la base SQLite locale."""
     try:
-        from infrastructure.cloud_database import CloudDatabase
+        from infrastructure.firestore.cloud_database import CloudDatabase
         if not CloudDatabase.is_enabled():
             return {"status": "skipped", "message": "Mode Firestore non activé (MEMBER_BACKEND != firestore)."}
 

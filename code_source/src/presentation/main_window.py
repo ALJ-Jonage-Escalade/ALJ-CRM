@@ -16,7 +16,7 @@ from presentation.pages.settings import SettingsPage
 from presentation.pages.help import HelpPage
 from presentation.pages.logs import LogsPage
 from presentation.workers import SyncHelloAssoWorker, DownloadDriveFileWorker
-from infrastructure.secret_store import SecretStore
+from infrastructure.security.secret_store import SecretStore
 from domain.constants import get_active_season, APP_VERSION
 
 class MainWindow(QMainWindow):
@@ -566,7 +566,7 @@ class MainWindow(QMainWindow):
         """Base Firestore : envoi automatique des modifications (toutes les 15 s),
         réception de celles des autres postes (toutes les 2 min) et mise à jour
         du pied de page."""
-        from infrastructure.cloud_database import CloudDatabase
+        from infrastructure.firestore.cloud_database import CloudDatabase
         if not CloudDatabase.is_enabled() or getattr(self, "_cloud_timer", None):
             return
         CloudDatabase.start_background(interval=15)
@@ -630,7 +630,7 @@ class MainWindow(QMainWindow):
             )
     def update_last_sync_footer_label(self):
         """Met à jour l'étiquette de dernière sauvegarde et de dernier import de la BDD SQLite sur le Google Drive dans le pied de page."""
-        from infrastructure.cloud_database import CloudDatabase
+        from infrastructure.firestore.cloud_database import CloudDatabase
         if CloudDatabase.is_enabled():
             import datetime
             st = CloudDatabase.status()
@@ -693,9 +693,9 @@ class MainWindow(QMainWindow):
         QCoreApplication.processEvents() # Forcer l'IHM à s'afficher
         
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
-            from infrastructure.google_drive_client import GoogleDriveClient
-            from infrastructure.secret_store import SecretStore
+            from infrastructure.sqlite.repository import SqliteRepository
+            from infrastructure.google.drive import GoogleDriveClient
+            from infrastructure.security.secret_store import SecretStore
             import datetime
             
             print("\n================================================================================")
@@ -703,7 +703,7 @@ class MainWindow(QMainWindow):
             print("================================================================================")
             
             # Étape 0 : base Firestore — envoyer les dernières modifications
-            from infrastructure.cloud_database import CloudDatabase
+            from infrastructure.firestore.cloud_database import CloudDatabase
             if CloudDatabase.is_enabled():
                 progress.setLabelText("Envoi des dernières modifications vers Firestore...")
                 QCoreApplication.processEvents()

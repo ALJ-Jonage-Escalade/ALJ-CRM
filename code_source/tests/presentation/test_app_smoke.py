@@ -32,7 +32,7 @@ class TestAppSmoke(unittest.TestCase):
             cls.PYSIDE6_AVAILABLE = False
             return
 
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         cls._SqliteRepository = SqliteRepository
 
         cls._tmpdir = tempfile.mkdtemp(prefix="alj_app_smoke_test_")

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFrame, QHBoxLayout, QMessageBox
 from PySide6.QtCore import Qt
-from infrastructure.secret_store import SecretStore
+from infrastructure.security.secret_store import SecretStore
 
 class SettingsPage(QWidget):
     """
@@ -264,14 +264,14 @@ class SettingsPage(QWidget):
 
     def upload_db_to_drive(self):
         """Envoie la base locale vers Firestore (ou Drive en mode retour arrière)."""
-        from infrastructure.cloud_database import CloudDatabase
+        from infrastructure.firestore.cloud_database import CloudDatabase
         if CloudDatabase.is_enabled():
             main_win = self.window()
             if main_win and hasattr(main_win, "start_drive_upload_workflow"):
                 main_win.start_drive_upload_workflow()
             return
-        from infrastructure.sqlite_repository import SqliteRepository
-        from infrastructure.google_drive_client import GoogleDriveClient
+        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.google.drive import GoogleDriveClient
         import os
         
         db_local_path = SqliteRepository.get_db_path()
@@ -387,8 +387,8 @@ class SettingsPage(QWidget):
 
         def auth_thread():
             try:
-                import gmail_auth_helper
-                gmail_auth_helper.run_helper()
+                from infrastructure.google import gmail_auth
+                gmail_auth.run_helper()
                 # Recharger les paramètres pour afficher l'adresse e-mail mise à jour
                 self.load_settings()
             except Exception as e:
@@ -437,7 +437,7 @@ class SettingsPage(QWidget):
         self.log_msg = ["🕵️ <b>Lancement du diagnostic des services Google...</b><br>"]
         
         # Loader pour patienter
-        from infrastructure.google_drive_client import GoogleDriveClient
+        from infrastructure.google.drive import GoogleDriveClient
         import requests
         
         try:
@@ -504,7 +504,7 @@ class SettingsPage(QWidget):
     def check_local_files_status(self):
         """Vérifie la disponibilité et la lisibilité de la base SQLite locale."""
         import os
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
 
         db_status = "🔴 Introuvable"
         db_color = "#EF4444"
@@ -523,7 +523,7 @@ class SettingsPage(QWidget):
     def load_drive_filenames(self):
         """Récupère en arrière-plan les noms des bases SQLite (adhérents + compétitions) sur Google Drive."""
         import threading
-        from infrastructure.google_drive_client import GoogleDriveClient
+        from infrastructure.google.drive import GoogleDriveClient
 
         drive_keys = [k for k in ("GOOGLE_DRIVE_DB_ID", "GOOGLE_DRIVE_COMPETITION_DB_ID")
                       if k in self.filename_labels]

@@ -15,7 +15,9 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 import server
-from api import coaches, competition_members, competitions, helloasso_items, members, participants, seasons
+from api.competitions import coaches, competitions, helloasso_items, participants
+from api.competitions import members as competition_members
+from api.members import members, seasons
 from api.responses import json_with_etag
 
 SERVER_MODE = {"ALJ_API_AUTH": "off", "K_SERVICE": "alj-escalade-api"}
@@ -70,9 +72,9 @@ class TestSqliteCacheScope(unittest.TestCase):
                 patch.object(server.CloudDatabase, "is_enabled", return_value=True), \
                 patch.object(server.CloudDatabase, "ensure_fresh") as fresh, \
                 patch.object(server.CloudDatabase, "after_write") as after, \
-                patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.list_competition_docs", return_value=[]), \
-                patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.add_participant_doc", return_value=None), \
-                patch("infrastructure.competition_firestore_repository.CompetitionFirestoreRepository.get_competition_doc", return_value=None):
+                patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.list_competition_docs", return_value=[]), \
+                patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.add_participant_doc", return_value=None), \
+                patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.get_competition_doc", return_value=None):
             client.get("/api/competitions")
             client.post("/api/competitions/1/participants", json={"adherent_id": 2})
             fresh.assert_not_called()
@@ -102,14 +104,14 @@ class TestSqliteCacheScope(unittest.TestCase):
         """The cron reads the notification address and writes last_run/status in the SQLite cache."""
         r = self._assert_cache_around(
             "POST", "/api/competitions/cron/fetch-results",
-            "infrastructure.competition_results_batch_service.CompetitionResultsBatchService.run_daily_batch",
+            "services.competitions.results_batch.CompetitionResultsBatchService.run_daily_batch",
             {"status": "success"})
         self.assertEqual(r.json(), {"status": "success"})
 
     def test_check_all_paid_runs_on_refreshed_cache(self):
         r = self._assert_cache_around(
             "POST", "/api/competitions/12/check-all-paid",
-            "infrastructure.helloasso_webhook_service.HelloAssoWebhookService.check_and_notify_all_paid",
+            "infrastructure.helloasso.webhook.HelloAssoWebhookService.check_and_notify_all_paid",
             True)
         self.assertEqual(r.json(), {"status": "success", "competition_id": 12, "notified": True})
 

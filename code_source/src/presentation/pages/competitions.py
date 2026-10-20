@@ -31,7 +31,7 @@ from PySide6.QtGui import QColor
 
 from paths import ROOT_DIR
 from domain.constants import COLOR_ACTION, COLOR_SUCCESS, COLOR_WARNING, COLOR_ERROR
-from domain.competition_models import (
+from domain.competitions.models import (
     Competition,
     LIBELLES_STATUT_COMPETITION,
     LIBELLES_STATUT_PAIEMENT,
@@ -39,17 +39,17 @@ from domain.competition_models import (
     PAIEMENT_EN_ATTENTE,
     PAIEMENT_NON_INVITE,
 )
-from infrastructure.competition_firestore_repository import (
+from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as CompetitionRepository,
 )
-from domain import competition_matching
-from domain.competition_models import (
+from domain.competitions import matching as competition_matching
+from domain.competitions.models import (
     PAIEMENT_PAYE,
     PAIEMENT_STATUTS_ANNULES,
     PAIEMENT_ANNULE_PERDU,
     PAIEMENT_ANNULE_REPORTE,
 )
-from domain.planning_groups import group_for_tarif
+from domain.members.planning_groups import group_for_tarif
 from domain.utils import normalize_string
 
 # Catégorie « hors groupe » : compétiteurs dont le tarif ne correspond à aucun
@@ -75,7 +75,7 @@ class FirestoreImportWorker(QThread):
         result = {"report": {}, "message": ""}
         try:
             self.progress.emit("Connexion à Firestore...", 20)
-            from infrastructure.firestore_sync import FirestoreSyncService
+            from infrastructure.firestore.sync import FirestoreSyncService
             self.progress.emit("Import de l'ancienne base (fusion, sans écrasement)...", 60)
             report = FirestoreSyncService.import_sqlite_into_firestore()
             result["report"] = report
@@ -118,7 +118,7 @@ class AnnualHelloAssoSyncWorker(QThread):
                 return
 
             self.progress.emit("Connexion à l'API HelloAsso...", 30)
-            from helloasso_api import get_items
+            from infrastructure.helloasso.api import get_items
             items = get_items(ident["form_type"], ident["slug"]) or []
             summarized = competition_matching.summarize_items(items)
 
@@ -521,7 +521,7 @@ class ManualCorrectionDialog(QDialog):
 
     def _match_adherent_by_name(self, payer: str):
         """Retrouve un adhérent par nom + prénom (normalisés, ordre inversé accepté)."""
-        from domain.competition_matching import match_adherent_by_name
+        from domain.competitions.matching import match_adherent_by_name
         return match_adherent_by_name(payer, self._adherents())
 
     def _fill_participant_combo(self, combo, competition_id, preferred_adherent_id=None,
@@ -1373,7 +1373,7 @@ class CompetitionsPage(QWidget):
         # U11-U13…) ; les tarifs non rapprochés vont dans la catégorie « Non identifiés ».
         planning = []
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             planning = SqliteRepository.load_planning_data(log_debug=False)
         except Exception as e:
             print(f"⚠️ [COMPETITIONS] Planning indisponible pour le regroupement : {e}")
@@ -2067,7 +2067,7 @@ class CompetitionsPage(QWidget):
         out_dir = os.path.join(ROOT_DIR, "exports")
         os.makedirs(out_dir, exist_ok=True)
         path = os.path.join(out_dir, f"bilan_competitions_{season}.csv")
-        from infrastructure.spreadsheet_safety import csv_safe
+        from exports.spreadsheet_safety import csv_safe
         with open(path, "w", newline="", encoding="utf-8-sig") as f:
             writer = csv.writer(f, delimiter=";")
             writer.writerow(["Bilan des compétitions - Saison", season])

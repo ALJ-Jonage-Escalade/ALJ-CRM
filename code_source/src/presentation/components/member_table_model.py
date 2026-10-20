@@ -1,6 +1,6 @@
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from typing import List, Any
-from domain.models import Member
+from domain.members.models import Member
 
 class MemberTableModel(QAbstractTableModel):
     """

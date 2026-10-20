@@ -14,7 +14,7 @@ from PySide6.QtGui import QPixmap
 
 from paths import CODE_ROOT, ROOT_DIR
 
-from infrastructure.secret_store import SecretStore
+from infrastructure.security.secret_store import SecretStore
 
 class GeocodeWorker(QThread):
     """
@@ -35,7 +35,7 @@ class GeocodeWorker(QThread):
                 return
                 
             from geopy.geocoders import Nominatim
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             import time
             
             geolocator = Nominatim(user_agent="alj_escalade_manager_manual_geocode")
@@ -699,7 +699,7 @@ class ReportsPage(QWidget):
         """Récupère la liste des adhérents dont l'adresse est invalide ou non résolue par la carte."""
         unresolved_list = []
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             raw_data = SqliteRepository.load_direct_data()
             geocache = SqliteRepository.get_geocache()
             
@@ -896,7 +896,7 @@ class ReportsPage(QWidget):
             box.exec()
             
             if box.clickedButton() == yes_btn:
-                from infrastructure.sqlite_repository import SqliteRepository
+                from infrastructure.sqlite.repository import SqliteRepository
 
                 # Match the member by first/last name
                 parts = orig_name.split(" ", 1)
@@ -929,7 +929,7 @@ class ReportsPage(QWidget):
         """Récupère toutes les adresses en attente de géocodage et lance le worker asynchrone."""
         unresolved_addresses = []
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             raw_data = SqliteRepository.load_direct_data()
             geocache = SqliteRepository.get_geocache()
             
@@ -1009,8 +1009,8 @@ class ReportsPage(QWidget):
     def _refresh_drive_db_date(self):
         """Interroge Google Drive en arrière-plan pour afficher la date de dernière
         modification du fichier database.db hébergé sur Drive."""
-        from infrastructure.google_drive_client import GoogleDriveClient
-        from infrastructure.cloud_database import CloudDatabase
+        from infrastructure.google.drive import GoogleDriveClient
+        from infrastructure.firestore.cloud_database import CloudDatabase
         if CloudDatabase.is_enabled():
             import datetime
             st = CloudDatabase.status()

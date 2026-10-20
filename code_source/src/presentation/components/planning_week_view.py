@@ -1,7 +1,7 @@
 """
 Vue semaine du planning (graphique Qt) pour l'onglet Créneaux.
 
-Reprend la présentation de l'export Excel (planning_excel_export.py) :
+Reprend la présentation de l'export Excel (exports/planning_excel.py) :
 - grille Lundi → Samedi, 9h-22h par pas de 30 minutes, heures affichées à gauche
   ET à droite ;
 - hiérarchie des traits : séparateurs de JOURS épais noirs, lignes d'HEURES moyennes,
@@ -16,7 +16,7 @@ from PySide6.QtWidgets import QGraphicsTextItem, QGraphicsView, QGraphicsScene
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 
-from infrastructure.planning_excel_export import (
+from exports.planning_excel import (
     DAYS, GRID_START, GRID_END, STEP,
     assign_lanes, clean_group_label, encadrants_text, fill_for_item, parse_horaire,
 )

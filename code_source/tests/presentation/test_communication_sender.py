@@ -14,8 +14,8 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.sqlite_repository import SqliteRepository, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
-from infrastructure.email_repository import EmailRepository
+from infrastructure.sqlite.repository import SqliteRepository, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from infrastructure.mail.repository import EmailRepository
 
 
 def decode_from_header(raw_value: str):
@@ -150,7 +150,7 @@ class TestEmailRepositoryFrom(unittest.TestCase):
 
     def _patch_secret_store(self, secrets):
         return patch(
-            "infrastructure.email_repository.SecretStore.get_secret",
+            "infrastructure.mail.repository.SecretStore.get_secret",
             side_effect=lambda key: secrets.get(key, ""),
         )
 
@@ -168,8 +168,8 @@ class TestEmailRepositoryFrom(unittest.TestCase):
             return FakeResponse()
 
         with self._patch_secret_store(self.OAUTH_SECRETS), \
-             patch("infrastructure.google_drive_client.GoogleDriveClient.get_access_token", return_value="fake-token"), \
-             patch("infrastructure.email_repository.requests.post", side_effect=fake_post):
+             patch("infrastructure.google.drive.GoogleDriveClient.get_access_token", return_value="fake-token"), \
+             patch("infrastructure.mail.repository.requests.post", side_effect=fake_post):
             EmailRepository.send_email(
                 "dest@example.com", "Sujet", "Corps",
                 from_email="inscription@alj-escalade.fr",
@@ -197,8 +197,8 @@ class TestEmailRepositoryFrom(unittest.TestCase):
             return FakeResponse()
 
         with self._patch_secret_store(self.OAUTH_SECRETS), \
-             patch("infrastructure.google_drive_client.GoogleDriveClient.get_access_token", return_value="fake-token"), \
-             patch("infrastructure.email_repository.requests.post", side_effect=fake_post):
+             patch("infrastructure.google.drive.GoogleDriveClient.get_access_token", return_value="fake-token"), \
+             patch("infrastructure.mail.repository.requests.post", side_effect=fake_post):
             EmailRepository.send_email(
                 "dest@example.com", "Sujet", "Corps",
                 from_email="inscription@alj-escalade.fr", from_name="  "
@@ -220,8 +220,8 @@ class TestEmailRepositoryFrom(unittest.TestCase):
             return FakeResponse()
 
         with self._patch_secret_store(self.OAUTH_SECRETS), \
-             patch("infrastructure.google_drive_client.GoogleDriveClient.get_access_token", return_value="fake-token"), \
-             patch("infrastructure.email_repository.requests.post", side_effect=fake_post):
+             patch("infrastructure.google.drive.GoogleDriveClient.get_access_token", return_value="fake-token"), \
+             patch("infrastructure.mail.repository.requests.post", side_effect=fake_post):
             EmailRepository.send_email("dest@example.com", "Sujet", "Corps", from_email="   ")
 
         msg = email_lib.message_from_bytes(base64.urlsafe_b64decode(captured["payload"]["raw"]))
@@ -239,7 +239,7 @@ class TestEmailRepositoryFrom(unittest.TestCase):
         fake_server.sendmail.side_effect = fake_sendmail
 
         with self._patch_secret_store(self.SMTP_SECRETS), \
-             patch("infrastructure.email_repository.smtplib.SMTP", return_value=fake_server):
+             patch("infrastructure.mail.repository.smtplib.SMTP", return_value=fake_server):
             EmailRepository.send_email(
                 "dest@example.com", "Sujet", "Corps",
                 from_email="inscription@alj-escalade.fr",
@@ -403,7 +403,7 @@ class TestCommunicationsPageSender(TempDbTestCase):
         """L'encart liste les destinataires cochés même s'ils sont masqués par le filtre,
         et le titre alerte sur les cochés invisibles."""
         from presentation.pages.communications import CommunicationsPage
-        from infrastructure.sqlite_repository import SqliteRepository as Repo
+        from infrastructure.sqlite.repository import SqliteRepository as Repo
 
         base_member = {
             "order_ref": "99999",
@@ -460,7 +460,7 @@ class TestCommunicationsPageSender(TempDbTestCase):
         """« Tout désélectionner » décoche aussi les personnes masquées par les filtres,
         contrairement à « Décocher le filtre » qui ne touche que les visibles."""
         from presentation.pages.communications import CommunicationsPage
-        from infrastructure.sqlite_repository import SqliteRepository as Repo
+        from infrastructure.sqlite.repository import SqliteRepository as Repo
 
         base_member = {
             "order_ref": "99999",

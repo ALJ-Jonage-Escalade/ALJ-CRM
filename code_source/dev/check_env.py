@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src")))
 
 from infrastructure import runtime_env  # noqa: E402
-from infrastructure.secret_store import SecretStore  # noqa: E402  (loads the .env files like the application)
+from infrastructure.security.secret_store import SecretStore  # noqa: E402  (loads the .env files like the application)
 
 LOCAL_SMTP_HOSTS = {"localhost", "127.0.0.1", "::1"}  # also the allowed fake HelloAsso hosts
 

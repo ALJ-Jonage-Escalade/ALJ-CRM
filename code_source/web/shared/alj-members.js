@@ -1,5 +1,5 @@
 /* Display helpers of the member pages of the bureau (statuses, keys, dates, phone links).
-   The member list itself comes from the API (alj-members-sync.js, domain/member_view.py). */
+   The member list itself comes from the API (alj-members-sync.js, domain/members/view.py). */
 
 export const STATUS_MAP = {
   "processed": "Traité", "validated": "Validé", "validé": "Validé", "valide": "Validé",

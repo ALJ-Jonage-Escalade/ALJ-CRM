@@ -28,8 +28,8 @@ EVENTUALLY_TIMEOUT = 5.0   # seconds, as Playwright's expect (shortened by conft
 _WORKER = f"""
 import json, sys, traceback
 sys.path.insert(0, "src")
-from domain.competition_models import Competition
-from infrastructure.competition_firestore_repository import CompetitionFirestoreRepository as Repo
+from domain.competitions.models import Competition
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 for line in sys.stdin:
     request = json.loads(line)
     try:
@@ -134,8 +134,8 @@ class TestData:
         pushed to Firestore (crm_geocache). Run before the server starts: it uses its SQLite file."""
         return self._run("""
 import server
-from infrastructure.cloud_database import CloudDatabase
-from infrastructure.sqlite_repository import SqliteRepository
+from infrastructure.firestore.cloud_database import CloudDatabase
+from infrastructure.sqlite.repository import SqliteRepository
 
 class Collect:
     addresses = []

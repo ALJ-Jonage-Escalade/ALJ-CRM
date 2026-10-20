@@ -20,8 +20,8 @@ if _src_dir not in sys.path:
 
 from fastapi.testclient import TestClient
 
-from infrastructure import api_auth
-from infrastructure.api_auth import Role
+from infrastructure.security import api_auth
+from infrastructure.security.api_auth import Role
 from server import (
     app, get_bureau_home, get_bureau_page, get_competitions_page, get_annuaire_page,
     get_sw, get_web_version,
@@ -142,7 +142,7 @@ class TestBureauFiles(unittest.TestCase):
         update_competitions_results_settings_api({"notification_email": "david.lopez@alj-jonage.fr"})
 
         # 3. POST /api/competitions/cron/fetch-results
-        with patch("infrastructure.competition_results_batch_service.CompetitionResultsBatchService.run_daily_batch") as mock_batch:
+        with patch("services.competitions.results_batch.CompetitionResultsBatchService.run_daily_batch") as mock_batch:
             mock_batch.return_value = {
                 "status": "success",
                 "competitions_checked": 0,
@@ -179,7 +179,7 @@ class TestBureauFiles(unittest.TestCase):
         """Vérifie le calcul des statistiques et le téléchargement du fichier CSV FFME."""
         import shutil
         import tempfile
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from server import get_ffme_stats_api, export_ffme_api
 
         # Seeded temporary database: never read data/database.db (absent in CI, personal data locally).
@@ -224,7 +224,7 @@ class TestBureauFiles(unittest.TestCase):
     def test_pivot_table_configuration_and_fields(self):
         """Vérifie la présence du filtre Âge, des colonnes Statut & Sexe, et de l'exclusion par défaut d'Annulé."""
         from server import get_pivot_table
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
 
         # Fake data: attribute keys only appear in data rows, so the test must not depend on the local DB.
         fake_row = {"last_name": "Dupont", "first_name": "jean", "gender": "M", "birth_date": "2000-01-15",
@@ -353,7 +353,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_build_attestation_pure_function_rules(self):
         """build_attestation respecte les règles de montant, d'annulation, de signature et de payeur."""
-        from domain.attestation import build_attestation, get_safe_pdf_filename, render_attestation_pdf
+        from domain.attestation.document import build_attestation, get_safe_pdf_filename, render_attestation_pdf
 
         # 1. Validation montant manquant ou nul
         with self.assertRaises(ValueError):
@@ -388,7 +388,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_attestation_endpoints_require_admin_role(self):
         """Les endpoints /api/attestations exigent le rôle admin."""
-        from infrastructure.api_auth import required_role
+        from infrastructure.security.api_auth import required_role
         self.assertEqual(required_role("POST", "/api/attestations/preview"), Role.ADMIN)
         self.assertEqual(required_role("POST", "/api/attestations/send"), Role.ADMIN)
 
@@ -396,7 +396,7 @@ class TestBureauFiles(unittest.TestCase):
         """send_attestation_api enregistre la date d'envoi dans SQLite et utilise le modèle par défaut."""
         import tempfile
         import shutil
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from server import send_attestation_api
 
         temp_dir = tempfile.mkdtemp()
@@ -437,7 +437,7 @@ class TestBureauFiles(unittest.TestCase):
                 "season": "2026-2027"
             }
 
-            with patch("infrastructure.email_repository.EmailRepository.send_email", return_value=True) as mock_send:
+            with patch("infrastructure.mail.repository.EmailRepository.send_email", return_value=True) as mock_send:
                 res = send_attestation_api(payload)
 
             self.assertEqual(res.get("status"), "success")
@@ -490,7 +490,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_member_add_requires_admin_role(self):
         """Les endpoints de création manuelle d'adhérents exigent le rôle admin."""
-        from infrastructure.api_auth import required_role
+        from infrastructure.security.api_auth import required_role
         self.assertEqual(required_role("POST", "/api/members/create"), Role.ADMIN)
         self.assertEqual(required_role("POST", "/api/members/add"), Role.ADMIN)
 
@@ -498,7 +498,7 @@ class TestBureauFiles(unittest.TestCase):
         """add_member_api persiste le nouvel adhérent, la commande et l'achat dans SQLite."""
         import tempfile
         import shutil
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from server import add_member_api
 
         temp_dir = tempfile.mkdtemp()
@@ -595,14 +595,14 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_member_update_requires_admin_role(self):
         """L'endpoint /api/members/update exige le rôle admin."""
-        from infrastructure.api_auth import required_role
+        from infrastructure.security.api_auth import required_role
         self.assertEqual(required_role("POST", "/api/members/update"), Role.ADMIN)
 
     def test_member_update_endpoint_and_sqlite_persistence(self):
         """update_member_api persiste les badges, emails, téléphone et créneau dans SQLite."""
         import tempfile
         import shutil
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from server import update_member_api
 
         temp_dir = tempfile.mkdtemp()
@@ -685,8 +685,8 @@ class TestBureauFiles(unittest.TestCase):
     def test_sync_cloud_db_endpoint(self):
         """Vérifie l'endpoint POST /api/cloud-db/sync."""
         from server import sync_cloud_db_api
-        with patch("infrastructure.cloud_database.CloudDatabase.is_enabled", return_value=True):
-            with patch("infrastructure.cloud_database.CloudDatabase.sync", return_value={"status": "ok", "errors": []}):
+        with patch("infrastructure.firestore.cloud_database.CloudDatabase.is_enabled", return_value=True):
+            with patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"status": "ok", "errors": []}):
                 res = sync_cloud_db_api(force=True)
                 self.assertEqual(res.get("status"), "success")
 
@@ -773,7 +773,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_ffme_auth_roles(self):
         """Les routes de modification/import FFME exigent le rôle admin."""
-        from infrastructure.api_auth import required_role
+        from infrastructure.security.api_auth import required_role
         self.assertEqual(required_role("POST", "/api/ffme/preview"), Role.ADMIN)
         self.assertEqual(required_role("POST", "/api/ffme/import"), Role.ADMIN)
         self.assertEqual(required_role("GET", "/api/ffme/export"), Role.COACH)
@@ -784,7 +784,7 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         import pandas as pd
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from server import preview_ffme_import_api, apply_ffme_import_api
 
         temp_dir = tempfile.mkdtemp()
@@ -963,9 +963,9 @@ class TestBureauFiles(unittest.TestCase):
         self.assertIn("hasResults", html)
         self.assertIn("🏆 Résultats", html)
 
-    @patch("mycompet_scraper.fetch_and_parse_mycompet_results")
-    @patch("infrastructure.firestore_client.FirestoreClient.get_document")
-    @patch("infrastructure.firestore_client.FirestoreClient.update_fields")
+    @patch("infrastructure.mycompet.scraper.fetch_and_parse_mycompet_results")
+    @patch("infrastructure.firestore.client.FirestoreClient.get_document")
+    @patch("infrastructure.firestore.client.FirestoreClient.update_fields")
     def test_fetch_competition_results_endpoint(self, mock_update, mock_get, mock_scraper):
         mock_get.return_value = {
             "id": "comp_123",
@@ -995,7 +995,7 @@ class TestBureauFiles(unittest.TestCase):
         """Les endpoints POST et DELETE /api/email-templates modifient correctement SQLite."""
         import tempfile
         import shutil
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from server import save_email_template_api, delete_email_template_api, get_email_templates
 
         temp_dir = tempfile.mkdtemp()
@@ -1055,7 +1055,7 @@ class TestBureauFiles(unittest.TestCase):
         """GET et POST /api/whatsapp-template enregistrent et lisent le texte WhatsApp."""
         import tempfile
         import shutil
-        from infrastructure.sqlite_repository import SqliteRepository
+        from infrastructure.sqlite.repository import SqliteRepository
         from server import get_whatsapp_template_api, save_whatsapp_template_api
 
         temp_dir = tempfile.mkdtemp()
@@ -1077,7 +1077,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_email_template_write_requires_admin_role(self):
         """Les modifications de templates d'emails exigent le rôle admin."""
-        from infrastructure.api_auth import required_role
+        from infrastructure.security.api_auth import required_role
         self.assertEqual(required_role("POST", "/api/email-templates"), Role.ADMIN)
         self.assertEqual(required_role("DELETE", "/api/email-templates/Test"), Role.ADMIN)
         self.assertEqual(required_role("POST", "/api/whatsapp-template"), Role.ADMIN)

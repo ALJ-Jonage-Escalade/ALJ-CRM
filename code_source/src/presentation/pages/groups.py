@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QColor
 from paths import ROOT_DIR
-from domain.age_rules import extract_birth_years
+from domain.members.age_rules import extract_birth_years
 from infrastructure.qrcodes import get_group_qrcode
 
 class GroupsPage(QWidget):
@@ -30,7 +30,7 @@ class GroupsPage(QWidget):
     def load_all_helloasso_tarifs(self):
         """Récupère tous les tarifs HelloAsso uniques présents dans la table d'adhérents de la BDD SQLite."""
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             self.all_helloasso_tarifs = SqliteRepository.get_all_tarifs()
         except Exception as e:
             print(f"⚠️ [MAPPING_TARIF] Impossible de précharger les tarifs : {e}")
@@ -325,7 +325,7 @@ class GroupsPage(QWidget):
     def load_planning(self):
         """Charge le planning de créneaux depuis la BDD SQLite."""
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             self.planning_data = SqliteRepository.load_planning_data()
 
             self.group_planning_data()
@@ -619,7 +619,7 @@ class GroupsPage(QWidget):
         """Exporte le planning hebdomadaire en Excel (grille Lundi → Samedi, 9h-22h,
         blocs colorés par type, encadrants — initiales si la place est insuffisante)."""
         try:
-            from infrastructure.planning_excel_export import export_planning_excel
+            from exports.planning_excel import export_planning_excel
             from domain.constants import get_active_season
 
             self.flatten_groups_data()
@@ -636,7 +636,7 @@ class GroupsPage(QWidget):
     def on_export_planning_list_excel(self):
         """Exporte le planning au format liste : une ligne par créneau, comme la BDD."""
         try:
-            from infrastructure.planning_excel_export import export_planning_list_excel
+            from exports.planning_excel import export_planning_list_excel
             from domain.constants import get_active_season
 
             self.flatten_groups_data()
@@ -682,7 +682,7 @@ class GroupsPage(QWidget):
         print("🧗 [PLANNING] Enregistrement des modifications du planning...")
         print("================================================================================")
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             SqliteRepository.save_planning_data(self.planning_data)
             
             # Désactivation du téléversement individuel sur Google Drive (car cela ralentit trop l'IHM) (Nouveau !)
@@ -726,7 +726,7 @@ class GroupEditDialog(QDialog):
     def load_all_helloasso_tarifs(self):
         """Récupère l'intégralité des tarifs HelloAsso existants dans la BDD."""
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             self.all_helloasso_tarifs = SqliteRepository.get_all_tarifs()
         except Exception as e:
             print(f"⚠️ [MAPPING_TARIF] Impossible de charger les tarifs : {e}")
@@ -1181,7 +1181,7 @@ class SlotEditDialog(QDialog):
     def load_members_as_animators(self):
         """Charge l'intégralité des adhérents de la base SQLite active pour alimenter le menu de recherche pour la saison active (2026-2027)."""
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             SqliteRepository.setup_database()
             all_members = SqliteRepository.load_direct_data(season_filter="2026-2027")
             

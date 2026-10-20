@@ -22,8 +22,8 @@ if _src_dir not in sys.path:
 from fastapi.testclient import TestClient
 
 from infrastructure import runtime_env
-from infrastructure.cloud_database import RestStore
-from infrastructure.firestore_client import FirestoreClient
+from infrastructure.firestore.cloud_database import RestStore
+from infrastructure.firestore.client import FirestoreClient
 
 DEV_ENV = {
     "ALJ_ENV": "dev",
@@ -96,7 +96,7 @@ class TestDevMode(unittest.TestCase):
                     runtime_env.validate()
 
     def test_helloasso_redirected_to_fake(self):
-        import helloasso_api
+        from infrastructure.helloasso import api as helloasso_api
         with _env(**DEV_ENV, **FAKE_HELLOASSO), \
                 patch.object(helloasso_api, "CLIENT_ID", "id"), patch.object(helloasso_api, "CLIENT_SECRET", "secret"), \
                 patch.object(helloasso_api.requests, "post") as post, patch.object(helloasso_api.requests, "get") as get:

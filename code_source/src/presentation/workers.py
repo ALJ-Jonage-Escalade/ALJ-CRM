@@ -3,10 +3,10 @@ import glob
 import datetime
 from PySide6.QtCore import QThread, Signal
 
-from domain.models import Member
+from domain.members.models import Member
 from paths import ROOT_DIR
-from infrastructure.google_drive_client import GoogleDriveClient
-from infrastructure.email_repository import EmailRepository
+from infrastructure.google.drive import GoogleDriveClient
+from infrastructure.mail.repository import EmailRepository
 from infrastructure.qrcodes import get_group_qrcode
 
 class SyncHelloAssoWorker(QThread):
@@ -26,7 +26,7 @@ class SyncHelloAssoWorker(QThread):
             self.progress.emit("Démarrage de la synchronisation HelloAsso...", 10)
             self.progress.emit("Synchronisation Firestore et intégration en arrière-plan...", 50)
             
-            from create_excel import update_membership_excel
+            from exports.membership_excel import update_membership_excel
             success, new_participants, result = update_membership_excel()
             
             if success:
@@ -62,8 +62,8 @@ class SyncHelloAssoWorker(QThread):
                 planning_data = []
                 age_rules_ok = True
                 try:
-                    from infrastructure.sqlite_repository import SqliteRepository
-                    from domain.age_rules import check_age_conflict, find_planning_item_for_tarif
+                    from infrastructure.sqlite.repository import SqliteRepository
+                    from domain.members.age_rules import check_age_conflict, find_planning_item_for_tarif
                     planning_data = SqliteRepository.load_planning_data(log_debug=False)
                 except Exception as ac_err:
                     print(f"⚠️ [SYNC_WORKER] Contrôle d'âge impossible : {ac_err}")
@@ -138,7 +138,7 @@ class GenerateAttestationsWorker(QThread):
                 raw_data = self.members
             else:
                 self.progress.emit("Chargement des adhérents depuis la base SQLite...", 30)
-                from infrastructure.sqlite_repository import SqliteRepository
+                from infrastructure.sqlite.repository import SqliteRepository
                 raw_data = SqliteRepository.load_direct_data()
             
             self.progress.emit("Lancement de la fusion Word et conversion PDF en arrière-plan...", 50)
@@ -209,7 +209,7 @@ class SendEmailCampaignWorker(QThread):
         # 1. Charger le planning depuis SQLite pour récupérer les liens WhatsApp associés aux créneaux
         planning_data = []
         try:
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             planning_data = SqliteRepository.load_planning_data()
         except Exception as pe:
             print(f"⚠️ [EMAIL_WORKER] Impossible de charger le planning depuis SQLite : {pe}")
@@ -243,7 +243,7 @@ class SendEmailCampaignWorker(QThread):
             pdf_path = None
             if self.attach_pdf:
                 # 1. Vérifier si l'attestation PDF existe
-                from attestation_generator import get_safe_filename
+                from exports.attestation_word import get_safe_filename
                 filename_docx = get_safe_filename(m.user_last_name, m.user_first_name, m.order_ref)
                 filename_pdf = filename_docx.replace(".docx", ".pdf")
                 pdf_path = os.path.join(ROOT_DIR, "exports", "attestation", filename_pdf)
@@ -296,7 +296,7 @@ class SendEmailCampaignWorker(QThread):
                             
                     # 2.2 Si aucune correspondance configurée, utiliser le rapprochement sémantique d'origine
                     if not found_item:
-                        from presence_sheet_generator import find_planning_match_dynamically
+                        from exports.presence_sheets import find_planning_match_dynamically
                         match_info = find_planning_match_dynamically(m.tarif_name, planning_data)
                         if match_info:
                             # Retrouver le créneau réel du planning qui correspond au groupe trouvé par l'algorithme sémantique
@@ -361,7 +361,7 @@ class SendEmailCampaignWorker(QThread):
                     attachments.append(qr_path)
 
                 # 4. Préparer les versions texte brut et HTML (avec signature du club optionnelle)
-                from email_html import build_email_html, build_signature_plain, get_inline_images
+                from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
                 plain_body = msg_body
                 html_body = apply_template_variables(
                     build_email_html(html_template, add_signature=self.add_signature, image_src_mode="cid"),
@@ -387,7 +387,7 @@ class SendEmailCampaignWorker(QThread):
                 # Enregistrer la date d'envoi d'e-mail directement dans SQLite
                 try:
                     now_str = datetime.datetime.now().strftime("%d/%m/%Y")
-                    from infrastructure.sqlite_repository import SqliteRepository
+                    from infrastructure.sqlite.repository import SqliteRepository
                     SqliteRepository.update_email_sent_date(
                         order_ref=m.order_ref,
                         last_name=m.user_last_name,
@@ -489,12 +489,12 @@ class ExportWorker(QThread):
             
             # Ne pas brider les autres types d'exports s'ils ont besoin d'autres saisons, mais par défaut on prend raw_data
             self.progress.emit("Chargement des adhérents depuis la base SQLite...", 30)
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             raw_data = SqliteRepository.load_direct_data(season_filter="2026-2027")
             
             if self.export_type == "ffme":
                 self.progress.emit("Génération du fichier CSV d'import FFME...", 60)
-                from create_excel import generate_ffme_csv
+                from exports.membership_excel import generate_ffme_csv
                 ignored_members = generate_ffme_csv(raw_data)
                 
                 # S'il y a des ignorés, les afficher de manière très visible dans les logs de la console
@@ -514,7 +514,7 @@ class ExportWorker(QThread):
                 
             elif self.export_type == "presence":
                 self.progress.emit("Génération des fiches de présence d'activité...", 50)
-                from presence_sheet_generator import generate_presence_sheets
+                from exports.presence_sheets import generate_presence_sheets
                 
                 # Utiliser les groupes sélectionnés par l'utilisateur ou charger tous les groupes par défaut
                 groups_to_gen = self.selected_groups
@@ -572,7 +572,7 @@ class ExportWorker(QThread):
                 
                 dest_file = os.path.join(ROOT_DIR, "exports", "Anciens_Adherents_Non_Reinscrits.xlsx")
                 os.makedirs(os.path.dirname(dest_file), exist_ok=True)
-                from infrastructure.spreadsheet_safety import safe_to_excel
+                from exports.spreadsheet_safety import safe_to_excel
                 safe_to_excel(df, dest_file, index=False)  # member data must never become a formula
                 
                 self.progress.emit("Liste des anciens adhérents exportée avec succès !", 100)
@@ -580,7 +580,7 @@ class ExportWorker(QThread):
                     
             elif self.export_type == "urgency":
                 self.progress.emit("Génération du cahier des contacts d'urgence (A4)...", 60)
-                from urgency_contact_generator import generate_urgency_contacts_sheet
+                from exports.emergency_contacts import generate_urgency_contacts_sheet
                 success, filename = generate_urgency_contacts_sheet(raw_data)
                 if success:
                     file_path = os.path.join(ROOT_DIR, "exports", filename)
@@ -591,7 +591,7 @@ class ExportWorker(QThread):
                     
             elif self.export_type == "mycompet":
                 self.progress.emit("Lancement du scraper de résultats MyCompet...", 40)
-                from mycompet_scraper import scrape_mycompet
+                from infrastructure.mycompet.scraper import scrape_mycompet
                 try:
                     excel_path = scrape_mycompet(progress_callback=self.progress.emit)
                     self.progress.emit("Résultats de compétition MyCompet exportés avec succès !", 100)
@@ -601,7 +601,7 @@ class ExportWorker(QThread):
                     
             elif self.export_type == "cours":
                 self.progress.emit("Alimentation et rapprochement automatique du tableur Cours.xlsx...", 50)
-                from fill_presence_cours import main as fill_cours_main
+                from exports.presence_cours import main as fill_cours_main
                 stats = fill_cours_main()
                 
                 # Compiler le résumé statistique
@@ -672,11 +672,11 @@ class DownloadDriveFileWorker(QThread):
 
     def run(self):
         try:
-            from infrastructure.secret_store import SecretStore
-            from infrastructure.sqlite_repository import SqliteRepository
-            from infrastructure.google_drive_client import GoogleDriveClient
+            from infrastructure.security.secret_store import SecretStore
+            from infrastructure.sqlite.repository import SqliteRepository
+            from infrastructure.google.drive import GoogleDriveClient
             
-            from infrastructure.cloud_database import CloudDatabase
+            from infrastructure.firestore.cloud_database import CloudDatabase
             if CloudDatabase.is_enabled():
                 self.progress.emit("Synchronisation avec Firestore...", 30)
                 report = CloudDatabase.sync(progress=lambda m: self.progress.emit(m, 60))
@@ -699,7 +699,7 @@ class DownloadDriveFileWorker(QThread):
             if not db_drive_id and excel_drive_id:
                 self.progress.emit("Première utilisation : Migration automatique de l'Excel vers SQLite...", 40)
                 try:
-                    from migrate_excel_to_db import run_migration
+                    from infrastructure.sqlite.migrations.migrate_excel_to_db import run_migration
                     run_migration()
                     db_drive_id = SecretStore.get_secret("GOOGLE_DRIVE_DB_ID")
                 except Exception as me:
@@ -730,9 +730,9 @@ class LocalDataLoaderWorker(QThread):
 
     def run(self):
         try:
-            from infrastructure.secret_store import SecretStore
-            from infrastructure.sqlite_repository import SqliteRepository
-            from infrastructure.google_drive_client import GoogleDriveClient
+            from infrastructure.security.secret_store import SecretStore
+            from infrastructure.sqlite.repository import SqliteRepository
+            from infrastructure.google.drive import GoogleDriveClient
             import os
             
             self.progress.emit("Initialisation de la base SQLite...", 10)
@@ -744,7 +744,7 @@ class LocalDataLoaderWorker(QThread):
             # Vérifier si la base SQLite locale existe déjà
             db_exists = os.path.exists(db_local_path)
 
-            from infrastructure.cloud_database import CloudDatabase
+            from infrastructure.firestore.cloud_database import CloudDatabase
             if CloudDatabase.is_enabled():
                 # Base principale dans Firestore : mise à jour du cache local
                 # (chargement complet au premier lancement, puis incrémental).
@@ -773,7 +773,7 @@ class LocalDataLoaderWorker(QThread):
                 elif excel_drive_id:
                     self.progress.emit("Base vide détectée, migration de l'Excel de référence vers SQLite...", 25)
                     try:
-                        from migrate_excel_to_db import run_migration
+                        from infrastructure.sqlite.migrations.migrate_excel_to_db import run_migration
                         run_migration()
                         db_drive_id = SecretStore.get_secret("GOOGLE_DRIVE_DB_ID")
                         if db_drive_id:
@@ -856,7 +856,7 @@ class FFMEMergeWorker(QThread):
             
             self.progress.emit("Rapprochement automatique avec la base de données locale...", 60)
             
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             prep = SqliteRepository.prepare_ffme_licensees(dest_path)
             stats = prep["stats"]
 
@@ -897,7 +897,7 @@ class FFMEMergeWorker(QThread):
                 self.finished.emit(False, stats)
             else:
                 # Téléverser automatiquement la base SQLite mise à jour vers le Google Drive
-                from infrastructure.secret_store import SecretStore
+                from infrastructure.security.secret_store import SecretStore
                 db_drive_id = SecretStore.get_secret("GOOGLE_DRIVE_DB_ID")
                 if db_drive_id:
                     self.progress.emit("Synchronisation de la base avec Firestore...", 85)
@@ -929,7 +929,7 @@ class AutonomesMergeWorker(QThread):
 
             import shutil
             from paths import ROOT_DIR
-            from infrastructure.google_drive_client import GoogleDriveClient
+            from infrastructure.google.drive import GoogleDriveClient
 
             # Définir le dossier de destination relative au ROOT_DIR
             dest_dir = os.path.join(ROOT_DIR, "import", "badge rouge")
@@ -946,7 +946,7 @@ class AutonomesMergeWorker(QThread):
 
             self.progress.emit("Lancement de la fusion avec la base de données locale...", 60)
 
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             stats = SqliteRepository.merge_autonomes_data(dest_path)
 
             if stats.get("errors"):
@@ -954,7 +954,7 @@ class AutonomesMergeWorker(QThread):
                 self.finished.emit(False, stats)
             else:
                 # Téléverser automatiquement la base SQLite mise à jour vers le Google Drive
-                from infrastructure.secret_store import SecretStore
+                from infrastructure.security.secret_store import SecretStore
                 db_drive_id = SecretStore.get_secret("GOOGLE_DRIVE_DB_ID")
                 if db_drive_id:
                     self.progress.emit("Synchronisation de la base avec Firestore...", 85)
@@ -978,12 +978,12 @@ class UploadDriveFileWorker(QThread):
 
     def run(self):
         try:
-            from infrastructure.secret_store import SecretStore
-            from infrastructure.sqlite_repository import SqliteRepository
-            from infrastructure.google_drive_client import GoogleDriveClient
+            from infrastructure.security.secret_store import SecretStore
+            from infrastructure.sqlite.repository import SqliteRepository
+            from infrastructure.google.drive import GoogleDriveClient
             import os
             
-            from infrastructure.cloud_database import CloudDatabase
+            from infrastructure.firestore.cloud_database import CloudDatabase
             if CloudDatabase.is_enabled():
                 self.progress.emit("Envoi des modifications vers Firestore...", 30)
                 report = CloudDatabase.sync(progress=lambda m: self.progress.emit(m, 60))
@@ -1040,8 +1040,8 @@ class SyncGmailContactsWorker(QThread):
         try:
             self.progress.emit("Initialisation de la synchronisation des contacts...", 10)
             
-            from infrastructure.sqlite_repository import SqliteRepository
-            from infrastructure.google_contacts_client import GoogleContactsClient
+            from infrastructure.sqlite.repository import SqliteRepository
+            from infrastructure.google.contacts import GoogleContactsClient
             from domain.constants import get_active_season
             
             season = get_active_season()
@@ -1200,7 +1200,7 @@ class SaisonMergeWorker(QThread):
 
             self.progress.emit(f"Lancement de l'importateur multi-saisons SQLite pour la saison {self.season_name}...", 60)
 
-            from infrastructure.sqlite_repository import SqliteRepository
+            from infrastructure.sqlite.repository import SqliteRepository
             stats = SqliteRepository.import_old_season_ffme(dest_path, self.season_name)
 
             if stats.get("errors"):
@@ -1208,8 +1208,8 @@ class SaisonMergeWorker(QThread):
                 self.finished.emit(False, stats)
             else:
                 # Téléverser automatiquement la base SQLite mise à jour vers le Google Drive
-                from infrastructure.secret_store import SecretStore
-                from infrastructure.google_drive_client import GoogleDriveClient
+                from infrastructure.security.secret_store import SecretStore
+                from infrastructure.google.drive import GoogleDriveClient
                 db_drive_id = SecretStore.get_secret("GOOGLE_DRIVE_DB_ID")
                 if db_drive_id:
                     self.progress.emit("Synchronisation de la base avec Firestore...", 85)
