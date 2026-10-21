@@ -1,7 +1,8 @@
 # AGENTS.md — ALJ-CRM
 
-Membership management for the climbing section of the Amicale Laïque de Jonage: a Windows desktop client (PySide6)
-and a web app (FastAPI + PWA) on Google Cloud Run, with data in Firestore.
+Membership management for the climbing section of the Amicale Laïque de Jonage: a web app (FastAPI + PWA) on
+Google Cloud Run, with data in Firestore. (The former Windows desktop client was removed; see
+`documentations/desktop_features_missing_in_web.md`.)
 User docs: `README.md` · Architecture: `documentations/ARCHITECTURE.md` · Local dev stack: `code_source/dev/README.md`.
 Python conventions (lint, typing, tests): `code_source/AGENTS.md`.
 
@@ -22,8 +23,7 @@ docker compose -f dev/docker-compose.yml down     # stop (emulator data kept in 
 
 ## Checks (same as CI)
 - all: `uv lock --check && uv run python dev/export_requirements.py --check && uv run ruff check src tests && uv run mypy && uv run pytest tests`
-- unit tests without Qt: `uv run pytest tests --ignore=tests/presentation`
-- Qt tests: `QT_QPA_PLATFORM=offscreen uv run pytest tests/presentation/<file>.py`, one file per process
+- unit tests: `uv sync --group web && uv run pytest tests` (the `web` group brings WeasyPrint/pydyf, needed by the attestation tests; WeasyPrint needs Pango, see `README.md`)
 - e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker; see `dev/README.md`)
 
 ## Deployment — production, ask before running
@@ -40,7 +40,7 @@ Run from `code_source/` (the script always uploads `code_source/`); Windows scri
 - Never commit personal data (databases, exports, `tests/fixtures/`): members' health, emergency contacts, minors (GDPR)
 - Never point dev tools at production: dev mode only works against the `demo-alj` emulator project
 - Put throwaway diagnostic scripts (`check_*`, `query_*`, ad-hoc queries) in `scripts_temporaires/` at the repo root (git-ignored), never in `code_source/`
-- Versioning: bump `APP_VERSION` in `src/domain/constants.py` and `code_source/VERSION` together on every functional change (release CI checks tag == `VERSION` == `APP_VERSION`; the `pyproject.toml` version is not used)
+- Versioning: bump `APP_VERSION` in `src/domain/constants.py` and `code_source/VERSION` together on every functional change (`tests/test_cloud_run_lot4.py` checks `VERSION` == `APP_VERSION`; the `pyproject.toml` version is not used)
 
 ## Data & domain rules
 - Firestore is the source of truth (`crm_<table>` collections); `database.db` is a SQLite cache rebuilt from it (`infrastructure/firestore/cloud_database.py`). Write routes must go through `SqliteRepository` so changes are replicated

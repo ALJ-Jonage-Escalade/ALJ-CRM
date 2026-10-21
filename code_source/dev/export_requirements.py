@@ -1,7 +1,7 @@
 """Régénère (ou vérifie) les requirements*.txt à partir de uv.lock.
 
-uv.lock est la source de vérité. Les requirements*.txt restent versionnés car le client
-lourd les consomme avec pip (runtime Python embarqué du paquet portable, updater, install.bat).
+uv.lock est la source de vérité. Les requirements*.txt restent versionnés pour les installations
+sans uv (pip) : image e2e, postes de développement.
 
     python dev/export_requirements.py            # réécrit les fichiers
     python dev/export_requirements.py --check    # échoue si un fichier est périmé (CI)
@@ -15,7 +15,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # code_sourc
 # fichier -> arguments de `uv export` (la sortie est toujours sans hash : parité avec l'existant,
 # pip passerait sinon en mode strict --require-hashes)
 TARGETS = {
-    "requirements.txt": ["--no-dev", "--group", "desktop"],
     "requirements-docker.txt": ["--no-dev", "--group", "web"],
     "requirements-dev.txt": ["--only-dev"],
 }

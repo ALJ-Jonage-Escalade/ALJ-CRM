@@ -1,4 +1,4 @@
-"""Mobile app without network (docs/plan_api_only_front.md, phase 5): the last data received is kept
+"""Mobile app without network (documentations/plan_api_only_front.md, phase 5): the last data received is kept
 in IndexedDB (web/shared/alj-store.js). Competitors' emergency contacts are kept for coaches only, and
 the store is wiped on logout. Offline, only « Participe » can be changed (5b): kept in the outbox and
 sent when the network comes back, refused if the participant changed meanwhile.

@@ -3,7 +3,7 @@
 Front + API + Firestore en local, sur l'**émulateur Firebase** (Auth + Firestore) du projet
 fictif `demo-alj`, avec des **données fictives** (univers Harry Potter). Aucun accès possible
 aux données de production : un projet `demo-*` n'existe pas chez Google et le serveur refuse
-le mode dev sur Cloud Run. Détails et architecture : `ARCHITECTURE.md` §7.
+le mode dev sur Cloud Run. Détails et architecture : `documentations/ARCHITECTURE.md` §7.
 
 ## Démarrage
 
@@ -94,7 +94,7 @@ python -m pytest -c e2e/pytest.ini e2e -m smoke      # rapide ; sans -m : toute 
   y charge ses propres paiements (`fake_helloasso.set([item(...)])`), le webhook est appelé avec
   `HELLOASSO_WEBHOOK_TOKEN`.
 - Bugs connus : tests marqués `xfail(strict=True)` avec la référence du bug (ex. A6 de
-  `docs/plan_api_only_front.md`). Ils échouent (XPASS) dès que le bug est corrigé : retirer alors le marqueur.
+  `documentations/plan_api_only_front.md`). Ils échouent (XPASS) dès que le bug est corrigé : retirer alors le marqueur.
 - Déboguer : `-n 0 --headed --slowmo 300`, ou `--tracing retain-on-failure` puis
   `python -m playwright show-trace e2e-results/<test>/trace.zip`. Journaux de la pile, du serveur et du seed :
   `test-results/stack.log`, `test-results/server.log` (`e2e-results/` avec `--output e2e-results`, comme la CI).

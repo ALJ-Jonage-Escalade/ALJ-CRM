@@ -17,15 +17,6 @@ dependencies = [
 ]
 
 [dependency-groups]
-# Client lourd Windows (Qt, Word COM, trousseau). Exclu de l'image Cloud Run.
-desktop = [
-    "PySide6==6.11.1",
-    "pywin32==312; sys_platform == 'win32'",
-    "python-docx==1.2.0",
-    "keyring==25.7.0",
-    # Repli PDF pur Python pour les attestations quand WeasyPrint/Pango est indisponible (Windows)
-    "pydyf==0.12.1",
-]
 # Génération des attestations PDF sur Cloud Run (nécessite Pango côté système).
 web = ["weasyprint==70.0"]
 dev = [
@@ -65,10 +56,6 @@ ignore = [
     "F841",  # variables locales assignées non relues (récupération de boutons Qt, styles)
     "E402",  # imports après configuration sys.path (structure des entry points du projet)
 ]
-
-[tool.ruff.lint.per-file-ignores]
-# Les workers/pages émettent des print() redirigés vers le log applicatif.
-"src/app.py" = ["E402"]
 
 [tool.mypy]
 ignore_missing_imports = true

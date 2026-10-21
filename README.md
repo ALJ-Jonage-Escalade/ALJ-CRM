@@ -1,7 +1,9 @@
 # ALJ-CRM
 
-Gestion des adhésions de la section Escalade de l'Amicale Laïque de Jonage : client lourd Windows (PySide6)
-et application web (FastAPI + PWA) sur Google Cloud Run, données dans Firestore.
+Gestion des adhésions de la section Escalade de l'Amicale Laïque de Jonage : application web (FastAPI + PWA)
+sur Google Cloud Run, données dans Firestore. L'ancien client lourd Windows a été retiré ; les fonctions qui
+n'existent pas encore sur le web sont listées dans
+[documentations/desktop_features_missing_in_web.md](documentations/desktop_features_missing_in_web.md).
 Architecture détaillée : [documentations/ARCHITECTURE.md](documentations/ARCHITECTURE.md).
 
 ## Lancer l'application en mode dev local
@@ -20,13 +22,13 @@ uv sync --group web          # crée .venv/ aux versions exactes de uv.lock (pro
 
 Toutes les commandes Python se lancent ensuite avec `uv run <commande>` (inutile d'activer le venv).
 
-`uv sync --group desktop` ajoute le client lourd (PySide6, pywin32…). Sans uv, `pip install -r requirements-docker.txt
--r requirements-dev.txt` reste possible : ces fichiers sont générés à partir de `uv.lock`.
+Sans uv, `pip install -r requirements-docker.txt -r requirements-dev.txt` reste possible : ces fichiers sont générés
+à partir de `uv.lock`.
 
 ### Gérer les dépendances
 
 `pyproject.toml` (+ `uv.lock`) fait foi. Les `requirements*.txt` sont **générés** : ne pas les éditer à la main
-(le client lourd les consomme avec pip, le CI vérifie qu'ils sont à jour).
+(installations pip, tests e2e ; le CI vérifie qu'ils sont à jour).
 
 ```bash
 cd code_source
@@ -84,21 +86,17 @@ dans le bon répertoire de travail.
 
 | Script | Rôle |
 |---|---|
-| `scripts/install.bat` | Installation (venv à la racine, dépendances, raccourci bureau) |
 | `scripts/lancer_site_web.bat` | Serveur web local → http://127.0.0.1:8000/bureau/ |
 | `scripts/deploy_cloud_run.bat` | Déploiement en production (appelle `code_source/scripts/deploy_cloud_run.bat`) |
 | `scripts/backup_projet.ps1` | Sauvegarde ZIP du projet (`.\scripts\backup_projet.ps1 [-Destination E:\]`) |
-| `code_source/scripts/install.bat` | Installation (venv dans `code_source/`, dépendances, raccourci bureau) |
-| `code_source/scripts/run_app.bat`, `Lancer_ALJ.vbs` | Client lourd (le `.vbs` lance sans console) |
 | `code_source/scripts/lancer_site_web.bat` | Serveur web local |
-| `code_source/scripts/run_batch_resultats.bat` | Batch quotidien des résultats MyCompet (planifié par `installer/creer_tache_resultats_07h.ps1`) |
 | `code_source/scripts/deploy_cloud_run.sh` / `.bat` | Déploiement Cloud Run (voir plus bas) |
 
 ## Tests
 
 ```bash
 cd code_source
-uv run pytest tests --ignore=tests/presentation   # voir .github/workflows pour la liste de la CI
+uv run pytest tests                               # après uv sync --group web (comme la CI)
 uv run ruff check src tests
 uv run mypy                                       # fichiers listés dans [tool.mypy] de pyproject.toml
 ```

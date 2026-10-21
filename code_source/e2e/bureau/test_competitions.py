@@ -18,7 +18,7 @@ from helpers.data import eventually, unique_name
 from helpers.mobile import SEEDED_COMPETITION, accept_dialogs
 
 PAST_SEEDED = "Diagon Alley Bouldering Cup"
-# Known bug A6 (docs/plan_api_only_front.md, appendix A): this page reads the `adherents` projection
+# Known bug A6 (documentations/plan_api_only_front.md, appendix A): this page reads the `adherents` projection
 # with the wrong field names (last_name/first_name/email_primary instead of nom/prenom/email), so
 # member search and e-mail recipients come back empty. Fixed by the API rewrite of the page:
 # strict, so these tests fail (XPASS) once the fix is merged, as a reminder to drop the marker.

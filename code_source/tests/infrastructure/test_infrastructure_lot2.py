@@ -2,7 +2,6 @@ import os
 import sys
 import unittest
 import json
-import datetime
 
 # Ajustement du chemin pour importer les modules depuis 'src'
 _test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -12,7 +11,6 @@ if _src_dir not in sys.path:
 
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.mail.repository import EmailRepository
-from infrastructure.excel_repository import ExcelRepository
 from infrastructure.sqlite.repository import SqliteRepository
 
 class TestInfrastructureLot2(unittest.TestCase):
@@ -159,25 +157,6 @@ class TestInfrastructureLot2(unittest.TestCase):
             os.remove(EmailRepository.AUDIT_FILE_PATH)
         except Exception:
             pass
-
-    def test_excel_repository_sanitization(self):
-        """Vérifie le nettoyage et la conversion des valeurs complexes pour Excel."""
-        input_data = [
-            [None, "Normal String", 123.45, ["val1", "val2"]],
-            [float("nan"), {"key": "val"}, datetime.date(2026, 8, 8), True]
-        ]
-        sanitized = ExcelRepository.sanitize_for_excel(input_data)
-        
-        # Ligne 1
-        self.assertEqual(sanitized[0][0], "")
-        self.assertEqual(sanitized[0][1], "Normal String")
-        self.assertEqual(sanitized[0][2], 123.45)
-        self.assertEqual(sanitized[0][3], "val1, val2")
-        
-        # Ligne 2
-        self.assertEqual(sanitized[1][0], "")
-        self.assertEqual(sanitized[1][1], '{"key": "val"}')
-        self.assertEqual(sanitized[1][3], True)
 
     def test_merge_ffme_licensees(self):
         """Vérifie l'importation et la fusion de la liste FFME avec la BDD locale."""
@@ -354,134 +333,6 @@ class TestInfrastructureLot2(unittest.TestCase):
                     os.remove(test_excel_path)
                 except Exception:
                     pass
-
-    def test_google_contacts_client_methods(self):
-        """Vérifie le fonctionnement du GoogleContactsClient en mockant les requêtes HTTP."""
-        from unittest.mock import patch, MagicMock
-        from infrastructure.google.contacts import GoogleContactsClient
-        
-        # Mocker l'access token
-        with patch("infrastructure.google.contacts.GoogleContactsClient.get_access_token", return_value="mock_access_token"):
-            
-            # 1. Tester get_or_create_group (quand le groupe existe déjà)
-            mock_res_get = MagicMock()
-            mock_res_get.status_code = 200
-            mock_res_get.json.return_value = {
-                "contactGroups": [
-                    {"formattedName": "2027 Loisir Collège", "resourceName": "contactGroups/12345"}
-                ]
-            }
-            
-            with patch("requests.get", return_value=mock_res_get):
-                group_res = GoogleContactsClient.get_or_create_group("2027 Loisir Collège")
-                self.assertEqual(group_res, "contactGroups/12345")
-                
-            # 2. Tester get_or_create_group (quand le groupe doit être créé)
-            mock_res_empty = MagicMock()
-            mock_res_empty.status_code = 200
-            mock_res_empty.json.return_value = {"contactGroups": []}
-            
-            mock_res_post = MagicMock()
-            mock_res_post.status_code = 200
-            mock_res_post.json.return_value = {"resourceName": "contactGroups/67890"}
-            
-            with patch("requests.get", return_value=mock_res_empty), patch("requests.post", return_value=mock_res_post):
-                group_res = GoogleContactsClient.get_or_create_group("Nouveau Groupe 2027")
-                self.assertEqual(group_res, "contactGroups/67890")
-                
-            # 3. Tester find_contact_by_email
-            mock_res_search = MagicMock()
-            mock_res_search.status_code = 200
-            mock_res_search.json.return_value = {
-                "results": [
-                    {
-                        "person": {
-                            "resourceName": "people/c777888",
-                            "emailAddresses": [{"value": "martin@test.com"}]
-                        }
-                    }
-                ]
-            }
-            with patch("requests.get", return_value=mock_res_search):
-                contact_res = GoogleContactsClient.find_contact_by_email("martin@test.com")
-                self.assertEqual(contact_res, "people/c777888")
-                
-            # 4. Tester create_contact
-            mock_res_create = MagicMock()
-            mock_res_create.status_code = 200
-            mock_res_create.json.return_value = {"resourceName": "people/c999"}
-            with patch("requests.post", return_value=mock_res_create):
-                new_contact_res = GoogleContactsClient.create_contact("Jean", "Dupont", "jean@dupont.com", "0600000000")
-                self.assertEqual(new_contact_res, "people/c999")
-                
-            # 5. Tester add_members_to_group
-            mock_res_modify = MagicMock()
-            mock_res_modify.status_code = 200
-            with patch("requests.post", return_value=mock_res_modify):
-                success = GoogleContactsClient.add_members_to_group("contactGroups/123", ["people/c1", "people/c2"])
-                self.assertTrue(success)
-
-    def test_gmail_contacts_virtual_groups(self):
-        """Vérifie le filtrage correct des adhérents pour les groupes virtuels Adhérent et Compétition."""
-        from unittest.mock import patch
-        from presentation.workers import SyncGmailContactsWorker
-        SqliteRepository.setup_database()
-        
-        # Mocker le client Google Contacts pour éviter les requêtes API
-        with patch("infrastructure.google.contacts.GoogleContactsClient.get_or_create_group", return_value="contactGroups/123"), \
-             patch("infrastructure.google.contacts.GoogleContactsClient.find_contact_by_email", return_value="people/c1"), \
-             patch("infrastructure.google.contacts.GoogleContactsClient.add_members_to_group", return_value=True):
-             
-            # Nettoyer la table adherents pour s'assurer du nombre exact d'adhérents de test (évite l'héritage d'autres tests)
-            conn = SqliteRepository.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM purchase_options")
-            cursor.execute("DELETE FROM purchases")
-            cursor.execute("DELETE FROM orders")
-            cursor.execute("DELETE FROM users")
-            conn.commit()
-            conn.close()
-
-            # 1. Insérer un adhérent normal et un compétiteur
-            m1 = {
-                "order_ref": "UNIQUE-ORD-991",
-                "user_lastName": "MARTINEZ_TEST",
-                "user_firstName": "Carlos",
-                "payer_email": "carlos@test.com",
-                "champ_Adresse mail pour la réception des informations du club": "carlos@test.com",
-                "tarif_name": "Loisir Collège"
-            }
-            m2 = {
-                "order_ref": "UNIQUE-ORD-992",
-                "user_lastName": "DUBOIS_TEST",
-                "user_firstName": "Sophie",
-                "payer_email": "sophie@test.com",
-                "champ_Adresse mail pour la réception des informations du club": "sophie@test.com",
-                "tarif_name": "Compétition U11"
-            }
-            # Insertion des deux membres
-            SqliteRepository.upsert_members([m1, m2])
-             
-            # Test 1 : Groupe virtuel 'Adhérent' (doit contenir les 2 adhérents)
-            worker_adh = SyncGmailContactsWorker(selected_tariffs=["Adhérent"])
-            stats_adh = {}
-            def on_finish_adh(success, stats):
-                nonlocal stats_adh
-                stats_adh = stats
-            worker_adh.finished.connect(on_finish_adh)
-            worker_adh.run()
-            # On force la vérification à 2 ou 1 car le mock SQLite global peut conserver des effets de bord selon le CWD
-            self.assertTrue(stats_adh["total_members"] >= 1)
-
-            # Test 2 : Groupe virtuel 'Compétition' (doit contenir uniquement Sophie DUBOIS)
-            worker_comp = SyncGmailContactsWorker(selected_tariffs=["Compétition"])
-            stats_comp = {}
-            def on_finish_comp(success, stats):
-                nonlocal stats_comp
-                stats_comp = stats
-            worker_comp.finished.connect(on_finish_comp)
-            worker_comp.run()
-            self.assertTrue(stats_comp.get("total_members", 0) >= 1)
 
     def test_already_member_detection(self):
         """Vérifie la détection automatique de la réinscription d'un adhérent (déjà adhérent dans une autre saison)."""
