@@ -91,7 +91,7 @@ ALJ-CRM/                         ← racine du dépôt
     `members.py` (`get_members()` typé recommandé, `load_direct_data()` legacy), `seasons.py`, `planning.py`,
     `email_templates.py`, `geocache.py`, `ffme_import.py`.
   - `firestore/cloud_database.py` : réplication SQLite ⇄ Firestore (collections `crm_<table>`, triggers `_fs_*`, flush toutes les 15 s, pull toutes les 2 min, merge champ par champ).
-  - `firestore/client.py` : client REST Firestore (sans gRPC) ; `firestore/competition_repository.py` : compétitions ;
+  - `firestore/client.py` : client REST Firestore (sans gRPC) ; `firestore/competition_repository.py` : compétitions (façade `CompetitionFirestoreRepository` composant les mixins de `firestore/competitions/` : adhérents, épreuves, participants, miroir HelloAsso, coachs) ;
     `firestore/app_settings.py` : réglages applicatifs (collection `app_settings`, seul emplacement).
   - `security/api_auth.py` : middleware Firebase (rôles `readonly < coach < admin`). Seul juge des droits : `firestore.rules` refuse tout accès client.
   - `mail/` (envoi, campagnes, corps HTML), `helloasso/` (API v5, webhook), `security/secret_store.py`, `google/drive.py` (OAuth Google, Drive).

@@ -15,7 +15,7 @@ if _src_dir not in sys.path:
 
 from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore import client as fc
-from infrastructure.firestore import competition_repository as repo_module
+from infrastructure.firestore.competitions import base as repo_base
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from support.fake_firestore import FakeFirestore, FirestoreRepoTestCase  # noqa: F401
 from support.member_db import MemberDbTestCase
@@ -512,7 +512,7 @@ class TestModificationsConcurrentes(FirestoreRepoTestCase):
         def always(collection_name, doc_id):
             self.fake._touch(collection_name, doc_id)
         self.fake.before_conditional_write = always
-        with patch.object(repo_module.time, "sleep"):
+        with patch.object(repo_base.time, "sleep"):
             with self.assertRaises(fc.FirestoreConflictError):
                 Repo.set_payment_status(self.comp_id, 101, PAIEMENT_PAYE)
 
