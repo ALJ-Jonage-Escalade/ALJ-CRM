@@ -29,7 +29,7 @@ class TestWebhookPayments(ApiTestCase):
         super().setUp()
         self.seed_adherent(101)
         self.comp = self.create(id_ffme="18846", prix=15)["id"]
-        for target, kwargs in ((f"{REPO}.get_app_setting", {"return_value": ""}),
+        for target, kwargs in (("infrastructure.firestore.app_settings.AppSettingsRepository.get", {"return_value": ""}),
                                ("infrastructure.helloasso.webhook.HelloAssoWebhookService.check_and_notify_all_paid",
                                 {"return_value": False})):
             p = patch(target, **kwargs)

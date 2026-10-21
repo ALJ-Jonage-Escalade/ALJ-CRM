@@ -24,10 +24,10 @@ def list_seasons(request: Request) -> Response:
 def get_season_tarifs_api(season: Optional[str] = None) -> Union[Doc, JSONResponse]:
     """Retourne la liste des tarifs HelloAsso (groupes disponibles) d'une saison pour l'édition de créneau."""
     try:
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.seasons import SeasonRepository
         from domain.constants import get_active_season
         target_season = season or get_active_season()
-        tarifs = SqliteRepository.get_season_tarifs(target_season)
+        tarifs = SeasonRepository.get_season_tarifs(target_season)
         return {"status": "success", "season": target_season, "tarifs": tarifs}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "get_season_tarifs_api")})

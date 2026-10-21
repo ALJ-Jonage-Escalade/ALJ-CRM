@@ -4,7 +4,9 @@ import pandas as pd
 from paths import CODE_ROOT
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.google.drive import GoogleDriveClient
-from infrastructure.sqlite.repository import SqliteRepository, CORRECTIVE_MAP
+from domain.constants import CORRECTIVE_MAP
+from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.members import MemberRepository
 
 def run_migration(interactive=None):
     print("==========================================================")
@@ -85,16 +87,16 @@ def run_migration(interactive=None):
     print(f"📋 {len(members_to_import)} adhérents identifiés pour l'importation.")
 
     # 5. Initialiser et peupler la base SQLite locale
-    db_local_path = SqliteRepository.get_db_path()
+    db_local_path = SqliteDatabase.get_db_path()
     if os.path.exists(db_local_path):
         try:
             os.remove(db_local_path)
         except Exception:
             pass
 
-    SqliteRepository.setup_database()
+    SqliteDatabase.setup_database()
     print("💾 Insertion des données dans la base de données SQLite locale...")
-    SqliteRepository.upsert_members(members_to_import)
+    MemberRepository.upsert_members(members_to_import)
 
     # 6. Téléverser la nouvelle base de données SQLite sur Google Drive
     print("📤 Envoi de la base SQLite sur Google Drive...")

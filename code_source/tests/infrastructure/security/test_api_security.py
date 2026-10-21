@@ -230,7 +230,7 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
         coach = make_token(email="stephane.loridant@orange.fr")
         r = self.client.post("/api/planning", json=[], headers={"Authorization": f"Bearer {coach}"})
         self.assertEqual(r.status_code, 403)
-        with patch("api.activities.planning.SqliteRepository.save_planning_data") as save:
+        with patch("api.activities.planning.PlanningRepository.save_planning_data") as save:
             r = self.client.post("/api/planning", json=[], headers={"Authorization": f"Bearer {make_token()}"})
             self.assertEqual(r.status_code, 200)
             save.assert_called_once()

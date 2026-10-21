@@ -119,6 +119,8 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_competitions_results_cron_and_settings_endpoints(self):
         """Vérifie les endpoints de configuration et de cron du batch des résultats MyCompet."""
+        from support.fake_firestore import use_fake_firestore
+        use_fake_firestore(self)
         from api.competitions.results import (
             get_competitions_results_settings_api,
             update_competitions_results_settings_api
@@ -178,17 +180,18 @@ class TestBureauFiles(unittest.TestCase):
         """Vérifie le calcul des statistiques et le téléchargement du fichier CSV FFME."""
         import shutil
         import tempfile
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.connection import SqliteDatabase
+        from infrastructure.sqlite.members import MemberRepository
         from api.ffme.ffme import get_ffme_stats_api, export_ffme_api
 
         # Seeded temporary database: never read data/database.db (absent in CI, personal data locally).
-        original_db_path = SqliteRepository.get_db_path()
+        original_db_path = SqliteDatabase.get_db_path()
         tmpdir = tempfile.mkdtemp(prefix="alj_ffme_test_")
         self.addCleanup(shutil.rmtree, tmpdir, ignore_errors=True)
-        self.addCleanup(SqliteRepository.set_db_path, original_db_path)
-        SqliteRepository.set_db_path(os.path.join(tmpdir, "database.db"))
-        SqliteRepository.setup_database()
-        SqliteRepository.upsert_members([{
+        self.addCleanup(SqliteDatabase.set_db_path, original_db_path)
+        SqliteDatabase.set_db_path(os.path.join(tmpdir, "database.db"))
+        SqliteDatabase.setup_database()
+        MemberRepository.upsert_members([{
             "order_ref": "ORD-1",
             "order_date": "2026-08-20T10:00:00",
             "status": "Validated",
@@ -223,12 +226,12 @@ class TestBureauFiles(unittest.TestCase):
     def test_pivot_table_configuration_and_fields(self):
         """Vérifie la présence du filtre Âge, des colonnes Statut & Sexe, et de l'exclusion par défaut d'Annulé."""
         from api.reports.pivot import get_pivot_table
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.members import MemberRepository
 
         # Fake data: attribute keys only appear in data rows, so the test must not depend on the local DB.
         fake_row = {"last_name": "Dupont", "first_name": "jean", "gender": "M", "birth_date": "2000-01-15",
                     "city": "Jonage", "tarif_name": "Adulte", "status": "Processed", "season_name": "2026-2027"}
-        with patch.object(SqliteRepository, "load_direct_data", return_value=[fake_row]):
+        with patch.object(MemberRepository, "load_direct_data", return_value=[fake_row]):
             resp = get_pivot_table(season="2026-2027")
         self.assertEqual(resp.status_code, 200)
         html = resp.body.decode("utf-8")
@@ -395,16 +398,16 @@ class TestBureauFiles(unittest.TestCase):
         """send_attestation_api enregistre la date d'envoi dans SQLite et utilise le modèle par défaut."""
         import tempfile
         import shutil
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.connection import SqliteDatabase
         from api.communications.attestations import send_attestation_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_attestation.db")
-        orig_db_path = SqliteRepository.get_db_path()
+        orig_db_path = SqliteDatabase.get_db_path()
         try:
-            SqliteRepository.set_db_path(db_path)
-            SqliteRepository.setup_database()
-            conn = SqliteRepository.get_connection()
+            SqliteDatabase.set_db_path(db_path)
+            SqliteDatabase.setup_database()
+            conn = SqliteDatabase.get_connection()
             c = conn.cursor()
             c.execute("INSERT OR REPLACE INTO seasons (id, name, is_active) VALUES (1, '2026-2027', 1)")
             c.execute("""
@@ -452,13 +455,13 @@ class TestBureauFiles(unittest.TestCase):
             self.assertIn("Amicale Laïque", kwargs.get("html_body", ""))
 
             # Vérifier que la date est enregistrée en base SQLite
-            conn = SqliteRepository.get_connection()
+            conn = SqliteDatabase.get_connection()
             row = conn.execute("SELECT email_sent_date FROM purchases WHERE id = 30").fetchone()
             conn.close()
             self.assertIsNotNone(row["email_sent_date"])
             self.assertEqual(row["email_sent_date"], res["email_sent_date"])
         finally:
-            SqliteRepository.set_db_path(orig_db_path)
+            SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_member_edit_ui_elements(self):
@@ -497,16 +500,16 @@ class TestBureauFiles(unittest.TestCase):
         """add_member_api persiste le nouvel adhérent, la commande et l'achat dans SQLite."""
         import tempfile
         import shutil
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.connection import SqliteDatabase
         from api.members.members import add_member_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_member_add.db")
-        orig_db_path = SqliteRepository.get_db_path()
+        orig_db_path = SqliteDatabase.get_db_path()
         try:
-            SqliteRepository.set_db_path(db_path)
-            SqliteRepository.setup_database()
-            conn = SqliteRepository.get_connection()
+            SqliteDatabase.set_db_path(db_path)
+            SqliteDatabase.setup_database()
+            conn = SqliteDatabase.get_connection()
             c = conn.cursor()
             c.execute("INSERT OR REPLACE INTO seasons (id, name, is_active) VALUES (1, '2026-2027', 1)")
             conn.commit()
@@ -542,7 +545,7 @@ class TestBureauFiles(unittest.TestCase):
             self.assertTrue(res.get("order_ref", "").startswith("MANUEL-"))
 
             # Vérification dans SQLite
-            conn = SqliteRepository.get_connection()
+            conn = SqliteDatabase.get_connection()
             u = conn.execute("SELECT * FROM users WHERE last_name = 'VALENTIN'").fetchone()
             self.assertIsNotNone(u)
             self.assertEqual(u["first_name"], "Claire")
@@ -573,7 +576,7 @@ class TestBureauFiles(unittest.TestCase):
             self.assertEqual(o["payer_email"], "claire.valentin@example.com")
             conn.close()
         finally:
-            SqliteRepository.set_db_path(orig_db_path)
+            SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_member_add_validation(self):
@@ -601,16 +604,16 @@ class TestBureauFiles(unittest.TestCase):
         """update_member_api persiste les badges, emails, téléphone et créneau dans SQLite."""
         import tempfile
         import shutil
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.connection import SqliteDatabase
         from api.members.members import update_member_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_member_edit.db")
-        orig_db_path = SqliteRepository.get_db_path()
+        orig_db_path = SqliteDatabase.get_db_path()
         try:
-            SqliteRepository.set_db_path(db_path)
-            SqliteRepository.setup_database()
-            conn = SqliteRepository.get_connection()
+            SqliteDatabase.set_db_path(db_path)
+            SqliteDatabase.setup_database()
+            conn = SqliteDatabase.get_connection()
             c = conn.cursor()
             c.execute("INSERT OR REPLACE INTO seasons (id, name, is_active) VALUES (1, '2026-2027', 1)")
             c.execute("""
@@ -652,7 +655,7 @@ class TestBureauFiles(unittest.TestCase):
             self.assertEqual(res.get("status"), "success")
 
             # Vérification dans la table users
-            conn = SqliteRepository.get_connection()
+            conn = SqliteDatabase.get_connection()
             u = conn.execute("SELECT * FROM users WHERE id = 50").fetchone()
             self.assertEqual(u["licence_ffme"], "778899")
             self.assertEqual(u["address"], "12 chemin du Moulin")
@@ -678,7 +681,7 @@ class TestBureauFiles(unittest.TestCase):
             self.assertEqual(o["status_normalized"], "Annulé")
             conn.close()
         finally:
-            SqliteRepository.set_db_path(orig_db_path)
+            SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_sync_cloud_db_endpoint(self):
@@ -783,17 +786,17 @@ class TestBureauFiles(unittest.TestCase):
         import tempfile
         import shutil
         import pandas as pd
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.connection import SqliteDatabase
         from api.ffme.ffme import preview_ffme_import_api, apply_ffme_import_api
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_ffme_import.db")
-        orig_db_path = SqliteRepository.get_db_path()
+        orig_db_path = SqliteDatabase.get_db_path()
 
         try:
-            SqliteRepository.set_db_path(db_path)
-            SqliteRepository.setup_database()
-            conn = SqliteRepository.get_connection()
+            SqliteDatabase.set_db_path(db_path)
+            SqliteDatabase.setup_database()
+            conn = SqliteDatabase.get_connection()
             c = conn.cursor()
             c.execute("INSERT OR REPLACE INTO seasons (id, name, is_active) VALUES (1, '2026-2027', 1)")
             # Insérer un utilisateur connu
@@ -884,7 +887,7 @@ class TestBureauFiles(unittest.TestCase):
             self.assertEqual(apply_res.get("updated_count"), 2)
 
             # Vérification dans SQLite
-            conn = SqliteRepository.get_connection()
+            conn = SqliteDatabase.get_connection()
             u1 = conn.execute("SELECT * FROM users WHERE id = 101").fetchone()
             self.assertEqual(u1["licence_ffme"], "112233")
             self.assertEqual(u1["raw_passports"], "Grimpeur Vert")
@@ -903,7 +906,7 @@ class TestBureauFiles(unittest.TestCase):
             self.assertEqual(p2["document_sante"], "Certificat médical")
             conn.close()
         finally:
-            SqliteRepository.set_db_path(orig_db_path)
+            SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_communications_page_ui_and_wiring(self):
@@ -994,15 +997,15 @@ class TestBureauFiles(unittest.TestCase):
         """Les endpoints POST et DELETE /api/email-templates modifient correctement SQLite."""
         import tempfile
         import shutil
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.connection import SqliteDatabase
         from api.communications.email import save_email_template_api, delete_email_template_api, get_email_templates
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_tpl.db")
-        orig_db_path = SqliteRepository.get_db_path()
+        orig_db_path = SqliteDatabase.get_db_path()
         try:
-            SqliteRepository.set_db_path(db_path)
-            SqliteRepository.setup_database()
+            SqliteDatabase.set_db_path(db_path)
+            SqliteDatabase.setup_database()
 
             # 1. Création d'un nouveau modèle
             payload = {
@@ -1047,32 +1050,22 @@ class TestBureauFiles(unittest.TestCase):
             names2 = [t["name"] for t in res_list2.get("templates", [])]
             self.assertNotIn("Test Modèle Renommé", names2)
         finally:
-            SqliteRepository.set_db_path(orig_db_path)
+            SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_whatsapp_template_endpoints(self):
         """GET et POST /api/whatsapp-template enregistrent et lisent le texte WhatsApp."""
-        import tempfile
-        import shutil
-        from infrastructure.sqlite.repository import SqliteRepository
+        from support.fake_firestore import use_fake_firestore
         from api.communications.whatsapp import get_whatsapp_template_api, save_whatsapp_template_api
+        use_fake_firestore(self)
 
-        temp_dir = tempfile.mkdtemp()
-        db_path = os.path.join(temp_dir, "test_wa.db")
-        orig_db_path = SqliteRepository.get_db_path()
-        try:
-            SqliteRepository.set_db_path(db_path)
-            SqliteRepository.setup_database()
+        self.assertEqual(get_whatsapp_template_api().get("template"), "")
+        res_save = save_whatsapp_template_api({"template": "Rejoignez le groupe WhatsApp du club : https://chat.whatsapp.com/xxx"})
+        self.assertEqual(res_save.get("status"), "success")
 
-            res_save = save_whatsapp_template_api({"template": "Rejoignez le groupe WhatsApp du club : https://chat.whatsapp.com/xxx"})
-            self.assertEqual(res_save.get("status"), "success")
-
-            res_get = get_whatsapp_template_api()
-            self.assertEqual(res_get.get("status"), "success")
-            self.assertIn("chat.whatsapp.com", res_get.get("template", ""))
-        finally:
-            SqliteRepository.set_db_path(orig_db_path)
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        res_get = get_whatsapp_template_api()
+        self.assertEqual(res_get.get("status"), "success")
+        self.assertIn("chat.whatsapp.com", res_get.get("template", ""))
 
     def test_email_template_write_requires_admin_role(self):
         """Les modifications de templates d'emails exigent le rôle admin."""

@@ -1,8 +1,6 @@
-"""Tests du module de gestion des compétitions (dépôt dédié + rapprochement HelloAsso)."""
+"""Tests du module de gestion des compétitions (rapprochement HelloAsso)."""
 import os
 import sys
-import sqlite3
-import tempfile
 import unittest
 
 _test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -10,10 +8,6 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.sqlite import competition_repository as cr
-from infrastructure.sqlite.repository import SqliteRepository
-from infrastructure.sqlite import schema_v2
-from domain.competitions.models import Competition, STATUT_EN_COURS
 from domain.competitions.matching import (
     parse_campaign_identifier,
     match_items_to_participants,
@@ -243,296 +237,6 @@ class TestCompetitionNumberCheck(unittest.TestCase):
         self.assertEqual(res["manual_review"], [])
 
 
-class TestCompetitionRepository(unittest.TestCase):
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self._tmp_main = tempfile.TemporaryDirectory()
-        self.comp_db_path = os.path.join(self._tmp.name, "database_Competition.db")
-        self.main_db_path = os.path.join(self._tmp_main.name, "database.db")
-        # Sauvegarder les chemins d'origine : les tests ne doivent jamais fuiter
-        # leur base temporaire vers les tests suivants (ordre de la suite).
-        self._original_comp_path = cr.CompetitionRepository.get_db_path()
-        self._original_main_path = SqliteRepository.get_db_path()
-        cr.CompetitionRepository.set_db_path(self.comp_db_path)
-        self.repo = cr.CompetitionRepository
-
-    def tearDown(self):
-        cr.CompetitionRepository.set_db_path(self._original_comp_path)
-        SqliteRepository.set_db_path(self._original_main_path)
-        self._tmp.cleanup()
-        self._tmp_main.cleanup()
-
-    def _seed_main_db(self):
-        """Crée une base principale v2 minimale avec 2 compétiteurs + 1 loisir."""
-        SqliteRepository.set_db_path(self.main_db_path)
-        SqliteRepository.setup_database()
-        conn = sqlite3.connect(self.main_db_path)
-        conn.execute("INSERT OR IGNORE INTO seasons (name, is_active) VALUES ('2026-2027', 1)")
-        conn.execute(
-            "INSERT INTO users (id, last_name, first_name, last_name_key, first_name_key, "
-            "birth_date, licence_ffme, email_primary, phone) VALUES "
-            "(1, 'DUPONT', 'Jean', 'DUPONT', 'jean', '2010-05-01', '123456', 'jean@ex.fr', '0600000001'),"
-            "(2, 'MARTIN', 'Léa', 'MARTIN', 'lea', '2011-03-12', '789012', 'lea@ex.fr', '0600000002'),"
-            "(3, 'LOISIR', 'Bob', 'LOISIR', 'bob', '1990-01-01', '', 'bob@ex.fr', '0600000003')"
-        )
-        conn.execute("INSERT INTO orders (id, order_ref, season_id) VALUES (1, 'CMD1', 1), (2, 'CMD2', 1), (3, 'CMD3', 1)")
-        conn.execute(
-            "INSERT INTO purchases (order_id, user_id, tarif_name, amount, status) VALUES "
-            "(1, 1, 'Compétition - U13/U15', 10.0, 'Validé'),"
-            "(2, 2, 'Compétition - U13/U15', 10.0, 'Validé'),"
-            "(3, 3, 'Enfants 2016-2018', 5.0, 'Validé')"
-        )
-        schema_v2.recreate_compat_view(conn.cursor())
-        conn.commit()
-        conn.close()
-        # Rétablir le dépôt compétition (le setup principal peut avoir réinitialisé des états)
-        cr.CompetitionRepository.set_db_path(self.comp_db_path)
-
-    def test_schema_and_competition_crud(self):
-        self.repo.setup_database()
-        self.assertTrue(os.path.exists(self.comp_db_path))
-
-        comp = Competition(id_ffme="EVT-2026-001", nom="Championnat U13",
-                           date_competition="2026-11-15", prix=10.0,
-                           whatsapp_link="https://chat.whatsapp.com/test_sqlite")
-        comp_id = self.repo.save_competition(comp)
-        self.assertTrue(comp_id)
-
-        loaded = self.repo.get_competition(comp_id)
-        self.assertEqual(loaded.nom, "Championnat U13")
-        self.assertEqual(loaded.statut, "en_preparation")
-        self.assertEqual(loaded.prix, 10.0)
-        self.assertEqual(loaded.whatsapp_link, "https://chat.whatsapp.com/test_sqlite")
-
-        loaded.statut = STATUT_EN_COURS
-        self.repo.save_competition(loaded)
-        self.assertEqual(self.repo.get_competition(comp_id).statut, "en_cours")
-
-        self.repo.set_competition_status(comp_id, "close")
-        self.assertEqual(self.repo.get_competition(comp_id).statut, "close")
-
-        comps = self.repo.list_competitions()
-        self.assertEqual(len(comps), 1)
-
-        self.assertTrue(self.repo.delete_competition(comp_id))
-        self.assertEqual(self.repo.list_competitions(), [])
-
-    def test_participants_selection_and_payment(self):
-        self.repo.setup_database()
-        comp_id = self.repo.save_competition(Competition(nom="Test", prix=10.0))
-        # L'instantané adhérents est vide ici : l'insertion directe simule la synchro
-        conn = self.repo.get_connection()
-        conn.execute("INSERT INTO adherents (id, nom, prenom, num_licence, tarif) VALUES (1,'DUPONT','Jean','123456','Compétition - U13')")
-        conn.execute("INSERT INTO adherents (id, nom, prenom, num_licence, tarif) VALUES (2,'MARTIN','Léa','789012','Compétition - U15')")
-        conn.execute("INSERT INTO adherents (id, nom, prenom, num_licence, tarif) VALUES (3,'LOISIR','Bob','','Enfants')")
-        conn.commit()
-        conn.close()
-
-        group = self.repo.list_adherents(competition_only=True)
-        self.assertEqual(len(group), 2)
-
-        n = self.repo.load_competition_group_into(comp_id)
-        self.assertEqual(n, 2)
-
-        participants = self.repo.list_participants(comp_id)
-        self.assertEqual(len(participants), 2)
-        self.assertTrue(all(not p.selectionne for p in participants))
-        self.assertTrue(all(p.statut_paiement == "non_invite" for p in participants))
-
-        # Bascule Oui/Non
-        self.repo.set_selection(comp_id, 1, True)
-        p1 = [p for p in self.repo.list_participants(comp_id) if p.adherent_id == 1][0]
-        self.assertTrue(p1.selectionne)
-        self.assertEqual(p1.statut_paiement, "en_attente")
-        self.repo.set_selection(comp_id, 1, False)
-        p1 = [p for p in self.repo.list_participants(comp_id) if p.adherent_id == 1][0]
-        self.assertFalse(p1.selectionne)
-        self.assertEqual(p1.statut_paiement, "non_invite")
-
-        # Ajout hors groupe via recherche étendue
-        self.repo.add_participant(comp_id, 3)
-        self.assertEqual(len(self.repo.list_participants(comp_id)), 3)
-
-        # Paiement
-        self.repo.set_payment_status(comp_id, 3, "en_attente")
-        self.repo.apply_helloasso_payment(comp_id, 3, 9.5, "2026-11-16 10:00:00", order_ref="CMD99")
-        p3 = [p for p in self.repo.list_participants(comp_id) if p.adherent_id == 3][0]
-        self.assertEqual(p3.statut_paiement, "paye")
-        self.assertEqual(p3.montant_paye, 9.5)
-        self.assertEqual(p3.date_synchro_helloasso, "2026-11-16 10:00:00")
-        self.assertEqual(p3.commande_helloasso, "CMD99")
-
-        # Suppression
-        self.assertTrue(self.repo.remove_participant(comp_id, 3))
-        self.assertEqual(len(self.repo.list_participants(comp_id)), 2)
-
-    def test_migration_commande_helloasso(self):
-        """Une base ancienne sans la colonne commande_helloasso est migrée à l'ouverture."""
-        self.repo.setup_database()
-        conn = self.repo.get_connection()
-        conn.executescript(
-            """DROP TABLE participants;
-               CREATE TABLE participants (
-                   id INTEGER PRIMARY KEY AUTOINCREMENT,
-                   competition_id INTEGER NOT NULL,
-                   adherent_id INTEGER NOT NULL,
-                   selectionne INTEGER DEFAULT 0,
-                   statut_paiement TEXT DEFAULT 'non_invite',
-                   date_synchro_helloasso TEXT DEFAULT '',
-                   montant_paye REAL DEFAULT 0.0,
-                   UNIQUE(competition_id, adherent_id)
-               );"""
-        )
-        conn.commit()
-        conn.close()
-        self.repo.setup_database(force=True)
-        conn = self.repo.get_connection()
-        try:
-            cols = {r["name"] for r in conn.execute("PRAGMA table_info(participants)").fetchall()}
-        finally:
-            conn.close()
-        self.assertIn("commande_helloasso", cols)
-
-    def test_coaches_crud_and_assignment(self):
-        self.repo.setup_database()
-        
-        # Check default coaches are seeded
-        coaches = self.repo.list_coaches()
-        self.assertEqual(len(coaches), 3)
-        self.assertEqual(coaches[0]["nom"], "Adrien BERGER")
-        self.assertEqual(coaches[1]["nom"], "Clement DE LIMA FERREIRA")
-        self.assertEqual(coaches[2]["nom"], "Stephane LORIDANT")
-
-        # Save new coach
-        coach_id = self.repo.save_coach("Nouveau Coach")
-        self.assertTrue(coach_id)
-        coaches = self.repo.list_coaches()
-        self.assertEqual(len(coaches), 4)
-
-        # Edit coach
-        self.repo.save_coach("Coach Modifie", coach_id)
-        coach = self.repo.get_coach(coach_id)
-        self.assertEqual(coach["nom"], "Coach Modifie")
-
-        # Assign coaches to competition
-        # Any number of coaches, in the order given (plan cleanup C2)
-        coach_4 = self.repo.save_coach("Quatrième Coach")
-        comp = Competition(nom="Compet Coachs", coach_ids=[coach_id, 1, 2, coach_4])
-        comp_id = self.repo.save_competition(comp)
-        self.assertTrue(comp_id)
-
-        loaded = self.repo.get_competition(comp_id)
-        self.assertEqual(loaded.coach_ids, [coach_id, 1, 2, coach_4])
-        self.assertEqual([c.nom for c in self.repo.list_competitions()], ["Compet Coachs"])
-        self.assertEqual(self.repo.list_competitions()[0].coach_ids, [coach_id, 1, 2, coach_4])
-
-        # Saving again replaces the list
-        loaded.coach_ids = [2, coach_id]
-        self.repo.save_competition(loaded)
-        self.assertEqual(self.repo.get_competition(comp_id).coach_ids, [2, coach_id])
-
-        # List competitions for coach
-        comps_for_coach = self.repo.list_competitions_for_coach(coach_id)
-        self.assertEqual(len(comps_for_coach), 1)
-        self.assertEqual(comps_for_coach[0].nom, "Compet Coachs")
-
-        # Delete coach
-        self.assertTrue(self.repo.delete_coach(coach_id))
-        self.assertEqual(len(self.repo.list_coaches()), 4)
-
-        # The link goes with the coach (foreign key ON DELETE CASCADE)
-        self.assertEqual(self.repo.get_competition(comp_id).coach_ids, [2])
-        self.assertEqual(self.repo.list_competitions_for_coach(coach_id), [])
-
-    def test_legacy_coach_columns_migrated_once(self):
-        """coach1_id..coach3_id of an older database move to competition_coaches, then are
-        emptied, so a coach removed afterwards doesn't come back."""
-        self.repo.setup_database()
-        conn = self.repo.get_connection()
-        try:
-            conn.execute("INSERT INTO competitions (nom, coach1_id, coach3_id) VALUES ('Ancienne', 2, 1)")
-            conn.commit()
-            comp_id = conn.execute("SELECT id FROM competitions WHERE nom = 'Ancienne'").fetchone()[0]
-        finally:
-            conn.close()
-        self.repo._database_setup_done = False
-        self.repo.setup_database()
-        self.assertEqual(self.repo.get_competition(comp_id).coach_ids, [2, 1])
-
-        comp = self.repo.get_competition(comp_id)
-        comp.coach_ids = [1]
-        self.repo.save_competition(comp)
-        self.repo._database_setup_done = False
-        self.repo.setup_database()
-        self.assertEqual(self.repo.get_competition(comp_id).coach_ids, [1])
-
-    def test_sync_adherents_from_main(self):
-        self._seed_main_db()
-        self.repo.setup_database()
-        report = self.repo.sync_adherents_from_main("2026-2027")
-        self.assertEqual(report["errors"], [])
-        self.assertEqual(report["imported"], 3)
-
-        adherents = self.repo.list_adherents()
-        self.assertEqual(len(adherents), 3)
-        dupont = [a for a in adherents if a["nom"] == "DUPONT"][0]
-        self.assertEqual(dupont["num_licence"], "123456")
-        self.assertEqual(dupont["tarif"], "Compétition - U13/U15")
-
-        # Idempotence : une seconde synchro met à jour sans dupliquer
-        report2 = self.repo.sync_adherents_from_main("2026-2027")
-        self.assertEqual(report2["imported"], 0)
-        self.assertEqual(report2["updated"], 3)
-        self.assertEqual(self.repo.count_adherents(), 3)
-
-    def test_planning_groups_mirror(self):
-        """Le miroir planning_groups (pour la page web) est rempli depuis database.db."""
-        self._seed_main_db()
-        conn = sqlite3.connect(self.main_db_path)
-        conn.execute("INSERT INTO planning (id, groupe, jour, horaires, helloasso_tarifs) VALUES "
-                     "(1,'Compétition - U13','mercredi','18h','[\"Compétition - U13/U15\"]'),"
-                     "(2,'Autonome','lundi','20h','[\"Adultes autonomes\"]')")
-        conn.commit()
-        conn.close()
-        report = self.repo.sync_adherents_from_main("2026-2027")
-        self.assertEqual(report["errors"], [])
-        mapping = self.repo.list_planning_groups()
-        self.assertEqual(mapping["competition - u13/u15"], "Compétition - U13")
-        self.assertEqual(mapping["adultes autonomes"], "Autonome")
-
-    def test_bilan_pivot(self):
-        self.repo.setup_database()
-        conn = self.repo.get_connection()
-        conn.execute("INSERT INTO adherents (id, nom, prenom, num_licence, tarif) VALUES (1,'DUPONT','Jean','123456','Compétition'), (2,'MARTIN','Léa','789012','Compétition')")
-        conn.commit()
-        conn.close()
-        c1 = self.repo.save_competition(Competition(nom="Comp A", date_competition="2026-11-15", prix=10.0))
-        c2 = self.repo.save_competition(Competition(nom="Comp B", date_competition="2027-02-20", prix=12.0))
-        for a in (1, 2):
-            self.repo.add_participant(c1, a)
-            self.repo.add_participant(c2, a)
-        self.repo.apply_helloasso_payment(c1, 1, 10.0)
-        self.repo.set_payment_status(c1, 2, "en_attente")
-
-        bilan = self.repo.get_bilan("2026-2027")
-        self.assertEqual(len(bilan["competitions"]), 2)
-        self.assertEqual(len(bilan["students"]), 2)
-        self.assertEqual(bilan["participations"][(1, c1)], "paye")
-        self.assertEqual(bilan["participations"][(2, c1)], "en_attente")
-        self.assertEqual(bilan["payments"][(1, c1)]["montant_paye"], 10.0)
-        self.assertEqual(bilan["payments"][(1, c1)]["prix"], 10.0)
-        self.assertEqual(bilan["payments"][(2, c1)]["montant_paye"], 0.0)
-        self.assertEqual(bilan["payments"][(2, c1)]["prix"], 10.0)
-        # Saison inconnue → bilan vide
-        self.assertEqual(len(self.repo.get_bilan("1999-2000")["competitions"]), 0)
-
-    def test_season_of_date(self):
-        self.assertEqual(self.repo.season_of_date("2026-09-01"), "2026-2027")
-        self.assertEqual(self.repo.season_of_date("2027-02-20"), "2026-2027")
-        self.assertEqual(self.repo.season_of_date("2026-07-15"), "2025-2026")
-        self.assertEqual(self.repo.season_of_date(""), "")
-
-
 class TestSummarizeItems(unittest.TestCase):
     """Projection tabulaire des articles HelloAsso (valeurs à vide si absentes)."""
 
@@ -564,28 +268,15 @@ class TestSummarizeItems(unittest.TestCase):
         self.assertEqual(summarize_items([]), [])
 
 
-class TestAutoLinkAndMirror(unittest.TestCase):
-    """Miroir HelloAsso + liens article -> (compétition, adhérent)."""
+class TestAutoLinkItems(unittest.TestCase):
+    """Liens automatiques article HelloAsso -> (compétition, adhérent)."""
 
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self._original_comp_path = cr.CompetitionRepository.get_db_path()
-        cr.CompetitionRepository.set_db_path(os.path.join(self._tmp.name, "database_Competition.db"))
-        self.repo = cr.CompetitionRepository
-        self.repo.setup_database()
-        conn = self.repo.get_connection()
-        conn.execute("INSERT INTO adherents (id, nom, prenom, num_licence) VALUES (1,'DUPONT','Jean','123456'), (2,'MARTIN','Léa','789012')")
-        conn.commit()
-        conn.close()
-        self.c1 = self.repo.save_competition(Competition(id_ffme="EVT-2026-001", nom="Coupe du Rhône", date_competition="2026-09-26", prix=15.0))
-        self.c2 = self.repo.save_competition(Competition(id_ffme="EVT-2026-002", nom="Championnat", date_competition="2026-11-14", prix=15.0))
-        self.comps = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom}
-                      for c in self.repo.list_competitions()]
-        self.adherents = self.repo.list_adherents()
-
-    def tearDown(self):
-        cr.CompetitionRepository.set_db_path(self._original_comp_path)
-        self._tmp.cleanup()
+        self.c1, self.c2 = 1, 2
+        self.comps = [{"id": 1, "id_ffme": "EVT-2026-001", "nom": "Coupe du Rhône"},
+                      {"id": 2, "id_ffme": "EVT-2026-002", "nom": "Championnat"}]
+        self.adherents = [{"id": 1, "nom": "DUPONT", "prenom": "Jean", "num_licence": "123456"},
+                          {"id": 2, "nom": "MARTIN", "prenom": "Léa", "num_licence": "789012"}]
 
     @staticmethod
     def _item(id_item, etat="Validated", licence="", competition="", payeur="DUPONT Jean"):
@@ -619,79 +310,6 @@ class TestAutoLinkAndMirror(unittest.TestCase):
         links = auto_link_items(items, self.comps, self.adherents, {5: "manuel"})
         # 5 : manuel préservé ; 6 : auto ; 7 : état non payé ignoré
         self.assertEqual(list(links.keys()), [6])
-
-    def test_mirror_upsert_and_manual_link_persistence(self):
-        items = [self._item(10, licence="123456", competition="EVT-2026-001")]
-        self.assertEqual(self.repo.sync_helloasso_mirror(items, [{"id": 10}], "competition-saison"), 1)
-        # Lien manuel posé puis nouvelle synchro : le lien doit survivre
-        self.repo.set_item_link(10, self.c1, 1, source="manuel")
-        self.repo.sync_helloasso_mirror(items, [{"id": 10}], "competition-saison")
-        links = self.repo.list_helloasso_links()
-        self.assertEqual(links[10]["source"], "manuel")
-        self.assertEqual(links[10]["competition_id"], self.c1)
-
-        # replace_auto_links écrase les auto, jamais les manuels
-        from domain.competitions.matching import auto_link_items
-        other = [self._item(11, licence="789012", competition="EVT-2026-002")]
-        self.repo.sync_helloasso_mirror(other, [{"id": 11}], "competition-saison")
-        auto = auto_link_items(other, self.comps, self.adherents, self.repo.list_helloasso_links())
-        self.repo.replace_auto_links(auto)
-        links = self.repo.list_helloasso_links()
-        self.assertEqual(links[10]["source"], "manuel")
-        self.assertEqual(links[11]["source"], "auto")
-
-    def test_apply_links_to_participants_aggregates(self):
-        items = [self._item(20, licence="123456", competition="EVT-2026-001"),
-                 self._item(21, licence="123456", competition="EVT-2026-001")]
-        self.repo.sync_helloasso_mirror(items, [{"id": 20}, {"id": 21}], "slug")
-        self.repo.set_item_link(20, self.c1, 1, source="manuel")
-        self.repo.set_item_link(21, self.c1, 1, source="manuel")
-        applied = self.repo.apply_links_to_participants()
-        self.assertEqual(applied, 1)
-        parts = [p for p in self.repo.list_participants(self.c1) if p.adherent_id == 1]
-        self.assertEqual(len(parts), 1)
-        p = parts[0]
-        self.assertEqual(p.statut_paiement, "paye")
-        self.assertEqual(p.montant_paye, 30.0)          # cumul des 2 articles
-        self.assertEqual(p.commande_helloasso, "1020, 1021")
-
-    def test_unlinked_items_listing(self):
-        items = [self._item(30, licence="123456", competition=""),          # pas de lien
-                 self._item(31, licence="", competition="EVT-2026-001"),    # compétition sans adhérent
-                 self._item(32, etat="Waiting", competition="")]            # état non payé : ignoré
-        self.repo.sync_helloasso_mirror(items, [{"id": 30}, {"id": 31}, {"id": 32}], "slug")
-        unlinked = self.repo.list_unlinked_items()
-        ids = [u["id_item"] for u in unlinked]
-        self.assertIn(30, ids)
-        self.assertIn(31, ids)
-        self.assertNotIn(32, ids)
-        # pré-sélection adhérent via licence pour l'article 30
-        u30 = [u for u in unlinked if u["id_item"] == 30][0]
-        self.assertEqual(u30["adherent_id"], 1)
-
-    def test_item_comments_persistence(self):
-        # Initialise un miroir
-        items = [self._item(40, licence="123456", competition="EVT-2026-001")]
-        self.repo.sync_helloasso_mirror(items, [{"id": 40}], "slug")
-        
-        # Le commentaire par défaut doit être vide
-        unlinked = self.repo.list_unlinked_items()
-        u40 = [u for u in unlinked if u["id_item"] == 40][0]
-        self.assertEqual(u40["commentaire"], "")
-
-        # Enregistre un commentaire
-        self.assertTrue(self.repo.save_item_comment(40, "Commentaire de test"))
-        
-        # Le commentaire doit être retrouvé dans list_unlinked_items
-        unlinked = self.repo.list_unlinked_items()
-        u40_after = [u for u in unlinked if u["id_item"] == 40][0]
-        self.assertEqual(u40_after["commentaire"], "Commentaire de test")
-
-        # Nouvelle synchro HelloAsso : le commentaire doit survivre
-        self.repo.sync_helloasso_mirror(items, [{"id": 40}], "slug")
-        unlinked_post_sync = self.repo.list_unlinked_items()
-        u40_post_sync = [u for u in unlinked_post_sync if u["id_item"] == 40][0]
-        self.assertEqual(u40_post_sync["commentaire"], "Commentaire de test")
 
 
 class TestMatchAdherentByName(unittest.TestCase):

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse, Response
 
 from api.responses import error, internal_error
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.planning import PlanningRepository
 
 router = APIRouter()
 
@@ -17,8 +17,8 @@ router = APIRouter()
 def get_planning():
     """Récupère le planning depuis la BDD SQLite."""
     try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        return SqliteRepository.load_planning_data(log_debug=False)
+        from infrastructure.sqlite.planning import PlanningRepository
+        return PlanningRepository.load_planning_data(log_debug=False)
     except Exception as e:
         return {"error": internal_error(e, "get_planning")}
 
@@ -27,8 +27,8 @@ def get_planning():
 def save_planning_item_api(item: Dict[str, Any] = Body(...)):
     """Crée ou met à jour un créneau unique dans la table planning."""
     try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        saved_item = SqliteRepository.save_planning_item(item)
+        from infrastructure.sqlite.planning import PlanningRepository
+        saved_item = PlanningRepository.save_planning_item(item)
         return {"status": "success", "message": "Créneau enregistré avec succès.", "item": saved_item}
     except Exception as e:
         return JSONResponse(status_code=400, content={"status": "error", "message": internal_error(e, "save_planning_item_api")})
@@ -38,8 +38,8 @@ def save_planning_item_api(item: Dict[str, Any] = Body(...)):
 def delete_planning_item_api(item_id: int):
     """Supprime un créneau de planning par son ID."""
     try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        ok = SqliteRepository.delete_planning_item(item_id)
+        from infrastructure.sqlite.planning import PlanningRepository
+        ok = PlanningRepository.delete_planning_item(item_id)
         if not ok:
             return JSONResponse(status_code=404, content={"status": "error", "message": f"Créneau #{item_id} introuvable."})
         return {"status": "success", "message": f"Créneau #{item_id} supprimé avec succès."}
@@ -53,14 +53,14 @@ def export_planning_api(mode: str = Query("grid"), season: Optional[str] = Query
     import os
     import tempfile
     import shutil
-    from infrastructure.sqlite.repository import SqliteRepository
+    from infrastructure.sqlite.planning import PlanningRepository
     from exports.planning_excel import export_planning_excel, export_planning_list_excel
     from domain.constants import get_active_season, is_valid_season
 
     target_season = season or get_active_season()
     if not is_valid_season(target_season):
         return error(400, "Saison invalide (format attendu : AAAA-AAAA).")
-    planning_data = SqliteRepository.load_planning_data(log_debug=False)
+    planning_data = PlanningRepository.load_planning_data(log_debug=False)
 
     tmp_dir = tempfile.mkdtemp(prefix="alj_plan_export_")
     out_path = os.path.join(tmp_dir, "planning.xlsx")
@@ -91,7 +91,7 @@ def export_planning_api(mode: str = Query("grid"), season: Optional[str] = Query
 def update_planning(planning_data: List[Dict[str, Any]] = Body(...)):
     """Met à jour le planning dans la BDD SQLite."""
     try:
-        SqliteRepository.save_planning_data(planning_data)
+        PlanningRepository.save_planning_data(planning_data)
         return {"status": "success", "message": "Planning mis à jour"}
     except Exception as e:
         return {"error": internal_error(e, "update_planning")}

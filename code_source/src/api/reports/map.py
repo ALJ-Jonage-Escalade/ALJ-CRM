@@ -16,11 +16,12 @@ router = APIRouter()
 def get_sqlite_map_data(background_tasks: BackgroundTasks = None) -> List[Dict[str, Any]]:
     """Génère les points cartographiques directement depuis la base SQLite (Source unique de vérité)."""
     try:
-        from infrastructure.sqlite.repository import SqliteRepository
-        raw_data = SqliteRepository.load_direct_data()
+        from infrastructure.sqlite.geocache import GeocacheRepository
+        from infrastructure.sqlite.members import MemberRepository
+        raw_data = MemberRepository.load_direct_data()
         
         map_data_dict = {}
-        geocache = SqliteRepository.get_geocache()
+        geocache = GeocacheRepository.get_geocache()
         missing_addresses = set()
         
         for row in raw_data:

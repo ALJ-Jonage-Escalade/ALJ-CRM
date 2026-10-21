@@ -7,7 +7,6 @@ join the Firestore-only routers of server.py.
 from __future__ import annotations
 
 import datetime
-import os
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, HTTPException
@@ -131,35 +130,6 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
         finally:
             from services.competitions.store import invalidate_cache
             invalidate_cache()  # results visible on the next poll of the competition pages
-
-    # Sauvegarde miroir dans la base SQLite locale si disponible
-    try:
-        from infrastructure.sqlite.competition_repository import CompetitionRepository
-        if os.path.exists(CompetitionRepository.get_db_path()):
-            CompetitionRepository.setup_database()
-            conn = CompetitionRepository.get_connection()
-            try:
-                conn.execute(
-                    "UPDATE competitions SET url_resultats = ?, resultats_synced_at = ? WHERE id = ? OR id_ffme = ?",
-                    (canonical_url, now_iso, comp_id, comp_id)
-                )
-                for p in participants:
-                    aid = p.get("adherent_id")
-                    if aid:
-                        conn.execute(
-                            """UPDATE participants SET classement = ?, total_categorie = ?, resultat_ffme = ?,
-                               categorie_ffme = ?, performance_ffme = ?, resultat_synced_at = ?
-                               WHERE (competition_id = ? OR competition_id = (SELECT id FROM competitions WHERE id_ffme = ?))
-                               AND adherent_id = ?""",
-                            (p.get("classement") or "", int(p.get("total_categorie") or 0), p.get("resultat_ffme") or "",
-                             p.get("categorie_ffme") or "", p.get("performance_ffme") or "",
-                             now_iso, comp_id, comp_id, aid)
-                        )
-                conn.commit()
-            finally:
-                conn.close()
-    except Exception as e:
-        print(f"⚠️ [SQLITE] Erreur sauvegarde locale des résultats : {e}")
 
     return {
         "status": "success",

@@ -11,10 +11,10 @@
 |---|---|---|---|---|
 | Bulk e-mail to filtered members (season, slot, status, "registered after"), choice of recipient address (member / 2nd e-mail / HelloAsso payer), attestation PDF and WhatsApp invitation/QR as attachments, duplicate removal | Communications | `pages/communications.py` | Partly: `/api/send-email`, `/api/preview-email`, `infrastructure/mail/*` | The web sends to one member at a time (`adherents.html`) or to a competition campaign (`competitions.html`). `communications.html` only manages templates. |
 | A4 emergency-contacts book (Excel, club style) | Exports | `exports/emergency_contacts.py` | No | Contacts can only be viewed per member in the mobile directory (`web/index.html`). |
-| Excel export of former members not re-registered | Exports | worker in `presentation/workers.py` | Yes: "Non réinscrits" filter in `SqliteRepository` (`infrastructure/sqlite/repository.py`) | Needs a route + button. |
+| Excel export of former members not re-registered | Exports | worker in `presentation/workers.py` | Yes: "Non réinscrits" filter in `MemberRepository.load_direct_data` (`infrastructure/sqlite/members.py`) | Needs a route + button. |
 | MyCompet rankings export (Excel) | Exports | worker | Yes: `infrastructure/mycompet/scraper.scrape_mycompet` (no caller anymore) | Per-competition results exist on the web ("Trouver les résultats"). |
-| Import of the autonomy list `Autonomes_*.xlsx` (red badges) | FFME | `pages/ffme.py` | Yes: `SqliteRepository.merge_autonomes_data` (no caller anymore) | Badges can only be edited member by member. |
-| Import of the previous season's FFME file | FFME | `pages/ffme.py` | Yes: `SqliteRepository.import_old_season_ffme` (no caller anymore) | |
+| Import of the autonomy list `Autonomes_*.xlsx` (red badges) | FFME | `pages/ffme.py` | Yes: `FfmeImportRepository.merge_autonomes_data` (no caller anymore) | Badges can only be edited member by member. |
+| Import of the previous season's FFME file | FFME | `pages/ffme.py` | No: `import_old_season_ffme` was removed (dead code, see git history) | |
 | Google Contacts sync (labels per group, address choice) | Gmail contacts | `infrastructure/google/contacts.py`, `infrastructure/google/gmail_auth.py`, `pages/gmail_contact.py` | No | Would need the Contacts scope on the web OAuth client. |
 | WhatsApp QR code per slot | Groups | `pages/groups.py` | Partly: `infrastructure/qrcodes/` | The WhatsApp invitation text exists (`/api/whatsapp-template`), but there is no QR generation in the UI. |
 | Address quality: list of unrecognised addresses, suggested correction, manual geocoding | Reports | `pages/reports.py` | Partly: `server.geocode_missing_addresses` (background) | The web has the map (`/map`), but no correction screen. |

@@ -22,7 +22,8 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from infrastructure.mail.repository import EmailRepository
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.firestore.app_settings import AppSettingsRepository
+from infrastructure.firestore.client import FirestoreError
 from infrastructure.mycompet.scraper import fetch_and_parse_mycompet_results, normalize_result_url, find_mycompet_result_url
 
 DEFAULT_NOTIFICATION_EMAIL = "david.lopez@alj-jonage.fr"
@@ -38,7 +39,7 @@ class CompetitionResultsBatchService:
     def get_notification_email(cls) -> str:
         """Retourne l'e-mail de notification configuré, ou l'adresse par défaut."""
         try:
-            val = SqliteRepository.get_app_setting(SETTING_NOTIFICATION_EMAIL, "")
+            val = AppSettingsRepository.get(SETTING_NOTIFICATION_EMAIL)
             if val and "@" in str(val).strip():
                 return str(val).strip()
         except Exception:
@@ -52,27 +53,17 @@ class CompetitionResultsBatchService:
         if not clean or "@" not in clean or "." not in clean:
             raise ValueError("Adresse e-mail de notification invalide.")
 
-        ok = False
         try:
-            ok = SqliteRepository.save_app_setting(SETTING_NOTIFICATION_EMAIL, clean)
-        except Exception:
-            pass
-
-        # Miroir Firestore si disponible
-        try:
-            from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
-            CompetitionFirestoreRepository.save_app_setting(SETTING_NOTIFICATION_EMAIL, clean)
-            ok = True
-        except Exception:
-            pass
-
-        return ok
+            return AppSettingsRepository.save(SETTING_NOTIFICATION_EMAIL, clean)
+        except FirestoreError as e:
+            print(f"⚠️ [BATCH_RESULTATS] Enregistrement de l'e-mail de notification impossible : {e}")
+            return False
 
     @classmethod
     def get_batch_status(cls) -> Dict[str, Any]:
         """Retourne les indicateurs du dernier passage du batch."""
-        last_run = SqliteRepository.get_app_setting(SETTING_BATCH_LAST_RUN, "") or ""
-        last_status = SqliteRepository.get_app_setting(SETTING_BATCH_LAST_STATUS, "") or ""
+        last_run = AppSettingsRepository.get(SETTING_BATCH_LAST_RUN) or ""
+        last_status = AppSettingsRepository.get(SETTING_BATCH_LAST_STATUS) or ""
         return {
             "notification_email": cls.get_notification_email(),
             "last_run": last_run,
@@ -111,13 +102,11 @@ class CompetitionResultsBatchService:
     @classmethod
     def list_pending_competitions(cls, force: bool = False) -> List[Dict[str, Any]]:
         """
-        Sélectionne les compétitions passées qui n'ont pas encore de résultats enregistrés.
-        Cherche dans Firestore en priorité, puis dans SQLite en secours.
+        Sélectionne les compétitions passées (Firestore) qui n'ont pas encore de résultats enregistrés.
         """
         comps = []
         today = datetime.date.today()
 
-        # 1. Tentative de lecture Firestore
         try:
             from infrastructure.firestore.client import FirestoreClient
             raw_docs = FirestoreClient.get_collection("competitions")
@@ -127,30 +116,7 @@ class CompetitionResultsBatchService:
                     if force or not cls.has_results(doc_dict):
                         comps.append(doc_dict)
         except Exception as e:
-            print(f"⚠️ [BATCH_RESULTATS] Lecture Firestore impossible, repli SQLite : {e}")
-
-        # 2. Si aucune compétition trouvée via Firestore, essayer SQLite
-        if not comps:
-            try:
-                from infrastructure.sqlite.competition_repository import CompetitionRepository
-                if os.path.exists(CompetitionRepository.get_db_path()):
-                    CompetitionRepository.setup_database()
-                    conn = CompetitionRepository.get_connection()
-                    try:
-                        rows = conn.execute("SELECT * FROM competitions").fetchall()
-                        for r in rows:
-                            row_dict = dict(r)
-                            cid = row_dict.get("id")
-                            # Charger les participants
-                            part_rows = conn.execute("SELECT * FROM participants WHERE competition_id = ?", (cid,)).fetchall()
-                            row_dict["participants"] = [dict(p) for p in part_rows]
-                            if cls.is_competition_past(row_dict, today):
-                                if force or not cls.has_results(row_dict):
-                                    comps.append(row_dict)
-                    finally:
-                        conn.close()
-            except Exception as e:
-                print(f"⚠️ [BATCH_RESULTATS] Lecture SQLite impossible : {e}")
+            print(f"⚠️ [BATCH_RESULTATS] Lecture Firestore impossible : {e}")
 
         return comps
 
@@ -241,9 +207,9 @@ class CompetitionResultsBatchService:
 
         matched_athletes.sort(key=_sort_rank)
 
-        # Si des résultats ont été matchés, enregistrer dans Firestore et SQLite
+        # Si des résultats ont été matchés, enregistrer dans Firestore
         if matched_count > 0:
-            # 1. Sauvegarde Firestore
+            # Sauvegarde Firestore
             try:
                 from infrastructure.firestore.client import FirestoreClient
                 FirestoreClient.update_fields("competitions", cid, {
@@ -254,34 +220,6 @@ class CompetitionResultsBatchService:
             except Exception as e:
                 print(f"⚠️ [BATCH_RESULTATS] Sauvegarde Firestore impossible : {e}")
 
-            # 2. Sauvegarde SQLite miroir
-            try:
-                from infrastructure.sqlite.competition_repository import CompetitionRepository
-                if os.path.exists(CompetitionRepository.get_db_path()):
-                    CompetitionRepository.setup_database()
-                    conn = CompetitionRepository.get_connection()
-                    try:
-                        conn.execute(
-                            "UPDATE competitions SET url_resultats = ?, resultats_synced_at = ? WHERE id = ? OR id_ffme = ?",
-                            (canonical_url, now_iso, cid, cid)
-                        )
-                        for p in participants:
-                            aid = p.get("adherent_id")
-                            if aid:
-                                conn.execute(
-                                    """UPDATE participants SET classement = ?, total_categorie = ?, resultat_ffme = ?,
-                                       categorie_ffme = ?, performance_ffme = ?, resultat_synced_at = ?
-                                       WHERE (competition_id = ? OR competition_id = (SELECT id FROM competitions WHERE id_ffme = ?))
-                                       AND adherent_id = ?""",
-                                    (p.get("classement") or "", int(p.get("total_categorie") or 0), p.get("resultat_ffme") or "",
-                                     p.get("categorie_ffme") or "", p.get("performance_ffme") or "",
-                                     now_iso, cid, cid, aid)
-                                )
-                        conn.commit()
-                    finally:
-                        conn.close()
-            except Exception as e:
-                print(f"⚠️ [BATCH_RESULTATS] Sauvegarde SQLite locale impossible : {e}")
 
         return matched_count, matched_athletes, canonical_url
 
@@ -542,10 +480,10 @@ class CompetitionResultsBatchService:
             status_msg += " (Échec envoi e-mail)"
 
         try:
-            SqliteRepository.set_app_setting(SETTING_BATCH_LAST_RUN, now_iso)
-            SqliteRepository.set_app_setting(SETTING_BATCH_LAST_STATUS, status_msg)
-        except Exception:
-            pass
+            AppSettingsRepository.save(SETTING_BATCH_LAST_RUN, now_iso)
+            AppSettingsRepository.save(SETTING_BATCH_LAST_STATUS, status_msg)
+        except Exception as e:
+            print(f"⚠️ [BATCH_RESULTATS] Enregistrement du statut du batch impossible : {e}")
 
         return {
             "status": "success",

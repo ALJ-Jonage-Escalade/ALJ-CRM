@@ -8,8 +8,8 @@ Source unique de vérité pour :
   sqlite_repository.py et exports/membership_excel.py),
 - les upserts users / orders / purchases / purchase_options.
 
-Importé par sqlite_repository (écritures miroir phase 3) et migrate_schema_v2.
-Aucune dépendance à SqliteRepository pour éviter toute importation circulaire.
+Importé par infrastructure.sqlite.members (écritures miroir phase 3) et migrate_schema_v2.
+Aucune dépendance à infrastructure.sqlite.connection pour éviter toute importation circulaire.
 """
 import datetime
 import sqlite3
@@ -518,7 +518,7 @@ def insert_options_v2(cur, purchase_id, rec):
 def sync_members_to_v2(cur, members, season_name=SEASON_ACTIVE):
     """
     Phase 3 — Écriture applicative des adhésions dans le schéma v2.
-    Appelé par SqliteRepository.upsert_members en miroir du flux legacy (même transaction).
+    Appelé par MemberRepository.upsert_members en miroir du flux legacy (même transaction).
     Écrit désormais les payeurs (payer_*) perdus par l'ancien upsert.
     """
     ensure_v2_schema(cur)

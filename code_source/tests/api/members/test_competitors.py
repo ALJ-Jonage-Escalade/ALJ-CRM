@@ -6,7 +6,7 @@ from support.member_db import MemberDbTestCase
 
 from domain.members.view import COMPETITOR_FIELDS
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.members import MemberRepository
 
 EMERGENCY = {
     "champ_Téléphone ": "+33612345678",
@@ -25,7 +25,7 @@ class TestCompetitors(MemberDbTestCase, ApiTestCase):
         self.seed("1", "Léo", "MARTIN", "Compétition U18", **EMERGENCY)
         self.seed("2", "Max", "PETIT", "Compétition U18")
         self.seed("3", "Zoé", "DURAND", "Compétition U18")
-        ids = {r["first_name"]: r["user_id"] for r in SqliteRepository.list_member_rows("2026-2027")}
+        ids = {r["first_name"]: r["user_id"] for r in MemberRepository.list_member_rows("2026-2027")}
         self.leo, self.max, self.zoe = ids["Léo"], ids["Max"], ids["Zoé"]
         for aid in ids.values():
             self.seed_adherent(aid)
@@ -61,7 +61,7 @@ class TestCompetitors(MemberDbTestCase, ApiTestCase):
 
     def test_participant_not_registered_again_keeps_last_season_contacts(self):
         self.seed("9", "Inès", "ROUX", "Compétition U18", season="2025-2026", **EMERGENCY)
-        (ines,) = [r["user_id"] for r in SqliteRepository.list_member_rows("2025-2026")]
+        (ines,) = [r["user_id"] for r in MemberRepository.list_member_rows("2025-2026")]
         Repo.add_participant(self.create()["id"], ines)
         (contact,) = self.client.get("/api/members/competitors").json()
         self.assertEqual((contact["adherent_id"], contact["first_name"], contact["emergency2_phone"]),
@@ -69,7 +69,7 @@ class TestCompetitors(MemberDbTestCase, ApiTestCase):
 
     def test_active_season_row_preferred(self):
         self.seed("10", "Léo", "MARTIN", "Ancien tarif", season="2025-2026", **EMERGENCY)
-        rows = SqliteRepository.list_member_rows_of_users([self.leo])
+        rows = MemberRepository.list_member_rows_of_users([self.leo])
         self.assertEqual({r["season_name"] for r in rows}, {"2025-2026", "2026-2027"})
         Repo.add_participant(self.create()["id"], self.leo)
         (contact,) = self.client.get("/api/members/competitors").json()

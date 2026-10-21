@@ -8,12 +8,11 @@ même modèle de documents Firestore :
 - `competitions/{id}`        : épreuve + tableau `participants` embarqué ;
 - `coaches/{id}`             : référentiel des coachs ;
 - `adherents/{id}`           : instantané des adhérents (miroir de database.db) ;
-- `app_settings/{key}`       : paramètres applicatifs (campagne annuelle…) ;
 - `helloasso_items/{id_item}` : miroir des paiements HelloAsso + rattachements.
 
 L'API publique reproduit à l'identique celle de l'ancien
-`CompetitionRepository` (SQLite) afin que les pages et services existants
-fonctionnent sans changement. Toutes les méthodes sont des classmethods.
+`CompetitionRepository` (SQLite, supprimé depuis) afin que les pages et services
+existants fonctionnent sans changement. Toutes les méthodes sont des classmethods.
 
 Normalisation des identifiants : les documents hérités créés par la page web
 avaient un identifiant Firestore aléatoire. À la première lecture d'une épreuve,
@@ -50,7 +49,7 @@ from infrastructure.firestore.client import (
     FirestoreConflictError,
     FirestoreError,
 )
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.connection import SqliteDatabase
 
 # Collé pour l'ancien appelant (web) : état de paiement par défaut d'un nouveau
 # participant ajouté explicitement (même sémantique que l'ancienne base SQLite).
@@ -111,7 +110,6 @@ class CompetitionFirestoreRepository:
     COLLECTION_COACHES = "coaches"
     COLLECTION_ADHERENTS = "adherents"
     COLLECTION_PLANNING = "planning"
-    COLLECTION_SETTINGS = "app_settings"
     COLLECTION_ITEMS = "helloasso_items"
 
     # ------------------------------------------------------------------
@@ -318,8 +316,8 @@ class CompetitionFirestoreRepository:
         season = (season_filter or get_active_season() or "").strip()
 
         try:
-            SqliteRepository.setup_database()
-            main_conn = SqliteRepository.get_connection()
+            SqliteDatabase.setup_database()
+            main_conn = SqliteDatabase.get_connection()
         except Exception as e:
             report["errors"].append(f"Base principale inaccessible : {e}")
             return report
@@ -441,8 +439,8 @@ class CompetitionFirestoreRepository:
     @classmethod
     def list_planning_groups(cls) -> Dict[str, str]:
         """{tarif normalisé -> groupe de créneau} (lu directement dans database.db)."""
-        SqliteRepository.setup_database()
-        conn = SqliteRepository.get_connection()
+        SqliteDatabase.setup_database()
+        conn = SqliteDatabase.get_connection()
         try:
             return cls._read_planning_groups(conn)
         finally:
@@ -1008,24 +1006,6 @@ class CompetitionFirestoreRepository:
         )
         return {"competitions": comps, "students": students,
                 "participations": participants_map, "payments": payments_map, "seasons": seasons}
-
-    # ------------------------------------------------------------------
-    # Paramètres applicatifs
-    # ------------------------------------------------------------------
-    @classmethod
-    def get_app_setting(cls, key: str, default: str = "") -> str:
-        doc = FirestoreClient.get_document(cls.COLLECTION_SETTINGS, str(key))
-        if not doc:
-            return default
-        value = doc.get("value")
-        return str(value) if value is not None else default
-
-    @classmethod
-    def save_app_setting(cls, key: str, value: str) -> bool:
-        FirestoreClient.upsert_document(cls.COLLECTION_SETTINGS, str(key),
-                                        {"key": key, "value": str(value or ""),
-                                         "updated_at": cls._now_iso()})
-        return True
 
     # ------------------------------------------------------------------
     # Miroir HelloAsso (documents avec rattachement embarqué)

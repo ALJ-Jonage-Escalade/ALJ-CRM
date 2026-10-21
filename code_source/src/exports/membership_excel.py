@@ -155,8 +155,9 @@ def update_membership_excel():
     db_drive_id = env_vars.get("GOOGLE_DRIVE_DB_ID", "").strip()
     excel_drive_id = env_vars.get("GOOGLE_DRIVE_FILE_ID", "").strip()
     
-    from infrastructure.sqlite.repository import SqliteRepository
-    db_local_path = SqliteRepository.get_db_path()
+    from infrastructure.sqlite.connection import SqliteDatabase
+    from infrastructure.sqlite.members import MemberRepository
+    db_local_path = SqliteDatabase.get_db_path()
     
     # S'assurer d'avoir la base de données initialisée et téléchargée
     if not db_drive_id and excel_drive_id:
@@ -179,9 +180,9 @@ def update_membership_excel():
     else:
         print("⚠️ Aucun ID de BDD partagée détecté sur le Drive. Utilisation de la base SQLite locale.")
 
-    SqliteRepository.setup_database()
+    SqliteDatabase.setup_database()
     initial_db_hash = get_file_hash(db_local_path)
-    existing_participants = SqliteRepository.load_direct_data()
+    existing_participants = MemberRepository.load_direct_data()
     
     # ÉTAPES 2 & 3 gérées dynamiquement au sein de get_helloasso_data()
     participants_data = get_helloasso_data()
@@ -311,7 +312,7 @@ def update_membership_excel():
         print("🔄 [PIPELINE SYNC] ÉTAPE 5/8 : Création d'un Point de Restauration (Backup)...")
         print("================================================================================")
         print("💾 Sauvegarde préventive de la base de données locale en cours...")
-        # Note : Le backup est créé automatiquement par SqliteRepository.upsert_members() ci-dessous.
+        # Note : Le backup est créé automatiquement par MemberRepository.upsert_members() ci-dessous.
         
         print("\n================================================================================")
         print("🔄 [PIPELINE SYNC] ÉTAPE 6/8 : Insertion chirurgicale en Base de Données...")
@@ -322,7 +323,7 @@ def update_membership_excel():
             p["commentaires_correctif"] = ""
             
         print(f"📝 Écriture de {len(new_participants)} nouvelles fiches adhérents dans SQLite...")
-        SqliteRepository.upsert_members(new_participants)
+        MemberRepository.upsert_members(new_participants)
         print("✅ Base SQLite locale mise à jour et complétée.")
         
         print("\n================================================================================")

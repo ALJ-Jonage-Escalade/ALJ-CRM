@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import List, TypedDict
 
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.seasons import SeasonRepository
 
 
 class Seasons(TypedDict):
@@ -21,7 +21,7 @@ class SeasonService:
     def list_seasons() -> Seasons:
         """{seasons: names most recent first, active: the active season}. Without a season
         flagged active, the most recent one is."""
-        seasons: List[dict] = SqliteRepository.list_seasons()
+        seasons: List[dict] = SeasonRepository.list_seasons()
         names = [s["name"] for s in seasons]
         active = next((s["name"] for s in seasons if s["is_active"]), names[0] if names else "")
         return {"seasons": names, "active": active}

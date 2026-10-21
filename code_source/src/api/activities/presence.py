@@ -17,14 +17,15 @@ def get_presence_config():
     """Renvoie les groupes disponibles (autonomes et cours) et leurs statistiques pour l'IHM."""
     try:
         import datetime
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.members import MemberRepository
+        from infrastructure.sqlite.planning import PlanningRepository
         from domain.members.planning_groups import is_autonome_creneau
         from domain.constants import get_active_season
         from exports.presence_sheets import SEASON_COURSE_START, SEASON_COURSE_END
 
         season = get_active_season()
-        creneaux = SqliteRepository.load_creneaux_groups()
-        raw_data = SqliteRepository.load_direct_data(season_filter=season)
+        creneaux = PlanningRepository.load_creneaux_groups()
+        raw_data = MemberRepository.load_direct_data(season_filter=season)
 
         # 1. Groupes autonomes
         aut_creneaux = [c for c in creneaux if is_autonome_creneau(c)]
@@ -137,7 +138,8 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
     import tempfile
     import zipfile
     from exports.presence_sheets import generate_presence_sheets
-    from infrastructure.sqlite.repository import SqliteRepository
+    from infrastructure.sqlite.members import MemberRepository
+    from infrastructure.sqlite.planning import PlanningRepository
     from domain.members.planning_groups import is_autonome_creneau
     from domain.constants import get_active_season, is_valid_season
 
@@ -145,8 +147,8 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
         season = str(data.get("season") or get_active_season()).strip()
         if not is_valid_season(season):
             return error(400, "Saison invalide (format attendu : AAAA-AAAA).")
-        raw_data = SqliteRepository.load_direct_data(season_filter=season)
-        creneaux = SqliteRepository.load_creneaux_groups()
+        raw_data = MemberRepository.load_direct_data(season_filter=season)
+        creneaux = PlanningRepository.load_creneaux_groups()
 
         variant = "autonome" if str(data.get("variant") or "").strip().lower() == "autonome" else "cours"
         start_date = (data.get("start_date") or "").strip() or None

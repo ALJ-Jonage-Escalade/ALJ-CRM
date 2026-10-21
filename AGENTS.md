@@ -43,11 +43,12 @@ Run from `code_source/` (the script always uploads `code_source/`); Windows scri
 - Versioning: bump `APP_VERSION` in `src/domain/constants.py` and `code_source/VERSION` together on every functional change (`tests/test_cloud_run_lot4.py` checks `VERSION` == `APP_VERSION`; the `pyproject.toml` version is not used)
 
 ## Data & domain rules
-- Firestore is the source of truth (`crm_<table>` collections); `database.db` is a SQLite cache rebuilt from it (`infrastructure/firestore/cloud_database.py`). Write routes must go through `SqliteRepository` so changes are replicated
+- Firestore is the source of truth (`crm_<table>` collections); `database.db` is a SQLite cache rebuilt from it (`infrastructure/firestore/cloud_database.py`). Write routes must go through the repositories of `infrastructure/sqlite/` (`MemberRepository`, `PlanningRepository`, …; connection and schema in `SqliteDatabase`) so changes are replicated
 - FFME CSV export (`exports/membership_excel.generate_ffme_csv`): strict format (`;` separator, `dd/mm/yyyy` dates); `tests/exports/test_ffme_golden_master.py` must stay byte-identical, or the reference is renewed with the club's approval
+- App settings (key/value: HelloAsso campaign, WhatsApp text, results batch e-mail…) live only in the Firestore `app_settings` collection: `infrastructure/firestore/app_settings.AppSettingsRepository`
 - HelloAsso `customFields`: the value can be in `answer` or `value` — always read both
 - Name matching: use `normalize_string` / `normalize_name` from `domain/utils.py`; never rebuild paths by hand, import `CODE_ROOT` / `ROOT_DIR` / `DATA_ROOT` from `src/paths.py`
-- SQLite backups: use the SQLite backup API (`SqliteRepository.create_db_backup`), never a raw file copy (WAL)
+- SQLite backups: use the SQLite backup API (`SqliteDatabase.create_db_backup`), never a raw file copy (WAL)
 - New API routes go in a router `src/api/<theme>/<domain>.py`, never in `server.py` (app assembly only); add them to `tests/test_route_inventory.py`. A route that touches the SQLite cache must not join the Firestore-only routers listed in `server.py`
 - New API routes declare an explicit role (`admin` for any write or e-mail send); Cloud Run is ephemeral → generate files in memory and return them, never persist locally
 - Generated Excel sheets (attendance, emergency contacts) follow the club style: Segoe UI, dark blue `1E3A8A` headers, orange `EA580C` for emergency, zebra rows, print gridlines on

@@ -12,7 +12,9 @@ Permet de :
 from typing import Dict, Any, List, Optional
 
 from domain.utils import apply_template_variables, format_montant
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.email_templates import EmailTemplateRepository
+from infrastructure.sqlite.members import MemberRepository
 from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as CompetitionRepository,
 )
@@ -40,7 +42,7 @@ class EmailDispatchService:
     @classmethod
     def known_member_emails(cls) -> set:
         """Every member and payer address known to the club database (lower-cased)."""
-        emails = SqliteRepository.list_contact_emails()
+        emails = MemberRepository.list_contact_emails()
         try:
             emails.update(str(a.get("email") or "").strip().lower() for a in CompetitionRepository.list_adherents())
         except Exception as e:
@@ -69,8 +71,8 @@ class EmailDispatchService:
     @classmethod
     def list_templates(cls) -> List[Dict[str, Any]]:
         """Retourne la liste des modèles d'e-mails disponibles en base SQLite."""
-        SqliteRepository.setup_database()
-        return SqliteRepository.get_email_templates()
+        SqliteDatabase.setup_database()
+        return EmailTemplateRepository.get_email_templates()
 
     @classmethod
     def get_template_by_name(cls, name: str) -> Optional[Dict[str, Any]]:
@@ -124,7 +126,7 @@ class EmailDispatchService:
         # 1. Traitement par identifiants
         if recipient_ids:
             # Charger les profils depuis la base adhérents
-            all_users = SqliteRepository.get_users_by_ids(recipient_ids)
+            all_users = MemberRepository.get_users_by_ids(recipient_ids)
             # Charger les profils depuis la base compétitions en secours
             comp_adh = {a["id"]: a for a in CompetitionRepository.list_adherents()}
 

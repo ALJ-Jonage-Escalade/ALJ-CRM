@@ -12,7 +12,9 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from infrastructure.firestore import cloud_database as cdb  # noqa: E402
-from infrastructure.sqlite.repository import SqliteRepository  # noqa: E402
+from infrastructure.sqlite.connection import SqliteDatabase  # noqa: E402
+from infrastructure.sqlite.email_templates import EmailTemplateRepository  # noqa: E402
+from infrastructure.sqlite.members import MemberRepository  # noqa: E402
 
 
 class FakeStore:
@@ -106,8 +108,8 @@ def _seed(path):
 
 
 def _load(path, season):
-    SqliteRepository.set_db_path(path)
-    return SqliteRepository.load_direct_data(season)
+    SqliteDatabase.set_db_path(path)
+    return MemberRepository.load_direct_data(season)
 
 
 class CloudDatabaseTest(unittest.TestCase):
@@ -121,10 +123,10 @@ class CloudDatabaseTest(unittest.TestCase):
         self.b = os.path.join(self.tmp, "b.db")
         cdb.build_cache(self.a, self.store)
         cdb.build_cache(self.b, self.store)
-        self._saved_path = SqliteRepository.get_db_path()
+        self._saved_path = SqliteDatabase.get_db_path()
 
     def tearDown(self):
-        SqliteRepository.set_db_path(self._saved_path)
+        SqliteDatabase.set_db_path(self._saved_path)
 
     def sync(self, path):
         conn = cdb.connect(path)
@@ -136,8 +138,8 @@ class CloudDatabaseTest(unittest.TestCase):
             conn.close()
 
     def write(self, path, sql, *params):
-        SqliteRepository.set_db_path(path)
-        conn = SqliteRepository.get_connection()
+        SqliteDatabase.set_db_path(path)
+        conn = SqliteDatabase.get_connection()
         conn.execute(sql, params)
         conn.commit()
         conn.close()
@@ -237,12 +239,12 @@ class CloudDatabaseTest(unittest.TestCase):
             self.assertEqual([g[0] for g in got], ["GRAND", "PETIT"])
 
     def test_repository_write_path_is_tracked(self):
-        SqliteRepository.set_db_path(self.a)
-        ok = SqliteRepository.save_app_setting("default_sender_name", "ALJ Escalade")
+        SqliteDatabase.set_db_path(self.a)
+        ok = EmailTemplateRepository.save_email_template("Bienvenue", "Bienvenue au club", "Bonjour {first_name}")
         self.assertTrue(ok)
         self.sync(self.a)
-        docs = [d for (c, _), d in self.store.docs.items() if c == "crm_app_settings"]
-        self.assertIn("ALJ Escalade", [d["fields"].get("value") for d in docs])
+        docs = [d for (c, _), d in self.store.docs.items() if c == "crm_email_templates"]
+        self.assertIn("Bienvenue au club", [d["fields"].get("subject") for d in docs])
 
     def test_pull_does_not_reapply_own_writes(self):
         self.write(self.a, "UPDATE users SET city = 'Lyon' WHERE id = 1")

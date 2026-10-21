@@ -18,12 +18,12 @@ def get_ffme_stats_api(season: Optional[str] = None):
     """Calcule et renvoie les statistiques de l'export fédéral FFME."""
     try:
         import datetime
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.members import MemberRepository
         from domain.constants import get_active_season
         from exports.membership_excel import parse_date_to_datetime, clean_digits_only
 
         target_season = season or get_active_season()
-        participants = SqliteRepository.load_direct_data(season_filter=target_season)
+        participants = MemberRepository.load_direct_data(season_filter=target_season)
 
         produced_count = 0
         ignored_count = 0
@@ -98,13 +98,13 @@ def export_ffme_api(season: Optional[str] = None, include_termine: bool = Query(
     import os
     import tempfile
     import datetime
-    from infrastructure.sqlite.repository import SqliteRepository
+    from infrastructure.sqlite.members import MemberRepository
     from domain.constants import get_active_season
     from exports.membership_excel import generate_ffme_csv
 
     try:
         target_season = season or get_active_season()
-        raw_data = SqliteRepository.load_direct_data(season_filter=target_season)
+        raw_data = MemberRepository.load_direct_data(season_filter=target_season)
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"import_ffme_{timestamp}.csv"
@@ -141,7 +141,7 @@ def preview_ffme_import_api(data: Dict[str, Any] = Body(...)):
     import base64
     import tempfile
     import os
-    from infrastructure.sqlite.repository import SqliteRepository
+    from infrastructure.sqlite.ffme_import import FfmeImportRepository
 
     try:
         content_b64 = data.get("content_base64") or ""
@@ -156,7 +156,7 @@ def preview_ffme_import_api(data: Dict[str, Any] = Body(...)):
             tmp_path = tmp.name
 
         try:
-            prep = SqliteRepository.prepare_ffme_licensees(tmp_path)
+            prep = FfmeImportRepository.prepare_ffme_licensees(tmp_path)
             stats = prep.get("stats", {})
             if stats.get("errors") and not prep.get("updates"):
                 return JSONResponse(status_code=400, content={"status": "error", "message": stats["errors"][0], "errors": stats["errors"]})
@@ -187,7 +187,7 @@ def apply_ffme_import_api(data: Dict[str, Any] = Body(...)):
     import base64
     import os
     import tempfile
-    from infrastructure.sqlite.repository import SqliteRepository
+    from infrastructure.sqlite.ffme_import import FfmeImportRepository
     from domain.constants import get_active_season
 
     try:
@@ -211,7 +211,7 @@ def apply_ffme_import_api(data: Dict[str, Any] = Body(...)):
                 tmp.write(file_bytes)
                 tmp_path = tmp.name
             try:
-                prep = SqliteRepository.prepare_ffme_licensees(tmp_path)
+                prep = FfmeImportRepository.prepare_ffme_licensees(tmp_path)
                 updates = prep.get("updates", [])
                 stats = prep.get("stats", {})
             finally:
@@ -246,7 +246,7 @@ def apply_ffme_import_api(data: Dict[str, Any] = Body(...)):
                 content={"status": "error", "message": "Aucune mise à jour à appliquer (aucun rapprochement trouvé)."}
             )
 
-        ok = SqliteRepository.apply_ffme_matches(updates, season_name=season)
+        ok = FfmeImportRepository.apply_ffme_matches(updates, season_name=season)
         if not ok:
             return JSONResponse(status_code=500, content={"status": "error", "message": "Échec de l'écriture des associations en base de données."})
 

@@ -33,6 +33,7 @@ from domain.competitions.matching import (
     auto_link_items,
     summarize_items,
 )
+from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as CompetitionRepository,
 )
@@ -186,7 +187,7 @@ class HelloAssoWebhookService:
         """Slug du formulaire HelloAsso des compétitions (réglage HELLOASSO_ANNUAL_CAMPAIGN)."""
         try:
             from domain.competitions.matching import parse_campaign_identifier
-            ref = CompetitionRepository.get_app_setting("HELLOASSO_ANNUAL_CAMPAIGN")
+            ref = AppSettingsRepository.get("HELLOASSO_ANNUAL_CAMPAIGN")
             if not isinstance(ref, str) or not ref.strip():
                 return ""
             return parse_campaign_identifier(ref)["slug"]
@@ -576,12 +577,12 @@ class HelloAssoWebhookService:
             if str(st or "").strip().lower() != "paye":
                 # Si au moins un participant n'a pas encore payé, réinitialiser le flag
                 setting_key = f"COMP_ALL_PAID_NOTIFIED_{competition_id}"
-                CompetitionRepository.save_app_setting(setting_key, "")
+                AppSettingsRepository.save(setting_key, "")
                 return False
 
         # Tous les compétiteurs sélectionnés ont payé !
         setting_key = f"COMP_ALL_PAID_NOTIFIED_{competition_id}"
-        already_notified = CompetitionRepository.get_app_setting(setting_key, "")
+        already_notified = AppSettingsRepository.get(setting_key, "")
         if already_notified:
             return False
 
@@ -609,7 +610,7 @@ class HelloAssoWebhookService:
             )
             if ok:
                 now_iso = datetime.datetime.now().isoformat(timespec="seconds")
-                CompetitionRepository.save_app_setting(setting_key, now_iso)
+                AppSettingsRepository.save(setting_key, now_iso)
                 print(f"✅ [WEBHOOK_HELLOASSO] E-mail 'Tous les paiements validés' envoyé à {recipient} pour la compétition '{nom_comp}'")
                 return True
             else:

@@ -18,6 +18,7 @@ from infrastructure.firestore import client as fc
 from infrastructure.firestore import competition_repository as repo_module
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from support.fake_firestore import FakeFirestore, FirestoreRepoTestCase  # noqa: F401
+from support.member_db import MemberDbTestCase
 from domain.competitions.models import (
     Competition,
     statut_paiement_apres_bascule,
@@ -373,14 +374,38 @@ class TestHelloAssoMirror(FirestoreRepoTestCase):
             self.assertNotIn(f, captured[0]["data"])
 
 
-class TestAppSettings(FirestoreRepoTestCase):
-    def test_settings_roundtrip(self):
-        self.assertEqual(Repo.get_app_setting("HELLOASSO_ANNUAL_CAMPAIGN"), "")
-        Repo.save_app_setting("HELLOASSO_ANNUAL_CAMPAIGN", "competition-saison-2026")
-        self.assertEqual(Repo.get_app_setting("HELLOASSO_ANNUAL_CAMPAIGN"),
-                         "competition-saison-2026")
-        Repo.save_app_setting("HELLOASSO_ANNUAL_CAMPAIGN", "")
-        self.assertEqual(Repo.get_app_setting("HELLOASSO_ANNUAL_CAMPAIGN"), "")
+class TestSyncAdherentsFromMain(MemberDbTestCase, FirestoreRepoTestCase):
+    """`adherents` and `planning` collections rebuilt from the members of database.db."""
+
+    def setUp(self):
+        super().setUp()
+        self.seed("CMD1", "Jean", "DUPONT", "Compétition - U13/U15", **{"champ_Numéro de Licence FFME (6 chiffres)": "123456"})
+        self.seed("CMD2", "Léa", "MARTIN", "Compétition - U13/U15")
+        self.seed("CMD3", "Bob", "LOISIR", "Adultes autonomes")
+        self.seed_planning("Compétition - U13", ["Compétition - U13/U15"], jour="mercredi", horaires="18h")
+        self.seed_planning("Autonome", ["Adultes autonomes"], jour="lundi", horaires="20h")
+
+    def test_sync_writes_directory_and_planning(self):
+        report = Repo.sync_adherents_from_main("2026-2027")
+        self.assertEqual(report["errors"], [])
+        self.assertEqual((report["imported"], report["updated"]), (3, 3))
+        self.assertEqual(len(self.fake.store["planning"]), 2)
+
+        adherents = Repo.list_adherents()
+        self.assertEqual(len(adherents), 3)
+        dupont = [a for a in adherents if a["nom"] == "DUPONT"][0]
+        self.assertEqual(dupont["num_licence"], "123456")
+        self.assertEqual(dupont["tarif"], "Compétition - U13/U15")
+        self.assertEqual(dupont["creneau_groupe"], "Compétition - U13")
+
+        # Idempotent: a second sync rewrites the same documents
+        Repo.sync_adherents_from_main("2026-2027")
+        self.assertEqual(Repo.count_adherents(), 3)
+
+    def test_planning_groups(self):
+        mapping = Repo.list_planning_groups()
+        self.assertEqual(mapping["competition - u13/u15"], "Compétition - U13")
+        self.assertEqual(mapping["adultes autonomes"], "Autonome")
 
 
 class TestAdherents(FirestoreRepoTestCase):

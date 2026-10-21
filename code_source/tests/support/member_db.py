@@ -4,7 +4,8 @@ import os
 import tempfile
 import unittest
 
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.members import MemberRepository
 
 BASE_MEMBER = {
     "order_date": "2026-09-01T10:00:00",
@@ -24,24 +25,24 @@ class MemberDbTestCase(unittest.TestCase):
         super().setUp()
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
-        original = SqliteRepository.get_db_path()
+        original = SqliteDatabase.get_db_path()
 
         def restore():
-            SqliteRepository.set_db_path(original)
-            SqliteRepository._database_setup_done = False
+            SqliteDatabase.set_db_path(original)
+            SqliteDatabase._database_setup_done = False
         self.addCleanup(restore)
-        SqliteRepository.set_db_path(os.path.join(self._tmp.name, "members.db"))
-        SqliteRepository._database_setup_done = False
-        SqliteRepository.setup_database()
+        SqliteDatabase.set_db_path(os.path.join(self._tmp.name, "members.db"))
+        SqliteDatabase._database_setup_done = False
+        SqliteDatabase.setup_database()
 
     def seed(self, ref, first_name, last_name, tarif, season="2026-2027", **extra):
         member = dict(BASE_MEMBER, order_ref=ref, user_firstName=first_name, user_lastName=last_name,
                       tarif_name=tarif, payer_email=f"{ref}@test.com", **extra)
-        SqliteRepository.upsert_members([member], season_name=season)
+        MemberRepository.upsert_members([member], season_name=season)
 
     def seed_planning(self, groupe, tarifs, **extra):
         import json
-        conn = SqliteRepository.get_connection()
+        conn = SqliteDatabase.get_connection()
         try:
             conn.execute("INSERT INTO planning (groupe, helloasso_tarifs, jour, horaires, categorie_age, type)"
                          " VALUES (?, ?, ?, ?, ?, ?)",

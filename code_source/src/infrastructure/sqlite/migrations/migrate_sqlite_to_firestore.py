@@ -27,7 +27,8 @@ import tempfile
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))  # src/
 
 from infrastructure.firestore import cloud_database as cdb  # noqa: E402
-from infrastructure.sqlite.repository import SqliteRepository  # noqa: E402
+from infrastructure.sqlite.connection import SqliteDatabase  # noqa: E402
+from infrastructure.sqlite.members import MemberRepository  # noqa: E402
 
 
 def normalized_copy(src: str, workdir: str) -> str:
@@ -37,12 +38,12 @@ def normalized_copy(src: str, workdir: str) -> str:
     s.backup(d)
     d.close()
     s.close()
-    saved = SqliteRepository.get_db_path()
+    saved = SqliteDatabase.get_db_path()
     try:
-        SqliteRepository.set_db_path(dst)
-        SqliteRepository.setup_database(force=True)
+        SqliteDatabase.set_db_path(dst)
+        SqliteDatabase.setup_database(force=True)
     finally:
-        SqliteRepository.set_db_path(saved)
+        SqliteDatabase.set_db_path(saved)
     return dst
 
 
@@ -55,12 +56,12 @@ def counts(path: str) -> dict:
 
 
 def load_view(path: str, season: str) -> list:
-    saved = SqliteRepository.get_db_path()
+    saved = SqliteDatabase.get_db_path()
     try:
-        SqliteRepository.set_db_path(path)
-        return SqliteRepository.load_direct_data(season)
+        SqliteDatabase.set_db_path(path)
+        return MemberRepository.load_direct_data(season)
     finally:
-        SqliteRepository.set_db_path(saved)
+        SqliteDatabase.set_db_path(saved)
 
 
 def compare(source: str, cache: str) -> list:

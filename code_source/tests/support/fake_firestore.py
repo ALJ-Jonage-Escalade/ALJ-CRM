@@ -83,22 +83,21 @@ class FakeFirestore:
         return {"written": len(writes), "errors_count": 0, "errors": []}
 
 
+def use_fake_firestore(test: unittest.TestCase) -> FakeFirestore:
+    """Replace FirestoreClient by an in-memory store for the duration of `test`."""
+    fake = FakeFirestore()
+    for name in ("get_document", "list_documents", "upsert_document", "update_fields", "delete_document", "batch_upsert"):
+        p = patch.object(FirestoreClient, name, getattr(fake, name))
+        p.start()
+        test.addCleanup(p.stop)
+    return fake
+
+
 class FirestoreRepoTestCase(unittest.TestCase):
     """Base commune : FirestoreClient remplacé par le magasin en mémoire."""
 
     def setUp(self):
-        self.fake = FakeFirestore()
-        self._patches = [
-            patch.object(FirestoreClient, "get_document", self.fake.get_document),
-            patch.object(FirestoreClient, "list_documents", self.fake.list_documents),
-            patch.object(FirestoreClient, "upsert_document", self.fake.upsert_document),
-            patch.object(FirestoreClient, "update_fields", self.fake.update_fields),
-            patch.object(FirestoreClient, "delete_document", self.fake.delete_document),
-            patch.object(FirestoreClient, "batch_upsert", self.fake.batch_upsert),
-        ]
-        for p in self._patches:
-            p.start()
-            self.addCleanup(p.stop)
+        self.fake = use_fake_firestore(self)
         # Cache adhérents remis à zéro entre les tests
         Repo._invalidate_adherents_cache()
         self.addCleanup(Repo._invalidate_adherents_cache)

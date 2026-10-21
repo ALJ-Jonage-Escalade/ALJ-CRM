@@ -102,4 +102,6 @@ files = [
     "src/services/competitions/participants.py",
     "src/services/members/seasons.py",
     "src/infrastructure/geocoding.py",
+    "src/infrastructure/sqlite/connection.py",
+    "src/infrastructure/firestore/app_settings.py",
 ]

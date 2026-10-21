@@ -7,7 +7,7 @@ réglages, cache de géocodage) est Firestore : une collection `crm_<table>` par
 table, un document par ligne (ID = clé primaire SQLite).
 
 Le fichier `database.db` local devient un **cache** reconstruit depuis Firestore :
-tout le code existant (SqliteRepository, vue `v_adherents_legacy`, SQL brut des
+tout le code existant (repositories de infrastructure/sqlite, vue `v_adherents_legacy`, SQL brut des
 pages) continue de lire et d'écrire en SQL, sans modification.
 
 Mécanisme :
@@ -693,16 +693,16 @@ def flush(conn, store, by: str = "", report: Optional[Dict[str, Any]] = None,
 # Construction complète du cache et export initial
 # ----------------------------------------------------------------------
 def create_schema(path: str):
-    """Crée une base vide au schéma de l'application (SqliteRepository)."""
-    from infrastructure.sqlite.repository import SqliteRepository as R
-    saved = (R._db_path, R._db_path_overridden, R._database_setup_done, R._startup_db_hash)
+    """Crée une base vide au schéma de l'application (SqliteDatabase)."""
+    from infrastructure.sqlite.connection import SqliteDatabase as R
+    saved = (R._db_path, R._db_path_overridden, R._database_setup_done)
     try:
         R._db_path = path
         R._db_path_overridden = True
         R._database_setup_done = False
         R.setup_database(force=True)
     finally:
-        R._db_path, R._db_path_overridden, R._database_setup_done, R._startup_db_hash = saved
+        R._db_path, R._db_path_overridden, R._database_setup_done = saved
 
 
 def _remove_db_files(path: str):
@@ -855,8 +855,8 @@ class CloudDatabase:
 
     @staticmethod
     def db_path() -> str:
-        from infrastructure.sqlite.repository import SqliteRepository
-        return SqliteRepository.get_db_path()
+        from infrastructure.sqlite.connection import SqliteDatabase
+        return SqliteDatabase.get_db_path()
 
     @staticmethod
     def who() -> str:
@@ -888,9 +888,9 @@ class CloudDatabase:
                         progress("Chargement complet de la base depuis Firestore…")
                     backup_dir = os.path.join(os.path.dirname(path), "backups")
                     report = build_cache(path, store, backup_dir=backup_dir)
-                    from infrastructure.sqlite.repository import SqliteRepository
-                    SqliteRepository._database_setup_done = False
-                    SqliteRepository.setup_database()
+                    from infrastructure.sqlite.connection import SqliteDatabase
+                    SqliteDatabase._database_setup_done = False
+                    SqliteDatabase.setup_database()
                     conn = connect(path)
                     try:
                         install_tracking(conn)

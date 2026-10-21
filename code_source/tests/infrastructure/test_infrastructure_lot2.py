@@ -11,20 +11,22 @@ if _src_dir not in sys.path:
 
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.mail.repository import EmailRepository
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.ffme_import import FfmeImportRepository
+from infrastructure.sqlite.members import MemberRepository
 
 class TestInfrastructureLot2(unittest.TestCase):
 
     def setUp(self):
         # Sauvegarder le chemin de la BDD d'origine
-        self.original_db_path = SqliteRepository.get_db_path()
+        self.original_db_path = SqliteDatabase.get_db_path()
         # Configurer un chemin temporaire pour les tests
         self.test_db_path = os.path.join(_test_dir, "test_database.db")
-        SqliteRepository.set_db_path(self.test_db_path)
+        SqliteDatabase.set_db_path(self.test_db_path)
         
     def tearDown(self):
         # Restaurer la BDD d'origine
-        SqliteRepository.set_db_path(self.original_db_path)
+        SqliteDatabase.set_db_path(self.original_db_path)
         # Supprimer le fichier de test s'il existe
         if os.path.exists(self.test_db_path):
             try:
@@ -33,9 +35,9 @@ class TestInfrastructureLot2(unittest.TestCase):
                 pass
 
     def test_sqlite_repository_crud(self):
-        """Vérifie le cycle de vie complet des données (CRUD) avec SqliteRepository."""
+        """Vérifie le cycle de vie complet des données (CRUD) avec MemberRepository."""
         # 1. Initialisation de la BDD
-        SqliteRepository.setup_database()
+        SqliteDatabase.setup_database()
         self.assertTrue(os.path.exists(self.test_db_path))
         
         # 2. Insertion de membres (Create/Upsert)
@@ -63,11 +65,11 @@ class TestInfrastructureLot2(unittest.TestCase):
             "commentaires_correctif": ""
         }
         
-        inserted = SqliteRepository.upsert_members([test_member])
+        inserted = MemberRepository.upsert_members([test_member])
         self.assertEqual(inserted, 1)
         
         # 3. Chargement des membres (Read)
-        loaded = SqliteRepository.load_direct_data()
+        loaded = MemberRepository.load_direct_data()
         self.assertEqual(len(loaded), 1)
         self.assertEqual(loaded[0]["last_name"], "DUPONT")
         self.assertEqual(loaded[0]["first_name"], "Jean")
@@ -78,7 +80,7 @@ class TestInfrastructureLot2(unittest.TestCase):
             "phone": "0699999999",
             "city": "Villeurbanne"
         }
-        success, err = SqliteRepository.update_member_in_db(
+        success, err = MemberRepository.update_member_in_db(
             original_order_ref="99999",
             original_last_name="DUPONT",
             original_first_name="Jean",
@@ -89,7 +91,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         self.assertEqual(err, "")
         
         # Vérifier si les modifications sont présentes en base
-        loaded_after_update = SqliteRepository.load_direct_data()
+        loaded_after_update = MemberRepository.load_direct_data()
         self.assertEqual(len(loaded_after_update), 1)
         self.assertEqual(loaded_after_update[0]["phone"], "0699999999")
         self.assertEqual(loaded_after_update[0]["city"], "Villeurbanne")
@@ -161,7 +163,7 @@ class TestInfrastructureLot2(unittest.TestCase):
     def test_merge_ffme_licensees(self):
         """Vérifie l'importation et la fusion de la liste FFME avec la BDD locale."""
         import pandas as pd
-        SqliteRepository.setup_database()
+        SqliteDatabase.setup_database()
         
         # 1. Insérer des adhérents de test
         m1 = {
@@ -192,7 +194,7 @@ class TestInfrastructureLot2(unittest.TestCase):
             "champ_Numéro de Licence FFME (6 chiffres)": ""
         }
         
-        SqliteRepository.upsert_members([m1, m2])
+        MemberRepository.upsert_members([m1, m2])
         
         # 2. Créer un fichier Excel FFME temporaire
         test_excel_path = os.path.join(_test_dir, "test_ffme_import.xlsx")
@@ -209,7 +211,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         
         try:
             # 3. Exécuter la fusion
-            stats = SqliteRepository.merge_ffme_licensees(test_excel_path)
+            stats = FfmeImportRepository.merge_ffme_licensees(test_excel_path)
             
             # 4. Vérifier les statistiques retournées
             self.assertEqual(stats["total_processed"], 3)
@@ -219,7 +221,7 @@ class TestInfrastructureLot2(unittest.TestCase):
             self.assertEqual(len(stats["errors"]), 0)
             
             # 5. Vérifier les mises à jour réelles en BDD
-            loaded = SqliteRepository.load_direct_data()
+            loaded = MemberRepository.load_direct_data()
             
             # Trouver les membres dans les données chargées
             carlos = next(m for m in loaded if m["last_name"] == "MARTINEZ")
@@ -244,7 +246,7 @@ class TestInfrastructureLot2(unittest.TestCase):
     def test_merge_autonomes_data(self):
         """Vérifie l'importation et la fusion de la liste d'autonomie avec la BDD locale."""
         import pandas as pd
-        SqliteRepository.setup_database()
+        SqliteDatabase.setup_database()
 
         # 1. Insérer des adhérents de test avec licence
         m1 = {
@@ -275,7 +277,7 @@ class TestInfrastructureLot2(unittest.TestCase):
             "champ_Numéro de Licence FFME (6 chiffres)": "789012"
         }
 
-        conn = SqliteRepository.get_connection()
+        conn = SqliteDatabase.get_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM purchase_options")
         cursor.execute("DELETE FROM purchases")
@@ -284,7 +286,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        SqliteRepository.upsert_members([m1, m2])
+        MemberRepository.upsert_members([m1, m2])
 
         # 2. Créer un fichier Excel Autonomes temporaire
         test_excel_path = os.path.join(_test_dir, "test_autonomes_import.xlsx")
@@ -306,7 +308,7 @@ class TestInfrastructureLot2(unittest.TestCase):
 
         try:
             # 3. Exécuter la fusion
-            stats = SqliteRepository.merge_autonomes_data(test_excel_path)
+            stats = FfmeImportRepository.merge_autonomes_data(test_excel_path)
 
             # 4. Vérifier les statistiques retournées
             self.assertEqual(stats["total_processed"], 3)
@@ -315,7 +317,7 @@ class TestInfrastructureLot2(unittest.TestCase):
             self.assertEqual(len(stats["errors"]), 0)
 
             # 5. Vérifier les mises à jour réelles en BDD
-            loaded = SqliteRepository.load_direct_data()
+            loaded = MemberRepository.load_direct_data()
 
             luc = next(m for m in loaded if m["last_name"] == "RODRIGUEZ")
             maria = next(m for m in loaded if m["last_name"] == "GARCIA")
@@ -336,7 +338,7 @@ class TestInfrastructureLot2(unittest.TestCase):
 
     def test_already_member_detection(self):
         """Vérifie la détection automatique de la réinscription d'un adhérent (déjà adhérent dans une autre saison)."""
-        SqliteRepository.setup_database()
+        SqliteDatabase.setup_database()
         
         # Adhérent réinscrit (présent en 25/26 et en 26/27)
         member_historic = {
@@ -350,7 +352,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         }
         
         # Insérer d'abord dans l'ancienne saison
-        SqliteRepository.upsert_members([member_historic], "2025-2026")
+        MemberRepository.upsert_members([member_historic], "2025-2026")
         
         # Insérer maintenant le même adhérent dans la nouvelle saison
         member_new = {
@@ -362,7 +364,7 @@ class TestInfrastructureLot2(unittest.TestCase):
             "user_lastName": "MARTINEZ",
             "user_firstName": "Carlos"
         }
-        SqliteRepository.upsert_members([member_new], "2026-2027")
+        MemberRepository.upsert_members([member_new], "2026-2027")
         
         # Adhérent complètement nouveau (uniquement en 26/27)
         member_unique = {
@@ -374,10 +376,10 @@ class TestInfrastructureLot2(unittest.TestCase):
             "user_lastName": "LORENZO",
             "user_firstName": "Ines"
         }
-        SqliteRepository.upsert_members([member_unique], "2026-2027")
+        MemberRepository.upsert_members([member_unique], "2026-2027")
         
         # Charger les données pour la saison active 2026-2027
-        loaded_raw = SqliteRepository.load_direct_data("2026-2027")
+        loaded_raw = MemberRepository.load_direct_data("2026-2027")
         self.assertEqual(len(loaded_raw), 2)
         
         from domain.members.models import Member
@@ -392,8 +394,8 @@ class TestInfrastructureLot2(unittest.TestCase):
         self.assertEqual(ines.already_member, "Non")
 
     def test_sqlite_repository_export_to_excel(self):
-        """Vérifie que SqliteRepository.export_to_excel génère bien un fichier Excel valide."""
-        SqliteRepository.setup_database()
+        """Vérifie que MemberRepository.export_to_excel génère bien un fichier Excel valide."""
+        SqliteDatabase.setup_database()
         
         m = {
             "order_ref": "EXPORT-123",
@@ -401,14 +403,14 @@ class TestInfrastructureLot2(unittest.TestCase):
             "user_firstName": "John",
             "tarif_name": "Loisir Collège"
         }
-        SqliteRepository.upsert_members([m])
+        MemberRepository.upsert_members([m])
         
         temp_excel = os.path.join(_test_dir, "test_export_output.xlsx")
         if os.path.exists(temp_excel):
             os.remove(temp_excel)
             
         try:
-            success = SqliteRepository.export_to_excel(temp_excel)
+            success = MemberRepository.export_to_excel(temp_excel)
             self.assertTrue(success)
             self.assertTrue(os.path.exists(temp_excel))
             
@@ -428,7 +430,7 @@ class TestInfrastructureLot2(unittest.TestCase):
 
     def test_upsert_members_status_priority(self):
         """Vérifie que upsert_members préserve les statuts prioritaires (Processed > Canceled)."""
-        SqliteRepository.setup_database()
+        SqliteDatabase.setup_database()
         
         # 1. Commande active
         member_active = {
@@ -440,10 +442,10 @@ class TestInfrastructureLot2(unittest.TestCase):
             "user_lastName": "CLAPET_TEST",
             "user_firstName": "Mathilde"
         }
-        SqliteRepository.upsert_members([member_active], "2026-2027")
+        MemberRepository.upsert_members([member_active], "2026-2027")
         
         # Charger et vérifier que c'est bien actif
-        loaded = SqliteRepository.load_direct_data("2026-2027")
+        loaded = MemberRepository.load_direct_data("2026-2027")
         match = next(m for m in loaded if m["last_name"] == "CLAPET_TEST")
         self.assertEqual(match["status"], "Processed")
         self.assertEqual(match["order_ref"], "ORD-ACTIVE-123")
@@ -458,10 +460,10 @@ class TestInfrastructureLot2(unittest.TestCase):
             "user_lastName": "CLAPET_TEST",
             "user_firstName": "Mathilde"
         }
-        SqliteRepository.upsert_members([member_canceled], "2026-2027")
+        MemberRepository.upsert_members([member_canceled], "2026-2027")
         
         # Vérifier que la commande active a été CONSERVÉE (priorité supérieure)
-        loaded = SqliteRepository.load_direct_data("2026-2027")
+        loaded = MemberRepository.load_direct_data("2026-2027")
         match = next(m for m in loaded if m["last_name"] == "CLAPET_TEST")
         self.assertEqual(match["status"], "Processed")
         self.assertEqual(match["order_ref"], "ORD-ACTIVE-123")
@@ -478,10 +480,10 @@ class TestInfrastructureLot2(unittest.TestCase):
             "user_lastName": "CLAPET_TEST2",
             "user_firstName": "Mathilde"
         }
-        SqliteRepository.upsert_members([m_canceled], "2026-2027")
+        MemberRepository.upsert_members([m_canceled], "2026-2027")
         
         # Vérifier qu'il est bien Canceled
-        loaded = SqliteRepository.load_direct_data("2026-2027")
+        loaded = MemberRepository.load_direct_data("2026-2027")
         match = next(m for m in loaded if m["last_name"] == "CLAPET_TEST2")
         self.assertEqual(match["status"], "Canceled")
         
@@ -495,10 +497,10 @@ class TestInfrastructureLot2(unittest.TestCase):
             "user_lastName": "CLAPET_TEST2",
             "user_firstName": "Mathilde"
         }
-        SqliteRepository.upsert_members([m_active], "2026-2027")
+        MemberRepository.upsert_members([m_active], "2026-2027")
         
         # Vérifier qu'il a bien été mis à jour à Processed
-        loaded = SqliteRepository.load_direct_data("2026-2027")
+        loaded = MemberRepository.load_direct_data("2026-2027")
         match = next(m for m in loaded if m["last_name"] == "CLAPET_TEST2")
         self.assertEqual(match["status"], "Processed")
         self.assertEqual(match["order_ref"], "ORD-ACTIVE-888")

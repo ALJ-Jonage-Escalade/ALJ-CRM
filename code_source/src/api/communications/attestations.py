@@ -114,9 +114,9 @@ def send_attestation_api(data: Dict[str, Any] = Body(...)):
         # (CloudDatabase.after_write synchronisera automatiquement la modification vers Firestore)
         now_str = datetime.datetime.now().strftime("%d/%m/%Y")
         try:
-            from infrastructure.sqlite.repository import SqliteRepository
+            from infrastructure.sqlite.members import MemberRepository
             pid = member.get("purchase_id")
-            SqliteRepository.update_email_sent_date(
+            MemberRepository.update_email_sent_date(
                 order_ref=str(order_ref or "").strip(),
                 last_name=str(last_name or "").strip(),
                 first_name=str(first_name or "").strip(),

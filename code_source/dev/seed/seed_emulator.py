@@ -7,7 +7,7 @@ Fills the local Firestore emulator with FAKE data (Harry Potter universe).
 
 Fully resets the emulator database, then follows the production path:
 1. temporary SQLite database with the current schema, filled by the same functions as
-   the HelloAsso import (`SqliteRepository.upsert_members`, `save_planning_data`, …);
+   the HelloAsso import (`MemberRepository.upsert_members`, `save_planning_data`, …);
 2. push to Firestore with `cloud_database.import_database` (real `crm_*` format);
 3. PWA `adherents` / `planning` projection, coaches and competitions through
    `CompetitionFirestoreRepository`.
@@ -67,12 +67,12 @@ def reset_emulator(host: str, project: str) -> None:
 def drop_server_cache() -> None:
     """Deletes the dev server's SQLite cache (ALJ_DATA_DIR): the reset leaves no deletions
     to sync, and the server rebuilds its cache from the emulator."""
-    from infrastructure.sqlite.repository import SqliteRepository
+    from infrastructure.sqlite.connection import SqliteDatabase
     if not os.environ.get("ALJ_DATA_DIR"):
         # Without a dedicated folder, the default path would be this machine's database (data/): leave it alone.
         print("ℹ️  ALJ_DATA_DIR not set: dev server cache kept.")
         return
-    db = SqliteRepository.get_db_path()
+    db = SqliteDatabase.get_db_path()
     for path in (db, db + "-wal", db + "-shm"):
         if os.path.exists(path):
             os.remove(path)
@@ -237,22 +237,25 @@ EMAIL_TEMPLATES = [
 # Writing
 # --------------------------------------------------------------------------
 def build_sqlite(path, fake, rng, coach_names):
-    from infrastructure.sqlite.repository import SqliteRepository
-    SqliteRepository.set_db_path(path)
-    SqliteRepository.setup_database(force=True)
+    from infrastructure.sqlite.connection import SqliteDatabase
+    from infrastructure.sqlite.email_templates import EmailTemplateRepository
+    from infrastructure.sqlite.members import MemberRepository
+    from infrastructure.sqlite.planning import PlanningRepository
+    SqliteDatabase.set_db_path(path)
+    SqliteDatabase.setup_database(force=True)
 
     planning = planning_items(coach_names)
-    SqliteRepository.save_planning_data(planning)
+    PlanningRepository.save_planning_data(planning)
 
     people = build_people(fake, rng, planning)
     current = [member_record(fake, rng, p, SEASON, i) for i, p in enumerate(people, start=1)]
     returning = [p for p in people if rng.random() < RETURNING_RATIO]
     previous = [member_record(fake, rng, p, PREVIOUS_SEASON, i) for i, p in enumerate(returning, start=1)]
-    SqliteRepository.upsert_members(previous, PREVIOUS_SEASON)
-    SqliteRepository.upsert_members(current, SEASON)
+    MemberRepository.upsert_members(previous, PREVIOUS_SEASON)
+    MemberRepository.upsert_members(current, SEASON)
 
     for name, subject, body in EMAIL_TEMPLATES:
-        SqliteRepository.save_email_template(name, subject, body, "", "ALJ Escalade (dev)")
+        EmailTemplateRepository.save_email_template(name, subject, body, "", "ALJ Escalade (dev)")
     return len(current), len(previous)
 
 

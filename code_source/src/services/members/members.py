@@ -11,7 +11,8 @@ from typing import List, Optional
 
 from domain.members import view as member_view
 from domain.competitions.models import STATUT_CLOSE
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.members import MemberRepository
+from infrastructure.sqlite.planning import PlanningRepository
 from services.competitions.competitions import CompetitionService
 from services.documents import Doc
 from services.errors import NotFound
@@ -27,8 +28,8 @@ class MemberService:
         name = (season or "").strip() or seasons["active"]
         if name not in seasons["seasons"]:
             raise NotFound(f"Saison inconnue : {name}.")
-        planning = SqliteRepository.load_planning_data(log_debug=False)
-        rows = SqliteRepository.list_member_rows(name)
+        planning = PlanningRepository.load_planning_data(log_debug=False)
+        rows = MemberRepository.list_member_rows(name)
         return {
             "season": name,
             "members": member_view.build_members(rows, planning, name),
@@ -48,6 +49,6 @@ class MemberService:
         seasons = SeasonService.list_seasons()
         order = [seasons["active"]] + [s for s in seasons["seasons"] if s != seasons["active"]]
         rank = {s: i for i, s in enumerate(order)}
-        rows = sorted(SqliteRepository.list_member_rows_of_users(ids), key=lambda r: rank.get(r["season_name"], len(rank)))
-        planning = SqliteRepository.load_planning_data(log_debug=False)
+        rows = sorted(MemberRepository.list_member_rows_of_users(ids), key=lambda r: rank.get(r["season_name"], len(rank)))
+        planning = PlanningRepository.load_planning_data(log_debug=False)
         return member_view.competitor_contacts(rows, planning, seasons["active"])
