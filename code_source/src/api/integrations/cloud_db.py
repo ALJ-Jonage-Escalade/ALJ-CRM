@@ -17,17 +17,17 @@ def get_cloud_db_status_api():
     """Retourne l'état détaillé du cache local SQLite et de sa synchronisation Firestore."""
     try:
         from infrastructure.firestore.cloud_database import CloudDatabase
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.connection import SqliteDatabase
         enabled = CloudDatabase.is_enabled()
         st = CloudDatabase.status() if enabled else {}
-        db_path = SqliteRepository.get_db_path()
+        db_path = SqliteDatabase.get_db_path()
         db_exists = os.path.exists(db_path)
         db_size_kb = round(os.path.getsize(db_path) / 1024, 1) if db_exists else 0
 
         member_count = 0
         if db_exists:
             try:
-                conn = SqliteRepository.get_connection()
+                conn = SqliteDatabase.get_connection()
                 row = conn.execute("SELECT COUNT(*) FROM users").fetchone()
                 member_count = row[0] if row else 0
                 conn.close()

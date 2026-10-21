@@ -30,7 +30,7 @@ def list_competitors(request: Request) -> Response:
 def update_member_api(data: Doc = Body(...)) -> Union[Doc, JSONResponse]:
     """Met à jour les informations d'un adhérent (badge rouge, autonomie bloc, créneau/tarif, e-mails, téléphone)."""
     try:
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.members import MemberRepository
         user_id = data.get("user_id")
         purchase_id = data.get("purchase_id")
         order_ref = data.get("order_ref")
@@ -42,7 +42,7 @@ def update_member_api(data: Doc = Body(...)) -> Union[Doc, JSONResponse]:
                 content={"status": "error", "message": "Identifiant d'adhérent manquant (user_id, purchase_id ou order_ref)."}
             )
 
-        success, err = SqliteRepository.update_member_fields(
+        success, err = MemberRepository.update_member_fields(
             user_id=int(user_id) if user_id is not None else None,
             fields=fields,
             purchase_id=int(purchase_id) if purchase_id is not None else None,
@@ -67,7 +67,7 @@ def update_member_api(data: Doc = Body(...)) -> Union[Doc, JSONResponse]:
 def add_member_api(data: Doc = Body(...)) -> Union[Doc, JSONResponse]:
     """Ajoute manuellement un adhérent dans la base (saison active ou saison spécifiée)."""
     try:
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.members import MemberRepository
         from domain.constants import get_active_season
 
         fields = data.get("fields") or data
@@ -94,7 +94,7 @@ def add_member_api(data: Doc = Body(...)) -> Union[Doc, JSONResponse]:
                 content={"status": "error", "message": "Le groupe (tarif) est obligatoire."}
             )
 
-        success, res = SqliteRepository.add_manual_member(fields, season_name=season)
+        success, res = MemberRepository.add_manual_member(fields, season_name=season)
         if not success:
             return JSONResponse(status_code=400, content={"status": "error", "message": res})
 

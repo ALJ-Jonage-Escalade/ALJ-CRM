@@ -121,8 +121,9 @@ class TestData:
         return self._run("result = Repo.list_coaches()")
 
     def save_setting(self, key: str, value: str) -> None:
-        """Firestore app setting (e.g. HELLOASSO_ANNUAL_CAMPAIGN), as the desktop app saves it."""
-        self._run("Repo.save_app_setting(args['key'], args['value'])\nresult = True", key=key, value=value)
+        """Firestore app setting (e.g. HELLOASSO_ANNUAL_CAMPAIGN), as the bureau pages save it."""
+        self._run("from infrastructure.firestore.app_settings import AppSettingsRepository\n"
+                  "result = AppSettingsRepository.save(args['key'], args['value'])", key=key, value=value)
 
     def helloasso_item(self, id_item: int):
         """Mirror document of a HelloAsso item (link, ignore flag, comment), or None."""
@@ -135,7 +136,7 @@ class TestData:
         return self._run("""
 from api.reports.map import get_sqlite_map_data
 from infrastructure.firestore.cloud_database import CloudDatabase
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.geocache import GeocacheRepository
 
 class Collect:
     addresses = []
@@ -146,7 +147,7 @@ CloudDatabase.sync(full=True)
 collect = Collect()
 get_sqlite_map_data(collect)
 for i, address in enumerate(sorted(set(collect.addresses))):
-    SqliteRepository.save_geocode(address, 45.79 + (i % 10) * 0.004, 5.04 + (i // 10) * 0.004)
+    GeocacheRepository.save_geocode(address, 45.79 + (i % 10) * 0.004, 5.04 + (i // 10) * 0.004)
 CloudDatabase.flush_only()
 result = len(set(collect.addresses))
 """)

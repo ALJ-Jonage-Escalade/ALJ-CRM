@@ -10,7 +10,8 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.members import MemberRepository
 
 
 def _ha_item(order_ref, last, first, status="Processed", amount=246.0, licence="", date="2026-08-20T10:00:00"):
@@ -38,11 +39,11 @@ class TestSyncPipeline(unittest.TestCase):
     """Phase 8 — Tests du cœur de synchronisation HelloAsso -> BDD (update_membership_excel)."""
 
     def setUp(self):
-        self._original_db_path = SqliteRepository.get_db_path()
+        self._original_db_path = SqliteDatabase.get_db_path()
         self._tmpdir = tempfile.mkdtemp(prefix="alj_sync_test_")
         self._tmp_db = os.path.join(self._tmpdir, "database.db")
-        SqliteRepository.set_db_path(self._tmp_db)
-        SqliteRepository.setup_database()
+        SqliteDatabase.set_db_path(self._tmp_db)
+        SqliteDatabase.setup_database()
 
         # Environnement Drive factice : base "partagée" avec un ID, téléchargement no-op
         # NB : get_file_hash n'est PAS mocké — le hash réel détermine l'upload conditionnel.
@@ -59,7 +60,7 @@ class TestSyncPipeline(unittest.TestCase):
             self.addCleanup(pt.stop)
 
     def tearDown(self):
-        SqliteRepository.set_db_path(self._original_db_path)
+        SqliteDatabase.set_db_path(self._original_db_path)
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def _run_sync(self, items):
@@ -71,7 +72,7 @@ class TestSyncPipeline(unittest.TestCase):
         success, new_participants, _ = self._run_sync([_ha_item("ORD-1", "MARTIN", "Leo")])
         self.assertTrue(success)
         self.assertEqual(len(new_participants), 1)
-        rows = SqliteRepository.load_direct_data(season_filter="2026-2027")
+        rows = MemberRepository.load_direct_data(season_filter="2026-2027")
         match = next(r for r in rows if r["last_name"] == "MARTIN")
         self.assertEqual(match["order_ref"], "ORD-1")
         self.assertEqual(match["is_modified"], "Oui (Ajouté)")
@@ -81,7 +82,7 @@ class TestSyncPipeline(unittest.TestCase):
 
     def test_dedup_order_ref_nom_prenom_deja_present(self):
         item = _ha_item("ORD-2", "DUBOIS", "Claire")
-        SqliteRepository.upsert_members([dict(item)])
+        MemberRepository.upsert_members([dict(item)])
         success, new_participants, msg = self._run_sync([dict(item)])
         self.assertTrue(success)
         self.assertEqual(len(new_participants), 0)
@@ -89,20 +90,20 @@ class TestSyncPipeline(unittest.TestCase):
         self._mock_upload.assert_not_called()
 
     def test_dedup_par_licence_ffme(self):
-        SqliteRepository.upsert_members([_ha_item("ORD-3A", "BERNI", "Paul", licence="123456")])
+        MemberRepository.upsert_members([_ha_item("ORD-3A", "BERNI", "Paul", licence="123456")])
         # Meme licence, commande differente : doit etre ignore (controle 1)
         success, new_participants, _ = self._run_sync([_ha_item("ORD-3B", "BERNI", "Paul", licence="123456")])
         self.assertTrue(success)
         self.assertEqual(len(new_participants), 0)
 
     def test_priorite_statut_processed_masque_canceled(self):
-        SqliteRepository.upsert_members([_ha_item("ORD-4A", "ROUX", "Eva", status="Processed", amount=246.0)])
+        MemberRepository.upsert_members([_ha_item("ORD-4A", "ROUX", "Eva", status="Processed", amount=246.0)])
         # Commande annulee en liste d'attente pour le meme adherent : ignoree (controle 0)
         success, new_participants, _ = self._run_sync(
             [_ha_item("ORD-4B", "ROUX", "Eva", status="Canceled", amount=0.0)])
         self.assertTrue(success)
         self.assertEqual(len(new_participants), 0)
-        rows = [r for r in SqliteRepository.load_direct_data(season_filter="2026-2027") if r["last_name"] == "ROUX"]
+        rows = [r for r in MemberRepository.load_direct_data(season_filter="2026-2027") if r["last_name"] == "ROUX"]
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["status"], "Processed")
 
@@ -113,7 +114,7 @@ class TestSyncPipeline(unittest.TestCase):
         ])
         self.assertTrue(success)
         self.assertEqual(len(new_participants), 2)
-        rows = [r for r in SqliteRepository.load_direct_data(season_filter="2026-2027") if r["last_name"] == "LEGRAND"]
+        rows = [r for r in MemberRepository.load_direct_data(season_filter="2026-2027") if r["last_name"] == "LEGRAND"]
         self.assertEqual(len(rows), 2)
 
     def test_api_helloasso_vide_interrompt_le_pipeline(self):
@@ -123,7 +124,7 @@ class TestSyncPipeline(unittest.TestCase):
         self.assertIn("Impossible de charger", msg)
 
     def test_accentues_normalises_pas_de_doublon(self):
-        SqliteRepository.upsert_members([_ha_item("ORD-5A", "GONZALEZ", "Inès", licence="111222")])
+        MemberRepository.upsert_members([_ha_item("ORD-5A", "GONZALEZ", "Inès", licence="111222")])
         # Meme personne avec accents different sur une nouvelle commande : licence deja presente
         success, new_participants, _ = self._run_sync([_ha_item("ORD-5B", "GONZÁLEZ", "Inès", licence="111222")])
         self.assertTrue(success)

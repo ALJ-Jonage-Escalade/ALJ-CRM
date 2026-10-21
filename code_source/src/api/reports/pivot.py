@@ -14,7 +14,7 @@ router = APIRouter()
 def get_pivot_table(season: str = "2026-2027"):
     """Renvoie la page du Tableau Croisé Dynamique interactif via PivotTable.js."""
     try:
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.members import MemberRepository
         from domain.constants import get_active_season
         from domain.members.age_rules import parse_birth_date, age_at, get_season_start_date
         from domain.members.models import normalize_gender
@@ -24,7 +24,7 @@ def get_pivot_table(season: str = "2026-2027"):
         if not target_season or target_season.lower() in ("default", "active"):
             target_season = get_active_season()
 
-        raw_data = SqliteRepository.load_direct_data(target_season)
+        raw_data = MemberRepository.load_direct_data(target_season)
         ref_date = get_season_start_date(target_season)
         
         # Préparer un tableau de données plat et épuré pour le TCD

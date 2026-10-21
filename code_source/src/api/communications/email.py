@@ -27,7 +27,7 @@ def get_email_templates():
 def save_email_template_api(data: Dict[str, Any] = Body(...)):
     """Crée ou met à jour un modèle d'e-mail dans la BDD SQLite (synchronisé avec Firestore)."""
     try:
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.email_templates import EmailTemplateRepository
         name = str(data.get("name") or "").strip()
         old_name = str(data.get("old_name") or "").strip() or None
         subject = str(data.get("subject") or "").strip()
@@ -40,7 +40,7 @@ def save_email_template_api(data: Dict[str, Any] = Body(...)):
         if not subject:
             return JSONResponse(status_code=400, content={"status": "error", "message": "Le sujet du modèle est obligatoire."})
 
-        ok = SqliteRepository.save_email_template(
+        ok = EmailTemplateRepository.save_email_template(
             name=name,
             subject=subject,
             body=body,
@@ -70,13 +70,13 @@ def save_email_template_api(data: Dict[str, Any] = Body(...)):
 def delete_email_template_api(template_name: str):
     """Supprime un modèle d'e-mail par son nom."""
     try:
-        from infrastructure.sqlite.repository import SqliteRepository
+        from infrastructure.sqlite.email_templates import EmailTemplateRepository
         import urllib.parse
         clean_name = urllib.parse.unquote(template_name).strip()
         if not clean_name:
             return JSONResponse(status_code=400, content={"status": "error", "message": "Nom de modèle invalide."})
 
-        ok = SqliteRepository.delete_email_template(clean_name)
+        ok = EmailTemplateRepository.delete_email_template(clean_name)
         if not ok:
             return JSONResponse(status_code=404, content={"status": "error", "message": f"Modèle '{clean_name}' introuvable ou déjà supprimé."})
 

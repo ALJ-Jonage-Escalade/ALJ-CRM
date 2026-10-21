@@ -9,7 +9,7 @@ from domain.utils import is_helloasso_url
 from infrastructure.geocoding import geocode_missing_addresses
 from infrastructure.helloasso.api import get_campaigns, get_items
 from infrastructure.security.secret_store import SecretStore
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.geocache import GeocacheRepository
 
 router = APIRouter()
 
@@ -47,7 +47,7 @@ def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: 
     map_data_dict = {}
 
     # Charger le cache géographique depuis SQLite
-    geocache = SqliteRepository.get_geocache()
+    geocache = GeocacheRepository.get_geocache()
     missing_addresses = set()
 
     for item in inscrits:

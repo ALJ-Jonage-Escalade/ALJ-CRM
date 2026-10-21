@@ -1,0 +1,240 @@
+"""`adherents` directory: snapshot of the members of database.db, read through a short cache."""
+import time
+import json
+from typing import Dict, Any, List, Optional
+
+from domain.constants import get_active_season
+from domain.members.age_rules import parse_birth_date, age_at, get_season_start_date
+from domain.members import view as member_view
+from domain.utils import normalize_string
+from infrastructure.firestore.client import FirestoreClient, FirestoreError
+from infrastructure.firestore.competitions.base import CompetitionStoreBase
+from infrastructure.sqlite.connection import SqliteDatabase
+
+_ADHERENTS_CACHE_TTL = 30.0
+
+
+class AdherentsMixin(CompetitionStoreBase):
+    """Member directory: sync from the main database, cached reads, search."""
+
+    _adherents_cache: Optional[List[Dict[str, Any]]] = None
+    _adherents_cache_at: float = 0.0
+
+    # ------------------------------------------------------------------
+    # Instantané des adhérents (source : database.db principale -> Firestore)
+    # ------------------------------------------------------------------
+    @classmethod
+    def sync_adherents_from_main(cls, season_filter: str = "") -> dict:
+        """Recalcule l'annuaire Firestore `adherents` depuis la base principale.
+
+        Le miroir est intégralement réécrit (l'annuaire Firestore reflète
+        database.db) et la collection `planning` est mise à jour dans la foulée
+        pour que la PWA dispose des groupes de créneaux.
+        Retourne un rapport {imported, updated, errors}.
+        """
+        report = {"imported": 0, "updated": 0, "errors": []}
+        season = (season_filter or get_active_season() or "").strip()
+
+        try:
+            SqliteDatabase.setup_database()
+            main_conn = SqliteDatabase.get_connection()
+        except Exception as e:
+            report["errors"].append(f"Base principale inaccessible : {e}")
+            return report
+
+        try:
+            rows = []
+            if season:
+                rows = main_conn.execute(
+                    'SELECT * FROM v_adherents_legacy WHERE season_name = ? '
+                    'ORDER BY "user_id" ASC', (season,)
+                ).fetchall()
+            if not rows:
+                rows = main_conn.execute(
+                    'SELECT * FROM v_adherents_legacy ORDER BY "user_id" ASC'
+                ).fetchall()
+
+            # Groupes de créneaux (planning -> tarifs) pour le champ creneau_groupe
+            planning_groups = cls._read_planning_groups(main_conn)
+
+            # Collection planning (référence pour la PWA)
+            planning_writes = []
+            for pr in main_conn.execute(
+                "SELECT * FROM planning ORDER BY jour, horaires"
+            ).fetchall():
+                enc = pr["encadrants"] or ""
+                if enc.startswith("["):
+                    try:
+                        enc = ", ".join(json.loads(enc))
+                    except Exception:
+                        pass
+                planning_writes.append({
+                    "path": f"{cls.COLLECTION_PLANNING}/{pr['id']}",
+                    "data": {
+                        "id": pr["id"],
+                        "groupe": pr["groupe"] or "",
+                        "type": pr["type"] or "",
+                        "categorie_age": pr["categorie_age"] or "",
+                        "jour": pr["jour"] or "",
+                        "horaires": pr["horaires"] or "",
+                        "encadrants": enc,
+                    },
+                })
+        except Exception as e:
+            report["errors"].append(f"Lecture de la base principale impossible : {e}")
+            return report
+        finally:
+            main_conn.close()
+
+        ref_date = get_season_start_date(season or get_active_season())
+        now = cls._now_iso()
+        adherent_writes = []
+        for row in rows:
+            d = dict(row)
+            adherent_id = d.get("user_id") or d.get("id")
+            if adherent_id is None:
+                continue
+            bdate = d.get("birth_date") or ""
+            b_parsed = parse_birth_date(bdate)
+            age_val = age_at(b_parsed, ref_date) if b_parsed else None
+            t_name = str(d.get("tarif_name") or "").strip()
+            groupe = planning_groups.get(normalize_string(t_name), "")
+            licence = str(d.get("licence_ffme") or "").strip()
+            adherent_writes.append({
+                "path": f"{cls.COLLECTION_ADHERENTS}/{adherent_id}",
+                "data": {
+                    "id": adherent_id,
+                    "nom": str(d.get("last_name") or "").strip().upper(),
+                    "prenom": str(d.get("first_name") or "").strip().title(),
+                    "licence_ffme": licence,
+                    "num_licence": licence,
+                    "birth_date": bdate,
+                    "age": age_val,
+                    "gender": d.get("gender") or "",
+                    "email": str(d.get("email_primary") or "").strip(),
+                    "email_secondaire": str(d.get("email_secondary") or "").strip(),
+                    "phone": str(d.get("phone") or "").strip(),
+                    "creneau_groupe": groupe,
+                    "tarif": t_name,
+                    "saison": str(d.get("season_name") or "").strip(),
+                    "emergency_name": d.get("emergency1_name") or "",
+                    "emergency_phone": d.get("emergency1_phone") or "",
+                    "badge_rouge": d.get("badge_rouge") or "Non",
+                    "autonomie_bloc": d.get("autonomie_bloc") or "Non",
+                    "updated_at": now,
+                },
+            })
+            report["imported"] += 1
+
+        writes = planning_writes + adherent_writes
+        if writes:
+            try:
+                batch_report = FirestoreClient.batch_upsert(writes)
+            except Exception as e:
+                report["errors"].append(str(e))
+                return report
+            if batch_report["errors_count"]:
+                report["errors"].append(
+                    f"{batch_report['errors_count']} écriture(s) Firestore en échec : "
+                    + " ; ".join(batch_report["errors"][:3])
+                )
+                report["updated"] = max(0, batch_report["written"] - len(planning_writes))
+                return report
+
+        cls._invalidate_adherents_cache()
+        report["updated"] = len(adherent_writes)
+        return report
+
+    @staticmethod
+    def _read_planning_groups(main_conn) -> Dict[str, str]:
+        """{tarif normalisé -> groupe de créneau} depuis la table planning (same rule as the
+        member pages, domain.members.view: a tariff in two groups belongs to the first by id)."""
+        try:
+            rows = [dict(r) for r in main_conn.execute(
+                "SELECT id, groupe, helloasso_tarifs FROM planning").fetchall()]
+        except Exception:
+            return {}
+        return {k: slot["groupe"] for k, slot in member_view.tarif_slots(rows).items()}
+
+    @classmethod
+    def list_planning_groups(cls) -> Dict[str, str]:
+        """{tarif normalisé -> groupe de créneau} (lu directement dans database.db)."""
+        SqliteDatabase.setup_database()
+        conn = SqliteDatabase.get_connection()
+        try:
+            return cls._read_planning_groups(conn)
+        finally:
+            conn.close()
+
+    @classmethod
+    def _invalidate_adherents_cache(cls):
+        cls._adherents_cache = None
+        cls._adherents_cache_at = 0.0
+
+    @classmethod
+    def _adherents_raw(cls) -> List[Dict[str, Any]]:
+        """The `adherents` directory, cached _ADHERENTS_CACHE_TTL seconds. A failed read keeps
+        serving the last copy; with none yet, FirestoreError is raised (never an empty
+        directory: it would look like a club without members, and is not cached)."""
+        now = time.time()
+        if cls._adherents_cache is None or (now - cls._adherents_cache_at) > _ADHERENTS_CACHE_TTL:
+            try:
+                cls._adherents_cache = FirestoreClient.list_documents(cls.COLLECTION_ADHERENTS)
+            except Exception as e:
+                print(f"⚠️ [FIRESTORE] Lecture de l'annuaire adhérents impossible : {e}")
+                if cls._adherents_cache is None:
+                    if isinstance(e, FirestoreError):
+                        raise
+                    raise FirestoreError(f"Lecture de l'annuaire adhérents impossible : {e}") from e
+            cls._adherents_cache_at = now
+        return cls._adherents_cache
+
+    @classmethod
+    def _adherent_map(cls) -> Dict[int, Dict[str, Any]]:
+        return {a.get("id"): a for a in cls._adherents_raw() if a.get("id") is not None}
+
+    @classmethod
+    def _adherent_as_legacy_dict(cls, doc: Dict[str, Any]) -> Dict[str, Any]:
+        licence = str(doc.get("licence_ffme") or doc.get("num_licence") or "")
+        return {
+            "id": doc.get("id"),
+            "nom": str(doc.get("nom") or ""),
+            "prenom": str(doc.get("prenom") or ""),
+            "num_licence": licence,
+            "email": str(doc.get("email") or ""),
+            "email_secondaire": str(doc.get("email_secondaire") or ""),
+            "phone": str(doc.get("phone") or ""),
+            "tarif": str(doc.get("tarif") or ""),
+            "saison": str(doc.get("saison") or ""),
+            "licence_ffme": licence,
+            "creneau_groupe": str(doc.get("creneau_groupe") or ""),
+            "emergency_name": str(doc.get("emergency_name") or ""),
+            "emergency_phone": str(doc.get("emergency_phone") or ""),
+            "birth_date": str(doc.get("birth_date") or ""),
+            "age": doc.get("age"),
+            "gender": str(doc.get("gender") or ""),
+            "badge_rouge": str(doc.get("badge_rouge") or ""),
+            "autonomie_bloc": str(doc.get("autonomie_bloc") or ""),
+        }
+
+    @classmethod
+    def list_adherents(cls, search: str = "", competition_only: bool = False) -> list:
+        """Liste les adhérents de l'annuaire Firestore (recherche insensible aux accents)."""
+        q = normalize_string(search) if search else ""
+        result = []
+        for doc in cls._adherents_raw():
+            d = cls._adherent_as_legacy_dict(doc)
+            if competition_only and "competition" not in normalize_string(d.get("tarif") or ""):
+                continue
+            if q:
+                haystack = normalize_string(
+                    f"{d.get('nom')} {d.get('prenom')} {d.get('num_licence')} {d.get('tarif')}"
+                )
+                if q not in haystack:
+                    continue
+            result.append(d)
+        return result
+
+    @classmethod
+    def count_adherents(cls) -> int:
+        return len(cls._adherents_raw())

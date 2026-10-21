@@ -6,7 +6,7 @@ import time
 from typing import List
 
 from infrastructure.firestore.cloud_database import CloudDatabase
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.geocache import GeocacheRepository
 
 
 def geocode_missing_addresses(addresses: List[str]) -> None:
@@ -29,11 +29,11 @@ def geocode_missing_addresses(addresses: List[str]) -> None:
             if location:
                 lat, lon = location.latitude, location.longitude
                 print("✅ [GEOCODING] Adresse localisée.")
-                SqliteRepository.save_geocode(address, lat, lon)
+                GeocacheRepository.save_geocode(address, lat, lon)
             else:
                 print("⚠️ [GEOCODING] Adresse non résolue.")
                 # Enregistrer des coordonnées nulles pour éviter de requêter indéfiniment cette mauvaise adresse
-                SqliteRepository.save_geocode(address, None, None)
+                GeocacheRepository.save_geocode(address, None, None)
         except Exception as e:
             print(f"❌ [GEOCODING] Erreur lors du géocodage de l'adresse {i+1} : {type(e).__name__}")
     if CloudDatabase.is_enabled():

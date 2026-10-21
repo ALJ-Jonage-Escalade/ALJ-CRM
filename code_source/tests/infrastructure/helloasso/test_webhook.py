@@ -59,7 +59,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         self.assertEqual(items[0]["id"], 9001)
         self.assertEqual(items[0]["amount"], 1800)
 
-    @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.get_app_setting", return_value="")
+    @patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value="")
     @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.refresh_helloasso_payment")
     @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.set_item_link")
     @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.sync_helloasso_mirror")
@@ -123,7 +123,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         url = ("https://www.helloasso.com/associations/amicale-laique-de-jonage/evenements/"
                "regularisation-inscription-competiteurs-2026-2027")
         Repo = "infrastructure.firestore.competition_repository.CompetitionFirestoreRepository"
-        with patch(f"{Repo}.get_app_setting", return_value=url), \
+        with patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=url), \
              patch(f"{Repo}.setup_database"), \
              patch(f"{Repo}.sync_helloasso_mirror") as mirror, \
              patch(f"{Repo}.list_competitions", return_value=[]), \
@@ -182,8 +182,8 @@ class TestHelloAssoWebhookService(unittest.TestCase):
 
         with patch(f"{Repo}.get_competition", return_value=comp), \
              patch(f"{Repo}.list_participants", return_value=[p1, p2, p3]), \
-             patch(f"{Repo}.get_app_setting", side_effect=mock_get_setting), \
-             patch(f"{Repo}.save_app_setting", side_effect=mock_save_setting), \
+             patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", side_effect=mock_get_setting), \
+             patch("infrastructure.firestore.app_settings.AppSettingsRepository.save", side_effect=mock_save_setting), \
              patch("services.competitions.results_batch.CompetitionResultsBatchService.get_notification_email", return_value="coach@alj-escalade.fr"), \
              patch("infrastructure.mail.repository.EmailRepository.send_email", return_value=True) as mock_send:
 
@@ -214,8 +214,8 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         Repo = "infrastructure.firestore.competition_repository.CompetitionFirestoreRepository"
         with patch(f"{Repo}.get_competition", return_value=comp), \
              patch(f"{Repo}.list_participants", return_value=[p1, p2]), \
-             patch(f"{Repo}.get_app_setting", return_value=""), \
-             patch(f"{Repo}.save_app_setting"), \
+             patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=""), \
+             patch("infrastructure.firestore.app_settings.AppSettingsRepository.save"), \
              patch("infrastructure.mail.repository.EmailRepository.send_email") as mock_send:
 
             res = HelloAssoWebhookService.check_and_notify_all_paid(11)

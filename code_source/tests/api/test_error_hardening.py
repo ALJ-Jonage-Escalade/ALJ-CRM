@@ -10,7 +10,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from domain.constants import is_valid_season
-from infrastructure.sqlite.repository import DB_WRITE_ERROR, SqliteRepository
+from infrastructure.sqlite.connection import DB_WRITE_ERROR, SqliteDatabase
+from infrastructure.sqlite.members import MemberRepository
 
 SECRET_DETAIL = "sqlite3 at /srv/app/data/database.db: no such table"
 BAD_SEASONS = ["../../etc/x", "2026-2027/../../x", "2026-2027\r\nSet-Cookie: a=b", "x" * 9]
@@ -48,7 +49,7 @@ def test_presence_export_rejects_bad_season(client: TestClient, season: str) -> 
 
 
 def test_presence_export_error_is_generic(client: TestClient) -> None:
-    with patch("infrastructure.sqlite.repository.SqliteRepository.load_direct_data", side_effect=RuntimeError(SECRET_DETAIL)):
+    with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", side_effect=RuntimeError(SECRET_DETAIL)):
         body = client.post("/api/presence/export", json={}).json()
     assert SECRET_DETAIL not in str(body)
     assert "journaux" in body["message"]
@@ -77,8 +78,8 @@ def test_cloud_db_status_hides_last_error(client: TestClient) -> None:
 def test_repository_write_error_is_generic() -> None:
     conn = MagicMock()
     conn.cursor.return_value.execute.side_effect = RuntimeError(SECRET_DETAIL)
-    with patch.object(SqliteRepository, "setup_database"), patch.object(SqliteRepository, "get_connection", return_value=conn):
-        ok, message = SqliteRepository.update_member_fields(user_id=1, fields={"phone": "0600000000"})
+    with patch.object(SqliteDatabase, "setup_database"), patch.object(SqliteDatabase, "get_connection", return_value=conn):
+        ok, message = MemberRepository.update_member_fields(user_id=1, fields={"phone": "0600000000"})
     assert not ok
     assert message == DB_WRITE_ERROR
     conn.rollback.assert_called_once()

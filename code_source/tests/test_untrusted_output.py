@@ -62,7 +62,7 @@ class TestServerPagesEscapeMemberData(unittest.TestCase):
     def test_pivot_data(self):
         row = {"status": PAYLOAD, "city": PAYLOAD, "already_member": 0,
                "season_name": "2026-2027", "tarif_name": PAYLOAD}
-        with patch("infrastructure.sqlite.repository.SqliteRepository.load_direct_data", return_value=[row]):
+        with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", return_value=[row]):
             html = self.client.get("/pivot").text
         self._assert_payload_contained(html)
         self.assertIn("\\u003c/script\\u003e", html)

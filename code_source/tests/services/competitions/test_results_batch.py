@@ -21,13 +21,13 @@ from services.competitions.results_batch import (
     CompetitionResultsBatchService,
     DEFAULT_NOTIFICATION_EMAIL
 )
-from infrastructure.sqlite.repository import SqliteRepository
+from support.fake_firestore import use_fake_firestore
 
 
 class TestCompetitionResultsBatchService(unittest.TestCase):
 
     def setUp(self):
-        SqliteRepository.setup_database()
+        use_fake_firestore(self)  # notification e-mail setting
 
     def test_default_notification_email(self):
         """L'adresse de notification par défaut est david.lopez@alj-jonage.fr."""

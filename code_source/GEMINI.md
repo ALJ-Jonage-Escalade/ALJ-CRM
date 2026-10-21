@@ -182,8 +182,8 @@ Règles de conception (respecter impérativement) :
 2. **Vue de compatibilité** : `v_adherents_legacy` reproduit le format plat historique (colonnes `champ_*` /
    `opt_*`) pour les consommateurs existants. Elle est **recréée à chaque démarrage** depuis le code
    (`recreate_compat_view`) — toute modification passe par `COMPAT_VIEW_SQL` dans `schema_v2.py`.
-3. **Lectures** : `SqliteRepository.load_direct_data()` (dicts legacy via la vue) ou
-   `SqliteRepository.get_members()` (objets `Member` typés, API recommandée).
+3. **Lectures** : `MemberRepository.load_direct_data()` (dicts legacy via la vue) ou
+   `MemberRepository.get_members()` (objets `Member` typés, API recommandée), dans `infrastructure/sqlite/members.py`.
 4. **Golden master** : `tests/test_ffme_golden_master.py` garantit un export CSV FFME **octet-pour-octet
    identique** à la référence (`tests/fixtures/import_ffme_reference.csv`, données locales non versionnée).
    La référence a été **renouvelée le 31/08/2026** après correction du bug `str(None)` historique

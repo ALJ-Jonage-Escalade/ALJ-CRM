@@ -9,7 +9,8 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from domain.members.models import Member
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.members import MemberRepository
 
 
 class TestMemberBilingualAdapter(unittest.TestCase):
@@ -73,12 +74,12 @@ class TestMemberBilingualAdapter(unittest.TestCase):
 class TestGetMembersLoader(unittest.TestCase):
 
     def setUp(self):
-        self.original_db_path = SqliteRepository.get_db_path()
+        self.original_db_path = SqliteDatabase.get_db_path()
         self.test_db_path = os.path.join(_test_dir, "test_get_members.db")
-        SqliteRepository.set_db_path(self.test_db_path)
+        SqliteDatabase.set_db_path(self.test_db_path)
 
     def tearDown(self):
-        SqliteRepository.set_db_path(self.original_db_path)
+        SqliteDatabase.set_db_path(self.original_db_path)
         if os.path.exists(self.test_db_path):
             try:
                 os.remove(self.test_db_path)
@@ -95,8 +96,8 @@ class TestGetMembersLoader(unittest.TestCase):
             "champ_Adresse mail pour la réception des informations du club": "zoe@ex.fr",
             "opt_Assurance Base": "Oui", "opt_Montant Assurance Base": 45.0,
         }
-        SqliteRepository.upsert_members([membre])
-        members = SqliteRepository.get_members(season_filter="2026-2027")
+        MemberRepository.upsert_members([membre])
+        members = MemberRepository.get_members(season_filter="2026-2027")
         targets = [m for m in members if m.user_last_name == "GETMEMBER"]
         self.assertEqual(len(targets), 1)
         m = targets[0]

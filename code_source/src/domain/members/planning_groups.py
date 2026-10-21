@@ -5,7 +5,7 @@ de l'IHM : fiches de présence (Exporter), filtres Adhérents et Attestations.
 Un groupe de créneau du planning peut regrouper plusieurs tarifs HelloAsso :
 le matching membres/tarifs est à la charge de l'appelant (payload de tarifs
 rattaché à chaque créneau). Ce module reste pur : il reçoit la liste des
-créneaux déjà agrégés (SqliteRepository.load_creneaux_groups()).
+créneaux déjà agrégés (PlanningRepository.load_creneaux_groups()).
 """
 import re
 
@@ -94,7 +94,7 @@ def group_for_tarif(tarif_name: str, planning_data) -> str:
     """Nom du groupe de créneau associé à un tarif HelloAsso ("" si non rapproché).
 
     Comparaison insensible aux accents/majuscules/espaces superflus ; le planning
-    est la liste des créneaux (SqliteRepository.load_planning_data) portant chacun
+    est la liste des créneaux (PlanningRepository.load_planning_data) portant chacun
     un champ `groupe` et un payload `helloasso_tarifs`.
     """
     target = normalize_string(tarif_name)

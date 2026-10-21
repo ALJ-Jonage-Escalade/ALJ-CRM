@@ -10,7 +10,9 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.sqlite.repository import SqliteRepository
+from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.members import MemberRepository
+from infrastructure.sqlite.planning import PlanningRepository
 from exports.presence_sheets import clean_filename, format_encadrants
 
 
@@ -32,21 +34,21 @@ class TestPresenceSheetGenerator(unittest.TestCase):
 
     def setUp(self):
         # The export endpoints read the database: use a seeded temporary one, never data/database.db.
-        self._original_db_path = SqliteRepository.get_db_path()
+        self._original_db_path = SqliteDatabase.get_db_path()
         self._tmpdir = tempfile.mkdtemp(prefix="alj_presence_test_")
-        SqliteRepository.set_db_path(os.path.join(self._tmpdir, "database.db"))
-        SqliteRepository.setup_database()
-        SqliteRepository.save_planning_item({"groupe": "Adultes autonomes", "type": "autonome", "jour": "Mardi",
+        SqliteDatabase.set_db_path(os.path.join(self._tmpdir, "database.db"))
+        SqliteDatabase.setup_database()
+        PlanningRepository.save_planning_item({"groupe": "Adultes autonomes", "type": "autonome", "jour": "Mardi",
                                              "horaires": "19h-22h", "helloasso_tarifs": ["Adultes autonomes"]})
-        SqliteRepository.save_planning_item({"groupe": "Loisir cours", "jour": "Lundi", "horaires": "18h-20h",
+        PlanningRepository.save_planning_item({"groupe": "Loisir cours", "jour": "Lundi", "horaires": "18h-20h",
                                              "encadrants": ["Camille DIDIER"], "helloasso_tarifs": ["Loisir cours"]})
-        SqliteRepository.upsert_members([
+        MemberRepository.upsert_members([
             _member("ORD-1", "MARTIN", "Leo", "Adultes autonomes"),
             _member("ORD-2", "DURAND", "Lea", "Loisir cours"),
         ], "2026-2027")
 
     def tearDown(self):
-        SqliteRepository.set_db_path(self._original_db_path)
+        SqliteDatabase.set_db_path(self._original_db_path)
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_clean_filename(self):
@@ -111,10 +113,10 @@ class TestPresenceSheetGenerator(unittest.TestCase):
 
         from fastapi.testclient import TestClient
         from server import app
-        SqliteRepository.save_planning_item({"groupe": "Loisir WhatsApp", "jour": "Jeudi", "horaires": "18h-20h",
+        PlanningRepository.save_planning_item({"groupe": "Loisir WhatsApp", "jour": "Jeudi", "horaires": "18h-20h",
                                              "helloasso_tarifs": ["Loisir WhatsApp"],
                                              "whatsapp_link": "https://chat.whatsapp.com/exemple"})
-        SqliteRepository.upsert_members([_member("ORD-3", "PETIT", "Noe", "Loisir WhatsApp")], "2026-2027")
+        MemberRepository.upsert_members([_member("ORD-3", "PETIT", "Noe", "Loisir WhatsApp")], "2026-2027")
         # A regular file as ROOT_DIR makes os.makedirs fail on every OS
         # (chmod 0o555 does not prevent creating subfolders on Windows).
         unwritable_root = os.path.join(self._tmpdir, "not_a_dir")

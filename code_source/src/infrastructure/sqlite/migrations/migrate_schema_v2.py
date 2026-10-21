@@ -27,7 +27,7 @@ if _script_dir not in sys.path:
     sys.path.insert(0, _script_dir)
 
 from paths import ROOT_DIR  # noqa: E402
-from infrastructure.sqlite.repository import SqliteRepository  # noqa: E402
+from infrastructure.sqlite.connection import SqliteDatabase  # noqa: E402
 from infrastructure.sqlite.schema_v2 import (  # noqa: E402
     SCHEMA_TARGET_VERSION, SEASON_ACTIVE, recreate_compat_view,
     normalize_status, clean_legacy_text, is_true,
@@ -37,11 +37,11 @@ from infrastructure.sqlite.schema_v2 import (  # noqa: E402
 
 
 def migrate(skip_excel=False):
-    db_path = SqliteRepository.get_db_path()
+    db_path = SqliteDatabase.get_db_path()
     print(f"[MIGRATION V2] Base cible : {db_path}")
 
-    SqliteRepository.setup_database()
-    conn = SqliteRepository.get_connection()
+    SqliteDatabase.setup_database()
+    conn = SqliteDatabase.get_connection()
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
@@ -310,9 +310,9 @@ def main():
     args = parser.parse_args()
 
     if args.db_path:
-        SqliteRepository.set_db_path(args.db_path)
-    elif not os.path.exists(SqliteRepository.get_db_path()):
-        print(f"Base introuvable : {SqliteRepository.get_db_path()}")
+        SqliteDatabase.set_db_path(args.db_path)
+    elif not os.path.exists(SqliteDatabase.get_db_path()):
+        print(f"Base introuvable : {SqliteDatabase.get_db_path()}")
         sys.exit(1)
 
     ok = migrate(skip_excel=args.skip_excel)
