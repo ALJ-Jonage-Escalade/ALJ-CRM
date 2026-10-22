@@ -12,7 +12,8 @@ import { isStaff, roleLabel } from "../lib/roles";
 import PageLink from "./PageLink.vue";
 import VersionBadge from "./VersionBadge.vue";
 
-const props = defineProps<{ page: PageId; title: string }>();
+/** sync: freshness of the page's data, next to the title (Adhérents). */
+const props = defineProps<{ page: PageId; title: string; sync?: string }>();
 
 const auth = inject(AUTH_KEY)!;
 const api = inject(API_KEY)!;
@@ -89,7 +90,7 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
     <div class="min-w-0 px-4 pt-4 pb-28 md:px-7 md:pt-6 md:pb-10 print:p-0">
       <header class="mb-4 flex print:hidden flex-wrap items-center gap-x-4 gap-y-2">
         <h1 class="m-0 text-xl font-bold md:text-[22px]">{{ props.title }}</h1>
-        <span id="sync-info" class="text-[13px] text-slate-500"></span>
+        <span id="sync-info" class="text-[13px] text-slate-500">{{ props.sync }}</span>
         <div class="ml-auto flex min-w-0 items-center gap-2">
           <span id="who" class="min-w-0 text-xs break-words text-slate-500">{{ who }}</span>
           <button

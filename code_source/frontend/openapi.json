@@ -1006,9 +1006,21 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/MemberList"
+                }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -3393,6 +3405,38 @@
         "title": "CompetitionUpdate",
         "description": "Partial update: only the fields sent are changed."
       },
+      "Creneau": {
+        "properties": {
+          "groupe": {
+            "type": "string",
+            "title": "Groupe"
+          },
+          "tarifs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tarifs"
+          },
+          "categorie_age": {
+            "type": "string",
+            "title": "Categorie Age"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "groupe",
+          "tarifs",
+          "categorie_age",
+          "type"
+        ],
+        "title": "Creneau",
+        "description": "A slot group of the planning and the HelloAsso tariffs it covers."
+      },
       "EmailTemplate": {
         "properties": {
           "name": {
@@ -4156,6 +4200,259 @@
           "role"
         ],
         "title": "Me"
+      },
+      "Member": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "purchase_id": {
+            "type": "integer",
+            "title": "Purchase Id"
+          },
+          "season_name": {
+            "type": "string",
+            "title": "Season Name"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "gender": {
+            "type": "string",
+            "title": "Gender"
+          },
+          "address": {
+            "type": "string",
+            "title": "Address"
+          },
+          "zip_code": {
+            "type": "string",
+            "title": "Zip Code"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "email_primary": {
+            "type": "string",
+            "title": "Email Primary"
+          },
+          "email_secondary": {
+            "type": "string",
+            "title": "Email Secondary"
+          },
+          "licence_ffme": {
+            "type": "string",
+            "title": "Licence Ffme"
+          },
+          "emergency1_name": {
+            "type": "string",
+            "title": "Emergency1 Name"
+          },
+          "emergency1_phone": {
+            "type": "string",
+            "title": "Emergency1 Phone"
+          },
+          "emergency2_name": {
+            "type": "string",
+            "title": "Emergency2 Name"
+          },
+          "emergency2_phone": {
+            "type": "string",
+            "title": "Emergency2 Phone"
+          },
+          "health_commitment": {
+            "type": "string",
+            "title": "Health Commitment"
+          },
+          "document_sante": {
+            "type": "string",
+            "title": "Document Sante"
+          },
+          "photo_auth": {
+            "type": "string",
+            "title": "Photo Auth"
+          },
+          "badge_rouge": {
+            "type": "string",
+            "title": "Badge Rouge"
+          },
+          "autonomie_bloc": {
+            "type": "string",
+            "title": "Autonomie Bloc"
+          },
+          "passeport_orange": {
+            "type": "string",
+            "title": "Passeport Orange"
+          },
+          "raw_passports": {
+            "type": "string",
+            "title": "Raw Passports"
+          },
+          "raw_diplomas": {
+            "type": "string",
+            "title": "Raw Diplomas"
+          },
+          "payer": {
+            "type": "string",
+            "title": "Payer"
+          },
+          "payer_email": {
+            "type": "string",
+            "title": "Payer Email"
+          },
+          "order_ref": {
+            "type": "string",
+            "title": "Order Ref"
+          },
+          "order_date": {
+            "type": "string",
+            "title": "Order Date"
+          },
+          "tarif_name": {
+            "type": "string",
+            "title": "Tarif Name"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "status_norm": {
+            "type": "string",
+            "title": "Status Norm"
+          },
+          "email_sent_date": {
+            "type": "string",
+            "title": "Email Sent Date"
+          },
+          "commentaires_correctif": {
+            "type": "string",
+            "title": "Commentaires Correctif"
+          },
+          "creneau_groupe": {
+            "type": "string",
+            "title": "Creneau Groupe"
+          },
+          "categorie": {
+            "type": "string",
+            "title": "Categorie"
+          },
+          "creneau_details": {
+            "type": "string",
+            "title": "Creneau Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "purchase_id",
+          "season_name",
+          "last_name",
+          "first_name",
+          "birth_date",
+          "age",
+          "gender",
+          "address",
+          "zip_code",
+          "city",
+          "phone",
+          "email_primary",
+          "email_secondary",
+          "licence_ffme",
+          "emergency1_name",
+          "emergency1_phone",
+          "emergency2_name",
+          "emergency2_phone",
+          "health_commitment",
+          "document_sante",
+          "photo_auth",
+          "badge_rouge",
+          "autonomie_bloc",
+          "passeport_orange",
+          "raw_passports",
+          "raw_diplomas",
+          "payer",
+          "payer_email",
+          "order_ref",
+          "order_date",
+          "tarif_name",
+          "amount",
+          "status",
+          "status_norm",
+          "email_sent_date",
+          "commentaires_correctif",
+          "creneau_groupe",
+          "categorie",
+          "creneau_details"
+        ],
+        "title": "Member",
+        "description": "One member of a season (one purchase), as domain/members/view.py member_row() builds it.\nNames, city and phones are already formatted; status_norm is the French status label."
+      },
+      "MemberList": {
+        "properties": {
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "creneaux": {
+            "items": {
+              "$ref": "#/components/schemas/Creneau"
+            },
+            "type": "array",
+            "title": "Creneaux"
+          }
+        },
+        "type": "object",
+        "required": [
+          "season",
+          "members",
+          "creneaux"
+        ],
+        "title": "MemberList",
+        "description": "The members of one season, sorted by name, with the planning's slot groups (filters of the list)."
       },
       "ParticipantAdd": {
         "properties": {

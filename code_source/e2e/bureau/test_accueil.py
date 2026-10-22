@@ -35,8 +35,8 @@ def test_desktop_layout(page):
     expect(page.locator(f"{NAV} a[data-page='accueil']")).to_have_attribute("aria-current", "page")
     expect(page.get_by_text(f"v{VERSION}", exact=True).filter(visible=True)).to_be_visible()
 
-    page.locator("#content a[href='/bureau/adherents']").click()
-    page.wait_for_url("**/bureau/adherents")
+    page.locator("#content a[href='/bureau/competitions']").click()
+    page.wait_for_url("**/bureau/competitions")
     expect(page.locator("#who")).to_contain_text("albus.dumbledore@alj-escalade.fr")  # same session on the former page
 
 
@@ -75,7 +75,7 @@ def test_coach_is_sent_back_from_an_admin_page(page, name, label):
 
 def test_former_pages_hide_the_admin_links_from_a_coach(page):
     """Pages not migrated yet: the former shell's menu follows the same rule."""
-    page.goto("/bureau/adherents")
+    page.goto("/bureau/competitions")
     login_as(page, "coach")
     expect(page.locator("#content")).to_be_visible()
     for admin_page in ADMIN_PAGES:

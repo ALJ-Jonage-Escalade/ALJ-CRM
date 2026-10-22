@@ -1,0 +1,14 @@
+/* Test data of the member list (Vitest only). */
+import type { Member } from "./members";
+
+/** A member with every text field empty, changed by `change`. */
+export function member(change: Partial<Member>): Member {
+  const text = [
+    "season_name", "last_name", "first_name", "birth_date", "gender", "address", "zip_code", "city", "phone", "email_primary",
+    "email_secondary", "licence_ffme", "emergency1_name", "emergency1_phone", "emergency2_name", "emergency2_phone",
+    "health_commitment", "document_sante", "photo_auth", "badge_rouge", "autonomie_bloc", "passeport_orange", "raw_passports",
+    "raw_diplomas", "payer", "payer_email", "order_ref", "order_date", "tarif_name", "status", "status_norm", "email_sent_date",
+    "commentaires_correctif", "creneau_groupe", "categorie", "creneau_details",
+  ] as const;
+  return { ...Object.fromEntries(text.map((k) => [k, ""])), user_id: 1, purchase_id: 1, age: null, amount: null, season_name: "2026-2027", ...change } as Member;
+}

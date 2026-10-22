@@ -52,7 +52,7 @@ class TestBureauFiles(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(SHARED, name)), name)
 
     def test_routes_serve_only_known_pages(self):
-        self.assertEqual(get_bureau_page("adherents").status_code, 200)
+        self.assertEqual(get_bureau_page("adherents-fiche").status_code, 200)
         self.assertEqual(get_bureau_page("index.html").status_code, 404)
         self.assertEqual(get_bureau_page("..%2Fserver.py").status_code, 404)
         self.assertEqual(get_bureau_page("inconnue").status_code, 404)
@@ -918,7 +918,8 @@ class TestBureauAccess(unittest.TestCase):
         self.env.stop()
 
     def test_portal_public_api_protected(self):
-        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres",
+        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/adherents-fiche", "/bureau/communications", "/bureau/competitions",
+                     "/bureau/planning", "/bureau/outils", "/bureau/parametres",
                      "/static-web/alj.css", "/static-web/alj-shell.js"):
             self.assertEqual(self.client.get(path).status_code, 200, path)
         self.assertEqual(self.client.get("/bureau/inconnue").status_code, 404)
@@ -972,14 +973,16 @@ class TestVueApp(unittest.TestCase):
     def test_migrated_pages_serve_the_entry_page(self):
         with open(os.path.join(self.dist, "index.html"), "w", encoding="utf-8") as f:
             f.write("<div id=\"app\"></div>")
-        for page in ("communications", "outils", "parametres", "planning"):
+        for page in ("adherents", "communications", "outils", "parametres", "planning"):
             r = TestClient(app).get(f"/bureau/{page}")
             self.assertEqual(r.status_code, 200, page)
             self.assertEqual(r.text, '<div id="app"></div>', page)
+        for page in ("communications", "outils", "parametres", "planning"):
             self.assertFalse(os.path.exists(os.path.join(BUREAU, f"{page}.html")), page)
 
     def test_pages_not_migrated_keep_their_file(self):
-        self.assertEqual(get_bureau_page("adherents").path, os.path.join(BUREAU, "adherents.html"))
+        # The member record of the former members page, until it moves to the Vue app (plan phase 8)
+        self.assertEqual(get_bureau_page("adherents-fiche").path, os.path.join(BUREAU, "adherents.html"))
 
 
 class TestSingleFirebaseInit(unittest.TestCase):

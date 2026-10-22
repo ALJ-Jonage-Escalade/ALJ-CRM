@@ -198,11 +198,18 @@ until phase 8.
 
 ### Acceptance criteria
 
-- [ ] Filters and columns match the old page (including diploma and city)
-- [ ] Data refreshes while the screen is open; unchanged polls are 304
-- [ ] Nothing is stored offline for this route
-- [ ] Vitest covers the synced resource in online mode (polling, 304, stop, refresh)
-- [ ] e2e member list flows strengthened first, pass after migration
+- [x] Filters and columns match the old page (including diploma and city)
+- [x] Data refreshes while the screen is open; unchanged polls are 304
+- [x] Nothing is stored offline for this route
+- [x] Vitest covers the synced resource in online mode (polling, 304, stop, refresh)
+- [x] e2e member list flows strengthened first, pass after migration
+
+> Done 2026-10-22. The former page stays on `/bureau/adherents-fiche` as the member record (edit, add, e-mail,
+> attestation): the list links each name to `?id=<user_id>&saison=…` and « Ajouter un adhérent » to `?ajout=1`; it gets
+> a « Liste des adhérents » link back. The list has no detail pane of its own (the record comes in phase 8). Pages of 50
+> rows; the CSV export holds every page, in the table's order. The filters are remembered as before (same
+> `localStorage` key as the record page), except the search, which often holds a member's name. `GET /api/members` has
+> a response model (`MemberList`); its body is still built by hand (ETag), a test checks it matches the model.
 
 ---
 

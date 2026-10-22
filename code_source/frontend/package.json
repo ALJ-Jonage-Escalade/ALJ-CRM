@@ -20,6 +20,7 @@
   "dependencies": {
     "@firebase/app": "0.16.3",
     "@firebase/auth": "1.13.7",
+    "@tanstack/vue-table": "9.2.8",
     "openapi-fetch": "0.17.0",
     "reka-ui": "2.11.0",
     "vue": "3.5.43",

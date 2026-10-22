@@ -31,6 +31,8 @@ Migration is gradual: FastAPI serves the SPA `index.html` for migrated routes an
 - Same protections: wipe on logout, 401/403, user change, 30-day age limit.
 - `alj-store.js` and `alj-sync.js` are kept almost as is, converted to TypeScript modules, and exposed through a
   `useSyncedResource(name, url, { offline })` composable. No rewrite of this edge-case-heavy code.
+  Online mode since phase 7 (2026-10-22): `poll()` of `alj-sync.js` is `frontend/src/lib/sync.ts`, the composable
+  `frontend/src/composables/syncedResource.ts`; `alj-store.js` (offline copy) joins it with the directory (phase 9).
 
 ### D3 — TypeScript, with API types generated from OpenAPI
 Only 4 of 76 routes declare a `response_model` today. Each migrated page adds Pydantic response models to the
@@ -61,6 +63,9 @@ no single vendor whose license change could force a rewrite**.
 - **TanStack Table** (MIT): table logic (sort, filters, pagination). One responsive data table component of our own
   (table on desktop, cards on phones), built once in the Adhérents list phase and reused. Check that the v9 Vue adapter is
   stable, otherwise stay on v8.
+  Checked 2026-10-22 (phase 7): v9 is stable since 2026-08 (9.0.0), `@tanstack/vue-table` 9.2.8 is used. The component
+  is `frontend/src/components/DataTable.vue`: the pages describe their columns with `DataColumn` (`dataTable.ts`) and
+  filter the rows themselves; TanStack does sorting and pagination only and is not imported anywhere else.
 - **shadcn-vue** (MIT) used as a generator, not a dependency: it copies Reka + Tailwind components into the repo, which
   we then own and trim. No runtime package to follow.
 - French formatting with `Intl` (`fr-FR`); plain validation functions per form (no form library).

@@ -24,11 +24,13 @@ _annuaire_page_path = os.path.join(WEB_DIR, "index.html")
 # (lecture Firestore avec le compte Google, appels API avec jeton).
 _bureau_dir = os.path.join(WEB_DIR, "bureau")
 _BUREAU_PAGES = {
-    "adherents": "adherents.html",
+    # Former members page, kept for the member record (edit, add, e-mail, attestation) until it is migrated
+    # too: the list of the Vue app links to it (?id=<user_id>&saison=…, ?ajout=1)
+    "adherents-fiche": "adherents.html",
     "competitions": "competitions.html",
 }
 # Pages migrated to the Vue application (frontend/src/router.ts): its entry page answers them
-_SPA_PAGES = frozenset({"communications", "outils", "parametres", "planning"})
+_SPA_PAGES = frozenset({"adherents", "communications", "outils", "parametres", "planning"})
 
 
 # Vue application, built by `npm run build` (frontend/dist) or by the Dockerfile. Its hashed assets

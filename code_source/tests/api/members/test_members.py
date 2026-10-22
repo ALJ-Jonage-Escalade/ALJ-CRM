@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from api.members.schemas import MemberList
 from support.member_db import MemberDbTestCase
 
 import server
@@ -39,6 +40,8 @@ class TestMemberRoutes(MemberDbTestCase):
                          ("Loisir adultes", "Lundi 19h", "Validé"))
         self.assertTrue(leo["purchase_id"])
         self.assertEqual(data["creneaux"][0]["tarifs"], ["Loisir"])
+        # The body is built by hand (json_with_etag): it must still match the declared contract, field for field
+        self.assertEqual(MemberList.model_validate(data).model_dump(), data)
 
         again = self.client.get("/api/members", headers={"If-None-Match": r.headers["etag"]})
         self.assertEqual(again.status_code, 304)

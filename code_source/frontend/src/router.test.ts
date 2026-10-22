@@ -94,7 +94,7 @@ describe("app routes", () => {
     expect(router.currentRoute.value.fullPath).toBe("/bureau/?reserve=/bureau/communications");
   });
 
-  it.each(["/bureau/planning", "/bureau/outils?tab=ffme"])("open %s to a coach", async (path) => {
+  it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils?tab=ffme"])("open %s to a coach", async (path) => {
     const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
     await router.push(path);
     expect(router.currentRoute.value.fullPath).toBe(path);

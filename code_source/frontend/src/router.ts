@@ -10,6 +10,7 @@ import AccueilPage from "./pages/AccueilPage.vue";
 import NotFoundPage from "./pages/NotFoundPage.vue";
 
 // Loaded when opened: Accueil (the most opened page) does not wait for them
+const AdherentsPage = () => import("./pages/AdherentsPage.vue");
 const CommunicationsPage = () => import("./pages/CommunicationsPage.vue");
 const OutilsPage = () => import("./pages/OutilsPage.vue");
 const ParametresPage = () => import("./pages/ParametresPage.vue");
@@ -23,6 +24,7 @@ declare module "vue-router" {
 
 export const routes: RouteRecordRaw[] = [
   { path: HOME, name: "accueil", component: AccueilPage, meta: { access: pageAccess("accueil") } },
+  { path: "/bureau/adherents", name: "adherents", component: AdherentsPage, meta: { access: pageAccess("adherents") } },
   { path: "/bureau/communications", name: "communications", component: CommunicationsPage, meta: { access: pageAccess("communications") } },
   { path: "/bureau/planning", name: "planning", component: PlanningPage, meta: { access: pageAccess("planning") } },
   { path: "/bureau/outils", name: "outils", component: OutilsPage, meta: { access: pageAccess("outils") } },

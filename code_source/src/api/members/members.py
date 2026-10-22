@@ -9,14 +9,15 @@ from typing import Optional, Union
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse, Response
 
-from api.responses import internal_error, json_with_etag
+from api.members.schemas import MemberList
+from api.responses import error_responses, internal_error, json_with_etag
 from services.documents import Doc
 from services.members.members import MemberService as Service
 
 router = APIRouter(prefix="/api/members")
 
 
-@router.get("")
+@router.get("", response_model=MemberList, responses=error_responses(404))
 def list_members(request: Request, season: Optional[str] = None) -> Response:
     return json_with_etag(request, Service.list_members(season))
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Version du portail bureau : identique à competitions.html, index.html et CACHE_NAME (sw.js) -->
 <meta name="alj-web-version" content="25">
-<title>ALJ Escalade — Bureau · Adhérents (v25)</title>
+<title>ALJ Escalade — Bureau · Fiche adhérent (v25)</title>
 <meta name="theme-color" content="#0F172A">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='85' font-size='85'>🧗</text></svg>">
 <link rel="stylesheet" href="/static-web/alj.css">
@@ -17,6 +17,9 @@
 <script src="/static-web/alj-members-sync.js"></script>
 </head>
 <body>
+<!-- Former members page, served on /bureau/adherents-fiche for the member record (edit, add, e-mail, attestation)
+     until it moves to the Vue app; the list of the Vue app (/bureau/adherents) opens it with ?id=<user_id>&saison=…
+     (the member to show) or ?ajout=1 (the add form). -->
 <div id="shell"></div>
 
 <script type="module">
@@ -50,12 +53,13 @@ const esc = s => (s == null ? "" : String(s))
 
 startBureau({
   page: "adherents",
-  title: "Adhérents",
+  title: "Fiche adhérent",
   onReady: ({ user, role, isAdmin }) => {
     const content = document.getElementById("content");
     content.innerHTML = `
       <div class="toolbar-wrap">
         <div class="toolbar-row">
+          <a href="/bureau/adherents" class="btn btn-muted btn-mini" style="text-decoration:none;" data-testid="back-to-list">← Liste des adhérents</a>
           <select id="season-select" class="select-input" title="Choisir la saison"></select>
           <input type="search" id="search-input" class="search-input" placeholder="🔍 Rechercher (nom, prénom, ville, tarif, licence, e-mail, tel)…">
           <button class="btn btn-muted btn-mini" id="toggle-filter-box" title="Afficher ou masquer la sélection des créneaux">📂 Créneaux / Tarifs</button>
@@ -524,10 +528,13 @@ startBureau({
       })()
     );
 
-    let currentSeason = filters.season || "";
+    // Opened from the list of the Vue app: the member to show and its season, or the add form
+    const params = new URLSearchParams(location.search);
+    let currentSeason = params.get("saison") || filters.season || "";
     let sortKey = "last_name";
     let sortAsc = true;
-    let selectedUserId = null;
+    let selectedUserId = params.get("id");
+    let openAddOnLoad = isAdmin && params.get("ajout") === "1";
     let displayedMembers = [];
 
     // Modèles d'e-mails et état actif
@@ -1698,8 +1705,10 @@ startBureau({
       // Mise à jour de la sélection
       if (selectedUserId) {
         const found = displayedMembers.find(m => String(m.user_id) === String(selectedUserId));
-        if (found) {
-          renderDetailPanel(found);
+        // A member hidden by the filters (waiting list…) still gets its record when asked for by ?id=
+        const hidden = !found && (filterCache.members || []).find(m => String(m.user_id) === String(selectedUserId));
+        if (found || hidden) {
+          renderDetailPanel(found || hidden);
         } else if (displayedMembers.length > 0) {
           selectedUserId = displayedMembers[0].user_id;
           renderDetailPanel(displayedMembers[0]);
@@ -1858,6 +1867,10 @@ startBureau({
         renderFilterChips();
         renderFilterCreneaux();
         refreshDisplay();
+        if (openAddOnLoad) {
+          openAddOnLoad = false;
+          openAddMemberModal();
+        }
       },
       onStatus: (status, info) => {
         if (status === "offline") setSyncInfo("📴 Hors ligne : liste non actualisée");

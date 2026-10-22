@@ -1452,6 +1452,20 @@ export interface components {
             /** Type */
             type?: string | null;
         };
+        /**
+         * Creneau
+         * @description A slot group of the planning and the HelloAsso tariffs it covers.
+         */
+        Creneau: {
+            /** Groupe */
+            groupe: string;
+            /** Tarifs */
+            tarifs: string[];
+            /** Categorie Age */
+            categorie_age: string;
+            /** Type */
+            type: string;
+        };
         /** EmailTemplate */
         EmailTemplate: {
             /** Name */
@@ -1869,6 +1883,105 @@ export interface components {
             email: string;
             /** Role */
             role: ("admin" | "coach" | "readonly") | null;
+        };
+        /**
+         * Member
+         * @description One member of a season (one purchase), as domain/members/view.py member_row() builds it.
+         *     Names, city and phones are already formatted; status_norm is the French status label.
+         */
+        Member: {
+            /** User Id */
+            user_id: number;
+            /** Purchase Id */
+            purchase_id: number;
+            /** Season Name */
+            season_name: string;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Birth Date */
+            birth_date: string;
+            /** Age */
+            age: number | null;
+            /** Gender */
+            gender: string;
+            /** Address */
+            address: string;
+            /** Zip Code */
+            zip_code: string;
+            /** City */
+            city: string;
+            /** Phone */
+            phone: string;
+            /** Email Primary */
+            email_primary: string;
+            /** Email Secondary */
+            email_secondary: string;
+            /** Licence Ffme */
+            licence_ffme: string;
+            /** Emergency1 Name */
+            emergency1_name: string;
+            /** Emergency1 Phone */
+            emergency1_phone: string;
+            /** Emergency2 Name */
+            emergency2_name: string;
+            /** Emergency2 Phone */
+            emergency2_phone: string;
+            /** Health Commitment */
+            health_commitment: string;
+            /** Document Sante */
+            document_sante: string;
+            /** Photo Auth */
+            photo_auth: string;
+            /** Badge Rouge */
+            badge_rouge: string;
+            /** Autonomie Bloc */
+            autonomie_bloc: string;
+            /** Passeport Orange */
+            passeport_orange: string;
+            /** Raw Passports */
+            raw_passports: string;
+            /** Raw Diplomas */
+            raw_diplomas: string;
+            /** Payer */
+            payer: string;
+            /** Payer Email */
+            payer_email: string;
+            /** Order Ref */
+            order_ref: string;
+            /** Order Date */
+            order_date: string;
+            /** Tarif Name */
+            tarif_name: string;
+            /** Amount */
+            amount: number | null;
+            /** Status */
+            status: string;
+            /** Status Norm */
+            status_norm: string;
+            /** Email Sent Date */
+            email_sent_date: string;
+            /** Commentaires Correctif */
+            commentaires_correctif: string;
+            /** Creneau Groupe */
+            creneau_groupe: string;
+            /** Categorie */
+            categorie: string;
+            /** Creneau Details */
+            creneau_details: string;
+        };
+        /**
+         * MemberList
+         * @description The members of one season, sorted by name, with the planning's slot groups (filters of the list).
+         */
+        MemberList: {
+            /** Season */
+            season: string;
+            /** Members */
+            members: components["schemas"]["Member"][];
+            /** Creneaux */
+            creneaux: components["schemas"]["Creneau"][];
         };
         /** ParticipantAdd */
         ParticipantAdd: {
@@ -3016,7 +3129,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MemberList"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
