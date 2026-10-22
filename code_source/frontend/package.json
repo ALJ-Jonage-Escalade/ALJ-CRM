@@ -13,11 +13,14 @@
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint --max-warnings=0 .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:api": "openapi-typescript openapi.json -o src/lib/api-schema.ts --default-non-nullable false",
+    "check:api": "openapi-typescript openapi.json -o src/lib/api-schema.ts --default-non-nullable false --check"
   },
   "dependencies": {
     "@firebase/app": "0.16.3",
     "@firebase/auth": "1.13.7",
+    "openapi-fetch": "0.17.0",
     "vue": "3.5.43",
     "vue-router": "5.4.0"
   },
@@ -29,6 +32,7 @@
     "eslint": "10.12.0",
     "eslint-plugin-vue": "10.11.1",
     "jsdom": "30.1.2",
+    "openapi-typescript": "7.13.0",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.1",
@@ -38,5 +42,10 @@
   },
   "allowScripts": {
     "@firebase/util": false
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }

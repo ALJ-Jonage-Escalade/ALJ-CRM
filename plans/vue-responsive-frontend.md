@@ -109,11 +109,12 @@ to the SPA.
 
 ### Acceptance criteria
 
-- [ ] Paramètres routes declare response models; generated types are used by the page
-- [ ] Changing a response model without regenerating types fails CI
-- [ ] Vitest covers the API client (token added, error mapping, network failure)
-- [ ] e2e Paramètres flows moved to `data-testid` before the migration and pass after it
-- [ ] HTML string checks for Paramètres removed from the bureau web tests; its API tests kept
+- [x] Paramètres routes declare response models; generated types are used by the page
+- [x] Changing a response model without regenerating types fails CI (`dev/export_openapi.py --check`, `npm run check:api`;
+  both verified locally, the workflow not yet run on GitHub)
+- [x] Vitest covers the API client (token added, error mapping, network failure)
+- [x] e2e Paramètres flows moved to `data-testid` before the migration and pass after it
+- [x] HTML string checks for Paramètres removed from the bureau web tests; its API tests kept
 
 ---
 

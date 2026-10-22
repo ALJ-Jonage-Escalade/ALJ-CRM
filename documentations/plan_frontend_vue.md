@@ -36,6 +36,11 @@ Migration is gradual: FastAPI serves the SPA `index.html` for migrated routes an
 Only 4 of 76 routes declare a `response_model` today. Each migrated page adds Pydantic response models to the
 routes it calls; TS types are generated from `/openapi.json` (`openapi-typescript`) and CI checks they are up to
 date (like `requirements*.txt`).
+Set up in phase 3 (2026-10-22): `dev/export_openapi.py` writes `frontend/openapi.json`; `openapi-typescript` (MIT, dev
+only) generates `src/lib/api-schema.ts` from it, with `--default-non-nullable false` (a field with a server default is
+optional). Its latest release only declares TypeScript 5 as a peer: `package.json` overrides that peer to our TypeScript
+(the generated file is type-checked in CI). Calls go through `openapi-fetch` (MIT, no dependency besides its helpers)
+over `apiFetch`; errors become `ApiError { status, code, message }`.
 
 ### D4 — Auth: same login flow, roles from the server
 - Port the implicit Google OAuth + `signInWithCredential` flow as is into a `useAuth()` composable, with the modular

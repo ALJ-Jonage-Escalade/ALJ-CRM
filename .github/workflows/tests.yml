@@ -47,6 +47,10 @@ jobs:
         uv lock --check
         python dev/export_requirements.py --check
 
+    - name: Check the API contract (frontend/openapi.json) is up to date
+      working-directory: code_source
+      run: uv run --no-sync python dev/export_openapi.py --check
+
     - name: Lint (ruff)
       working-directory: code_source
       run: uv run --no-sync ruff check src tests
@@ -78,6 +82,9 @@ jobs:
 
     - name: Install Dependencies (package-lock.json)
       run: npm ci --no-fund
+
+    - name: Check the API types match the contract (src/lib/api-schema.ts)
+      run: npm run check:api
 
     - name: Lint (ESLint)
       run: npm run lint

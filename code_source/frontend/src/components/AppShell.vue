@@ -8,6 +8,7 @@ import { AUTH_KEY } from "../composables/auth";
 import { canOpen, pageAccess, PAGES, verdict, type PageId } from "../lib/access";
 import { API_KEY } from "../lib/api";
 import { isStaff, roleLabel } from "../lib/roles";
+import PageLink from "./PageLink.vue";
 import VersionBadge from "./VersionBadge.vue";
 
 const props = defineProps<{ page: PageId; title: string }>();
@@ -62,7 +63,7 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         aria-label="Navigation principale"
         class="fixed inset-x-0 bottom-0 z-40 flex h-16 justify-around border-t border-side-hover bg-side pb-[env(safe-area-inset-bottom)] md:static md:h-auto md:flex-col md:justify-start md:gap-0.5 md:border-0 md:pb-0"
       >
-        <a
+        <PageLink
           v-for="item in nav"
           :key="item.id"
           :href="item.href"
@@ -77,7 +78,7 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
           <span aria-hidden="true" class="text-lg md:text-base">{{ item.icon }}</span>
           <span class="max-w-full truncate text-[10px] md:hidden">{{ item.short }}</span>
           <span class="hidden md:inline">{{ item.label }}</span>
-        </a>
+        </PageLink>
       </nav>
       <div class="mt-auto hidden flex-col gap-2 px-2 md:flex">
         <a class="text-[13px] text-side-text no-underline hover:text-white hover:underline" href="/competitions?vue=mobile">📱 Version mobile</a>

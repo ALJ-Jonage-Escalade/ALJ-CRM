@@ -29,8 +29,9 @@ _BUREAU_PAGES = {
     "competitions": "competitions.html",
     "planning": "planning.html",
     "outils": "outils.html",
-    "parametres": "parametres.html"
 }
+# Pages migrated to the Vue application (frontend/src/router.ts): its entry page answers them
+_SPA_PAGES = frozenset({"parametres"})
 
 
 # Vue application, built by `npm run build` (frontend/dist) or by the Dockerfile. Its hashed assets
@@ -90,7 +91,9 @@ def get_bureau_home():
 
 @router.get("/bureau/{page}", response_class=HTMLResponse, include_in_schema=False)
 def get_bureau_page(page: str):
-    """Pages du portail bureau : seules les pages de _BUREAU_PAGES sont servies."""
+    """Pages du portail bureau : application Vue (_SPA_PAGES) ou ancienne page (_BUREAU_PAGES), sinon 404."""
+    if page in _SPA_PAGES:
+        return spa_entry()
     return _bureau_file(page)
 
 @router.get("/index", response_class=HTMLResponse)

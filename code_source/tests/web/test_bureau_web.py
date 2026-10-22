@@ -71,7 +71,7 @@ class TestBureauFiles(unittest.TestCase):
     def test_bureau_pages_share_web_version(self):
         version = _current_version()
         self.assertRegex(version, r"^\d+$")
-        for name in ("adherents.html", "communications.html", "competitions.html", "planning.html", "outils.html", "parametres.html"):
+        for name in ("adherents.html", "communications.html", "competitions.html", "planning.html", "outils.html"):
             html = _read(os.path.join(BUREAU, name))
             self.assertIn(f'<meta name="alj-web-version" content="{version}">', html, name)
             self.assertRegex(html, rf"<title>[^<]*\(v{version}\)</title>", name)
@@ -98,60 +98,42 @@ class TestBureauFiles(unittest.TestCase):
         self.assertIn("btn-export-excel-grid", html)
         self.assertIn("slot-modal", html)
 
-    def test_parametres_file_structure(self):
-        """La nouvelle page parametres.html doit contenir l'outil de connexion Google, la gestion SQLite et le batch résultats."""
-        html = _read(os.path.join(BUREAU, "parametres.html"))
-        self.assertIn("alj-shell.js", html)
-        self.assertIn("alj-firebase.js", html)
-        self.assertIn("google-status-badge", html)
-        self.assertIn("btn-google-reconnect", html)
-        self.assertIn("btn-google-test", html)
-        self.assertIn("btn-force-update-sqlite", html)
-        self.assertIn("btn-full-rebuild-sqlite", html)
-        self.assertIn("sqlite-status-badge", html)
-        self.assertIn("sqlite-file-info", html)
-        # Nouveaux éléments du batch de résultats MyCompet
-        self.assertIn("results-notif-email", html)
-        self.assertIn("btn-save-notif-email", html)
-        self.assertIn("btn-run-results-batch", html)
-        self.assertIn("results-batch-last-run", html)
-        self.assertIn("results-batch-report", html)
-        self.assertIn("Suivi Automatique des Résultats MyCompet", html)
-
     def test_competitions_results_cron_and_settings_endpoints(self):
         """Vérifie les endpoints de configuration et de cron du batch des résultats MyCompet."""
         from support.fake_firestore import use_fake_firestore
         use_fake_firestore(self)
-        from api.competitions.results import (
-            get_competitions_results_settings_api,
-            update_competitions_results_settings_api
-        )
         from server import app
+        client = TestClient(app)
 
         # 1. GET /api/settings/competitions-results
-        res = get_competitions_results_settings_api()
+        res = client.get("/api/settings/competitions-results").json()
         self.assertEqual(res.get("status"), "success")
-        self.assertIn("notification_email", res)
         self.assertIn("@", res["notification_email"])
         self.assertIn("cron_schedule", res)
 
         # 2. POST /api/settings/competitions-results
-        up_res = update_competitions_results_settings_api({"notification_email": "test.notif@alj-jonage.fr"})
+        up_res = client.post("/api/settings/competitions-results", json={"notification_email": "test.notif@alj-jonage.fr"}).json()
         self.assertEqual(up_res.get("status"), "success")
         self.assertEqual(up_res.get("notification_email"), "test.notif@alj-jonage.fr")
+        bad = client.post("/api/settings/competitions-results", json={"notification_email": "pas-une-adresse"})
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(bad.json(), {"status": "error", "message": "Adresse e-mail de notification invalide."})
 
         # Rétablir l'adresse par défaut
-        update_competitions_results_settings_api({"notification_email": "david.lopez@alj-jonage.fr"})
+        client.post("/api/settings/competitions-results", json={"notification_email": "david.lopez@alj-jonage.fr"})
 
         # 3. POST /api/competitions/cron/fetch-results
         with patch("services.competitions.results_batch.CompetitionResultsBatchService.run_daily_batch") as mock_batch:
             mock_batch.return_value = {
                 "status": "success",
-                "competitions_checked": 0,
+                "executed_at": "2026-10-22T07:00:00",
+                "competitions_checked": 1,
                 "competitions_updated": 0,
-                "email_sent": False
+                "email_sent": False,
+                "notification_email": "david.lopez@alj-jonage.fr",
+                "details": [{"id": "c1", "nom": "Open", "date": "2026-10-01", "lieu": "Lyon", "url": "", "athletes": [],
+                             "status": "pending"}],
             }
-            client = TestClient(app)
             cron_resp = client.post("/api/competitions/cron/fetch-results?force=true")
             self.assertEqual(cron_resp.status_code, 200)
             self.assertEqual(cron_resp.json().get("status"), "success")
@@ -159,8 +141,8 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_cloud_db_status_endpoint(self):
         """Vérifie l'endpoint GET /api/cloud-db/status."""
-        from api.integrations.cloud_db import get_cloud_db_status_api
-        res = get_cloud_db_status_api()
+        from server import app
+        res = TestClient(app).get("/api/cloud-db/status").json()
         self.assertEqual(res.get("status"), "success")
         self.assertIn("db_exists", res)
         self.assertIn("pending", res)
@@ -691,7 +673,8 @@ class TestBureauFiles(unittest.TestCase):
         with patch("infrastructure.firestore.cloud_database.CloudDatabase.is_enabled", return_value=True):
             with patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"status": "ok", "errors": []}):
                 res = sync_cloud_db_api(force=True)
-                self.assertEqual(res.get("status"), "success")
+                self.assertEqual(res.status, "success")
+                self.assertEqual(res.result.model_dump(), {"pulled": 0, "pushed": 0, "full": False})
 
     def test_season_tarifs_endpoint(self):
         """GET /api/season-tarifs retourne les tarifs disponibles de la saison active."""
@@ -1215,6 +1198,14 @@ class TestVueApp(unittest.TestCase):
         """The mount reads the folder of the build at startup: the app's own one (frontend/dist), maybe not built."""
         r = TestClient(app).get("/spa/assets/does-not-exist.js")
         self.assertEqual(r.status_code, 404)  # not a server error when the frontend is not built
+
+    def test_migrated_pages_serve_the_entry_page(self):
+        with open(os.path.join(self.dist, "index.html"), "w", encoding="utf-8") as f:
+            f.write("<div id=\"app\"></div>")
+        r = TestClient(app).get("/bureau/parametres")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.text, '<div id="app"></div>')
+        self.assertFalse(os.path.exists(os.path.join(BUREAU, "parametres.html")))
 
     def test_pages_not_migrated_keep_their_file(self):
         self.assertEqual(get_bureau_page("adherents").path, os.path.join(BUREAU, "adherents.html"))

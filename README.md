@@ -112,6 +112,15 @@ uv run mypy                                       # fichiers listés dans [tool.
 cd frontend && npm run lint && npm run typecheck && npm test   # application Vue (ESLint, vue-tsc, Vitest)
 ```
 
+Contrat de l'API : les types TypeScript de l'application Vue sont générés à partir des modèles Pydantic des routes.
+Après avoir modifié un modèle de réponse :
+
+```bash
+cd code_source
+uv run python dev/export_openapi.py               # met à jour frontend/openapi.json
+cd frontend && npm run gen:api                    # régénère src/lib/api-schema.ts (vérifié par la CI)
+```
+
 ## Déployer sur Cloud Run
 
 Depuis Google Cloud Shell ou un poste avec le Google Cloud SDK (le script envoie toujours `code_source/`,

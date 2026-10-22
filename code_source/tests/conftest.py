@@ -33,6 +33,17 @@ def _production_environment(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _frontend_build(monkeypatch, tmp_path_factory):
+    """A stub build of the Vue app (frontend/dist): the pages it serves answer 200 whether `npm run build` ran or not
+    (the CI's Python job does not build it). TestVueApp sets its own folder."""
+    dist = tmp_path_factory.getbasetemp() / "frontend-dist"
+    if not dist.exists():
+        dist.mkdir()
+        (dist / "index.html").write_text('<div id="app"></div>', encoding="utf-8")
+    monkeypatch.setenv("ALJ_FRONTEND_DIST", str(dist))
+
+
+@pytest.fixture(autouse=True)
 def _test_client_host(monkeypatch):
     """Starlette's TestClient sends `Host: testserver`: accepted by the local-server guard in tests only."""
     src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")

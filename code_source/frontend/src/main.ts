@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import { AUTH_KEY, sharedAuth } from "./composables/auth";
 import { API_KEY, apiFetch } from "./lib/api";
+import { CLIENT_KEY, createApiClient } from "./lib/client";
 import { registerServiceWorker } from "./lib/version";
 import { createAppRouter } from "./router";
 import "./styles.css";
@@ -13,6 +14,7 @@ if (!window.ALJ_UNSUPPORTED) {
     .use(createAppRouter(auth))
     .provide(AUTH_KEY, auth)
     .provide(API_KEY, apiFetch)
+    .provide(CLIENT_KEY, createApiClient(apiFetch))
     .mount("#app");
   registerServiceWorker();
 }

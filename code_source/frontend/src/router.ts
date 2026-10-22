@@ -8,6 +8,7 @@ import type { Auth } from "./composables/auth";
 import { HOME, pageAccess, REFUSED_QUERY, verdict, type Access } from "./lib/access";
 import AccueilPage from "./pages/AccueilPage.vue";
 import NotFoundPage from "./pages/NotFoundPage.vue";
+import ParametresPage from "./pages/ParametresPage.vue";
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -16,7 +17,8 @@ declare module "vue-router" {
 }
 
 export const routes: RouteRecordRaw[] = [
-  { path: HOME, component: AccueilPage, meta: { access: pageAccess("accueil") } },
+  { path: HOME, name: "accueil", component: AccueilPage, meta: { access: pageAccess("accueil") } },
+  { path: "/bureau/parametres", name: "parametres", component: ParametresPage, meta: { access: pageAccess("parametres") } },
   { path: "/:unknown(.*)*", component: NotFoundPage, meta: { access: "public" } },
 ];
 

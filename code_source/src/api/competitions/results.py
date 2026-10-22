@@ -9,9 +9,12 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+
+from api.competitions.schemas.results import BatchReport, ResultsSettings, ResultsSettingsSaved, ResultsSettingsUpdate
+from api.responses import error, error_responses
 
 # Full paths: /api/competitions/... and /api/settings/...
 router = APIRouter()
@@ -21,11 +24,11 @@ router = APIRouter()
 # Batch quotidien de récupération des résultats MyCompet FFME & Notifications.
 # Stays registered before /{comp_id}/fetch-results, which would capture "cron": Cloud Scheduler
 # (job batch-resultats-competitions) calls POST /api/competitions/cron/fetch-results every day.
-@router.post("/api/competitions/cron/fetch-results")
+@router.post("/api/competitions/cron/fetch-results", response_model=BatchReport)
 async def api_cron_fetch_competition_results(
     force: bool = False,
     email: Optional[str] = None
-):
+) -> BatchReport:
     """
     Exécute le batch de récupération des résultats MyCompet FFME pour les compétitions passées
     et envoie un e-mail de synthèse si des résultats sont découverts.
@@ -34,7 +37,8 @@ async def api_cron_fetch_competition_results(
     from services.competitions.results_batch import CompetitionResultsBatchService
     from services.competitions.store import invalidate_cache
     try:
-        return await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
+        report = await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
+        return BatchReport.model_validate(report)
     finally:
         invalidate_cache()  # the batch writes competition documents directly
 
@@ -141,27 +145,20 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
     }
 
 
-@router.get("/api/settings/competitions-results")
-def get_competitions_results_settings_api():
+@router.get("/api/settings/competitions-results", response_model=ResultsSettings)
+def get_competitions_results_settings_api() -> ResultsSettings:
     """Retourne la configuration et l'état du batch quotidien de résultats."""
     from services.competitions.results_batch import CompetitionResultsBatchService
-    return {
-        "status": "success",
-        **CompetitionResultsBatchService.get_batch_status()
-    }
+    return ResultsSettings(status="success", **CompetitionResultsBatchService.get_batch_status())
 
 
-@router.post("/api/settings/competitions-results")
-def update_competitions_results_settings_api(data: Dict[str, Any] = Body(...)):
+@router.post("/api/settings/competitions-results", response_model=ResultsSettingsSaved, responses=error_responses(400))
+def update_competitions_results_settings_api(data: ResultsSettingsUpdate) -> ResultsSettingsSaved | JSONResponse:
     """Met à jour l'adresse e-mail de notification des résultats."""
     from services.competitions.results_batch import CompetitionResultsBatchService
-    email = str(data.get("notification_email") or "").strip()
+    email = data.notification_email
     if not email or "@" not in email or "." not in email:
-        raise HTTPException(status_code=400, detail="Adresse e-mail de notification invalide.")
+        return error(400, "Adresse e-mail de notification invalide.")
 
     ok = CompetitionResultsBatchService.set_notification_email(email)
-    return {
-        "status": "success",
-        "notification_email": CompetitionResultsBatchService.get_notification_email(),
-        "saved": ok
-    }
+    return ResultsSettingsSaved(status="success", notification_email=CompetitionResultsBatchService.get_notification_email(), saved=ok)

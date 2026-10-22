@@ -2,10 +2,11 @@
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import AppShell from "../components/AppShell.vue";
+import PageLink from "../components/PageLink.vue";
 import { canOpen, pageAccess, PAGES, REFUSED_QUERY, type Access } from "../lib/access";
 import type { Role } from "../lib/roles";
 
-/* Pages not migrated yet are links to their former page (full page load). Only the cards the role may open are shown. */
+/* Links to the migrated pages stay in the app; the others load their former page. Only the cards the role may open are shown. */
 const LINKS: { href: string; title: string; text: string; access: Access }[] = [
   { href: "/bureau/adherents", title: "👥 Adhérents", text: "Liste des adhérents, filtre par tarif et fiche détaillée.", access: pageAccess("adherents") },
   { href: "/bureau/communications", title: "✉️ Communications", text: "Modèles d'e-mails et de messages du club.", access: pageAccess("communications") },
@@ -34,7 +35,7 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
         class="mb-3.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-900"
       >⛔ La page {{ refused }} est réservée aux administrateurs.</p>
       <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
-        <a
+        <PageLink
           v-for="link in linksFor(role)"
           :key="link.href"
           :href="link.href"
@@ -42,7 +43,7 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
         >
           <b class="mb-1 block text-base">{{ link.title }}</b>
           <span class="text-[13px] leading-snug text-slate-500">{{ link.text }}</span>
-        </a>
+        </PageLink>
       </div>
       <img
         :src="BANNER"

@@ -63,10 +63,18 @@ def test_non_staff_sees_no_menu(page, role):
     expect(page.locator(NAV)).to_have_count(0)
 
 
-@pytest.mark.parametrize("name", ADMIN_PAGES)
-def test_coach_is_refused_admin_pages(page, name):
+def test_coach_is_sent_back_from_an_admin_page(page):
+    """Vue app: the router guards send a coach back to Accueil, which names the page."""
+    page.goto("/bureau/parametres")
+    login_as(page, "coach")
+    page.wait_for_url("**/bureau/?reserve=/bureau/parametres")
+    expect(page.locator("#refused-page")).to_have_text("⛔ La page Paramètres est réservée aux administrateurs.")
+    expect(page.locator(f"{NAV} a[data-page='parametres']")).to_have_count(0)
+
+
+def test_coach_is_refused_former_admin_page(page):
     """Pages not migrated yet: same rule in the former shell (adminOnly), menu without the admin pages."""
-    page.goto(f"/bureau/{name}")
+    page.goto("/bureau/communications")
     login_as(page, "coach")
     expect(page.locator("#gate")).to_contain_text("Réservé aux administrateurs")
     expect(page.locator("#content")).to_be_hidden()
@@ -82,7 +90,22 @@ def test_admin_opens_admin_pages(page):
     login_as(page, "admin")
     expect(page.locator("#content")).to_be_visible()
     expect(page.locator("#gate")).to_be_hidden()
-    expect(page.locator("nav a[data-page='communications']")).to_be_visible()
+    page.locator("nav a[data-page='communications']").filter(visible=True).click()  # former page: full load
+    page.wait_for_url("**/bureau/communications")
+    expect(page.locator("#content")).to_be_visible()
+
+
+def test_in_app_navigation_keeps_the_page_loaded(page):
+    """Accueil → Paramètres → Accueil are routes of the same app: no page load, the session stays."""
+    page.goto("/bureau/")
+    login_as(page, "admin")
+    expect(page.locator("#content")).to_be_visible()
+    page.evaluate("() => { window.__sameDocument = true; }")
+    page.locator(f"{NAV} a[data-page='parametres']").filter(visible=True).click()
+    expect(page.get_by_test_id("cache-status")).to_contain_text("Cache opérationnel")
+    page.locator(f"{NAV} a[data-page='accueil']").filter(visible=True).click()
+    expect(page.locator("#content a[href='/bureau/planning']")).to_be_visible()
+    assert page.evaluate("() => window.__sameDocument") is True
 
 
 def test_refused_page_notice(page):

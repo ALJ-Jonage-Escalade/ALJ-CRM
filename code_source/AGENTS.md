@@ -10,7 +10,9 @@ All commands run from `code_source/`. Python 3.14 (`.python-version`), `requires
 - typecheck: `uv run mypy` (no path: checks the files listed under `[tool.mypy] files` in pyproject.toml; `mypy src/` fails on module-path errors)
 - all checks (as CI): `uv lock --check && uv run python dev/export_requirements.py --check && uv run ruff check src tests && uv run mypy && uv run pytest tests`
 - frontend (Vue 3 + Vite + TypeScript, in `frontend/`, Node version from `frontend/.nvmrc`):
-  `cd frontend && npm ci && npm run lint && npm run typecheck && npm test && npm run build`
+  `cd frontend && npm ci && npm run check:api && npm run lint && npm run typecheck && npm test && npm run build`
+  - API types: `src/lib/api-schema.ts` is generated from `openapi.json` (`uv run python dev/export_openapi.py`, then
+    `npm run gen:api`); never edit either by hand. Pages call the API through the typed client (`src/lib/client.ts`)
   - dev: `npm run dev` → http://localhost:5173/bureau/, next to `uv run dev/run_server.sh` (Vite proxies the API and the pages not migrated)
   - unit tests: Vitest, `src/**/*.test.ts` next to the module they test
 
