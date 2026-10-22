@@ -1,25 +1,41 @@
 <script setup lang="ts">
+import { computed } from "vue";
+import { useRoute } from "vue-router";
 import AppShell from "../components/AppShell.vue";
+import { canOpen, pageAccess, PAGES, REFUSED_QUERY, type Access } from "../lib/access";
+import type { Role } from "../lib/roles";
 
-/* Pages not migrated yet are links to their former page (full page load). */
-const LINKS = [
-  { href: "/bureau/adherents", title: "👥 Adhérents", text: "Liste des adhérents, filtre par tarif et fiche détaillée." },
-  { href: "/bureau/communications", title: "✉️ Communications", text: "Modèles d'e-mails et de messages du club." },
-  { href: "/bureau/outils", title: "🛠️ Outils", text: "Carte interactive et analyse des effectifs." },
-  { href: "/bureau/competitions", title: "🏆 Compétitions", text: "Compétitions, participants et paiements HelloAsso." },
-  { href: "/bureau/planning", title: "📅 Créneaux & Planning", text: "Création, modification des créneaux, animateurs, tarifs et impression du planning." },
-  { href: "/bureau/parametres", title: "⚙️ Paramètres", text: "Connexion Google du club, statut de la base de données et services associés." },
-  { href: "/competitions?vue=mobile", title: "📱 Version mobile", text: "Ouvre l'application smartphone et mémorise ce choix sur cet appareil." },
+/* Pages not migrated yet are links to their former page (full page load). Only the cards the role may open are shown. */
+const LINKS: { href: string; title: string; text: string; access: Access }[] = [
+  { href: "/bureau/adherents", title: "👥 Adhérents", text: "Liste des adhérents, filtre par tarif et fiche détaillée.", access: pageAccess("adherents") },
+  { href: "/bureau/communications", title: "✉️ Communications", text: "Modèles d'e-mails et de messages du club.", access: pageAccess("communications") },
+  { href: "/bureau/outils", title: "🛠️ Outils", text: "Carte interactive et analyse des effectifs.", access: pageAccess("outils") },
+  { href: "/bureau/competitions", title: "🏆 Compétitions", text: "Compétitions, participants et paiements HelloAsso.", access: pageAccess("competitions") },
+  { href: "/bureau/planning", title: "📅 Créneaux & Planning", text: "Création, modification des créneaux, animateurs, tarifs et impression du planning.", access: pageAccess("planning") },
+  { href: "/bureau/parametres", title: "⚙️ Paramètres", text: "Connexion Google du club, statut de la base de données et services associés.", access: pageAccess("parametres") },
+  { href: "/competitions?vue=mobile", title: "📱 Version mobile", text: "Ouvre l'application smartphone et mémorise ce choix sur cet appareil.", access: "staff" },
 ];
 const BANNER = "https://alj-escalade.fr/wp-content/uploads/2026/09/De-nouveaux-blocs-tous-les-15-jours-3-1024x512.png";
+
+const linksFor = (role: Role) => LINKS.filter((link) => canOpen(role, link.access));
+
+// Sent back by the router guards from an admin page: only a known page is named
+const route = useRoute();
+const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_QUERY])?.label);
 </script>
 
 <template>
   <AppShell page="accueil" title="Accueil">
     <template #default="{ role }">
+      <p
+        v-if="refused"
+        id="refused-page"
+        role="status"
+        class="mb-3.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-900"
+      >⛔ La page {{ refused }} est réservée aux administrateurs.</p>
       <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
         <a
-          v-for="link in LINKS"
+          v-for="link in linksFor(role)"
           :key="link.href"
           :href="link.href"
           class="block rounded-xl border border-slate-200 bg-white px-4.5 py-4 text-slate-800 no-underline shadow-sm hover:border-accent"

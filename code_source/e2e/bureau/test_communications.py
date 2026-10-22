@@ -119,9 +119,9 @@ def test_whatsapp_text(page):
     expect(page.locator("#whatsapp-input")).to_have_value(text)
 
 
-def test_coach_reads_only(page):
-    _open(page, role="coach")
-    for field in ("#subject-input", "#body-input", "#sender-email", "#whatsapp-input"):
-        expect(page.locator(field)).to_be_disabled()
-    for button in ("#btn-save-tpl", "#btn-new-tpl", "#btn-del-tpl", "#btn-save-whatsapp"):
-        expect(page.locator(button)).to_have_count(0)
+def test_coach_is_refused(page):
+    """Communications is for admins only (see e2e/bureau/test_accueil.py)."""
+    page.goto("/bureau/communications")
+    login_as(page, "coach")
+    expect(page.locator("#gate")).to_contain_text("Réservé aux administrateurs")
+    expect(page.locator("#template-select")).to_have_count(0)

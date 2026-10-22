@@ -1,6 +1,7 @@
 """Office portal, Accueil: first page of the Vue app (frontend/), one responsive layout for every screen."""
 from pathlib import Path
 
+import pytest
 from playwright.sync_api import expect
 
 from helpers.auth import login_as
@@ -20,7 +21,7 @@ def test_phone_layout(mobile_page):
     nav = mobile_page.locator(NAV).bounding_box()
     assert abs(nav["y"] + nav["height"] - viewport["height"]) <= 1, "navigation bar at the bottom of the screen"
     assert nav["width"] == viewport["width"]
-    expect(mobile_page.locator(f"{NAV} a")).to_have_count(7)
+    expect(mobile_page.locator(f"{NAV} a")).to_have_count(5)  # a coach: no Communications, no Paramètres
     expect(mobile_page.get_by_text(f"v{VERSION}", exact=True).filter(visible=True)).to_be_visible()
 
 
@@ -37,3 +38,58 @@ def test_desktop_layout(page):
     page.locator("#content a[href='/bureau/planning']").click()
     page.wait_for_url("**/bureau/planning")
     expect(page.locator("#who")).to_contain_text("albus.dumbledore@alj-escalade.fr")  # same session on the former page
+
+
+ADMIN_PAGES = ["communications", "parametres"]
+
+
+@pytest.mark.parametrize("role, count", [("admin", 7), ("coach", 5)])
+def test_menu_and_cards_follow_the_role(page, role, count):
+    page.goto("/bureau/")
+    login_as(page, role)
+    expect(page.locator("#content")).to_be_visible()
+    expect(page.locator(f"{NAV} a")).to_have_count(count)
+    for name in ADMIN_PAGES:
+        shown = 1 if role == "admin" else 0
+        expect(page.locator(f"{NAV} a[data-page='{name}']")).to_have_count(shown)
+        expect(page.locator(f"#content a[href='/bureau/{name}']")).to_have_count(shown)
+
+
+@pytest.mark.parametrize("role", ["readonly", "stranger"])
+def test_non_staff_sees_no_menu(page, role):
+    page.goto("/bureau/")
+    login_as(page, role)
+    expect(page.locator("#gate")).to_contain_text("Accès réservé")
+    expect(page.locator(NAV)).to_have_count(0)
+
+
+@pytest.mark.parametrize("name", ADMIN_PAGES)
+def test_coach_is_refused_admin_pages(page, name):
+    """Pages not migrated yet: same rule in the former shell (adminOnly), menu without the admin pages."""
+    page.goto(f"/bureau/{name}")
+    login_as(page, "coach")
+    expect(page.locator("#gate")).to_contain_text("Réservé aux administrateurs")
+    expect(page.locator("#content")).to_be_hidden()
+    for admin_page in ADMIN_PAGES:
+        expect(page.locator(f"nav a[data-page='{admin_page}']")).to_be_hidden()
+    page.locator("#gate a[href='/bureau/']").click()
+    page.wait_for_url("**/bureau/")
+    expect(page.locator("#content")).to_be_visible()
+
+
+def test_admin_opens_admin_pages(page):
+    page.goto("/bureau/parametres")
+    login_as(page, "admin")
+    expect(page.locator("#content")).to_be_visible()
+    expect(page.locator("#gate")).to_be_hidden()
+    expect(page.locator("nav a[data-page='communications']")).to_be_visible()
+
+
+def test_refused_page_notice(page):
+    """Where the router guards send a coach from an admin page; an unknown page is not named."""
+    page.goto("/bureau/?reserve=/bureau/parametres")
+    login_as(page, "coach")
+    expect(page.locator("#refused-page")).to_have_text("⛔ La page Paramètres est réservée aux administrateurs.")
+    page.goto("/bureau/?reserve=/autre")
+    expect(page.locator("#content")).to_be_visible()
+    expect(page.locator("#refused-page")).to_have_count(0)

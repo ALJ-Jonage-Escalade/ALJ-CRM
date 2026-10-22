@@ -26,6 +26,7 @@ const esc = s => (s == null ? "" : String(s))
 
 startBureau({
   page: "parametres",
+  adminOnly: true,
   title: "Paramètres",
   onReady: ({ user, role, isAdmin }) => {
     const content = document.getElementById("content");

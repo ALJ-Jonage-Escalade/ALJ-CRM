@@ -1,13 +1,41 @@
 /* Routes migrated to the Vue app. FastAPI serves the app's entry page for these paths only
-   (api/web/pages.py); links to the other pages are plain <a href> (full page load). */
-import { createRouter, createWebHistory } from "vue-router";
+   (api/web/pages.py); links to the other pages are plain <a href> (full page load).
+   Every route declares meta.access (lib/access.ts); the guards send a coach who opens an admin page back to
+   Accueil. Signed-out, unverified and non-staff visitors stay on the page, which shows the sign-in gate. */
+import { watch } from "vue";
+import { createRouter, createWebHistory, type RouteLocationNormalized, type RouteLocationRaw, type Router, type RouteRecordRaw, type RouterHistory } from "vue-router";
+import type { Auth } from "./composables/auth";
+import { HOME, pageAccess, REFUSED_QUERY, verdict, type Access } from "./lib/access";
 import AccueilPage from "./pages/AccueilPage.vue";
 import NotFoundPage from "./pages/NotFoundPage.vue";
 
-export const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: "/bureau/", component: AccueilPage },
-    { path: "/:unknown(.*)*", component: NotFoundPage },
-  ],
-});
+declare module "vue-router" {
+  interface RouteMeta {
+    access: Access;
+  }
+}
+
+export const routes: RouteRecordRaw[] = [
+  { path: HOME, component: AccueilPage, meta: { access: pageAccess("accueil") } },
+  { path: "/:unknown(.*)*", component: NotFoundPage, meta: { access: "public" } },
+];
+
+function redirectFor(to: RouteLocationNormalized, auth: Auth): RouteLocationRaw | true {
+  if (verdict(auth.state.value, to.meta.access ?? "public") !== "adminOnly") return true;
+  return { path: HOME, query: { [REFUSED_QUERY]: to.path } };
+}
+
+/** Checks every navigation, and the current page again whenever the session changes (role answered, other account). */
+export function installGuards(router: Router, auth: Auth): void {
+  router.beforeEach((to) => redirectFor(to, auth));
+  watch(auth.state, () => {
+    const target = redirectFor(router.currentRoute.value, auth);
+    if (target !== true) void router.replace(target);
+  });
+}
+
+export function createAppRouter(auth: Auth, history: RouterHistory = createWebHistory()): Router {
+  const router = createRouter({ history, routes });
+  installGuards(router, auth);
+  return router;
+}

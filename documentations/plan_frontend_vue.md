@@ -126,6 +126,15 @@ Vite's default `build.target` ("baseline widely available": about Safari/iOS 16+
 `@vitejs/plugin-legacy`. Older browsers (iOS ≤ 15) get a "browser not supported" message instead of a blank page.
 Before step 1, check the user agents of `/competitions` in the Cloud Run request logs to confirm.
 
+### D13 — Screens per role
+Decided 2026-10-22 (phase 2). The office portal is for coaches and admins; read-only accounts and accounts without a role
+get the "Accès réservé" gate, as before. **Paramètres** and **Communications** are admin only: hidden from the menu and
+the Accueil cards for coaches, and refused if opened directly (the router sends a coach back to Accueil with a notice;
+the pages not migrated yet show a "Réservé aux administrateurs" gate). Before, coaches could open them read-only.
+Accueil, Adhérents, Compétitions, Planning and Outils stay open to coaches. The table lives in
+`frontend/src/lib/access.ts` (mirrored by `adminOnly` in `web/shared/alj-shell.js` until cutover); the server stays the
+judge of every API call (`api_auth.required_role`).
+
 ## Open questions
 None. D2 confirmed (2026-10-21): offline mode is kept as is; usage by coaches at venues is not measured, so the outbox
 stays (losing data entered at a venue is the worst failure for this app).

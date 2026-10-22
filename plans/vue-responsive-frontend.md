@@ -1,7 +1,7 @@
 # Plan: Vue 3 responsive single-page frontend
 
 > Source PRD: [#23 — PRD: Vue 3 responsive single-page frontend](https://github.com/ALJ-Jonage-Escalade/ALJ-CRM/issues/23)
-> Decision record: `documentations/plan_frontend_vue.md` (D1–D12)
+> Decision record: `documentations/plan_frontend_vue.md` (D1–D13)
 
 ## Architectural decisions
 
@@ -87,10 +87,12 @@ admin-only screens.
 
 ### Acceptance criteria
 
-- [ ] Guards: anonymous → sign-in prompt, wrong role → blocked/redirected, callback route always reachable
-- [ ] Vitest covers every role × route guard case and the auth composable (Firebase mocked)
-- [ ] Navigation and Accueil cards follow the role
-- [ ] e2e: role display and navigation per role
+Screens per role: decision record D13 (Paramètres and Communications admin only).
+
+- [x] Guards: anonymous → sign-in prompt, wrong role → blocked/redirected, callback route always reachable
+- [x] Vitest covers every role × route guard case and the auth composable (Firebase mocked)
+- [x] Navigation and Accueil cards follow the role
+- [x] e2e: role display and navigation per role
 
 ---
 

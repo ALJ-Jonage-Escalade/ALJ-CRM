@@ -2,16 +2,17 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
+import type { PageId } from "../lib/access";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import AppShell from "./AppShell.vue";
 
 const USER = { uid: "u1", email: "albus@alj-escalade.fr" };
 
-function render(state: AuthState, googleStatus = "ok") {
+function render(state: AuthState, googleStatus = "ok", page: PageId = "accueil") {
   const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
   const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: googleStatus })));
   const wrapper = mount(AppShell, {
-    props: { page: "accueil", title: "Accueil" },
+    props: { page, title: "Titre" },
     slots: { default: '<p id="page-body">contenu</p>' },
     global: { provide: { [AUTH_KEY]: auth, [API_KEY]: api }, stubs: { VersionBadge: true } },
   });
@@ -74,5 +75,33 @@ describe("AppShell", () => {
     expect(wrapper.find('nav a[data-page="accueil"]').attributes("aria-current")).toBe("page");
     expect(wrapper.find('nav a[data-page="adherents"]').attributes("aria-current")).toBeUndefined();
     expect(wrapper.findAll("nav a")).toHaveLength(7);
+  });
+
+  it.each([
+    ["admin", 7],
+    ["coach", 5],
+    ["readonly", 0],
+    [null, 0],
+  ] as const)("lists the pages %s may open", (role, count) => {
+    const { wrapper } = render({ status: "signedIn", user: USER, role });
+    expect(wrapper.findAll("nav a")).toHaveLength(count);
+    if (role === "coach") {
+      expect(wrapper.find('nav a[data-page="parametres"]').exists()).toBe(false);
+      expect(wrapper.find('nav a[data-page="communications"]').exists()).toBe(false);
+    }
+  });
+
+  it("keeps an admin page from a coach", async () => {
+    const { wrapper, api } = render({ status: "signedIn", user: USER, role: "coach" }, "ok", "parametres");
+    expect(wrapper.find("#gate").text()).toContain("Réservé aux administrateurs");
+    expect(wrapper.find("#content").exists()).toBe(false);
+    await flushPromises();
+    expect(api).toHaveBeenCalledOnce();  // the shell's Google token check only, nothing for the page
+  });
+
+  it("renders an admin page for an admin", () => {
+    const { wrapper } = render({ status: "signedIn", user: USER, role: "admin" }, "ok", "parametres");
+    expect(wrapper.find("#page-body").exists()).toBe(true);
+    expect(wrapper.find("#gate").exists()).toBe(false);
   });
 });

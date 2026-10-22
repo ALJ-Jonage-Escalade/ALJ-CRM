@@ -1,24 +1,16 @@
 <script setup lang="ts">
 /* Layout of every page: navigation (side menu on desktop, bottom bar on phones), header with the
-   signed-in account, and the sign-in / access gate. The page content is only rendered for staff.
+   signed-in account, and the sign-in / access gate. The page content is only rendered for a role allowed on
+   the page (lib/access.ts), and the menu only lists those pages.
    Element ids are the ones of the former web/shared/alj-shell.js: the e2e tests rely on them. */
 import { computed, inject, ref, watch } from "vue";
 import { AUTH_KEY } from "../composables/auth";
+import { canOpen, pageAccess, PAGES, verdict, type PageId } from "../lib/access";
 import { API_KEY } from "../lib/api";
 import { isStaff, roleLabel } from "../lib/roles";
 import VersionBadge from "./VersionBadge.vue";
 
-const props = defineProps<{ page: string; title: string }>();
-
-const NAV = [
-  { id: "accueil", icon: "🏠", label: "Accueil", short: "Accueil", href: "/bureau/" },
-  { id: "adherents", icon: "👥", label: "Adhérents", short: "Adhérents", href: "/bureau/adherents" },
-  { id: "communications", icon: "✉️", label: "Communications", short: "Messages", href: "/bureau/communications" },
-  { id: "competitions", icon: "🏆", label: "Compétitions", short: "Compét.", href: "/bureau/competitions" },
-  { id: "planning", icon: "📅", label: "Planning", short: "Planning", href: "/bureau/planning" },
-  { id: "outils", icon: "🛠️", label: "Outils", short: "Outils", href: "/bureau/outils" },
-  { id: "parametres", icon: "⚙️", label: "Paramètres", short: "Réglages", href: "/bureau/parametres" },
-] as const;
+const props = defineProps<{ page: PageId; title: string }>();
 
 const auth = inject(AUTH_KEY)!;
 const api = inject(API_KEY)!;
@@ -32,6 +24,9 @@ const who = computed(() => {
 });
 const staff = computed(() => state.value.status === "signedIn" && isStaff(state.value.role));
 const role = computed(() => (state.value.status === "signedIn" ? state.value.role : null));
+const access = computed(() => verdict(state.value, pageAccess(props.page)));
+// Every page until the role is known, then only those the role may open (none outside the staff)
+const nav = computed(() => (state.value.status === "signedIn" ? PAGES.filter((p) => canOpen(role.value, p.access)) : PAGES));
 
 // Club Google token (Gmail, Drive) expired or revoked: warned on every page, checked once per user
 const googleExpired = ref(false);
@@ -63,11 +58,12 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         <span class="mt-0.5 block text-xs text-slate-400">Bureau · <VersionBadge /></span>
       </div>
       <nav
+        v-if="nav.length"
         aria-label="Navigation principale"
         class="fixed inset-x-0 bottom-0 z-40 flex h-16 justify-around border-t border-side-hover bg-side pb-[env(safe-area-inset-bottom)] md:static md:h-auto md:flex-col md:justify-start md:gap-0.5 md:border-0 md:pb-0"
       >
         <a
-          v-for="item in NAV"
+          v-for="item in nav"
           :key="item.id"
           :href="item.href"
           :data-page="item.id"
@@ -114,19 +110,24 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
       </div>
 
       <section
-        v-if="state.status !== 'loading' && !staff"
+        v-if="access !== 'allow' && access !== 'pending'"
         id="gate"
         class="max-w-xl rounded-xl border border-slate-200 bg-white px-4.5 py-4 shadow-sm"
       >
-        <template v-if="state.status === 'signedOut'">
+        <template v-if="access === 'signIn'">
           <h2 class="mb-2 text-[17px] font-bold">🔐 Connexion</h2>
           <p class="my-1.5 leading-normal">Le bureau est réservé aux coachs et administrateurs du club. Connectez-vous avec votre compte Google.</p>
           <button id="gate-login" type="button" class="mt-2 cursor-pointer rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:bg-accent-dark" @click="auth.login()">🔑 Se connecter avec Google</button>
         </template>
-        <template v-else-if="state.status === 'error'">
+        <template v-else-if="access === 'unverified' && state.status === 'error'">
           <h2 class="mb-2 text-[17px] font-bold">⚠️ Droits non vérifiés</h2>
           <p class="my-1.5 leading-normal">{{ state.message }}</p>
           <button id="gate-retry" type="button" class="mt-2 cursor-pointer rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:bg-accent-dark" @click="auth.retry()">🔄 Réessayer</button>
+        </template>
+        <template v-else-if="access === 'adminOnly'">
+          <h2 class="mb-2 text-[17px] font-bold">⛔ Réservé aux administrateurs</h2>
+          <p class="my-1.5 leading-normal">Cette page est réservée aux administrateurs du club.</p>
+          <a href="/bureau/" class="mt-2 inline-block rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white no-underline hover:bg-accent-dark">🏠 Retour à l'accueil</a>
         </template>
         <template v-else>
           <h2 class="mb-2 text-[17px] font-bold">⛔ Accès réservé</h2>
@@ -135,7 +136,7 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         </template>
       </section>
 
-      <div v-if="staff" id="content">
+      <div v-if="access === 'allow'" id="content">
         <slot :role="role" />
       </div>
 

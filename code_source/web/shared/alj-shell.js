@@ -1,6 +1,7 @@
 /* Mise en page commune des pages « bureau » (ordinateur) : menu latéral, en-tête,
    contrôle de connexion et de rôle (coach / administrateur). Chaque page appelle
-   startBureau() puis remplit la zone #content dans onReady(). */
+   startBureau() puis remplit la zone #content dans onReady(). Pages réservées aux administrateurs
+   (admin: true, adminOnly) : même répartition que l'application Vue (frontend/src/lib/access.ts). */
 import {
   apiFetch, initFirebase, login, logout, roleFor, isStaff,
   checkWebVersion, registerServiceWorker, WEB_VERSION
@@ -9,11 +10,11 @@ import {
 const NAV = [
   { id: "accueil", label: "🏠 Accueil", href: "/bureau/" },
   { id: "adherents", label: "👥 Adhérents", href: "/bureau/adherents" },
-  { id: "communications", label: "✉️ Communications", href: "/bureau/communications" },
+  { id: "communications", label: "✉️ Communications", href: "/bureau/communications", admin: true },
   { id: "competitions", label: "🏆 Compétitions", href: "/bureau/competitions" },
   { id: "planning", label: "📅 Planning", href: "/bureau/planning" },
   { id: "outils", label: "🛠️ Outils", href: "/bureau/outils" },
-  { id: "parametres", label: "⚙️ Paramètres", href: "/bureau/parametres" }
+  { id: "parametres", label: "⚙️ Paramètres", href: "/bureau/parametres", admin: true }
 ];
 const ROLE_LABEL = {
   admin: "🛡️ Administrateur", coach: "🏃 Coach", lecture: "👁️ Lecture seule", aucun: "⛔ Non autorisé"
@@ -23,10 +24,10 @@ const esc = s => (s == null ? "" : String(s)).replace(/[&<>"']/g, c => ({ "&": "
 const $ = id => document.getElementById(id);
 
 /**
- * @param {{page: string, title: string, onReady: function({user, role, isAdmin, claims}): void}} opts
+ * @param {{page: string, title: string, adminOnly?: boolean, onReady: function({user, role, isAdmin, claims}): void}} opts
  * @returns {{setStatus: function(string): void}}
  */
-export function startBureau({ page, title, onReady }) {
+export function startBureau({ page, title, adminOnly = false, onReady }) {
   $("shell").innerHTML = `
     <div class="app">
       <aside class="side">
@@ -35,7 +36,7 @@ export function startBureau({ page, title, onReady }) {
           <span>Bureau · <span class="web-version" id="web-version">v${esc(WEB_VERSION)}</span></span>
         </div>
         <nav>
-          ${NAV.map(n => `<a href="${n.href}" data-page="${n.id}"${n.id === page ? ' class="active" aria-current="page"' : ""}>${n.label}</a>`).join("")}
+          ${NAV.map(n => `<a href="${n.href}" data-page="${n.id}"${n.admin ? " data-admin" : ""}${n.id === page ? ' class="active" aria-current="page"' : ""}>${n.label}</a>`).join("")}
         </nav>
         <div class="side-foot">
           <a class="mobile-link" href="/competitions?vue=mobile">📱 Version mobile</a>
@@ -89,6 +90,7 @@ export function startBureau({ page, title, onReady }) {
     const role = roleFor(user, claims);
     $("who").textContent = (user.email || "(compte sans e-mail)") + " · " + (ROLE_LABEL[role] || "");
     $("logout-btn").hidden = false;
+    document.querySelectorAll("nav a[data-admin]").forEach(a => { a.hidden = role !== "admin"; });
 
     if (!isStaff(role)) {
       readyUid = null;
@@ -97,6 +99,15 @@ export function startBureau({ page, title, onReady }) {
       showGate(`<h2>⛔ Accès réservé</h2>
         <p>Ce compte n'est pas autorisé à consulter le bureau. Déconnectez-vous et utilisez un compte coach ou administrateur.</p>
         <button class="btn btn-muted" id="gate-logout">🚪 Se déconnecter</button>`);
+      return;
+    }
+    if (adminOnly && role !== "admin") {
+      readyUid = null;
+      setStatus("");
+      $("content").hidden = true;
+      showGate(`<h2>⛔ Réservé aux administrateurs</h2>
+        <p>Cette page est réservée aux administrateurs du club.</p>
+        <a class="btn btn-primary" href="/bureau/" style="text-decoration:none;">🏠 Retour à l'accueil</a>`);
       return;
     }
 
