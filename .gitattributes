@@ -1,6 +1,8 @@
-# Conserver les retours à la ligne Linux (LF) pour les scripts shell
-*.sh text eol=lf
+# Retours à la ligne Linux (LF) pour tous les fichiers texte, dans le dépôt et à l'extraction
+# (y compris sous Windows) : diffs lisibles, vérifications de fraîcheur en CI (uv.lock, requirements*.txt,
+# openapi.json), scripts shell exécutables. Git détecte lui-même les fichiers binaires.
+* text=auto eol=lf
 
-# Fichiers générés par uv : LF partout (vérification de fraîcheur en CI, checkouts Windows)
-requirements*.txt text eol=lf
-uv.lock text eol=lf
+# Exception : scripts Windows en CRLF (cmd.exe lit mal les étiquettes goto/call d'un .bat en LF)
+*.bat text eol=crlf
+*.cmd text eol=crlf

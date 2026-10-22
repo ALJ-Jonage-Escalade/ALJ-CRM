@@ -11,9 +11,11 @@ const APP_VERSION = readFileSync(fileURLToPath(new URL("../VERSION", import.meta
 // the API, the runtime configuration, the PWA files and the pages not migrated. The Host header is
 // kept (no changeOrigin) so that the local server's same-origin check accepts the writes.
 const BACKEND = process.env.ALJ_BACKEND_URL ?? "http://localhost:8080";
+// Office pages already migrated (src/router.ts, _SPA_PAGES of api/web/pages.py): served by Vite, not proxied
+const SPA_PAGES = ["parametres"];
 const BACKEND_PATHS =
   "^/($|\\?|api/|webhooks/|runtime-config\\.js|sw\\.js|manifest\\.webmanifest|static-web/|annuaire/|competitions|index($|\\?)" +
-  "|map($|\\?)|pivot($|\\?)|health|docs|redoc|openapi\\.json|bureau/[a-z])";
+  `|map($|\\?)|pivot($|\\?)|health|docs|redoc|openapi\\.json|bureau/(?!(${SPA_PAGES.join("|")})($|[/?]))[a-z])`;
 
 export default defineConfig(({ command }) => ({
   // FastAPI serves the built assets under /spa/ (api/web/pages.py); the dev server from its root

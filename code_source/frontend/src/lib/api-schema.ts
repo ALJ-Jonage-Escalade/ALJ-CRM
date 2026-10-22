@@ -1270,22 +1270,39 @@ export interface components {
         };
         /** BatchCompetition */
         BatchCompetition: {
-            /** Id */
+            /**
+             * Id
+             * @default
+             */
             id: string;
-            /** Nom */
+            /**
+             * Nom
+             * @default
+             */
             nom: string;
-            /** Date */
+            /**
+             * Date
+             * @default
+             */
             date: string;
-            /** Lieu */
+            /**
+             * Lieu
+             * @default
+             */
             lieu: string;
-            /** Url */
+            /**
+             * Url
+             * @default
+             */
             url: string;
-            /** Athletes */
-            athletes: {
-                [key: string]: unknown;
-            }[];
+            /**
+             * Athletes
+             * @default []
+             */
+            athletes: unknown[];
             /**
              * Status
+             * @default pending
              * @enum {string}
              */
             status: "found" | "pending";

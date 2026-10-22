@@ -2647,31 +2647,34 @@
         "properties": {
           "id": {
             "type": "string",
-            "title": "Id"
+            "title": "Id",
+            "default": ""
           },
           "nom": {
             "type": "string",
-            "title": "Nom"
+            "title": "Nom",
+            "default": ""
           },
           "date": {
             "type": "string",
-            "title": "Date"
+            "title": "Date",
+            "default": ""
           },
           "lieu": {
             "type": "string",
-            "title": "Lieu"
+            "title": "Lieu",
+            "default": ""
           },
           "url": {
             "type": "string",
-            "title": "Url"
+            "title": "Url",
+            "default": ""
           },
           "athletes": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
+            "items": {},
             "type": "array",
-            "title": "Athletes"
+            "title": "Athletes",
+            "default": []
           },
           "status": {
             "type": "string",
@@ -2679,7 +2682,8 @@
               "found",
               "pending"
             ],
-            "title": "Status"
+            "title": "Status",
+            "default": "pending"
           }
         },
         "type": "object",

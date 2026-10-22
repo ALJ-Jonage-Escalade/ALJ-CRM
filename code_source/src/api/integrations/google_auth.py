@@ -457,7 +457,7 @@ def update_google_token(data: GoogleTokenUpdate) -> GoogleTokenUpdated | JSONRes
                 timeout=10
             )
             if u_resp.status_code == 200:
-                user_email = u_resp.json().get("email", "")
+                user_email = u_resp.json().get("email") or ""
         except Exception:
             pass
 
