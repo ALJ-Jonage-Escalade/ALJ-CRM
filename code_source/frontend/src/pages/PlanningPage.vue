@@ -10,7 +10,7 @@ import UiDialog from "../components/ui/UiDialog.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText, unwrap } from "../lib/client";
-import { attachmentName, saveFile } from "../lib/download";
+import { saveExport } from "../lib/download";
 import SlotForm from "./planning/SlotForm.vue";
 import SlotList from "./planning/SlotList.vue";
 import { countLabel, draftOf, filterSlots, KINDS, updateOf, type KindFilter, type Slot, type SlotDraft } from "./planning/slots";
@@ -100,9 +100,7 @@ async function download(mode: "grid" | "list"): Promise<void> {
   toast.show("⏳ Génération du fichier Excel en cours…", 60_000);
   try {
     const call = client.GET("/api/planning/export", { params: { query: { mode } }, parseAs: "blob" });
-    const blob = await unwrap(call);
-    const name = attachmentName((await call).response.headers.get("content-disposition"), mode === "list" ? "Planning_Liste.xlsx" : "Planning_Grille.xlsx");
-    saveFile(blob, name);
+    const name = await saveExport(call, mode === "list" ? "Planning_Liste.xlsx" : "Planning_Grille.xlsx");
     toast.show(`✅ Fichier « ${name} » téléchargé !`);
   } catch (e) {
     toast.show(`❌ Échec lors de la génération Excel : ${errorText(e)}`, 8000);

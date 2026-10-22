@@ -12,3 +12,9 @@ class SeasonTarifs(BaseModel):
     status: Literal["success"]
     season: str
     tarifs: List[str]
+
+
+class Seasons(BaseModel):
+    """Season names, most recent first, and the active season."""
+    seasons: List[str]
+    active: str

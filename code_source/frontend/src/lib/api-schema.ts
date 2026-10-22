@@ -893,7 +893,8 @@ export interface paths {
         put?: never;
         /**
          * Apply Ffme Import Api
-         * @description Applique l'importation FFME en BDD (mises à jour automatiques + associations manuelles).
+         * @description Applique l'importation FFME en BDD : rapprochements automatiques du fichier (recalculés ici, comme
+         *     dans l'aperçu) et associations manuelles choisies par le bureau.
          */
         post: operations["apply_ffme_import_api_api_ffme_import_post"];
         delete?: never;
@@ -1532,6 +1533,214 @@ export interface components {
             /** Templates */
             templates: components["schemas"]["EmailTemplate"][];
         };
+        /**
+         * FfmeFile
+         * @description The licensee list exported from MyFFME (.xlsx), base64 encoded.
+         */
+        FfmeFile: {
+            /**
+             * Filename
+             * @default licencies_ffme.xlsx
+             */
+            filename?: string;
+            /**
+             * Content Base64
+             * @default
+             */
+            content_base64?: string;
+        };
+        /**
+         * FfmeImportRequest
+         * @description The file is matched again by the server; manual_matches are added. season: the active one when empty.
+         */
+        FfmeImportRequest: {
+            /**
+             * Filename
+             * @default licencies_ffme.xlsx
+             */
+            filename?: string;
+            /**
+             * Content Base64
+             * @default
+             */
+            content_base64?: string;
+            /**
+             * Season
+             * @default
+             */
+            season?: string;
+            /**
+             * Manual Matches
+             * @default []
+             */
+            manual_matches?: components["schemas"]["FfmeManualMatch"][];
+        };
+        /** FfmeImportResult */
+        FfmeImportResult: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Message */
+            message: string;
+            /** Updated Count */
+            updated_count: number;
+            /** Matched Manually */
+            matched_manually: number;
+            /** Season */
+            season: string;
+            stats: components["schemas"]["FfmeMatchStats"];
+        };
+        /**
+         * FfmeLicensee
+         * @description A row of the file matched with no member: shown so that the office can pick one.
+         */
+        FfmeLicensee: {
+            /** Nom */
+            nom: string;
+            /** Prenom */
+            prenom: string;
+            /** Licence */
+            licence: string;
+            /** Birth Date */
+            birth_date: string;
+            /** Passeports */
+            passeports: string;
+            /** Diplomes */
+            diplomes: string;
+            /** Document Sante */
+            document_sante: string;
+        };
+        /**
+         * FfmeManualMatch
+         * @description A row left unmatched by the preview, linked by the office to member user_id.
+         */
+        FfmeManualMatch: {
+            /** User Id */
+            user_id: number;
+            /**
+             * Nom
+             * @default
+             */
+            nom?: string;
+            /**
+             * Prenom
+             * @default
+             */
+            prenom?: string;
+            /**
+             * Licence
+             * @default
+             */
+            licence?: string;
+            /**
+             * Passeports
+             * @default
+             */
+            passeports?: string;
+            /**
+             * Diplomes
+             * @default
+             */
+            diplomes?: string;
+            /**
+             * Document Sante
+             * @default
+             */
+            document_sante?: string;
+        };
+        /** FfmeMatchStats */
+        FfmeMatchStats: {
+            /**
+             * Total Processed
+             * @default 0
+             */
+            total_processed?: number;
+            /**
+             * Matched By Licence
+             * @default 0
+             */
+            matched_by_licence?: number;
+            /**
+             * Matched By Name
+             * @default 0
+             */
+            matched_by_name?: number;
+            /**
+             * Matched Manually
+             * @default 0
+             */
+            matched_manually?: number;
+            /**
+             * Errors
+             * @default []
+             */
+            errors?: string[];
+        };
+        /**
+         * FfmeMember
+         * @description A member of the club, candidate for a manual match.
+         */
+        FfmeMember: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Birth Date */
+            birth_date: string;
+        };
+        /**
+         * FfmePreview
+         * @description Matching of the file, nothing written. matched_count: rows matched by license number or name.
+         */
+        FfmePreview: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Filename */
+            filename: string;
+            stats: components["schemas"]["FfmeMatchStats"];
+            /** Matched Count */
+            matched_count: number;
+            /** Unmatched Count */
+            unmatched_count: number;
+            /** Unmatched */
+            unmatched: components["schemas"]["FfmeLicensee"][];
+            /** Users */
+            users: components["schemas"]["FfmeMember"][];
+        };
+        /**
+         * FfmeStats
+         * @description Members of the season in the federal CSV export. ignored_details: the first 20 rows left out, with the reason.
+         */
+        FfmeStats: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Season */
+            season: string;
+            /** Produced Count */
+            produced_count: number;
+            /** Termine Count */
+            termine_count: number;
+            /** Ignored Count */
+            ignored_count: number;
+            /** Estimated Total */
+            estimated_total: number;
+            /** Renewals Count */
+            renewals_count: number;
+            /** New Licences Count */
+            new_licences_count: number;
+            /** Ignored Details */
+            ignored_details: string[];
+        };
         /** GoogleChecks */
         GoogleChecks: {
             oauth_token: components["schemas"]["ServiceCheck"];
@@ -1798,6 +2007,103 @@ export interface components {
              */
             naissance_max?: string;
         };
+        /**
+         * PresenceAutonomous
+         * @description Members of the autonomous slots, plus the minors of other groups allowed to climb on their own.
+         */
+        PresenceAutonomous: {
+            /** Adultes */
+            adultes: number;
+            /** Mineurs */
+            mineurs: number;
+            /** Mineurs Autorises */
+            mineurs_autorises: number;
+            /** Total */
+            total: number;
+            /** Groups */
+            groups: string[];
+        };
+        /** PresenceConfig */
+        PresenceConfig: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Season */
+            season: string;
+            default_dates: components["schemas"]["PresenceDates"];
+            autonome: components["schemas"]["PresenceAutonomous"];
+            /** Cours */
+            cours: components["schemas"]["PresenceCourse"][];
+        };
+        /**
+         * PresenceCourse
+         * @description A supervised course. slots: "Lundi 18:00 - 20:00 · Jeudi …"; count: its members.
+         */
+        PresenceCourse: {
+            /** Groupe */
+            groupe: string;
+            /** Slots */
+            slots: string;
+            /** Tarifs */
+            tarifs: string[];
+            /** Count */
+            count: number;
+        };
+        /**
+         * PresenceDates
+         * @description Default period of the sheets (dd/mm/yyyy).
+         */
+        PresenceDates: {
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
+        };
+        /**
+         * PresenceExportRequest
+         * @description Attendance sheets to generate. season: the active one when empty; dates: dd/mm/yyyy, the season's when empty.
+         *     cours only: selected_groups (all the courses when empty) and same_sheet (one workbook, else a ZIP of one file per course).
+         */
+        PresenceExportRequest: {
+            /**
+             * Variant
+             * @default cours
+             * @enum {string}
+             */
+            variant?: "autonome" | "cours";
+            /**
+             * Season
+             * @default
+             */
+            season?: string;
+            /**
+             * Start Date
+             * @default
+             */
+            start_date?: string;
+            /**
+             * End Date
+             * @default
+             */
+            end_date?: string;
+            /**
+             * Show Health Col
+             * @default false
+             */
+            show_health_col?: boolean;
+            /**
+             * Selected Groups
+             * @default []
+             */
+            selected_groups?: string[];
+            /**
+             * Same Sheet
+             * @default true
+             */
+            same_sheet?: boolean;
+        };
         /** ResultsSettings */
         ResultsSettings: {
             /**
@@ -1848,6 +2154,16 @@ export interface components {
             season: string;
             /** Tarifs */
             tarifs: string[];
+        };
+        /**
+         * Seasons
+         * @description Season names, most recent first, and the active season.
+         */
+        Seasons: {
+            /** Seasons */
+            seasons: string[];
+            /** Active */
+            active: string;
         };
         /** ServiceCheck */
         ServiceCheck: {
@@ -2854,7 +3170,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Seasons"];
                 };
             };
         };
@@ -3546,7 +3862,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PresenceConfig"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3560,19 +3885,27 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["PresenceExportRequest"];
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Classeur Excel, ou archive ZIP d'un classeur par cours */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
+                    "application/zip": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3582,6 +3915,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3654,7 +3996,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FfmeStats"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3664,6 +4015,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3680,13 +4040,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Fichier CSV FFME */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3696,6 +4065,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3709,9 +4087,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["FfmeFile"];
             };
         };
         responses: {
@@ -3721,7 +4097,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FfmePreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3731,6 +4116,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3744,9 +4138,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["FfmeImportRequest"];
             };
         };
         responses: {
@@ -3756,7 +4148,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FfmeImportResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3766,6 +4167,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

@@ -45,7 +45,7 @@ def _current_version():
 class TestBureauFiles(unittest.TestCase):
 
     def test_pages_exist(self):
-        for name in ("adherents.html", "outils.html"):
+        for name in ("adherents.html",):
             self.assertTrue(os.path.exists(os.path.join(BUREAU, name)), name)
         for name in ("alj.css", "alj-core.js", "alj-shell.js", "alj-vue.js",
                       "alj-members.js", "alj-filters.js", "alj-sync.js"):
@@ -53,14 +53,13 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_routes_serve_only_known_pages(self):
         self.assertEqual(get_bureau_page("adherents").status_code, 200)
-        self.assertEqual(get_bureau_page("outils").status_code, 200)
         self.assertEqual(get_bureau_page("index.html").status_code, 404)
         self.assertEqual(get_bureau_page("..%2Fserver.py").status_code, 404)
         self.assertEqual(get_bureau_page("inconnue").status_code, 404)
 
     def test_pages_are_static_shells_without_member_data(self):
         """Les pages n'embarquent aucune donnée : elles chargent le socle et lisent l'API après connexion."""
-        for name in ("adherents.html", "outils.html"):
+        for name in ("adherents.html",):
             html = _read(os.path.join(BUREAU, name))
             self.assertIn('href="/static-web/alj.css"', html, name)
             self.assertIn('import { startBureau } from "/static-web/alj-shell.js"', html, name)
@@ -71,7 +70,7 @@ class TestBureauFiles(unittest.TestCase):
     def test_bureau_pages_share_web_version(self):
         version = _current_version()
         self.assertRegex(version, r"^\d+$")
-        for name in ("adherents.html", "competitions.html", "outils.html"):
+        for name in ("adherents.html", "competitions.html"):
             html = _read(os.path.join(BUREAU, name))
             self.assertIn(f'<meta name="alj-web-version" content="{version}">', html, name)
             self.assertRegex(html, rf"<title>[^<]*\(v{version}\)</title>", name)
@@ -135,65 +134,6 @@ class TestBureauFiles(unittest.TestCase):
         self.assertEqual(res.get("status"), "success")
         self.assertIn("db_exists", res)
         self.assertIn("pending", res)
-
-    def test_outils_no_longer_has_google_reconnect(self):
-        """L'onglet Google a été déplacé vers parametres.html : outils contient map, pivot, fiches de présence et FFME."""
-        html = _read(os.path.join(BUREAU, "outils.html"))
-        self.assertNotIn("btn-google-reconnect", html)
-        self.assertIn("pane-map", html)
-        self.assertIn("pane-pivot", html)
-        self.assertIn("pane-presence", html)
-        self.assertIn("pane-ffme", html)
-        self.assertIn("btn-download-autonome", html)
-        self.assertIn("btn-download-cours", html)
-        self.assertIn("btn-download-ffme", html)
-
-    def test_ffme_api_stats_and_export(self):
-        """Vérifie le calcul des statistiques et le téléchargement du fichier CSV FFME."""
-        import shutil
-        import tempfile
-        from infrastructure.sqlite.connection import SqliteDatabase
-        from infrastructure.sqlite.members import MemberRepository
-        from api.ffme.ffme import get_ffme_stats_api, export_ffme_api
-
-        # Seeded temporary database: never read data/database.db (absent in CI, personal data locally).
-        original_db_path = SqliteDatabase.get_db_path()
-        tmpdir = tempfile.mkdtemp(prefix="alj_ffme_test_")
-        self.addCleanup(shutil.rmtree, tmpdir, ignore_errors=True)
-        self.addCleanup(SqliteDatabase.set_db_path, original_db_path)
-        SqliteDatabase.set_db_path(os.path.join(tmpdir, "database.db"))
-        SqliteDatabase.setup_database()
-        MemberRepository.upsert_members([{
-            "order_ref": "ORD-1",
-            "order_date": "2026-08-20T10:00:00",
-            "status": "Validated",
-            "tarif_name": "Adultes autonomes",
-            "amount": 150.0,
-            "user_lastName": "MARTIN",
-            "user_firstName": "Leo",
-            "payer_email": "leo.martin@test.fr",
-            "champ_Date de naissance de l'adhérent": "1990-05-15",
-            "champ_Sexe": "M",
-            "champ_Adresse : numéro et nom de rue": "10 Rue des Fleurs",
-            "champ_Code postal": "69000",
-            "champ_Ville": "Lyon",
-            "champ_Téléphone ": "0612345678",
-        }], "2026-2027")
-
-        # 1. Statistiques
-        stats = get_ffme_stats_api("2026-2027")
-        self.assertEqual(stats.get("status"), "success")
-        self.assertIn("estimated_total", stats)
-        self.assertIn("renewals_count", stats)
-        self.assertIn("new_licences_count", stats)
-
-        # 2. Export CSV avec include_termine=True
-        resp = export_ffme_api(season="2026-2027", include_termine=True)
-        self.assertEqual(resp.headers.get("content-type"), "text/csv; charset=utf-8")
-        self.assertIn("attachment", resp.headers.get("content-disposition", ""))
-        csv_text = resp.body.decode("utf-8")
-        self.assertIn("numero de licence;nom;prenom", csv_text)
-        self.assertIn("MARTIN", csv_text)
 
     def test_pivot_table_configuration_and_fields(self):
         """Vérifie la présence du filtre Âge, des colonnes Statut & Sexe, et de l'exclusion par défaut d'Annulé."""
@@ -296,14 +236,12 @@ class TestBureauFiles(unittest.TestCase):
     def test_member_pages_use_members_api(self):
         """Members and seasons come from the API, never Firestore directly (plan phase 2)."""
         adherents = _read(os.path.join(BUREAU, "adherents.html"))
-        outils = _read(os.path.join(BUREAU, "outils.html"))
         members_js = _read(os.path.join(SHARED, "alj-members.js"))
-        for name, text in (("adherents", adherents), ("outils", outils), ("alj-members.js", members_js)):
+        for name, text in (("adherents", adherents), ("alj-members.js", members_js)):
             for firestore_call in (".collection(", "onSnapshot", "crm_"):
                 self.assertNotIn(firestore_call, text, f"{name}: {firestore_call}")
         self.assertIn('<script src="/static-web/alj-members-sync.js"></script>', adherents)
         self.assertIn("ALJMembersSync.start(", adherents)
-        self.assertIn('apiFetch("/api/seasons")', outils)
 
     def test_adherents_email_modal_and_api_wiring(self):
         """L'Étape 2 intègre la modale d'e-mail et le câblage aux endpoints d'e-mail."""
@@ -733,168 +671,6 @@ class TestBureauFiles(unittest.TestCase):
         self.assertIn("Aucun créneau à placer sur la grille", r.json()["message"])
         self.assertEqual(client.get("/api/planning/export", params={"mode": "list", "season": "2026-2027"}).status_code, 200)
 
-    def test_outils_page_tabs(self):
-        """La page outils.html contient les onglets Carte et TCD."""
-        html = _read(os.path.join(BUREAU, "outils.html"))
-        for elem in ("tab-btn-map", "tab-btn-pivot", "pane-map", "pane-pivot",
-                      "iframe-map", "iframe-pivot", "pivot-season-select", "tools-refresh-btn"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/map")', html)
-        self.assertIn('apiFetch(url)', html)
-        self.assertIn('frame.srcdoc = html;', html)
-
-    def test_ffme_import_ui_elements(self):
-        """La page outils.html contient l'onglet et les éléments d'importation Excel FFME."""
-        html = _read(os.path.join(BUREAU, "outils.html"))
-        for elem in (
-            "tab-btn-ffme-import", "pane-ffme-import", "ffme-drop-zone", "ffme-file-input",
-            "ffme-browse-btn", "btn-ffme-analyze", "btn-ffme-quick-import",
-            "btn-ffme-apply", "ffme-results-section", "ffme-unmatched-box", "ffme-unmatched-tbody"
-        ):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/api/ffme/preview"', html)
-        self.assertIn('apiFetch("/api/ffme/import"', html)
-
-        # Vérification du lien direct depuis adherents.html
-        adh_html = _read(os.path.join(BUREAU, "adherents.html"))
-        self.assertIn('/bureau/outils?tab=ffme-import', adh_html)
-
-    def test_ffme_auth_roles(self):
-        """Les routes de modification/import FFME exigent le rôle admin."""
-        from infrastructure.security.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/ffme/preview"), Role.ADMIN)
-        self.assertEqual(required_role("POST", "/api/ffme/import"), Role.ADMIN)
-        self.assertEqual(required_role("GET", "/api/ffme/export"), Role.COACH)
-
-    def test_ffme_preview_and_apply_api(self):
-        """preview_ffme_import_api et apply_ffme_import_api fonctionnent de bout en bout avec un fichier Excel FFME."""
-        import base64
-        import tempfile
-        import shutil
-        import pandas as pd
-        from infrastructure.sqlite.connection import SqliteDatabase
-        from api.ffme.ffme import preview_ffme_import_api, apply_ffme_import_api
-
-        temp_dir = tempfile.mkdtemp()
-        db_path = os.path.join(temp_dir, "test_ffme_import.db")
-        orig_db_path = SqliteDatabase.get_db_path()
-
-        try:
-            SqliteDatabase.set_db_path(db_path)
-            SqliteDatabase.setup_database()
-            conn = SqliteDatabase.get_connection()
-            c = conn.cursor()
-            c.execute("INSERT OR REPLACE INTO seasons (id, name, is_active) VALUES (1, '2026-2027', 1)")
-            # Insérer un utilisateur connu
-            c.execute("""
-                INSERT INTO users (id, last_name, first_name, last_name_key, first_name_key, licence_ffme, birth_date)
-                VALUES (101, 'GARCIA', 'Elena', 'garcia', 'elena', '112233', '2008-03-15')
-            """)
-            c.execute("""
-                INSERT INTO orders (id, order_ref, season_id, order_date, status, status_normalized)
-                VALUES (201, 'CMD-GARCIA', 1, '2026-09-01', 'Validé', 'Validé')
-            """)
-            c.execute("""
-                INSERT INTO purchases (id, order_id, user_id, tarif_name, amount, status, status_normalized)
-                VALUES (301, 201, 101, 'Cours Ados', 190.0, 'Validé', 'Validé')
-            """)
-            # Insérer un second utilisateur qui sera associé manuellement
-            c.execute("""
-                INSERT INTO users (id, last_name, first_name, last_name_key, first_name_key, licence_ffme, birth_date)
-                VALUES (102, 'MOREL', 'Thomas', 'morel', 'thomas', '', '2009-07-22')
-            """)
-            c.execute("""
-                INSERT INTO orders (id, order_ref, season_id, order_date, status, status_normalized)
-                VALUES (202, 'CMD-MOREL', 1, '2026-09-01', 'Validé', 'Validé')
-            """)
-            c.execute("""
-                INSERT INTO purchases (id, order_id, user_id, tarif_name, amount, status, status_normalized)
-                VALUES (302, 202, 102, 'Cours Ados', 190.0, 'Validé', 'Validé')
-            """)
-            conn.commit()
-            conn.close()
-
-            # Création du fichier Excel FFME de test (header=1)
-            excel_path = os.path.join(temp_dir, "test_ffme.xlsx")
-            df = pd.DataFrame([
-                {
-                    "Nom": "GARCIA",
-                    "Prénom": "Elena",
-                    "N° de licence": "112233",
-                    "Date de naissance": "15/03/2008",
-                    "Passeports": "Grimpeur Vert",
-                    "Diplômes": "Initiateur SAE",
-                    "Document de santé": "Questionnaire de santé"
-                },
-                {
-                    "Nom": "MOREL-DUPONT",
-                    "Prénom": "Tom",
-                    "N° de licence": "998877",
-                    "Date de naissance": "22/07/2009",
-                    "Passeports": "Grimpeur Bleu",
-                    "Diplômes": "",
-                    "Document de santé": "Certificat médical"
-                }
-            ])
-            with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-                df.to_excel(writer, index=False, startrow=1)
-
-            with open(excel_path, "rb") as f:
-                b64_content = base64.b64encode(f.read()).decode("utf-8")
-
-            # 1. Test Prévisualisation
-            prev_res = preview_ffme_import_api({
-                "filename": "test_ffme.xlsx",
-                "content_base64": b64_content
-            })
-            self.assertEqual(prev_res.get("status"), "success")
-            self.assertEqual(prev_res.get("matched_count"), 1)
-            self.assertEqual(prev_res.get("unmatched_count"), 1)
-
-            # 2. Test Application avec 1 correspondance automatique et 1 association manuelle
-            apply_res = apply_ffme_import_api({
-                "season": "2026-2027",
-                "filename": "test_ffme.xlsx",
-                "content_base64": b64_content,
-                "updates": prev_res.get("updates"),
-                "manual_matches": [
-                    {
-                        "user_id": 102,
-                        "nom": "MOREL-DUPONT",
-                        "prenom": "Tom",
-                        "licence": "998877",
-                        "passeports": "Grimpeur Bleu",
-                        "diplomes": "",
-                        "document_sante": "Certificat médical"
-                    }
-                ]
-            })
-            self.assertEqual(apply_res.get("status"), "success")
-            self.assertEqual(apply_res.get("updated_count"), 2)
-
-            # Vérification dans SQLite
-            conn = SqliteDatabase.get_connection()
-            u1 = conn.execute("SELECT * FROM users WHERE id = 101").fetchone()
-            self.assertEqual(u1["licence_ffme"], "112233")
-            self.assertEqual(u1["raw_passports"], "Grimpeur Vert")
-            self.assertEqual(u1["raw_diplomas"], "Initiateur SAE")
-
-            p1 = conn.execute("SELECT * FROM purchases WHERE id = 301").fetchone()
-            self.assertEqual(p1["status_normalized"], "Terminé")
-            self.assertEqual(p1["document_sante"], "Questionnaire de santé")
-
-            u2 = conn.execute("SELECT * FROM users WHERE id = 102").fetchone()
-            self.assertEqual(u2["licence_ffme"], "998877")
-            self.assertEqual(u2["raw_passports"], "Grimpeur Bleu")
-
-            p2 = conn.execute("SELECT * FROM purchases WHERE id = 302").fetchone()
-            self.assertEqual(p2["status_normalized"], "Terminé")
-            self.assertEqual(p2["document_sante"], "Certificat médical")
-            conn.close()
-        finally:
-            SqliteDatabase.set_db_path(orig_db_path)
-            shutil.rmtree(temp_dir, ignore_errors=True)
-
     def test_competitions_desktop_page_ui_and_wiring(self):
         """La page bureau/competitions.html est adaptée aux grands écrans d'ordinateur tout en préservant le mobile."""
         html = _read(os.path.join(BUREAU, "competitions.html"))
@@ -1196,7 +972,7 @@ class TestVueApp(unittest.TestCase):
     def test_migrated_pages_serve_the_entry_page(self):
         with open(os.path.join(self.dist, "index.html"), "w", encoding="utf-8") as f:
             f.write("<div id=\"app\"></div>")
-        for page in ("communications", "parametres", "planning"):
+        for page in ("communications", "outils", "parametres", "planning"):
             r = TestClient(app).get(f"/bureau/{page}")
             self.assertEqual(r.status_code, 200, page)
             self.assertEqual(r.text, '<div id="app"></div>', page)

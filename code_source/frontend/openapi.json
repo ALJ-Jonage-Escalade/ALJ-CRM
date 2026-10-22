@@ -1165,7 +1165,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Seasons"
+                }
               }
             }
           }
@@ -1972,7 +1974,19 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PresenceConfig"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           }
@@ -1988,9 +2002,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Data"
+                "$ref": "#/components/schemas/PresenceExportRequest"
               }
             }
           },
@@ -1998,10 +2010,29 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Classeur Excel, ou archive ZIP d'un classeur par cours",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {},
+              "application/zip": {}
+            }
+          },
+          "400": {
+            "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -2106,9 +2137,31 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FfmeStats"
+                }
               }
             }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -2158,12 +2211,30 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Fichier CSV FFME",
+            "content": {
+              "text/csv": {}
+            }
+          },
+          "400": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
-            }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -2187,9 +2258,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Data"
+                "$ref": "#/components/schemas/FfmeFile"
               }
             }
           },
@@ -2200,7 +2269,29 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FfmePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -2220,15 +2311,13 @@
     "/api/ffme/import": {
       "post": {
         "summary": "Apply Ffme Import Api",
-        "description": "Applique l'importation FFME en BDD (mises à jour automatiques + associations manuelles).",
+        "description": "Applique l'importation FFME en BDD : rapprochements automatiques du fichier (recalculés ici, comme\ndans l'aperçu) et associations manuelles choisies par le bureau.",
         "operationId": "apply_ffme_import_api_api_ffme_import_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Data"
+                "$ref": "#/components/schemas/FfmeImportRequest"
               }
             }
           },
@@ -2239,7 +2328,29 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FfmeImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -3417,6 +3528,353 @@
         ],
         "title": "EmailTemplates"
       },
+      "FfmeFile": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "default": "licencies_ffme.xlsx"
+          },
+          "content_base64": {
+            "type": "string",
+            "title": "Content Base64",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FfmeFile",
+        "description": "The licensee list exported from MyFFME (.xlsx), base64 encoded."
+      },
+      "FfmeImportRequest": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "default": "licencies_ffme.xlsx"
+          },
+          "content_base64": {
+            "type": "string",
+            "title": "Content Base64",
+            "default": ""
+          },
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          },
+          "manual_matches": {
+            "items": {
+              "$ref": "#/components/schemas/FfmeManualMatch"
+            },
+            "type": "array",
+            "title": "Manual Matches",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FfmeImportRequest",
+        "description": "The file is matched again by the server; manual_matches are added. season: the active one when empty."
+      },
+      "FfmeImportResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "updated_count": {
+            "type": "integer",
+            "title": "Updated Count"
+          },
+          "matched_manually": {
+            "type": "integer",
+            "title": "Matched Manually"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/FfmeMatchStats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "updated_count",
+          "matched_manually",
+          "season",
+          "stats"
+        ],
+        "title": "FfmeImportResult"
+      },
+      "FfmeLicensee": {
+        "properties": {
+          "nom": {
+            "type": "string",
+            "title": "Nom"
+          },
+          "prenom": {
+            "type": "string",
+            "title": "Prenom"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "passeports": {
+            "type": "string",
+            "title": "Passeports"
+          },
+          "diplomes": {
+            "type": "string",
+            "title": "Diplomes"
+          },
+          "document_sante": {
+            "type": "string",
+            "title": "Document Sante"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nom",
+          "prenom",
+          "licence",
+          "birth_date",
+          "passeports",
+          "diplomes",
+          "document_sante"
+        ],
+        "title": "FfmeLicensee",
+        "description": "A row of the file matched with no member: shown so that the office can pick one."
+      },
+      "FfmeManualMatch": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          },
+          "prenom": {
+            "type": "string",
+            "title": "Prenom",
+            "default": ""
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence",
+            "default": ""
+          },
+          "passeports": {
+            "type": "string",
+            "title": "Passeports",
+            "default": ""
+          },
+          "diplomes": {
+            "type": "string",
+            "title": "Diplomes",
+            "default": ""
+          },
+          "document_sante": {
+            "type": "string",
+            "title": "Document Sante",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "FfmeManualMatch",
+        "description": "A row left unmatched by the preview, linked by the office to member user_id."
+      },
+      "FfmeMatchStats": {
+        "properties": {
+          "total_processed": {
+            "type": "integer",
+            "title": "Total Processed",
+            "default": 0
+          },
+          "matched_by_licence": {
+            "type": "integer",
+            "title": "Matched By Licence",
+            "default": 0
+          },
+          "matched_by_name": {
+            "type": "integer",
+            "title": "Matched By Name",
+            "default": 0
+          },
+          "matched_manually": {
+            "type": "integer",
+            "title": "Matched Manually",
+            "default": 0
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "FfmeMatchStats"
+      },
+      "FfmeMember": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "last_name",
+          "first_name",
+          "birth_date"
+        ],
+        "title": "FfmeMember",
+        "description": "A member of the club, candidate for a manual match."
+      },
+      "FfmePreview": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/FfmeMatchStats"
+          },
+          "matched_count": {
+            "type": "integer",
+            "title": "Matched Count"
+          },
+          "unmatched_count": {
+            "type": "integer",
+            "title": "Unmatched Count"
+          },
+          "unmatched": {
+            "items": {
+              "$ref": "#/components/schemas/FfmeLicensee"
+            },
+            "type": "array",
+            "title": "Unmatched"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/FfmeMember"
+            },
+            "type": "array",
+            "title": "Users"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "filename",
+          "stats",
+          "matched_count",
+          "unmatched_count",
+          "unmatched",
+          "users"
+        ],
+        "title": "FfmePreview",
+        "description": "Matching of the file, nothing written. matched_count: rows matched by license number or name."
+      },
+      "FfmeStats": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "produced_count": {
+            "type": "integer",
+            "title": "Produced Count"
+          },
+          "termine_count": {
+            "type": "integer",
+            "title": "Termine Count"
+          },
+          "ignored_count": {
+            "type": "integer",
+            "title": "Ignored Count"
+          },
+          "estimated_total": {
+            "type": "integer",
+            "title": "Estimated Total"
+          },
+          "renewals_count": {
+            "type": "integer",
+            "title": "Renewals Count"
+          },
+          "new_licences_count": {
+            "type": "integer",
+            "title": "New Licences Count"
+          },
+          "ignored_details": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ignored Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "season",
+          "produced_count",
+          "termine_count",
+          "ignored_count",
+          "estimated_total",
+          "renewals_count",
+          "new_licences_count",
+          "ignored_details"
+        ],
+        "title": "FfmeStats",
+        "description": "Members of the season in the federal CSV export. ignored_details: the first 20 rows left out, with the reason."
+      },
       "GoogleChecks": {
         "properties": {
           "oauth_token": {
@@ -3960,6 +4418,179 @@
         "title": "PlanningSlotUpdate",
         "description": "id: 0 for a new slot."
       },
+      "PresenceAutonomous": {
+        "properties": {
+          "adultes": {
+            "type": "integer",
+            "title": "Adultes"
+          },
+          "mineurs": {
+            "type": "integer",
+            "title": "Mineurs"
+          },
+          "mineurs_autorises": {
+            "type": "integer",
+            "title": "Mineurs Autorises"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "adultes",
+          "mineurs",
+          "mineurs_autorises",
+          "total",
+          "groups"
+        ],
+        "title": "PresenceAutonomous",
+        "description": "Members of the autonomous slots, plus the minors of other groups allowed to climb on their own."
+      },
+      "PresenceConfig": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "default_dates": {
+            "$ref": "#/components/schemas/PresenceDates"
+          },
+          "autonome": {
+            "$ref": "#/components/schemas/PresenceAutonomous"
+          },
+          "cours": {
+            "items": {
+              "$ref": "#/components/schemas/PresenceCourse"
+            },
+            "type": "array",
+            "title": "Cours"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "season",
+          "default_dates",
+          "autonome",
+          "cours"
+        ],
+        "title": "PresenceConfig"
+      },
+      "PresenceCourse": {
+        "properties": {
+          "groupe": {
+            "type": "string",
+            "title": "Groupe"
+          },
+          "slots": {
+            "type": "string",
+            "title": "Slots"
+          },
+          "tarifs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tarifs"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "groupe",
+          "slots",
+          "tarifs",
+          "count"
+        ],
+        "title": "PresenceCourse",
+        "description": "A supervised course. slots: \"Lundi 18:00 - 20:00 · Jeudi …\"; count: its members."
+      },
+      "PresenceDates": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "title": "End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "PresenceDates",
+        "description": "Default period of the sheets (dd/mm/yyyy)."
+      },
+      "PresenceExportRequest": {
+        "properties": {
+          "variant": {
+            "type": "string",
+            "enum": [
+              "autonome",
+              "cours"
+            ],
+            "title": "Variant",
+            "default": "cours"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": ""
+          },
+          "end_date": {
+            "type": "string",
+            "title": "End Date",
+            "default": ""
+          },
+          "show_health_col": {
+            "type": "boolean",
+            "title": "Show Health Col",
+            "default": false
+          },
+          "selected_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Selected Groups",
+            "default": []
+          },
+          "same_sheet": {
+            "type": "boolean",
+            "title": "Same Sheet",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PresenceExportRequest",
+        "description": "Attendance sheets to generate. season: the active one when empty; dates: dd/mm/yyyy, the season's when empty.\ncours only: selected_groups (all the courses when empty) and same_sheet (one workbook, else a ZIP of one file per course)."
+      },
       "ResultsSettings": {
         "properties": {
           "status": {
@@ -4057,6 +4688,28 @@
         ],
         "title": "SeasonTarifs",
         "description": "The season's HelloAsso tariffs, to link them to a planning slot."
+      },
+      "Seasons": {
+        "properties": {
+          "seasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Seasons"
+          },
+          "active": {
+            "type": "string",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seasons",
+          "active"
+        ],
+        "title": "Seasons",
+        "description": "Season names, most recent first, and the active season."
       },
       "ServiceCheck": {
         "properties": {

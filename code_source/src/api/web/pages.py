@@ -26,10 +26,9 @@ _bureau_dir = os.path.join(WEB_DIR, "bureau")
 _BUREAU_PAGES = {
     "adherents": "adherents.html",
     "competitions": "competitions.html",
-    "outils": "outils.html",
 }
 # Pages migrated to the Vue application (frontend/src/router.ts): its entry page answers them
-_SPA_PAGES = frozenset({"communications", "parametres", "planning"})
+_SPA_PAGES = frozenset({"communications", "outils", "parametres", "planning"})
 
 
 # Vue application, built by `npm run build` (frontend/dist) or by the Dockerfile. Its hashed assets

@@ -7,7 +7,7 @@ from typing import Optional, Union
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 
-from api.members.schemas import SeasonTarifs
+from api.members.schemas import Seasons, SeasonTarifs
 from api.responses import error, error_responses, internal_error, json_with_etag
 from services.members.seasons import SeasonService as Service
 
@@ -15,7 +15,7 @@ from services.members.seasons import SeasonService as Service
 router = APIRouter()
 
 
-@router.get("/api/seasons")
+@router.get("/api/seasons", response_model=Seasons)
 def list_seasons(request: Request) -> Response:
     return json_with_etag(request, Service.list_seasons())
 

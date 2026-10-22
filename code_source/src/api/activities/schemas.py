@@ -52,3 +52,46 @@ class PlanningSlotSaved(BaseModel):
 class PlanningSlotDeleted(BaseModel):
     status: Literal["success"]
     message: str
+
+
+class PresenceDates(BaseModel):
+    """Default period of the sheets (dd/mm/yyyy)."""
+    start: str
+    end: str
+
+
+class PresenceAutonomous(BaseModel):
+    """Members of the autonomous slots, plus the minors of other groups allowed to climb on their own."""
+    adultes: int
+    mineurs: int
+    mineurs_autorises: int
+    total: int
+    groups: List[str]
+
+
+class PresenceCourse(BaseModel):
+    """A supervised course. slots: "Lundi 18:00 - 20:00 · Jeudi …"; count: its members."""
+    groupe: str
+    slots: str
+    tarifs: List[str]
+    count: int
+
+
+class PresenceConfig(BaseModel):
+    status: Literal["success"]
+    season: str
+    default_dates: PresenceDates
+    autonome: PresenceAutonomous
+    cours: List[PresenceCourse]
+
+
+class PresenceExportRequest(RequestBody):
+    """Attendance sheets to generate. season: the active one when empty; dates: dd/mm/yyyy, the season's when empty.
+    cours only: selected_groups (all the courses when empty) and same_sheet (one workbook, else a ZIP of one file per course)."""
+    variant: Literal["autonome", "cours"] = "cours"
+    season: str = ""
+    start_date: str = ""
+    end_date: str = ""
+    show_health_col: bool = False
+    selected_groups: List[str] = []
+    same_sheet: bool = True

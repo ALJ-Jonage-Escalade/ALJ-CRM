@@ -71,7 +71,8 @@ class TestServerPagesEscapeMemberData(unittest.TestCase):
 class TestToolsIframesIsolated(unittest.TestCase):
 
     def test_no_same_origin_sandbox(self):
-        with open(os.path.join(_code_root, "web", "bureau", "outils.html"), encoding="utf-8") as f:
+        """The map and the pivot table (Vue app, Outils page) run in frames that cannot reach the session or the API."""
+        with open(os.path.join(_code_root, "frontend", "src", "pages", "OutilsPage.vue"), encoding="utf-8") as f:
             html = f.read()
         sandboxes = re.findall(r'sandbox="([^"]*)"', html)
         self.assertEqual(len(sandboxes), 2)

@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Union
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse, Response
 
-from api.responses import error, internal_error
+from api.activities.schemas import PresenceAutonomous, PresenceConfig, PresenceCourse, PresenceDates, PresenceExportRequest
+from api.responses import error, error_responses, internal_error
 
 router = APIRouter()
 
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-@router.get("/api/presence/config")
-def get_presence_config():
+
+@router.get("/api/presence/config", response_model=PresenceConfig, responses=error_responses(500))
+def get_presence_config() -> Union[PresenceConfig, JSONResponse]:
     """Renvoie les groupes disponibles (autonomes et cours) et leurs statistiques pour l'IHM."""
     try:
         import datetime
@@ -102,35 +105,29 @@ def get_presence_config():
                         c_seen.add(ikey)
                         count += 1
             slots_str = " · ".join(f"{j} {h}".strip() for j, h in c["slots"] if j or h)
-            cours_list.append({
-                "groupe": c["groupe"],
-                "slots": slots_str,
-                "tarifs": c["tarifs"],
-                "count": count,
-            })
+            cours_list.append(PresenceCourse(groupe=str(c["groupe"]), slots=slots_str, tarifs=[str(t) for t in c["tarifs"] or []], count=count))
 
-        return {
-            "status": "success",
-            "season": season,
-            "default_dates": {
-                "start": SEASON_COURSE_START.strftime("%d/%m/%Y"),
-                "end": SEASON_COURSE_END.strftime("%d/%m/%Y")
-            },
-            "autonome": {
-                "adultes": aut_adultes,
-                "mineurs": aut_mineurs,
-                "mineurs_autorises": added_minors,
-                "total": aut_adultes + aut_mineurs + added_minors,
-                "groups": [c["groupe"] for c in aut_creneaux],
-            },
-            "cours": cours_list
-        }
+        return PresenceConfig(
+            status="success",
+            season=season,
+            default_dates=PresenceDates(start=SEASON_COURSE_START.strftime("%d/%m/%Y"), end=SEASON_COURSE_END.strftime("%d/%m/%Y")),
+            autonome=PresenceAutonomous(
+                adultes=aut_adultes,
+                mineurs=aut_mineurs,
+                mineurs_autorises=added_minors,
+                total=aut_adultes + aut_mineurs + added_minors,
+                groups=[str(c["groupe"]) for c in aut_creneaux],
+            ),
+            cours=cours_list,
+        )
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "get_presence_config")})
+        return error(500, internal_error(e, "get_presence_config"))
 
 
-@router.post("/api/presence/export")
-def export_presence_api(data: Dict[str, Any] = Body(...)):
+@router.post("/api/presence/export", response_class=Response,
+             responses={200: {"content": {XLSX: {}, "application/zip": {}}, "description": "Classeur Excel, ou archive ZIP d'un classeur par cours"},
+                        **error_responses(400, 500)})
+def export_presence_api(data: PresenceExportRequest) -> Response:
     """Génère les fiches de présence au format Excel et les renvoie directement en téléchargement."""
     import io
     import os
@@ -144,16 +141,16 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
     from domain.constants import get_active_season, is_valid_season
 
     try:
-        season = str(data.get("season") or get_active_season()).strip()
+        season = data.season or get_active_season()
         if not is_valid_season(season):
             return error(400, "Saison invalide (format attendu : AAAA-AAAA).")
         raw_data = MemberRepository.load_direct_data(season_filter=season)
         creneaux = PlanningRepository.load_creneaux_groups()
 
-        variant = "autonome" if str(data.get("variant") or "").strip().lower() == "autonome" else "cours"
-        start_date = (data.get("start_date") or "").strip() or None
-        end_date = (data.get("end_date") or "").strip() or None
-        show_health_col = bool(data.get("show_health_col", False))
+        variant = data.variant
+        start_date = data.start_date or None
+        end_date = data.end_date or None
+        show_health_col = data.show_health_col
 
         if variant == "autonome":
             aut_creneaux = [c for c in creneaux if is_autonome_creneau(c)]
@@ -165,7 +162,7 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
             same_sheet = False
         else:
             cours_creneaux = [c for c in creneaux if not is_autonome_creneau(c)]
-            user_groups = data.get("selected_groups") or []
+            user_groups = data.selected_groups
             if user_groups:
                 selected_groups = [c["groupe"] for c in cours_creneaux if c["groupe"] in user_groups]
             else:
@@ -174,10 +171,10 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
             merge_groups = False
             auth_only = False
             hide_badge_cols = True
-            same_sheet = bool(data.get("same_sheet", True))
+            same_sheet = data.same_sheet
 
         if not selected_groups:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Aucun groupe sélectionné pour l'export."})
+            return error(400, "Aucun groupe sélectionné pour l'export.")
 
         tmp_dir = tempfile.mkdtemp(prefix="alj_presence_")
         try:
@@ -205,7 +202,7 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
                     content_bytes = f.read()
                 return Response(
                     content=content_bytes,
-                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    media_type=XLSX,
                     headers={
                         "Content-Disposition": f'attachment; filename="{filename}"',
                         "Access-Control-Expose-Headers": "Content-Disposition"
@@ -230,4 +227,4 @@ def export_presence_api(data: Dict[str, Any] = Body(...)):
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "export_presence_api")})
+        return error(500, internal_error(e, "export_presence_api"))
