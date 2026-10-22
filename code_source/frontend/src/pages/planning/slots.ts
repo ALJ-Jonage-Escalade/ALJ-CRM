@@ -23,20 +23,17 @@ export const FIRST_HOUR = 9;
 export const HOURS = Array.from({ length: 13 }, (_, i) => FIRST_HOUR + i);
 export const HOUR_PX = 50;
 
-/** "18:30", "18h30", "18h" → hours (18.5); null when unreadable. */
-export function parseTime(text: string): number | null {
-  const m = /(\d{1,2})[h:](\d{2})?/i.exec(text);
-  if (!m) return null;
-  return Number(m[1]) + (m[2] ? Number(m[2]) : 0) / 60;
-}
-
-/** "18:00 - 20:00" → [18, 20]; null when unreadable or not increasing. */
+/** "18:00 - 20:00", "18h30–20h", "17:00 18:00" → [18, 20]: the first two times, whatever separates them (same rule
+    as parse_horaire in exports/planning_excel.py); null when unreadable or not increasing. */
 export function parseHours(horaires: string): [number, number] | null {
-  const parts = horaires.split("-");
-  if (parts.length < 2) return null;
-  const start = parseTime(parts[0]!);
-  const end = parseTime(parts[1]!);
-  return start !== null && end !== null && end > start ? [start, end] : null;
+  const times: number[] = [];
+  for (const m of horaires.matchAll(/(\d{1,2})\s*[:h]\s*(\d{1,2})?/gi)) {
+    const h = Number(m[1]);
+    const min = Number(m[2] ?? 0);
+    if (h <= 23 && min <= 59) times.push(h + min / 60);
+  }
+  const [start, end] = times;
+  return start !== undefined && end !== undefined && end > start ? [start, end] : null;
 }
 
 /** Colour of a slot: from its type, or its name for old slots. */

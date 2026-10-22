@@ -22,9 +22,27 @@ declare module "vue-router" {
   }
 }
 
+/** Member record links of the former page (/bureau/adherents?id=…&saison=…, ?ajout=1): the record is still the former
+    page, on /bureau/adherents-fiche until plan phase 8, which gets the same query. null for the list itself. */
+export function formerRecordUrl(to: Pick<RouteLocationNormalized, "path" | "fullPath" | "query">): string | null {
+  if (to.query.id === undefined && to.query.ajout === undefined) return null;
+  return `/bureau/adherents-fiche${to.fullPath.slice(to.path.length)}`;
+}
+
 export const routes: RouteRecordRaw[] = [
   { path: HOME, name: "accueil", component: AccueilPage, meta: { access: pageAccess("accueil") } },
-  { path: "/bureau/adherents", name: "adherents", component: AdherentsPage, meta: { access: pageAccess("adherents") } },
+  {
+    path: "/bureau/adherents",
+    name: "adherents",
+    component: AdherentsPage,
+    meta: { access: pageAccess("adherents") },
+    beforeEnter: (to) => {
+      const url = formerRecordUrl(to);
+      if (!url) return true;
+      window.location.replace(url);  // a page of the server, not of the app
+      return false;
+    },
+  },
   { path: "/bureau/communications", name: "communications", component: CommunicationsPage, meta: { access: pageAccess("communications") } },
   { path: "/bureau/planning", name: "planning", component: PlanningPage, meta: { access: pageAccess("planning") } },
   { path: "/bureau/outils", name: "outils", component: OutilsPage, meta: { access: pageAccess("outils") } },

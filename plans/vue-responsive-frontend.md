@@ -183,6 +183,13 @@ table export from now on.
 > preview). « Toutes les saisons » in the pivot table now really shows every season (the old page fell back to
 > 2026-2027).
 
+**TODO (FFME import, to think through)**: the manual matches of the import behave oddly. A row of the file can be
+linked by hand to a member the file already matched automatically: `apply_ffme_matches` then writes that member twice
+and the last write wins (licence, passports, diplomas and health document of the wrong row). `user_id` is never checked
+against the season's members either (an unknown id is written for nothing, silently). Decide what a manual match may
+target (members left unmatched only? any member of the season?), refuse the rest in `/api/ffme/import`, and filter the
+pickers of the page the same way.
+
 ---
 
 ## Phase 7: Adhérents list (online)

@@ -10,7 +10,7 @@ export type MemberList = Schemas["MemberList"];
 
 /** Lower case, without accents nor surrounding spaces: the key of every comparison. */
 export function normKey(s: unknown): string {
-  return String(s ?? "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return String(s ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 // ---------------------------------------------------------------- Slot groups and tariffs

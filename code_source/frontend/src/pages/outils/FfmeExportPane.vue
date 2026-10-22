@@ -83,7 +83,7 @@ const count = (n: number | undefined) => (n === undefined ? "…" : String(n));
     <div v-if="stats?.ignored_details.length" data-testid="ffme-ignored-details" class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
       <b>⚠️ Adhérents ignorés (données incomplètes) :</b>
       <ul class="mt-1 list-disc pl-5">
-        <li v-for="item in stats.ignored_details" :key="item">{{ item }}</li>
+        <li v-for="(item, i) in stats.ignored_details" :key="i">{{ item }}</li>
       </ul>
     </div>
 

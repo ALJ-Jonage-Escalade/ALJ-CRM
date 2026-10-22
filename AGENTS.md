@@ -60,5 +60,5 @@ Run from `code_source/` (the script always uploads `code_source/`); Windows scri
 - Name matching: use `normalize_string` / `normalize_name` from `domain/utils.py`; never rebuild paths by hand, import `CODE_ROOT` / `ROOT_DIR` / `DATA_ROOT` from `src/paths.py`
 - SQLite backups: use the SQLite backup API (`SqliteDatabase.create_db_backup`), never a raw file copy (WAL)
 - New API routes go in a router `src/api/<theme>/<domain>.py`, never in `server.py` (app assembly only); add them to `tests/test_route_inventory.py`. A route that touches the SQLite cache must not join the Firestore-only routers listed in `server.py`
-- New API routes declare an explicit role (`admin` for any write or e-mail send); Cloud Run is ephemeral → generate files in memory and return them, never persist locally
+- New API routes declare an explicit role (`admin` for any write or e-mail send; exception: coaches create, edit and delete single planning slots, `/api/planning/item`, while replacing the whole planning stays admin); Cloud Run is ephemeral → generate files in memory and return them, never persist locally
 - Generated Excel sheets (attendance, emergency contacts) follow the club style: Segoe UI, dark blue `1E3A8A` headers, orange `EA580C` for emergency, zebra rows, print gridlines on

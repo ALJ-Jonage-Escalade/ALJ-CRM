@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import os
 
 from infrastructure.sqlite import schema_v2
 from infrastructure.sqlite.connection import SqliteDatabase
+
+logger = logging.getLogger("alj")
+
+# Shown to the office (the cause goes to the logs only: it may hold the temporary file's path)
+UNREADABLE_EXCEL = "Fichier Excel illisible : vérifiez qu'il s'agit bien de l'export .xlsx des licenciés MyFFME."
 
 
 class FfmeImportRepository:
@@ -45,8 +51,9 @@ class FfmeImportRepository:
                         df = df_h1
                 except Exception:
                     pass
-        except Exception as e:
-            stats["errors"].append(f"Erreur de lecture Excel : {e}")
+        except Exception:
+            logger.exception("FFME import: Excel file unreadable")
+            stats["errors"].append(UNREADABLE_EXCEL)
             return prep
 
         required_cols = ["Nom", "Pr\u00e9nom", "N\u00b0 de licence"]

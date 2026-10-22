@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security.api_auth import Role, required_role
 from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.ffme_import import UNREADABLE_EXCEL
 from support.member_db import MemberDbTestCase
 
 import server
@@ -129,6 +130,8 @@ class TestFfmeRoutes(MemberDbTestCase):
             ("/api/ffme/preview", {"content_base64": ""}, "Fichier Excel manquant (content_base64 obligatoire)."),
             ("/api/ffme/preview", {"content_base64": "pas du base64 !"}, "Fichier illisible : il doit s'agir d'un fichier Excel encodé en base64."),
             ("/api/ffme/preview", {"content_base64": wrong_columns}, "Colonne requise manquante dans le fichier Excel : Nom"),
+            # Valid base64, but not an Excel file: the reader's error stays in the logs
+            ("/api/ffme/preview", {"content_base64": base64.b64encode(b"not a workbook").decode("ascii")}, UNREADABLE_EXCEL),
             ("/api/ffme/import", {"content_base64": no_header}, "Aucune mise à jour à appliquer (aucun rapprochement trouvé)."),
             ("/api/ffme/import", {"content_base64": wrong_columns}, "Colonne requise manquante dans le fichier Excel : Nom"),
             ("/api/ffme/import", {"season": "../x", "content_base64": no_header}, "Saison invalide (format attendu : AAAA-AAAA)."),
