@@ -1,4 +1,4 @@
-"""Office portal, planning page: week view, table and filters, slot create/edit/delete, Excel exports."""
+"""Office portal, planning page: week view, table and filters, slot create/edit/delete, print, Excel exports."""
 import io
 
 import openpyxl
@@ -7,32 +7,37 @@ from playwright.sync_api import expect
 
 from helpers.auth import login_as
 from helpers.data import unique_name
-from helpers.mobile import accept_dialogs
 
 # Tests create slots and compare counts with /api/planning: one after another, with test_outils.py
 pytestmark = pytest.mark.xdist_group("planning")
-ROWS = "#planning-table-tbody tr"
+DAYS = ("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi")
 
 
 @pytest.fixture
 def planning(page):
     """Seeded slots (from the API) and cleanup of the slots a test creates: other tests read the planning."""
-    before = {s["id"] for s in page.request.get("/api/planning").json()}
-    yield page.request.get("/api/planning").json()
+    before = {s["id"]: s for s in page.request.get("/api/planning").json()}
+    yield list(before.values())
     for slot in page.request.get("/api/planning").json():
         if slot["id"] not in before:
             page.request.delete(f"/api/planning/item/{slot['id']}")
+        elif slot != before[slot["id"]]:
+            page.request.post("/api/planning/item", data=before[slot["id"]])
 
 
 def _open(page, role="admin"):
     page.goto("/bureau/planning")
     login_as(page, role)
-    expect(page.locator("#active-slots-count")).to_contain_text("créneau(x) configuré(s)")
+    expect(page.get_by_test_id("slot-count")).to_contain_text("créneau(x) configuré(s)", timeout=20_000)
     return page
 
 
 def _row(page, groupe):
-    return page.locator(ROWS).filter(has=page.get_by_text(groupe, exact=True))
+    return page.get_by_test_id("slot-row").filter(has=page.get_by_text(groupe, exact=True))
+
+
+def _stored(page, groupe):
+    return next(s for s in page.request.get("/api/planning").json() if s["groupe"] == groupe)
 
 
 def _xlsx_text(download, folder) -> str:
@@ -44,91 +49,160 @@ def _xlsx_text(download, folder) -> str:
 
 def test_week_view_and_table(page, planning):
     _open(page)
-    expect(page.locator("#active-slots-count")).to_have_text(f"{len(planning)} créneau(x) configuré(s)")
+    expect(page.get_by_test_id("slot-count")).to_have_text(f"{len(planning)} créneau(x) configuré(s)")
     # One card per slot of a single day (the « Lundi / Jeudi » slot spans two days: not on the grid)
-    on_grid = [s for s in planning if s["jour"] in ("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche")]
-    expect(page.locator(".plan-slot-card")).to_have_count(len(on_grid))
+    on_grid = [s for s in planning if s["jour"] in DAYS]
+    expect(page.get_by_test_id("slot-card")).to_have_count(len(on_grid))
     saturday = next(s for s in planning if s["jour"] == "Samedi")
-    expect(page.locator(".day-column[data-day='Samedi'] .plan-slot-card")).to_contain_text(saturday["groupe"])
+    expect(page.get_by_test_id("day-Samedi").get_by_test_id("slot-card")).to_contain_text(saturday["groupe"])
 
-    page.locator("#tab-btn-table").click()
-    expect(page.locator(ROWS)).to_have_count(len(planning))
-    page.locator("#planning-search-input").fill("bouldering")
-    expect(page.locator(ROWS)).to_have_count(1)
-    page.locator("#planning-search-input").fill("")
-    page.locator(".filter-type-chip[data-type='compétition']").click()
+    page.get_by_test_id("view-table").click()
+    expect(page.get_by_test_id("slot-row")).to_have_count(len(planning))
+    page.get_by_test_id("slot-search").fill("bouldering")
+    expect(page.get_by_test_id("slot-row")).to_have_count(1)
+    page.get_by_test_id("slot-search").fill("")
+    page.get_by_test_id("kind-compétition").click()
     competition = [s for s in planning if s["type"] == "compétition"]
-    expect(page.locator(ROWS)).to_have_count(len(competition))
+    expect(page.get_by_test_id("slot-row")).to_have_count(len(competition))
+    page.get_by_test_id("kind-all").click()
+    expect(page.get_by_test_id("slot-row")).to_have_count(len(planning))
 
 
 def test_create_edit_delete_slot(page, planning):
     groupe = unique_name("E2E Slot")
     _open(page)
-    accept_dialogs(page)
-    page.locator("#btn-create-slot").click()
-    expect(page.locator("#slot-modal")).to_be_visible()
-    page.locator("#slot-groupe").fill(groupe)
-    page.locator("#slot-jour").select_option("Samedi")
-    page.locator("#slot-horaires").fill("14:00 - 16:00")
-    page.locator("#slot-type").select_option("perfectionnement")
-    page.locator("#slot-encadrants").fill("Remus Lupin, Rubeus Hagrid")
-    page.locator("#slot-tarifs-checkboxes label").filter(has_text="Autonome bouldering").locator("input").check()
-    page.locator("#btn-save-modal").click()
-    expect(page.locator("#toast")).to_contain_text(f"Créneau « {groupe} » enregistré")
-    expect(page.locator(".day-column[data-day='Samedi'] .plan-slot-card").filter(has_text=groupe)).to_be_visible()
+    page.get_by_test_id("slot-new").click()
+    expect(page.get_by_test_id("slot-dialog")).to_be_visible()
+    page.get_by_test_id("slot-groupe").fill(groupe)
+    page.get_by_test_id("slot-jour").select_option("Samedi")
+    page.get_by_test_id("slot-horaires").fill("14:00 - 16:00")
+    page.get_by_test_id("slot-type").select_option("perfectionnement")
+    page.get_by_test_id("slot-categorie").fill("U14-U16")
+    page.get_by_test_id("slot-encadrants").fill("Remus Lupin, Rubeus Hagrid")
+    page.get_by_test_id("slot-whatsapp").fill("https://chat.whatsapp.com/e2e")
+    page.get_by_test_id("slot-tarifs").locator("label").filter(has_text="Autonome bouldering").locator("input").check()
+    page.get_by_test_id("slot-naissance-min").fill("2010")
+    page.get_by_test_id("slot-naissance-max").fill("2012")
+    page.get_by_test_id("slot-save").click()
+    expect(page.get_by_test_id("toast")).to_contain_text(f"Créneau « {groupe} » enregistré")
+    expect(page.get_by_test_id("slot-dialog")).to_be_hidden()
+    expect(page.get_by_test_id("day-Samedi").get_by_test_id("slot-card").filter(has_text=groupe)).to_be_visible()
 
-    page.locator("#tab-btn-table").click()
+    page.get_by_test_id("view-table").click()
     row = _row(page, groupe)
     expect(row).to_contain_text("Remus Lupin, Rubeus Hagrid")
     expect(row).to_contain_text("Autonome bouldering")
-    stored = next(s for s in page.request.get("/api/planning").json() if s["groupe"] == groupe)
-    assert (stored["jour"], stored["horaires"], stored["type"]) == ("Samedi", "14:00 - 16:00", "perfectionnement")
+    expect(row).to_contain_text("Nés entre 2010 et 2012")
+    stored = _stored(page, groupe)
+    assert {k: stored[k] for k in ("jour", "horaires", "type", "categorie_age", "whatsapp_link", "naissance_min", "naissance_max")} == {
+        "jour": "Samedi", "horaires": "14:00 - 16:00", "type": "perfectionnement", "categorie_age": "U14-U16",
+        "whatsapp_link": "https://chat.whatsapp.com/e2e", "naissance_min": "2010", "naissance_max": "2012"}
+    assert (stored["encadrants"], stored["helloasso_tarifs"]) == (["Remus Lupin", "Rubeus Hagrid"], ["Autonome bouldering"])
 
-    row.locator(".btn-edit-slot").click()
-    expect(page.locator("#slot-groupe")).to_have_value(groupe)
-    page.locator("#slot-horaires").fill("16:00 - 18:00")
-    page.locator("#btn-save-modal").click()
-    expect(page.locator("#toast")).to_contain_text("enregistré")
-    page.locator("#tab-btn-table").click()
+    # Editing changes the hours and keeps every other field
+    row.get_by_test_id("slot-edit").click()
+    expect(page.get_by_test_id("slot-groupe")).to_have_value(groupe)
+    expect(page.get_by_test_id("slot-tarifs").locator("label").filter(has_text="Autonome bouldering").locator("input")).to_be_checked()
+    page.get_by_test_id("slot-horaires").fill("16:00 - 18:00")
+    page.get_by_test_id("slot-save").click()
+    expect(page.get_by_test_id("toast")).to_contain_text("enregistré")
+    page.get_by_test_id("view-table").click()
     expect(_row(page, groupe)).to_contain_text("16:00 - 18:00")
+    assert _stored(page, groupe) == {**stored, "horaires": "16:00 - 18:00"}
 
-    _row(page, groupe).locator(".btn-del-slot").click()
-    expect(page.locator("#toast")).to_contain_text("Créneau supprimé")
+    # The week view's card opens the same form
+    page.get_by_test_id("view-week").click()
+    page.get_by_test_id("slot-card").filter(has_text=groupe).click()
+    expect(page.get_by_test_id("slot-groupe")).to_have_value(groupe)
+    page.get_by_test_id("slot-cancel").click()
+    expect(page.get_by_test_id("slot-dialog")).to_be_hidden()
+
+    page.get_by_test_id("view-table").click()
+    page.once("dialog", lambda dialog: dialog.dismiss())
+    _row(page, groupe).get_by_test_id("slot-delete").click()
+    expect(_row(page, groupe)).to_have_count(1)
+    page.once("dialog", lambda dialog: dialog.accept())
+    _row(page, groupe).get_by_test_id("slot-delete").click()
+    expect(page.get_by_test_id("toast")).to_contain_text("Créneau supprimé")
     expect(_row(page, groupe)).to_have_count(0)
     assert all(s["groupe"] != groupe for s in page.request.get("/api/planning").json())
 
 
-@pytest.mark.xfail(strict=True, reason="the week view has no Sunday column (daysList stops at Samedi) "
+def test_editing_keeps_a_two_day_slot(page, planning):
+    """Its day is not in the form's list: saving keeps it (the former page moved the slot to Monday)."""
+    two_days = next(s for s in planning if s["jour"] == "Lundi / Jeudi")
+    _open(page)
+    page.get_by_test_id("view-table").click()
+    _row(page, two_days["groupe"]).get_by_test_id("slot-edit").click()
+    page.get_by_test_id("slot-save").click()
+    expect(page.get_by_test_id("toast")).to_contain_text("enregistré")
+    assert _stored(page, two_days["groupe"])["jour"] == "Lundi / Jeudi"
+
+
+@pytest.mark.xfail(strict=True, reason="the week view has no Sunday column (like the Excel grid) "
                                        "although the slot form offers « Dimanche »")
 def test_sunday_slot_on_week_view(page, planning):
     groupe = unique_name("E2E Sunday")
     _open(page)
-    page.locator("#btn-create-slot").click()
-    page.locator("#slot-groupe").fill(groupe)
-    page.locator("#slot-jour").select_option("Dimanche")
-    page.locator("#slot-horaires").fill("10:00 - 12:00")
-    page.locator("#btn-save-modal").click()
-    expect(page.locator("#toast")).to_contain_text("enregistré")
-    expect(page.locator(".plan-slot-card").filter(has_text=groupe)).to_be_visible()
+    page.get_by_test_id("slot-new").click()
+    page.get_by_test_id("slot-groupe").fill(groupe)
+    page.get_by_test_id("slot-jour").select_option("Dimanche")
+    page.get_by_test_id("slot-horaires").fill("10:00 - 12:00")
+    page.get_by_test_id("slot-save").click()
+    expect(page.get_by_test_id("toast")).to_contain_text("enregistré")
+    expect(page.get_by_test_id("slot-card").filter(has_text=groupe)).to_be_visible()
 
 
-def test_name_and_hours_are_required(page, planning):
+@pytest.mark.parametrize("field", ["slot-groupe", "slot-horaires"])
+def test_name_and_hours_are_required(page, planning, field):
     _open(page)
-    page.locator("#btn-create-slot").click()
-    page.locator("#slot-horaires").fill("")
-    page.locator("#btn-save-modal").click()
-    # Browser validation of the form (required fields): nothing is sent
-    expect(page.locator("#slot-modal")).to_be_visible()
+    page.get_by_test_id("slot-new").click()
+    page.get_by_test_id("slot-groupe").fill(unique_name("E2E Required"))
+    page.get_by_test_id(field).fill("")
+    page.get_by_test_id("slot-save").click()
+    expect(page.get_by_test_id("slot-dialog")).to_be_visible()
     assert len(page.request.get("/api/planning").json()) == len(planning)
 
 
 def test_excel_exports(page, planning, tmp_path):
     _open(page)
-    for button, title in (("#btn-export-excel-grid", "Saison"), ("#btn-export-excel-list", "Groupe")):
-        page.locator("#btn-export-menu").click()
+    for button, title in (("export-grid", "Saison"), ("export-list", "Groupe")):
+        page.get_by_test_id("export-menu").click()
         with page.expect_download() as info:
-            page.locator(button).click()
+            page.get_by_test_id(button).click()
         assert info.value.suggested_filename.endswith(".xlsx")
         text = _xlsx_text(info.value, tmp_path)
         assert title in text
         assert all(slot["groupe"] in text for slot in planning), f"{button}: a slot is missing"
+
+
+def test_print_shows_the_grid_only(page, planning):
+    _open(page)
+    page.emulate_media(media="print")
+    expect(page.get_by_test_id("day-Samedi")).to_be_visible()
+    for control in ("slot-new", "planning-print", "export-menu", "view-table"):
+        expect(page.get_by_test_id(control)).to_be_hidden()
+
+
+def test_phone(mobile_page, planning):
+    """Read and edit on a phone: no horizontal page scroll, the form fits the screen."""
+    page = _open(mobile_page)
+    assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
+    page.get_by_test_id("view-table").click()
+    expect(page.get_by_test_id("slot-row")).to_have_count(len(planning))
+    assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
+    _row(page, planning[0]["groupe"]).get_by_test_id("slot-edit").click()
+    box = page.get_by_test_id("slot-dialog").bounding_box()
+    assert box["x"] >= 0 and box["x"] + box["width"] <= page.viewport_size["width"]
+    expect(page.get_by_test_id("slot-save")).to_be_visible()
+
+
+def test_coach_changes_a_slot(page, planning):
+    """Coaches change the slots too (only replacing the whole planning is for admins)."""
+    saturday = next(s for s in planning if s["jour"] == "Samedi")
+    _open(page, "coach")
+    page.get_by_test_id("day-Samedi").get_by_test_id("slot-card").first.click()
+    page.get_by_test_id("slot-encadrants").fill("Remus Lupin")
+    page.get_by_test_id("slot-save").click()
+    expect(page.get_by_test_id("toast")).to_contain_text(f"Créneau « {saturday['groupe']} » enregistré")
+    assert _stored(page, saturday["groupe"])["encadrants"] == ["Remus Lupin"]  # the fixture puts the slot back

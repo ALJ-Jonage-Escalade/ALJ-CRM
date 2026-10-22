@@ -148,9 +148,14 @@ grid and export it to Excel (server-generated file, club style), on typed routes
 
 ### Acceptance criteria
 
-- [ ] Slot CRUD, print and Excel export work as on the old page
-- [ ] Usable on a phone (read and edit)
-- [ ] e2e Planning flows strengthened first, pass after migration; HTML string checks removed
+- [x] Slot CRUD, print and Excel export work as on the old page
+- [x] Usable on a phone (read and edit)
+- [x] e2e Planning flows strengthened first, pass after migration; HTML string checks removed
+
+> Done 2026-10-22. Coaches and admins change the slots (`/api/planning/item`); replacing the whole planning
+> (`POST /api/planning`) stays admin only. Editing a slot keeps a day or tariff missing from the form's lists (« Lundi /
+> Jeudi », a former season's tariff), which the old page dropped. TanStack Table waits for Adhérents: this
+> table is small and needs no sorting or paging. The week grid still has no Sunday column, like the Excel grid.
 
 ---
 

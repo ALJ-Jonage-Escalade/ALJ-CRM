@@ -71,7 +71,7 @@ class TestBureauFiles(unittest.TestCase):
     def test_bureau_pages_share_web_version(self):
         version = _current_version()
         self.assertRegex(version, r"^\d+$")
-        for name in ("adherents.html", "competitions.html", "planning.html", "outils.html"):
+        for name in ("adherents.html", "competitions.html", "outils.html"):
             html = _read(os.path.join(BUREAU, name))
             self.assertIn(f'<meta name="alj-web-version" content="{version}">', html, name)
             self.assertRegex(html, rf"<title>[^<]*\(v{version}\)</title>", name)
@@ -86,17 +86,6 @@ class TestBureauFiles(unittest.TestCase):
                       "/static-web/alj-members.js", "/static-web/alj-filters.js",
                       "/static-web/alj-sync.js"):
             self.assertIn(f'"{asset}"', sw)
-
-    def test_planning_file_structure(self):
-        """La nouvelle page planning.html doit contenir la grille visuelle, le tableau, la modale et les exports."""
-        html = _read(os.path.join(BUREAU, "planning.html"))
-        self.assertIn("alj-shell.js", html)
-        self.assertIn("pane-visual", html)
-        self.assertIn("pane-table", html)
-        self.assertIn("btn-create-slot", html)
-        self.assertIn("btn-print-grid", html)
-        self.assertIn("btn-export-excel-grid", html)
-        self.assertIn("slot-modal", html)
 
     def test_competitions_results_cron_and_settings_endpoints(self):
         """Vérifie les endpoints de configuration et de cron du batch des résultats MyCompet."""
@@ -678,18 +667,16 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_season_tarifs_endpoint(self):
         """GET /api/season-tarifs retourne les tarifs disponibles de la saison active."""
-        from api.members.seasons import get_season_tarifs_api
-        res = get_season_tarifs_api("2026-2027")
-        self.assertEqual(res.get("status"), "success")
-        self.assertIn("tarifs", res)
-        self.assertIsInstance(res["tarifs"], list)
+        res = TestClient(app).get("/api/season-tarifs", params={"season": "2026-2027"}).json()
+        self.assertEqual((res["status"], res["season"]), ("success", "2026-2027"))
         self.assertIn("Licence sèche", res["tarifs"])
 
     def test_planning_item_crud_and_export(self):
         """Vérifie la création, modification, suppression et export Excel des créneaux de planning."""
-        from api.activities.planning import save_planning_item_api, delete_planning_item_api, export_planning_api, get_planning
-        
-        # 1. Création d'un nouveau créneau
+        self._temp_database("test_planning.db")
+        client = TestClient(app)
+
+        # 1. Création d'un nouveau créneau (champs absents : vides)
         new_slot = {
             "id": 0,
             "groupe": "Test Nouveau Créneau Web",
@@ -697,39 +684,54 @@ class TestBureauFiles(unittest.TestCase):
             "horaires": "19:00 - 20:30",
             "type": "cours",
             "categorie_age": "Adultes",
-            "encadrants": ["Test Coach"],
+            "encadrants": ["Test Coach", " "],
             "helloasso_tarifs": ["Licence sèche"]
         }
-        res_create = save_planning_item_api(new_slot)
-        self.assertEqual(res_create.get("status"), "success")
+        res_create = client.post("/api/planning/item", json=new_slot).json()
+        self.assertEqual(res_create["status"], "success")
         saved_id = res_create["item"]["id"]
         self.assertGreater(saved_id, 0)
+        expected = {**new_slot, "id": saved_id, "encadrants": ["Test Coach"], "whatsapp_link": "", "naissance_min": "", "naissance_max": ""}
+        self.assertEqual(res_create["item"], expected)
 
         # 2. Modification du créneau
-        new_slot["id"] = saved_id
-        new_slot["groupe"] = "Test Créneau Modifié Web"
-        res_update = save_planning_item_api(new_slot)
-        self.assertEqual(res_update.get("status"), "success")
-
-        # Vérification dans la liste
-        planning = get_planning()
-        found = next((x for x in planning if x.get("id") == saved_id), None)
-        self.assertIsNotNone(found)
-        self.assertEqual(found["groupe"], "Test Créneau Modifié Web")
+        res_update = client.post("/api/planning/item", json={**expected, "groupe": "Test Créneau Modifié Web"})
+        self.assertEqual(res_update.status_code, 200)
+        self.assertEqual(client.get("/api/planning").json(), [{**expected, "groupe": "Test Créneau Modifié Web"}])
 
         # 3. Export Excel (grille et liste)
-        resp_export_grid = export_planning_api(mode="grid", season="2026-2027")
-        self.assertEqual(resp_export_grid.headers.get("content-type"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        self.assertIn("attachment", resp_export_grid.headers.get("content-disposition", ""))
-        self.assertGreater(len(resp_export_grid.body), 1000)
-
-        resp_export_list = export_planning_api(mode="list", season="2026-2027")
-        self.assertEqual(resp_export_list.headers.get("content-type"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        self.assertGreater(len(resp_export_list.body), 1000)
+        for mode in ("grid", "list"):
+            resp = client.get("/api/planning/export", params={"mode": mode, "season": "2026-2027"})
+            self.assertEqual(resp.headers.get("content-type"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            self.assertIn("attachment", resp.headers.get("content-disposition", ""))
+            self.assertGreater(len(resp.content), 1000)
+        self.assertEqual(client.get("/api/planning/export", params={"mode": "autre"}).status_code, 422)
 
         # 4. Suppression
-        res_del = delete_planning_item_api(saved_id)
-        self.assertEqual(res_del.get("status"), "success")
+        self.assertEqual(client.delete(f"/api/planning/item/{saved_id}").json()["status"], "success")
+        self.assertEqual(client.get("/api/planning").json(), [])
+        r = client.delete(f"/api/planning/item/{saved_id}")
+        self.assertEqual((r.status_code, r.json()["message"]), (404, f"Créneau #{saved_id} introuvable."))
+
+    def test_planning_refusals(self):
+        """Un créneau sans nom ou sans horaires est refusé ; une grille sans créneau placable aussi."""
+        self._temp_database("test_planning_refusals.db")
+        client = TestClient(app)
+        for body, message in (
+            ({"groupe": " ", "horaires": "18:00 - 20:00"}, "Le nom du groupe est obligatoire."),
+            ({"groupe": "Loisir", "horaires": ""}, "Les horaires sont obligatoires."),
+        ):
+            with self.subTest(body=body):
+                r = client.post("/api/planning/item", json=body)
+                self.assertEqual((r.status_code, r.json()["message"]), (400, message))
+        self.assertEqual(client.post("/api/planning/item", json={"groupe": "X", "horaires": "1", "inconnu": 1}).status_code, 422)
+        self.assertEqual(client.get("/api/planning").json(), [])
+
+        client.post("/api/planning/item", json={"groupe": "Autonome", "jour": "Lundi / Jeudi", "horaires": "20:00 - 22:00"})
+        r = client.get("/api/planning/export", params={"mode": "grid", "season": "2026-2027"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Aucun créneau à placer sur la grille", r.json()["message"])
+        self.assertEqual(client.get("/api/planning/export", params={"mode": "list", "season": "2026-2027"}).status_code, 200)
 
     def test_outils_page_tabs(self):
         """La page outils.html contient les onglets Carte et TCD."""
@@ -1194,7 +1196,7 @@ class TestVueApp(unittest.TestCase):
     def test_migrated_pages_serve_the_entry_page(self):
         with open(os.path.join(self.dist, "index.html"), "w", encoding="utf-8") as f:
             f.write("<div id=\"app\"></div>")
-        for page in ("communications", "parametres"):
+        for page in ("communications", "parametres", "planning"):
             r = TestClient(app).get(f"/bureau/{page}")
             self.assertEqual(r.status_code, 200, page)
             self.assertEqual(r.text, '<div id="app"></div>', page)

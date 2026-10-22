@@ -94,6 +94,12 @@ describe("app routes", () => {
     expect(router.currentRoute.value.fullPath).toBe("/bureau/?reserve=/bureau/communications");
   });
 
+  it("open Planning to a coach", async () => {
+    const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
+    await router.push("/bureau/planning");
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/planning");
+  });
+
   it("show unknown paths to anyone", async () => {
     const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
     await router.push("/bureau/inconnu");

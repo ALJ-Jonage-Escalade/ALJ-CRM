@@ -1200,9 +1200,21 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonTarifs"
+                }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -1691,7 +1703,23 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlanningSlot"
+                  },
+                  "type": "array",
+                  "title": "Response Get Planning Api Planning Get"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           }
@@ -1747,9 +1775,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Item"
+                "$ref": "#/components/schemas/PlanningSlotUpdate"
               }
             }
           },
@@ -1760,7 +1786,29 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningSlotSaved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -1798,9 +1846,31 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningSlotDeleted"
+                }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -1826,6 +1896,10 @@
             "in": "query",
             "required": false,
             "schema": {
+              "enum": [
+                "grid",
+                "list"
+              ],
               "type": "string",
               "default": "grid",
               "title": "Mode"
@@ -1850,12 +1924,30 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Classeur Excel",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+            }
+          },
+          "400": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
-            }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -3687,6 +3779,187 @@
         "type": "object",
         "title": "ParticipantUpdate"
       },
+      "PlanningSlot": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "groupe": {
+            "type": "string",
+            "title": "Groupe"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "categorie_age": {
+            "type": "string",
+            "title": "Categorie Age"
+          },
+          "jour": {
+            "type": "string",
+            "title": "Jour"
+          },
+          "horaires": {
+            "type": "string",
+            "title": "Horaires"
+          },
+          "encadrants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Encadrants"
+          },
+          "helloasso_tarifs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Helloasso Tarifs"
+          },
+          "whatsapp_link": {
+            "type": "string",
+            "title": "Whatsapp Link"
+          },
+          "naissance_min": {
+            "type": "string",
+            "title": "Naissance Min"
+          },
+          "naissance_max": {
+            "type": "string",
+            "title": "Naissance Max"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "groupe",
+          "type",
+          "categorie_age",
+          "jour",
+          "horaires",
+          "encadrants",
+          "helloasso_tarifs",
+          "whatsapp_link",
+          "naissance_min",
+          "naissance_max"
+        ],
+        "title": "PlanningSlot",
+        "description": "A weekly slot. jour: a day (\"Lundi\"…), or several (\"Lundi / Jeudi\"); horaires: \"18:00 - 20:00\".\nhelloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds."
+      },
+      "PlanningSlotDeleted": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "PlanningSlotDeleted"
+      },
+      "PlanningSlotSaved": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "item": {
+            "$ref": "#/components/schemas/PlanningSlot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "item"
+        ],
+        "title": "PlanningSlotSaved"
+      },
+      "PlanningSlotUpdate": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "default": 0
+          },
+          "groupe": {
+            "type": "string",
+            "title": "Groupe",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": ""
+          },
+          "categorie_age": {
+            "type": "string",
+            "title": "Categorie Age",
+            "default": ""
+          },
+          "jour": {
+            "type": "string",
+            "title": "Jour",
+            "default": ""
+          },
+          "horaires": {
+            "type": "string",
+            "title": "Horaires",
+            "default": ""
+          },
+          "encadrants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Encadrants",
+            "default": []
+          },
+          "helloasso_tarifs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Helloasso Tarifs",
+            "default": []
+          },
+          "whatsapp_link": {
+            "type": "string",
+            "title": "Whatsapp Link",
+            "default": ""
+          },
+          "naissance_min": {
+            "type": "string",
+            "title": "Naissance Min",
+            "default": ""
+          },
+          "naissance_max": {
+            "type": "string",
+            "title": "Naissance Max",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PlanningSlotUpdate",
+        "description": "id: 0 for a new slot."
+      },
       "ResultsSettings": {
         "properties": {
           "status": {
@@ -3756,6 +4029,34 @@
         "additionalProperties": false,
         "type": "object",
         "title": "ResultsSettingsUpdate"
+      },
+      "SeasonTarifs": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "tarifs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tarifs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "season",
+          "tarifs"
+        ],
+        "title": "SeasonTarifs",
+        "description": "The season's HelloAsso tariffs, to link them to a planning slot."
       },
       "ServiceCheck": {
         "properties": {

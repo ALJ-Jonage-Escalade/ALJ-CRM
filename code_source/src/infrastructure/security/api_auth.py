@@ -140,7 +140,7 @@ def required_role(method: str, path: str) -> Optional[Role]:
                                          for ro_prefix in READONLY_READ_PREFIXES):
         return Role.READONLY
     if path == "/api/planning" and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # planning modifiable par les admins
+        return Role.ADMIN  # remplacement du planning complet réservé aux admins ; les coachs modifient les créneaux
     if path.startswith("/api/attestations"):
         return Role.ADMIN  # attestations réservées aux administrateurs
     if path.startswith("/api/members") and method not in ("GET", "HEAD"):

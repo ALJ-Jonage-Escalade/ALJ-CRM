@@ -2,7 +2,8 @@
 /* Layout of every page: navigation (side menu on desktop, bottom bar on phones), header with the
    signed-in account, and the sign-in / access gate. The page content is only rendered for a role allowed on
    the page (lib/access.ts), and the menu only lists those pages.
-   Element ids are the ones of the former web/shared/alj-shell.js: the e2e tests rely on them. */
+   Element ids are the ones of the former web/shared/alj-shell.js: the e2e tests rely on them.
+   Printed, only the page content remains (Planning prints its grid). */
 import { computed, inject, ref, watch } from "vue";
 import { AUTH_KEY } from "../composables/auth";
 import { canOpen, pageAccess, PAGES, verdict, type PageId } from "../lib/access";
@@ -52,8 +53,8 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
 </script>
 
 <template>
-  <div class="min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)]">
-    <aside class="md:sticky md:top-0 md:flex md:h-dvh md:flex-col md:gap-5 md:bg-side md:px-3 md:py-5 md:text-side-text">
+  <div class="min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)] print:block">
+    <aside class="print:hidden md:sticky md:top-0 md:flex md:h-dvh md:flex-col md:gap-5 md:bg-side md:px-3 md:py-5 md:text-side-text">
       <div class="hidden px-2 md:block">
         <b class="block text-base text-slate-50">🧗 ALJ Escalade</b>
         <span class="mt-0.5 block text-xs text-slate-400">Bureau · <VersionBadge /></span>
@@ -85,8 +86,8 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
       </div>
     </aside>
 
-    <div class="min-w-0 px-4 pt-4 pb-28 md:px-7 md:pt-6 md:pb-10">
-      <header class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+    <div class="min-w-0 px-4 pt-4 pb-28 md:px-7 md:pt-6 md:pb-10 print:p-0">
+      <header class="mb-4 flex print:hidden flex-wrap items-center gap-x-4 gap-y-2">
         <h1 class="m-0 text-xl font-bold md:text-[22px]">{{ props.title }}</h1>
         <span id="sync-info" class="text-[13px] text-slate-500"></span>
         <div class="ml-auto flex min-w-0 items-center gap-2">
@@ -104,7 +105,7 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
       <div
         v-show="googleExpired"
         id="google-auth-warning"
-        class="mb-3.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-300 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800"
+        class="mb-3.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-300 print:hidden bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800"
       >
         <span>⚠️ <b>Accès Google & BDD suspendus :</b> le jeton de connexion Google du club a expiré ou a été révoqué.</span>
         <a :href="renewUrl" class="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-bold text-white no-underline">🔄 Renouveler l'accès</a>
@@ -141,7 +142,7 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         <slot :role="role" />
       </div>
 
-      <p class="mt-8 text-center text-[11px] text-slate-400 md:hidden">🧗 ALJ Escalade · <VersionBadge /></p>
+      <p class="mt-8 text-center text-[11px] text-slate-400 md:hidden print:hidden">🧗 ALJ Escalade · <VersionBadge /></p>
     </div>
   </div>
 </template>

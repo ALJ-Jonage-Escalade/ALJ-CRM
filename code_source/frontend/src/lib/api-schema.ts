@@ -1687,6 +1687,117 @@ export interface components {
             /** Unchanged Since */
             unchanged_since?: string | null;
         };
+        /**
+         * PlanningSlot
+         * @description A weekly slot. jour: a day ("Lundi"…), or several ("Lundi / Jeudi"); horaires: "18:00 - 20:00".
+         *     helloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds.
+         */
+        PlanningSlot: {
+            /** Id */
+            id: number;
+            /** Groupe */
+            groupe: string;
+            /** Type */
+            type: string;
+            /** Categorie Age */
+            categorie_age: string;
+            /** Jour */
+            jour: string;
+            /** Horaires */
+            horaires: string;
+            /** Encadrants */
+            encadrants: string[];
+            /** Helloasso Tarifs */
+            helloasso_tarifs: string[];
+            /** Whatsapp Link */
+            whatsapp_link: string;
+            /** Naissance Min */
+            naissance_min: string;
+            /** Naissance Max */
+            naissance_max: string;
+        };
+        /** PlanningSlotDeleted */
+        PlanningSlotDeleted: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Message */
+            message: string;
+        };
+        /** PlanningSlotSaved */
+        PlanningSlotSaved: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Message */
+            message: string;
+            item: components["schemas"]["PlanningSlot"];
+        };
+        /**
+         * PlanningSlotUpdate
+         * @description id: 0 for a new slot.
+         */
+        PlanningSlotUpdate: {
+            /**
+             * Id
+             * @default 0
+             */
+            id?: number;
+            /**
+             * Groupe
+             * @default
+             */
+            groupe?: string;
+            /**
+             * Type
+             * @default
+             */
+            type?: string;
+            /**
+             * Categorie Age
+             * @default
+             */
+            categorie_age?: string;
+            /**
+             * Jour
+             * @default
+             */
+            jour?: string;
+            /**
+             * Horaires
+             * @default
+             */
+            horaires?: string;
+            /**
+             * Encadrants
+             * @default []
+             */
+            encadrants?: string[];
+            /**
+             * Helloasso Tarifs
+             * @default []
+             */
+            helloasso_tarifs?: string[];
+            /**
+             * Whatsapp Link
+             * @default
+             */
+            whatsapp_link?: string;
+            /**
+             * Naissance Min
+             * @default
+             */
+            naissance_min?: string;
+            /**
+             * Naissance Max
+             * @default
+             */
+            naissance_max?: string;
+        };
         /** ResultsSettings */
         ResultsSettings: {
             /**
@@ -1722,6 +1833,21 @@ export interface components {
              * @default
              */
             notification_email?: string;
+        };
+        /**
+         * SeasonTarifs
+         * @description The season's HelloAsso tariffs, to link them to a planning slot.
+         */
+        SeasonTarifs: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Season */
+            season: string;
+            /** Tarifs */
+            tarifs: string[];
         };
         /** ServiceCheck */
         ServiceCheck: {
@@ -2750,7 +2876,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SeasonTarifs"];
                 };
             };
             /** @description Validation Error */
@@ -2760,6 +2886,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3197,7 +3332,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PlanningSlot"][];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3246,9 +3390,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["PlanningSlotUpdate"];
             };
         };
         responses: {
@@ -3258,7 +3400,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PlanningSlotSaved"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3268,6 +3419,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3289,7 +3449,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PlanningSlotDeleted"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3301,12 +3470,21 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
         };
     };
     export_planning_api_api_planning_export_get: {
         parameters: {
             query?: {
-                mode?: string;
+                mode?: "grid" | "list";
                 season?: string | null;
             };
             header?: never;
@@ -3315,13 +3493,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Classeur Excel */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3331,6 +3518,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

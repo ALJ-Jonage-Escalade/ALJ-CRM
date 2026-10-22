@@ -14,7 +14,7 @@
 
 @layer base {
   body {
-    @apply bg-slate-100 text-sm text-slate-800 antialiased;
+    @apply bg-slate-100 text-sm text-slate-800 antialiased print:bg-white;
   }
   a {
     @apply text-accent;
