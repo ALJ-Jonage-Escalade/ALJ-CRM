@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Schemas } from "../../lib/client";
-import { batchReport, cacheFile, googleChecks, googleStatus, lastRun, lastSync, looksLikeEmail, pendingText, syncReport } from "./view";
+import { batchReport, cacheFile, googleChecks, googleStatus, lastRun, lastSync, pendingText, syncReport } from "./view";
 
 const GOOGLE: Schemas["GoogleStatus"] = {
   status: "disconnected", valid: false, configured: false, client_id_configured: false, refresh_token_present: false,
@@ -71,9 +71,5 @@ describe("Paramètres view", () => {
     ]);
     expect(batchReport({ ...report, email_sent: false }, AT)[3]).toBe("• E-mail récapitulatif expédié : Erreur envoi");
     expect(batchReport({ ...report, email_sent: false, competitions_updated: 0 }, AT)[3]).toBe("• E-mail récapitulatif expédié : Non (aucun nouveau résultat)");
-  });
-
-  it.each([["a@b.fr", true], ["a@b", false], ["pas-une-adresse", false], ["a b@c.fr", false]])("e-mail %s: %s", (value, ok) => {
-    expect(looksLikeEmail(value)).toBe(ok);
   });
 });

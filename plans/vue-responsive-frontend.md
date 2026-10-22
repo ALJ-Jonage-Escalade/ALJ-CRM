@@ -129,10 +129,11 @@ routes with response models. Admin only.
 
 ### Acceptance criteria
 
-- [ ] Template CRUD works end to end and is persisted through the existing repository
-- [ ] Non-admin roles cannot reach the screen or call the writes
-- [ ] Component tests for the validated template form
-- [ ] e2e Communications flows strengthened first, pass after migration; HTML string checks removed
+- [x] Template CRUD works end to end and is persisted through the existing repository (the server now also refuses
+  a duplicate name, 409, and an invalid sender address)
+- [x] Non-admin roles cannot reach the screen or call the writes
+- [x] Component tests for the validated template form
+- [x] e2e Communications flows strengthened first, pass after migration; HTML string checks removed
 
 ---
 

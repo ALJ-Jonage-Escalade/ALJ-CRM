@@ -17,7 +17,7 @@ function fakeAuth(initial: AuthState) {
   return { auth, state };
 }
 
-/** One route per access level: the app has no admin route yet (Paramètres comes next). */
+/** One route per access level. */
 async function setup(initial: AuthState, path: string) {
   const { auth, state } = fakeAuth(initial);
   const page = (p: string, access: Access) => ({ path: p, component: Empty, meta: { access } });
@@ -81,6 +81,17 @@ describe("router guards", () => {
 describe("app routes", () => {
   it("declare their access", () => {
     for (const route of routes) expect(["public", "staff", "admin"]).toContain(route.meta?.access);
+  });
+
+  it("reserve Communications and Paramètres to admins", () => {
+    const access = (name: string) => routes.find((r) => r.name === name)?.meta?.access;
+    expect([access("communications"), access("parametres")]).toEqual(["admin", "admin"]);
+  });
+
+  it("send a coach back from Communications", async () => {
+    const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
+    await router.push("/bureau/communications");
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/?reserve=/bureau/communications");
   });
 
   it("show unknown paths to anyone", async () => {

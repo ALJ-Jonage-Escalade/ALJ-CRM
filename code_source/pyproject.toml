@@ -90,6 +90,8 @@ files = [
     "src/api/competitions/schemas/participants.py",
     "src/api/competitions/schemas/results.py",
     "src/api/integrations/schemas.py",
+    "src/api/communications/schemas.py",
+    "src/api/communications/whatsapp.py",
     "src/api/integrations/cloud_db.py",
     "src/api/members/seasons.py",
     "src/domain/members/view.py",

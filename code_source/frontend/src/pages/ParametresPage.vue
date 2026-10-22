@@ -10,8 +10,9 @@ import UiTile from "../components/ui/UiTile.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText, unwrap, type Schemas } from "../lib/client";
+import { looksLikeEmail } from "../lib/email";
 import {
-  batchReport, cacheFile, cacheStatus, CHECKING, dbMode, googleChecks, googleStatus, lastRun, lastSync, looksLikeEmail,
+  batchReport, cacheFile, cacheStatus, CHECKING, dbMode, googleChecks, googleStatus, lastRun, lastSync,
   pendingText, syncReport, UNAVAILABLE, type CheckLine, type Status,
 } from "./parametres/view";
 

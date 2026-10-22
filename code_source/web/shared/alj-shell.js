@@ -1,7 +1,7 @@
 /* Mise en page commune des pages « bureau » (ordinateur) : menu latéral, en-tête,
    contrôle de connexion et de rôle (coach / administrateur). Chaque page appelle
-   startBureau() puis remplit la zone #content dans onReady(). Pages réservées aux administrateurs
-   (admin: true, adminOnly) : même répartition que l'application Vue (frontend/src/lib/access.ts). */
+   startBureau() puis remplit la zone #content dans onReady(). Liens réservés aux administrateurs
+   (admin: true) : même répartition que l'application Vue (frontend/src/lib/access.ts), qui contient ces pages. */
 import {
   apiFetch, initFirebase, login, logout, roleFor, isStaff,
   checkWebVersion, registerServiceWorker, WEB_VERSION
@@ -24,10 +24,10 @@ const esc = s => (s == null ? "" : String(s)).replace(/[&<>"']/g, c => ({ "&": "
 const $ = id => document.getElementById(id);
 
 /**
- * @param {{page: string, title: string, adminOnly?: boolean, onReady: function({user, role, isAdmin, claims}): void}} opts
+ * @param {{page: string, title: string, onReady: function({user, role, isAdmin, claims}): void}} opts
  * @returns {{setStatus: function(string): void}}
  */
-export function startBureau({ page, title, adminOnly = false, onReady }) {
+export function startBureau({ page, title, onReady }) {
   $("shell").innerHTML = `
     <div class="app">
       <aside class="side">
@@ -101,16 +101,6 @@ export function startBureau({ page, title, adminOnly = false, onReady }) {
         <button class="btn btn-muted" id="gate-logout">🚪 Se déconnecter</button>`);
       return;
     }
-    if (adminOnly && role !== "admin") {
-      readyUid = null;
-      setStatus("");
-      $("content").hidden = true;
-      showGate(`<h2>⛔ Réservé aux administrateurs</h2>
-        <p>Cette page est réservée aux administrateurs du club.</p>
-        <a class="btn btn-primary" href="/bureau/" style="text-decoration:none;">🏠 Retour à l'accueil</a>`);
-      return;
-    }
-
     $("gate").hidden = true;
     $("content").hidden = false;
     if (readyUid !== user.uid) {

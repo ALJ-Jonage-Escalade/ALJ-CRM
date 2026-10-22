@@ -71,7 +71,7 @@ class TestBureauFiles(unittest.TestCase):
     def test_bureau_pages_share_web_version(self):
         version = _current_version()
         self.assertRegex(version, r"^\d+$")
-        for name in ("adherents.html", "communications.html", "competitions.html", "planning.html", "outils.html"):
+        for name in ("adherents.html", "competitions.html", "planning.html", "outils.html"):
             html = _read(os.path.join(BUREAU, name))
             self.assertIn(f'<meta name="alj-web-version" content="{version}">', html, name)
             self.assertRegex(html, rf"<title>[^<]*\(v{version}\)</title>", name)
@@ -893,23 +893,6 @@ class TestBureauFiles(unittest.TestCase):
             SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)
 
-    def test_communications_page_ui_and_wiring(self):
-        """La page communications.html reprend le design desktop et contient tous les contrôles."""
-        html = _read(os.path.join(BUREAU, "communications.html"))
-        shell = _read(os.path.join(SHARED, "alj-shell.js"))
-
-        # Vérification du menu
-        self.assertIn('/bureau/communications', shell)
-
-        # Contrôles de la page
-        for elem in ("template-select", "template-name-input", "btn-save-tpl", "btn-new-tpl", "btn-del-tpl",
-                      "sender-email", "sender-name", "subject-input", "body-input",
-                      "signature-checkbox", "whatsapp-input", "pv-from", "pv-subject", "pv-body"):
-            self.assertIn(f'id="{elem}"', html)
-
-        self.assertIn('apiFetch("/api/email-templates"', html)
-        self.assertIn('apiFetch("/api/whatsapp-template"', html)
-
     def test_competitions_desktop_page_ui_and_wiring(self):
         """La page bureau/competitions.html est adaptée aux grands écrans d'ordinateur tout en préservant le mobile."""
         html = _read(os.path.join(BUREAU, "competitions.html"))
@@ -973,79 +956,88 @@ class TestBureauFiles(unittest.TestCase):
         self.assertEqual(data["total_scraped"], 1)
         mock_update.assert_called_once()
 
-    def test_email_template_crud_endpoints_and_sqlite(self):
-        """Les endpoints POST et DELETE /api/email-templates modifient correctement SQLite."""
-        import tempfile
-        import shutil
+    def _temp_database(self, name):
+        """SqliteDatabase on an empty database for the test."""
         from infrastructure.sqlite.connection import SqliteDatabase
-        from api.communications.email import save_email_template_api, delete_email_template_api, get_email_templates
-
         temp_dir = tempfile.mkdtemp()
-        db_path = os.path.join(temp_dir, "test_tpl.db")
         orig_db_path = SqliteDatabase.get_db_path()
-        try:
-            SqliteDatabase.set_db_path(db_path)
-            SqliteDatabase.setup_database()
+        SqliteDatabase.set_db_path(os.path.join(temp_dir, name))
+        SqliteDatabase.setup_database()
+        self.addCleanup(shutil.rmtree, temp_dir, ignore_errors=True)
+        self.addCleanup(SqliteDatabase.set_db_path, orig_db_path)
 
-            # 1. Création d'un nouveau modèle
-            payload = {
-                "name": "Test Nouveau Modèle",
-                "subject": "Sujet de test personnalisé",
-                "body": "Bonjour {first_name}, corps de test.",
-                "sender_email": "test@alj-escalade.fr",
-                "sender_name": "ALJ Test"
-            }
-            res_save = save_email_template_api(payload)
-            self.assertEqual(res_save.get("status"), "success")
+    def test_email_template_crud_endpoints_and_sqlite(self):
+        """POST, GET et DELETE /api/email-templates modifient correctement SQLite."""
+        self._temp_database("test_tpl.db")
+        client = TestClient(app)
 
-            # 2. Vérification dans la liste
-            res_list = get_email_templates()
-            self.assertEqual(res_list.get("status"), "success")
-            names = [t["name"] for t in res_list.get("templates", [])]
-            self.assertIn("Test Nouveau Modèle", names)
+        def names():
+            return [t["name"] for t in client.get("/api/email-templates").json()["templates"]]
 
-            # 3. Renommage du modèle (old_name -> name)
-            rename_payload = {
-                "name": "Test Modèle Renommé",
-                "old_name": "Test Nouveau Modèle",
-                "subject": "Sujet mis à jour",
-                "body": "Bonjour {first_name}, corps mis à jour.",
-                "sender_email": "test@alj-escalade.fr",
-                "sender_name": "ALJ Test"
-            }
-            res_rename = save_email_template_api(rename_payload)
-            self.assertEqual(res_rename.get("status"), "success")
+        # 1. Création d'un nouveau modèle
+        payload = {
+            "name": "Test Nouveau Modèle",
+            "subject": "Sujet de test personnalisé",
+            "body": "Bonjour {first_name}, corps de test.",
+            "sender_email": "test@alj-escalade.fr",
+            "sender_name": "ALJ Test"
+        }
+        res_save = client.post("/api/email-templates", json=payload).json()
+        self.assertEqual(res_save["status"], "success")
+        self.assertEqual(res_save["template"], payload)
+        self.assertIn("Test Nouveau Modèle", names())
 
-            res_list_renamed = get_email_templates()
-            names_renamed = [t["name"] for t in res_list_renamed.get("templates", [])]
-            self.assertIn("Test Modèle Renommé", names_renamed)
-            self.assertNotIn("Test Nouveau Modèle", names_renamed)
+        # 2. Renommage du modèle (old_name -> name)
+        rename_payload = {**payload, "name": "Test Modèle Renommé", "old_name": "Test Nouveau Modèle", "subject": "Sujet mis à jour"}
+        self.assertEqual(client.post("/api/email-templates", json=rename_payload).json()["status"], "success")
+        self.assertIn("Test Modèle Renommé", names())
+        self.assertNotIn("Test Nouveau Modèle", names())
 
-            # 4. Suppression du modèle
-            res_del = delete_email_template_api("Test Modèle Renommé")
-            self.assertEqual(res_del.get("status"), "success")
+        # 3. Suppression du modèle
+        res_del = client.delete("/api/email-templates/Test Modèle Renommé")
+        self.assertEqual(res_del.json()["status"], "success")
+        self.assertNotIn("Test Modèle Renommé", names())
+        self.assertEqual(client.delete("/api/email-templates/Test Modèle Renommé").status_code, 404)
 
-            # 5. Vérification que le modèle a disparu
-            res_list2 = get_email_templates()
-            names2 = [t["name"] for t in res_list2.get("templates", [])]
-            self.assertNotIn("Test Modèle Renommé", names2)
-        finally:
-            SqliteDatabase.set_db_path(orig_db_path)
-            shutil.rmtree(temp_dir, ignore_errors=True)
+    def test_email_template_save_refusals(self):
+        """Nom, sujet, adresse d'expédition et doublons sont vérifiés par le serveur."""
+        self._temp_database("test_tpl_refusals.db")
+        client = TestClient(app)
+        base = {"name": "Relance", "subject": "Sujet", "body": "Corps"}
+        self.assertEqual(client.post("/api/email-templates", json=base).status_code, 200)
+        client.post("/api/email-templates", json={**base, "name": "Autre"})
+
+        for body, status, message in (
+            ({**base, "name": " "}, 400, "Le nom du modèle est obligatoire."),
+            ({**base, "subject": ""}, 400, "Le sujet du modèle est obligatoire."),
+            ({**base, "sender_email": "pas-une-adresse"}, 400, "L'adresse d'expédition doit être une adresse e-mail valide."),
+            # A new template, or a rename, onto an existing name (case ignored)
+            ({**base, "name": "RELANCE"}, 409, "Un modèle nommé « RELANCE » existe déjà."),
+            ({**base, "name": "autre", "old_name": "Relance"}, 409, "Un modèle nommé « autre » existe déjà."),
+        ):
+            with self.subTest(body=body):
+                r = client.post("/api/email-templates", json=body)
+                self.assertEqual(r.status_code, status)
+                self.assertEqual(r.json()["message"], message)
+        # Saving a template under its own name, or changing the case of it, is fine
+        self.assertEqual(client.post("/api/email-templates", json={**base, "old_name": "Relance"}).status_code, 200)
+        self.assertEqual(client.post("/api/email-templates", json={**base, "name": "RELANCE", "old_name": "Relance"}).status_code, 200)
+        # An empty sender falls back to the club's address
+        saved = client.post("/api/email-templates", json={**base, "name": "Défaut"}).json()["template"]
+        self.assertEqual(saved["sender_email"], "inscription@alj-escalade.fr")
+        self.assertEqual(client.get("/api/email-templates").json()["templates"][0]["sender_email"], "inscription@alj-escalade.fr")
 
     def test_whatsapp_template_endpoints(self):
         """GET et POST /api/whatsapp-template enregistrent et lisent le texte WhatsApp."""
         from support.fake_firestore import use_fake_firestore
-        from api.communications.whatsapp import get_whatsapp_template_api, save_whatsapp_template_api
         use_fake_firestore(self)
+        client = TestClient(app)
+        self.assertEqual(client.get("/api/whatsapp-template").json(), {"status": "success", "template": ""})
 
-        self.assertEqual(get_whatsapp_template_api().get("template"), "")
-        res_save = save_whatsapp_template_api({"template": "Rejoignez le groupe WhatsApp du club : https://chat.whatsapp.com/xxx"})
-        self.assertEqual(res_save.get("status"), "success")
-
-        res_get = get_whatsapp_template_api()
-        self.assertEqual(res_get.get("status"), "success")
-        self.assertIn("chat.whatsapp.com", res_get.get("template", ""))
+        res_save = client.post("/api/whatsapp-template", json={"template": "Rejoignez le groupe WhatsApp du club : https://chat.whatsapp.com/xxx"})
+        self.assertEqual(res_save.json()["status"], "success")
+        self.assertIn("chat.whatsapp.com", client.get("/api/whatsapp-template").json()["template"])
+        self.assertEqual(client.post("/api/whatsapp-template", json={"template": "  "}).status_code, 400)
 
     def test_email_template_write_requires_admin_role(self):
         """Les modifications de templates d'emails exigent le rôle admin."""
@@ -1202,10 +1194,11 @@ class TestVueApp(unittest.TestCase):
     def test_migrated_pages_serve_the_entry_page(self):
         with open(os.path.join(self.dist, "index.html"), "w", encoding="utf-8") as f:
             f.write("<div id=\"app\"></div>")
-        r = TestClient(app).get("/bureau/parametres")
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.text, '<div id="app"></div>')
-        self.assertFalse(os.path.exists(os.path.join(BUREAU, "parametres.html")))
+        for page in ("communications", "parametres"):
+            r = TestClient(app).get(f"/bureau/{page}")
+            self.assertEqual(r.status_code, 200, page)
+            self.assertEqual(r.text, '<div id="app"></div>', page)
+            self.assertFalse(os.path.exists(os.path.join(BUREAU, f"{page}.html")), page)
 
     def test_pages_not_migrated_keep_their_file(self):
         self.assertEqual(get_bureau_page("adherents").path, os.path.join(BUREAU, "adherents.html"))

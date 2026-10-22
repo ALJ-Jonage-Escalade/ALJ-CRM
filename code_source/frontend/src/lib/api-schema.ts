@@ -1451,6 +1451,87 @@ export interface components {
             /** Type */
             type?: string | null;
         };
+        /** EmailTemplate */
+        EmailTemplate: {
+            /** Name */
+            name: string;
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /** Sender Email */
+            sender_email: string;
+            /** Sender Name */
+            sender_name: string;
+        };
+        /** EmailTemplateDeleted */
+        EmailTemplateDeleted: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Message */
+            message: string;
+        };
+        /** EmailTemplateSaved */
+        EmailTemplateSaved: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Message */
+            message: string;
+            template: components["schemas"]["EmailTemplate"];
+        };
+        /**
+         * EmailTemplateUpdate
+         * @description old_name: the template's current name, to rename it; empty for a new template.
+         *     An empty sender falls back to the club's default address and name.
+         */
+        EmailTemplateUpdate: {
+            /**
+             * Name
+             * @default
+             */
+            name?: string;
+            /**
+             * Old Name
+             * @default
+             */
+            old_name?: string;
+            /**
+             * Subject
+             * @default
+             */
+            subject?: string;
+            /**
+             * Body
+             * @default
+             */
+            body?: string;
+            /**
+             * Sender Email
+             * @default
+             */
+            sender_email?: string;
+            /**
+             * Sender Name
+             * @default
+             */
+            sender_name?: string;
+        };
+        /** EmailTemplates */
+        EmailTemplates: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Templates */
+            templates: components["schemas"]["EmailTemplate"][];
+        };
         /** GoogleChecks */
         GoogleChecks: {
             oauth_token: components["schemas"]["ServiceCheck"];
@@ -1670,6 +1751,36 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WhatsappTemplate */
+        WhatsappTemplate: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Template */
+            template: string;
+        };
+        /** WhatsappTemplateSaved */
+        WhatsappTemplateSaved: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Message */
+            message: string;
+            /** Template */
+            template: string;
+        };
+        /** WhatsappTemplateUpdate */
+        WhatsappTemplateUpdate: {
+            /**
+             * Template
+             * @default
+             */
+            template?: string;
         };
     };
     responses: never;
@@ -2699,7 +2810,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EmailTemplates"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -2713,9 +2833,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["EmailTemplateUpdate"];
             };
         };
         responses: {
@@ -2725,7 +2843,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EmailTemplateSaved"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -2735,6 +2871,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -2756,7 +2901,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EmailTemplateDeleted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -2766,6 +2929,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -2875,7 +3047,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["WhatsappTemplate"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -2889,9 +3070,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["WhatsappTemplateUpdate"];
             };
         };
         responses: {
@@ -2901,7 +3080,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["WhatsappTemplateSaved"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -2911,6 +3099,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

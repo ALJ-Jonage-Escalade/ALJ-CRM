@@ -63,36 +63,37 @@ def test_non_staff_sees_no_menu(page, role):
     expect(page.locator(NAV)).to_have_count(0)
 
 
-def test_coach_is_sent_back_from_an_admin_page(page):
+@pytest.mark.parametrize("name, label", [("parametres", "Paramètres"), ("communications", "Communications")])
+def test_coach_is_sent_back_from_an_admin_page(page, name, label):
     """Vue app: the router guards send a coach back to Accueil, which names the page."""
-    page.goto("/bureau/parametres")
+    page.goto(f"/bureau/{name}")
     login_as(page, "coach")
-    page.wait_for_url("**/bureau/?reserve=/bureau/parametres")
-    expect(page.locator("#refused-page")).to_have_text("⛔ La page Paramètres est réservée aux administrateurs.")
-    expect(page.locator(f"{NAV} a[data-page='parametres']")).to_have_count(0)
+    page.wait_for_url(f"**/bureau/?reserve=/bureau/{name}")
+    expect(page.locator("#refused-page")).to_have_text(f"⛔ La page {label} est réservée aux administrateurs.")
+    expect(page.locator(f"{NAV} a[data-page='{name}']")).to_have_count(0)
 
 
-def test_coach_is_refused_former_admin_page(page):
-    """Pages not migrated yet: same rule in the former shell (adminOnly), menu without the admin pages."""
-    page.goto("/bureau/communications")
+def test_former_pages_hide_the_admin_links_from_a_coach(page):
+    """Pages not migrated yet: the former shell's menu follows the same rule."""
+    page.goto("/bureau/planning")
     login_as(page, "coach")
-    expect(page.locator("#gate")).to_contain_text("Réservé aux administrateurs")
-    expect(page.locator("#content")).to_be_hidden()
+    expect(page.locator("#content")).to_be_visible()
     for admin_page in ADMIN_PAGES:
         expect(page.locator(f"nav a[data-page='{admin_page}']")).to_be_hidden()
-    page.locator("#gate a[href='/bureau/']").click()
-    page.wait_for_url("**/bureau/")
-    expect(page.locator("#content")).to_be_visible()
+    expect(page.locator("nav a[data-page='planning']")).to_be_visible()
 
 
 def test_admin_opens_admin_pages(page):
+    """Paramètres → Communications: routes of the Vue app, no page load."""
     page.goto("/bureau/parametres")
     login_as(page, "admin")
     expect(page.locator("#content")).to_be_visible()
     expect(page.locator("#gate")).to_be_hidden()
-    page.locator("nav a[data-page='communications']").filter(visible=True).click()  # former page: full load
+    page.evaluate("() => { window.__sameDocument = true; }")
+    page.locator(f"{NAV} a[data-page='communications']").filter(visible=True).click()
     page.wait_for_url("**/bureau/communications")
-    expect(page.locator("#content")).to_be_visible()
+    expect(page.get_by_test_id("template-select").locator("option").first).to_be_attached()
+    assert page.evaluate("() => window.__sameDocument") is True
 
 
 def test_in_app_navigation_keeps_the_page_loaded(page):

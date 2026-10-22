@@ -8,7 +8,10 @@ import type { Auth } from "./composables/auth";
 import { HOME, pageAccess, REFUSED_QUERY, verdict, type Access } from "./lib/access";
 import AccueilPage from "./pages/AccueilPage.vue";
 import NotFoundPage from "./pages/NotFoundPage.vue";
-import ParametresPage from "./pages/ParametresPage.vue";
+
+// Admin pages: loaded when opened, Accueil (the most opened page) does not wait for them
+const CommunicationsPage = () => import("./pages/CommunicationsPage.vue");
+const ParametresPage = () => import("./pages/ParametresPage.vue");
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -18,6 +21,7 @@ declare module "vue-router" {
 
 export const routes: RouteRecordRaw[] = [
   { path: HOME, name: "accueil", component: AccueilPage, meta: { access: pageAccess("accueil") } },
+  { path: "/bureau/communications", name: "communications", component: CommunicationsPage, meta: { access: pageAccess("communications") } },
   { path: "/bureau/parametres", name: "parametres", component: ParametresPage, meta: { access: pageAccess("parametres") } },
   { path: "/:unknown(.*)*", component: NotFoundPage, meta: { access: "public" } },
 ];

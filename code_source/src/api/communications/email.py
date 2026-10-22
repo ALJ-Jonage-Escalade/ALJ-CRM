@@ -7,82 +7,91 @@ from typing import Any, Dict
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
-from api.responses import internal_error
+from api.communications.schemas import EmailTemplate, EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate
+from api.responses import error, error_responses, internal_error
 from infrastructure.mail.dispatch import EmailDispatchService
 from infrastructure.security.secret_store import SecretStore
 
 router = APIRouter()
 
 
-@router.get("/api/email-templates")
-def get_email_templates():
+@router.get("/api/email-templates", response_model=EmailTemplates, responses=error_responses(500))
+def get_email_templates() -> EmailTemplates | JSONResponse:
     """Retourne la liste des modèles d'e-mails configurés."""
     try:
-        return {"status": "success", "templates": EmailDispatchService.list_templates()}
+        rows = EmailDispatchService.list_templates()
+        # Old rows may hold NULL columns
+        templates = [EmailTemplate(**{field: str(row.get(field) or "") for field in EmailTemplate.model_fields}) for row in rows]
+        return EmailTemplates(status="success", templates=templates)
     except Exception as e:
-        return {"status": "error", "message": internal_error(e, "get_email_templates")}
+        return error(500, internal_error(e, "get_email_templates"))
 
 
-@router.post("/api/email-templates")
-def save_email_template_api(data: Dict[str, Any] = Body(...)):
+def _same_name(a: str, b: str) -> bool:
+    return a.casefold() == b.casefold()
+
+
+@router.post("/api/email-templates", response_model=EmailTemplateSaved, responses=error_responses(400, 409, 500))
+def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved | JSONResponse:
     """Crée ou met à jour un modèle d'e-mail dans la BDD SQLite (synchronisé avec Firestore)."""
     try:
+        from infrastructure.sqlite.connection import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
         from infrastructure.sqlite.email_templates import EmailTemplateRepository
-        name = str(data.get("name") or "").strip()
-        old_name = str(data.get("old_name") or "").strip() or None
-        subject = str(data.get("subject") or "").strip()
-        body = str(data.get("body") or "").strip()
-        sender_email = str(data.get("sender_email") or "").strip()
-        sender_name = str(data.get("sender_name") or "").strip()
-
-        if not name:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Le nom du modèle est obligatoire."})
-        if not subject:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Le sujet du modèle est obligatoire."})
+        if not data.name:
+            return error(400, "Le nom du modèle est obligatoire.")
+        if not data.subject:
+            return error(400, "Le sujet du modèle est obligatoire.")
+        if data.sender_email and ("@" not in data.sender_email or "." not in data.sender_email):
+            return error(400, "L'adresse d'expédition doit être une adresse e-mail valide.")
+        # A new name must not take another template's (the save would overwrite it, or fail on a rename)
+        if not (data.old_name and _same_name(data.old_name, data.name)):
+            others = (t["name"] for t in EmailTemplateRepository.get_email_templates() if t["name"] != data.old_name)
+            if any(_same_name(other, data.name) for other in others):
+                return error(409, f"Un modèle nommé « {data.name} » existe déjà.", "duplicate_name")
 
         ok = EmailTemplateRepository.save_email_template(
-            name=name,
-            subject=subject,
-            body=body,
-            sender_email=sender_email,
-            sender_name=sender_name,
-            old_name=old_name
+            name=data.name,
+            subject=data.subject,
+            body=data.body,
+            sender_email=data.sender_email,
+            sender_name=data.sender_name,
+            old_name=data.old_name or None,
         )
         if not ok:
-            return JSONResponse(status_code=500, content={"status": "error", "message": f"Impossible d'enregistrer le modèle '{name}'."})
+            return error(500, f"Impossible d'enregistrer le modèle '{data.name}'.")
 
-        return {
-            "status": "success",
-            "message": f"Modèle d'e-mail '{name}' enregistré avec succès.",
-            "template": {
-                "name": name,
-                "subject": subject,
-                "body": body,
-                "sender_email": sender_email,
-                "sender_name": sender_name
-            }
-        }
+        return EmailTemplateSaved(
+            status="success",
+            message=f"Modèle d'e-mail '{data.name}' enregistré avec succès.",
+            template=EmailTemplate(
+                name=data.name,
+                subject=data.subject,
+                body=data.body,
+                sender_email=data.sender_email or DEFAULT_SENDER_EMAIL,
+                sender_name=data.sender_name or DEFAULT_SENDER_NAME,
+            ),
+        )
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "save_email_template_api")})
+        return error(500, internal_error(e, "save_email_template_api"))
 
 
-@router.delete("/api/email-templates/{template_name}")
-def delete_email_template_api(template_name: str):
+@router.delete("/api/email-templates/{template_name}", response_model=EmailTemplateDeleted, responses=error_responses(400, 404, 500))
+def delete_email_template_api(template_name: str) -> EmailTemplateDeleted | JSONResponse:
     """Supprime un modèle d'e-mail par son nom."""
     try:
         from infrastructure.sqlite.email_templates import EmailTemplateRepository
         import urllib.parse
         clean_name = urllib.parse.unquote(template_name).strip()
         if not clean_name:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Nom de modèle invalide."})
+            return error(400, "Nom de modèle invalide.")
 
         ok = EmailTemplateRepository.delete_email_template(clean_name)
         if not ok:
-            return JSONResponse(status_code=404, content={"status": "error", "message": f"Modèle '{clean_name}' introuvable ou déjà supprimé."})
+            return error(404, f"Modèle '{clean_name}' introuvable ou déjà supprimé.")
 
-        return {"status": "success", "message": f"Modèle '{clean_name}' supprimé avec succès."}
+        return EmailTemplateDeleted(status="success", message=f"Modèle '{clean_name}' supprimé avec succès.")
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "delete_email_template_api")})
+        return error(500, internal_error(e, "delete_email_template_api"))
 
 
 @router.post("/api/preview-email")

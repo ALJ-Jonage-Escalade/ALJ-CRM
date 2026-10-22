@@ -104,8 +104,3 @@ export function batchReport(b: Schemas["BatchReport"], now?: Date): string[] {
       c.status === "found" ? `🏆 ${c.nom} : ${c.athletes.length} athlète(s) classé(s) pour le club` : `⏳ ${c.nom} : pas encore de résultats publiés`),
   ];
 }
-
-/** Rough check before asking the server, which checks again. */
-export function looksLikeEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
