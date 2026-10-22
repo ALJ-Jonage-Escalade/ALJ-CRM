@@ -45,21 +45,19 @@ def _current_version():
 class TestBureauFiles(unittest.TestCase):
 
     def test_pages_exist(self):
-        for name in ("adherents.html",):
-            self.assertTrue(os.path.exists(os.path.join(BUREAU, name)), name)
-        for name in ("alj.css", "alj-core.js", "alj-shell.js", "alj-vue.js",
-                      "alj-members.js", "alj-filters.js", "alj-sync.js"):
+        self.assertTrue(os.path.exists(os.path.join(BUREAU, "competitions.html")))
+        for name in ("alj.css", "alj-core.js", "alj-shell.js", "alj-vue.js", "alj-sync.js"):
             self.assertTrue(os.path.exists(os.path.join(SHARED, name)), name)
 
     def test_routes_serve_only_known_pages(self):
-        self.assertEqual(get_bureau_page("adherents-fiche").status_code, 200)
+        self.assertEqual(get_bureau_page("competitions").status_code, 200)
         self.assertEqual(get_bureau_page("index.html").status_code, 404)
         self.assertEqual(get_bureau_page("..%2Fserver.py").status_code, 404)
         self.assertEqual(get_bureau_page("inconnue").status_code, 404)
 
     def test_pages_are_static_shells_without_member_data(self):
         """Les pages n'embarquent aucune donnée : elles chargent le socle et lisent l'API après connexion."""
-        for name in ("adherents.html",):
+        for name in ("competitions.html",):
             html = _read(os.path.join(BUREAU, name))
             self.assertIn('href="/static-web/alj.css"', html, name)
             self.assertIn('import { startBureau } from "/static-web/alj-shell.js"', html, name)
@@ -70,7 +68,7 @@ class TestBureauFiles(unittest.TestCase):
     def test_bureau_pages_share_web_version(self):
         version = _current_version()
         self.assertRegex(version, r"^\d+$")
-        for name in ("adherents.html", "competitions.html"):
+        for name in ("competitions.html",):
             html = _read(os.path.join(BUREAU, name))
             self.assertIn(f'<meta name="alj-web-version" content="{version}">', html, name)
             self.assertRegex(html, rf"<title>[^<]*\(v{version}\)</title>", name)
@@ -82,7 +80,6 @@ class TestBureauFiles(unittest.TestCase):
         for asset in ("/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres",
                       "/static-web/alj.css", "/static-web/alj-core.js",
                       "/static-web/alj-shell.js", "/static-web/alj-vue.js",
-                      "/static-web/alj-members.js", "/static-web/alj-filters.js",
                       "/static-web/alj-sync.js"):
             self.assertIn(f'"{asset}"', sw)
 
@@ -160,109 +157,6 @@ class TestBureauFiles(unittest.TestCase):
         self.assertIn('"Sexe"', html)
         self.assertIn('"Statut"', html)
 
-    def test_adherents_page_imports_exist_in_modules(self):
-        """Chaque symbole importé par adherents.html doit être exporté par alj-members.js et alj-filters.js."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        members_js = _read(os.path.join(SHARED, "alj-members.js"))
-        filters_js = _read(os.path.join(SHARED, "alj-filters.js"))
-
-        m_block = re.search(r"import\s*\{([^}]+)\}\s*from\s*\"/static-web/alj-members\.js\"", html, re.S).group(1)
-        for sym in [s.strip() for s in m_block.split(",") if s.strip()]:
-            self.assertRegex(members_js, rf"export (function|const|async function) {sym}\b", sym)
-
-        f_block = re.search(r"import\s*\{([^}]+)\}\s*from\s*\"/static-web/alj-filters\.js\"", html, re.S).group(1)
-        for sym in [s.strip() for s in f_block.split(",") if s.strip()]:
-            self.assertRegex(filters_js, rf"export (function|const|async function) {sym}\b", sym)
-
-    def test_adherents_formatters_names_city_phone(self):
-        """Vérifie l'harmonisation d'affichage pour les noms, prénoms, villes et téléphones."""
-        members_js = _read(os.path.join(SHARED, "alj-members.js"))
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-
-        # Vérification des exports et imports
-        for fn in ("fmtLastName", "fmtFirstName", "fmtCity", "fmtPhone"):
-            self.assertIn(f"export function {fn}", members_js)
-            self.assertIn(fn, html)
-
-        # Vérification du regex / logique de téléphone
-        self.assertIn("replace(/(\\d{2})(?=\\d)/g, \"$1 \")", members_js)
-
-    def test_adherents_page_elements(self):
-        """La page adherents.html contient le tableau, les filtres et le panneau de détail."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        filters_js = _read(os.path.join(SHARED, "alj-filters.js"))
-        for elem in ("members-table", "members-tbody", "detail-pane", "search-input",
-                      "season-select", "export-csv-btn", "status-chips", "filter-box"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn("Attestation envoyée", html)
-        self.assertIn("email_sent_date", html)
-        self.assertIn('data-sort="order_date"', html)
-        self.assertIn("Date d'inscription", html)
-        self.assertIn("order_date", filters_js)
-
-    def test_adherents_columns_diplome_and_city(self):
-        """Vérifie le masquage des colonnes Tarif/Catégorie et l'ajout des colonnes Diplôme et Ville."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        members_js = _read(os.path.join(SHARED, "alj-members.js"))
-        filters_js = _read(os.path.join(SHARED, "alj-filters.js"))
-
-        # 1. Vérification des colonnes du tableau
-        thead_match = re.search(r"<table[^>]*id=\"members-table\"[^>]*>.*?<thead>(.*?)</thead>", html, re.S)
-        self.assertIsNotNone(thead_match)
-        thead = thead_match.group(1)
-
-        # Les colonnes Tarif et Catégorie doivent être masquées (absentes du thead)
-        self.assertNotIn('data-sort="tarif_name"', thead)
-        self.assertNotIn('data-sort="categorie"', thead)
-
-        # Les nouvelles colonnes Diplôme et Ville doivent être présentes
-        self.assertIn('data-sort="diplome"', thead)
-        self.assertIn('data-sort="city"', thead)
-        self.assertIn("Diplôme", thead)
-        self.assertIn("Ville", thead)
-
-        # 2. Pictogrammes / badges attendus
-        self.assertIn("🔴", html)  # Badge rouge (rond rouge)
-        self.assertIn("🧗", html)  # Autonomie bloc (picto du grimpeur)
-        self.assertIn("🟠", html)  # Passeport Orange (rond orange)
-
-        # 3. Helpers et propagation des champs
-        self.assertIn("raw_passports", members_js)
-        self.assertIn("getMemberDiplomes", members_js)
-        self.assertIn("export function getMemberDiplomes", members_js)
-        self.assertIn("diplome", filters_js)
-        self.assertIn("ville", filters_js)
-
-    def test_member_pages_use_members_api(self):
-        """Members and seasons come from the API, never Firestore directly (plan phase 2)."""
-        adherents = _read(os.path.join(BUREAU, "adherents.html"))
-        members_js = _read(os.path.join(SHARED, "alj-members.js"))
-        for name, text in (("adherents", adherents), ("alj-members.js", members_js)):
-            for firestore_call in (".collection(", "onSnapshot", "crm_"):
-                self.assertNotIn(firestore_call, text, f"{name}: {firestore_call}")
-        self.assertIn('<script src="/static-web/alj-members-sync.js"></script>', adherents)
-        self.assertIn("ALJMembersSync.start(", adherents)
-
-    def test_adherents_email_modal_and_api_wiring(self):
-        """L'Étape 2 intègre la modale d'e-mail et le câblage aux endpoints d'e-mail."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        for elem in ("email-modal", "em-template-select", "em-subject", "em-body",
-                      "em-signature", "em-preview-box", "em-submit-btn", "em-cancel-btn"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/api/email-templates")', html)
-        self.assertIn('apiFetch("/api/send-email"', html)
-
-    def test_adherents_attestation_modal_and_api_wiring(self):
-        """L'Étape 3 intègre la modale d'attestation, le choix du template d'e-mail et le câblage aux endpoints PDF."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        for elem in ("attestation-modal", "att-download-btn", "att-send-btn", "att-pdf-frame",
-                      "att-preview-loading", "att-ineligible-warn", "att-template-select",
-                      "att-to-email", "att-email-subject", "att-email-body", "att-email-signature"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/api/attestations/preview"', html)
-        self.assertIn('apiFetch("/api/attestations/send"', html)
-        self.assertIn("Attestation échéance", html)
-
     def test_build_attestation_pure_function_rules(self):
         """build_attestation respecte les règles de montant, d'annulation, de signature et de payeur."""
         from domain.attestation.document import build_attestation, get_safe_pdf_filename, render_attestation_pdf
@@ -310,6 +204,7 @@ class TestBureauFiles(unittest.TestCase):
         import shutil
         from infrastructure.sqlite.connection import SqliteDatabase
         from api.communications.attestations import send_attestation_api
+        from api.communications.schemas import AttestationSend
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_attestation.db")
@@ -335,25 +230,14 @@ class TestBureauFiles(unittest.TestCase):
             conn.commit()
             conn.close()
 
-            payload = {
-                "member": {
-                    "user_id": 10,
-                    "purchase_id": 30,
-                    "first_name": "Jean",
-                    "last_name": "DUPONT",
-                    "email_primary": "jean.dupont@example.com",
-                    "order_ref": "CMD-TEST-ATT",
-                    "amount": 180.0,
-                    "status": "Payé"
-                },
-                "season": "2026-2027"
-            }
+            # The member, its amount and payer are read from the database: only the purchase is sent
+            payload = AttestationSend(purchase_id=30, season="2026-2027", to_email="jean.dupont@example.com")
 
             with patch("infrastructure.mail.repository.EmailRepository.send_email", return_value=True) as mock_send:
                 res = send_attestation_api(payload)
 
-            self.assertEqual(res.get("status"), "success")
-            self.assertTrue(res.get("email_sent_date"))
+            self.assertEqual(res.status, "success")
+            self.assertTrue(res.email_sent_date)
 
             # Vérifier les paramètres de l'envoi d'e-mail (conforme desktop)
             mock_send.assert_called_once()
@@ -369,36 +253,10 @@ class TestBureauFiles(unittest.TestCase):
             row = conn.execute("SELECT email_sent_date FROM purchases WHERE id = 30").fetchone()
             conn.close()
             self.assertIsNotNone(row["email_sent_date"])
-            self.assertEqual(row["email_sent_date"], res["email_sent_date"])
+            self.assertEqual(row["email_sent_date"], res.email_sent_date)
         finally:
             SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)
-
-    def test_member_edit_ui_elements(self):
-        """La page adherents.html contient le bouton Modifier et la modale d'édition complète."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        for elem in ("btn-action-edit", "member-edit-modal", "edit-modal-close", "edit-cancel-btn",
-                      "edit-save-btn", "edit-licence", "edit-badge-rouge", "edit-autonomie-bloc",
-                      "edit-tarifs-container", "edit-email-primary", "edit-email-secondary", "edit-phone",
-                      "edit-address", "edit-zip", "edit-city",
-                      "edit-commentaire", "btn-insert-comment-date"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/api/members/update"', html)
-
-    def test_member_add_ui_elements(self):
-        """La page adherents.html contient le bouton d'ajout et la modale complète d'ajout manuel."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        for elem in (
-            "btn-add-member", "member-add-modal", "add-modal-close", "add-cancel-btn",
-            "add-save-btn", "add-last-name", "add-first-name", "add-birth-date",
-            "add-gender", "add-tarifs-container", "add-status", "add-amount",
-            "add-licence", "add-badge-rouge", "add-autonomie-bloc",
-            "add-email-primary", "add-email-secondary", "add-phone",
-            "add-address", "add-zip", "add-city", "add-emergency-name",
-            "add-emergency-phone", "add-commentaire", "btn-insert-add-comment-date"
-        ):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/api/members/create"', html)
 
     def test_member_add_requires_admin_role(self):
         """Les endpoints de création manuelle d'adhérents exigent le rôle admin."""
@@ -412,6 +270,7 @@ class TestBureauFiles(unittest.TestCase):
         import shutil
         from infrastructure.sqlite.connection import SqliteDatabase
         from api.members.members import add_member_api
+        from api.members.schemas import MemberCreate
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_member_add.db")
@@ -450,9 +309,9 @@ class TestBureauFiles(unittest.TestCase):
                 }
             }
 
-            res = add_member_api(payload)
-            self.assertEqual(res.get("status"), "success")
-            self.assertTrue(res.get("order_ref", "").startswith("MANUEL-"))
+            res = add_member_api(MemberCreate.model_validate(payload))
+            self.assertEqual(res.status, "success")
+            self.assertTrue(res.order_ref.startswith("MANUEL-"))
 
             # Vérification dans SQLite
             conn = SqliteDatabase.get_connection()
@@ -482,7 +341,7 @@ class TestBureauFiles(unittest.TestCase):
 
             o = conn.execute("SELECT * FROM orders WHERE id = ?", (p["order_id"],)).fetchone()
             self.assertIsNotNone(o)
-            self.assertEqual(o["order_ref"], res["order_ref"])
+            self.assertEqual(o["order_ref"], res.order_ref)
             self.assertEqual(o["payer_email"], "claire.valentin@example.com")
             conn.close()
         finally:
@@ -492,17 +351,18 @@ class TestBureauFiles(unittest.TestCase):
     def test_member_add_validation(self):
         """add_member_api rejette les requêtes avec champs obligatoires manquants."""
         from api.members.members import add_member_api
+        from api.members.schemas import MemberCreate
 
         # Nom manquant
-        res = add_member_api({"fields": {"first_name": "Jean", "birth_date": "2000-01-01", "tarif_name": "Licence"}})
+        res = add_member_api(MemberCreate.model_validate({"fields": {"first_name": "Jean", "birth_date": "2000-01-01", "tarif_name": "Licence"}}))
         self.assertEqual(res.status_code, 400)
 
         # Date de naissance manquante
-        res = add_member_api({"fields": {"last_name": "DUPONT", "first_name": "Jean", "tarif_name": "Licence"}})
+        res = add_member_api(MemberCreate.model_validate({"fields": {"last_name": "DUPONT", "first_name": "Jean", "tarif_name": "Licence"}}))
         self.assertEqual(res.status_code, 400)
 
         # Tarif manquant
-        res = add_member_api({"fields": {"last_name": "DUPONT", "first_name": "Jean", "birth_date": "2000-01-01"}})
+        res = add_member_api(MemberCreate.model_validate({"fields": {"last_name": "DUPONT", "first_name": "Jean", "birth_date": "2000-01-01"}}))
         self.assertEqual(res.status_code, 400)
 
     def test_member_update_requires_admin_role(self):
@@ -516,6 +376,7 @@ class TestBureauFiles(unittest.TestCase):
         import shutil
         from infrastructure.sqlite.connection import SqliteDatabase
         from api.members.members import update_member_api
+        from api.members.schemas import MemberUpdate
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_member_edit.db")
@@ -561,8 +422,8 @@ class TestBureauFiles(unittest.TestCase):
                 }
             }
 
-            res = update_member_api(payload)
-            self.assertEqual(res.get("status"), "success")
+            res = update_member_api(MemberUpdate.model_validate(payload))
+            self.assertEqual(res.status, "success")
 
             # Vérification dans la table users
             conn = SqliteDatabase.get_connection()
@@ -885,9 +746,7 @@ class TestBureauFiles(unittest.TestCase):
     def test_bureau_imports_exist_in_core(self):
         """Every name imported from alj-core.js by the bureau pages and shared modules is exported."""
         core = _read(os.path.join(SHARED, "alj-core.js"))
-        for path in (os.path.join(BUREAU, "competitions.html"),
-                     os.path.join(BUREAU, "adherents.html"),
-                     os.path.join(SHARED, "alj-filters.js")):
+        for path in (os.path.join(BUREAU, "competitions.html"),):
             block = re.search(r"import\s*\{([^}]+)\}\s*from\s*\"/static-web/alj-core\.js\"", _read(path)).group(1)
             names = [n.strip() for n in block.split(",") if n.strip()]
             self.assertTrue(names, path)
@@ -918,7 +777,7 @@ class TestBureauAccess(unittest.TestCase):
         self.env.stop()
 
     def test_portal_public_api_protected(self):
-        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/adherents-fiche", "/bureau/communications", "/bureau/competitions",
+        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions",
                      "/bureau/planning", "/bureau/outils", "/bureau/parametres",
                      "/static-web/alj.css", "/static-web/alj-shell.js"):
             self.assertEqual(self.client.get(path).status_code, 200, path)
@@ -977,12 +836,16 @@ class TestVueApp(unittest.TestCase):
             r = TestClient(app).get(f"/bureau/{page}")
             self.assertEqual(r.status_code, 200, page)
             self.assertEqual(r.text, '<div id="app"></div>', page)
-        for page in ("communications", "outils", "parametres", "planning"):
             self.assertFalse(os.path.exists(os.path.join(BUREAU, f"{page}.html")), page)
 
     def test_pages_not_migrated_keep_their_file(self):
-        # The member record of the former members page, until it moves to the Vue app (plan phase 8)
-        self.assertEqual(get_bureau_page("adherents-fiche").path, os.path.join(BUREAU, "adherents.html"))
+        self.assertEqual(get_bureau_page("competitions").path, os.path.join(BUREAU, "competitions.html"))
+
+    def test_former_record_url_goes_to_the_list(self):
+        """/bureau/adherents-fiche (member record of the former page, 2.14) opens the record in the Vue app."""
+        r = TestClient(app).get("/bureau/adherents-fiche?id=12&saison=2026-2027", follow_redirects=False)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.headers["location"], "/bureau/adherents?id=12&saison=2026-2027")
 
 
 class TestSingleFirebaseInit(unittest.TestCase):

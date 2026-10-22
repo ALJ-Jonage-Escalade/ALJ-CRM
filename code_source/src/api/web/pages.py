@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -24,9 +24,6 @@ _annuaire_page_path = os.path.join(WEB_DIR, "index.html")
 # (lecture Firestore avec le compte Google, appels API avec jeton).
 _bureau_dir = os.path.join(WEB_DIR, "bureau")
 _BUREAU_PAGES = {
-    # Former members page, kept for the member record (edit, add, e-mail, attestation) until it is migrated
-    # too: the list of the Vue app links to it (?id=<user_id>&saison=…, ?ajout=1)
-    "adherents-fiche": "adherents.html",
     "competitions": "competitions.html",
 }
 # Pages migrated to the Vue application (frontend/src/router.ts): its entry page answers them
@@ -87,6 +84,12 @@ def _bureau_file(page: str):
 def get_bureau_home():
     """Accueil du portail bureau : application Vue."""
     return spa_entry()
+
+@router.get("/bureau/adherents-fiche", include_in_schema=False)
+def get_former_member_record(request: Request) -> RedirectResponse:
+    """Member record of the former members page (2.14): now in the Vue app, same query (?id=…&saison=…, ?ajout=1)."""
+    query = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(url=f"/bureau/adherents{query}", status_code=302)
 
 @router.get("/bureau/{page}", response_class=HTMLResponse, include_in_schema=False)
 def get_bureau_page(page: str):

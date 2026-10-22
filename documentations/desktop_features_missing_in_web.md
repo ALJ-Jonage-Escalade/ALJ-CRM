@@ -32,7 +32,7 @@
 
 | Desktop feature | Web equivalent |
 |---|---|
-| Members list, details, add, edit, change group | `bureau/adherents.html` |
+| Members list, details, add, edit, change group | Vue app, Adhérents (`frontend/src/pages/AdherentsPage.vue`) |
 | FFME import with manual matching of licensees not found | `bureau/outils.html` → `/api/ffme/preview`, `/api/ffme/import` (`manual_matches`) |
 | FFME CSV export + pre-export summary | `/api/ffme/export`, `/api/ffme/stats` |
 | Slots: instructors, HelloAsso tariffs, birth-year limits, weekly view, planning export | `bureau/planning.html` |

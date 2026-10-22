@@ -1,5 +1,5 @@
-/* Member list of Adhérents: slot / tariff filters, search, status, sorting and CSV export (port of
-   web/shared/alj-filters.js and alj-members.js, which the member record page still uses until plan phase 8).
+/* Member list of Adhérents: slot / tariff filters, search, status, sorting and CSV export (port of the former
+   web/shared/alj-filters.js and alj-members.js).
    The members come formatted by the server (GET /api/members, domain/members/view.py). */
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
@@ -246,12 +246,20 @@ export function telHref(phone: string): string {
   return `tel:${phone.replace(/[^\d+]/g, "")}`;
 }
 
-/** The member record (former page, until plan phase 8), on the member's season. */
-export function recordHref(m: Member): string {
-  return `/bureau/adherents-fiche?${new URLSearchParams({ id: String(m.user_id), saison: m.season_name })}`;
+/** Query of Adhérents opening the member's record on its season: ?id=<user_id>&saison=…&achat=<purchase_id>
+    (id and saison are the links of the former page, which still open the member; achat picks the membership when a
+    member has several in a season). ?ajout=1 opens the add form. */
+export type RecordQuery = { id: string; saison: string; achat?: string } | { ajout: "1" };
+
+export function recordQuery(m: Member): RecordQuery {
+  return { id: String(m.user_id), saison: m.season_name, achat: String(m.purchase_id) };
 }
 
-export const ADD_MEMBER_HREF = "/bureau/adherents-fiche?ajout=1";
+/** The member a record query names, among the members of its season (undefined: not, or not yet, loaded). */
+export function recordMember(members: readonly Member[], id: string, achat?: string): Member | undefined {
+  const mine = members.filter((m) => String(m.user_id) === id);
+  return mine.find((m) => String(m.purchase_id) === achat) ?? mine[0];
+}
 
 export function countSummary(shown: number, total: number, season: string): string {
   const s = shown > 1 ? "s" : "";
@@ -286,7 +294,7 @@ export function csvName(season: string): string {
 
 // ---------------------------------------------------------------- Saved filters
 
-/** Same key as the member record page (web/shared/alj-filters.js), which reads the same shape. */
+/** Same key and shape as the former page (web/shared/alj-filters.js): the filters of earlier visits are kept. */
 export const FILTER_KEY = "alj_bureau_adherents_filters";
 
 /** The filters of the last visit on this browser. The search is not kept: it often holds a member's name. */

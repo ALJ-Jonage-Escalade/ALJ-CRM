@@ -164,16 +164,25 @@ def test_phone_shows_stacked_cards(mobile_page, people):
 
 def test_record_opens_from_the_list(page, people):
     member = people[0]
-    pane = open_record(page, member)
-    expect(pane).to_contain_text(member["email"])
-    page.get_by_test_id("back-to-list").click()
-    expect(page.get_by_test_id(ROWS).first).to_be_visible(timeout=20_000)
+    dialog = open_record(page, member)
+    expect(dialog.get_by_test_id("record-fields")).to_contain_text(member["email"])
+    assert re.search(r"/bureau/adherents\?id=\d+&saison=[\d-]+&achat=\d+$", page.url), page.url
+    # The record is in the URL: a reload (or a shared link) opens it again
+    page.reload()
+    expect(page.get_by_test_id("record-name")).to_have_text(f"{member['prenom']} {member['nom'].upper()}", timeout=20_000)
+    page.keyboard.press("Escape")
+    expect(page.get_by_test_id("record-dialog")).to_be_hidden()
+    assert "id=" not in page.url
 
 
-def test_add_member_link(page):
-    open_members(page)
-    page.get_by_test_id("member-add").click()
-    expect(page.locator("#member-add-modal")).to_be_visible(timeout=20_000)
+def test_former_record_link_opens_the_record(page, people):
+    """/bureau/adherents-fiche?id=… (record page of version 2.14) opens the same record."""
+    member = people[0]
+    open_record(page, member)
+    query = page.url.split("?", 1)[1]
+    page.goto(f"/bureau/adherents-fiche?{query}")
+    page.wait_for_url(re.compile(r"/bureau/adherents\?id="))
+    expect(page.get_by_test_id("record-name")).to_have_text(f"{member['prenom']} {member['nom'].upper()}", timeout=20_000)
 
 
 def test_coach_has_no_admin_action(page):
@@ -182,44 +191,90 @@ def test_coach_has_no_admin_action(page):
     expect(page.locator("a[href='/bureau/outils?tab=ffme-import']")).to_have_count(0)
 
 
+def test_coach_record_emails_but_does_not_edit(page, mailpit, people):
+    member = people[4]
+    accept_dialogs(page)
+    dialog = open_record(page, member, role="coach")
+    expect(dialog.get_by_test_id("record-readonly")).to_contain_text("réservées aux administrateurs")
+    for action in ("record-attestation", "record-edit"):
+        expect(dialog.get_by_test_id(action)).to_have_count(0)
+
+    dialog.get_by_test_id("record-email").click()
+    topic = unique_name("Coach note")
+    dialog.get_by_test_id("email-subject").fill(topic)
+    dialog.get_by_test_id("email-body").fill("Hello {first_name}.")
+    dialog.get_by_test_id("email-send").click()
+    expect(page.get_by_test_id("toast")).to_contain_text("E-mail envoyé avec succès")
+    [sent] = mailpit.wait_for(f'to:{member["email"]} subject:"{topic}"')
+    assert f"Hello {member['prenom']}." in sent["Text"]
+
+
 def test_edit_member(page, people):
     member = people[1]
     digits = "06" + str(uuid.uuid4().int)[:8]
-    phone = " ".join(digits[i:i + 2] for i in range(0, 10, 2))   # as fmtPhone (alj-members.js) shows it
+    phone = " ".join(digits[i:i + 2] for i in range(0, 10, 2))   # as the server formats it (domain/members/view.py)
     accept_dialogs(page)
-    open_record(page, member).locator("#btn-action-edit").click()
-    expect(page.locator("#member-edit-modal")).to_be_visible()
-    page.locator("#edit-phone").fill(digits)
-    page.locator("#edit-badge-rouge").select_option("Oui")
-    page.locator("#edit-save-btn").click()
-    expect(page.locator("#toast")).to_contain_text("mise à jour avec succès")
-    expect(page.locator("#detail-pane")).to_contain_text(phone)
+    dialog = open_record(page, member)
+    dialog.get_by_test_id("record-edit").click()
+    dialog.get_by_test_id("member-phone").fill("12")
+    dialog.get_by_test_id("member-save").click()
+    expect(dialog.get_by_test_id("member-form")).to_contain_text("Numéro de téléphone invalide.")
+    dialog.get_by_test_id("member-phone").fill(digits)
+    dialog.get_by_test_id("member-badge_rouge").select_option("Oui")
+    dialog.get_by_test_id("member-save").click()
+    expect(page.get_by_test_id("toast")).to_contain_text("mise à jour avec succès")
+    expect(dialog.get_by_test_id("record-fields")).to_contain_text(phone)
 
-    # Saved on the server and replicated to Firestore: still there after a reload (the record opens on ?id=)
+    # Saved on the server and replicated to Firestore: still there after a reload (the record is in the URL)
     page.reload()
-    pane = page.locator("#detail-pane")
-    expect(pane).to_contain_text(phone, timeout=20_000)
-    expect(pane.locator("tr").filter(has_text="Badge rouge")).to_contain_text("Oui")
+    fields = page.get_by_test_id("record-fields")
+    expect(fields).to_contain_text(phone, timeout=20_000)
+    expect(fields.get_by_test_id("record-field").filter(has_text="Badge rouge")).to_contain_text("Oui")
 
 
 def test_edit_without_change(page, people):
-    open_record(page, people[0]).locator("#btn-action-edit").click()
-    page.locator("#edit-save-btn").click()
-    expect(page.locator("#toast")).to_contain_text("Aucune modification")
-    expect(page.locator("#member-edit-modal")).to_be_hidden()
+    dialog = open_record(page, people[0])
+    dialog.get_by_test_id("record-edit").click()
+    dialog.get_by_test_id("member-save").click()
+    expect(page.get_by_test_id("toast")).to_contain_text("Aucune modification")
+    expect(dialog.get_by_test_id("member-form")).to_be_hidden()
+    expect(dialog.get_by_test_id("record-name")).to_be_visible()
+
+
+def test_add_member(page, test_data):
+    # Sorted mid-list: the tests take the first seeded members (people) and Outils the last one
+    last_name = unique_name("MEDIANE").upper().replace(" ", "-")
+    accept_dialogs(page)
+    open_members(page)
+    page.get_by_test_id("member-add").click()
+    dialog = page.get_by_test_id("add-dialog")
+    dialog.get_by_test_id("member-save").click()
+    expect(dialog.get_by_test_id("member-last_name")).to_have_attribute("aria-invalid", "true")
+    dialog.get_by_test_id("member-last_name").fill(last_name)
+    dialog.get_by_test_id("member-first_name").fill("Nina")
+    dialog.get_by_test_id("member-birth_date").fill("2012-04-05")
+    dialog.get_by_test_id("member-email_primary").fill("nina.e2e@example.org")
+    dialog.get_by_test_id("member-save").click()
+    expect(page.get_by_test_id("toast")).to_contain_text("ajouté avec succès")
+    # The new record opens, read from the list reloaded from the server
+    expect(page.get_by_test_id("record-name")).to_have_text(f"Nina {last_name}", timeout=20_000)
+
+    page.reload()   # replicated: still there for a new page
+    expect(page.get_by_test_id("record-name")).to_have_text(f"Nina {last_name}", timeout=20_000)
 
 
 def test_send_email(page, mailpit, people):
     member = people[2]
     accept_dialogs(page)
-    open_record(page, member).locator("#btn-action-email").click()
-    expect(page.locator("#em-dest-email")).to_contain_text(member["email"])
+    dialog = open_record(page, member)
+    dialog.get_by_test_id("record-email").click()
+    expect(dialog.get_by_test_id("email-to")).to_contain_text(member["email"])
     topic = unique_name("Practice moved")
-    page.locator("#em-subject").fill(topic + ", {first_name}")
-    page.locator("#em-body").fill("Hello {first_name}, practice moves to Thursday.")
-    expect(page.locator("#em-preview-box")).to_contain_text(f"{topic}, {member['prenom']}")
-    page.locator("#em-submit-btn").click()
-    expect(page.locator("#toast")).to_contain_text("E-mail envoyé avec succès")
+    dialog.get_by_test_id("email-subject").fill(topic + ", {first_name}")
+    dialog.get_by_test_id("email-body").fill("Hello {first_name}, practice moves to Thursday.")
+    expect(dialog.get_by_test_id("email-preview")).to_contain_text(f"{topic}, {member['prenom']}")
+    dialog.get_by_test_id("email-send").click()
+    expect(page.get_by_test_id("toast")).to_contain_text("E-mail envoyé avec succès")
 
     [sent] = mailpit.wait_for(f'to:{member["email"]} subject:"{topic}"')
     assert sent["Subject"] == f"{topic}, {member['prenom']}"
@@ -228,42 +283,37 @@ def test_send_email(page, mailpit, people):
 
 def test_email_needs_subject_and_body(page, people):
     accept_dialogs(page)
-    open_record(page, people[0]).locator("#btn-action-email").click()
-    page.locator("#em-submit-btn").click()
-    expect(page.locator("#toast")).to_contain_text("renseigner le sujet et le message")
-    expect(page.locator("#email-modal")).to_be_visible()
+    dialog = open_record(page, people[0])
+    dialog.get_by_test_id("record-email").click()
+    dialog.get_by_test_id("email-send").click()
+    expect(dialog.get_by_test_id("email-problem")).to_contain_text("renseigner le sujet et le message")
+    expect(dialog.get_by_test_id("email-form")).to_be_visible()
 
 
 def test_payment_certificate(page, mailpit, people, tmp_path):
     member = people[3]
     accept_dialogs(page)
-    open_record(page, member).locator("#btn-action-attestation").click()
-    expect(page.locator("#attestation-modal")).to_be_visible()
+    dialog = open_record(page, member)
+    dialog.get_by_test_id("record-attestation").click()
     # The PDF is generated by the server (WeasyPrint), then shown in the preview frame
-    expect(page.locator("#att-download-btn")).to_be_enabled(timeout=30_000)
-    expect(page.locator("#att-pdf-frame")).to_be_visible()
-    recipient = page.locator("#att-to-email").input_value()
+    expect(dialog.get_by_test_id("attestation-download")).to_be_enabled(timeout=30_000)
+    expect(dialog.get_by_test_id("attestation-pdf")).to_be_visible()
+    recipient = dialog.get_by_test_id("attestation-to").input_value()
     assert "@" in recipient
 
     with page.expect_download() as info:
-        page.locator("#att-download-btn").click()
+        dialog.get_by_test_id("attestation-download").click()
     pdf = tmp_path / info.value.suggested_filename
     info.value.save_as(pdf)
     assert re.match(r"Attestation_.+\.pdf$", pdf.name)
     assert pdf.read_bytes().startswith(b"%PDF") and pdf.stat().st_size > 1_000
 
-    page.locator("#att-send-btn").click()
+    dialog.get_by_test_id("attestation-send").click()
     # Sending renders the PDF again (5 s on a loaded CI runner)
-    expect(page.locator("#toast")).to_contain_text("Attestation envoyée avec succès", timeout=30_000)
+    expect(page.get_by_test_id("toast")).to_contain_text("Attestation envoyée avec succès", timeout=30_000)
     [sent] = mailpit.wait_for(f"to:{recipient} has:attachment")   # the only e-mails with one
     attachments = sent["Attachments"]
     assert [a["ContentType"] for a in attachments] == ["application/pdf"]
     assert attachments[0]["FileName"].endswith(".pdf")
-    expect(page.locator("#detail-pane")).to_contain_text("Attestation envoyée")
-
-
-def test_coach_record_is_consultation_only(page, people):
-    pane = open_record(page, people[0], role="coach")
-    expect(pane).to_contain_text("Mode consultation coach")
-    for action in ("#btn-action-email", "#btn-action-attestation", "#btn-action-edit"):
-        expect(pane.locator(action)).to_have_count(0)
+    # The sent date is recorded and shown once the list is reloaded
+    expect(dialog.get_by_test_id("record-fields")).to_contain_text("Attestation envoyée", timeout=20_000)

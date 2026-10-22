@@ -7,7 +7,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
-from api.communications.schemas import EmailTemplate, EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate
+from api.communications.schemas import EmailDispatch, EmailTemplate, EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate
 from api.responses import error, error_responses, internal_error
 from infrastructure.mail.dispatch import EmailDispatchService
 from infrastructure.security.secret_store import SecretStore
@@ -133,8 +133,8 @@ def get_email_status():
     }
 
 
-@router.post("/api/send-email")
-def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
+@router.post("/api/send-email", response_model=EmailDispatch, responses=error_responses(403))
+def send_email_api(request: Request, data: Dict[str, Any] = Body(...)) -> EmailDispatch | JSONResponse:  # Any: bodies of several pages
     """Déclenche l'envoi d'e-mails sécurisé via Gmail API ou SMTP avec injection de variables."""
     from infrastructure.security.api_auth import Role, has_role
     claims = getattr(request.state, "user", None)  # None: token check off (local desktop server)
@@ -142,7 +142,7 @@ def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
         data.get("recipients"), data.get("sender_email"),
         is_admin=claims is None or has_role(claims, Role.ADMIN))
     if reason:
-        return JSONResponse(status_code=403, content={"status": "error", "message": reason})
+        return error(403, reason)
     try:
         result = EmailDispatchService.dispatch_emails(
             template_name=data.get("template_name"),
@@ -155,6 +155,6 @@ def send_email_api(request: Request, data: Dict[str, Any] = Body(...)):
             sender_name=data.get("sender_name"),
             add_signature=data.get("add_signature", True)
         )
-        return result
+        return EmailDispatch.model_validate(result)
     except Exception as e:
-        return {"status": "error", "message": internal_error(e, "send_email_api")}
+        return EmailDispatch(status="error", message=internal_error(e, "send_email_api"))

@@ -1,5 +1,5 @@
-"""Office portal members: the list (Vue app, /bureau/adherents) and the member record, still the former page
-(web/bureau/adherents.html on /bureau/adherents-fiche) until plan phase 8: navigation and locators."""
+"""Office portal members (Vue app, /bureau/adherents): the list and the member record (a dialog of the page, in the
+URL as ?id=…&saison=…&achat=…): navigation and locators."""
 import re
 
 from playwright.sync_api import Locator, Page, expect
@@ -28,10 +28,9 @@ def find(page: Page, member: dict) -> Locator:
 
 
 def open_record(page: Page, member: dict, role: str = "admin") -> Locator:
-    """Opens the member's record from the list (former page) and returns its detail pane."""
+    """Opens the member's record from the list (dialog of the page) and returns it."""
     open_members(page, role)
     find(page, member).get_by_test_id("member-record").click()
-    page.wait_for_url(re.compile(r"/bureau/adherents-fiche\?id="))
-    pane = page.locator("#detail-pane")
-    expect(pane.locator(".detail-name")).to_have_text(f"{member['prenom']} {member['nom'].upper()}", timeout=20_000)
-    return pane
+    dialog = page.get_by_test_id("record-dialog")
+    expect(dialog.get_by_test_id("record-name")).to_have_text(f"{member['prenom']} {member['nom'].upper()}")
+    return dialog

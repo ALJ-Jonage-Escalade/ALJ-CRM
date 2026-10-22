@@ -232,11 +232,24 @@ is cached on the device.
 
 ### Acceptance criteria
 
-- [ ] Edit and add persist and replicate as today; validation errors are shown on the form
-- [ ] E-mail and attestation sends work and record the sent date
-- [ ] Non-admin roles see the record read-only (or not at all, per role) and cannot call writes
-- [ ] Component tests for the member form validation
-- [ ] e2e member edit / add / e-mail / attestation flows pass; remaining Adhérents HTML string checks removed
+- [x] Edit and add persist and replicate as today; validation errors are shown on the form
+- [x] E-mail and attestation sends work and record the sent date
+- [x] Non-admin roles see the record read-only (coaches can still e-mail the member) and cannot call writes
+- [x] Component tests for the member form validation
+- [x] e2e member edit / add / e-mail / attestation flows pass; remaining Adhérents HTML string checks removed
+
+> Done 2026-10-22. The record is a dialog of Adhérents, in the URL (`?id=<user_id>&saison=…&achat=<purchase_id>`,
+> `?ajout=1`): the former page's links still open it, and `/bureau/adherents-fiche` (2.14) redirects there. It is read
+> from the polled list, so it follows the server after each write; one dialog shows the record, the edit form, the
+> e-mail or the certificate in turn. `web/bureau/adherents.html`, `alj-members.js` and `alj-filters.js` are removed.
+> The routes are typed: `/api/members/update` writes only the fields sent and refuses invalid e-mails, badges and
+> statuses (422); `/api/members/create` refuses a non-ISO birth date. The certificate routes now take the
+> membership (`purchase_id`, season) and read the amount, payer and status from the database instead of trusting a
+> member object sent by the page; an accented name no longer breaks the PDF's `Content-Disposition` header.
+> `/api/send-email` keeps its body (the competitions pages call it too) and gets a response model. Coaches send e-mails
+> too, from the record as from a competition (the server limits them to known members); editing, adding and the
+> certificate stay admin only. The
+> server's refusal of a coach's write is covered by the `required_role` tests: the e2e stack runs without auth.
 
 ---
 

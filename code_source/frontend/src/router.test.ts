@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import type { Auth, AuthState } from "./composables/auth";
 import type { Access } from "./lib/access";
 import type { Role } from "./lib/roles";
-import { createAppRouter, formerRecordUrl, installGuards, routes } from "./router";
+import { createAppRouter, installGuards, routes } from "./router";
 
 const USER = { uid: "u1", email: "u@example.org" };
 const signedIn = (role: Role): AuthState => ({ status: "signedIn", user: USER, role });
@@ -100,24 +100,11 @@ describe("app routes", () => {
     expect(router.currentRoute.value.fullPath).toBe(path);
   });
 
-  it.each([
-    ["/bureau/adherents?id=12&saison=2026-2027", "/bureau/adherents-fiche?id=12&saison=2026-2027"],
-    ["/bureau/adherents?ajout=1", "/bureau/adherents-fiche?ajout=1"],
-  ])("send the former record link %s to the record page", async (path, record) => {
-    const replace = vi.fn();
-    vi.stubGlobal("location", { replace });
-    try {
-      const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
-      await router.push(path);
-      expect(replace).toHaveBeenCalledWith(record);
-      expect(router.currentRoute.value.name).not.toBe("adherents");
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it("keep the list on /bureau/adherents without a record query", () => {
-    expect(formerRecordUrl({ path: "/bureau/adherents", fullPath: "/bureau/adherents?saison=x", query: { saison: "x" } })).toBeNull();
+  it("open the member record links of the former page in Adhérents itself", async () => {
+    const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
+    await router.push("/bureau/adherents?id=12&saison=2026-2027");
+    expect(router.currentRoute.value.name).toBe("adherents");
+    expect(router.currentRoute.value.query).toEqual({ id: "12", saison: "2026-2027" });
   });
 
   it("show unknown paths to anyone", async () => {

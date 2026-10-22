@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   allowedTarifs, checkAll, creneauItems, csvName, csvRows, dateValue, diplomes, diplomeWeight, emptyFilters, filterMembers,
-  fmtDay, loadFilters, matchesSearch, recordHref, saveFilters, shortenGroupLabel, statusChips, tarifCounts,
+  fmtDay, loadFilters, matchesSearch, recordMember, recordQuery, saveFilters, shortenGroupLabel, statusChips, tarifCounts,
   type Creneau,
 } from "./members";
 import { member } from "./members.fixture";
@@ -88,8 +88,12 @@ describe("display", () => {
     expect(dateValue("")).toBe(0);
   });
 
-  it("links the member record of the member's season", () => {
-    expect(recordHref(member({ user_id: 42, season_name: "2025-2026" }))).toBe("/bureau/adherents-fiche?id=42&saison=2025-2026");
+  it("names the member record by member, season and membership", () => {
+    expect(recordQuery(member({ user_id: 42, purchase_id: 7, season_name: "2025-2026" }))).toEqual({ id: "42", saison: "2025-2026", achat: "7" });
+    const both = [member({ user_id: 42, purchase_id: 7 }), member({ user_id: 42, purchase_id: 8 }), member({ user_id: 43, purchase_id: 9 })];
+    expect(recordMember(both, "42", "8")?.purchase_id).toBe(8);
+    expect(recordMember(both, "42")?.purchase_id).toBe(7);  // a link of the former page: the first membership
+    expect(recordMember(both, "44")).toBeUndefined();
   });
 });
 

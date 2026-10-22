@@ -65,9 +65,9 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── index.html           ← PWA « annuaire » (smartphone)
 │   │   ├── competitions.html    ← PWA « compétitions » (smartphone, 2700 lignes)
 │   │   ├── sw.js, manifest.webmanifest
-│   │   ├── bureau/              ← portail ordinateur : index, adherents, communications, competitions, outils
-│   │   └── shared/              ← alj-firebase.js (init Firebase unique + émulateur dev), alj-core.js (login/apiFetch), alj-shell.js (menu), alj-members.js,
-│   │                              alj-filters.js, alj-vue.js (redirection bureau/mobile), alj.css
+│   │   ├── bureau/              ← portail ordinateur, pages pas encore migrées vers l'application Vue (frontend/) : competitions
+│   │   └── shared/              ← alj-firebase.js (init Firebase unique + émulateur dev), alj-core.js (login/apiFetch), alj-shell.js (menu),
+│   │                              alj-sync.js / alj-members-sync.js (lecture de l'API), alj-vue.js (redirection bureau/mobile), alj.css
 │   ├── tests/                   ← tests pytest/unittest, rangés comme le code testé : domain/, exports/, infrastructure/, services/, api/, web/ ; modules racine de src/ à la racine
 │   ├── dev/                     ← mode dev local : émulateur Firebase (Docker), dev.env, run_server.sh, seed/ (données fictives)
 │   ├── docs/                    ← docs d'architecture/plan (partiellement obsolètes, voir §8)

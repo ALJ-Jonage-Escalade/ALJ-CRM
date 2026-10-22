@@ -17,8 +17,6 @@ const ASSETS_TO_CACHE = [
   "/static-web/alj-core.js",
   "/static-web/alj-shell.js",
   "/static-web/alj-vue.js",
-  "/static-web/alj-members.js",
-  "/static-web/alj-filters.js",
   "/static-web/alj-firebase.js",
   "/static-web/alj-sync.js",
   "/static-web/alj-store.js",

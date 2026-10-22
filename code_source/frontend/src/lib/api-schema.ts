@@ -384,29 +384,9 @@ export interface paths {
         put?: never;
         /**
          * Update Member Api
-         * @description Met à jour les informations d'un adhérent (badge rouge, autonomie bloc, créneau/tarif, e-mails, téléphone).
+         * @description Changes a member record: badges, licence, contacts and address (member), tariff, status and comment (purchase).
          */
         post: operations["update_member_api_api_members_update_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/members/add": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Member Api
-         * @description Ajoute manuellement un adhérent dans la base (saison active ou saison spécifiée).
-         */
-        post: operations["add_member_api_api_members_add_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -424,7 +404,7 @@ export interface paths {
         put?: never;
         /**
          * Add Member Api
-         * @description Ajoute manuellement un adhérent dans la base (saison active ou saison spécifiée).
+         * @description Adds a member by hand to a season (the active one by default).
          */
         post: operations["add_member_api_api_members_create_post"];
         delete?: never;
@@ -1269,6 +1249,69 @@ export interface components {
             /** Code */
             code?: string | null;
         };
+        /**
+         * AttestationRequest
+         * @description The membership (purchase) the certificate is about; the server reads its amount, payer and status itself.
+         *     season: the active season when empty.
+         */
+        AttestationRequest: {
+            /** Purchase Id */
+            purchase_id: number;
+            /**
+             * Season
+             * @default
+             */
+            season?: string;
+        };
+        /**
+         * AttestationSend
+         * @description The e-mail sent with the certificate; an empty subject or body falls back to the template.
+         */
+        AttestationSend: {
+            /** Purchase Id */
+            purchase_id: number;
+            /**
+             * Season
+             * @default
+             */
+            season?: string;
+            /** To Email */
+            to_email: string;
+            /**
+             * Template Name
+             * @default
+             */
+            template_name?: string;
+            /**
+             * Subject
+             * @default
+             */
+            subject?: string;
+            /**
+             * Body
+             * @default
+             */
+            body?: string;
+            /**
+             * Add Signature
+             * @default true
+             */
+            add_signature?: boolean;
+        };
+        /** AttestationSent */
+        AttestationSent: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Message */
+            message: string;
+            /** Email Sent Date */
+            email_sent_date: string;
+            /** Filename */
+            filename: string;
+        };
         /** BatchCompetition */
         BatchCompetition: {
             /**
@@ -1465,6 +1508,65 @@ export interface components {
             categorie_age: string;
             /** Type */
             type: string;
+        };
+        /**
+         * EmailDispatch
+         * @description Outcome of /api/send-email. A refused request (empty subject, no valid recipient) or a failed sending is
+         *     answered with HTTP 200 and status "error": the caller checks `status`, not the HTTP code.
+         */
+        EmailDispatch: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "success" | "partial" | "error";
+            /**
+             * Message
+             * @default
+             */
+            message?: string;
+            /**
+             * Sent Count
+             * @default 0
+             */
+            sent_count?: number;
+            /**
+             * Errors Count
+             * @default 0
+             */
+            errors_count?: number;
+            /**
+             * Total Recipients
+             * @default 0
+             */
+            total_recipients?: number;
+            /**
+             * Details
+             * @default []
+             */
+            details?: components["schemas"]["EmailSendDetail"][];
+        };
+        /**
+         * EmailSendDetail
+         * @description Outcome for one recipient.
+         */
+        EmailSendDetail: {
+            /** Id */
+            id?: number | string | null;
+            /**
+             * Name
+             * @default
+             */
+            name?: string;
+            /** Email */
+            email?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "sent" | "error";
+            /** Error */
+            error?: string | null;
         };
         /** EmailTemplate */
         EmailTemplate: {
@@ -1972,6 +2074,62 @@ export interface components {
             creneau_details: string;
         };
         /**
+         * MemberChanges
+         * @description Fields of a member record to change; a field left out is kept (only the given ones are written).
+         */
+        MemberChanges: {
+            /** Status */
+            status?: ("Validé" | "Traité" | "En cours" | "Terminé" | "Annulé") | null;
+            /** Licence Ffme */
+            licence_ffme?: string | null;
+            /** Badge Rouge */
+            badge_rouge?: ("Oui" | "Non") | null;
+            /** Autonomie Bloc */
+            autonomie_bloc?: ("Oui" | "Non") | null;
+            /** Email Primary */
+            email_primary?: string | null;
+            /** Email Secondary */
+            email_secondary?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Address */
+            address?: string | null;
+            /** Zip Code */
+            zip_code?: string | null;
+            /** City */
+            city?: string | null;
+            /** Tarif Name */
+            tarif_name?: string | null;
+            /** Commentaires Correctif */
+            commentaires_correctif?: string | null;
+        };
+        /**
+         * MemberCreate
+         * @description season: the active season when empty.
+         */
+        MemberCreate: {
+            /**
+             * Season
+             * @default
+             */
+            season?: string;
+            fields: components["schemas"]["NewMember"];
+        };
+        /** MemberCreated */
+        MemberCreated: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Message */
+            message: string;
+            /** Order Ref */
+            order_ref: string;
+            /** Season */
+            season: string;
+        };
+        /**
          * MemberList
          * @description The members of one season, sorted by name, with the planning's slot groups (filters of the list).
          */
@@ -1982,6 +2140,134 @@ export interface components {
             members: components["schemas"]["Member"][];
             /** Creneaux */
             creneaux: components["schemas"]["Creneau"][];
+        };
+        /**
+         * MemberUpdate
+         * @description The purchase (one membership of a season) and its member; purchase_id is enough, the others are fallbacks.
+         */
+        MemberUpdate: {
+            /** User Id */
+            user_id?: number | null;
+            /** Purchase Id */
+            purchase_id?: number | null;
+            /** Order Ref */
+            order_ref?: string | null;
+            fields: components["schemas"]["MemberChanges"];
+        };
+        /** MemberUpdated */
+        MemberUpdated: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Message */
+            message: string;
+        };
+        /**
+         * NewMember
+         * @description A member added by hand. Name, birth date and tariff are required (checked by the route, with its messages).
+         */
+        NewMember: {
+            /**
+             * Last Name
+             * @default
+             */
+            last_name?: string;
+            /**
+             * First Name
+             * @default
+             */
+            first_name?: string;
+            /**
+             * Birth Date
+             * @default
+             */
+            birth_date?: string;
+            /**
+             * Gender
+             * @default
+             * @enum {string}
+             */
+            gender?: "Homme" | "Femme" | "";
+            /**
+             * Tarif Name
+             * @default
+             */
+            tarif_name?: string;
+            /**
+             * Status
+             * @default Validé
+             * @enum {string}
+             */
+            status?: "Validé" | "Traité" | "En cours" | "Terminé" | "Annulé";
+            /**
+             * Amount
+             * @default 0
+             */
+            amount?: number;
+            /**
+             * Licence Ffme
+             * @default
+             */
+            licence_ffme?: string;
+            /**
+             * Badge Rouge
+             * @default Non
+             * @enum {string}
+             */
+            badge_rouge?: "Oui" | "Non";
+            /**
+             * Autonomie Bloc
+             * @default Non
+             * @enum {string}
+             */
+            autonomie_bloc?: "Oui" | "Non";
+            /**
+             * Email Primary
+             * @default
+             */
+            email_primary?: string;
+            /**
+             * Email Secondary
+             * @default
+             */
+            email_secondary?: string;
+            /**
+             * Phone
+             * @default
+             */
+            phone?: string;
+            /**
+             * Address
+             * @default
+             */
+            address?: string;
+            /**
+             * Zip Code
+             * @default
+             */
+            zip_code?: string;
+            /**
+             * City
+             * @default
+             */
+            city?: string;
+            /**
+             * Emergency1 Name
+             * @default
+             */
+            emergency1_name?: string;
+            /**
+             * Emergency1 Phone
+             * @default
+             */
+            emergency1_phone?: string;
+            /**
+             * Commentaires Correctif
+             * @default
+             */
+            commentaires_correctif?: string;
         };
         /** ParticipantAdd */
         ParticipantAdd: {
@@ -3181,9 +3467,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["MemberUpdate"];
             };
         };
         responses: {
@@ -3193,7 +3477,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MemberUpdated"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3205,39 +3498,13 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-        };
-    };
-    add_member_api_api_members_add_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3251,9 +3518,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["MemberCreate"];
             };
         };
         responses: {
@@ -3263,7 +3528,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MemberCreated"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3273,6 +3547,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3591,7 +3874,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EmailDispatch"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3694,19 +3986,35 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["AttestationRequest"];
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description The certificate (PDF) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3716,6 +4024,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -3729,9 +4046,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["AttestationSend"];
             };
         };
         responses: {
@@ -3741,7 +4056,34 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AttestationSent"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3751,6 +4093,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

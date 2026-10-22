@@ -1054,15 +1054,13 @@
     "/api/members/update": {
       "post": {
         "summary": "Update Member Api",
-        "description": "Met à jour les informations d'un adhérent (badge rouge, autonomie bloc, créneau/tarif, e-mails, téléphone).",
+        "description": "Changes a member record: badges, licence, contacts and address (member), tariff, status and comment (purchase).",
         "operationId": "update_member_api_api_members_update_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Data"
+                "$ref": "#/components/schemas/MemberUpdate"
               }
             }
           },
@@ -1071,48 +1069,31 @@
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/MemberUpdated"
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/members/add": {
-      "post": {
-        "summary": "Add Member Api",
-        "description": "Ajoute manuellement un adhérent dans la base (saison active ou saison spécifiée).",
-        "operationId": "add_member_api_api_members_add_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Data"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
+          "500": {
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -1132,15 +1113,13 @@
     "/api/members/create": {
       "post": {
         "summary": "Add Member Api",
-        "description": "Ajoute manuellement un adhérent dans la base (saison active ou saison spécifiée).",
+        "description": "Adds a member by hand to a season (the active one by default).",
         "operationId": "add_member_api_api_members_create_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Data"
+                "$ref": "#/components/schemas/MemberCreate"
               }
             }
           },
@@ -1151,7 +1130,29 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -1526,7 +1527,19 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/EmailDispatch"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -1638,9 +1651,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Data"
+                "$ref": "#/components/schemas/AttestationRequest"
               }
             }
           },
@@ -1648,10 +1659,38 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "The certificate (PDF)",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "400": {
+            "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -1677,9 +1716,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Data"
+                "$ref": "#/components/schemas/AttestationSend"
               }
             }
           },
@@ -1690,7 +1727,49 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AttestationSent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -2964,6 +3043,100 @@
         "title": "ApiErrorBody",
         "description": "Body of error(): what the frontend's API client turns into an ApiError."
       },
+      "AttestationRequest": {
+        "properties": {
+          "purchase_id": {
+            "type": "integer",
+            "title": "Purchase Id"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "purchase_id"
+        ],
+        "title": "AttestationRequest",
+        "description": "The membership (purchase) the certificate is about; the server reads its amount, payer and status itself.\nseason: the active season when empty."
+      },
+      "AttestationSend": {
+        "properties": {
+          "purchase_id": {
+            "type": "integer",
+            "title": "Purchase Id"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          },
+          "to_email": {
+            "type": "string",
+            "title": "To Email"
+          },
+          "template_name": {
+            "type": "string",
+            "title": "Template Name",
+            "default": ""
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "default": ""
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": ""
+          },
+          "add_signature": {
+            "type": "boolean",
+            "title": "Add Signature",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "purchase_id",
+          "to_email"
+        ],
+        "title": "AttestationSend",
+        "description": "The e-mail sent with the certificate; an empty subject or body falls back to the template."
+      },
+      "AttestationSent": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "email_sent_date": {
+            "type": "string",
+            "title": "Email Sent Date"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "email_sent_date",
+          "filename"
+        ],
+        "title": "AttestationSent"
+      },
       "BatchCompetition": {
         "properties": {
           "id": {
@@ -3436,6 +3609,112 @@
         ],
         "title": "Creneau",
         "description": "A slot group of the planning and the HelloAsso tariffs it covers."
+      },
+      "EmailDispatch": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "partial",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
+          "sent_count": {
+            "type": "integer",
+            "title": "Sent Count",
+            "default": 0
+          },
+          "errors_count": {
+            "type": "integer",
+            "title": "Errors Count",
+            "default": 0
+          },
+          "total_recipients": {
+            "type": "integer",
+            "title": "Total Recipients",
+            "default": 0
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/EmailSendDetail"
+            },
+            "type": "array",
+            "title": "Details",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "EmailDispatch",
+        "description": "Outcome of /api/send-email. A refused request (empty subject, no valid recipient) or a failed sending is\nanswered with HTTP 200 and status \"error\": the caller checks `status`, not the HTTP code."
+      },
+      "EmailSendDetail": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "EmailSendDetail",
+        "description": "Outcome for one recipient."
       },
       "EmailTemplate": {
         "properties": {
@@ -4424,6 +4703,210 @@
         "title": "Member",
         "description": "One member of a season (one purchase), as domain/members/view.py member_row() builds it.\nNames, city and phones are already formatted; status_norm is the French status label."
       },
+      "MemberChanges": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Validé",
+                  "Traité",
+                  "En cours",
+                  "Terminé",
+                  "Annulé"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "licence_ffme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence Ffme"
+          },
+          "badge_rouge": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Oui",
+                  "Non"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Badge Rouge"
+          },
+          "autonomie_bloc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Oui",
+                  "Non"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autonomie Bloc"
+          },
+          "email_primary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Primary"
+          },
+          "email_secondary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Secondary"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "zip_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "tarif_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarif Name"
+          },
+          "commentaires_correctif": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commentaires Correctif"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MemberChanges",
+        "description": "Fields of a member record to change; a field left out is kept (only the given ones are written)."
+      },
+      "MemberCreate": {
+        "properties": {
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          },
+          "fields": {
+            "$ref": "#/components/schemas/NewMember"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "title": "MemberCreate",
+        "description": "season: the active season when empty."
+      },
+      "MemberCreated": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "order_ref": {
+            "type": "string",
+            "title": "Order Ref"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "order_ref",
+          "season"
+        ],
+        "title": "MemberCreated"
+      },
       "MemberList": {
         "properties": {
           "season": {
@@ -4453,6 +4936,197 @@
         ],
         "title": "MemberList",
         "description": "The members of one season, sorted by name, with the planning's slot groups (filters of the list)."
+      },
+      "MemberUpdate": {
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "purchase_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Id"
+          },
+          "order_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Ref"
+          },
+          "fields": {
+            "$ref": "#/components/schemas/MemberChanges"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "title": "MemberUpdate",
+        "description": "The purchase (one membership of a season) and its member; purchase_id is enough, the others are fallbacks."
+      },
+      "MemberUpdated": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "MemberUpdated"
+      },
+      "NewMember": {
+        "properties": {
+          "last_name": {
+            "type": "string",
+            "title": "Last Name",
+            "default": ""
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name",
+            "default": ""
+          },
+          "birth_date": {
+            "type": "string",
+            "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$",
+            "title": "Birth Date",
+            "default": ""
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "Homme",
+              "Femme",
+              ""
+            ],
+            "title": "Gender",
+            "default": ""
+          },
+          "tarif_name": {
+            "type": "string",
+            "title": "Tarif Name",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Validé",
+              "Traité",
+              "En cours",
+              "Terminé",
+              "Annulé"
+            ],
+            "title": "Status",
+            "default": "Validé"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Amount",
+            "default": 0.0
+          },
+          "licence_ffme": {
+            "type": "string",
+            "title": "Licence Ffme",
+            "default": ""
+          },
+          "badge_rouge": {
+            "type": "string",
+            "enum": [
+              "Oui",
+              "Non"
+            ],
+            "title": "Badge Rouge",
+            "default": "Non"
+          },
+          "autonomie_bloc": {
+            "type": "string",
+            "enum": [
+              "Oui",
+              "Non"
+            ],
+            "title": "Autonomie Bloc",
+            "default": "Non"
+          },
+          "email_primary": {
+            "type": "string",
+            "title": "Email Primary",
+            "default": ""
+          },
+          "email_secondary": {
+            "type": "string",
+            "title": "Email Secondary",
+            "default": ""
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone",
+            "default": ""
+          },
+          "address": {
+            "type": "string",
+            "title": "Address",
+            "default": ""
+          },
+          "zip_code": {
+            "type": "string",
+            "title": "Zip Code",
+            "default": ""
+          },
+          "city": {
+            "type": "string",
+            "title": "City",
+            "default": ""
+          },
+          "emergency1_name": {
+            "type": "string",
+            "title": "Emergency1 Name",
+            "default": ""
+          },
+          "emergency1_phone": {
+            "type": "string",
+            "title": "Emergency1 Phone",
+            "default": ""
+          },
+          "commentaires_correctif": {
+            "type": "string",
+            "title": "Commentaires Correctif",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NewMember",
+        "description": "A member added by hand. Name, birth date and tariff are required (checked by the route, with its messages)."
       },
       "ParticipantAdd": {
         "properties": {

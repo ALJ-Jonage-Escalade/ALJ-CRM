@@ -1,6 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
+import { defineComponent, ref } from "vue";
+import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import { AUTH_KEY, type Auth } from "../composables/auth";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
@@ -30,7 +31,7 @@ const ACTIVE: MemberList = {
 };
 const PAST: MemberList = { season: "2025-2026", creneaux: CRENEAUX, members: [member({ user_id: 4, purchase_id: 21, last_name: "ANCIEN", season_name: "2025-2026", tarif_name: "Adulte loisir" })] };
 
-type Answer = (req: { search: string; ifNoneMatch: string | null }) => Response;
+type Answer = (req: { search: string; ifNoneMatch: string | null; body?: unknown }) => Response;
 const ANSWERS: Record<string, Answer> = {
   "GET /api/seasons": () => json({ seasons: ["2026-2027", "2025-2026"], active: "2026-2027" }, 200, '"s1"'),
   "GET /api/members": ({ search, ifNoneMatch }) => {
@@ -42,16 +43,22 @@ const ANSWERS: Record<string, Answer> = {
   "POST /api/cloud-db/sync": () => json({ status: "success", message: "ok", result: { pulled: 1, pushed: 0, full: true } }),
 };
 
-function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS) {
-  const calls: { method: string; path: string; ifNoneMatch: string | null }[] = [];
+async function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS, path = "/bureau/adherents") {
+  const calls: { method: string; path: string; ifNoneMatch: string | null; body?: unknown }[] = [];
   const api: ApiFetch = vi.fn(async (url: string, init?: RequestInit) => {
     const u = new URL(url, "http://alj.test");
     const method = init?.method ?? "GET";
     const ifNoneMatch = new Headers(init?.headers).get("If-None-Match");
-    calls.push({ method, path: u.pathname + u.search, ifNoneMatch });
+    const body = typeof init?.body === "string" && init.body ? JSON.parse(init.body) : undefined;
+    calls.push({ method, path: u.pathname + u.search, ifNoneMatch, body });
     const answer = answers[`${method} ${u.pathname}`];
-    return answer ? answer({ search: u.search, ifNoneMatch }) : json({}, 404);
+    return answer ? answer({ search: u.search, ifNoneMatch, body }) : json({}, 404);
   });
+  const router: Router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: "/bureau/adherents", component: AdherentsPage }, { path: "/:any(.*)*", component: defineComponent({ render: () => null }) }],
+  });
+  await router.push(path);
   const auth: Auth = {
     state: ref({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role }),
     login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn(),
@@ -59,13 +66,17 @@ function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS)
   const wrapper = mount(AdherentsPage, {
     attachTo: document.body,
     global: {
+      plugins: [router],
       provide: { [AUTH_KEY]: auth, [API_KEY]: api, [CLIENT_KEY]: createApiClient(api, "http://alj.test") },
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
     },
   });
   const byId = (id: string) => wrapper.find(`[data-testid="${id}"]`);
+  // Dialogs are rendered at the end of <body>
+  const inBody = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
   const names = () => wrapper.findAll('[data-testid="data-row"]').map((tr) => tr.find("td").text());
-  return { wrapper, calls, byId, names };
+  const writes = () => calls.filter((c) => c.method !== "GET");
+  return { wrapper, calls, writes, byId, inBody, names, router };
 }
 
 beforeEach(() => {
@@ -80,21 +91,21 @@ afterEach(() => {
 
 describe("AdherentsPage", () => {
   it("lists the active season without the waiting list, with links to the member record", async () => {
-    const { byId, names, wrapper } = render();
+    const { byId, names, wrapper } = await render();
     await flushPromises();
     expect(names()).toEqual(["DUPONT", "MARTIN"]);
     expect(byId("member-count").text()).toBe("2 adhérents affichés sur 3 (saison 2026-2027)");
-    expect(byId("member-record").attributes("href")).toBe("/bureau/adherents-fiche?id=1&saison=2026-2027");
+    expect(byId("member-record").attributes("href")).toBe("/bureau/adherents?id=1&saison=2026-2027&achat=11");
     expect(wrapper.find('a[href="tel:+33612345678"]').exists()).toBe(true);
     expect((byId("season-select").element as HTMLSelectElement).value).toBe("2026-2027");
     expect(byId("season-select").text()).toContain("2026-2027 (active)");
     expect(wrapper.find("#sync-info").text()).toMatch(/^☁️ À jour — /);
-    expect(byId("member-add").attributes("href")).toBe("/bureau/adherents-fiche?ajout=1");
+    expect(byId("member-add").attributes("href")).toBe("/bureau/adherents?ajout=1");
   });
 
   it("polls every 20 s with the ETag: unchanged polls are 304", async () => {
     vi.useFakeTimers();
-    const { calls, names } = render();
+    const { calls, names } = await render();
     await flushPromises();
     await vi.advanceTimersByTimeAsync(20_000);
     const polls = calls.filter((c) => c.path === "/api/members");
@@ -104,7 +115,7 @@ describe("AdherentsPage", () => {
   });
 
   it("filters by search, status and slot, and remembers the filters but not the search", async () => {
-    const { byId, names, wrapper } = render();
+    const { byId, names, wrapper } = await render();
     await flushPromises();
     await byId("member-search").setValue("léa");
     expect(names()).toEqual(["DUPONT"]);
@@ -130,7 +141,7 @@ describe("AdherentsPage", () => {
   });
 
   it("sorts by a column", async () => {
-    const { byId, names } = render();
+    const { byId, names } = await render();
     await flushPromises();
     await byId("sort-last_name").trigger("click");
     expect(names()).toEqual(["MARTIN", "DUPONT"]);
@@ -139,7 +150,7 @@ describe("AdherentsPage", () => {
   });
 
   it("switches season, and falls back to the active season when the remembered one is gone", async () => {
-    const { byId, names, calls } = render();
+    const { byId, names, calls } = await render();
     await flushPromises();
     await byId("season-select").setValue("2025-2026");
     await flushPromises();
@@ -148,7 +159,7 @@ describe("AdherentsPage", () => {
     expect(calls.map((c) => c.path)).toContain("/api/members?season=2025-2026");
 
     localStorage.setItem(FILTER_KEY, JSON.stringify({ season: "1999-2000" }));
-    const again = render();
+    const again = await render();
     await flushPromises();
     expect(again.names()).toEqual(["DUPONT", "MARTIN"]);
   });
@@ -161,7 +172,7 @@ describe("AdherentsPage", () => {
     });
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    const { byId } = render();
+    const { byId } = await render();
     await flushPromises();
     await byId("sort-last_name").trigger("click");
     await byId("export-csv").trigger("click");
@@ -174,7 +185,7 @@ describe("AdherentsPage", () => {
   });
 
   it("synchronises the database, then reloads the list", async () => {
-    const { byId, calls, wrapper } = render("coach");
+    const { byId, calls, wrapper } = await render("coach");
     await flushPromises();
     await byId("sync-now").trigger("click");
     await flushPromises();
@@ -184,10 +195,177 @@ describe("AdherentsPage", () => {
   });
 
   it("shows a coach no admin action", async () => {
-    const { byId, wrapper } = render("coach");
+    const { byId, wrapper } = await render("coach");
     await flushPromises();
     expect(byId("member-add").exists()).toBe(false);
     expect(wrapper.find('a[href="/bureau/outils?tab=ffme-import"]').exists()).toBe(false);
     expect(wrapper.find('a[href="/bureau/outils?tab=ffme"]').exists()).toBe(true);
+  });
+
+  it("opens the record of a member from the list: a coach can e-mail but not edit", async () => {
+    const { byId, inBody, router } = await render("coach");
+    await flushPromises();
+    await byId("member-record").trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.query).toEqual({ id: "1", saison: "2026-2027", achat: "11" });
+    expect(inBody("record-name")!.textContent).toBe("Léa DUPONT");
+    expect(inBody("record-fields")!.textContent).toContain("lea@example.org");
+    expect(inBody("record-readonly")).not.toBeNull();
+    expect(inBody("record-edit")).toBeNull();
+    expect(inBody("record-attestation")).toBeNull();
+    expect(inBody("record-email")).not.toBeNull();
+  });
+
+  it("opens a link of the former page (?id=&saison=) on its season", async () => {
+    const { inBody, calls } = await render("admin", ANSWERS, "/bureau/adherents?id=4&saison=2025-2026");
+    await flushPromises();
+    expect(calls.map((c) => c.path)).toContain("/api/members?season=2025-2026");
+    expect(inBody("record-name")!.textContent).toBe(" ANCIEN");
+  });
+
+  it("says when the member is not in the season", async () => {
+    const { inBody } = await render("admin", ANSWERS, "/bureau/adherents?id=99&saison=2026-2027");
+    await flushPromises();
+    expect(inBody("record-missing")!.textContent).toBe("Adhérent introuvable dans la saison 2026-2027.");
+  });
+
+  it("edits a record: checks the fields, sends only the changes, then reloads the list", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const answers = { ...ANSWERS, "POST /api/members/update": () => json({ status: "success", message: "ok" }) };
+    const { inBody, writes, calls } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027&achat=11");
+    await flushPromises();
+    inBody("record-edit")!.click();
+    await flushPromises();
+    const phone = inBody("member-phone") as HTMLInputElement;
+    phone.value = "12";
+    phone.dispatchEvent(new Event("input"));
+    inBody("member-save")!.click();
+    await flushPromises();
+    expect(inBody("member-form")!.textContent).toContain("Numéro de téléphone invalide.");
+    expect(document.activeElement).toBe(phone);
+    expect(writes()).toEqual([]);
+
+    phone.value = "06 99 88 77 66";
+    phone.dispatchEvent(new Event("input"));
+    (inBody("member-badge_rouge") as HTMLSelectElement).value = "Oui";
+    inBody("member-badge_rouge")!.dispatchEvent(new Event("change"));
+    inBody("member-save")!.click();
+    await flushPromises();
+    expect(writes()).toEqual([expect.objectContaining({
+      path: "/api/members/update",
+      body: { user_id: 1, purchase_id: 11, order_ref: "", fields: { phone: "06 99 88 77 66", badge_rouge: "Oui" } },
+    })]);
+    expect(calls.filter((c) => c.path.startsWith("/api/members")).length).toBeGreaterThan(1);  // reloaded after the write
+    expect(document.querySelector("#toast")!.textContent).toContain("mise à jour avec succès");
+  });
+
+  it("adds a member to the season shown, then opens the new record", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const added = member({ user_id: 9, purchase_id: 90, last_name: "NOUVEAU", first_name: "Nina", order_ref: "MANUEL-1", tarif_name: "Adulte loisir" });
+    let created = false;
+    const answers: Record<string, Answer> = {
+      ...ANSWERS,
+      "GET /api/members": () => json(created ? { ...ACTIVE, members: [...ACTIVE.members, added] } : ACTIVE, 200, created ? '"m2"' : '"m1"'),
+      "POST /api/members/create": () => {
+        created = true;
+        return json({ status: "success", message: "Adhérent Nina NOUVEAU ajouté avec succès.", order_ref: "MANUEL-1", season: "2026-2027" });
+      },
+    };
+    const { inBody, writes, router, byId } = await render("admin", answers);
+    await flushPromises();
+    await byId("member-add").trigger("click");
+    await flushPromises();
+    inBody("member-save")!.click();
+    await flushPromises();
+    for (const field of ["last_name", "first_name", "birth_date"]) expect(inBody(`member-${field}`)!.getAttribute("aria-invalid")).toBe("true");
+    expect(writes()).toEqual([]);
+
+    const type = (id: string, value: string) => {
+      const input = inBody(id) as HTMLInputElement;
+      input.value = value;
+      input.dispatchEvent(new Event("input"));
+    };
+    type("member-last_name", "nouveau");
+    type("member-first_name", "Nina");
+    type("member-birth_date", "2012-04-05");
+    inBody("member-save")!.click();
+    await flushPromises();
+    expect(writes()[0]!.body).toEqual(expect.objectContaining({
+      season: "2026-2027",
+      fields: expect.objectContaining({ last_name: "NOUVEAU", first_name: "Nina", birth_date: "2012-04-05", tarif_name: "Adulte loisir", amount: 0 }),
+    }));
+    expect(router.currentRoute.value.query).toEqual({ id: "9", saison: "2026-2027", achat: "90" });
+  });
+
+  it.each<Role>(["admin", "coach"])("sends an e-mail from the record (%s)", async (role) => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const answers: Record<string, Answer> = {
+      ...ANSWERS,
+      "GET /api/email-templates": () => json({ status: "success", templates: [{ name: "Rappel", subject: "Rappel {first_name}", body: "Bonjour {first_name}", sender_email: "", sender_name: "" }] }),
+      "POST /api/send-email": () => json({ status: "success", sent_count: 1 }),
+    };
+    const { inBody, writes } = await render(role, answers, "/bureau/adherents?id=1&saison=2026-2027");
+    await flushPromises();
+    inBody("record-email")!.click();
+    await flushPromises();
+    inBody("email-send")!.click();
+    await flushPromises();
+    expect(inBody("email-problem")!.textContent).toContain("renseigner le sujet et le message");
+
+    const select = inBody("email-template") as HTMLSelectElement;
+    select.value = "Rappel";
+    select.dispatchEvent(new Event("change"));
+    await flushPromises();
+    expect(inBody("email-preview")!.textContent).toContain("Sujet : Rappel Léa");
+    inBody("email-send")!.click();
+    await flushPromises();
+    expect(writes()[0]).toEqual(expect.objectContaining({ path: "/api/send-email" }));
+    expect(writes()[0]!.body).toEqual(expect.objectContaining({ subject: "Rappel {first_name}", recipients: [expect.objectContaining({ email: "lea@example.org" })] }));
+    expect(document.querySelector("#toast")!.textContent).toContain("E-mail envoyé avec succès");
+    expect(inBody("record-name")).not.toBeNull();  // back to the record
+  });
+
+  it("previews and sends the payment certificate of the membership", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:pdf");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const paid = { ...ACTIVE, members: [{ ...ACTIVE.members[0]!, amount: 180, payer_email: "parent@example.org" }, ...ACTIVE.members.slice(1)] };
+    const answers: Record<string, Answer> = {
+      ...ANSWERS,
+      "GET /api/members": () => json(paid, 200, '"paid"'),
+      "GET /api/email-templates": () => json({ status: "success", templates: [] }),
+      "POST /api/attestations/preview": () => new Response(new Blob(["%PDF"]), { status: 200, headers: { "Content-Type": "application/pdf" } }),
+      "POST /api/attestations/send": () => json({ status: "success", message: "ok", email_sent_date: "22/10/2026", filename: "a.pdf" }),
+    };
+    const { inBody, writes } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027");
+    await flushPromises();
+    inBody("record-attestation")!.click();
+    await flushPromises();
+    expect(inBody("attestation-pdf")!.getAttribute("src")).toBe("blob:pdf");
+    expect((inBody("attestation-to") as HTMLInputElement).value).toBe("parent@example.org");
+    expect((inBody("attestation-subject") as HTMLInputElement).value).toContain("Attestation de paiement");
+    inBody("attestation-send")!.click();
+    await flushPromises();
+    expect(writes().map((w) => w.path)).toEqual(["/api/attestations/preview", "/api/attestations/send"]);
+    expect(writes()[0]!.body).toEqual({ purchase_id: 11, season: "2026-2027" });
+    expect(writes()[1]!.body).toEqual(expect.objectContaining({ purchase_id: 11, to_email: "parent@example.org", template_name: "Attestation échéance" }));
+    expect(document.querySelector("#toast")!.textContent).toContain("Attestation envoyée avec succès");
+  });
+
+  it("refuses a certificate for a membership without amount", async () => {
+    const answers: Record<string, Answer> = { ...ANSWERS, "GET /api/email-templates": () => json({ status: "success", templates: [] }) };
+    const { inBody, writes } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027");
+    await flushPromises();
+    inBody("record-attestation")!.click();
+    await flushPromises();
+    expect(inBody("attestation-ineligible")!.textContent).toContain("le montant est nul");
+    expect(inBody("attestation-send")!.hasAttribute("disabled")).toBe(true);
+    expect(writes()).toEqual([]);
+  });
+
+  it("does not open the add form for a coach", async () => {
+    const { inBody } = await render("coach", ANSWERS, "/bureau/adherents?ajout=1");
+    await flushPromises();
+    expect(inBody("add-dialog")).toBeNull();
   });
 });

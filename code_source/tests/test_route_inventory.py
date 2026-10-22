@@ -84,6 +84,7 @@ EXPECTED_ROUTES = {
     ("POST", "/api/whatsapp-template"),
     ("GET", "/bureau"),
     ("GET", "/bureau/"),
+    ("GET", "/bureau/adherents-fiche"),
     ("GET", "/bureau/{page}"),
     ("GET", "/competitions"),
     ("GET", "/docs"),

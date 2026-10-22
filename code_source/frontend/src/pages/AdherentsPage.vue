@@ -1,28 +1,39 @@
 <script setup lang="ts">
 /* Adhérents (coaches and admins): the members of a season, filtered by slot / tariff, status and search, sorted,
-   paged, exported to CSV. Read only: the member record (edit, add, e-mail, attestation) is still the former page
-   (/bureau/adherents-fiche) until plan phase 8. Online only: the list is polled every 20 s (ETag, 304 when unchanged)
-   and nothing is kept on the device; only the filters are remembered, without the search. */
+   paged, exported to CSV, and the member record in a dialog: read and e-mailed by coaches and admins, edited and sent
+   its payment certificate by admins, who also add members. The record is in the URL (?id=<user_id>&saison=…&achat=…, ?ajout=1:
+   recordQuery), so a record can be linked and the former page's links still open it. Online only: the list is polled
+   every 20 s (ETag, 304 when unchanged) and the record is read from it; nothing is kept on the device, only the filters
+   are remembered, without the search. */
 import { computed, inject, ref, watch } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import DataTable from "../components/DataTable.vue";
 import type { DataColumn } from "../components/dataTable";
 import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
+import UiDialog from "../components/ui/UiDialog.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText, unwrap, type Schemas } from "../lib/client";
 import { csvBlob } from "../lib/csv";
 import { saveFile } from "../lib/download";
+import MemberAttestation from "./adherents/MemberAttestation.vue";
+import MemberEmail from "./adherents/MemberEmail.vue";
+import MemberForm from "./adherents/MemberForm.vue";
+import MemberRecord from "./adherents/MemberRecord.vue";
 import {
-  ADD_MEMBER_HREF, allowedTarifs, checkAll, collator, countSummary, creneauItems, csvName, csvRows, dateValue, diplomes,
-  diplomeWeight, filterMembers, fmtDay, groupChecked, loadFilters, OTHER_PREFIX, otherChecked, recordHref, saveFilters,
+  allowedTarifs, checkAll, collator, countSummary, creneauItems, csvName, csvRows, dateValue, diplomes,
+  diplomeWeight, filterMembers, fmtDay, groupChecked, loadFilters, OTHER_PREFIX, otherChecked, recordMember, recordQuery, saveFilters,
   statusChips, tarifCounts, telHref, type CreneauItem, type Member, type MemberList,
 } from "./adherents/members";
+import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft, type Template } from "./adherents/record";
 
 const client = inject(CLIENT_KEY)!;
 const toast = useToast();
+const route = useRoute();
+const router = useRouter();
 
 const filters = ref(loadFilters());
 watch(filters, (f) => saveFilters(f), { deep: true });
@@ -128,6 +139,124 @@ async function syncNow(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------- Member record (dialog)
+
+const queryText = (name: string) => (typeof route.query[name] === "string" ? (route.query[name] as string) : "");
+const recordId = computed(() => queryText("id"));
+// A record of another season (link): the list follows it
+watch(
+  () => queryText("saison"),
+  (wanted) => {
+    if (wanted && wanted !== season.value) filters.value.season = wanted;
+  },
+  { immediate: true },
+);
+const recordReady = computed(() => !!list.value && (!queryText("saison") || list.value.season === queryText("saison")));
+const record = computed(() => (recordId.value && recordReady.value ? recordMember(all.value, recordId.value, queryText("achat") || undefined) : undefined));
+const recordOpen = computed({
+  get: () => !!recordId.value,
+  set: (open) => {
+    if (!open) closeRecord();
+  },
+});
+
+type Mode = "view" | "edit" | "email" | "attestation";
+const mode = ref<Mode>("view");
+watch(recordId, () => (mode.value = "view"));
+const TITLES: Record<Mode, string> = { view: "👤 Fiche adhérent", edit: "✏️ Modifier la fiche", email: "✉️ E-mail à l'adhérent", attestation: "📄 Attestation de paiement" };
+
+function closeRecord(): void {
+  const rest = Object.fromEntries(Object.entries(route.query).filter(([k]) => !["id", "saison", "achat", "ajout"].includes(k)));
+  void router.replace({ query: rest });
+}
+
+const STATUS_CLASS_OF = (m: Member) => statusClass(m.status_norm);
+
+// Email templates, for the e-mail (coaches and admins) and the certificate (admins), loaded once
+const templates = ref<Template[]>([]);
+let templatesLoaded = false;
+async function loadTemplates(): Promise<void> {
+  if (templatesLoaded) return;
+  templatesLoaded = true;
+  try {
+    templates.value = (await unwrap(client.GET("/api/email-templates"))).templates;
+  } catch (e) {
+    templatesLoaded = false;
+    console.warn("Modèles d'e-mails :", e);
+  }
+}
+
+async function open(next: Mode): Promise<void> {
+  if (next === "email" || next === "attestation") await loadTemplates();
+  if (next === "edit" && record.value) draft.value = draftOf(record.value);
+  mode.value = next;
+}
+
+function sent(message: string): void {
+  toast.show(message);
+  mode.value = "view";
+  void members.refresh();  // the certificate's sent date
+}
+
+// Edit and add
+const tarifs = computed(() => tarifChoices(list.value?.creneaux ?? [], all.value));
+const draft = ref<MemberDraft>(draftOf());
+const saving = ref(false);
+
+async function saveEdit(m: Member): Promise<void> {
+  const { fields, lines } = changesOf(m, draft.value);
+  if (!lines.length) {
+    toast.show("ℹ️ Aucune modification détectée.");
+    mode.value = "view";
+    return;
+  }
+  if (!confirm(`Valider les modifications pour ${m.first_name} ${m.last_name} ?\n\n• ${lines.join("\n• ")}`)) return;
+  saving.value = true;
+  try {
+    await unwrap(client.POST("/api/members/update", { body: { user_id: m.user_id, purchase_id: m.purchase_id, order_ref: m.order_ref, fields } }));
+    await members.refresh();
+    mode.value = "view";
+    toast.show(`✅ Fiche de ${m.first_name} ${m.last_name} mise à jour avec succès !`);
+  } catch (e) {
+    toast.show(`❌ Échec de la mise à jour : ${errorText(e)}`, 9000);
+  } finally {
+    saving.value = false;
+  }
+}
+
+const adding = computed({
+  get: () => queryText("ajout") === "1",
+  set: (open) => {
+    if (!open) closeRecord();
+  },
+});
+watch(adding, (now) => {
+  if (now) draft.value = draftOf(undefined, tarifs.value[0]?.tarif ?? "");
+}, { immediate: true });
+// Tariffs arrive with the list: the first one is chosen when the form opened before
+watch(tarifs, (now) => {
+  if (adding.value && !draft.value.tarif_name && now[0]) draft.value.tarif_name = now[0].tarif;
+});
+
+async function saveNew(): Promise<void> {
+  const d = draft.value;
+  const twin = sameName(all.value, d);
+  if (twin && !confirm(`⚠️ Un adhérent « ${twin.last_name} ${twin.first_name} » existe déjà pour la saison ${season.value}.\n\nVoulez-vous quand même créer cette nouvelle fiche ?`)) return;
+  saving.value = true;
+  try {
+    const created = await unwrap(client.POST("/api/members/create", { body: { season: season.value, fields: newMemberOf(d) } }));
+    toast.show(`✅ ${created.message}`);
+    await members.refresh();
+    // Opens the new record (its membership is the one of the new order)
+    const added = all.value.find((m) => m.order_ref === created.order_ref);
+    void router.replace({ query: added ? recordQuery(added) : {} });
+  } catch (e) {
+    toast.show(`❌ Échec de la création : ${errorText(e)}`, 9000);
+  } finally {
+    saving.value = false;
+  }
+}
+
 const chip = (active: boolean) => [
   "cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold",
   active ? "border-accent bg-accent text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
@@ -162,13 +291,13 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
         <a href="/bureau/outils?tab=ffme" :class="linkButton" title="Ouvrir l'export officiel FFME">🇫🇷 Export FFME</a>
         <a v-if="role === 'admin'" href="/bureau/outils?tab=ffme-import" :class="linkButton" title="Importer la liste Excel des licenciés FFME">📥 Import FFME</a>
         <UiButton variant="muted" small data-testid="sync-now" :busy="syncing && 'Synchro…'" title="Synchroniser maintenant la base du serveur avec Firestore" @click="syncNow">🔄 Synchroniser BDD</UiButton>
-        <a
+        <RouterLink
           v-if="role === 'admin'"
-          :href="ADD_MEMBER_HREF"
+          :to="{ query: { ...route.query, ajout: '1' } }"
           data-testid="member-add"
           class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-bold text-white no-underline hover:bg-accent-dark"
-          title="Ajouter un adhérent (fiche adhérent)"
-        >➕ Ajouter un adhérent</a>
+          title="Ajouter un adhérent à la saison affichée"
+        >➕ Ajouter un adhérent</RouterLink>
       </div>
 
       <div v-if="filterOpen" data-testid="filter-box" class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -228,7 +357,7 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
       :empty="list ? 'Aucun adhérent ne correspond aux filtres actifs.' : 'Chargement en cours…'"
     >
       <template #cell-last_name="{ row }">
-        <a :href="recordHref(row)" data-testid="member-record" class="font-bold text-slate-800 no-underline hover:text-accent hover:underline" title="Ouvrir la fiche adhérent">{{ row.last_name }}</a>
+        <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="font-bold text-slate-800 no-underline hover:text-accent hover:underline" title="Ouvrir la fiche adhérent">{{ row.last_name }}</RouterLink>
       </template>
       <template #cell-order_date="{ value }">{{ value || "—" }}</template>
       <template #cell-diplome="{ row }">
@@ -252,7 +381,7 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
 
       <template #card="{ row }">
         <div class="flex items-start justify-between gap-2">
-          <a :href="recordHref(row)" data-testid="member-record" class="min-w-0 font-bold text-slate-800 no-underline">{{ row.last_name }} {{ row.first_name }}</a>
+          <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="min-w-0 font-bold text-slate-800 no-underline">{{ row.last_name }} {{ row.first_name }}</RouterLink>
           <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(row.status_norm)]">{{ row.status_norm || "—" }}</span>
         </div>
         <div class="mt-0.5 text-xs text-slate-500">
@@ -266,6 +395,35 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
         </div>
       </template>
     </DataTable>
+
+    <UiDialog v-model:open="recordOpen" :title="TITLES[mode]" :wide="mode !== 'attestation'" :xl="mode === 'attestation'" data-testid="record-dialog">
+      <p v-if="!record" data-testid="record-missing" class="text-[13px] text-slate-500">
+        {{ recordReady ? `Adhérent introuvable dans la saison ${season}.` : "Chargement de la fiche…" }}
+      </p>
+      <template v-else>
+        <MemberRecord v-if="mode === 'view'" :member="record" :admin="role === 'admin'" @email="open('email')" @attestation="open('attestation')" @edit="open('edit')">
+          <template #status>
+            <span :class="['rounded-full px-2.5 py-0.5 text-[11.5px] font-bold text-white', STATUS_CLASS_OF(record)]">{{ record.status_norm || "—" }}</span>
+          </template>
+        </MemberRecord>
+        <MemberEmail v-else-if="mode === 'email'" :member="record" :templates="templates" @sent="sent" @failed="(m) => toast.show(m, 9000)" @cancel="mode = 'view'" />
+        <template v-else-if="role === 'admin'">
+          <MemberForm v-if="mode === 'edit'" v-model="draft" :adding="false" :tarifs="tarifs" :saving="saving" @save="saveEdit(record)" @cancel="mode = 'view'" />
+          <MemberAttestation v-else :member="record" :templates="templates" @sent="sent" @failed="(m) => toast.show(m, 9000)" @cancel="mode = 'view'" />
+        </template>
+      </template>
+    </UiDialog>
+
+    <UiDialog
+      v-if="role === 'admin'"
+      v-model:open="adding"
+      title="➕ Ajouter un adhérent"
+      :description="`Saisie manuelle d'un adhérent pour la saison ${season}. Les champs marqués d'un astérisque (*) sont obligatoires.`"
+      wide
+      data-testid="add-dialog"
+    >
+      <MemberForm v-model="draft" adding :tarifs="tarifs" :saving="saving" @save="saveNew" @cancel="adding = false" />
+    </UiDialog>
     <UiToast :message="toast.message.value" />
   </AppShell>
 </template>

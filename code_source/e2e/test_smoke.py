@@ -6,7 +6,7 @@ from playwright.sync_api import expect
 
 pytestmark = pytest.mark.smoke
 
-BUREAU_PAGES = ["/bureau/", "/bureau/adherents", "/bureau/adherents-fiche", "/bureau/communications", "/bureau/competitions", "/bureau/planning",
+BUREAU_PAGES = ["/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning",
                 "/bureau/outils", "/bureau/parametres"]
 MOBILE_PAGES = ["/competitions", "/index"]
 

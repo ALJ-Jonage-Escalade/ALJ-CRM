@@ -5,8 +5,8 @@ import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPor
 
 // Attributes (data-testid…) go to the dialog box, not to the root, which renders nothing
 defineOptions({ inheritAttrs: false });
-// wide: a form of several columns
-defineProps<{ title: string; description?: string; wide?: boolean }>();
+// wide: a form of several columns; xl: a form next to a document (PDF preview)
+defineProps<{ title: string; description?: string; wide?: boolean; xl?: boolean }>();
 const open = defineModel<boolean>("open", { required: true });
 </script>
 
@@ -17,7 +17,7 @@ const open = defineModel<boolean>("open", { required: true });
       <DialogContent
         :class="[
           'fixed top-1/2 left-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl bg-white p-5 shadow-xl',
-          wide ? 'max-w-xl' : 'max-w-md',
+          xl ? 'max-w-4xl' : wide ? 'max-w-xl' : 'max-w-md',
         ]"
         v-bind="$attrs"
       >
