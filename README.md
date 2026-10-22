@@ -65,8 +65,9 @@ Arrêt : `Ctrl+C` pour le serveur, `docker compose -f dev/docker-compose.yml dow
 |---|---|
 | http://localhost:5173/bureau/ | Portail bureau, application Vue (`npm run dev`) |
 | http://localhost:8080/bureau/ | Portail bureau servi par FastAPI (application Vue compilée) |
-| http://localhost:8080/competitions?vue=pwa | PWA compétitions (smartphone) |
-| http://localhost:8080/index?vue=pwa | PWA annuaire (smartphone) |
+| http://localhost:5173/competitions | Compétitions, application Vue (téléphone et ordinateur, lisible hors ligne) ; retour de la connexion Google |
+| http://localhost:8080/competitions/gestion | Ancienne page des compétitions (téléphone) : modifications, jusqu'à la phase 11 |
+| http://localhost:5173/index | Annuaire des adhérents, application Vue (téléphone et ordinateur, lisible hors ligne) |
 | http://localhost:8080/health | État du serveur |
 | http://localhost:8080/docs | Documentation de l'API (Swagger) |
 | http://localhost:4000 | Interface de l'émulateur Firebase (Firestore, Auth) |

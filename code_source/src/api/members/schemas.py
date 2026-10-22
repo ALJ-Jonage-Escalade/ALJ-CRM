@@ -76,6 +76,20 @@ class Member(BaseModel):
     creneau_details: str
 
 
+class CompetitorContact(BaseModel):
+    """Contacts of a participant of an open competition (domain/members/view.py competitor_contacts): the only
+    member data kept offline on a coach's phone."""
+    adherent_id: int
+    last_name: str
+    first_name: str
+    phone: str
+    creneau_groupe: str
+    emergency1_name: str
+    emergency1_phone: str
+    emergency2_name: str
+    emergency2_phone: str
+
+
 class MemberList(BaseModel):
     """The members of one season, sorted by name, with the planning's slot groups (filters of the list)."""
     season: str

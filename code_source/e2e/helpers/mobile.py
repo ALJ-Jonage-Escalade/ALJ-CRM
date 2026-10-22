@@ -1,4 +1,5 @@
-"""Mobile competitions page (web/competitions.html): navigation and locators."""
+"""Former phone page of the competitions (web/competitions.html, on /competitions/gestion: the writes until plan
+phase 11): navigation and locators."""
 from playwright.sync_api import Locator, Page, expect
 
 from helpers.auth import login_as
@@ -8,7 +9,7 @@ SEEDED_COMPETITION = "Hogwarts Lead Open"
 
 
 def open_app(page: Page, role: str = "coach") -> Page:
-    page.goto("/competitions")
+    page.goto("/competitions/gestion")
     login_as(page, role)
     # First load: every collection's listener (members included), slower while other workers run
     expect(competition_card(page, SEEDED_COMPETITION)).to_be_visible(timeout=20_000)

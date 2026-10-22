@@ -10,6 +10,7 @@ import {
 const NAV = [
   { id: "accueil", label: "🏠 Accueil", href: "/bureau/" },
   { id: "adherents", label: "👥 Adhérents", href: "/bureau/adherents" },
+  { id: "annuaire", label: "📇 Annuaire", href: "/index" },
   { id: "communications", label: "✉️ Communications", href: "/bureau/communications", admin: true },
   { id: "competitions", label: "🏆 Compétitions", href: "/bureau/competitions" },
   { id: "planning", label: "📅 Planning", href: "/bureau/planning" },
@@ -39,7 +40,6 @@ export function startBureau({ page, title, onReady }) {
           ${NAV.map(n => `<a href="${n.href}" data-page="${n.id}"${n.admin ? " data-admin" : ""}${n.id === page ? ' class="active" aria-current="page"' : ""}>${n.label}</a>`).join("")}
         </nav>
         <div class="side-foot">
-          <a class="mobile-link" href="/competitions?vue=mobile">📱 Version mobile</a>
           <div class="who" id="who">Vérification de la connexion…</div>
           <button class="btn btn-muted btn-mini" id="logout-btn" hidden>🚪 Se déconnecter</button>
         </div>

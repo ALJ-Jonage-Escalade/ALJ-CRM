@@ -12,6 +12,7 @@ from helpers.auth import login_as
 from helpers.data import unique_name
 from helpers.members import ROWS, displayed_count, find, open_members, open_record
 from helpers.mobile import accept_dialogs
+from helpers.offline import resource_names
 
 
 @pytest.fixture(scope="module")
@@ -145,9 +146,10 @@ def test_nothing_stored_on_the_device(page, people):
         session: Object.keys(sessionStorage).map(k => k + "=" + sessionStorage.getItem(k)).join("\\n"),
         databases: (await indexedDB.databases()).map(d => d.name),
     })""")
-    # Only the filters are kept (never the search); the Firebase session has its own database
+    # Only the filters are kept (never the search); the Firebase session has its own database. The offline store
+    # of the directory and the competitions page only knows its owner here (to be wiped for another account)
     assert people[0]["nom"].lower() not in (stored["local"] + stored["session"]).lower()
-    assert "alj-offline" not in stored["databases"]
+    assert resource_names(page) == []
 
 
 def test_phone_shows_stacked_cards(mobile_page, people):

@@ -1097,8 +1097,7 @@ export interface paths {
         };
         /**
          * Get Annuaire Page
-         * @description Annuaire des adhérents (lecture seule) : lit la base principale dans
-         *     Firestore (collections crm_*) avec le compte Google du coach.
+         * @description Directory of the members (read only, readable offline): Vue application, on phones as on desktop.
          */
         get: operations["get_annuaire_page_index_get"];
         put?: never;
@@ -1118,7 +1117,7 @@ export interface paths {
         };
         /**
          * Root Route
-         * @description Point d'entrée racine : redirige vers la PWA Mobile des compétitions.
+         * @description Point d'entrée racine : les compétitions (application Vue).
          */
         get: operations["root_route__get"];
         put?: never;
@@ -1138,8 +1137,8 @@ export interface paths {
         };
         /**
          * Get Competitions Page
-         * @description Page web de gestion des compétitions : données en temps réel depuis
-         *     Google Cloud Firestore (même base que l'application de bureau).
+         * @description Competitions (read only, readable offline) and the Google sign-in callback (the OAuth redirect URI
+         *     registered for the club): Vue application, on phones as on desktop. Also the PWA's start page.
          */
         get: operations["get_competitions_page_competitions_get"];
         put?: never;
@@ -1414,6 +1413,72 @@ export interface components {
             /** Nom */
             nom: string;
         };
+        /**
+         * Competition
+         * @description A competition with its participants, most recent first in the list.
+         */
+        Competition: {
+            /** Id */
+            id: number;
+            /**
+             * Nom
+             * @default
+             */
+            nom?: string;
+            /**
+             * Id Ffme
+             * @default
+             */
+            id_ffme?: string;
+            /**
+             * Date Competition
+             * @description YYYY-MM-DD, empty when not dated
+             * @default
+             */
+            date_competition?: string;
+            /**
+             * Date Fin
+             * @default
+             */
+            date_fin?: string;
+            /**
+             * Prix
+             * @default 0
+             */
+            prix?: number;
+            /**
+             * Statut
+             * @description en_preparation, en_cours or close (archived)
+             * @default en_preparation
+             */
+            statut?: string;
+            /**
+             * Whatsapp Link
+             * @default
+             */
+            whatsapp_link?: string;
+            /**
+             * Url Resultats
+             * @default
+             */
+            url_resultats?: string;
+            /**
+             * Resultats Synced At
+             * @default
+             */
+            resultats_synced_at?: string;
+            /** Coach Ids */
+            coach_ids?: number[];
+            /**
+             * Coaches
+             * @description Names of coach_ids, from the coaches collection
+             */
+            coaches?: string[];
+            /** Participants */
+            participants?: components["schemas"]["CompetitionParticipant"][];
+        } & {
+            [key: string]: unknown;
+        };
         /** CompetitionCreate */
         CompetitionCreate: {
             /** Nom */
@@ -1466,6 +1531,133 @@ export interface components {
             type?: string | null;
         };
         /**
+         * CompetitionMember
+         * @description A member of the `adherents` directory as the competition pages see it (current tariff and slot group).
+         */
+        CompetitionMember: {
+            /** Id */
+            id?: number | null;
+            /**
+             * Nom
+             * @default
+             */
+            nom?: string;
+            /**
+             * Prenom
+             * @default
+             */
+            prenom?: string;
+            /**
+             * Num Licence
+             * @default
+             */
+            num_licence?: string;
+            /**
+             * Tarif
+             * @default
+             */
+            tarif?: string;
+            /**
+             * Saison
+             * @default
+             */
+            saison?: string;
+            /**
+             * Creneau Groupe
+             * @default
+             */
+            creneau_groupe?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * CompetitionParticipant
+         * @description A member registered for a competition (row of its `participants`, infrastructure/firestore/competitions).
+         */
+        CompetitionParticipant: {
+            /** Adherent Id */
+            adherent_id?: number | null;
+            /**
+             * Nom
+             * @default
+             */
+            nom?: string;
+            /**
+             * Prenom
+             * @default
+             */
+            prenom?: string;
+            /**
+             * Num Licence
+             * @default
+             */
+            num_licence?: string;
+            /**
+             * Tarif
+             * @default
+             */
+            tarif?: string;
+            /**
+             * Phone
+             * @default
+             */
+            phone?: string;
+            /**
+             * Selectionne
+             * @default false
+             */
+            selectionne?: boolean;
+            /**
+             * Statut Paiement
+             * @description non_invite, en_attente, paye, annule_perdu or annule_reporte
+             * @default
+             */
+            statut_paiement?: string;
+            /**
+             * Montant Paye
+             * @default 0
+             */
+            montant_paye?: number;
+            /**
+             * Commande Helloasso
+             * @default
+             */
+            commande_helloasso?: string;
+            /**
+             * Note Paiement
+             * @default
+             */
+            note_paiement?: string;
+            /**
+             * Urgence Nom
+             * @description Emergency contact copied when the member was added
+             * @default
+             */
+            urgence_nom?: string;
+            /**
+             * Urgence Tel
+             * @default
+             */
+            urgence_tel?: string;
+            /**
+             * Classement
+             * @default
+             */
+            classement?: string;
+            /**
+             * Resultat Ffme
+             * @default
+             */
+            resultat_ffme?: string;
+            /**
+             * Updated At
+             * @default
+             */
+            updated_at?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
          * CompetitionUpdate
          * @description Partial update: only the fields sent are changed.
          */
@@ -1494,6 +1686,31 @@ export interface components {
             lieu?: string | null;
             /** Type */
             type?: string | null;
+        };
+        /**
+         * CompetitorContact
+         * @description Contacts of a participant of an open competition (domain/members/view.py competitor_contacts): the only
+         *     member data kept offline on a coach's phone.
+         */
+        CompetitorContact: {
+            /** Adherent Id */
+            adherent_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Phone */
+            phone: string;
+            /** Creneau Groupe */
+            creneau_groupe: string;
+            /** Emergency1 Name */
+            emergency1_name: string;
+            /** Emergency1 Phone */
+            emergency1_phone: string;
+            /** Emergency2 Name */
+            emergency2_name: string;
+            /** Emergency2 Phone */
+            emergency2_phone: string;
         };
         /**
          * Creneau
@@ -2647,7 +2864,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Competition"][];
                 };
             };
         };
@@ -3137,7 +3354,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CompetitionMember"][];
                 };
             };
         };
@@ -3453,7 +3670,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CompetitorContact"][];
                 };
             };
         };

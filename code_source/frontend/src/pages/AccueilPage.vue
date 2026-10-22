@@ -9,12 +9,12 @@ import type { Role } from "../lib/roles";
 /* Links to the migrated pages stay in the app; the others load their former page. Only the cards the role may open are shown. */
 const LINKS: { href: string; title: string; text: string; access: Access }[] = [
   { href: "/bureau/adherents", title: "👥 Adhérents", text: "Liste des adhérents, filtre par tarif et fiche détaillée.", access: pageAccess("adherents") },
+  { href: "/index", title: "📇 Annuaire", text: "Coordonnées et contacts d'urgence des adhérents, consultables hors ligne.", access: pageAccess("annuaire") },
   { href: "/bureau/communications", title: "✉️ Communications", text: "Modèles d'e-mails et de messages du club.", access: pageAccess("communications") },
   { href: "/bureau/outils", title: "🛠️ Outils", text: "Carte interactive et analyse des effectifs.", access: pageAccess("outils") },
   { href: "/bureau/competitions", title: "🏆 Compétitions", text: "Compétitions, participants et paiements HelloAsso.", access: pageAccess("competitions") },
   { href: "/bureau/planning", title: "📅 Créneaux & Planning", text: "Création, modification des créneaux, animateurs, tarifs et impression du planning.", access: pageAccess("planning") },
   { href: "/bureau/parametres", title: "⚙️ Paramètres", text: "Connexion Google du club, statut de la base de données et services associés.", access: pageAccess("parametres") },
-  { href: "/competitions?vue=mobile", title: "📱 Version mobile", text: "Ouvre l'application smartphone et mémorise ce choix sur cet appareil.", access: "staff" },
 ];
 const BANNER = "https://alj-escalade.fr/wp-content/uploads/2026/09/De-nouveaux-blocs-tous-les-15-jours-3-1024x512.png";
 

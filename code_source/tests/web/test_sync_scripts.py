@@ -1,5 +1,6 @@
-"""web/shared/alj-sync.js and alj-members-sync.js run in Node (sync_scripts_harness.js): answers
-that arrive after a season switch or a stop must not reach the page. Skipped without Node."""
+"""web/shared/alj-sync.js runs in Node (sync_scripts_harness.js): an answer that arrives after a stop
+must not reach the page. Skipped without Node. (The season switch of the member list is tested with
+the Vue app: frontend/src/composables/syncedResource.test.ts.)"""
 
 from __future__ import annotations
 
@@ -33,20 +34,6 @@ class TestSyncScripts(unittest.TestCase):
         result = self.results[name]
         self.assertNotIn("error", result, result.get("error"))
         return result
-
-    def test_late_answer_of_previous_season_is_dropped(self) -> None:
-        result = self.scenario("late_answer_of_previous_season")
-        self.assertEqual(result["shown"], [{"season": "2025-2026", "members": ["DURAND"]}])
-        self.assertEqual(result["last_request"], "/api/members?season=2025-2026")  # season not switched back
-
-    def test_early_answer_of_previous_season_is_dropped(self) -> None:
-        self.assertEqual(self.scenario("early_answer_of_previous_season")["shown"],
-                         [{"season": "2025-2026", "members": ["DURAND"]}])
-
-    def test_active_season_keeps_updating(self) -> None:
-        self.assertEqual(self.scenario("active_season_keeps_updating")["shown"],
-                         [{"season": "2026-2027", "members": ["MARTIN"]},
-                          {"season": "2026-2027", "members": ["MARTIN", "PETIT"]}])
 
     def test_stopped_poll_drops_its_answer(self) -> None:
         self.assertEqual(self.scenario("stopped_poll_drops_its_answer")["calls"], [])

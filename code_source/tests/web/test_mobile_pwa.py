@@ -13,7 +13,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 
-from api.web.pages import get_annuaire_page, get_competitions_page
+from api.web.pages import get_competitions_management_page
 from api.web.pwa import get_manifest, get_sw, get_web_version
 
 
@@ -46,33 +46,14 @@ class TestMobilePWA(unittest.TestCase):
         with open(get_sw().path, "r", encoding="utf-8") as f:
             sw = f.read()
         self.assertIn(f'CACHE_NAME = "alj-escalade-v{version}"', sw)
-        with open(get_competitions_page().path, "r", encoding="utf-8") as f:
+        with open(get_competitions_management_page().path, "r", encoding="utf-8") as f:
             html = f.read()
         self.assertIn(f"(v{version})</title>", html)
         self.assertIn(f'id="web-version">v{version}<', html)
-        # L'annuaire partage le même service worker : même numéro de version
-        with open(get_annuaire_page().path, "r", encoding="utf-8") as f:
-            ann = f.read()
-        self.assertIn(f'<meta name="alj-web-version" content="{version}">', ann)
-        self.assertIn(f"(v{version})</title>", ann)
-        self.assertIn(f'id="web-version">v{version}<', ann)
-
-    def test_annuaire_uses_members_api(self):
-        """The directory loads members from the API (one season), never Firestore directly."""
-        with open(get_annuaire_page().path, "r", encoding="utf-8") as f:
-            html = f.read()
-        for firestore_call in (".collection(", "onSnapshot", "crm_purchases"):
-            self.assertNotIn(firestore_call, html, firestore_call)
-        for script in ("alj-sync.js", "alj-members-sync.js"):
-            self.assertIn(f'<script src="/static-web/{script}"></script>', html)
-        self.assertIn("ALJMembersSync.start(", html)
-        self.assertIn("membersSync.setSeason(", html)
-        self.assertNotIn("sql-wasm", html)
-        self.assertNotIn("drive.readonly", html)
 
     def test_competitions_page_uses_api_only(self):
         """Competition data is read and written through the API, never Firestore directly."""
-        with open(get_competitions_page().path, "r", encoding="utf-8") as f:
+        with open(get_competitions_management_page().path, "r", encoding="utf-8") as f:
             html = f.read()
         for firestore_call in (".collection(", "onSnapshot", "runTransaction"):
             self.assertNotIn(firestore_call, html, firestore_call)
@@ -97,7 +78,7 @@ class TestMobilePWA(unittest.TestCase):
                     # alj-firebase.js deletes the old Firestore SDK copy (firestore/*) only
                     self.assertNotIn("indexedDB.open(", content, path)
                     self.assertNotIn("alj_snapshot:", content, path)  # old localStorage snapshots
-        with open(get_competitions_page().path, "r", encoding="utf-8") as f:
+        with open(get_competitions_management_page().path, "r", encoding="utf-8") as f:
             html = f.read()
         self.assertIn('const STORED_RESOURCES = ["competitions", "coaches", "competitors"];', html)
         self.assertIn('"/api/members/competitors"', html)
@@ -118,7 +99,7 @@ class TestMobilePWA(unittest.TestCase):
         """Phase 5b: only « Participe » on a listed competitor is queued offline, sent with the
         participant's updated_at (the server refuses it if the participant changed), and the
         outbox is wiped with the store."""
-        with open(get_competitions_page().path, "r", encoding="utf-8") as f:
+        with open(get_competitions_management_page().path, "r", encoding="utf-8") as f:
             html = f.read()
         self.assertIn(r"const QUEUED_URL = /^\/api\/competitions\/\d+\/participants\/\d+$/;", html)
         self.assertIn('const QUEUED_FLAGS = ["selectionne"];', html)
@@ -131,11 +112,11 @@ class TestMobilePWA(unittest.TestCase):
         role_lost = html[html.index("function roleLost()"):html.index("/* =====", html.index("function roleLost()"))]
         self.assertIn("ALJStore.clearAll()", role_lost)
         self.assertIn("outbox = new Map()", role_lost)
-        logout = html[html.index("function logout()"):html.index("function readOauthFragment()")]
+        logout = html[html.index("function logout()"):html.index("auth.onAuthStateChanged")]
         self.assertIn("confirm(", logout)  # unsent changes: warned before they are lost
 
     def test_competitions_html_pwa_and_email_features(self):
-        resp = get_competitions_page()
+        resp = get_competitions_management_page()
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(os.path.exists(resp.path))
         with open(resp.path, "r", encoding="utf-8") as f:

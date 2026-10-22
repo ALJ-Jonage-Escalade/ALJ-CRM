@@ -8,18 +8,21 @@ readonly, writes need coach.
 
 from __future__ import annotations
 
+from typing import List
+
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from api.responses import SUCCESS, json_with_etag
 from api.competitions.schemas.competitions import CompetitionCreate, CompetitionUpdate
+from api.competitions.schemas.views import Competition
 from services.competitions.competitions import CompetitionService as Service
 from services.documents import Doc
 
 router = APIRouter(prefix="/api/competitions")
 
 
-@router.get("")
+@router.get("", response_model=List[Competition])
 def list_competitions(request: Request) -> Response:
     return json_with_etag(request, Service.list_competitions())
 

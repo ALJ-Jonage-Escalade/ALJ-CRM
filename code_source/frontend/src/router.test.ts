@@ -33,7 +33,7 @@ async function setup(initial: AuthState, path: string) {
 const SESSIONS: [string, AuthState][] = [
   ["loading", { status: "loading" }],
   ["signed out", { status: "signedOut" }],
-  ["role not checked", { status: "error", user: USER, message: "x" }],
+  ["role not checked", { status: "error", user: USER, message: "x", offline: false }],
   ["admin", signedIn("admin")],
   ["coach", signedIn("coach")],
   ["readonly", signedIn("readonly")],
@@ -80,7 +80,7 @@ describe("router guards", () => {
 
 describe("app routes", () => {
   it("declare their access", () => {
-    for (const route of routes) expect(["public", "staff", "admin"]).toContain(route.meta?.access);
+    for (const route of routes) expect(["public", "viewer", "staff", "admin"]).toContain(route.meta?.access);
   });
 
   it("reserve Communications and Paramètres to admins", () => {
@@ -94,7 +94,7 @@ describe("app routes", () => {
     expect(router.currentRoute.value.fullPath).toBe("/bureau/?reserve=/bureau/communications");
   });
 
-  it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils?tab=ffme"])("open %s to a coach", async (path) => {
+  it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils?tab=ffme", "/index", "/index?vue=pwa"])("open %s to a coach", async (path) => {
     const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
     await router.push(path);
     expect(router.currentRoute.value.fullPath).toBe(path);
@@ -105,6 +105,20 @@ describe("app routes", () => {
     await router.push("/bureau/adherents?id=12&saison=2026-2027");
     expect(router.currentRoute.value.name).toBe("adherents");
     expect(router.currentRoute.value.query).toEqual({ id: "12", saison: "2026-2027" });
+  });
+
+  it("open the directory on /index, offline too (the page shows its copy)", async () => {
+    const offline: AuthState = { status: "error", user: USER, message: "x", offline: true };
+    const router = createAppRouter(fakeAuth(offline).auth, createMemoryHistory());
+    await router.push("/index");
+    expect([router.currentRoute.value.name, router.currentRoute.value.meta.access]).toEqual(["annuaire", "staff"]);
+  });
+
+  it.each(["/competitions", "/competitions?vue=mobile", "/bureau/competitions?id=3"])("open %s to a read-only account", async (path) => {
+    const router = createAppRouter(fakeAuth(signedIn("readonly")).auth, createMemoryHistory());
+    await router.push(path);
+    expect(router.currentRoute.value.fullPath).toBe(path);
+    expect(router.currentRoute.value.meta.access).toBe("viewer");
   });
 
   it("show unknown paths to anyone", async () => {

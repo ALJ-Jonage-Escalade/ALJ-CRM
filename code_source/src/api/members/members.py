@@ -4,12 +4,12 @@ offline by the phone (coach); manual member creation and edits (admin).
 
 from __future__ import annotations
 
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 
-from api.members.schemas import MemberCreate, MemberCreated, MemberList, MemberUpdate, MemberUpdated
+from api.members.schemas import CompetitorContact, MemberCreate, MemberCreated, MemberList, MemberUpdate, MemberUpdated
 from api.responses import error, error_responses, internal_error, json_with_etag
 from services.members.members import MemberService as Service
 
@@ -21,7 +21,7 @@ def list_members(request: Request, season: Optional[str] = None) -> Response:
     return json_with_etag(request, Service.list_members(season))
 
 
-@router.get("/competitors")
+@router.get("/competitors", response_model=List[CompetitorContact])
 def list_competitors(request: Request) -> Response:
     return json_with_etag(request, Service.list_competitors())
 

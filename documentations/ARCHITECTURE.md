@@ -62,12 +62,11 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME, Excel adhérents),
 │   │   │                          presence_sheets, planning_excel, spreadsheet_safety
 │   ├── web/
-│   │   ├── index.html           ← PWA « annuaire » (smartphone)
-│   │   ├── competitions.html    ← PWA « compétitions » (smartphone, 2700 lignes)
+│   │   ├── competitions.html    ← ancienne page compétitions (smartphone, /competitions/gestion) : les modifications
 │   │   ├── sw.js, manifest.webmanifest
 │   │   ├── bureau/              ← portail ordinateur, pages pas encore migrées vers l'application Vue (frontend/) : competitions
 │   │   └── shared/              ← alj-firebase.js (init Firebase unique + émulateur dev), alj-core.js (login/apiFetch), alj-shell.js (menu),
-│   │                              alj-sync.js / alj-members-sync.js (lecture de l'API), alj-vue.js (redirection bureau/mobile), alj.css
+│   │                              alj-sync.js (lecture de l'API), alj-store.js (copie hors ligne), alj.css
 │   ├── tests/                   ← tests pytest/unittest, rangés comme le code testé : domain/, exports/, infrastructure/, services/, api/, web/ ; modules racine de src/ à la racine
 │   ├── dev/                     ← mode dev local : émulateur Firebase (Docker), dev.env, run_server.sh, seed/ (données fictives)
 │   ├── docs/                    ← docs d'architecture/plan (partiellement obsolètes, voir §8)
@@ -124,7 +123,7 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
 
 | Thème (`api/…`) | Fichiers | Routes |
 |---|---|---|
-| `web/` | `pages`, `pwa`, `health` | `/`, `/index`, `/competitions`, `/bureau`, `/bureau/{page}` (liste blanche), `/annuaire` et `/static-web/*` (`mount_static`) · `/sw.js`, `/manifest.webmanifest`, `/runtime-config.js`, `/api/web-version` · `/health` |
+| `web/` | `pages`, `pwa`, `health` | `/`, `/index`, `/competitions`, `/competitions/gestion`, `/bureau`, `/bureau/{page}` (liste blanche), `/annuaire` et `/static-web/*` (`mount_static`) · `/sw.js`, `/manifest.webmanifest`, `/runtime-config.js`, `/api/web-version` · `/health` |
 | `members/` | `members`, `seasons`, `dashboard` | `/api/members` (+ `/competitors`, `/update`, `/create`, `/add`) · `/api/seasons`, `/api/season-tarifs` · `/api/dashboard` |
 | `competitions/` | `competitions`, `participants`, `coaches`, `members`, `helloasso_items`, `results`, `payments` | `/api/competitions/*`, `/api/coaches`, `/api/competition-members`, `/api/helloasso/items` · résultats MyCompet (`/api/competitions/cron/fetch-results`, `/{id}/fetch-results`, `/api/settings/competitions-results`) · `/{id}/check-all-paid` |
 | `communications/` | `email`, `whatsapp`, `attestations` | `/api/email-templates` (GET/POST/DELETE), `/api/preview-email`, `/api/email-status`, `/api/send-email` · `/api/whatsapp-template` · `/api/attestations/preview`, `/send` (PDF en mémoire, admin) |
@@ -142,15 +141,15 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
   fige la liste complète des routes.
 
 **Auth** : `ALJ_API_AUTH=required` (Docker) ou présence de `K_SERVICE` (Cloud Run) → jeton Firebase obligatoire, fail-closed.
-Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protégées. Les listes d'e-mails admin/coach sont **codées en dur** dans `api_auth.py`, recopiées pour l'affichage seulement dans `alj-core.js`, `competitions.html` et `../index.html` (un test vérifie la cohérence — modifier les quatre). `firestore.rules` ne contient plus de rôle : il refuse tout client.
+Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protégées. Les listes d'e-mails admin/coach sont **codées en dur** dans `api_auth.py`, recopiées pour l'affichage seulement dans `alj-core.js` et `competitions.html` (un test vérifie la cohérence — modifier les trois ; l'application Vue lit le rôle sur `GET /api/me`). `firestore.rules` ne contient plus de rôle : il refuse tout client.
 
 ---
 
 ## 5. Front web
 
 - **Aucun framework ni build** : HTML + JS ES modules + CSS, Firebase Auth (connexion seulement), `fetch` via `apiFetch` (`alj-core.js`, ajoute le jeton Bearer).
-- **Toutes les données passent par l'API** (plan `plan_api_only_front.md`) : aucune page ne charge le SDK Firestore. Les écrans se mettent à jour par interrogation (`alj-sync.js`, `alj-members-sync.js` : toutes les 20 s quand la page est visible, ETag/304). Hors ligne, seule la PWA compétitions affiche une copie en lecture seule (`alj-store.js`, IndexedDB `alj-offline` : épreuves, coachs et, pour les coachs, contacts d'urgence des compétiteurs via `GET /api/members/competitors` ; 30 jours au plus, effacée à la déconnexion ou à la perte du rôle) ; l'annuaire nécessite le réseau. Hors ligne, seule la case « Participe » d'un compétiteur inscrit peut changer : la modification est gardée dans la file `outbox` du même magasin et envoyée au retour du réseau avec le `updated_at` du compétiteur vu par le téléphone (`unchanged_since`) ; le serveur la refuse (409 `changed`) si le compétiteur a changé entre-temps, ou si la compétition est archivée (phase 5b du plan). `alj-firebase.js` efface au démarrage l'ancien cache Firestore (IndexedDB) des téléphones.
-- **Deux « vues »** : PWA smartphone (`/competitions`, `/index`) et portail bureau (`/bureau/*`). `alj-vue.js` redirige automatiquement les écrans ≥ 1024 px vers `/bureau/` (`?vue=mobile` pour forcer la PWA).
+- **Toutes les données passent par l'API** (plan `plan_api_only_front.md`) : aucune page ne charge le SDK Firestore. Les écrans se mettent à jour par interrogation (`alj-sync.js`, et `frontend/src/lib/sync.ts` dans l'application Vue : toutes les 20 s quand la page est visible, ETag/304). Hors ligne, deux écrans affichent une copie en lecture seule, dans la même base IndexedDB `alj-offline` (`alj-store.js`, et son portage `frontend/src/lib/store.ts`) : la PWA compétitions (épreuves, coachs et, pour les coachs, contacts d'urgence des compétiteurs via `GET /api/members/competitors`) et l'annuaire `/index` (coordonnées, contacts d'urgence et diplômes des adhérents de la saison, sans santé ni paiement : `frontend/src/pages/annuaire/directory.ts`). La copie dure 30 jours au plus et est effacée à la déconnexion, sur un 401/403 et quand un autre compte se connecte sur l'appareil. Hors ligne, seule la case « Participe » d'un compétiteur inscrit peut changer : la modification est gardée dans la file `outbox` du même magasin et envoyée au retour du réseau avec le `updated_at` du compétiteur vu par le téléphone (`unchanged_since`) ; le serveur la refuse (409 `changed`) si le compétiteur a changé entre-temps, ou si la compétition est archivée (phase 5b du plan). `alj-firebase.js` efface au démarrage l'ancien cache Firestore (IndexedDB) des téléphones.
+- **Une application responsive** : `/competitions` (= `/bureau/competitions`, page de départ de la PWA et retour de la connexion Google), `/index` et `/bureau/*` sont des écrans de l'application Vue, sur téléphone comme sur ordinateur (plus de redirection selon l'appareil). Les modifications des compétitions restent sur les anciennes pages, `/competitions/gestion` (téléphone) et `/bureau/competitions-gestion` (ordinateur), jusqu'à la phase 11 du plan.
 - **Un seul numéro de version web** à garder synchronisé : `<meta alj-web-version>`, `<title>`, badge, et `CACHE_NAME` de `sw.js` (le test `test_mobile_pwa` le vérifie). Chaque déploiement visible = version web +1 (actuellement v23).
 - Rôles : coach/readonly = lecture ; admin = envoi e-mail/attestation, écritures.
 - Plan et décisions du portail : `plan_pages_web_bureau.md`.
@@ -281,7 +280,7 @@ La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[too
 
 - **Documentation partiellement périmée** : `../GEMINI.md` (racine et `code_source/`) décrit encore Tkinter, un fonctionnement 100 % Windows/Excel/Drive et des chemins de l'ancien poste. `architecture_actuelle.md` et `plan_migration.md` datent de la migration Tkinter→PySide6. `plan_architecture_cloud_mobile.md` annonce `APP_VERSION 2.3.0`, `512Mi`. `pyproject.toml` dit `2.0.5`. **Faire confiance au code et à `VERSION`, puis `base_firestore.md` et `plan_pages_web_bureau.md` (les plus récents).**
 - `../GEMINI.md` impose une convention utile : scripts de diagnostic jetables dans `scripts_temporaires/` (ignoré par git), jamais à la racine.
-- **Duplication du front** : `competitions.html` (2700 lignes) et `../index.html` dupliquent historiquement auth/style ; le portail `bureau/` utilise `shared/`. Ne pas dupliquer davantage.
+- **Duplication du front** : `competitions.html` (2700 lignes) duplique historiquement auth/style ; le portail `bureau/` utilise `shared/`. Ne pas dupliquer davantage.
 - **Admins codés en dur** (`api_auth.py` + copies d'affichage en JS) : à terme, passer par les custom claims Firebase.
 - **Exports FFME** : CSV strict (`;`, dates `jj/mm/aaaa`) ; le golden master doit rester vert ou être renouvelé avec accord du club.
 - **Sauvegardes** : API backup SQLite (jamais de copie brute avec WAL), PITR Firestore 7 j, export quotidien 14 j, retour arrière via `MEMBER_BACKEND=drive`.

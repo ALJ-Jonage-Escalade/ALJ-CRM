@@ -77,7 +77,7 @@ class TestRoles(unittest.TestCase):
 
     def test_required_role(self):
         r = api_auth.required_role
-        for path in ("/", "/health", "/competitions", "/index", "/sw.js", "/manifest.webmanifest",
+        for path in ("/", "/health", "/competitions", "/competitions/gestion", "/index", "/sw.js", "/manifest.webmanifest",
                      "/api/web-version", "/webhooks/helloasso", "/annuaire/", "/annuaire/index.html",
                      "/bureau", "/bureau/", "/bureau/adherents", "/static-web/alj-core.js", "/spa/assets/index-abc.js"):
             self.assertIsNone(r("GET", path), path)
@@ -145,7 +145,7 @@ class TestRoles(unittest.TestCase):
 
     def test_display_lists_match_api(self):
         """The pages' role lists (display only) stay identical to the API's."""
-        for page in ("competitions.html", "index.html", os.path.join("shared", "alj-core.js")):
+        for page in ("competitions.html", os.path.join("shared", "alj-core.js")):
             with open(os.path.join(_code_root, "web", page), encoding="utf-8") as f:
                 html = f.read()
 

@@ -32,7 +32,7 @@ Les collections `adherents` et `planning` (annuaire lu par la PWA et le webhook)
 - Une copie du cache est encore déposée sur Google Drive (`GOOGLE_DRIVE_DB_ID`), en
   lecture seule (sauvegarde) ; l'annuaire web ne l'utilise plus.
 
-## Annuaire web (`web/index.html`, URL `/index`)
+## Annuaire web (application Vue, `frontend/src/pages/DirectoryPage.vue`, URL `/index`)
 
 - Lit `GET /api/seasons` et `GET /api/members?season=` (une saison à la fois). La liste
   est calculée sur le serveur (`domain/member_view.py`) depuis son cache SQLite des
@@ -41,12 +41,11 @@ Les collections `adherents` et `planning` (annuaire lu par la PWA et le webhook)
   `/competitions` : le bouton « Se connecter » passe par `/competitions?login=1`
   (URI de redirection OAuth déjà autorisée) puis revient sur l'annuaire
   (`sessionStorage.alj_after_login`).
-- Actualisation toutes les 20 s quand la page est visible (`alj-members-sync.js`,
-  ETag/304) ; le bouton 🔄 recharge immédiatement. Pas de copie hors ligne : l'annuaire
-  nécessite le réseau. L'ancienne copie hors ligne du SDK Firestore (IndexedDB) est
-  effacée au démarrage par `alj-firebase.js`.
-- Même numéro de version que `competitions.html` (meta `alj-web-version`, titre,
-  badge, `CACHE_NAME` de `sw.js`).
+- Actualisation toutes les 20 s quand la page est visible (`useSyncedResource`, ETag/304).
+- Lecture hors ligne : la dernière liste reçue est gardée dans IndexedDB (`alj-offline`,
+  `frontend/src/lib/store.ts`), sans les données de santé ni de paiement, et affichée avec
+  sa date quand le réseau manque ; effacée à la déconnexion, sur un 401/403, pour un autre
+  compte et au bout de 30 jours.
 
 Code : `src/infrastructure/cloud_database.py`.
 

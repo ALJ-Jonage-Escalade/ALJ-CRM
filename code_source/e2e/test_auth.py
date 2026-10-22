@@ -60,7 +60,7 @@ def test_session_survives_reload(page, login_as):
 
 @pytest.mark.parametrize("role, badge", [("coach", "Coach"), ("readonly", "Consultation")])
 def test_mobile_app_role_badge(mobile_page, login_as, role, badge):
-    mobile_page.goto("/competitions")
+    mobile_page.goto("/competitions/gestion")
     login_as(mobile_page, role)
     expect(mobile_page.locator("#setup-email")).to_have_text(ACCOUNTS[role].email)
     expect(mobile_page.locator("#setup-role-badge")).to_contain_text(badge)

@@ -26,7 +26,7 @@ import MemberRecord from "./adherents/MemberRecord.vue";
 import {
   allowedTarifs, checkAll, collator, countSummary, creneauItems, csvName, csvRows, dateValue, diplomes,
   diplomeWeight, filterMembers, fmtDay, groupChecked, loadFilters, OTHER_PREFIX, otherChecked, recordMember, recordQuery, saveFilters,
-  statusChips, tarifCounts, telHref, type CreneauItem, type Member, type MemberList,
+  statusChips, statusClass, tarifCounts, telHref, type CreneauItem, type Member, type MemberList,
 } from "./adherents/members";
 import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft, type Template } from "./adherents/record";
 
@@ -108,11 +108,6 @@ const COLUMNS: DataColumn<Member>[] = [
   { id: "phone", label: "Téléphone", value: (m) => m.phone, class: "whitespace-nowrap" },
   { id: "licence_ffme", label: "Licence", value: (m) => m.licence_ffme, class: "text-slate-500" },
 ];
-
-const STATUS_CLASS: Record<string, string> = {
-  "Validé": "bg-green-600", "Traité": "bg-blue-600", "Terminé": "bg-violet-500", "En cours": "bg-amber-600", "Annulé": "bg-red-600",
-};
-const statusClass = (s: string) => STATUS_CLASS[s] ?? "bg-slate-400";
 
 // The CSV holds the list shown, every page, in the table's order
 const tableRef = ref<{ sortedRows(): Member[] } | null>(null);

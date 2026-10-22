@@ -3,8 +3,8 @@
    with the pages not migrated yet: no second sign-in when moving between them. */
 import { initializeApp } from "@firebase/app";
 import {
-  browserLocalPersistence, connectAuthEmulator, GoogleAuthProvider, indexedDBLocalPersistence,
-  initializeAuth, signInWithCredential, type Auth,
+  browserLocalPersistence, browserPopupRedirectResolver, connectAuthEmulator, getRedirectResult, GoogleAuthProvider,
+  indexedDBLocalPersistence, initializeAuth, signInWithCredential, signInWithRedirect, type Auth,
 } from "@firebase/auth";
 import { isEmulator, runtime } from "./runtime";
 
@@ -20,7 +20,7 @@ let auth: Auth | null = null;
 export function firebaseAuth(): Auth {
   if (auth) return auth;
   const app = initializeApp(isEmulator ? { ...FIREBASE_CONFIG, projectId: runtime.projectId } : FIREBASE_CONFIG);
-  // No popup/redirect resolver: sign-in goes through the competitions page (composables/auth.ts)
+  // No popup/redirect resolver by default: only the emulator's sign-in redirects (devSignIn below)
   const created = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
   if (isEmulator && runtime.authEmulator) {
     connectAuthEmulator(created, runtime.authEmulator, { disableWarnings: true });
@@ -32,4 +32,20 @@ export function firebaseAuth(): Auth {
   }
   auth = created;
   return created;
+}
+
+/** Production sign-in: the Google access token received on /competitions (implicit OAuth, lib/oauth.ts). */
+export async function signInWithGoogleAccessToken(accessToken: string): Promise<void> {
+  await signInWithCredential(firebaseAuth(), GoogleAuthProvider.credential(null, accessToken));
+}
+
+/** Dev: the Auth emulator's account picker (a redirect: sign-in can start without a click, ?login=1). */
+export async function devSignIn(): Promise<void> {
+  await signInWithRedirect(firebaseAuth(), new GoogleAuthProvider(), browserPopupRedirectResolver);
+}
+
+/** Dev: back from the emulator's account picker, true when a sign-in just completed. */
+export async function completeDevSignIn(): Promise<boolean> {
+  const result = await getRedirectResult(firebaseAuth(), browserPopupRedirectResolver);
+  return !!result?.user;
 }

@@ -12,8 +12,9 @@ import { isStaff, roleLabel } from "../lib/roles";
 import PageLink from "./PageLink.vue";
 import VersionBadge from "./VersionBadge.vue";
 
-/** sync: freshness of the page's data, next to the title (Adhérents). */
-const props = defineProps<{ page: PageId; title: string; sync?: string }>();
+/** sync: freshness of the page's data, next to the title (Adhérents). offlineRead: the page shows the copy kept on the
+    device when the role cannot be checked for lack of network (the directory); its slot then gets no role. */
+const props = defineProps<{ page: PageId; title: string; sync?: string; offlineRead?: boolean }>();
 
 const auth = inject(AUTH_KEY)!;
 const api = inject(API_KEY)!;
@@ -27,7 +28,7 @@ const who = computed(() => {
 });
 const staff = computed(() => state.value.status === "signedIn" && isStaff(state.value.role));
 const role = computed(() => (state.value.status === "signedIn" ? state.value.role : null));
-const access = computed(() => verdict(state.value, pageAccess(props.page)));
+const access = computed(() => verdict(state.value, pageAccess(props.page), props.offlineRead));
 // Every page until the role is known, then only those the role may open (none outside the staff)
 const nav = computed(() => (state.value.status === "signedIn" ? PAGES.filter((p) => canOpen(role.value, p.access)) : PAGES));
 
@@ -82,9 +83,6 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
           <span class="hidden md:inline">{{ item.label }}</span>
         </PageLink>
       </nav>
-      <div class="mt-auto hidden flex-col gap-2 px-2 md:flex">
-        <a class="text-[13px] text-side-text no-underline hover:text-white hover:underline" href="/competitions?vue=mobile">📱 Version mobile</a>
-      </div>
     </aside>
 
     <div class="min-w-0 px-4 pt-4 pb-28 md:px-7 md:pt-6 md:pb-10 print:p-0">
@@ -112,8 +110,15 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         <a :href="renewUrl" class="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-bold text-white no-underline">🔄 Renouveler l'accès</a>
       </div>
 
+      <p
+        v-if="access === 'offline'"
+        id="offline-notice"
+        role="status"
+        class="mb-3.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-900 print:hidden"
+      >📴 Hors ligne : consultation des dernières données reçues sur cet appareil.</p>
+
       <section
-        v-if="access !== 'allow' && access !== 'pending'"
+        v-if="access !== 'allow' && access !== 'pending' && access !== 'offline'"
         id="gate"
         class="max-w-xl rounded-xl border border-slate-200 bg-white px-4.5 py-4 shadow-sm"
       >
@@ -139,7 +144,7 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         </template>
       </section>
 
-      <div v-if="access === 'allow'" id="content">
+      <div v-if="access === 'allow' || access === 'offline'" id="content">
         <slot :role="role" />
       </div>
 

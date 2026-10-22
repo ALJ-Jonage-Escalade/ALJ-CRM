@@ -19,8 +19,8 @@ export type AuthState =
   | { status: "loading" }
   | { status: "signedOut" }
   | { status: "signedIn"; user: SessionUser; role: Role }
-  /** Signed in, but the server could not tell the role (offline, server error, token refused). */
-  | { status: "error"; user: SessionUser; message: string };
+  /** Signed in, but the server could not tell the role (offline: the network is down; server error, token refused). */
+  | { status: "error"; user: SessionUser; message: string; offline: boolean };
 
 export interface AuthDeps {
   /** Calls back with the current user now and on every change; returns the unsubscribe function. */
@@ -30,6 +30,8 @@ export interface AuthDeps {
   storage: Pick<Storage, "setItem">;
   navigate(url: string): void;
   currentPath(): string;
+  /** Calls back when the network comes back (an unverified role is asked again); returns the unsubscribe function. */
+  onNetworkBack?(callback: () => void): () => void;
 }
 
 export interface Auth {
@@ -57,9 +59,14 @@ async function readMe(res: Response): Promise<{ email: string; role: Role }> {
   return { email: typeof body.email === "string" ? body.email : "", role };
 }
 
+/** fetch rejects with a TypeError offline; Firebase, renewing the token, with auth/network-request-failed. */
+function isNetworkError(e: unknown): boolean {
+  return e instanceof TypeError || (e as { code?: unknown } | null)?.code === "auth/network-request-failed";
+}
+
 function errorMessage(e: unknown): string {
   if (e instanceof MeError) return e.message;
-  if (e instanceof TypeError) return "Serveur injoignable : vérifiez la connexion réseau.";  // fetch rejects offline
+  if (isNetworkError(e)) return "Serveur injoignable : vérifiez la connexion réseau.";
   return "Réponse inattendue du serveur.";  // e.g. a body that is not JSON
 }
 
@@ -80,12 +87,15 @@ export function createAuth(deps: AuthDeps): Auth {
       const me = await readMe(await deps.fetchMe());
       next = { status: "signedIn", user: { uid: user.uid, email: me.email || user.email }, role: me.role };
     } catch (e) {
-      next = { status: "error", user, message: errorMessage(e) };
+      next = { status: "error", user, message: errorMessage(e), offline: isNetworkError(e) };
     }
     if (mine === generation) state.value = next;
   }
 
-  const stop = deps.onUserChange((user) => void resolve(user));
+  const stopUser = deps.onUserChange((user) => void resolve(user));
+  const stopNetwork = deps.onNetworkBack?.(() => {
+    if (state.value.status === "error") void resolve(current);
+  });
 
   return {
     state: readonly(state),
@@ -101,7 +111,10 @@ export function createAuth(deps: AuthDeps): Auth {
       }
     },
     retry: () => resolve(current),
-    stop,
+    stop() {
+      stopUser();
+      stopNetwork?.();
+    },
   };
 }
 
@@ -120,6 +133,10 @@ export function sharedAuth(): Auth {
     storage: sessionStorage,
     navigate: (url) => location.assign(url),
     currentPath: () => location.pathname + location.search,
+    onNetworkBack: (callback) => {
+      window.addEventListener("online", callback);
+      return () => window.removeEventListener("online", callback);
+    },
   });
   return shared;
 }

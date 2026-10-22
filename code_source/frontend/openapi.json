@@ -14,7 +14,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Competition"
+                  },
+                  "type": "array",
+                  "title": "Response List Competitions Api Competitions Get"
+                }
               }
             }
           }
@@ -643,7 +649,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CompetitionMember"
+                  },
+                  "type": "array",
+                  "title": "Response List Competition Members Api Competition Members Get"
+                }
               }
             }
           }
@@ -1044,7 +1056,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CompetitorContact"
+                  },
+                  "type": "array",
+                  "title": "Response List Competitors Api Members Competitors Get"
+                }
               }
             }
           }
@@ -2889,7 +2907,7 @@
     "/index": {
       "get": {
         "summary": "Get Annuaire Page",
-        "description": "Annuaire des adhérents (lecture seule) : lit la base principale dans\nFirestore (collections crm_*) avec le compte Google du coach.",
+        "description": "Directory of the members (read only, readable offline): Vue application, on phones as on desktop.",
         "operationId": "get_annuaire_page_index_get",
         "responses": {
           "200": {
@@ -2908,7 +2926,7 @@
     "/": {
       "get": {
         "summary": "Root Route",
-        "description": "Point d'entrée racine : redirige vers la PWA Mobile des compétitions.",
+        "description": "Point d'entrée racine : les compétitions (application Vue).",
         "operationId": "root_route__get",
         "responses": {
           "200": {
@@ -2925,7 +2943,7 @@
     "/competitions": {
       "get": {
         "summary": "Get Competitions Page",
-        "description": "Page web de gestion des compétitions : données en temps réel depuis\nGoogle Cloud Firestore (même base que l'application de bureau).",
+        "description": "Competitions (read only, readable offline) and the Google sign-in callback (the OAuth redirect URI\nregistered for the club): Vue application, on phones as on desktop. Also the PWA's start page.",
         "operationId": "get_competitions_page_competitions_get",
         "responses": {
           "200": {
@@ -3348,6 +3366,90 @@
         ],
         "title": "CoachIn"
       },
+      "Competition": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          },
+          "id_ffme": {
+            "type": "string",
+            "title": "Id Ffme",
+            "default": ""
+          },
+          "date_competition": {
+            "type": "string",
+            "title": "Date Competition",
+            "description": "YYYY-MM-DD, empty when not dated",
+            "default": ""
+          },
+          "date_fin": {
+            "type": "string",
+            "title": "Date Fin",
+            "default": ""
+          },
+          "prix": {
+            "type": "number",
+            "title": "Prix",
+            "default": 0.0
+          },
+          "statut": {
+            "type": "string",
+            "title": "Statut",
+            "description": "en_preparation, en_cours or close (archived)",
+            "default": "en_preparation"
+          },
+          "whatsapp_link": {
+            "type": "string",
+            "title": "Whatsapp Link",
+            "default": ""
+          },
+          "url_resultats": {
+            "type": "string",
+            "title": "Url Resultats",
+            "default": ""
+          },
+          "resultats_synced_at": {
+            "type": "string",
+            "title": "Resultats Synced At",
+            "default": ""
+          },
+          "coach_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Coach Ids"
+          },
+          "coaches": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Coaches",
+            "description": "Names of coach_ids, from the coaches collection"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/CompetitionParticipant"
+            },
+            "type": "array",
+            "title": "Participants"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "Competition",
+        "description": "A competition with its participants, most recent first in the list."
+      },
       "CompetitionCreate": {
         "properties": {
           "nom": {
@@ -3432,6 +3534,151 @@
           "nom"
         ],
         "title": "CompetitionCreate"
+      },
+      "CompetitionMember": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          },
+          "prenom": {
+            "type": "string",
+            "title": "Prenom",
+            "default": ""
+          },
+          "num_licence": {
+            "type": "string",
+            "title": "Num Licence",
+            "default": ""
+          },
+          "tarif": {
+            "type": "string",
+            "title": "Tarif",
+            "default": ""
+          },
+          "saison": {
+            "type": "string",
+            "title": "Saison",
+            "default": ""
+          },
+          "creneau_groupe": {
+            "type": "string",
+            "title": "Creneau Groupe",
+            "default": ""
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "CompetitionMember",
+        "description": "A member of the `adherents` directory as the competition pages see it (current tariff and slot group)."
+      },
+      "CompetitionParticipant": {
+        "properties": {
+          "adherent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adherent Id"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          },
+          "prenom": {
+            "type": "string",
+            "title": "Prenom",
+            "default": ""
+          },
+          "num_licence": {
+            "type": "string",
+            "title": "Num Licence",
+            "default": ""
+          },
+          "tarif": {
+            "type": "string",
+            "title": "Tarif",
+            "default": ""
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone",
+            "default": ""
+          },
+          "selectionne": {
+            "type": "boolean",
+            "title": "Selectionne",
+            "default": false
+          },
+          "statut_paiement": {
+            "type": "string",
+            "title": "Statut Paiement",
+            "description": "non_invite, en_attente, paye, annule_perdu or annule_reporte",
+            "default": ""
+          },
+          "montant_paye": {
+            "type": "number",
+            "title": "Montant Paye",
+            "default": 0.0
+          },
+          "commande_helloasso": {
+            "type": "string",
+            "title": "Commande Helloasso",
+            "default": ""
+          },
+          "note_paiement": {
+            "type": "string",
+            "title": "Note Paiement",
+            "default": ""
+          },
+          "urgence_nom": {
+            "type": "string",
+            "title": "Urgence Nom",
+            "description": "Emergency contact copied when the member was added",
+            "default": ""
+          },
+          "urgence_tel": {
+            "type": "string",
+            "title": "Urgence Tel",
+            "default": ""
+          },
+          "classement": {
+            "type": "string",
+            "title": "Classement",
+            "default": ""
+          },
+          "resultat_ffme": {
+            "type": "string",
+            "title": "Resultat Ffme",
+            "default": ""
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "default": ""
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "CompetitionParticipant",
+        "description": "A member registered for a competition (row of its `participants`, infrastructure/firestore/competitions)."
       },
       "CompetitionUpdate": {
         "properties": {
@@ -3577,6 +3824,60 @@
         "type": "object",
         "title": "CompetitionUpdate",
         "description": "Partial update: only the fields sent are changed."
+      },
+      "CompetitorContact": {
+        "properties": {
+          "adherent_id": {
+            "type": "integer",
+            "title": "Adherent Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "creneau_groupe": {
+            "type": "string",
+            "title": "Creneau Groupe"
+          },
+          "emergency1_name": {
+            "type": "string",
+            "title": "Emergency1 Name"
+          },
+          "emergency1_phone": {
+            "type": "string",
+            "title": "Emergency1 Phone"
+          },
+          "emergency2_name": {
+            "type": "string",
+            "title": "Emergency2 Name"
+          },
+          "emergency2_phone": {
+            "type": "string",
+            "title": "Emergency2 Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "adherent_id",
+          "last_name",
+          "first_name",
+          "phone",
+          "creneau_groupe",
+          "emergency1_name",
+          "emergency1_phone",
+          "emergency2_name",
+          "emergency2_phone"
+        ],
+        "title": "CompetitorContact",
+        "description": "Contacts of a participant of an open competition (domain/members/view.py competitor_contacts): the only\nmember data kept offline on a coach's phone."
       },
       "Creneau": {
         "properties": {

@@ -10,31 +10,7 @@ from playwright.sync_api import expect
 
 from helpers.data import eventually, unique_name
 from helpers.mobile import competition_card, open_app, open_participants, participant_card, toast
-
-_STORED = """async (name) => new Promise(resolve => {
-  const req = indexedDB.open("alj-offline");
-  req.onerror = () => resolve(null);
-  req.onsuccess = () => {
-    const db = req.result;
-    if (!db.objectStoreNames.contains("resources")) { db.close(); resolve(null); return; }
-    const get = db.transaction("resources").objectStore("resources").get(name);
-    get.onsuccess = () => { db.close(); resolve(get.result ? get.result.data : null); };
-    get.onerror = () => { db.close(); resolve(null); };
-  };
-})"""
-
-
-def stored(page, name):
-    return page.evaluate(_STORED, name)
-
-
-def wait_stored(page, name, check=lambda data: True, timeout=None):
-    """The page saves after rendering: retried until the record is there and passes `check`."""
-    def ready():
-        data = stored(page, name)
-        assert data is not None and check(data), data
-        return data
-    return eventually(ready, timeout=timeout)
+from helpers.offline import stored, wait_stored
 
 
 @pytest.fixture

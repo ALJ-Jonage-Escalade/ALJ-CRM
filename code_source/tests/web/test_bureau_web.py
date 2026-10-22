@@ -2,7 +2,6 @@
 Tests du portail « bureau » (ordinateur) et de son socle web/shared/ :
 - routes publiques (pages) sans données, ressources communes servies ;
 - numéro de version identique (pages, service worker, pages PWA) ;
-- redirection ordinateur -> /bureau/ (script alj-vue.js) ;
 - rôles du socle identiques à l'API et à firestore.rules.
 """
 
@@ -24,7 +23,7 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
-from api.web.pages import get_annuaire_page, get_bureau_home, get_bureau_page, get_competitions_page
+from api.web.pages import get_bureau_home, get_bureau_page, get_competitions_management_page
 from api.web.pwa import get_sw, get_web_version
 from server import app
 
@@ -46,11 +45,11 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_pages_exist(self):
         self.assertTrue(os.path.exists(os.path.join(BUREAU, "competitions.html")))
-        for name in ("alj.css", "alj-core.js", "alj-shell.js", "alj-vue.js", "alj-sync.js"):
+        for name in ("alj.css", "alj-core.js", "alj-shell.js", "alj-sync.js"):
             self.assertTrue(os.path.exists(os.path.join(SHARED, name)), name)
 
     def test_routes_serve_only_known_pages(self):
-        self.assertEqual(get_bureau_page("competitions").status_code, 200)
+        self.assertEqual(get_bureau_page("competitions-gestion").status_code, 200)
         self.assertEqual(get_bureau_page("index.html").status_code, 404)
         self.assertEqual(get_bureau_page("..%2Fserver.py").status_code, 404)
         self.assertEqual(get_bureau_page("inconnue").status_code, 404)
@@ -78,8 +77,9 @@ class TestBureauFiles(unittest.TestCase):
         version = _current_version()
         self.assertIn(f'CACHE_NAME = "alj-escalade-v{version}"', sw)
         for asset in ("/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres",
+                      "/bureau/competitions-gestion", "/competitions/gestion",
                       "/static-web/alj.css", "/static-web/alj-core.js",
-                      "/static-web/alj-shell.js", "/static-web/alj-vue.js",
+                      "/static-web/alj-shell.js",
                       "/static-web/alj-sync.js"):
             self.assertIn(f'"{asset}"', sw)
 
@@ -541,7 +541,7 @@ class TestBureauFiles(unittest.TestCase):
         self.assertIn('/bureau/competitions', shell)
 
         # La vue mobile existe toujours séparément et n'est pas altérée
-        mobile_html = _read(get_competitions_page().path)
+        mobile_html = _read(get_competitions_management_page().path)
         self.assertIn('id="page-comps"', mobile_html)
         self.assertIn('id="page-participants"', mobile_html)
 
@@ -703,25 +703,17 @@ class TestBureauFiles(unittest.TestCase):
             "Bonjour Camille DURAND, votre inscription au groupe Jeunes 2010 pour la saison 2026-2027 (licence 654321) est validée."
         )
 
-    def test_pwa_entry_pages_check_device_before_rendering(self):
-        """competitions.html et index.html chargent alj-vue.js avant Firebase (redirection ordinateur)."""
-        for page in (get_competitions_page().path, get_annuaire_page().path):
-            html = _read(page)
-            self.assertIn('<script src="/static-web/alj-vue.js"></script>', html, page)
-            self.assertLess(html.index("alj-vue.js"), html.index("firebase-app-compat.js"), page)
-        self.assertIn('href="/index?vue=pwa"', _read(get_competitions_page().path))
-        self.assertIn('COMPETITIONS_URL + "?vue=pwa"', _read(get_annuaire_page().path))
-
-    def test_device_redirect_rules(self):
-        js = _read(os.path.join(SHARED, "alj-vue.js"))
-        # Ordinateur : écran large et pointeur fin (souris), pas tactile
-        self.assertIn("(min-width: 1024px) and (any-pointer: fine)", js)
-        self.assertIn('var BUREAU = "/bureau/";', js)
-        # Choix explicites : ?vue=mobile (mémorisé), ?vue=pwa (une fois), connexion Google
-        self.assertIn('vue === "mobile"', js)
-        self.assertIn('pwaDemandee = vue === "mobile" || vue === "pwa"', js)
-        self.assertIn('params.get("login") === "1"', js)
-        self.assertIn("access_token=", js)
+    def test_former_phone_page_signs_in_through_the_vue_app(self):
+        """The former phone page (/competitions/gestion) is no OAuth redirect URI: it signs in through
+        /competitions?login=1, which comes back to it (alj_after_login). No device redirection left."""
+        html = _read(get_competitions_management_page().path)
+        login = html[html.index("function login()"):html.index("function logout()")]
+        self.assertIn('sessionStorage.setItem("alj_after_login", location.pathname + location.search);', login)
+        self.assertIn('location.assign("/competitions?login=1");', login)
+        for gone in ("alj-vue.js", "accounts.google.com", "readOauthFragment", "completeDevLogin"):
+            self.assertNotIn(gone, html)
+        self.assertFalse(os.path.exists(os.path.join(SHARED, "alj-vue.js")))
+        self.assertIn('href="/index?vue=pwa"', html)
 
     def test_shell_imports_exist_in_core(self):
         """Chaque nom importé par alj-shell.js doit être exporté par alj-core.js."""
@@ -832,14 +824,35 @@ class TestVueApp(unittest.TestCase):
     def test_migrated_pages_serve_the_entry_page(self):
         with open(os.path.join(self.dist, "index.html"), "w", encoding="utf-8") as f:
             f.write("<div id=\"app\"></div>")
-        for page in ("adherents", "communications", "outils", "parametres", "planning"):
+        for page in ("adherents", "communications", "competitions", "outils", "parametres", "planning"):
             r = TestClient(app).get(f"/bureau/{page}")
             self.assertEqual(r.status_code, 200, page)
             self.assertEqual(r.text, '<div id="app"></div>', page)
-            self.assertFalse(os.path.exists(os.path.join(BUREAU, f"{page}.html")), page)
+            if page != "competitions":  # its former page keeps the writes (/bureau/competitions-gestion)
+                self.assertFalse(os.path.exists(os.path.join(BUREAU, f"{page}.html")), page)
+        # The competitions and the Google sign-in callback, on phones as on desktop (?vue=: former links)
+        for path in ("/competitions", "/competitions?vue=mobile", "/competitions?login=1"):
+            self.assertEqual(TestClient(app).get(path).text, '<div id="app"></div>', path)
+        r = TestClient(app).get("/", follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (302, "/competitions"))
+        # The directory, on phones as on desktop (?vue=pwa: link of the competitions page)
+        for path in ("/index", "/index?vue=pwa"):
+            self.assertEqual(TestClient(app).get(path).text, '<div id="app"></div>', path)
+        self.assertFalse(os.path.exists(os.path.join(WEB, "index.html")))
+
+    def test_former_directory_address_redirects(self):
+        for path in ("/annuaire/", "/annuaire/index.html?vue=pwa"):
+            r = TestClient(app).get(path, follow_redirects=False)
+            self.assertEqual(r.status_code, 302, path)
+            self.assertTrue(r.headers["location"].startswith("/index"), path)
+        self.assertEqual(TestClient(app).get("/annuaire/assets/logo.png").status_code, 200)  # the mount still serves the files
 
     def test_pages_not_migrated_keep_their_file(self):
-        self.assertEqual(get_bureau_page("competitions").path, os.path.join(BUREAU, "competitions.html"))
+        """The former competitions pages keep the writes until plan phase 11."""
+        self.assertEqual(get_bureau_page("competitions-gestion").path, os.path.join(BUREAU, "competitions.html"))
+        r = TestClient(app).get("/competitions/gestion")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('id="page-comps"', r.text)
 
     def test_former_record_url_goes_to_the_list(self):
         """/bureau/adherents-fiche (member record of the former page, 2.14) opens the record in the Vue app."""
@@ -852,7 +865,7 @@ class TestSingleFirebaseInit(unittest.TestCase):
     """Centralised Firebase initialisation (alj-firebase.js) and runtime configuration
     served by the server (/runtime-config.js): the basis of the emulator dev mode."""
 
-    PAGES = [os.path.join(WEB, "competitions.html"), os.path.join(WEB, "index.html")] + [
+    PAGES = [os.path.join(WEB, "competitions.html")] + [
         os.path.join(BUREAU, n) for n in sorted(os.listdir(BUREAU)) if n.endswith(".html")]
 
     def test_pages_load_config_then_init(self):

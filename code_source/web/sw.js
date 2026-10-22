@@ -1,26 +1,24 @@
-// Doit correspondre à <meta name="alj-web-version"> de competitions.html, index.html et bureau/*.html
+// Doit correspondre à <meta name="alj-web-version"> de competitions.html et bureau/*.html
 const CACHE_NAME = "alj-escalade-v25";
 const ASSETS_TO_CACHE = [
   "/competitions",
+  "/competitions/gestion",
   "/index",
-  "/annuaire/competitions.html",
-  "/annuaire/index.html",
   "/annuaire/assets/logo.png",
   "/bureau/",
   "/bureau/adherents",
   "/bureau/communications",
   "/bureau/competitions",
+  "/bureau/competitions-gestion",
   "/bureau/planning",
   "/bureau/outils",
   "/bureau/parametres",
   "/static-web/alj.css",
   "/static-web/alj-core.js",
   "/static-web/alj-shell.js",
-  "/static-web/alj-vue.js",
   "/static-web/alj-firebase.js",
   "/static-web/alj-sync.js",
   "/static-web/alj-store.js",
-  "/static-web/alj-members-sync.js",
   "/manifest.webmanifest",
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"

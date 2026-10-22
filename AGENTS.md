@@ -8,9 +8,6 @@ Python conventions (lint, typing, tests): `code_source/AGENTS.md`.
 Frontend: being migrated page by page to a Vue 3 app in `code_source/frontend/` (plan: `plans/vue-responsive-frontend.md`,
 decisions: `documentations/plan_frontend_vue.md`); pages not migrated yet stay in `code_source/web/`.
 
-## Setup
-See @./README.md
-
 ## Local dev (emulator only, no production access)
 ```bash
 docker compose -f dev/docker-compose.yml up -d    # Firebase emulator (:4000) + Mailpit (:8025)
@@ -25,11 +22,7 @@ docker compose -f dev/docker-compose.yml down     # stop (emulator data kept in 
 - HelloAsso endpoints call the real API and fail without credentials — expected in dev
 
 ## Checks (same as CI)
-- all: `uv lock --check && uv run python dev/export_requirements.py --check && uv run ruff check src tests && uv run mypy && uv run pytest tests`
-- frontend (from `code_source/frontend/`, Node from `.nvmrc`): `npm ci && npm run check:api && npm run lint && npm run typecheck && npm test && npm run build`
-- API contract: `uv run python dev/export_openapi.py --check` (`frontend/openapi.json` matches the Pydantic models)
-- unit tests: `uv sync --group web && uv run pytest tests` (the `web` group brings WeasyPrint/pydyf, needed by the attestation tests; WeasyPrint needs Pango, see `README.md`)
-- e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker and the Vue app built: `npm run build` in `frontend/`; see `dev/README.md`)
+Install, test, lint, typecheck, e2e and frontend commands: `code_source/AGENTS.md` § Commands.
 
 ## Deployment — production, ask before running
 Run from `code_source/` (the script always uploads `code_source/`); Windows scripts live in `scripts/` and `code_source/scripts/`

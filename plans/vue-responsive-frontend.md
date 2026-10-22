@@ -266,11 +266,27 @@ from the old page carries over.
 
 ### Acceptance criteria
 
-- [ ] The directory works on phone and desktop; read-only users see only what their role allows
-- [ ] With the network off, the last data is shown with its age
-- [ ] Logout, 401/403, a different user and a 31-day-old copy all leave no data on the device
-- [ ] Vitest covers the offline store and the synced resource in offline mode (load, expiry, wipe rules)
-- [ ] e2e offline directory scenarios pass
+- [x] The directory works on phone and desktop; read-only users see only what their role allows
+- [x] With the network off, the last data is shown with its age
+- [x] Logout, 401/403, a different user and a 31-day-old copy all leave no data on the device
+- [x] Vitest covers the offline store and the synced resource in offline mode (load, expiry, wipe rules)
+- [x] e2e offline directory scenarios pass
+
+> Done 2026-10-22. `/index` is the Vue route `annuaire` (`DirectoryPage.vue`), in the menu (« 📇 Annuaire ») and on
+> Accueil; desktops are no longer sent to `/bureau/` from it. Tabs on phones (Adhérents, Urgences, Filtres), filters
+> beside the list on desktop; same filters as Adhérents (`adherents/members.ts`), remembered under the former page's key
+> (`alj_annuaire_filters`), without the search. Read-only accounts keep the « Accès réservé » gate, as before
+> (`/api/members` is for coaches and admins); nothing is asked nor read from the device for them.
+> Only contacts, emergency contacts and diplomas are kept on the device (`annuaire/directory.ts`): the directory no
+> longer shows the health lines (engagement, document) nor the order (date, reference, amount) of the former page;
+> they stay in the Adhérents record, online. One copy per device: the last season viewed.
+> `lib/store.ts` is `alj-store.js` in TypeScript, same database: the competitions page's copy is read and wiped by
+> the app too. The former directory kept nothing offline (it was online only): there was nothing of its own to carry
+> over. The store is opened on every page of the app (`bindOfflineStore`), so that another account signing in wipes
+> it. Offline, `/api/me` cannot answer: the auth state says why (`offline`), and the directory then opens on the copy
+> of the signed-in user (verdict `offline`), and asks the server again when the network comes back. `/annuaire/` and
+> `/annuaire/index.html` redirect to `/index`; `web/index.html` and `alj-members-sync.js` are removed. Vitest runs the
+> store on `fake-indexeddb` (Apache-2.0, dev only, no dependencies).
 
 ---
 
@@ -286,11 +302,28 @@ OAuth callback keeps working on this route. Writes still go through the old page
 
 ### Acceptance criteria
 
-- [ ] Both URLs show the same screen; usable one-handed on a phone
-- [ ] Offline read shows the last data; wipe rules as in phase 9
-- [ ] Sign-in through Google still completes on `/competitions`
-- [ ] The app still installs and opens as a PWA
-- [ ] e2e competitions read, offline and auth scenarios pass
+- [x] Both URLs show the same screen; usable one-handed on a phone
+- [x] Offline read shows the last data; wipe rules as in phase 9
+- [x] Sign-in through Google still completes on `/competitions`
+- [x] The app still installs and opens as a PWA
+- [x] e2e competitions read, offline and auth scenarios pass
+
+> Done 2026-10-22. `CompetitionsPage.vue` answers `/competitions` and `/bureau/competitions`: the list, then a
+> competition's participants (`?id=`) grouped by slot group, with « Participe », payment status, KPIs and filters
+> (Tous / Participe / Paiement en attente); the list and the competition side by side on desktop, one at a time on a
+> phone. Read-only accounts open it too (new access level `viewer`: their menu has Compétitions only), without phones,
+> emergency contacts nor HelloAsso orders, as on the former page. The former pages keep the writes: the phone one on
+> `/competitions/gestion`, the office one on `/bureau/competitions-gestion` (« ✏️ Gérer les compétitions », coaches and
+> admins); HelloAsso, coaches and balance stay there. The former phone page now signs in through
+> `/competitions?login=1` (its new address is no OAuth redirect URI). The Google callback (access token in the
+> fragment, state checked), `?login=1` and the emulator's redirect are handled when the app starts (`signIn.ts`,
+> `lib/oauth.ts`, same client and scopes). Offline copies keep the former page's names (`competitions`, `competitors`):
+> its copies (no url recorded) are shown by the app. The member directory (`/api/competition-members`) only gives the
+> tariff and slot group, online. Response models: `Competition` (stored fields not listed are allowed),
+> `CompetitorContact`, `CompetitionMember`. The two offline screens are in the main bundle (a page loaded on demand is
+> missing offline when it was never opened online). With both entry pages in the app, `alj-vue.js` (desktop/phone
+> redirection) and the « 📱 Version mobile » links are removed; `/` still goes to `/competitions`. The entry page
+> gained the PWA tags (manifest, Apple icons).
 
 ---
 

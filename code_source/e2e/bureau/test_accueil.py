@@ -21,7 +21,7 @@ def test_phone_layout(mobile_page):
     nav = mobile_page.locator(NAV).bounding_box()
     assert abs(nav["y"] + nav["height"] - viewport["height"]) <= 1, "navigation bar at the bottom of the screen"
     assert nav["width"] == viewport["width"]
-    expect(mobile_page.locator(f"{NAV} a")).to_have_count(5)  # a coach: no Communications, no Paramètres
+    expect(mobile_page.locator(f"{NAV} a")).to_have_count(6)  # a coach: no Communications, no Paramètres
     expect(mobile_page.get_by_text(f"v{VERSION}", exact=True).filter(visible=True)).to_be_visible()
 
 
@@ -37,13 +37,13 @@ def test_desktop_layout(page):
 
     page.locator("#content a[href='/bureau/competitions']").click()
     page.wait_for_url("**/bureau/competitions")
-    expect(page.locator("#who")).to_contain_text("albus.dumbledore@alj-escalade.fr")  # same session on the former page
+    expect(page.locator("#who")).to_contain_text("albus.dumbledore@alj-escalade.fr")  # same session on the page
 
 
 ADMIN_PAGES = ["communications", "parametres"]
 
 
-@pytest.mark.parametrize("role, count", [("admin", 7), ("coach", 5)])
+@pytest.mark.parametrize("role, count", [("admin", 8), ("coach", 6)])
 def test_menu_and_cards_follow_the_role(page, role, count):
     page.goto("/bureau/")
     login_as(page, role)
@@ -55,12 +55,15 @@ def test_menu_and_cards_follow_the_role(page, role, count):
         expect(page.locator(f"#content a[href='/bureau/{name}']")).to_have_count(shown)
 
 
-@pytest.mark.parametrize("role", ["readonly", "stranger"])
-def test_non_staff_sees_no_menu(page, role):
+@pytest.mark.parametrize("role, pages", [("readonly", ["competitions"]), ("stranger", [])])
+def test_non_staff_sees_no_office_menu(page, role, pages):
+    """A read-only account only reaches the competitions (as on the former phone page)."""
     page.goto("/bureau/")
     login_as(page, role)
     expect(page.locator("#gate")).to_contain_text("Accès réservé")
-    expect(page.locator(NAV)).to_have_count(0)
+    expect(page.locator(f"{NAV} a")).to_have_count(len(pages))
+    for name in pages:
+        expect(page.locator(f"{NAV} a[data-page='{name}']")).to_be_visible()
 
 
 @pytest.mark.parametrize("name, label", [("parametres", "Paramètres"), ("communications", "Communications")])
@@ -75,7 +78,7 @@ def test_coach_is_sent_back_from_an_admin_page(page, name, label):
 
 def test_former_pages_hide_the_admin_links_from_a_coach(page):
     """Pages not migrated yet: the former shell's menu follows the same rule."""
-    page.goto("/bureau/competitions")
+    page.goto("/bureau/competitions-gestion")
     login_as(page, "coach")
     expect(page.locator("#content")).to_be_visible()
     for admin_page in ADMIN_PAGES:

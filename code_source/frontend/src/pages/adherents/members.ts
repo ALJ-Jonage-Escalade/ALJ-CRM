@@ -87,7 +87,7 @@ export interface TarifCounts {
   others: Record<string, number>;
 }
 
-export function tarifCounts(members: readonly Member[], items: readonly CreneauItem[]): TarifCounts {
+export function tarifCounts(members: readonly Pick<Member, "tarif_name">[], items: readonly CreneauItem[]): TarifCounts {
   const covered = new Set<string>();
   for (const it of items) if (it.kind === "group") for (const t of it.tarifs) covered.add(normKey(t));
   const byTarif: Record<string, number> = {};
@@ -151,8 +151,12 @@ export function checkAll(filters: Filters, items: readonly CreneauItem[], counts
 
 const digits = (s: string) => s.replace(/\D/g, "");
 
+/** What the search and the filters read of a member (the directory keeps fewer fields: no comment). */
+export type FilteredMember = Pick<Member, "last_name" | "first_name" | "tarif_name" | "licence_ffme" | "email_primary" | "phone" | "city" | "status_norm">
+  & Partial<Pick<Member, "commentaires_correctif">>;
+
 /** The search finds names (both orders), tariff, licence, e-mail, phone (4 digits at least, any spacing), city, comment. */
-export function matchesSearch(m: Member, search: string): boolean {
+export function matchesSearch(m: FilteredMember, search: string): boolean {
   const q = normKey(search);
   if (!q) return true;
   const qDigits = digits(q);
@@ -164,7 +168,7 @@ export function matchesSearch(m: Member, search: string): boolean {
 }
 
 /** A member without a tariff is always listed (as on the former page). */
-export function filterMembers(members: readonly Member[], filters: Filters, allowed: Set<string>): Member[] {
+export function filterMembers<M extends FilteredMember>(members: readonly M[], filters: Filters, allowed: Set<string>): M[] {
   return members.filter((m) => {
     const k = normKey(m.tarif_name);
     if (k && !allowed.has(k)) return false;
@@ -178,7 +182,7 @@ export function filterMembers(members: readonly Member[], filters: Filters, allo
 export const STATUSES = ["Validé", "Traité", "Terminé", "En cours", "Annulé"] as const;
 
 /** Status chips: « Tous » then the statuses some member has, with their counts. */
-export function statusChips(members: readonly Member[]): { value: string; label: string; count: number }[] {
+export function statusChips(members: readonly Pick<Member, "status_norm">[]): { value: string; label: string; count: number }[] {
   const chips = [{ value: "", label: "Tous", count: members.length }];
   for (const st of STATUSES) {
     const count = members.filter((m) => m.status_norm === st).length;
@@ -186,6 +190,13 @@ export function statusChips(members: readonly Member[]): { value: string; label:
   }
   return chips;
 }
+
+const STATUS_CLASS: Record<string, string> = {
+  "Validé": "bg-green-600", "Traité": "bg-blue-600", "Terminé": "bg-violet-500", "En cours": "bg-amber-600", "Annulé": "bg-red-600",
+};
+
+/** Background (Tailwind class) of a status badge. */
+export const statusClass = (status: string): string => STATUS_CLASS[status] ?? "bg-slate-400";
 
 const yes = (v: string) => ["oui", "x", "true", "1"].includes(v.trim().toLowerCase());
 
@@ -196,7 +207,7 @@ export interface Diplome {
 }
 
 /** Badges of the Diplôme column: red badge, bouldering autonomy, orange passport. */
-export function diplomes(m: Member): Diplome[] {
+export function diplomes(m: Pick<Member, "badge_rouge" | "autonomie_bloc" | "raw_passports" | "passeport_orange">): Diplome[] {
   const items: Diplome[] = [];
   if (yes(m.badge_rouge)) items.push({ type: "badge_rouge", label: "Badge rouge diff", icon: "🔴" });
   if (yes(m.autonomie_bloc)) items.push({ type: "autonomie_bloc", label: "Autonomie bloc", icon: "🧗" });
@@ -297,11 +308,12 @@ export function csvName(season: string): string {
 /** Same key and shape as the former page (web/shared/alj-filters.js): the filters of earlier visits are kept. */
 export const FILTER_KEY = "alj_bureau_adherents_filters";
 
-/** The filters of the last visit on this browser. The search is not kept: it often holds a member's name. */
-export function loadFilters(storage: Pick<Storage, "getItem"> | undefined = globalThis.localStorage): Filters {
+/** The filters of the last visit on this browser (key: another page's filters). The search is not kept: it often
+    holds a member's name. */
+export function loadFilters(storage: Pick<Storage, "getItem"> | undefined = globalThis.localStorage, key = FILTER_KEY): Filters {
   const filters = emptyFilters();
   try {
-    const saved: unknown = JSON.parse(storage?.getItem(FILTER_KEY) || "{}");
+    const saved: unknown = JSON.parse(storage?.getItem(key) || "{}");
     if (!saved || typeof saved !== "object") return filters;
     const { season, status, groups, others } = saved as Record<string, unknown>;
     if (typeof season === "string") filters.season = season;
@@ -319,9 +331,9 @@ function booleans(value: unknown): Record<string, boolean> {
   return Object.fromEntries(Object.entries(value).filter((e): e is [string, boolean] => typeof e[1] === "boolean"));
 }
 
-export function saveFilters(filters: Filters, storage: Pick<Storage, "setItem"> | undefined = globalThis.localStorage): void {
+export function saveFilters(filters: Filters, storage: Pick<Storage, "setItem"> | undefined = globalThis.localStorage, key = FILTER_KEY): void {
   try {
-    storage?.setItem(FILTER_KEY, JSON.stringify({ ...filters, search: "" }));
+    storage?.setItem(key, JSON.stringify({ ...filters, search: "" }));
   } catch {
     // blocked storage: the filters last for this visit only
   }

@@ -1,4 +1,4 @@
-/* Runs web/shared/alj-sync.js and alj-members-sync.js in Node with a fetch whose answers the
+/* Runs web/shared/alj-sync.js in Node with a fetch whose answers the
    scenarios release one by one, then prints {scenario: result} as JSON for
    tests/web/test_sync_scripts.py. Usage: node sync_scripts_harness.js <web/shared dir> */
 "use strict";
@@ -22,7 +22,7 @@ function makeContext() {
   };
   ctx.window = Object.assign(ctx, { addEventListener: noop, removeEventListener: noop });
   vm.createContext(ctx);
-  for (const name of ["alj-sync.js", "alj-members-sync.js"]) {
+  for (const name of ["alj-sync.js"]) {
     vm.runInContext(fs.readFileSync(path.join(sharedDir, name), "utf8"), ctx, { filename: name });
   }
   return ctx;
@@ -50,55 +50,7 @@ function makeFetch() {
   return { fetch, answer, requested };
 }
 
-const SEASONS = { seasons: ["2026-2027", "2025-2026"], active: "2026-2027" };
-const members = (season, names) => ({ season, members: names.map(n => ({ last_name: n })), creneaux: [] });
-const URL_2026 = "/api/members?season=2026-2027";
-const URL_2025 = "/api/members?season=2025-2026";
-
-function startMembers(ctx, f, season) {
-  const shown = [];
-  const sync = ctx.ALJMembersSync.start({
-    fetch: f.fetch, season,
-    onData: d => shown.push({ season: d.season, members: d.members.map(m => m.last_name) })
-  });
-  return { sync, shown };
-}
-
 const scenarios = {
-  /* The old season's answer arrives after the new season's one. */
-  async late_answer_of_previous_season() {
-    const ctx = makeContext(), f = makeFetch();
-    const { sync, shown } = startMembers(ctx, f, "2026-2027");
-    await f.answer("/api/seasons", SEASONS);
-    sync.setSeason("2025-2026");
-    await f.answer(URL_2025, members("2025-2026", ["DURAND"]));
-    await f.answer(URL_2026, members("2026-2027", ["MARTIN"]));
-    sync.refresh();
-    return { shown, last_request: f.requested[f.requested.length - 1] };
-  },
-
-  /* The old season's answer arrives before the new season's one. */
-  async early_answer_of_previous_season() {
-    const ctx = makeContext(), f = makeFetch();
-    const { sync, shown } = startMembers(ctx, f, "2026-2027");
-    await f.answer("/api/seasons", SEASONS);
-    sync.setSeason("2025-2026");
-    await f.answer(URL_2026, members("2026-2027", ["MARTIN"]));
-    await f.answer(URL_2025, members("2025-2026", ["DURAND"]));
-    return { shown };
-  },
-
-  /* Without a season the server picks the active one: later changes must still show. */
-  async active_season_keeps_updating() {
-    const ctx = makeContext(), f = makeFetch();
-    const { sync, shown } = startMembers(ctx, f, "");
-    await f.answer("/api/seasons", SEASONS);
-    await f.answer("/api/members", members("2026-2027", ["MARTIN"]));
-    sync.refresh();
-    await f.answer("/api/members", members("2026-2027", ["MARTIN", "PETIT"]));
-    return { shown };
-  },
-
   /* ALJSync.poll: an answer on its way when stop() is called reaches no callback. */
   async stopped_poll_drops_its_answer() {
     const ctx = makeContext(), f = makeFetch();

@@ -2,7 +2,7 @@
 
 > Written 2026-10-20 when the PySide6 desktop app was removed (branch `feat/remove_windows_app`, base `main` @ `e7e0624`).
 > Method: each desktop page (`src/presentation/pages/*.py`, last version in git history) was compared with
-> `web/bureau/*.html`, `web/index.html` and the API routes in `src/server.py` / `src/api/`.
+> `web/bureau/*.html`, the Vue app (`frontend/`) and the API routes in `src/server.py` / `src/api/`.
 > To read the removed code: `git show e7e0624:code_source/src/presentation/pages/<page>.py`.
 
 ## Missing on the web
@@ -10,7 +10,7 @@
 | Desktop feature | Desktop page | Removed code | Backend logic kept? | Notes |
 |---|---|---|---|---|
 | Bulk e-mail to filtered members (season, slot, status, "registered after"), choice of recipient address (member / 2nd e-mail / HelloAsso payer), attestation PDF and WhatsApp invitation/QR as attachments, duplicate removal | Communications | `pages/communications.py` | Partly: `/api/send-email`, `/api/preview-email`, `infrastructure/mail/*` | The web sends to one member at a time (`adherents.html`) or to a competition campaign (`competitions.html`). `communications.html` only manages templates. |
-| A4 emergency-contacts book (Excel, club style) | Exports | `exports/emergency_contacts.py` | No | Contacts can only be viewed per member in the mobile directory (`web/index.html`). |
+| A4 emergency-contacts book (Excel, club style) | Exports | `exports/emergency_contacts.py` | No | Contacts can only be viewed per member in the directory (`/index`, `frontend/src/pages/DirectoryPage.vue`). |
 | Excel export of former members not re-registered | Exports | worker in `presentation/workers.py` | Yes: "Non réinscrits" filter in `MemberRepository.load_direct_data` (`infrastructure/sqlite/members.py`) | Needs a route + button. |
 | MyCompet rankings export (Excel) | Exports | worker | Yes: `infrastructure/mycompet/scraper.scrape_mycompet` (no caller anymore) | Per-competition results exist on the web ("Trouver les résultats"). |
 | Import of the autonomy list `Autonomes_*.xlsx` (red badges) | FFME | `pages/ffme.py` | Yes: `FfmeImportRepository.merge_autonomes_data` (no caller anymore) | Badges can only be edited member by member. |

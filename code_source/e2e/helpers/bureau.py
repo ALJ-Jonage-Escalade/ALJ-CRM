@@ -1,4 +1,5 @@
-"""Office portal competitions page (web/bureau/competitions.html): navigation and locators."""
+"""Former office page of the competitions (web/bureau/competitions.html, on /bureau/competitions-gestion: the writes
+until plan phase 11): navigation and locators."""
 from playwright.sync_api import Locator, Page, expect
 
 from helpers.auth import login_as
@@ -6,7 +7,7 @@ from helpers.mobile import SEEDED_COMPETITION
 
 
 def open_competitions(page: Page, role: str = "admin") -> Page:
-    page.goto("/bureau/competitions")
+    page.goto("/bureau/competitions-gestion")
     login_as(page, role)
     expect(competition_card(page, SEEDED_COMPETITION)).to_be_visible(timeout=20_000)   # first load, as open_members
     return page

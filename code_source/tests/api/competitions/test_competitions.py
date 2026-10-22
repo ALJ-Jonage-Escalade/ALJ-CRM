@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from support.api_case import ApiTestCase
 
+from api.competitions.schemas.views import Competition as CompetitionView, CompetitionParticipant
 from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from infrastructure.firestore.client import FirestoreError
@@ -20,9 +21,22 @@ class TestCompetitions(ApiTestCase):
         self.assertEqual(doc["participants"], [])
         self.assertNotIn("_update_time", doc)
 
+        Repo.add_participant(doc["id"], 1)
         r = self.client.get("/api/competitions")
         self.assertEqual(r.status_code, 200)
         self.assertEqual([c["id"] for c in r.json()], [doc["id"]])
+        # The body is built by hand (json_with_etag): the fields the contract declares are all there, as declared
+        listed = r.json()[0]
+        parsed = CompetitionView.model_validate(listed).model_dump()
+        for field in CompetitionView.model_fields:
+            self.assertIn(field, listed)
+            if field != "participants":
+                self.assertEqual(parsed[field], listed[field], field)
+        (part,) = listed["participants"]
+        for field in CompetitionParticipant.model_fields:
+            if field not in ("classement", "resultat_ffme"):  # set by the results fetch only
+                self.assertIn(field, part)
+                self.assertEqual(parsed["participants"][0][field], part[field], field)
         again = self.client.get("/api/competitions", headers={"If-None-Match": r.headers["etag"]})
         self.assertEqual(again.status_code, 304)
 

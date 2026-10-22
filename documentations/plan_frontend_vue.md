@@ -32,7 +32,11 @@ Migration is gradual: FastAPI serves the SPA `index.html` for migrated routes an
 - `alj-store.js` and `alj-sync.js` are kept almost as is, converted to TypeScript modules, and exposed through a
   `useSyncedResource(name, url, { offline })` composable. No rewrite of this edge-case-heavy code.
   Online mode since phase 7 (2026-10-22): `poll()` of `alj-sync.js` is `frontend/src/lib/sync.ts`, the composable
-  `frontend/src/composables/syncedResource.ts`; `alj-store.js` (offline copy) joins it with the directory (phase 9).
+  `frontend/src/composables/syncedResource.ts`. Offline mode since phase 9 (2026-10-22): `alj-store.js` is
+  `frontend/src/lib/store.ts` (same database, so the competitions page and the app share and wipe the same copy);
+  `bindOfflineStore` (`composables/offlineSession.ts`) wipes it on logout and claims it for each account signing in.
+  Offline, `/api/me` cannot answer: a page readable offline (`AppShell offline-read`, verdict `offline`) then opens on
+  the copy of the signed-in user, which only exists if the server let that user in within 30 days.
 
 ### D3 — TypeScript, with API types generated from OpenAPI
 Only 4 of 76 routes declare a `response_model` today. Each migrated page adds Pydantic response models to the

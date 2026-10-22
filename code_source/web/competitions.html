@@ -12,7 +12,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="/annuaire/assets/logo.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='85' font-size='85'>🏆</text></svg>">
-<script src="/static-web/alj-vue.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="/runtime-config.js"></script>
@@ -766,54 +765,17 @@ function setSyncInfo(msg) {
 }
 
 /* ===================== Authentification Firebase ===================== */
-/* Flux : OAuth Google implicite (même origine, client 796572126711) puis
-   signInWithCredential — évite la redirection via firebaseapp.com dont le
-   stockage inter-sites est bloqué (Firefox ETP, navigation privée, PWA). */
-const OAUTH_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const OAUTH_CLIENT_ID = "796572126711-npcue84vd52prmtjik0bdp6ng6ggpie8.apps.googleusercontent.com";
-const OAUTH_SCOPES = "openid email profile";
-
+/* Sign-in goes through the competitions screen of the Vue app (/competitions, the Google OAuth redirect URI
+   registered for the club; emulator account picker in dev), which comes back here (alj_after_login). */
 function login() {
-  if (ALJFirebase.isEmulator) { ALJFirebase.devLogin(); return; }  // dev: Auth emulator
-  const state = Array.from(crypto.getRandomValues(new Uint8Array(16)),
-    b => b.toString(16).padStart(2, "0")).join("");
-  sessionStorage.setItem("alj_oauth_state", state);
-  const url = OAUTH_AUTH_URL
-    + "?client_id=" + encodeURIComponent(OAUTH_CLIENT_ID)
-    + "&redirect_uri=" + encodeURIComponent(location.origin + location.pathname)
-    + "&response_type=token"
-    + "&scope=" + encodeURIComponent(OAUTH_SCOPES)
-    + "&state=" + state
-    + "&prompt=select_account";
-  location.assign(url);
+  sessionStorage.setItem("alj_after_login", location.pathname + location.search);
+  location.assign("/competitions?login=1");
 }
 function logout() {
   const n = outbox.size;
   if (n && !confirm(`${n} modification${n > 1 ? "s" : ""} faite${n > 1 ? "s" : ""} hors ligne `
       + `pas encore envoyée${n > 1 ? "s" : ""} ser${n > 1 ? "ont" : "a"} perdue${n > 1 ? "s" : ""}. Se déconnecter ?`)) return;
   auth.signOut().catch(() => {});
-}
-function readOauthFragment() {
-  if (!location.hash || location.hash.length < 2) return null;
-  const params = new URLSearchParams(location.hash.slice(1));
-  history.replaceState(null, "", location.pathname + location.search);
-  if (params.get("error")) throw new Error("Connexion Google refusée : " + params.get("error"));
-  const token = params.get("access_token");
-  if (!token) return null;
-  const state = params.get("state");
-  const expected = sessionStorage.getItem("alj_oauth_state");
-  sessionStorage.removeItem("alj_oauth_state");
-  if (!state || state !== expected) throw new Error("Session de connexion invalide — cliquez à nouveau sur « Se connecter ».");
-  return token;
-}
-function showAuthError(e) {
-  console.error(e);
-  let msg = e.message || String(e);
-  if (e.code === "auth/unauthorized-domain") msg = "Domaine non autorisé : ajoutez l'adresse de ce site dans Firebase Authentication → Paramètres → Domaines autorisés.";
-  else if (e.code === "auth/operation-not-allowed") msg = "Le fournisseur Google n'est pas activé dans Firebase Authentication.";
-  else if (e.code === "auth/popup-blocked") msg = "Fenêtre de connexion bloquée par le navigateur — réessayez.";
-  setSyncInfo("⚠️ Connexion impossible");
-  toast("❌ " + msg, 9000);
 }
 
 auth.onAuthStateChanged(async u => {
@@ -2678,34 +2640,6 @@ async function forceWebUpdate() {
 
   wireEvents();
 
-  // Retour de Google après la redirection OAuth : access_token dans le fragment (#…)
-  // → connexion Firebase avec le credential Google (pas de domaine tiers impliqué)
-  // Sign-in requested from another page of the site (directory, office): go back there
-  const returnAfterLogin = () => {
-    const back = sessionStorage.getItem("alj_after_login") || "";
-    sessionStorage.removeItem("alj_after_login");
-    if (/^\/[^\/\\]/.test(back)) { location.replace(back); return true; }
-    return false;
-  };
-  try {
-    const oauthToken = readOauthFragment();
-    if (oauthToken) {
-      setSyncInfo("Connexion Firebase…");
-      const credential = firebase.auth.GoogleAuthProvider.credential(null, oauthToken);
-      await auth.signInWithCredential(credential);
-      if (returnAfterLogin()) return;
-    } else if (await ALJFirebase.completeDevLogin()) {
-      // Dev: back from the Auth emulator's account picker
-      if (returnAfterLogin()) return;
-    } else if (new URLSearchParams(location.search).get("login") === "1") {
-      // Arrivée depuis l'annuaire (bouton « Se connecter ») : lance la connexion Google
-      history.replaceState(null, "", location.pathname);
-      login();
-      return;
-    }
-  } catch (e) {
-    showAuthError(e);
-  }
 })();
 </script>
 </body>

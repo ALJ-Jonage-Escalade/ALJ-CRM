@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from support.api_case import ApiTestCase
 
+from api.competitions.schemas.views import CompetitionMember
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 
@@ -14,6 +15,11 @@ class TestCompetitionMembers(ApiTestCase):
         self.seed_adherent(1)
         members = self.client.get("/api/competition-members").json()
         self.assertEqual([(m["id"], m["nom"], m["licence_ffme"]) for m in members], [(1, "MARTIN", "654321")])
+        # The body is built by hand (json_with_etag): the fields the contract declares are there, as declared
+        declared = CompetitionMember.model_fields
+        for m in members:
+            self.assertEqual({k: v for k, v in CompetitionMember.model_validate(m).model_dump().items() if k in declared},
+                             {k: m[k] for k in declared})
 
     def test_firestore_failure_is_an_error_not_an_empty_directory(self):
         self.seed_adherent(1)

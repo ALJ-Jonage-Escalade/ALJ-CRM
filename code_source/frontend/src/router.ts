@@ -7,6 +7,10 @@ import { createRouter, createWebHistory, type RouteLocationNormalized, type Rout
 import type { Auth } from "./composables/auth";
 import { HOME, pageAccess, REFUSED_QUERY, verdict, type Access } from "./lib/access";
 import AccueilPage from "./pages/AccueilPage.vue";
+// The pages readable offline are in the main bundle: the service worker only keeps what was fetched, and a page
+// loaded on demand would be missing offline if it was never opened online on this device
+import CompetitionsPage from "./pages/CompetitionsPage.vue";
+import DirectoryPage from "./pages/DirectoryPage.vue";
 import NotFoundPage from "./pages/NotFoundPage.vue";
 
 // Loaded when opened: Accueil (the most opened page) does not wait for them
@@ -25,6 +29,10 @@ declare module "vue-router" {
 export const routes: RouteRecordRaw[] = [
   { path: HOME, name: "accueil", component: AccueilPage, meta: { access: pageAccess("accueil") } },
   { path: "/bureau/adherents", name: "adherents", component: AdherentsPage, meta: { access: pageAccess("adherents") } },
+  // Same screen on both addresses: /competitions is the PWA's start page and the Google sign-in callback (main.ts)
+  { path: "/competitions", name: "competitions-pwa", component: CompetitionsPage, meta: { access: pageAccess("competitions") } },
+  { path: "/bureau/competitions", name: "competitions", component: CompetitionsPage, meta: { access: pageAccess("competitions") } },
+  { path: "/index", name: "annuaire", component: DirectoryPage, meta: { access: pageAccess("annuaire") } },
   { path: "/bureau/communications", name: "communications", component: CommunicationsPage, meta: { access: pageAccess("communications") } },
   { path: "/bureau/planning", name: "planning", component: PlanningPage, meta: { access: pageAccess("planning") } },
   { path: "/bureau/outils", name: "outils", component: OutilsPage, meta: { access: pageAccess("outils") } },

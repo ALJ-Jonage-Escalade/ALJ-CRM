@@ -9,7 +9,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 /** Fake Firebase session: emit(user) plays onAuthStateChanged. */
-function setup(fetchMe: AuthDeps["fetchMe"]) {
+function setup(fetchMe: AuthDeps["fetchMe"], onNetworkBack?: AuthDeps["onNetworkBack"]) {
   let listener: (user: SessionUser | null) => void = () => {};
   const deps = {
     onUserChange: vi.fn((cb: (user: SessionUser | null) => void) => {
@@ -21,6 +21,7 @@ function setup(fetchMe: AuthDeps["fetchMe"]) {
     storage: { setItem: vi.fn() },
     navigate: vi.fn(),
     currentPath: () => "/bureau/?x=1",
+    onNetworkBack,
   };
   const auth = createAuth(deps);
   /** Firebase reports a user change; resolves once the state is settled. */
@@ -53,18 +54,39 @@ describe("createAuth", () => {
   it("reports a refused session", async () => {
     const { auth, emit } = setup(async () => json({ status: "error" }, 401));
     await emit(ALBUS);
-    expect(auth.state.value).toEqual({ status: "error", user: ALBUS, message: "Session refusée par le serveur : reconnectez-vous." });
+    expect(auth.state.value).toEqual({ status: "error", user: ALBUS, message: "Session refusée par le serveur : reconnectez-vous.", offline: false });
   });
 
+  const UNREACHABLE = "Serveur injoignable : vérifiez la connexion réseau.";
   it.each([
-    ["a server error", async () => json({}, 500), "Le serveur ne répond pas correctement (erreur 500)."],
-    ["no network", async () => { throw new TypeError("Failed to fetch"); }, "Serveur injoignable : vérifiez la connexion réseau."],
-    ["an unknown role", async () => json({ email: "x", role: "superuser" }), "Réponse inattendue du serveur."],
-    ["a body that is not JSON", async () => new Response("<html>", { status: 200 }), "Réponse inattendue du serveur."],
-  ])("reports %s without granting access", async (_case, fetchMe, message) => {
+    ["a server error", async () => json({}, 500), "Le serveur ne répond pas correctement (erreur 500).", false],
+    ["no network", async () => { throw new TypeError("Failed to fetch"); }, UNREACHABLE, true],
+    ["no network to renew the token", async () => { throw Object.assign(new Error("x"), { code: "auth/network-request-failed" }); }, UNREACHABLE, true],
+    ["an unknown role", async () => json({ email: "x", role: "superuser" }), "Réponse inattendue du serveur.", false],
+    ["a body that is not JSON", async () => new Response("<html>", { status: 200 }), "Réponse inattendue du serveur.", false],
+  ])("reports %s without granting access", async (_case, fetchMe, message, offline) => {
     const { auth, emit } = setup(fetchMe);
     await emit(ALBUS);
-    expect(auth.state.value).toEqual({ status: "error", user: ALBUS, message });
+    expect(auth.state.value).toEqual({ status: "error", user: ALBUS, message, offline });
+  });
+
+  it("asks the server again when the network comes back, only while the role is unknown", async () => {
+    let calls = 0;
+    let networkBack: () => void = () => {};
+    const { auth, deps, emit } = setup(async () => {
+      if (++calls === 1) throw new TypeError("Failed to fetch");
+      return json({ email: ALBUS.email, role: "coach" });
+    }, (cb) => {
+      networkBack = cb;
+      return () => {};
+    });
+    await emit(ALBUS);
+    expect(auth.state.value.status).toBe("error");
+    networkBack();
+    await vi.waitFor(() => expect(auth.state.value).toEqual({ status: "signedIn", user: ALBUS, role: "coach" }));
+    networkBack();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(deps.fetchMe).toHaveBeenCalledTimes(2);
   });
 
   it("asks the server again on retry", async () => {
