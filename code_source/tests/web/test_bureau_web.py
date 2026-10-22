@@ -8,7 +8,9 @@ Tests du portail « bureau » (ordinateur) et de son socle web/shared/ :
 
 import os
 import re
+import shutil
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -43,14 +45,13 @@ def _current_version():
 class TestBureauFiles(unittest.TestCase):
 
     def test_pages_exist(self):
-        for name in ("index.html", "adherents.html", "outils.html"):
+        for name in ("adherents.html", "outils.html"):
             self.assertTrue(os.path.exists(os.path.join(BUREAU, name)), name)
         for name in ("alj.css", "alj-core.js", "alj-shell.js", "alj-vue.js",
                       "alj-members.js", "alj-filters.js", "alj-sync.js"):
             self.assertTrue(os.path.exists(os.path.join(SHARED, name)), name)
 
     def test_routes_serve_only_known_pages(self):
-        self.assertEqual(get_bureau_home().status_code, 200)
         self.assertEqual(get_bureau_page("adherents").status_code, 200)
         self.assertEqual(get_bureau_page("outils").status_code, 200)
         self.assertEqual(get_bureau_page("index.html").status_code, 404)
@@ -59,7 +60,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_pages_are_static_shells_without_member_data(self):
         """Les pages n'embarquent aucune donnée : elles chargent le socle et lisent l'API après connexion."""
-        for name in ("index.html", "adherents.html", "outils.html"):
+        for name in ("adherents.html", "outils.html"):
             html = _read(os.path.join(BUREAU, name))
             self.assertIn('href="/static-web/alj.css"', html, name)
             self.assertIn('import { startBureau } from "/static-web/alj-shell.js"', html, name)
@@ -70,7 +71,7 @@ class TestBureauFiles(unittest.TestCase):
     def test_bureau_pages_share_web_version(self):
         version = _current_version()
         self.assertRegex(version, r"^\d+$")
-        for name in ("index.html", "adherents.html", "communications.html", "competitions.html", "planning.html", "outils.html", "parametres.html"):
+        for name in ("adherents.html", "communications.html", "competitions.html", "planning.html", "outils.html", "parametres.html"):
             html = _read(os.path.join(BUREAU, name))
             self.assertIn(f'<meta name="alj-web-version" content="{version}">', html, name)
             self.assertRegex(html, rf"<title>[^<]*\(v{version}\)</title>", name)
@@ -913,11 +914,9 @@ class TestBureauFiles(unittest.TestCase):
         """La page communications.html reprend le design desktop et contient tous les contrôles."""
         html = _read(os.path.join(BUREAU, "communications.html"))
         shell = _read(os.path.join(SHARED, "alj-shell.js"))
-        index = _read(os.path.join(BUREAU, "index.html"))
 
-        # Vérification du menu et du lien
+        # Vérification du menu
         self.assertIn('/bureau/communications', shell)
-        self.assertIn('/bureau/communications', index)
 
         # Contrôles de la page
         for elem in ("template-select", "template-name-input", "btn-save-tpl", "btn-new-tpl", "btn-del-tpl",
@@ -932,11 +931,9 @@ class TestBureauFiles(unittest.TestCase):
         """La page bureau/competitions.html est adaptée aux grands écrans d'ordinateur tout en préservant le mobile."""
         html = _read(os.path.join(BUREAU, "competitions.html"))
         shell = _read(os.path.join(SHARED, "alj-shell.js"))
-        index = _read(os.path.join(BUREAU, "index.html"))
 
-        # Vérification des liens du menu et de l'accueil
+        # Vérification du lien du menu
         self.assertIn('/bureau/competitions', shell)
-        self.assertIn('/bureau/competitions', index)
 
         # La vue mobile existe toujours séparément et n'est pas altérée
         mobile_html = _read(get_competitions_page().path)
@@ -1186,6 +1183,41 @@ class TestBureauAccess(unittest.TestCase):
         for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres", "/static-web/alj-core.js"):
             self.assertIsNone(r("GET", path), path)
         self.assertEqual(r("GET", "/api/email-status"), Role.COACH)
+
+
+class TestVueApp(unittest.TestCase):
+    """Pages migrated to the Vue application (frontend/): its entry page and assets (api/web/pages.py)."""
+
+    def setUp(self):
+        self.dist = tempfile.mkdtemp(prefix="alj-dist-")
+        self.env = patch.dict(os.environ, {"ALJ_FRONTEND_DIST": self.dist})
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+        shutil.rmtree(self.dist, ignore_errors=True)
+
+    def test_accueil_without_build_explains_how_to_build(self):
+        r = get_bureau_home()
+        self.assertEqual(r.status_code, 503)
+        self.assertIn(b"npm run build", r.body)
+
+    def test_accueil_serves_the_entry_page_uncached(self):
+        with open(os.path.join(self.dist, "index.html"), "w", encoding="utf-8") as f:
+            f.write("<div id=\"app\"></div>")
+        r = TestClient(app).get("/bureau/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.text, '<div id="app"></div>')
+        self.assertEqual(r.headers["cache-control"], "no-cache")
+        self.assertEqual(TestClient(app).get("/bureau").status_code, 200)
+
+    def test_assets_served_under_spa(self):
+        """The mount reads the folder of the build at startup: the app's own one (frontend/dist), maybe not built."""
+        r = TestClient(app).get("/spa/assets/does-not-exist.js")
+        self.assertEqual(r.status_code, 404)  # not a server error when the frontend is not built
+
+    def test_pages_not_migrated_keep_their_file(self):
+        self.assertEqual(get_bureau_page("adherents").path, os.path.join(BUREAU, "adherents.html"))
 
 
 class TestSingleFirebaseInit(unittest.TestCase):

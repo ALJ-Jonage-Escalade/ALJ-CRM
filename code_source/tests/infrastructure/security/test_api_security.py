@@ -79,7 +79,7 @@ class TestRoles(unittest.TestCase):
         r = api_auth.required_role
         for path in ("/", "/health", "/competitions", "/index", "/sw.js", "/manifest.webmanifest",
                      "/api/web-version", "/webhooks/helloasso", "/annuaire/", "/annuaire/index.html",
-                     "/bureau", "/bureau/", "/bureau/adherents", "/static-web/alj-core.js"):
+                     "/bureau", "/bureau/", "/bureau/adherents", "/static-web/alj-core.js", "/spa/assets/index-abc.js"):
             self.assertIsNone(r("GET", path), path)
         self.assertIsNone(r("POST", "/webhooks/helloasso"))
         self.assertIsNone(r("OPTIONS", "/api/send-email"))
@@ -180,6 +180,53 @@ class TestTokenVerification(_CertsMixin, unittest.TestCase):
         with patch.object(api_auth, "_fetch_certs", return_value={KID: CERT_PEM}) as fetch:
             self.assertRejected(make_token(kid="inconnu"))
             fetch.assert_called_once()
+
+
+class TestMeRoute(_CertsMixin, unittest.TestCase):
+    """GET /api/me: any signed-in account gets its own role (the pages no longer hold role lists)."""
+
+    def setUp(self):
+        super().setUp()
+        self.client = TestClient(app)
+
+    def me(self, token=None, **env):
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        with patch.dict(os.environ, {"ALJ_API_AUTH": "required", **env}):
+            return self.client.get("/api/me", headers=headers)
+
+    def test_requires_a_valid_token(self):
+        r = self.me()
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(r.headers.get("www-authenticate"), "Bearer")
+        self.assertEqual(self.me("abc").status_code, 401)
+        self.assertEqual(self.me(make_token(exp_delta=-3600)).status_code, 401)
+
+    def test_role_of_each_account(self):
+        cases = [
+            (make_token(email="albus@alj-escalade.fr"), "admin"),
+            (make_token(email="stephane.loridant@orange.fr"), "coach"),
+            (make_token(email="pirate@gmail.com", coach=True), "coach"),
+            (make_token(email="muah.did@gmail.com"), "readonly"),
+            (make_token(email="pirate@gmail.com"), None),                      # signed in, no access: 200, not 403
+            (make_token(email="albus@alj-escalade.fr", verified=False), None),  # address rules need a verified e-mail
+        ]
+        for token, role in cases:
+            r = self.me(token)
+            self.assertEqual(r.status_code, 200, role)
+            self.assertEqual(r.json()["role"], role)
+        self.assertEqual(self.me(make_token(email="albus@alj-escalade.fr")).json()["email"], "albus@alj-escalade.fr")
+
+    def test_emulator_token_in_dev_mode_only(self):
+        """Dev mode (emulator, token checks off): the unsigned emulator token is read as is."""
+        emulator_token = jwt.encode({"sub": "dev-snape", "email": "severus@hogwarts.example", "email_verified": True,
+                                     "coach": True}, key=None, algorithm="none")
+        r = self.me(emulator_token, ALJ_API_AUTH="off", ALJ_ENV="dev")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"email": "severus@hogwarts.example", "role": "coach"})
+        # Token checks off outside dev mode (local server): no unverified token is trusted
+        self.assertEqual(self.me(emulator_token, ALJ_API_AUTH="off", ALJ_ENV="prod").status_code, 401)
+        # Token checks on: the unsigned token is refused, even in dev mode
+        self.assertEqual(self.me(emulator_token, ALJ_ENV="dev").status_code, 401)
 
 
 class TestAuthMiddleware(_CertsMixin, unittest.TestCase):

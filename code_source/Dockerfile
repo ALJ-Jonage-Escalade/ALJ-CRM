@@ -3,6 +3,23 @@
 # Architecture Cloud & Mobile (Coût 0 €/mois sur Google Cloud Free Tier)
 # ==============================================================================
 
+# ------------------------------------------------------------------------------
+# Étape 1 — Application web Vue (frontend/) : compilée ici, jamais envoyée toute faite
+# (dist/ est exclu de l'envoi). Même version de Node que frontend/.nvmrc et la CI.
+# ------------------------------------------------------------------------------
+FROM node:24.22.1-slim AS frontend
+
+WORKDIR /build/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-fund --no-audit
+COPY frontend/ ./
+# La version affichée par l'application vient de VERSION (vite.config.ts)
+COPY VERSION /build/VERSION
+RUN npm run build
+
+# ------------------------------------------------------------------------------
+# Étape 2 — API FastAPI + pages web
+# ------------------------------------------------------------------------------
 FROM python:3.14.8-slim
 
 # Configuration de l'environnement Python et conteneur
@@ -36,9 +53,10 @@ RUN pip install --no-cache-dir uv==0.13.1 && \
     uv sync --frozen --no-dev --group web --no-install-project && \
     pip uninstall -y uv
 
-# 3. Copie du code source et des ressources web / templates
+# 3. Copie du code source, des ressources web / templates et de l'application Vue compilée
 COPY src/ ./src/
 COPY web/ ./web/
+COPY --from=frontend /build/frontend/dist ./frontend/dist/
 COPY doc/ ./doc/
 COPY VERSION ./VERSION
 

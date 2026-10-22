@@ -34,6 +34,7 @@ from typing import Any, Dict, Optional
 
 import requests
 
+from infrastructure import runtime_env
 from infrastructure.security.secret_store import SecretStore
 
 DEFAULT_PROJECT_ID = "smart-amplifier-510811-n6"
@@ -86,10 +87,12 @@ PUBLIC_PATHS = frozenset({
     "/api/auth/google/status",
 })
 # Portail bureau et ressources communes : pages et scripts publics, données protégées.
-PUBLIC_PREFIXES = ("/annuaire", "/bureau", "/static-web")
+PUBLIC_PREFIXES = ("/annuaire", "/bureau", "/static-web", "/spa")
 # Reads open to the readonly role (competitions view of the mobile app); every other
 # route still requires at least "coach".
 READONLY_READ_PREFIXES = ("/api/competitions", "/api/coaches", "/api/competition-members")
+# Open to any signed-in account, whatever its role: the role is what the route answers.
+SIGNED_IN_PATHS = frozenset({"/api/me"})
 
 
 class AuthError(Exception):
@@ -258,6 +261,23 @@ def verify_firebase_token(token: str) -> Dict[str, Any]:
     return claims
 
 
+def emulator_claims(authorization: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Claims of a Firebase Auth emulator token, read without verification (unsigned by design).
+
+    Dev mode only (ALJ_ENV=dev, which requires the emulator and is refused on Cloud Run): token
+    checks are off there, and the emulator's tokens cannot be verified anyway. None elsewhere."""
+
+    token = bearer_token(authorization)
+    if not token or not runtime_env.is_dev() or auth_enforced():
+        return None
+    import jwt  # PyJWT
+
+    try:
+        return jwt.decode(token, options={"verify_signature": False})
+    except jwt.PyJWTError:
+        return None
+
+
 def bearer_token(authorization: Optional[str]) -> Optional[str]:
     if not authorization:
         return None
@@ -270,6 +290,13 @@ def bearer_token(authorization: Optional[str]) -> Optional[str]:
 def authorize_request(method: str, path: str, authorization: Optional[str]) -> Optional[Dict[str, Any]]:
     """Contrôle d'accès d'une requête. Renvoie les claims (ou None si public /
     contrôle désactivé) ; lève AuthError en cas de refus."""
+    if (method or "GET").upper() != "OPTIONS" and path in SIGNED_IN_PATHS:
+        if not auth_enforced():
+            return None
+        token = bearer_token(authorization)
+        if not token:
+            raise AuthError(401, "Authentification requise : connectez-vous avec votre compte Google")
+        return verify_firebase_token(token)
     role = required_role(method, path)
     if role is None or not auth_enforced():
         return None

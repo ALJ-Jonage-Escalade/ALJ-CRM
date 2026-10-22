@@ -1,11 +1,14 @@
-"""HTML pages: competitions and directory PWAs, desk portal (bureau), static web files."""
+"""HTML pages: competitions and directory PWAs, desk portal (bureau), static web files.
+
+The portal is moving to a Vue application (code_source/frontend/, plan_frontend_vue.md) one page at a
+time: migrated pages answer with its entry page, the others still serve their file from web/."""
 
 from __future__ import annotations
 
 import os
 
 from fastapi import APIRouter, FastAPI
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from domain.constants import APP_VERSION
@@ -21,7 +24,6 @@ _annuaire_page_path = os.path.join(WEB_DIR, "index.html")
 # (lecture Firestore avec le compte Google, appels API avec jeton).
 _bureau_dir = os.path.join(WEB_DIR, "bureau")
 _BUREAU_PAGES = {
-    "": "index.html",
     "adherents": "adherents.html",
     "communications": "communications.html",
     "competitions": "competitions.html",
@@ -29,6 +31,33 @@ _BUREAU_PAGES = {
     "outils": "outils.html",
     "parametres": "parametres.html"
 }
+
+
+# Vue application, built by `npm run build` (frontend/dist) or by the Dockerfile. Its hashed assets
+# are served under /spa/ (Vite `base`); its entry page answers the routes already migrated.
+SPA_ASSETS_PATH = "/spa"
+
+
+def frontend_dist() -> str:
+    """Build output of the Vue application (ALJ_FRONTEND_DIST overrides it, for the tests)."""
+    return os.environ.get("ALJ_FRONTEND_DIST") or os.path.join(CODE_ROOT, "frontend", "dist")
+
+
+class _BuildFiles(StaticFiles):
+    """Static files of a build that may not exist yet (frontend not built): 404 instead of an error."""
+
+    async def check_config(self) -> None:
+        if self.directory is not None and os.path.isdir(self.directory):
+            await super().check_config()
+
+
+def spa_entry() -> Response:
+    """Entry page of the Vue application; never cached by the browser (it names the current assets)."""
+    p = os.path.join(frontend_dist(), "index.html")
+    if os.path.exists(p):
+        return FileResponse(p, media_type="text/html", headers={"Cache-Control": "no-cache"})
+    return HTMLResponse("<h1>Interface web non compilée</h1>"
+                        "<p>Lancer <code>npm run build</code> dans <code>code_source/frontend/</code>.</p>", status_code=503)
 
 
 def mount_static(app: FastAPI) -> None:
@@ -43,6 +72,8 @@ def mount_static(app: FastAPI) -> None:
     if os.path.isdir(shared_dir):
         app.mount("/static-web", StaticFiles(directory=shared_dir), name="static-web")
 
+    app.mount(SPA_ASSETS_PATH, _BuildFiles(directory=frontend_dist(), check_dir=False), name="spa")
+
 
 def _bureau_file(page: str):
     name = _BUREAU_PAGES.get(page)
@@ -54,8 +85,8 @@ def _bureau_file(page: str):
 @router.get("/bureau", response_class=HTMLResponse, include_in_schema=False)
 @router.get("/bureau/", response_class=HTMLResponse, include_in_schema=False)
 def get_bureau_home():
-    """Accueil du portail bureau (ordinateur)."""
-    return _bureau_file("")
+    """Accueil du portail bureau : application Vue."""
+    return spa_entry()
 
 @router.get("/bureau/{page}", response_class=HTMLResponse, include_in_schema=False)
 def get_bureau_page(page: str):

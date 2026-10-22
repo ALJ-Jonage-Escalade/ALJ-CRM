@@ -45,16 +45,31 @@ date (like `requirements*.txt`).
   longer published in public JS.
 - The OAuth callback stays on `/competitions` (now an SPA route): no change in the Google Cloud console.
 
-### D5 — UI: PrimeVue (styled mode, club theme preset)
-Theme preset in the club colours (dark blue `1E3A8A`, orange `EA580C`), French locale. `DataTable` (filter, sort,
-pagination, stacked layout on phones) replaces most of `alj-filters.js`; `Dialog`, `Tabs`, form inputs, toasts.
-CSV export goes through a wrapper that applies `csvSafe()` (formula injection), or uses the server-side export.
+### D5 — UI: Reka UI (headless) + Tailwind CSS + TanStack Table, components owned in the repo
+Revised 2026-10-22. PrimeVue was first chosen, then dropped: PrimeVue 5 (2026-10) moved to a commercial "PrimeUI"
+license with a license key (free Community tier for non-profits, renewed yearly, notice shown when the key is missing
+or expired); 4.5.5 is the last MIT release and is frozen. Requirement since then: **MIT (or equivalent) open source,
+no single vendor whose license change could force a rewrite**.
+- **Reka UI** (MIT): behaviour and accessibility only (dialogs with focus trap, tabs, select, toast, keyboard, ARIA).
+- **Tailwind CSS v4** (MIT): styling; responsive layout written with breakpoint prefixes. Club theme as design tokens
+  (dark blue `1E3A8A`, orange `EA580C`, Segoe UI).
+- **TanStack Table** (MIT): table logic (sort, filters, pagination). One responsive data table component of our own
+  (table on desktop, cards on phones), built once in the Adhérents list phase and reused. Check that the v9 Vue adapter is
+  stable, otherwise stay on v8.
+- **shadcn-vue** (MIT) used as a generator, not a dependency: it copies Reka + Tailwind components into the repo, which
+  we then own and trim. No runtime package to follow.
+- French formatting with `Intl` (`fr-FR`); plain validation functions per form (no form library).
+- Icons: emojis as today (no dependency); Lucide (ISC) icon by icon only if needed.
+- CSV export goes through a module that applies `csvSafe()` (formula injection), or uses the server-side export.
+- Alternatives considered: Vuetify 4 (MIT, complete, best built-in responsive support, heavier, Material look), Quasar 2
+  (MIT, CLI-centred), Element Plus (MIT, desktop oriented), PrimeVue 4.5.5 (MIT but frozen). Headless chosen to
+  carry nothing unnecessary and keep each part replaceable, at the cost of building the components.
 
 ### D6 — Migration order (production checkpoint after each step)
-1. **Foundation**: Vite + TS + PrimeVue, responsive layout, `useAuth`, `/api/me`, Docker multi-stage build, CI job,
+1. **Foundation**: Vite + TS + Tailwind/Reka UI, responsive layout, `useAuth`, `/api/me`, Docker multi-stage build, CI job,
    then **Accueil**.
 2. **Paramètres** and **Communications** (small, desktop only, admin, online only): settle the pattern
-   (route, response models, generated types, PrimeVue forms).
+   (route, response models, generated types, forms).
 3. **Planning** and **Outils**.
 4. **Adhérents** merged with the phone **directory** (`/index`): first responsive + offline-read page.
 5. **Compétitions**: desktop page merged with the phone PWA (outbox, HelloAsso payments, results). Then switch the

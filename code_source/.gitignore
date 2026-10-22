@@ -52,3 +52,6 @@ dist/
 Thumbs.db
 desktop.ini
 ~$*
+
+# Application Vue (frontend/) : dépendances npm (package-lock.json fait foi)
+node_modules/

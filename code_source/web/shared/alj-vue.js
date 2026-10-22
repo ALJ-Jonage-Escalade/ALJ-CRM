@@ -4,7 +4,8 @@
    - Sur ordinateur (écran >= 1024 px avec souris, pas de téléphone), la page renvoie vers /bureau/.
    - ?vue=mobile : reste sur la PWA et mémorise le choix « mobile » (localStorage).
    - ?vue=pwa    : ouvre la PWA une fois, sans redirection (liens internes du bureau).
-   - Pas de redirection pendant la connexion Google (?login=1, retour #access_token).
+   - Pas de redirection pendant la connexion Google (?login=1, retour #access_token, retour de
+     l'émulateur Auth en dev).
    - Un bouton 🖥️ ajouté dans l'en-tête permet de revenir au bureau (et oublie le choix). */
 (function () {
   var MEMO = "alj_vue";
@@ -27,7 +28,15 @@
 
   if (vue === "mobile") memoise("mobile");
 
-  var connexion = params.get("login") === "1" || /access_token=/.test(location.hash);
+  /* Dev: back from the Auth emulator's account picker, the redirect sign-in is finished by this
+     page (alj-firebase.js completeDevLogin), not by the office portal's Vue app. */
+  function redirectSignInPending() {
+    try {
+      return Object.keys(sessionStorage).some(function (k) { return k.indexOf("firebase:pendingRedirect:") === 0; });
+    } catch (e) { return false; }
+  }
+
+  var connexion = params.get("login") === "1" || /access_token=/.test(location.hash) || redirectSignInPending();
   var pwaDemandee = vue === "mobile" || vue === "pwa";
   if (isDesktop() && !connexion && !pwaDemandee && memorised() !== "mobile") {
     location.replace(BUREAU);

@@ -1,0 +1,78 @@
+import { flushPromises, mount } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
+import { ref } from "vue";
+import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
+import { API_KEY, type ApiFetch } from "../lib/api";
+import AppShell from "./AppShell.vue";
+
+const USER = { uid: "u1", email: "albus@alj-escalade.fr" };
+
+function render(state: AuthState, googleStatus = "ok") {
+  const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
+  const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: googleStatus })));
+  const wrapper = mount(AppShell, {
+    props: { page: "accueil", title: "Accueil" },
+    slots: { default: '<p id="page-body">contenu</p>' },
+    global: { provide: { [AUTH_KEY]: auth, [API_KEY]: api }, stubs: { VersionBadge: true } },
+  });
+  return { wrapper, auth, api };
+}
+
+describe("AppShell", () => {
+  it("shows neither the gate nor the content while the session loads", () => {
+    const { wrapper } = render({ status: "loading" });
+    expect(wrapper.find("#who").text()).toBe("Vérification de la connexion…");
+    expect(wrapper.find("#gate").exists()).toBe(false);
+    expect(wrapper.find("#content").exists()).toBe(false);
+  });
+
+  it("asks a signed-out visitor to sign in", async () => {
+    const { wrapper, auth } = render({ status: "signedOut" });
+    expect(wrapper.find("#who").text()).toBe("Non connecté");
+    expect(wrapper.find("#logout-btn").exists()).toBe(false);
+    expect(wrapper.find("#content").exists()).toBe(false);
+    await wrapper.find("#gate-login").trigger("click");
+    expect(auth.login).toHaveBeenCalledOnce();
+  });
+
+  it.each(["admin", "coach"] as const)("renders the page for %s", async (role) => {
+    const { wrapper } = render({ status: "signedIn", user: USER, role });
+    expect(wrapper.find("#page-body").exists()).toBe(true);
+    expect(wrapper.find("#gate").exists()).toBe(false);
+    expect(wrapper.find("#who").text()).toContain(USER.email);
+    await flushPromises();
+    expect(wrapper.find("#google-auth-warning").isVisible()).toBe(false);
+  });
+
+  it.each(["readonly", null] as const)("refuses the office to %s", async (role) => {
+    const { wrapper, auth, api } = render({ status: "signedIn", user: USER, role });
+    expect(wrapper.find("#gate").text()).toContain("Accès réservé");
+    expect(wrapper.find("#content").exists()).toBe(false);
+    await wrapper.find("#gate-logout").trigger("click");
+    expect(auth.logout).toHaveBeenCalledOnce();
+    expect(api).not.toHaveBeenCalled();  // no club data asked for a non-staff account
+  });
+
+  it("offers a retry when the role could not be checked", async () => {
+    const { wrapper, auth } = render({ status: "error", user: USER, message: "Serveur injoignable" });
+    expect(wrapper.find("#gate").text()).toContain("Serveur injoignable");
+    expect(wrapper.find("#content").exists()).toBe(false);
+    expect(wrapper.find("#logout-btn").exists()).toBe(true);
+    await wrapper.find("#gate-retry").trigger("click");
+    expect(auth.retry).toHaveBeenCalledOnce();
+  });
+
+  it("warns staff when the club's Google token has expired", async () => {
+    const { wrapper, api } = render({ status: "signedIn", user: USER, role: "admin" }, "expired");
+    await flushPromises();
+    expect(api).toHaveBeenCalledWith("/api/auth/google/status");
+    expect(wrapper.find("#google-auth-warning").isVisible()).toBe(true);
+  });
+
+  it("marks the current page in the navigation", () => {
+    const { wrapper } = render({ status: "signedOut" });
+    expect(wrapper.find('nav a[data-page="accueil"]').attributes("aria-current")).toBe("page");
+    expect(wrapper.find('nav a[data-page="adherents"]').attributes("aria-current")).toBeUndefined();
+    expect(wrapper.findAll("nav a")).toHaveLength(7);
+  });
+});

@@ -50,3 +50,6 @@ scripts_temporaires/
 .gitignore
 .vscode/
 .idea/
+
+# Application Vue : dépendances installées et compilée dans l'image (étape « frontend » du Dockerfile)
+node_modules/

@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Club design tokens (same colours as web/shared/alj.css and the generated Excel sheets) */
+@theme {
+  --font-sans: "Segoe UI", -apple-system, Roboto, "Helvetica Neue", sans-serif;
+  --color-club-blue: #1E3A8A;
+  --color-club-orange: #EA580C;
+  --color-accent: #2563EB;
+  --color-accent-dark: #1D4ED8;
+  --color-side: #0F172A;
+  --color-side-hover: #1E293B;
+  --color-side-text: #CBD5E1;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-100 text-sm text-slate-800 antialiased;
+  }
+  a {
+    @apply text-accent;
+  }
+}

@@ -7,8 +7,9 @@
 
 Durable decisions that apply across all phases:
 
-- **Stack**: Vue 3 + Vite + TypeScript, vue-router, PrimeVue (styled mode, club theme preset: dark blue `1E3A8A`,
-  orange `EA580C`, French locale). npm, Node version pinned and identical locally, in CI and in the Docker build
+- **Stack**: Vue 3 + Vite + TypeScript, vue-router; UI = Reka UI (headless) + Tailwind CSS v4 + TanStack Table,
+  components generated with shadcn-vue and owned in the repo (club tokens: dark blue `1E3A8A`, orange `EA580C`,
+  Segoe UI; French formatting with `Intl`). Every dependency MIT or equivalent (decision record D5). npm, Node version pinned and identical locally, in CI and in the Docker build
   stage. Vite default build target, no legacy bundle.
 - **Routes (unchanged URLs, become SPA routes)**: `/bureau/` (Accueil), `/bureau/parametres`,
   `/bureau/communications`, `/bureau/planning`, `/bureau/outils`, `/bureau/adherents`, `/bureau/competitions`,
@@ -37,53 +38,59 @@ Durable decisions that apply across all phases:
 
 ---
 
-## Phase 1: SPA skeleton end to end
+## Phase 1: SPA skeleton end to end, with sign-in
 
-**User stories**: 11, 31, 33, 38, 39, 41, 46, 47, 48
+**User stories**: 11, 27, 28, 31, 33, 38, 39, 41, 42, 46, 47, 48
+
+> Scope revised when phase 1 started (2026-10-22): today's `/bureau/` already refuses non-staff accounts (checked by
+> the e2e suite), so shipping Accueil without sign-in would be a production regression. Sign-in and `GET /api/me`
+> move here from phase 2.
 
 ### What to build
 
-The thinnest path from source to production: a Vue app built in the Docker image and served by FastAPI on
-`/bureau/`. It renders the responsive shell (sidebar on desktop, bottom tab bar on phones) with the club theme, the
-Accueil cards linking to the existing old pages, and the app version read from `VERSION`. Unsupported browsers get a
-message instead of a blank page. Locally, the Vite dev server (hot reload) proxies the API, the runtime config and the
-old pages to FastAPI on the emulator stack. CI gains a frontend job. Sign-in is not handled yet: an anonymous visitor
-sees a sign-in prompt that uses the existing flow.
+The thinnest path from source to production, at parity with today's Accueil: a Vue app built in the Docker image and
+served by FastAPI on `/bureau/`. It renders the responsive shell (sidebar on desktop, bottom tab bar on phones) with
+the club theme, the Accueil cards linking to the existing old pages, and the app version read from `VERSION`.
+Sign-in uses the existing flow (through `/competitions?login=1`, emulator picker in dev), the role comes from
+`GET /api/me`, non-staff accounts get the "access reserved" gate, and the club Google token warning is shown when it
+has expired. Unsupported browsers get a message instead of a blank page. Locally, the Vite dev server (hot reload)
+proxies the API, the runtime config and the old pages to FastAPI on the emulator stack. CI gains a frontend job.
+The shell keeps the element ids the e2e suite already uses, so the existing tests check the new page unchanged.
 
 ### Acceptance criteria
 
-- [ ] `/bureau/` is served from the built SPA in the container; every other page still serves the old HTML
-- [ ] The shell switches between sidebar and bottom bar by screen width; no horizontal scroll on a phone
-- [ ] The version shown in the UI equals `VERSION`
-- [ ] An unsupported browser shows a "browser not supported" message
-- [ ] `npm run dev` + the FastAPI dev server give one working URL for new and old pages
-- [ ] CI runs install, lint, typecheck, unit tests and build for the frontend; the Docker build passes in CI
+- [x] `/bureau/` is served from the built SPA; every other page still serves the old HTML
+- [x] The shell switches between sidebar and bottom bar by screen width; no horizontal scroll on a phone
+- [x] The version shown in the UI equals `VERSION`
+- [x] An unsupported browser shows a "browser not supported" message
+- [x] `/api/me` returns the right role for admin, coach, read-only and unknown accounts; 401 without a token
+- [x] Sign-in, logout, session shared with the old pages, gate for non-staff, Google token warning: the existing
+      e2e auth, smoke and service-worker tests pass against the SPA (only the sign-in helper gained an SPA branch;
+      `alj-vue.js` no longer redirects while the emulator's redirect sign-in is pending)
+- [x] `npm run dev` + the FastAPI dev server give one working URL for new and old pages
+- [ ] CI runs install, lint, typecheck, unit tests and build for the frontend; the e2e job builds the SPA first
+      (workflow written; not yet run on GitHub)
 - [ ] Deploying with the unchanged script works on a test revision
-- [ ] README, both AGENTS.md and the dev guide document the new commands and the "all checks" line
-- [ ] Existing e2e suite still passes
+- [x] README, both AGENTS.md and the dev guide document the new commands and the "all checks" line
 
 ---
 
-## Phase 2: Sign-in and roles
+## Phase 2: Router guards and role-aware navigation
 
-**User stories**: 14, 25, 27, 28, 42
+**User stories**: 14, 25
 
 ### What to build
 
-`GET /api/me` on the server, the auth composable on the client (same Google flow, callback still on `/competitions`,
-emulator login in dev) and router guards by role. Accueil greets the user with their role and only shows the cards
-their role allows. A user signed in on an old page is signed in on the SPA and vice versa. The new code contains no
-e-mail lists; the old pages keep theirs until phase 12.
+Role guards in the router (anonymous → sign-in gate, wrong role → blocked, callback route always reachable) and a
+navigation and Accueil that only show what the user's role allows. Small on its own, it lands just before the first
+admin-only screens.
 
 ### Acceptance criteria
 
-- [ ] `/api/me` returns the right role for admin, coach, read-only and unknown accounts; 401 without a token
-- [ ] Sign-in from the SPA returns to the page the user started from
-- [ ] The session is shared between the SPA and old pages (no second sign-in)
 - [ ] Guards: anonymous → sign-in prompt, wrong role → blocked/redirected, callback route always reachable
-- [ ] Vitest covers the auth composable (Firebase mocked) and every role × route guard case
-- [ ] pytest covers `/api/me`; the route is in the route inventory test
-- [ ] e2e: sign-in, role display and logout on Accueil
+- [ ] Vitest covers every role × route guard case and the auth composable (Firebase mocked)
+- [ ] Navigation and Accueil cards follow the role
+- [ ] e2e: role display and navigation per role
 
 ---
 
@@ -114,7 +121,7 @@ to the SPA.
 
 ### What to build
 
-E-mail template management (list, create, edit, delete) in the SPA with PrimeVue forms and dialogs, on typed
+E-mail template management (list, create, edit, delete) in the SPA with the repo's form and dialog components, on typed
 routes with response models. Admin only.
 
 ### Acceptance criteria
@@ -169,7 +176,7 @@ table export from now on.
 ### What to build
 
 The member list on the synced-resource composable in online mode (ETag polling, refresh on visibility and network
-return) and a PrimeVue data table: filters (season, tarif, …), sorting, pagination, CSV export through the safe
+return) and the repo's responsive data table component (TanStack Table, built in this phase): filters (season, tarif, …), sorting, pagination, CSV export through the safe
 export module, stacked rows on phones. Read-only in this phase; the old page's record actions link to the old page
 until phase 8.
 

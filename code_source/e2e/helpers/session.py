@@ -28,6 +28,9 @@ class E2ESession:
     def start(self) -> None:
         """Fresh emulator + Mailpit for the run (the emulator's memory grows with use, and a run must not
         reset the developer's dev data), seeded; then the fake HelloAsso and the server in dev mode."""
+        # The server serves the Vue app's build (api/web/pages.py): without it, the migrated pages are a 503
+        if not (stack.CODE_SOURCE / "frontend" / "dist" / "index.html").exists():
+            raise RuntimeError("Vue app not built: run `npm ci && npm run build` in code_source/frontend/")
         stack.start_stack(self.stack_log)
         self._stack_started = True
         Mailpit().clear()   # once per run: tests then search their own e-mails (recipient + subject)

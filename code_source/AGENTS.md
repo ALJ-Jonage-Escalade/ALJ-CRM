@@ -5,10 +5,14 @@ All commands run from `code_source/`. Python 3.14 (`.python-version`), `requires
 ## Commands
 - install: `uv sync --group web` (dev group by default, `web` adds WeasyPrint for the attestation PDFs and their tests; CI: `uv sync --frozen --group web`)
 - test: `uv run pytest tests` — always pass `tests`: bare `uv run pytest` also collects `e2e/` and fails without Playwright
-- e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker; see `dev/README.md`)
+- e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker and `npm run build` in `frontend/`; see `dev/README.md`)
 - lint: `uv run ruff check src tests`
 - typecheck: `uv run mypy` (no path: checks the files listed under `[tool.mypy] files` in pyproject.toml; `mypy src/` fails on module-path errors)
 - all checks (as CI): `uv lock --check && uv run python dev/export_requirements.py --check && uv run ruff check src tests && uv run mypy && uv run pytest tests`
+- frontend (Vue 3 + Vite + TypeScript, in `frontend/`, Node version from `frontend/.nvmrc`):
+  `cd frontend && npm ci && npm run lint && npm run typecheck && npm test && npm run build`
+  - dev: `npm run dev` → http://localhost:5173/bureau/, next to `uv run dev/run_server.sh` (Vite proxies the API and the pages not migrated)
+  - unit tests: Vitest, `src/**/*.test.ts` next to the module they test
 
 ## Critical Rules
 1. Use `uv run <cmd>` for all commands — never activate venv manually

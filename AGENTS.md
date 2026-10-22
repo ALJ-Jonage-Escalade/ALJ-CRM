@@ -5,6 +5,8 @@ Google Cloud Run, with data in Firestore. (The former Windows desktop client was
 `documentations/desktop_features_missing_in_web.md`.)
 User docs: `README.md` · Architecture: `documentations/ARCHITECTURE.md` · Local dev stack: `code_source/dev/README.md`.
 Python conventions (lint, typing, tests): `code_source/AGENTS.md`.
+Frontend: being migrated page by page to a Vue 3 app in `code_source/frontend/` (plan: `plans/vue-responsive-frontend.md`,
+decisions: `documentations/plan_frontend_vue.md`); pages not migrated yet stay in `code_source/web/`.
 
 ## Setup
 See @./README.md
@@ -14,7 +16,8 @@ See @./README.md
 docker compose -f dev/docker-compose.yml up -d    # Firebase emulator (:4000) + Mailpit (:8025)
 set -a && source dev/dev.env && set +a
 uv run python dev/seed/seed_emulator.py           # (re)seed fake data
-uv run dev/run_server.sh                          # FastAPI with reload → http://localhost:8080/bureau/
+uv run dev/run_server.sh                          # FastAPI with reload (API + pages not migrated)
+cd frontend && npm ci && npm run dev              # Vue app, hot reload → http://localhost:5173/bureau/ (proxies the rest to :8080)
 docker compose -f dev/docker-compose.yml down     # stop (emulator data kept in dev/.emulator-data/)
 ```
 - Health: http://localhost:8080/health · API docs: http://localhost:8080/docs
@@ -23,8 +26,9 @@ docker compose -f dev/docker-compose.yml down     # stop (emulator data kept in 
 
 ## Checks (same as CI)
 - all: `uv lock --check && uv run python dev/export_requirements.py --check && uv run ruff check src tests && uv run mypy && uv run pytest tests`
+- frontend (from `code_source/frontend/`, Node from `.nvmrc`): `npm ci && npm run lint && npm run typecheck && npm test && npm run build`
 - unit tests: `uv sync --group web && uv run pytest tests` (the `web` group brings WeasyPrint/pydyf, needed by the attestation tests; WeasyPrint needs Pango, see `README.md`)
-- e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker; see `dev/README.md`)
+- e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker and the Vue app built: `npm run build` in `frontend/`; see `dev/README.md`)
 
 ## Deployment — production, ask before running
 Run from `code_source/` (the script always uploads `code_source/`); Windows scripts live in `scripts/` and `code_source/scripts/`
@@ -40,6 +44,8 @@ Run from `code_source/` (the script always uploads `code_source/`); Windows scri
 - Never commit personal data (databases, exports, `tests/fixtures/`): members' health, emergency contacts, minors (GDPR)
 - Never point dev tools at production: dev mode only works against the `demo-alj` emulator project
 - Put throwaway diagnostic scripts (`check_*`, `query_*`, ad-hoc queries) in `scripts_temporaires/` at the repo root (git-ignored), never in `code_source/`
+- Frontend dependencies: `npm install --save-exact <pkg>` in `code_source/frontend/` (lockfile committed); MIT or equivalent
+  licenses only (decision D5); never commit `frontend/dist/` or `node_modules/`
 - Versioning: bump `APP_VERSION` in `src/domain/constants.py` and `code_source/VERSION` together on every functional change (`tests/test_cloud_run_lot4.py` checks `VERSION` == `APP_VERSION`; the `pyproject.toml` version is not used)
 
 ## Data & domain rules
