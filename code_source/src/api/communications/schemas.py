@@ -94,6 +94,15 @@ class EmailSendDetail(BaseModel):
     error: Optional[str] = None
 
 
+class EmailStatus(BaseModel):
+    """Sending configuration of /api/email-status (no secret: the sender address only).
+    mode: Gmail API (OAuth2) first, else SMTP, else "none" (configured is then false)."""
+    status: Literal["success"]
+    configured: bool
+    mode: Literal["gmail_oauth2", "smtp", "none"]
+    sender: str
+
+
 class EmailDispatch(BaseModel):
     """Outcome of /api/send-email. A refused request (empty subject, no valid recipient) or a failed sending is
     answered with HTTP 200 and status "error": the caller checks `status`, not the HTTP code."""

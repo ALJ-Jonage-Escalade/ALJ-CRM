@@ -1660,7 +1660,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/EmailStatus"
+                }
               }
             }
           }
@@ -4277,6 +4279,41 @@
         ],
         "title": "EmailSendDetail",
         "description": "Outcome for one recipient."
+      },
+      "EmailStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "gmail_oauth2",
+              "smtp",
+              "none"
+            ],
+            "title": "Mode"
+          },
+          "sender": {
+            "type": "string",
+            "title": "Sender"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "configured",
+          "mode",
+          "sender"
+        ],
+        "title": "EmailStatus",
+        "description": "Sending configuration of /api/email-status (no secret: the sender address only).\nmode: Gmail API (OAuth2) first, else SMTP, else \"none\" (configured is then false)."
       },
       "EmailTemplate": {
         "properties": {

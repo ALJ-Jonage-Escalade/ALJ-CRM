@@ -1857,6 +1857,27 @@ export interface components {
             /** Error */
             error?: string | null;
         };
+        /**
+         * EmailStatus
+         * @description Sending configuration of /api/email-status (no secret: the sender address only).
+         *     mode: Gmail API (OAuth2) first, else SMTP, else "none" (configured is then false).
+         */
+        EmailStatus: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Configured */
+            configured: boolean;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "gmail_oauth2" | "smtp" | "none";
+            /** Sender */
+            sender: string;
+        };
         /** EmailTemplate */
         EmailTemplate: {
             /** Name */
@@ -4421,7 +4442,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EmailStatus"];
                 };
             };
         };

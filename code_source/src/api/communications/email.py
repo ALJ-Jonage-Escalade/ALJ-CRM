@@ -7,7 +7,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
-from api.communications.schemas import EmailDispatch, EmailTemplate, EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate
+from api.communications.schemas import EmailDispatch, EmailStatus, EmailTemplate, EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate
 from api.responses import error, error_responses, internal_error
 from infrastructure.mail.dispatch import EmailDispatchService
 from infrastructure.security.secret_store import SecretStore
@@ -111,8 +111,8 @@ def preview_email(data: Dict[str, Any] = Body(...)):
         return {"status": "error", "message": internal_error(e, "preview_email")}
 
 
-@router.get("/api/email-status")
-def get_email_status():
+@router.get("/api/email-status", response_model=EmailStatus)
+def get_email_status() -> EmailStatus:
     """Vérifie l'état de la configuration d'envoi d'e-mails (sans exposer de secrets)."""
     gmail_user = SecretStore.get_secret("GMAIL_USER_EMAIL")
     gmail_client_id = SecretStore.get_secret("GMAIL_CLIENT_ID")
@@ -125,12 +125,12 @@ def get_email_status():
     use_oauth2 = bool(gmail_user and gmail_client_id and gmail_refresh)
     use_smtp = bool(smtp_host and smtp_user and smtp_password)
 
-    return {
-        "status": "success",
-        "configured": use_oauth2 or use_smtp,
-        "mode": "gmail_oauth2" if use_oauth2 else ("smtp" if use_smtp else "none"),
-        "sender": gmail_user if use_oauth2 else (smtp_user if use_smtp else ""),
-    }
+    return EmailStatus(
+        status="success",
+        configured=use_oauth2 or use_smtp,
+        mode="gmail_oauth2" if use_oauth2 else ("smtp" if use_smtp else "none"),
+        sender=(gmail_user if use_oauth2 else smtp_user if use_smtp else "") or "",
+    )
 
 
 @router.post("/api/send-email", response_model=EmailDispatch, responses=error_responses(403))

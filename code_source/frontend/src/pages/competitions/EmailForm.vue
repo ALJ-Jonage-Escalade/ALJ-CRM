@@ -40,8 +40,7 @@ void (async () => {
     problem.value = "⚠️ Modèles d'e-mails indisponibles : saisissez le message.";
   }
   try {
-    const status = (await unwrap(client.GET("/api/email-status"))) as { configured?: unknown };
-    notConfigured.value = status.configured === false;
+    notConfigured.value = !(await unwrap(client.GET("/api/email-status"))).configured;
   } catch {
     // checked again by the server when sending
   }
