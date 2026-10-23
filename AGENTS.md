@@ -5,15 +5,15 @@ Google Cloud Run, with data in Firestore. (The former Windows desktop client was
 `documentations/desktop_features_missing_in_web.md`.)
 User docs: `README.md` · Architecture: `documentations/ARCHITECTURE.md` · Local dev stack: `code_source/dev/README.md`.
 Python conventions (lint, typing, tests): `code_source/AGENTS.md`.
-Frontend: being migrated page by page to a Vue 3 app in `code_source/frontend/` (plan: `plans/vue-responsive-frontend.md`,
-decisions: `documentations/plan_frontend_vue.md`); pages not migrated yet stay in `code_source/web/`.
+Frontend: a Vue 3 app in `code_source/frontend/` (plan: `plans/vue-responsive-frontend.md`,
+decisions: `documentations/plan_frontend_vue.md`); every screen is in it. `code_source/web/` only keeps the PWA manifest and logo.
 
 ## Local dev (emulator only, no production access)
 ```bash
 docker compose -f dev/docker-compose.yml up -d    # Firebase emulator (:4000) + Mailpit (:8025)
 set -a && source dev/dev.env && set +a
 uv run python dev/seed/seed_emulator.py           # (re)seed fake data
-uv run dev/run_server.sh                          # FastAPI with reload (API + pages not migrated)
+uv run dev/run_server.sh                          # FastAPI with reload (API, /map, /pivot, PWA files)
 cd frontend && npm ci && npm run dev              # Vue app, hot reload → http://localhost:5173/bureau/ (proxies the rest to :8080)
 docker compose -f dev/docker-compose.yml down     # stop (emulator data kept in dev/.emulator-data/)
 ```

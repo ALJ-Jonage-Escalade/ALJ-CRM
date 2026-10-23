@@ -5,7 +5,7 @@ sur Google Cloud Run, données dans Firestore. L'ancien client lourd Windows a �
 n'existent pas encore sur le web sont listées dans
 [documentations/desktop_features_missing_in_web.md](documentations/desktop_features_missing_in_web.md).
 Architecture détaillée : [documentations/ARCHITECTURE.md](documentations/ARCHITECTURE.md).
-Les pages web passent une à une à une application Vue 3 (`code_source/frontend/`) :
+Les écrans web sont une application Vue 3 (`code_source/frontend/`), la même sur téléphone et sur ordinateur :
 [plans/vue-responsive-frontend.md](plans/vue-responsive-frontend.md).
 
 ## Lancer l'application en mode dev local
@@ -52,8 +52,8 @@ uv run dev/run_server.sh                           # serveur FastAPI avec rechar
 cd frontend && npm run dev                         # application Vue (autre terminal), rechargement à chaud
 ```
 
-L'application Vue répond sur http://localhost:5173/bureau/ et renvoie au serveur FastAPI (port 8080) l'API et
-les pages pas encore migrées. Sans `npm run dev`, http://localhost:8080/bureau/ sert la dernière compilation
+L'application Vue répond sur http://localhost:5173/bureau/ et renvoie au serveur FastAPI (port 8080) l'API,
+`/map`, `/pivot` et les fichiers de la PWA. Sans `npm run dev`, http://localhost:8080/bureau/ sert la dernière compilation
 (`npm run build`), ou explique comment la lancer.
 
 Arrêt : `Ctrl+C` pour le serveur, `docker compose -f dev/docker-compose.yml down` pour les conteneurs
@@ -66,7 +66,6 @@ Arrêt : `Ctrl+C` pour le serveur, `docker compose -f dev/docker-compose.yml dow
 | http://localhost:5173/bureau/ | Portail bureau, application Vue (`npm run dev`) |
 | http://localhost:8080/bureau/ | Portail bureau servi par FastAPI (application Vue compilée) |
 | http://localhost:5173/competitions | Compétitions, application Vue (téléphone et ordinateur, lisible hors ligne) ; retour de la connexion Google |
-| http://localhost:8080/competitions/gestion | Ancienne page des compétitions (téléphone) : modifications, jusqu'à la phase 11 |
 | http://localhost:5173/index | Annuaire des adhérents, application Vue (téléphone et ordinateur, lisible hors ligne) |
 | http://localhost:8080/health | État du serveur |
 | http://localhost:8080/docs | Documentation de l'API (Swagger) |

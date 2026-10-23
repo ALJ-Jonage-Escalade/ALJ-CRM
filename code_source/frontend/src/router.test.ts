@@ -121,6 +121,20 @@ describe("app routes", () => {
     expect(router.currentRoute.value.meta.access).toBe("viewer");
   });
 
+  // Former addresses the server answers with the entry page (/ too, where the service worker answers it offline)
+  it.each([
+    ["/", "competitions-pwa"],
+    ["/competitions?vue=mobile", "competitions-pwa"],
+    ["/competitions?vue=pwa", "competitions-pwa"],
+    ["/index?vue=pwa", "annuaire"],
+    ["/bureau/?vue=bureau", "accueil"],
+    ["/bureau/competitions?id=3", "competitions"],
+  ])("open the former address %s on its screen", async (path, name) => {
+    const router = createAppRouter(fakeAuth(signedIn("admin")).auth, createMemoryHistory());
+    await router.push(path);
+    expect(router.currentRoute.value.name).toBe(name);
+  });
+
   it("show unknown paths to anyone", async () => {
     const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
     await router.push("/bureau/inconnu");

@@ -1,6 +1,6 @@
-/* Offline copy of the data received from the API, in IndexedDB (TypeScript port of web/shared/alj-store.js, which the
-   competitions page still uses; plan decision D2: same behaviour, no rewrite). Same database as that page
-   ("alj-offline": resources, meta, outbox), so what one stores the other reads and wipes.
+/* Offline copy of the data received from the API, in IndexedDB (TypeScript port of the former pages' alj-store.js;
+   plan decision D2: same behaviour, no rewrite). Same database as those pages ("alj-offline": resources, meta,
+   outbox), so what they stored is read and wiped here.
 
    - start(uid): call once signed in. Wipes the store when another user owned it, moves the old localStorage
      snapshots (alj_snapshot:*) in, and asks the browser not to evict it. Calls for the same user share one start.

@@ -1,5 +1,9 @@
 # Plan — Version web « Bureau » (ordinateur) de l'application desktop
 
+> **Historique.** Ces pages (`web/bureau/`, `web/shared/`, `web/competitions.html`, `web/index.html`) ont été remplacées
+> par l'application Vue (`code_source/frontend/`) puis supprimées (phase 12 de `plans/vue-responsive-frontend.md`,
+> 2026-10-23). Voir `plan_frontend_vue.md`.
+
 Objectif : un portail web pour ordinateur, à côté de la PWA smartphone (`/competitions`, `/index`, inchangées),
 qui reprend : annuaire des adhérents avec filtres puissants, attestations (génération + envoi), communications
 (e-mails + modèles), et donne accès à la carte et à l'analyse des effectifs.

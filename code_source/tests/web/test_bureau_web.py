@@ -1,12 +1,10 @@
 """
-Tests du portail « bureau » (ordinateur) et de son socle web/shared/ :
-- routes publiques (pages) sans données, ressources communes servies ;
-- service worker ;
-- rôles du socle identiques à l'API et à firestore.rules.
+Tests du portail « bureau » :
+- routes publiques (pages de l'application Vue, anciennes adresses) sans données ;
+- endpoints de l'API appelés par les pages.
 """
 
 import os
-import re
 import shutil
 import sys
 import tempfile
@@ -24,46 +22,21 @@ from fastapi.testclient import TestClient
 from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
 from api.web.pages import get_bureau_home, get_bureau_page
-from api.web.pwa import get_sw, get_web_version
 from server import app
 
 WEB = os.path.join(_code_root, "web")
-SHARED = os.path.join(WEB, "shared")
-
-
-def _read(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def _current_version():
-    return get_web_version()["web_version"]
 
 
 class TestBureauFiles(unittest.TestCase):
 
-    def test_pages_exist(self):
-        """Every page is the Vue application's: no HTML page left in web/ (the former competitions pages went with
-        plan phase 11)."""
-        self.assertEqual([n for _, _, files in os.walk(WEB) for n in files if n.endswith(".html")], [])
-        for name in ("alj.css", "alj-core.js", "alj-shell.js", "alj-sync.js"):
-            self.assertTrue(os.path.exists(os.path.join(SHARED, name)), name)
+    def test_no_former_page_left(self):
+        """Every page is the Vue application's: no HTML page nor script left in web/ (plan phase 12)."""
+        self.assertEqual([n for _, _, files in os.walk(WEB) for n in files if n.endswith((".html", ".js", ".css"))], [])
 
     def test_routes_serve_only_known_pages(self):
         self.assertEqual(get_bureau_page("index.html").status_code, 404)
         self.assertEqual(get_bureau_page("..%2Fserver.py").status_code, 404)
         self.assertEqual(get_bureau_page("inconnue").status_code, 404)
-
-    def test_service_worker_precaches_portal(self):
-        sw = _read(get_sw().path)
-        version = _current_version()
-        self.assertIn(f'CACHE_NAME = "alj-escalade-v{version}"', sw)
-        for asset in ("/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres",
-                      "/competitions", "/index"):
-            self.assertIn(f'"{asset}"', sw)
-        # Redirections (former addresses): a redirected answer cannot serve a page from the cache
-        for redirected in ("/bureau/competitions-gestion", "/competitions/gestion", "/annuaire/"):
-            self.assertNotIn(f'"{redirected}"', sw)
 
     def test_competitions_results_cron_and_settings_endpoints(self):
         """Vérifie les endpoints de configuration et de cron du batch des résultats MyCompet."""
@@ -650,27 +623,6 @@ class TestBureauFiles(unittest.TestCase):
             "Bonjour Camille DURAND, votre inscription au groupe Jeunes 2010 pour la saison 2026-2027 (licence 654321) est validée."
         )
 
-    def test_shell_imports_exist_in_core(self):
-        """Chaque nom importé par alj-shell.js doit être exporté par alj-core.js."""
-        shell = _read(os.path.join(SHARED, "alj-shell.js"))
-        core = _read(os.path.join(SHARED, "alj-core.js"))
-        block = re.search(r"import\s*\{(.*?)\}\s*from\s*\"/static-web/alj-core.js\"", shell, re.S).group(1)
-        names = [n.strip() for n in block.split(",") if n.strip()]
-        self.assertTrue(names)
-        for name in names:
-            self.assertRegex(core, rf"export (function|const|async function) {name}\b", name)
-
-    def test_core_roles_match_api_and_rules(self):
-        core = _read(os.path.join(SHARED, "alj-core.js"))
-
-        def js_list(name):
-            body = re.search(r"export const %s = \[(.*?)\];" % name, core, re.S).group(1)
-            return set(re.findall(r'"([^"]+)"', body))
-
-        self.assertEqual(js_list("ADMIN_EMAILS"), set(api_auth.ADMIN_EMAILS))
-        self.assertEqual(js_list("COACH_EMAILS"), set(api_auth.ADMIN_EMAILS) | set(api_auth.COACH_EMAILS))
-        self.assertEqual(js_list("READONLY_EMAILS"), set(api_auth.READONLY_EMAILS))
-
 
 class TestBureauAccess(unittest.TestCase):
     """Le portail reste public (pages) tandis que l'API reste protégée."""
@@ -685,8 +637,7 @@ class TestBureauAccess(unittest.TestCase):
 
     def test_portal_public_api_protected(self):
         for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions",
-                     "/bureau/planning", "/bureau/outils", "/bureau/parametres",
-                     "/static-web/alj.css", "/static-web/alj-shell.js"):
+                     "/bureau/planning", "/bureau/outils", "/bureau/parametres"):
             self.assertEqual(self.client.get(path).status_code, 200, path)
         self.assertEqual(self.client.get("/bureau/inconnue").status_code, 404)
         self.assertEqual(self.client.get("/api/email-status").status_code, 401)
@@ -695,12 +646,12 @@ class TestBureauAccess(unittest.TestCase):
     def test_portal_content_types(self):
         self.assertIn("text/html", self.client.get("/bureau/").headers["content-type"])
         self.assertIn("text/html", self.client.get("/bureau/planning").headers["content-type"])
-        self.assertIn("javascript", self.client.get("/static-web/alj-shell.js").headers["content-type"])
-        self.assertIn("text/css", self.client.get("/static-web/alj.css").headers["content-type"])
+        # Former shared scripts: gone, and the address is no longer public (401 before the 404)
+        self.assertEqual(self.client.get("/static-web/alj-core.js").status_code, 401)
 
     def test_required_role_for_portal(self):
         r = api_auth.required_role
-        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres", "/static-web/alj-core.js"):
+        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres"):
             self.assertIsNone(r("GET", path), path)
         self.assertEqual(r("GET", "/api/email-status"), Role.COACH)
 
@@ -753,12 +704,18 @@ class TestVueApp(unittest.TestCase):
             self.assertEqual(TestClient(app).get(path).text, '<div id="app"></div>', path)
         self.assertFalse(os.path.exists(os.path.join(WEB, "index.html")))
 
-    def test_former_directory_address_redirects(self):
-        for path in ("/annuaire/", "/annuaire/index.html?vue=pwa"):
+    def test_former_page_files_redirect(self):
+        """The former pages of web/ (served by the /annuaire mount): their screen, query kept (?vue=… included)."""
+        for path, target in (("/annuaire/", "/index"), ("/annuaire/index.html?vue=pwa", "/index?vue=pwa"),
+                             ("/annuaire/competitions.html", "/competitions"),
+                             ("/annuaire/competitions.html?vue=mobile", "/competitions?vue=mobile"),
+                             ("/annuaire/bureau/", "/bureau/"), ("/annuaire/bureau/index.html", "/bureau/"),
+                             ("/annuaire/bureau/adherents.html?id=3", "/bureau/adherents?id=3"),
+                             ("/annuaire/bureau/competitions.html", "/bureau/competitions")):
             r = TestClient(app).get(path, follow_redirects=False)
-            self.assertEqual(r.status_code, 302, path)
-            self.assertTrue(r.headers["location"].startswith("/index"), path)
-        self.assertEqual(TestClient(app).get("/annuaire/assets/logo.png").status_code, 200)  # the mount still serves the files
+            self.assertEqual((r.status_code, r.headers.get("location")), (302, target), path)
+        self.assertEqual(TestClient(app).get("/annuaire/bureau/inconnue.html").status_code, 404)
+        self.assertEqual(TestClient(app).get("/annuaire/assets/logo.png").status_code, 200)  # the mount still serves the logo
 
     def test_former_management_pages_redirect(self):
         """The former competitions management pages (phone and office): the competitions screen, query kept."""
@@ -774,62 +731,11 @@ class TestVueApp(unittest.TestCase):
         self.assertEqual(r.headers["location"], "/bureau/adherents?id=12&saison=2026-2027")
 
 
-class TestSingleFirebaseInit(unittest.TestCase):
-    """Centralised Firebase initialisation (alj-firebase.js) and runtime configuration
-    served by the server (/runtime-config.js): the basis of the emulator dev mode."""
-
-    def test_no_client_firestore_access(self):
-        """Firebase signs in only: no Firestore SDK, query or offline cache left (plan phase 3)."""
-        files = [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
-        files.append(get_sw().path)
-        for path in files:
-            text = _read(path)
-            for needle in ("firestore-compat", "firebase.firestore(", ".collection(", "onSnapshot",
-                           "enablePersistence", "runTransaction"):
-                self.assertNotIn(needle, text, f"{os.path.basename(path)}: {needle}")
-
-    def test_old_firestore_cache_is_wiped(self):
-        """alj-firebase.js deletes the IndexedDB copy kept by the pages up to v22."""
-        js = _read(os.path.join(SHARED, "alj-firebase.js"))
-        self.assertIn('FIRESTORE_DB_PREFIX = "firestore/"', js)
-        self.assertIn("indexedDB.deleteDatabase(name)", js)
-        self.assertIn('"firestore/[DEFAULT]/" + FIREBASE_CONFIG.projectId + "/main"', js)
-        self.assertRegex(js, r"wipeFirestoreCache\(\);\s*services = \{ auth \};")
-
-    def test_firebase_config_defined_once(self):
-        files = [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
-        owners = [os.path.basename(p) for p in files if "apiKey:" in _read(p)]
-        self.assertEqual(owners, ["alj-firebase.js"])
-        for path in files:
-            self.assertNotIn("firebase.initializeApp(", _read(path).replace(
-                "firebase.initializeApp(config)", ""), path)
-
-    def test_service_worker_does_not_cache_config(self):
-        sw = _read(get_sw().path)
-        self.assertIn('"/static-web/alj-firebase.js"', sw)
-        self.assertNotIn('"/runtime-config.js",', sw)
-        self.assertIn('url.pathname === "/runtime-config.js"', sw)
+class TestRuntimeConfig(unittest.TestCase):
+    """Runtime configuration served by the server (/runtime-config.js): the basis of the emulator dev mode."""
 
     def test_runtime_config_is_public(self):
         self.assertIsNone(api_auth.required_role("GET", "/runtime-config.js"))
-
-
-class TestSharedModuleImports(unittest.TestCase):
-    """Every name imported from /static-web/*.js is exported by that module
-    (otherwise a SyntaxError on page load, invisible on the server side)."""
-
-    IMPORT_RE = re.compile(r'import\s*\{([^}]*)\}\s*from\s*"/static-web/([\w.-]+\.js)"')
-    EXPORT_RE = re.compile(r'^export\s+(?:async\s+)?(?:function\*?|const|let|class)\s+(\w+)', re.M)
-
-    def test_imported_names_are_exported(self):
-        files = [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
-        for path in files:
-            for names, module in self.IMPORT_RE.findall(_read(path)):
-                exported = set(self.EXPORT_RE.findall(_read(os.path.join(SHARED, module))))
-                for name in filter(None, (n.split(" as ")[0].strip() for n in names.split(","))):
-                    with self.subTest(page=os.path.basename(path), module=module, name=name):
-                        self.assertIn(name, exported)
-
 
 if __name__ == "__main__":
     unittest.main()

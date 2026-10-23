@@ -1,5 +1,5 @@
 """HTML pages: the Vue application (code_source/frontend/, plan_frontend_vue.md) on every page address, the former
-addresses redirected to it, and the static web files (web/: service worker, manifest, logo, shared scripts)."""
+addresses redirected to it, and the static web files (web/: manifest, logo)."""
 
 from __future__ import annotations
 
@@ -52,14 +52,9 @@ def spa_entry() -> Response:
 
 def mount_static(app: FastAPI) -> None:
     """Static web files: a router cannot carry mounts, so they are added to the app itself."""
-    # Static web files (logo, competitions page…) also served under /annuaire/ (the directory itself: /index).
+    # Static web files (the logo, named by the manifest) under /annuaire/, their former address
     if os.path.isdir(WEB_DIR):
-        app.mount("/annuaire", StaticFiles(directory=WEB_DIR, html=True), name="annuaire")
-
-    # Ressources communes du portail bureau (CSS, modules JavaScript) : web/shared/.
-    shared_dir = os.path.join(WEB_DIR, "shared")
-    if os.path.isdir(shared_dir):
-        app.mount("/static-web", StaticFiles(directory=shared_dir), name="static-web")
+        app.mount("/annuaire", StaticFiles(directory=WEB_DIR), name="annuaire")
 
     app.mount(SPA_ASSETS_PATH, _BuildFiles(directory=frontend_dist(), check_dir=False), name="spa")
 
@@ -95,12 +90,33 @@ def get_annuaire_page() -> Response:
     """Directory of the members (read only, readable offline): Vue application, on phones as on desktop."""
     return spa_entry()
 
+# Former pages, files of web/ served by the /annuaire mount (bookmarks, installed shortcuts): their Vue screen
+FORMER_WEB_FILES = {
+    "/annuaire/": "/index",
+    "/annuaire/index.html": "/index",
+    "/annuaire/competitions.html": "/competitions",
+    "/annuaire/bureau/": "/bureau/",
+    "/annuaire/bureau/index.html": "/bureau/",
+}
+
 @router.get("/annuaire/", include_in_schema=False)
 @router.get("/annuaire/index.html", include_in_schema=False)
-def get_former_annuaire_page(request: Request) -> RedirectResponse:
-    """Former address of the directory page (web/index.html under the /annuaire/ mount): now /index."""
+@router.get("/annuaire/competitions.html", include_in_schema=False)
+@router.get("/annuaire/bureau/", include_in_schema=False)
+@router.get("/annuaire/bureau/index.html", include_in_schema=False)
+def get_former_web_file(request: Request) -> RedirectResponse:
+    """Former page files of web/ (the directory, the phone competitions page, the office home): their screen, same
+    query (?vue=… is read by nobody any more, kept harmless)."""
     query = f"?{request.url.query}" if request.url.query else ""
-    return RedirectResponse(url=f"/index{query}", status_code=302)
+    return RedirectResponse(url=FORMER_WEB_FILES[request.url.path] + query, status_code=302)
+
+@router.get("/annuaire/bureau/{page}.html", include_in_schema=False)
+def get_former_office_file(page: str, request: Request) -> Response:
+    """Former office page files (web/bureau/<page>.html): /bureau/<page>, same query."""
+    if page not in _SPA_PAGES:
+        return HTMLResponse("<h1>Page bureau introuvable</h1>", status_code=404)
+    query = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(url=f"/bureau/{page}{query}", status_code=302)
 
 
 @router.get("/")

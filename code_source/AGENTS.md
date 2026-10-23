@@ -14,7 +14,7 @@ All commands run from `code_source/`. Python 3.14 (`.python-version`), `requires
   `cd frontend && npm ci && npm run check:api && npm run lint && npm run typecheck && npm test && npm run build`
   - API types: `src/lib/api-schema.ts` is generated from `openapi.json` (`uv run python dev/export_openapi.py`, then
     `npm run gen:api`); never edit either by hand. Pages call the API through the typed client (`src/lib/client.ts`)
-  - dev: `npm run dev` → http://localhost:5173/bureau/, next to `uv run dev/run_server.sh` (Vite proxies the API and the pages not migrated)
+  - dev: `npm run dev` → http://localhost:5173/bureau/, next to `uv run dev/run_server.sh` (Vite proxies the API, `/map`, `/pivot` and the PWA files)
   - unit tests: Vitest, `src/**/*.test.ts` next to the module they test
 
 ## Critical Rules

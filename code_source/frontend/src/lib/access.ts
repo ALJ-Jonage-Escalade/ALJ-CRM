@@ -1,6 +1,5 @@
 /* Which role may open which page. The server stays the judge of every API call (api_auth.py): this table
-   only keeps a role away from screens it cannot use (navigation, Accueil cards, router guards).
-   The same split is applied by the pages not migrated yet (web/shared/alj-shell.js, adminOnly). */
+   only keeps a role away from screens it cannot use (navigation, Accueil cards, router guards). */
 import type { AuthState } from "../composables/auth";
 import { isStaff, type Role } from "./roles";
 

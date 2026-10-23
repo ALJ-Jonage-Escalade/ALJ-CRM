@@ -1,6 +1,6 @@
 /* Firebase only signs the user in: its ID token is sent to the API, which decides the rights.
-   Same project and app name as web/shared/alj-firebase.js, so the session (IndexedDB) is shared
-   with the pages not migrated yet: no second sign-in when moving between them. */
+   Same project and app name as the former pages (alj-firebase.js), so the session (IndexedDB) they left is kept:
+   no new sign-in after the update. */
 import { initializeApp } from "@firebase/app";
 import {
   browserLocalPersistence, browserPopupRedirectResolver, connectAuthEmulator, getRedirectResult, GoogleAuthProvider,

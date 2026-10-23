@@ -90,10 +90,10 @@ class TestCsvSafe(unittest.TestCase):
                 self.assertEqual(csv_safe(value), value)
 
     def test_js_rule_matches_python(self):
-        """csvSafe in alj-core.js uses the same trigger and phone patterns."""
-        with open(os.path.join(_code_root, "web", "shared", "alj-core.js"), encoding="utf-8") as f:
+        """csvSafe of the web app (frontend/src/lib/csv.ts) uses the same trigger and phone patterns."""
+        with open(os.path.join(_code_root, "frontend", "src", "lib", "csv.ts"), encoding="utf-8") as f:
             js = f.read()
-        body = re.search(r"export function csvSafe\(value\) \{(.*?)\n\}", js, re.S).group(1)
+        body = re.search(r"export function csvSafe\(value: string\): string \{(.*?)\n\}", js, re.S).group(1)
         self.assertIn(r"/^[=+\-@\t\r]/", body)
         self.assertIn(r"/^[+-][\d\s().,]*$/", body)
 

@@ -5,12 +5,12 @@ const answer = (body: unknown, status = 200) => async () => new Response(JSON.st
 
 describe("deployedVersion", () => {
   it("reads the app version deployed", async () => {
-    expect(await deployedVersion(answer({ web_version: "25", app_version: "2.8.0" }))).toBe("2.8.0");
+    expect(await deployedVersion(answer({ app_version: "2.8.0" }))).toBe("2.8.0");
   });
 
   it.each([
     ["an error status", answer({ app_version: "2.8.0" }, 503)],
-    ["no version", answer({ web_version: "25" })],
+    ["no version", answer({})],
     ["offline", async () => { throw new TypeError("Failed to fetch"); }],
   ])("is null on %s", async (_case, fetchImpl) => {
     expect(await deployedVersion(fetchImpl)).toBeNull();

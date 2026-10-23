@@ -1,4 +1,5 @@
-"""PWA shell files: manifest, service worker, browser runtime configuration, web version."""
+"""PWA shell files: manifest, service worker (built with the Vue application), browser runtime configuration, app
+version."""
 
 from __future__ import annotations
 
@@ -7,8 +8,9 @@ import os
 
 from fastapi import APIRouter
 from fastapi.responses import FileResponse, HTMLResponse, Response
+from pydantic import BaseModel
 
-from api.web.pages import WEB_DIR
+from api.web.pages import WEB_DIR, frontend_dist
 from domain.constants import APP_VERSION
 from infrastructure import runtime_env
 
@@ -24,11 +26,13 @@ def get_manifest():
     return HTMLResponse("Not found", status_code=404)
 
 @router.get("/sw.js")
-def get_sw():
-    """Service Worker PWA pour cache hors-ligne."""
-    p = os.path.join(WEB_DIR, "sw.js")
+def get_sw() -> Response:
+    """Service worker of the Vue application (frontend/src/sw.ts, hashed precache), built into frontend/dist. Served
+    from / for its scope to cover every page; same address as the former hand-written worker, which it replaces in
+    the browsers that have it. Checked again on every visit (no-cache)."""
+    p = os.path.join(frontend_dist(), "sw.js")
     if os.path.exists(p):
-        return FileResponse(p, media_type="application/javascript")
+        return FileResponse(p, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
     return HTMLResponse("Not found", status_code=404)
 
 @router.get("/runtime-config.js", include_in_schema=False)
@@ -42,19 +46,12 @@ def get_runtime_config():
     )
 
 
-def _read_web_version() -> str:
-    """Version of the service worker's cache (CACHE_NAME = "alj-escalade-v<n>" in web/sw.js), until the build's
-    service worker replaces it (plan phase 12)."""
-    import re
-    try:
-        with open(os.path.join(WEB_DIR, "sw.js"), "r", encoding="utf-8") as f:
-            m = re.search(r'CACHE_NAME = "alj-escalade-v(\d+)"', f.read(4000))
-        return m.group(1) if m else ""
-    except OSError:
-        return ""
+class AppVersion(BaseModel):
+    app_version: str
 
 
-@router.get("/api/web-version")
-def get_web_version():
-    """Version en ligne de la page web (jamais mise en cache par le service worker)."""
-    return {"web_version": _read_web_version(), "app_version": APP_VERSION}
+@router.get("/api/web-version", response_model=AppVersion)
+def get_web_version() -> AppVersion:
+    """Version deployed (code_source/VERSION, APP_VERSION): the app compares it with its own to offer an update. Never
+    cached by the service worker."""
+    return AppVersion(app_version=APP_VERSION)

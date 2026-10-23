@@ -1,5 +1,5 @@
-/* Keeps data up to date through the API by polling (TypeScript port of poll() in web/shared/alj-sync.js, which the
-   pages not migrated yet still use; plan decision D2: same behaviour, no rewrite).
+/* Keeps data up to date through the API by polling (TypeScript port of poll() in the former pages' alj-sync.js; plan
+   decision D2: same behaviour, no rewrite).
 
    poll(url, opts) loads url now, then every intervalMs while the page is visible; reloads when the page becomes
    visible again, when the network comes back, and on demand (refresh()). Sends If-None-Match so an unchanged poll is

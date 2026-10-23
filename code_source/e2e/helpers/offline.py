@@ -1,5 +1,5 @@
 """The offline copy of the app (IndexedDB "alj-offline", frontend/src/lib/store.ts, same database as the former pages'
-web/shared/alj-store.js), read and changed from the page under test."""
+alj-store.js), read and changed from the page under test."""
 from playwright.sync_api import Page
 
 from helpers.data import eventually

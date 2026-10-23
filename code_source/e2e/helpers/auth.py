@@ -26,19 +26,16 @@ ACCOUNTS = {
     "stranger": Account("e2e-stranger", "stranger@hogwarts.example"),
 }
 
-# Vue app (frontend/): window.__aljE2E, exposed in emulator mode only (src/lib/firebase.ts).
-# Pages not migrated yet: the compat SDK of web/shared/alj-firebase.js.
+# window.__aljE2E, exposed by the app in emulator mode only (frontend/src/lib/firebase.ts)
 _SIGN_IN = """async ([sub, email]) => {
   const idToken = JSON.stringify({ sub, email, email_verified: true });
-  if (window.__aljE2E) return window.__aljE2E.signInWithIdToken(idToken);
-  const { auth } = ALJFirebase.init();
-  await auth.signInWithCredential(firebase.auth.GoogleAuthProvider.credential(idToken));
+  await window.__aljE2E.signInWithIdToken(idToken);
 }"""
 
 
 def login_as(page: Page, role: str) -> Account:
     """Signs the current page in; the page's onAuthStateChanged handler then renders the UI."""
     account = ACCOUNTS[role]
-    page.wait_for_function("() => window.__aljE2E || (window.ALJFirebase && window.firebase)")
+    page.wait_for_function("() => window.__aljE2E")
     page.evaluate(_SIGN_IN, [account.sub, account.email])
     return account

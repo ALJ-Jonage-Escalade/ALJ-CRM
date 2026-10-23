@@ -101,7 +101,7 @@ class ParticipantsMixin(AdherentsMixin):
             "note_paiement": "",
             "urgence_nom": str(adherent_doc.get("emergency_name") or ""),
             "urgence_tel": str(adherent_doc.get("emergency_phone") or ""),
-            "updated_at": cls._now_iso(),
+            "updated_at": cls._row_stamp(),
         }
 
     @classmethod
@@ -155,7 +155,7 @@ class ParticipantsMixin(AdherentsMixin):
                 if guard is not None and not guard(p):
                     continue
                 before = dict(p)
-                p["updated_at"] = cls._now_iso()
+                p["updated_at"] = cls._row_stamp()
                 if change(p) is False:
                     p.clear()
                     p.update(before)
@@ -315,7 +315,7 @@ class ParticipantsMixin(AdherentsMixin):
 
         def mutate(parts):
             existing = {p.get("adherent_id") for p in parts}
-            now = cls._now_iso()
+            now = cls._row_stamp()
             added["count"] = 0
             for a in groupe:
                 if a["id"] in existing:

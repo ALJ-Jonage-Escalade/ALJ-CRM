@@ -44,8 +44,8 @@ FIREBASE_CERTS_URL = (
 )
 
 # ---------------------------------------------------------------------------
-# Rôles : seul juge des droits (firestore.rules refuse tout client). Les pages web en
-# gardent une copie pour l'affichage (un test vérifie la cohérence des listes).
+# Rôles : seul juge des droits (firestore.rules refuse tout client). L'application web
+# n'en garde aucune copie : elle lit le rôle sur /api/me.
 # ---------------------------------------------------------------------------
 ADMIN_EMAIL_DOMAINS = ("alj-escalade.fr",)
 ADMIN_EMAILS = frozenset({
@@ -87,8 +87,8 @@ PUBLIC_PATHS = frozenset({
     "/api/auth/google/callback",
     "/api/auth/google/status",
 })
-# Portail bureau et ressources communes : pages et scripts publics, données protégées.
-PUBLIC_PREFIXES = ("/annuaire", "/bureau", "/static-web", "/spa")
+# Pages et fichiers de l'application web (logo, anciennes adresses) : publics, données protégées.
+PUBLIC_PREFIXES = ("/annuaire", "/bureau", "/spa")
 # Reads open to the readonly role (competitions view of the mobile app); every other
 # route still requires at least "coach".
 READONLY_READ_PREFIXES = ("/api/competitions", "/api/coaches", "/api/competition-members")

@@ -6,7 +6,6 @@ Tests de sécurité de l'API Cloud Run :
 
 import datetime
 import os
-import re
 import sys
 import time
 import unittest
@@ -79,7 +78,7 @@ class TestRoles(unittest.TestCase):
         r = api_auth.required_role
         for path in ("/", "/health", "/competitions", "/competitions/gestion", "/index", "/sw.js", "/manifest.webmanifest",
                      "/api/web-version", "/webhooks/helloasso", "/annuaire/", "/annuaire/index.html",
-                     "/bureau", "/bureau/", "/bureau/adherents", "/static-web/alj-core.js", "/spa/assets/index-abc.js"):
+                     "/bureau", "/bureau/", "/bureau/adherents", "/spa/assets/index-abc.js", "/annuaire/assets/logo.png"):
             self.assertIsNone(r("GET", path), path)
         self.assertIsNone(r("POST", "/webhooks/helloasso"))
         self.assertIsNone(r("OPTIONS", "/api/send-email"))
@@ -143,19 +142,20 @@ class TestRoles(unittest.TestCase):
         self.assertNotIn("@", rules)
         self.assertNotIn("request.auth", rules)
 
-    def test_display_lists_match_api(self):
-        """The pages' role lists (display only) stay identical to the API's."""
-        for page in (os.path.join("shared", "alj-core.js"),):
-            with open(os.path.join(_code_root, "web", page), encoding="utf-8") as f:
-                html = f.read()
-
-            def js_list(name):
-                body = re.search(r"const %s = \[(.*?)\];" % name, html, re.S).group(1)
-                return set(re.findall(r'"([^"]+)"', body))
-
-            self.assertEqual(js_list("COACH_EMAILS"), set(api_auth.ADMIN_EMAILS) | set(api_auth.COACH_EMAILS), page)
-            self.assertEqual(js_list("READONLY_EMAILS"), set(api_auth.READONLY_EMAILS), page)
-
+    def test_role_lists_not_copied_to_the_web_app(self):
+        """The web app reads the role on /api/me: no copy of the role lists in any frontend file (plan phase 12)."""
+        listed = set(api_auth.ADMIN_EMAILS) | set(api_auth.COACH_EMAILS) | set(api_auth.READONLY_EMAILS)
+        self.assertTrue(listed)
+        texts = [os.path.join(_code_root, "frontend", "index.html")]
+        for root in (os.path.join(_code_root, "web"), os.path.join(_code_root, "frontend", "src")):
+            texts += [os.path.join(d, n) for d, _, names in os.walk(root) for n in names
+                      if n.endswith((".ts", ".vue", ".js", ".html", ".json", ".css"))]
+        self.assertGreater(len(texts), 10)
+        for path in texts:
+            with open(path, encoding="utf-8") as f:
+                content = f.read().lower()
+            for email in listed:
+                self.assertNotIn(email.lower(), content, path)
 
 class TestTokenVerification(_CertsMixin, unittest.TestCase):
 
@@ -250,7 +250,7 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
 
     def test_public_routes(self):
         for path in ("/health", "/api/web-version", "/webhooks/helloasso",
-                     "/bureau/", "/bureau/adherents", "/static-web/alj-core.js"):
+                     "/bureau/", "/bureau/adherents", "/annuaire/assets/logo.png"):
             self.assertEqual(self.get(path).status_code, 200, path)
 
     def test_protected_routes(self):

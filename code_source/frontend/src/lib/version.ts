@@ -1,4 +1,4 @@
-/** App version, update check and service worker (web/sw.js, network first, until the cutover phase). */
+/** App version, update check and service worker (src/sw.ts, built into dist/sw.js, served at /sw.js). */
 export const APP_VERSION: string = __APP_VERSION__;
 
 /** Version currently deployed (null offline or on error). */
@@ -31,7 +31,19 @@ export async function forceUpdate(): Promise<void> {
   location.reload();
 }
 
+const RELOADED_KEY = "alj_chunk_reload";
+
+/** Registers the built service worker (not in `npm run dev`: there is no build to precache). After a deploy, a page
+ * opened before it may ask for a chunk of its own build that is gone: it reloads instead of breaking. */
 export function registerServiceWorker(): void {
+  if (!import.meta.env.PROD) return;
+  window.addEventListener("vite:preloadError", () => {
+    // Once a minute at most: a chunk missing after the reload too is a server fault, not a loop to start
+    const last = Number(sessionStorage.getItem(RELOADED_KEY) ?? 0);
+    if (Date.now() - last < 60_000) return;
+    sessionStorage.setItem(RELOADED_KEY, String(Date.now()));
+    location.reload();
+  });
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch((err: unknown) => console.warn("Service Worker :", err));
   }

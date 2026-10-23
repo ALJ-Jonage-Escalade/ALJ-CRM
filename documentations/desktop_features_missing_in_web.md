@@ -2,14 +2,14 @@
 
 > Written 2026-10-20 when the PySide6 desktop app was removed (branch `feat/remove_windows_app`, base `main` @ `e7e0624`).
 > Method: each desktop page (`src/presentation/pages/*.py`, last version in git history) was compared with
-> `web/bureau/*.html`, the Vue app (`frontend/`) and the API routes in `src/server.py` / `src/api/`.
+> the web pages of the time (`web/bureau/*.html`, since replaced by the Vue app, `frontend/`) and the API routes in `src/server.py` / `src/api/`.
 > To read the removed code: `git show e7e0624:code_source/src/presentation/pages/<page>.py`.
 
 ## Missing on the web
 
 | Desktop feature | Desktop page | Removed code | Backend logic kept? | Notes |
 |---|---|---|---|---|
-| Bulk e-mail to filtered members (season, slot, status, "registered after"), choice of recipient address (member / 2nd e-mail / HelloAsso payer), attestation PDF and WhatsApp invitation/QR as attachments, duplicate removal | Communications | `pages/communications.py` | Partly: `/api/send-email`, `/api/preview-email`, `infrastructure/mail/*` | The web sends to one member at a time (`adherents.html`) or to a competition campaign (`competitions.html`). `communications.html` only manages templates. |
+| Bulk e-mail to filtered members (season, slot, status, "registered after"), choice of recipient address (member / 2nd e-mail / HelloAsso payer), attestation PDF and WhatsApp invitation/QR as attachments, duplicate removal | Communications | `pages/communications.py` | Partly: `/api/send-email`, `/api/preview-email`, `infrastructure/mail/*` | The web sends to one member at a time (Adhérents, member record) or to a competition campaign (Compétitions). Communications only manages templates. |
 | A4 emergency-contacts book (Excel, club style) | Exports | `exports/emergency_contacts.py` | No | Contacts can only be viewed per member in the directory (`/index`, `frontend/src/pages/DirectoryPage.vue`). |
 | Excel export of former members not re-registered | Exports | worker in `presentation/workers.py` | Yes: "Non réinscrits" filter in `MemberRepository.load_direct_data` (`infrastructure/sqlite/members.py`) | Needs a route + button. |
 | MyCompet rankings export (Excel) | Exports | worker | Yes: `infrastructure/mycompet/scraper.scrape_mycompet` (no caller anymore) | Per-competition results exist on the web ("Trouver les résultats"). |
@@ -33,13 +33,13 @@
 | Desktop feature | Web equivalent |
 |---|---|
 | Members list, details, add, edit, change group | Vue app, Adhérents (`frontend/src/pages/AdherentsPage.vue`) |
-| FFME import with manual matching of licensees not found | `bureau/outils.html` → `/api/ffme/preview`, `/api/ffme/import` (`manual_matches`) |
+| FFME import with manual matching of licensees not found | Outils (`OutilsPage.vue`) → `/api/ffme/preview`, `/api/ffme/import` (`manual_matches`) |
 | FFME CSV export + pre-export summary | `/api/ffme/export`, `/api/ffme/stats` |
-| Slots: instructors, HelloAsso tariffs, birth-year limits, weekly view, planning export | `bureau/planning.html` |
-| Competitions, coaches, HelloAsso payment matching, reminders, CSV exports | `bureau/competitions.html`, `/api/competitions/*` |
-| E-mail templates, WhatsApp invitation text | `bureau/communications.html` |
-| Map, pivot table | `bureau/outils.html` (`/map`, `/pivot`) |
-| Google OAuth connection / token test | `bureau/parametres.html` (`/api/auth/google/*`) |
+| Slots: instructors, HelloAsso tariffs, birth-year limits, weekly view, planning export | Planning (`PlanningPage.vue`) |
+| Competitions, coaches, HelloAsso payment matching, reminders, CSV exports | Compétitions (`CompetitionsPage.vue`), `/api/competitions/*` |
+| E-mail templates, WhatsApp invitation text | Communications (`CommunicationsPage.vue`) |
+| Map, pivot table | Outils (`/map`, `/pivot` in iframes) |
+| Google OAuth connection / token test | Paramètres (`ParametresPage.vue`, `/api/auth/google/*`) |
 | HelloAsso sync | `/api/helloasso/sync` |
 | Daily MyCompet results task (Windows task at 07:00) | Cloud Scheduler job `batch-resultats-competitions`, working once `fix/job_comp_update` is merged (see `plan_fix_job_comp_update.md` on that branch) |
 

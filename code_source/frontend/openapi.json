@@ -3125,7 +3125,7 @@
     "/sw.js": {
       "get": {
         "summary": "Get Sw",
-        "description": "Service Worker PWA pour cache hors-ligne.",
+        "description": "Service worker of the Vue application (frontend/src/sw.ts, hashed precache), built into frontend/dist. Served\nfrom / for its scope to cover every page; same address as the former hand-written worker, which it replaces in\nthe browsers that have it. Checked again on every visit (no-cache).",
         "operationId": "get_sw_sw_js_get",
         "responses": {
           "200": {
@@ -3142,14 +3142,16 @@
     "/api/web-version": {
       "get": {
         "summary": "Get Web Version",
-        "description": "Version en ligne de la page web (jamais mise en cache par le service worker).",
+        "description": "Version deployed (code_source/VERSION, APP_VERSION): the app compares it with its own to offer an update. Never\ncached by the service worker.",
         "operationId": "get_web_version_api_web_version_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AppVersion"
+                }
               }
             }
           }
@@ -3206,6 +3208,19 @@
         ],
         "title": "ApiErrorBody",
         "description": "Body of error(): what the frontend's API client turns into an ApiError."
+      },
+      "AppVersion": {
+        "properties": {
+          "app_version": {
+            "type": "string",
+            "title": "App Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "app_version"
+        ],
+        "title": "AppVersion"
       },
       "AttestationRequest": {
         "properties": {

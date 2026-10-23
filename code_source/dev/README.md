@@ -14,13 +14,14 @@ cd code_source
 docker compose -f dev/docker-compose.yml up -d     # émulateur (UI :4000) + Mailpit (UI :8025)
 set -a && source dev/dev.env && set +a
 uv run python dev/seed/seed_emulator.py             # réinitialise + données fictives
-uv run dev/run_server.sh                            # API + pages pas encore migrées (port 8080)
+uv run dev/run_server.sh                            # API, /map, /pivot, fichiers PWA (port 8080)
 cd frontend && npm ci && npm run dev                # application Vue : http://localhost:5173/bureau/
 ```
 
 Vite (port 5173) sert l'application Vue avec rechargement à chaud et relaie au serveur FastAPI (8080) l'API,
-`/runtime-config.js`, le service worker et les pages pas encore migrées (`vite.config.ts`). Le serveur FastAPI
-seul sert la dernière compilation (`npm run build` → `frontend/dist/`).
+`/runtime-config.js`, le manifeste, `/map`, `/pivot` et les anciennes adresses (`vite.config.ts`). Le serveur FastAPI
+seul sert la dernière compilation (`npm run build` → `frontend/dist/`, service worker `dist/sw.js` compris ; il
+n'est enregistré que par la compilation, jamais par `npm run dev`).
 
 Connexion : le bouton « Se connecter » ouvre le sélecteur de comptes de l'émulateur.
 
@@ -116,4 +117,4 @@ python -m pytest -c e2e/pytest.ini e2e -m smoke      # rapide ; sans -m : toute 
 | `check_env.py` | refuse le démarrage si un e-mail pouvait partir réellement ou si l'émulateur manque |
 | `seed/seed_emulator.py`, `seed/hp_names.py` | données fictives (Faker, graine fixe) |
 | `../src/infrastructure/runtime_env.py` | source unique prod/dev côté serveur |
-| `../web/shared/alj-firebase.js` | initialisation Firebase unique côté navigateur |
+| `../frontend/src/lib/firebase.ts` | initialisation Firebase unique côté navigateur |

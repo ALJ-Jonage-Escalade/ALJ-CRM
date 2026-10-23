@@ -366,9 +366,23 @@ e-mail lists and their mirror test, and the leftover HTML string tests. Every fo
 
 ### Acceptance criteria
 
-- [ ] Clients on the old service worker update to the new one without a manual refresh or a broken page
-- [ ] No hand-kept precache list or cache-name bump remains
-- [ ] Every former URL (with and without `?vue=` parameters) opens the right screen
-- [ ] No e-mail address list remains in any frontend file
+- [x] Clients on the old service worker update to the new one without a manual refresh or a broken page
+- [x] No hand-kept precache list or cache-name bump remains
+- [x] Every former URL (with and without `?vue=` parameters) opens the right screen
+- [x] No e-mail address list remains in any frontend file
 - [ ] The full e2e suite passes; docs no longer mention the old pages
-- [ ] Follow-up issue opened for the map rebuild and the jQuery UI upgrade
+- [x] Follow-up issue opened for the map rebuild and the jQuery UI upgrade (#25)
+
+> 2026-10-23 (2.18.0). Service worker: `frontend/src/sw.ts` (Workbox, `vite-plugin-pwa` in `injectManifest` mode, classic
+> script), built into `dist/sw.js` and served by FastAPI at `/sw.js` (`no-cache`), the address and scope of the former
+> `web/sw.js`: browsers that have it install the new one on their next visit (`skipWaiting` + `clientsClaim`), and it
+> deletes the former `alj-escalade-v*` caches. Precache = every build file (hashed names, `/spa/…`) and the entry page;
+> app pages are network first, the precached entry page offline (`/` too: the router redirects it to `/competitions`);
+> the API, `/runtime-config.js`, the manifest, `/map` and `/pivot` are never cached. A page left open across a deploy
+> reloads once when one of its chunks is gone (`vite:preloadError`). The app registers the worker in builds only (not
+> in `npm run dev`). Removed: `web/shared/` (scripts, CSS, the last role e-mail lists), `web/sw.js`, the `/static-web`
+> mount, the separate web version (`/api/web-version` now answers `AppVersion { app_version }`), the role-list mirror
+> test, the HTML / shared-script string tests and the Node harness of `alj-sync.js`; a test now checks that no frontend
+> file holds a role e-mail. `web/` keeps the manifest and the logo (`/annuaire/assets/logo.png`). Former page files of
+> the `/annuaire` mount (`/annuaire/competitions.html`, `/annuaire/bureau/…`) redirect to their screen, query kept.
+> e2e: `test_service_worker.py` covers the precache, offline pages and the update from a former worker.

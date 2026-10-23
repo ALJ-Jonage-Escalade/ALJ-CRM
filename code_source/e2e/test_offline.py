@@ -162,11 +162,11 @@ def test_logout_with_changes_not_sent_asks_first(mobile_page, competition):
             else:
                 dialog.accept()
         page.on("dialog", answer)
-        page.locator("#logout-btn").click()
-
-        def asked():
-            assert messages == ["1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?"]
-        eventually(asked)
+        # The box opens after the click has returned (the outbox is read first). Waited through Playwright: the
+        # handler only runs inside a Playwright call, never during the time.sleep of eventually()
+        with page.expect_event("dialog"):
+            page.locator("#logout-btn").click()
+        assert messages == ["1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?"]
         expect(page.locator("#logout-btn")).to_be_visible()
         expect(participant_card(page, member).get_by_test_id("queued")).to_be_visible()
         page.locator("#logout-btn").click()

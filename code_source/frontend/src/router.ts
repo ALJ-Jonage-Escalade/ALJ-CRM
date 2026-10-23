@@ -7,8 +7,8 @@ import { createRouter, createWebHistory, type RouteLocationNormalized, type Rout
 import type { Auth } from "./composables/auth";
 import { HOME, pageAccess, REFUSED_QUERY, verdict, type Access } from "./lib/access";
 import AccueilPage from "./pages/AccueilPage.vue";
-// The pages readable offline are in the main bundle: the service worker only keeps what was fetched, and a page
-// loaded on demand would be missing offline if it was never opened online on this device
+// The pages readable offline are in the main bundle (the service worker precaches every chunk, but the main bundle
+// does not depend on it)
 import CompetitionsPage from "./pages/CompetitionsPage.vue";
 import DirectoryPage from "./pages/DirectoryPage.vue";
 import NotFoundPage from "./pages/NotFoundPage.vue";
@@ -27,6 +27,8 @@ declare module "vue-router" {
 }
 
 export const routes: RouteRecordRaw[] = [
+  // The server redirects / to the competitions (api/web/pages.py); same offline, where the service worker answers
+  { path: "/", redirect: "/competitions", meta: { access: "public" } },
   { path: HOME, name: "accueil", component: AccueilPage, meta: { access: pageAccess("accueil") } },
   { path: "/bureau/adherents", name: "adherents", component: AdherentsPage, meta: { access: pageAccess("adherents") } },
   // Same screen on both addresses: /competitions is the PWA's start page and the Google sign-in callback (main.ts)

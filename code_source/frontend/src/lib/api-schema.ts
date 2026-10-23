@@ -1179,7 +1179,9 @@ export interface paths {
         };
         /**
          * Get Sw
-         * @description Service Worker PWA pour cache hors-ligne.
+         * @description Service worker of the Vue application (frontend/src/sw.ts, hashed precache), built into frontend/dist. Served
+         *     from / for its scope to cover every page; same address as the former hand-written worker, which it replaces in
+         *     the browsers that have it. Checked again on every visit (no-cache).
          */
         get: operations["get_sw_sw_js_get"];
         put?: never;
@@ -1199,7 +1201,8 @@ export interface paths {
         };
         /**
          * Get Web Version
-         * @description Version en ligne de la page web (jamais mise en cache par le service worker).
+         * @description Version deployed (code_source/VERSION, APP_VERSION): the app compares it with its own to offer an update. Never
+         *     cached by the service worker.
          */
         get: operations["get_web_version_api_web_version_get"];
         put?: never;
@@ -1248,6 +1251,11 @@ export interface components {
             message: string;
             /** Code */
             code?: string | null;
+        };
+        /** AppVersion */
+        AppVersion: {
+            /** App Version */
+            app_version: string;
         };
         /**
          * AttestationRequest
@@ -5662,7 +5670,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AppVersion"];
                 };
             };
         };

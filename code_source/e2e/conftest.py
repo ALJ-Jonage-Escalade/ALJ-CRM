@@ -10,8 +10,8 @@ keeps it). The dev stack of dev/docker-compose.yml and its data are never touche
 Tests run concurrently against that one server: those that change state other tests read (fake
 HelloAsso items, planning slots) share an xdist_group, which runs them one after another on one worker.
 
-Every browser context blocks service workers: sw.js caches the emulator hosts cache-first, which
-would leak state between tests.
+Every browser context blocks service workers (test_service_worker.py allows them): a worker would keep
+state between tests.
 """
 import os
 import shutil

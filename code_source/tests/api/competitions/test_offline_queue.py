@@ -2,6 +2,10 @@
 `unchanged_since`: the participant's `updated_at` the phone saw. One test per situation of
 the plan's conflict table (K1-K9)."""
 
+import datetime
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from support.api_case import ApiTestCase
 
 from domain.competitions.models import PAIEMENT_PAYE
@@ -54,6 +58,21 @@ class TestQueuedFlagChanges(ApiTestCase):
         r = self.queued(present=True)
         self.assertEqual((r.status_code, r.json()["code"]), (409, "changed"))
         self.assertFalse(self.participant(self.comp, 1)["present"])
+
+    def test_k3_changed_within_the_same_second_is_refused(self):
+        """The office unselects and selects again in the second the phone read the participant (stamps of real
+        writes, no forced date): to the second, the row looked unchanged and the phone's older change won."""
+        ticks = (datetime.datetime(2026, 10, 23, 9, 57, 42, n) for n in range(1, 1000))
+        clock = SimpleNamespace(datetime=SimpleNamespace(now=lambda: next(ticks)))
+        with patch("infrastructure.firestore.competitions.base.datetime", clock):
+            Repo.set_selection(self.comp, 1, True)  # the row the phone shows
+            seen = self.participant(self.comp, 1)["updated_at"]
+            Repo.set_selection(self.comp, 1, False)
+            Repo.set_selection(self.comp, 1, True)
+            self.assertEqual(self.participant(self.comp, 1)["updated_at"][:19], seen[:19])  # same second
+            r = self.queued(selectionne=False, seen=seen)
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "changed"))
+        self.assertTrue(self.participant(self.comp, 1)["selectionne"])
 
     def test_k4_paid_meanwhile_unselect_is_refused(self):
         Repo.set_payment_status(self.comp, 1, PAIEMENT_PAYE)  # webhook: also a change of the row
