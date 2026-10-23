@@ -300,7 +300,7 @@ export function attestationRecipient(m: Member): string {
 
 /** File name of the downloaded certificate: Attestation_DUPONT_Lea.pdf. */
 export function attestationFileName(m: Member): string {
-  const clean = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w-]+/g, "_");
+  const clean = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w-]+/g, "_");
   const first = m.first_name ? m.first_name.charAt(0).toUpperCase() + m.first_name.slice(1).toLowerCase() : "Adherent";
   return `Attestation_${clean(m.last_name.toUpperCase() || "ADHERENT")}_${clean(first)}.pdf`;
 }

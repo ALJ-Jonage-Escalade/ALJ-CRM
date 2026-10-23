@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import unicodedata
 from urllib.parse import quote
 
@@ -15,6 +16,7 @@ from services.documents import Doc
 from services.members.members import MemberService
 
 router = APIRouter()
+logger = logging.getLogger("alj")
 
 _PDF = {200: {"content": {"application/pdf": {}}, "description": "The certificate (PDF)"}}
 
@@ -121,8 +123,8 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
             date_str=now_str,
             purchase_id=int(member["purchase_id"]),
         )
-    except Exception as db_err:
-        print(f"⚠️ [ATTESTATION] Erreur enregistrement date d'envoi dans SQLite : {db_err}")
+    except Exception:
+        logger.exception("Attestation: sent date not recorded in SQLite")
 
     return AttestationSent(status="success", message=f"Attestation envoyée avec succès à {data.to_email}.",
                            email_sent_date=now_str, filename=filename_pdf)

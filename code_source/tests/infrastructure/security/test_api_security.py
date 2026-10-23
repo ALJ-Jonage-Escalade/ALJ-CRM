@@ -231,6 +231,22 @@ class TestMeRoute(_CertsMixin, unittest.TestCase):
         # Token checks on: the unsigned token is refused, even in dev mode
         self.assertEqual(self.me(emulator_token, ALJ_ENV="dev").status_code, 401)
 
+    def test_local_server_verifies_the_token(self):
+        """Token checks off outside dev mode (lancer_site_web.bat): /api/me still verifies the token and answers the role."""
+        local = {"ALJ_API_AUTH": "off", "ALJ_ENV": "prod"}
+        r = self.me(make_token(email="albus@alj-escalade.fr"), **local)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"email": "albus@alj-escalade.fr", "role": "admin"})
+        self.assertEqual(self.me(make_token(email="stephane.loridant@orange.fr"), **local).json()["role"], "coach")
+        self.assertEqual(self.me(**local).status_code, 401)
+        self.assertEqual(self.me("abc", **local).status_code, 401)
+        self.assertEqual(self.me(make_token(exp_delta=-3600), **local).status_code, 401)
+        self.assertEqual(self.me(make_token(key=OTHER_KEY), **local).status_code, 401)
+        # The other routes still need no token there (local server: local_guard_middleware protects them)
+        with patch.dict(os.environ, local):
+            self.assertIsNone(api_auth.authorize_request("GET", "/api/members", None))
+            self.assertIsNone(api_auth.authorize_request("POST", "/api/members/update", "Bearer abc"))
+
 
 class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
 

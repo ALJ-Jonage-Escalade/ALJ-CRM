@@ -93,7 +93,8 @@ PUBLIC_PREFIXES = ("/annuaire", "/bureau", "/spa")
 # Reads open to the readonly role (competitions view of the mobile app); every other
 # route still requires at least "coach".
 READONLY_READ_PREFIXES = ("/api/competitions", "/api/coaches", "/api/competition-members")
-# Open to any signed-in account, whatever its role: the role is what the route answers.
+# Open to any signed-in account, whatever its role: the role is what the route answers. The token
+# is verified even when the checks are off (local server): the app shows the role it answers.
 SIGNED_IN_PATHS = frozenset({"/api/me"})
 
 
@@ -293,9 +294,9 @@ def authorize_request(method: str, path: str, authorization: Optional[str]) -> O
     """Contrôle d'accès d'une requête. Renvoie les claims (ou None si public /
     contrôle désactivé) ; lève AuthError en cas de refus."""
     if (method or "GET").upper() != "OPTIONS" and path in SIGNED_IN_PATHS:
-        if not auth_enforced():
-            return None
         token = bearer_token(authorization)
+        if not auth_enforced() and (not token or runtime_env.is_dev()):
+            return None  # no token: the route answers 401; dev mode: the route reads the emulator's token
         if not token:
             raise AuthError(401, "Authentification requise : connectez-vous avec votre compte Google")
         return verify_firebase_token(token)

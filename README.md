@@ -96,7 +96,7 @@ dans le bon répertoire de travail.
 
 | Script | Rôle |
 |---|---|
-| `scripts/lancer_site_web.bat` | Serveur web local → http://127.0.0.1:8000/bureau/ |
+| `scripts/lancer_site_web.bat` | Serveur web local → http://127.0.0.1:8000/bureau/ ; compile d'abord l'interface (`npm run build`, nécessite [Node.js](https://nodejs.org/)) |
 | `scripts/deploy_cloud_run.bat` | Déploiement en production (appelle `code_source/scripts/deploy_cloud_run.bat`) |
 | `scripts/backup_projet.ps1` | Sauvegarde ZIP du projet (`.\scripts\backup_projet.ps1 [-Destination E:\]`) |
 | `code_source/scripts/lancer_site_web.bat` | Serveur web local |

@@ -35,6 +35,7 @@ const pdf = ref<Blob | null>(null);
 const pdfUrl = ref("");
 const loading = ref(!ineligible);
 const loadError = ref("");
+let closed = false;  // closed before the PDF came: no URL left unrevoked
 
 onMounted(async () => {
   if (ineligible) return;
@@ -43,6 +44,7 @@ onMounted(async () => {
       body: { purchase_id: props.member.purchase_id, season: props.member.season_name },
       parseAs: "blob",
     }));
+    if (closed) return;
     pdf.value = blob;
     pdfUrl.value = URL.createObjectURL(blob);
   } catch (e) {
@@ -52,6 +54,7 @@ onMounted(async () => {
   }
 });
 onBeforeUnmount(() => {
+  closed = true;
   if (pdfUrl.value) URL.revokeObjectURL(pdfUrl.value);
 });
 
