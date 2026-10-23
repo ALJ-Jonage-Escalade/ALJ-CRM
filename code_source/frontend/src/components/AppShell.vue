@@ -6,7 +6,7 @@
    Printed, only the page content remains (Planning prints its grid). */
 import { computed, inject, ref, watch } from "vue";
 import { AUTH_KEY } from "../composables/auth";
-import { canOpen, pageAccess, PAGES, verdict, type PageId } from "../lib/access";
+import { canOpen, pageAccess, PAGES, shownOn, verdict, type PageId } from "../lib/access";
 import { API_KEY } from "../lib/api";
 import { isStaff, roleLabel } from "../lib/roles";
 import { offlineStore, STORE_KEY } from "../lib/store";
@@ -84,7 +84,8 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
           :data-page="item.id"
           :aria-current="item.id === props.page ? 'page' : undefined"
           :class="[
-            'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 font-semibold text-side-text no-underline',
+            shownOn(item.screen, 'flex'),
+            'min-w-0 flex-1 flex-col items-center justify-center gap-0.5 font-semibold text-side-text no-underline',
             'md:flex-none md:flex-row md:justify-start md:gap-2 md:rounded-lg md:px-3 md:py-2.5',
             item.id === props.page ? 'text-white md:bg-accent' : 'hover:text-white md:hover:bg-side-hover',
           ]"

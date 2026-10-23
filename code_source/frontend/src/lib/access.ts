@@ -11,22 +11,41 @@ export const HOME = "/bureau/";
 /** Query parameter of Accueil naming the admin page a coach was sent back from (router guards). */
 export const REFUSED_QUERY = "reserve";
 
+/** Screens on which a page is listed (menu, Accueil cards): Adhérents on a computer, the directory on a phone, from the
+    same breakpoint as the menu (`md`). Hidden by CSS only: both addresses still open on any screen. */
+export type Screen = "any" | "phone" | "desktop";
+
 /** Office pages, in menu order. */
 export const PAGES = [
-  { id: "accueil", icon: "🏠", label: "Accueil", short: "Accueil", href: "/bureau/", access: "staff" },
-  { id: "adherents", icon: "👥", label: "Adhérents", short: "Adhérents", href: "/bureau/adherents", access: "staff" },
-  { id: "annuaire", icon: "📇", label: "Annuaire", short: "Annuaire", href: "/index", access: "staff" },
-  { id: "communications", icon: "✉️", label: "Communications", short: "Messages", href: "/bureau/communications", access: "admin" },
-  { id: "competitions", icon: "🏆", label: "Compétitions", short: "Compét.", href: "/bureau/competitions", access: "viewer" },
-  { id: "planning", icon: "📅", label: "Planning", short: "Planning", href: "/bureau/planning", access: "staff" },
-  { id: "outils", icon: "🛠️", label: "Outils", short: "Outils", href: "/bureau/outils", access: "staff" },
-  { id: "parametres", icon: "⚙️", label: "Paramètres", short: "Réglages", href: "/bureau/parametres", access: "admin" },
-] as const satisfies readonly { id: string; icon: string; label: string; short: string; href: string; access: Access }[];
+  { id: "accueil", icon: "🏠", label: "Accueil", short: "Accueil", href: "/bureau/", access: "staff", screen: "any" },
+  { id: "adherents", icon: "👥", label: "Adhérents", short: "Adhérents", href: "/bureau/adherents", access: "staff", screen: "desktop" },
+  { id: "annuaire", icon: "📇", label: "Annuaire", short: "Annuaire", href: "/index", access: "staff", screen: "phone" },
+  { id: "communications", icon: "✉️", label: "Communications", short: "Messages", href: "/bureau/communications", access: "admin", screen: "any" },
+  { id: "competitions", icon: "🏆", label: "Compétitions", short: "Compét.", href: "/bureau/competitions", access: "viewer", screen: "any" },
+  { id: "planning", icon: "📅", label: "Planning", short: "Planning", href: "/bureau/planning", access: "staff", screen: "any" },
+  { id: "outils", icon: "🛠️", label: "Outils", short: "Outils", href: "/bureau/outils", access: "staff", screen: "any" },
+  { id: "parametres", icon: "⚙️", label: "Paramètres", short: "Réglages", href: "/bureau/parametres", access: "admin", screen: "any" },
+] as const satisfies readonly { id: string; icon: string; label: string; short: string; href: string; access: Access; screen: Screen }[];
 
 export type PageId = (typeof PAGES)[number]["id"];
 
 export function pageAccess(id: PageId): Access {
   return PAGES.find((p) => p.id === id)!.access;
+}
+
+export function pageScreen(id: PageId): Screen {
+  return PAGES.find((p) => p.id === id)!.screen;
+}
+
+// Whole class names, for Tailwind to find them in this file
+const SHOWN: Record<"flex" | "block", Record<Screen, string>> = {
+  flex: { any: "flex", phone: "flex md:hidden", desktop: "hidden md:flex" },
+  block: { any: "block", phone: "block md:hidden", desktop: "hidden md:block" },
+};
+
+/** Display classes of a link listed on these screens only. */
+export function shownOn(screen: Screen, display: "flex" | "block"): string {
+  return SHOWN[display][screen];
 }
 
 export function canOpen(role: Role, access: Access): boolean {

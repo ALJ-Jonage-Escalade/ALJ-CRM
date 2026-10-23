@@ -173,6 +173,9 @@ table export from now on.
 
 - [x] Map and pivot tabs load in sandboxed iframes with the season filter
 - [x] FFME preview / apply / export work; the FFME golden master test stays byte-identical
+- [x] Attendance sheets tab kept: course sheets (one workbook or a zip) and the autonomous sheet download, covered by
+      e2e (`test_course_attendance_sheets`, `test_autonomous_attendance_sheet`)
+- [x] The FFME « Importer & Fusionner directement » button (no preview) kept, admins only, behind a confirmation
 - [x] Vitest covers the CSV export module (formula cases; signed numbers and phone numbers kept)
 - [x] e2e Outils flows strengthened first, pass after migration; HTML string checks removed
 
@@ -287,6 +290,11 @@ from the old page carries over.
 > of the signed-in user (verdict `offline`), and asks the server again when the network comes back. `/annuaire/` and
 > `/annuaire/index.html` redirect to `/index`; `web/index.html` and `alj-members-sync.js` are removed. Vitest runs the
 > store on `fake-indexeddb` (Apache-2.0, dev only, no dependencies).
+>
+> Changed 2026-10-23: the menu and the Accueil cards list the directory on phones and Adhérents on computers (below /
+> from the `md` breakpoint of the menu, by CSS only: `screen` in `lib/access.ts`). Both addresses still open on any
+> screen, without redirect; a member's full record (health, order, edits) stays in Adhérents. The directory keeps its
+> offline copy of the season and Compétitions its copy of the competitors: both kept on purpose.
 
 ---
 

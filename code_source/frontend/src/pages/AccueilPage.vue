@@ -3,13 +3,14 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import PageLink from "../components/PageLink.vue";
-import { canOpen, pageAccess, PAGES, REFUSED_QUERY, type Access } from "../lib/access";
+import { canOpen, pageAccess, pageScreen, PAGES, REFUSED_QUERY, shownOn, type Access, type Screen } from "../lib/access";
 import type { Role } from "../lib/roles";
 
-/* Links to the migrated pages stay in the app; the others load their former page. Only the cards the role may open are shown. */
-const LINKS: { href: string; title: string; text: string; access: Access }[] = [
-  { href: "/bureau/adherents", title: "👥 Adhérents", text: "Liste des adhérents, filtre par tarif et fiche détaillée.", access: pageAccess("adherents") },
-  { href: "/index", title: "📇 Annuaire", text: "Coordonnées et contacts d'urgence des adhérents, consultables hors ligne.", access: pageAccess("annuaire") },
+/* Links to the migrated pages stay in the app; the others load their former page. Only the cards the role may open are
+   shown, and Adhérents or the directory depending on the screen, as in the menu. */
+const LINKS: { href: string; title: string; text: string; access: Access; screen?: Screen }[] = [
+  { href: "/bureau/adherents", title: "👥 Adhérents", text: "Liste des adhérents, filtre par tarif et fiche détaillée.", access: pageAccess("adherents"), screen: pageScreen("adherents") },
+  { href: "/index", title: "📇 Annuaire", text: "Coordonnées et contacts d'urgence des adhérents, consultables hors ligne.", access: pageAccess("annuaire"), screen: pageScreen("annuaire") },
   { href: "/bureau/communications", title: "✉️ Communications", text: "Modèles d'e-mails et de messages du club.", access: pageAccess("communications") },
   { href: "/bureau/outils", title: "🛠️ Outils", text: "Carte interactive et analyse des effectifs.", access: pageAccess("outils") },
   { href: "/bureau/competitions", title: "🏆 Compétitions", text: "Compétitions, participants et paiements HelloAsso.", access: pageAccess("competitions") },
@@ -39,7 +40,8 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
           v-for="link in linksFor(role)"
           :key="link.href"
           :href="link.href"
-          class="block rounded-xl border border-slate-200 bg-white px-4.5 py-4 text-slate-800 no-underline shadow-sm hover:border-accent"
+          :class="shownOn(link.screen ?? 'any', 'block')"
+          class="rounded-xl border border-slate-200 bg-white px-4.5 py-4 text-slate-800 no-underline shadow-sm hover:border-accent"
         >
           <b class="mb-1 block text-base">{{ link.title }}</b>
           <span class="text-[13px] leading-snug text-slate-500">{{ link.text }}</span>
