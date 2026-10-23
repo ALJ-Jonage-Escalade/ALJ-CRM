@@ -1,7 +1,7 @@
 """
 Tests du portail « bureau » (ordinateur) et de son socle web/shared/ :
 - routes publiques (pages) sans données, ressources communes servies ;
-- numéro de version identique (pages, service worker, pages PWA) ;
+- service worker ;
 - rôles du socle identiques à l'API et à firestore.rules.
 """
 
@@ -23,12 +23,11 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
-from api.web.pages import get_bureau_home, get_bureau_page, get_competitions_management_page
+from api.web.pages import get_bureau_home, get_bureau_page
 from api.web.pwa import get_sw, get_web_version
 from server import app
 
 WEB = os.path.join(_code_root, "web")
-BUREAU = os.path.join(WEB, "bureau")
 SHARED = os.path.join(WEB, "shared")
 
 
@@ -44,44 +43,27 @@ def _current_version():
 class TestBureauFiles(unittest.TestCase):
 
     def test_pages_exist(self):
-        self.assertTrue(os.path.exists(os.path.join(BUREAU, "competitions.html")))
+        """Every page is the Vue application's: no HTML page left in web/ (the former competitions pages went with
+        plan phase 11)."""
+        self.assertEqual([n for _, _, files in os.walk(WEB) for n in files if n.endswith(".html")], [])
         for name in ("alj.css", "alj-core.js", "alj-shell.js", "alj-sync.js"):
             self.assertTrue(os.path.exists(os.path.join(SHARED, name)), name)
 
     def test_routes_serve_only_known_pages(self):
-        self.assertEqual(get_bureau_page("competitions-gestion").status_code, 200)
         self.assertEqual(get_bureau_page("index.html").status_code, 404)
         self.assertEqual(get_bureau_page("..%2Fserver.py").status_code, 404)
         self.assertEqual(get_bureau_page("inconnue").status_code, 404)
-
-    def test_pages_are_static_shells_without_member_data(self):
-        """Les pages n'embarquent aucune donnée : elles chargent le socle et lisent l'API après connexion."""
-        for name in ("competitions.html",):
-            html = _read(os.path.join(BUREAU, name))
-            self.assertIn('href="/static-web/alj.css"', html, name)
-            self.assertIn('import { startBureau } from "/static-web/alj-shell.js"', html, name)
-            self.assertNotIn("firebase-firestore-compat.js", html, name)
-            self.assertNotIn("crm_users", html, name)
-            self.assertNotIn("crm_orders", html, name)
-
-    def test_bureau_pages_share_web_version(self):
-        version = _current_version()
-        self.assertRegex(version, r"^\d+$")
-        for name in ("competitions.html",):
-            html = _read(os.path.join(BUREAU, name))
-            self.assertIn(f'<meta name="alj-web-version" content="{version}">', html, name)
-            self.assertRegex(html, rf"<title>[^<]*\(v{version}\)</title>", name)
 
     def test_service_worker_precaches_portal(self):
         sw = _read(get_sw().path)
         version = _current_version()
         self.assertIn(f'CACHE_NAME = "alj-escalade-v{version}"', sw)
         for asset in ("/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres",
-                      "/bureau/competitions-gestion", "/competitions/gestion",
-                      "/static-web/alj.css", "/static-web/alj-core.js",
-                      "/static-web/alj-shell.js",
-                      "/static-web/alj-sync.js"):
+                      "/competitions", "/index"):
             self.assertIn(f'"{asset}"', sw)
+        # Redirections (former addresses): a redirected answer cannot serve a page from the cache
+        for redirected in ("/bureau/competitions-gestion", "/competitions/gestion", "/annuaire/"):
+            self.assertNotIn(f'"{redirected}"', sw)
 
     def test_competitions_results_cron_and_settings_endpoints(self):
         """Vérifie les endpoints de configuration et de cron du batch des résultats MyCompet."""
@@ -532,41 +514,6 @@ class TestBureauFiles(unittest.TestCase):
         self.assertIn("Aucun créneau à placer sur la grille", r.json()["message"])
         self.assertEqual(client.get("/api/planning/export", params={"mode": "list", "season": "2026-2027"}).status_code, 200)
 
-    def test_competitions_desktop_page_ui_and_wiring(self):
-        """La page bureau/competitions.html est adaptée aux grands écrans d'ordinateur tout en préservant le mobile."""
-        html = _read(os.path.join(BUREAU, "competitions.html"))
-        shell = _read(os.path.join(SHARED, "alj-shell.js"))
-
-        # Vérification du lien du menu
-        self.assertIn('/bureau/competitions', shell)
-
-        # La vue mobile existe toujours séparément et n'est pas altérée
-        mobile_html = _read(get_competitions_management_page().path)
-        self.assertIn('id="page-comps"', mobile_html)
-        self.assertIn('id="page-participants"', mobile_html)
-
-        # Éléments grand écran de la page bureau
-        for elem in ("comps-list-container", "comp-workspace", "comp-search-input",
-                      "comp-form-modal", "comp-email-modal", "btn-add-comp", "btn-fetch-results",
-                      "btn-nav-comps", "btn-nav-helloasso", "btn-nav-bilan", "btn-nav-coachs",
-                      "section-competitions", "section-helloasso", "section-bilan", "section-coachs"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn("comp-layout", html)
-        self.assertIn("part-chip-all", html)
-        self.assertIn("part-chip-selected", html)
-        self.assertIn("part-chip-unpaid", html)
-        self.assertIn("part-chip-non-invite", html)
-        self.assertIn("btn-remove-all-non-invites", html)
-        self.assertIn("Retirer tous les compétiteurs non invités", html)
-        self.assertIn("part-status-select", html)
-        self.assertIn("⚠️ Absent", html)
-        self.assertIn("🔄 Report", html)
-        self.assertIn('apiFetch("/api/helloasso/sync"', html)
-        self.assertIn('apiFetch("/api/send-email"', html)
-        self.assertIn("/fetch-results", html)
-        self.assertIn("hasResults", html)
-        self.assertIn("🏆 Résultats", html)
-
     @patch("infrastructure.mycompet.scraper.fetch_and_parse_mycompet_results")
     @patch("infrastructure.firestore.client.FirestoreClient.get_document")
     @patch("infrastructure.firestore.client.FirestoreClient.update_fields")
@@ -703,18 +650,6 @@ class TestBureauFiles(unittest.TestCase):
             "Bonjour Camille DURAND, votre inscription au groupe Jeunes 2010 pour la saison 2026-2027 (licence 654321) est validée."
         )
 
-    def test_former_phone_page_signs_in_through_the_vue_app(self):
-        """The former phone page (/competitions/gestion) is no OAuth redirect URI: it signs in through
-        /competitions?login=1, which comes back to it (alj_after_login). No device redirection left."""
-        html = _read(get_competitions_management_page().path)
-        login = html[html.index("function login()"):html.index("function logout()")]
-        self.assertIn('sessionStorage.setItem("alj_after_login", location.pathname + location.search);', login)
-        self.assertIn('location.assign("/competitions?login=1");', login)
-        for gone in ("alj-vue.js", "accounts.google.com", "readOauthFragment", "completeDevLogin"):
-            self.assertNotIn(gone, html)
-        self.assertFalse(os.path.exists(os.path.join(SHARED, "alj-vue.js")))
-        self.assertIn('href="/index?vue=pwa"', html)
-
     def test_shell_imports_exist_in_core(self):
         """Chaque nom importé par alj-shell.js doit être exporté par alj-core.js."""
         shell = _read(os.path.join(SHARED, "alj-shell.js"))
@@ -724,26 +659,6 @@ class TestBureauFiles(unittest.TestCase):
         self.assertTrue(names)
         for name in names:
             self.assertRegex(core, rf"export (function|const|async function) {name}\b", name)
-
-    def test_competitions_bureau_uses_api_only(self):
-        """The bureau competitions page reads and writes through the API, never Firestore directly."""
-        html = _read(os.path.join(BUREAU, "competitions.html"))
-        for firestore_call in (".collection(", "onSnapshot", "initFirebase"):
-            self.assertNotIn(firestore_call, html, firestore_call)
-        self.assertIn('<script src="/static-web/alj-sync.js"></script>', html)
-        for url in ("/api/competitions", "/api/coaches", "/api/competition-members",
-                    "/api/helloasso/items"):
-            self.assertIn(f'"{url}"', html, url)
-
-    def test_bureau_imports_exist_in_core(self):
-        """Every name imported from alj-core.js by the bureau pages and shared modules is exported."""
-        core = _read(os.path.join(SHARED, "alj-core.js"))
-        for path in (os.path.join(BUREAU, "competitions.html"),):
-            block = re.search(r"import\s*\{([^}]+)\}\s*from\s*\"/static-web/alj-core\.js\"", _read(path)).group(1)
-            names = [n.strip() for n in block.split(",") if n.strip()]
-            self.assertTrue(names, path)
-            for name in names:
-                self.assertRegex(core, rf"export (function|const|async function) {name}\b", f"{path}: {name}")
 
     def test_core_roles_match_api_and_rules(self):
         core = _read(os.path.join(SHARED, "alj-core.js"))
@@ -828,8 +743,6 @@ class TestVueApp(unittest.TestCase):
             r = TestClient(app).get(f"/bureau/{page}")
             self.assertEqual(r.status_code, 200, page)
             self.assertEqual(r.text, '<div id="app"></div>', page)
-            if page != "competitions":  # its former page keeps the writes (/bureau/competitions-gestion)
-                self.assertFalse(os.path.exists(os.path.join(BUREAU, f"{page}.html")), page)
         # The competitions and the Google sign-in callback, on phones as on desktop (?vue=: former links)
         for path in ("/competitions", "/competitions?vue=mobile", "/competitions?login=1"):
             self.assertEqual(TestClient(app).get(path).text, '<div id="app"></div>', path)
@@ -847,12 +760,12 @@ class TestVueApp(unittest.TestCase):
             self.assertTrue(r.headers["location"].startswith("/index"), path)
         self.assertEqual(TestClient(app).get("/annuaire/assets/logo.png").status_code, 200)  # the mount still serves the files
 
-    def test_pages_not_migrated_keep_their_file(self):
-        """The former competitions pages keep the writes until plan phase 11."""
-        self.assertEqual(get_bureau_page("competitions-gestion").path, os.path.join(BUREAU, "competitions.html"))
-        r = TestClient(app).get("/competitions/gestion")
-        self.assertEqual(r.status_code, 200)
-        self.assertIn('id="page-comps"', r.text)
+    def test_former_management_pages_redirect(self):
+        """The former competitions management pages (phone and office): the competitions screen, query kept."""
+        for path, target in (("/competitions/gestion", "/competitions"), ("/bureau/competitions-gestion?id=12", "/bureau/competitions?id=12")):
+            r = TestClient(app).get(path, follow_redirects=False)
+            self.assertEqual((r.status_code, r.headers["location"]), (302, target), path)
+        self.assertEqual(get_bureau_page("competitions-gestion").status_code, 404)  # not a page of its own any more
 
     def test_former_record_url_goes_to_the_list(self):
         """/bureau/adherents-fiche (member record of the former page, 2.14) opens the record in the Vue app."""
@@ -865,22 +778,9 @@ class TestSingleFirebaseInit(unittest.TestCase):
     """Centralised Firebase initialisation (alj-firebase.js) and runtime configuration
     served by the server (/runtime-config.js): the basis of the emulator dev mode."""
 
-    PAGES = [os.path.join(WEB, "competitions.html")] + [
-        os.path.join(BUREAU, n) for n in sorted(os.listdir(BUREAU)) if n.endswith(".html")]
-
-    def test_pages_load_config_then_init(self):
-        sdk = '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>'
-        for path in self.PAGES:
-            html = _read(path)
-            i_sdk = html.index(sdk)
-            i_cfg = html.index('<script src="/runtime-config.js"></script>')
-            i_init = html.index('<script src="/static-web/alj-firebase.js"></script>')
-            self.assertLess(i_sdk, i_cfg, path)
-            self.assertLess(i_cfg, i_init, path)
-
     def test_no_client_firestore_access(self):
         """Firebase signs in only: no Firestore SDK, query or offline cache left (plan phase 3)."""
-        files = self.PAGES + [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
+        files = [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
         files.append(get_sw().path)
         for path in files:
             text = _read(path)
@@ -897,7 +797,7 @@ class TestSingleFirebaseInit(unittest.TestCase):
         self.assertRegex(js, r"wipeFirestoreCache\(\);\s*services = \{ auth \};")
 
     def test_firebase_config_defined_once(self):
-        files = self.PAGES + [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
+        files = [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
         owners = [os.path.basename(p) for p in files if "apiKey:" in _read(p)]
         self.assertEqual(owners, ["alj-firebase.js"])
         for path in files:
@@ -922,9 +822,7 @@ class TestSharedModuleImports(unittest.TestCase):
     EXPORT_RE = re.compile(r'^export\s+(?:async\s+)?(?:function\*?|const|let|class)\s+(\w+)', re.M)
 
     def test_imported_names_are_exported(self):
-        files = [os.path.join(WEB, n) for n in os.listdir(WEB) if n.endswith(".html")]
-        files += [os.path.join(BUREAU, n) for n in os.listdir(BUREAU) if n.endswith(".html")]
-        files += [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
+        files = [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
         for path in files:
             for names, module in self.IMPORT_RE.findall(_read(path)):
                 exported = set(self.EXPORT_RE.findall(_read(os.path.join(SHARED, module))))

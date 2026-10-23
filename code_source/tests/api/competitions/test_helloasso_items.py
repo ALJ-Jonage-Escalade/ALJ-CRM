@@ -2,6 +2,7 @@
 
 from support.api_case import ApiTestCase
 
+from api.competitions.schemas.views import HelloAssoItem
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 
 
@@ -23,6 +24,14 @@ class TestHelloAssoItems(ApiTestCase):
         items = self.client.get("/api/helloasso/items").json()
         self.assertEqual([i["id_item"] for i in items], [55])
         self.assertNotIn("_doc_id", items[0])
+        # The body is built by hand (json_with_etag): what it holds matches the contract
+        parsed = HelloAssoItem.model_validate(items[0]).model_dump()
+        self.assertEqual({k: parsed[k] for k in items[0] if k in HelloAssoItem.model_fields}, {k: v for k, v in items[0].items() if k in HelloAssoItem.model_fields})
+
+    def test_ignore_and_link_answers(self):
+        r = self.client.put("/api/helloasso/items/55/ignore", json={"ignore": True, "motif": "test"})
+        self.assertEqual((r.status_code, r.json()), (200, {"status": "success"}))
+        self.assertEqual(self.link(competition_id=self.comp, adherent_id=1).json(), {"status": "success", "linked": True})
 
     def test_link_records_payment_once(self):
         r = self.link(competition_id=self.comp, adherent_id=1, commentaire="ok")

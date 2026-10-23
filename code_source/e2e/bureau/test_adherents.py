@@ -11,7 +11,7 @@ from playwright.sync_api import expect
 from helpers.auth import login_as
 from helpers.data import unique_name
 from helpers.members import ROWS, displayed_count, find, open_members, open_record
-from helpers.mobile import accept_dialogs
+from helpers.dialogs import accept_dialogs
 from helpers.offline import resource_names
 
 

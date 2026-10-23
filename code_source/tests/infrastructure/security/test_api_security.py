@@ -145,7 +145,7 @@ class TestRoles(unittest.TestCase):
 
     def test_display_lists_match_api(self):
         """The pages' role lists (display only) stay identical to the API's."""
-        for page in ("competitions.html", os.path.join("shared", "alj-core.js")):
+        for page in (os.path.join("shared", "alj-core.js"),):
             with open(os.path.join(_code_root, "web", page), encoding="utf-8") as f:
                 html = f.read()
 

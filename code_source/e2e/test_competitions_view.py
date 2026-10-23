@@ -1,18 +1,19 @@
-"""Competitions screen of the Vue app (frontend/src/pages/CompetitionsPage.vue), read only, on /competitions and
-/bureau/competitions: list, participants and payment status, roles, offline copy (shared with the former page), the
+"""Competitions screen of the Vue app (frontend/src/pages/CompetitionsPage.vue), reading, on /competitions and
+/bureau/competitions (changes: test_competitions_manage.py, test_competitors.py, test_offline.py…): list, participants and payment status, roles, offline copy (shared with the former page), the
 Google sign-in that ends on /competitions, and the installed app.
 
 Service workers are blocked in the e2e contexts (except where allowed), so "offline" is simulated by making every API
 call fail while the page itself still loads."""
 import re
+import time
 
 import pytest
 from playwright.sync_api import Page, expect
 
 from helpers.auth import ACCOUNTS, login_as
 from helpers.data import unique_name
-from helpers.mobile import SEEDED_COMPETITION, open_app
-from helpers.offline import record, wait_stored
+from helpers.competitions import SEEDED_COMPETITION
+from helpers.offline import owner, put_record, record, wait_stored
 from helpers.stack import AUTH_HOST
 
 
@@ -59,11 +60,10 @@ def test_phone_list_then_competition(mobile_page, competition):
     expect(page).to_have_url(re.compile(rf"/competitions\?id={competition['id']}$"))
     expect(card(page, SEEDED_COMPETITION)).to_be_hidden()  # one at a time on a phone
     row = participant(page, competition["member"])
-    expect(row.get_by_test_id("participe")).to_have_text("✅ Participe")
+    expect(row.get_by_test_id("participe-switch")).to_be_checked()
     expect(row.get_by_test_id("payment-badge")).to_be_visible()
     expect(row.get_by_test_id("emergency-link")).to_have_count(1)
     expect(page.get_by_test_id("kpi-selected")).to_have_text("1")
-    expect(page.get_by_test_id("manage-link")).to_have_attribute("href", "/competitions/gestion")
     assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"), "no horizontal scroll"
     page.get_by_test_id("back-link").click()
     expect(card(page, SEEDED_COMPETITION)).to_be_visible()
@@ -75,7 +75,6 @@ def test_desktop_shows_list_and_competition_side_by_side(page, competition):
     card(page, competition["nom"]).click()
     expect(page.get_by_test_id("detail-name")).to_have_text(competition["nom"])
     expect(card(page, SEEDED_COMPETITION)).to_be_visible()
-    expect(page.get_by_test_id("manage-link-desktop")).to_have_attribute("href", "/bureau/competitions-gestion")
 
 
 def test_both_addresses_show_the_same_screen(page):
@@ -91,7 +90,9 @@ def test_readonly_sees_no_contacts_nor_management(mobile_page, competition):
     card(page, competition["nom"]).click()
     expect(participant(page, competition["member"])).to_be_visible()
     expect(page.get_by_test_id("emergency-link")).to_have_count(0)
-    expect(page.get_by_test_id("manage-link")).to_have_count(0)
+    expect(participant(page, competition["member"]).get_by_test_id("participe")).to_have_text("✅ Participe")
+    for testid in ("participe-switch", "participant-actions", "detail-actions", "add-members", "create-comp", "sections"):
+        expect(page.get_by_test_id(testid)).to_have_count(0)
 
 
 def test_account_without_role_is_refused(mobile_page):
@@ -116,14 +117,13 @@ def test_shown_offline_with_its_date(mobile_page, competition):
         api_back(page)
 
 
-def test_copy_of_the_former_page_is_shown_offline(mobile_page, competition):
-    """Existing users' offline data carries over: the former page's copy (no url recorded) is read by the app."""
-    page = open_app(mobile_page)  # former page, /competitions/gestion
-    wait_stored(page, "competitions", lambda data: any(c["id"] == competition["id"] for c in data), timeout=30)
+def test_copy_of_the_former_page_is_shown_offline(mobile_page, competition, test_data):
+    """Existing users' offline data carries over: a copy as the former page's alj-store.js kept it (no url)."""
+    page = open_view(mobile_page)
+    put_record(page, {"name": "competitions", "uid": owner(page), "savedAt": int(time.time() * 1000), "etag": None,
+                      "data": [test_data.competition(competition["id"])]})
     assert record(page, "competitions").get("url") is None
-    page.context.route("**/api/**", lambda route: route.abort("internetdisconnected"))
-    page.goto("/competitions")
-    page.context.set_offline(True)
+    api_down(page)
     try:
         expect(card(page, competition["nom"])).to_be_visible()
     finally:
@@ -141,15 +141,14 @@ def test_sign_in_ends_on_competitions(page):
     expect(card(page, SEEDED_COMPETITION)).to_be_visible(timeout=20_000)
 
 
-def test_former_page_signs_in_through_competitions(mobile_page):
-    """The former phone page is no OAuth redirect URI: its sign-in goes through /competitions and comes back."""
-    page = mobile_page
+def test_former_management_addresses_open_the_screen(page, competition):
+    """Bookmarks of the former management pages (until plan phase 11) open the competitions screen."""
     page.goto("/competitions/gestion")
-    page.locator("#login-btn").click()
-    page.wait_for_url(re.compile(re.escape(AUTH_HOST) + "/emulator/auth/handler"))
-    page.get_by_text(ACCOUNTS["coach"].email).click()
-    page.wait_for_url(re.compile(r"/competitions/gestion$"))
-    expect(page.locator("#setup-email")).to_have_text(ACCOUNTS["coach"].email)
+    expect(page).to_have_url(re.compile(r"/competitions$"))
+    page.goto(f"/bureau/competitions-gestion?id={competition['id']}")
+    expect(page).to_have_url(re.compile(rf"/bureau/competitions\?id={competition['id']}$"))
+    login_as(page, "admin")
+    expect(page.get_by_test_id("detail-name")).to_have_text(competition["nom"])
 
 
 @pytest.mark.browser_context_args(service_workers="allow")

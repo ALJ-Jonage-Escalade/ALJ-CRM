@@ -9,6 +9,8 @@ import { AUTH_KEY } from "../composables/auth";
 import { canOpen, pageAccess, PAGES, verdict, type PageId } from "../lib/access";
 import { API_KEY } from "../lib/api";
 import { isStaff, roleLabel } from "../lib/roles";
+import { offlineStore, STORE_KEY } from "../lib/store";
+import { logoutWarning } from "../pages/competitions/outbox";
 import PageLink from "./PageLink.vue";
 import VersionBadge from "./VersionBadge.vue";
 
@@ -18,7 +20,16 @@ const props = defineProps<{ page: PageId; title: string; sync?: string; offlineR
 
 const auth = inject(AUTH_KEY)!;
 const api = inject(API_KEY)!;
+const store = inject(STORE_KEY, null) ?? offlineStore();
 const state = auth.state;
+
+/* Changes made offline and not sent yet (competitions outbox) go with the store on logout: asked first, on any page. */
+async function logout(): Promise<void> {
+  const s = state.value;
+  const waiting = s.status === "signedIn" || s.status === "error" ? (await store.queued(s.user.uid)).length : 0;
+  if (waiting && !confirm(logoutWarning(waiting))) return;
+  await auth.logout();
+}
 
 const who = computed(() => {
   const s = state.value;
@@ -96,7 +107,7 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
             id="logout-btn"
             type="button"
             class="shrink-0 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-300"
-            @click="auth.logout()"
+            @click="logout"
           >🚪 Se déconnecter</button>
         </div>
       </header>

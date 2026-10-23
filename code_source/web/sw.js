@@ -1,15 +1,13 @@
-// Doit correspondre à <meta name="alj-web-version"> de competitions.html et bureau/*.html
-const CACHE_NAME = "alj-escalade-v25";
+// Also the "web version" answered by /api/web-version (api/web/pwa.py), until the build's service worker (plan phase 12)
+const CACHE_NAME = "alj-escalade-v26";
 const ASSETS_TO_CACHE = [
   "/competitions",
-  "/competitions/gestion",
   "/index",
   "/annuaire/assets/logo.png",
   "/bureau/",
   "/bureau/adherents",
   "/bureau/communications",
   "/bureau/competitions",
-  "/bureau/competitions-gestion",
   "/bureau/planning",
   "/bureau/outils",
   "/bureau/parametres",

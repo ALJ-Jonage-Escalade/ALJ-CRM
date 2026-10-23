@@ -1,7 +1,5 @@
-"""HTML pages: competitions PWA, directory and desk portal (bureau), static web files.
-
-The portal is moving to a Vue application (code_source/frontend/, plan_frontend_vue.md) one page at a
-time: migrated pages answer with its entry page, the others still serve their file from web/."""
+"""HTML pages: the Vue application (code_source/frontend/, plan_frontend_vue.md) on every page address, the former
+addresses redirected to it, and the static web files (web/: service worker, manifest, logo, shared scripts)."""
 
 from __future__ import annotations
 
@@ -16,19 +14,13 @@ from paths import CODE_ROOT
 router = APIRouter()
 
 WEB_DIR = os.path.join(CODE_ROOT, "web")
-COMPETITIONS_PAGE_PATH = os.path.join(WEB_DIR, "competitions.html")
 
-# Portail « bureau » (ordinateur) : pages publiques, les données restent protégées
-# (lecture Firestore avec le compte Google, appels API avec jeton).
-_bureau_dir = os.path.join(WEB_DIR, "bureau")
-# The former competitions pages (phone and desktop) keep the competition writes until they move to the Vue app
-# (plan phase 11); the Vue app shows the competitions on /competitions and /bureau/competitions and links to them.
-_BUREAU_PAGES = {
-    "competitions-gestion": "competitions.html",
-}
-COMPETITIONS_MANAGEMENT_PATH = "/competitions/gestion"
-# Pages migrated to the Vue application (frontend/src/router.ts): its entry page answers them
+# Office pages of the Vue application (frontend/src/router.ts): its entry page answers them. The pages are public,
+# the data stays behind the API (ID token, roles).
 _SPA_PAGES = frozenset({"adherents", "communications", "competitions", "outils", "parametres", "planning"})
+# Former addresses of the competitions management pages (phone and office, until plan phase 11): now the competitions
+# screen itself, where coaches change everything
+FORMER_MANAGEMENT_PAGES = {"/competitions/gestion": "/competitions", "/bureau/competitions-gestion": "/bureau/competitions"}
 
 
 # Vue application, built by `npm run build` (frontend/dist) or by the Dockerfile. Its hashed assets
@@ -72,13 +64,6 @@ def mount_static(app: FastAPI) -> None:
     app.mount(SPA_ASSETS_PATH, _BuildFiles(directory=frontend_dist(), check_dir=False), name="spa")
 
 
-def _bureau_file(page: str):
-    name = _BUREAU_PAGES.get(page)
-    p = os.path.join(_bureau_dir, name) if name else ""
-    if p and os.path.exists(p):
-        return FileResponse(p, media_type="text/html")
-    return HTMLResponse("<h1>Page bureau introuvable</h1>", status_code=404)
-
 @router.get("/bureau", response_class=HTMLResponse, include_in_schema=False)
 @router.get("/bureau/", response_class=HTMLResponse, include_in_schema=False)
 def get_bureau_home():
@@ -91,12 +76,19 @@ def get_former_member_record(request: Request) -> RedirectResponse:
     query = f"?{request.url.query}" if request.url.query else ""
     return RedirectResponse(url=f"/bureau/adherents{query}", status_code=302)
 
+@router.get("/bureau/competitions-gestion", include_in_schema=False)
+@router.get("/competitions/gestion", include_in_schema=False)
+def get_former_management_page(request: Request) -> RedirectResponse:
+    """Former competitions management pages (bookmarks, installed shortcuts): the competitions screen, same query."""
+    query = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(url=FORMER_MANAGEMENT_PAGES[request.url.path] + query, status_code=302)
+
 @router.get("/bureau/{page}", response_class=HTMLResponse, include_in_schema=False)
-def get_bureau_page(page: str):
-    """Pages du portail bureau : application Vue (_SPA_PAGES) ou ancienne page (_BUREAU_PAGES), sinon 404."""
+def get_bureau_page(page: str) -> Response:
+    """Office pages: the Vue application (_SPA_PAGES), else 404."""
     if page in _SPA_PAGES:
         return spa_entry()
-    return _bureau_file(page)
+    return HTMLResponse("<h1>Page bureau introuvable</h1>", status_code=404)
 
 @router.get("/index", response_class=HTMLResponse)
 def get_annuaire_page() -> Response:
@@ -119,14 +111,6 @@ def root_route() -> RedirectResponse:
 
 @router.get("/competitions", response_class=HTMLResponse)
 def get_competitions_page() -> Response:
-    """Competitions (read only, readable offline) and the Google sign-in callback (the OAuth redirect URI
-    registered for the club): Vue application, on phones as on desktop. Also the PWA's start page."""
+    """Competitions (readable offline, changed offline through the outbox) and the Google sign-in callback (the OAuth
+    redirect URI registered for the club): Vue application, on phones as on desktop. Also the PWA's start page."""
     return spa_entry()
-
-
-@router.get(COMPETITIONS_MANAGEMENT_PATH, response_class=HTMLResponse, include_in_schema=False)
-def get_competitions_management_page():
-    """Former phone page of the competitions (web/competitions.html): the writes, until plan phase 11."""
-    if os.path.exists(COMPETITIONS_PAGE_PATH):
-        return FileResponse(COMPETITIONS_PAGE_PATH, media_type="text/html")
-    return HTMLResponse("<h1>Page web/competitions.html introuvable</h1>", status_code=404)

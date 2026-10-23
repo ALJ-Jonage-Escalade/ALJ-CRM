@@ -4,22 +4,52 @@ import { ref } from "vue";
 import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
 import type { PageId } from "../lib/access";
 import { API_KEY, type ApiFetch } from "../lib/api";
+import { STORE_KEY, type OfflineStore } from "../lib/store";
 import AppShell from "./AppShell.vue";
 
 const USER = { uid: "u1", email: "albus@alj-escalade.fr" };
 
-function render(state: AuthState, googleStatus = "ok", page: PageId = "accueil", offlineRead = false) {
+function render(state: AuthState, googleStatus = "ok", page: PageId = "accueil", offlineRead = false, queued = 0) {
   const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
   const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: googleStatus })));
   const wrapper = mount(AppShell, {
     props: { page, title: "Titre", offlineRead },
     slots: { default: '<p id="page-body">contenu</p>' },
-    global: { provide: { [AUTH_KEY]: auth, [API_KEY]: api }, stubs: { VersionBadge: true } },
+    global: { provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: storeWith(queued) }, stubs: { VersionBadge: true } },
   });
   return { wrapper, auth, api };
 }
 
+/** A store holding `n` changes made offline for the user. */
+function storeWith(n: number): OfflineStore {
+  const queued = vi.fn(async (uid: string | null) => (uid === USER.uid ? Array.from({ length: n }, (_, i) => ({ key: String(i) })) : []));
+  return { queued } as unknown as OfflineStore;
+}
+
 describe("AppShell", () => {
+  it("asks before a logout that would lose changes made offline", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { wrapper, auth } = render({ status: "signedIn", user: USER, role: "coach" }, "ok", "accueil", false, 2);
+    await wrapper.find("#logout-btn").trigger("click");
+    await flushPromises();
+    expect(confirm).toHaveBeenCalledWith("2 modifications faites hors ligne pas encore envoyées seront perdues. Se déconnecter ?");
+    expect(auth.logout).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    await wrapper.find("#logout-btn").trigger("click");
+    await flushPromises();
+    expect(auth.logout).toHaveBeenCalledOnce();
+    confirm.mockRestore();
+  });
+
+  it("signs out at once with nothing waiting", async () => {
+    const confirm = vi.spyOn(window, "confirm");
+    const { wrapper, auth } = render({ status: "signedIn", user: USER, role: "coach" });
+    await wrapper.find("#logout-btn").trigger("click");
+    await flushPromises();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(auth.logout).toHaveBeenCalledOnce();
+  });
+
   it("shows neither the gate nor the content while the session loads", () => {
     const { wrapper } = render({ status: "loading" });
     expect(wrapper.find("#who").text()).toBe("Vérification de la connexion…");

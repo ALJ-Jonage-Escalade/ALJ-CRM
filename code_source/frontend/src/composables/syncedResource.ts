@@ -43,6 +43,8 @@ export interface SyncedResource<T> {
   dataAt: Readonly<Ref<Date | null>>;
   /** Loads now, e.g. right after the user's own write. */
   refresh(): Promise<void>;
+  /** Shows data the user just wrote (the write's answer) until the next poll brings the server's; kept in memory only. */
+  set(value: T): void;
   stop(): void;
 }
 
@@ -135,6 +137,9 @@ export function useSyncedResource<T>(name: string, url: MaybeRefOrGetter<string 
     checkedAt: readonly(checkedAt),
     dataAt: readonly(dataAt),
     refresh: () => current?.refresh() ?? Promise.resolve(),
+    set: (value) => {
+      if (current) data.value = value;  // not for a former url, nor once stopped
+    },
     stop,
   };
 }

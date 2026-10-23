@@ -1,5 +1,6 @@
-"""HelloAsso payments: sync from the (fake) API, automatic and manual links, ignored lines,
-webhook notifications and the membership dashboard."""
+"""HelloAsso payments: sync from the (fake) API, automatic and manual links, ignored lines (« HelloAsso » section of
+the competitions screen, frontend/src/pages/competitions/HelloAssoPane.vue), webhook notifications and the
+membership dashboard."""
 import re
 import uuid
 
@@ -7,10 +8,9 @@ import pytest
 from playwright.sync_api import expect
 
 from helpers import helloasso
-from helpers.bureau import go_to as bureau_go_to, open_competitions
+from helpers.competitions import go_to, open_competition, open_screen, participant_card, toast
 from helpers.data import eventually, unique_name
 from helpers.helloasso import item
-from helpers.mobile import go_to, open_app, open_participants, participant_card
 
 # One fake HelloAsso state for the whole server: these tests run one after another (conftest.py)
 pytestmark = pytest.mark.xdist_group("helloasso")
@@ -36,17 +36,17 @@ def setup(test_data, fake_helloasso):
             "auto": auto, "unknown_payer": unknown_payer, "no_competition": no_competition}
 
 
-def _sync_on_phone(page):
+def _sync(page):
     go_to(page, "helloasso")
-    page.locator("#ha-btn-sync").click()
-    expect(page.locator("#toast")).to_contain_text("Synchro terminée : 3 article(s)", timeout=20_000)
+    page.get_by_test_id("ha-sync").click()
+    expect(toast(page)).to_contain_text("Synchro terminée : 3 article(s)", timeout=20_000)
 
 
 def _item_card(page, ha_item):
     """Card of a HelloAsso item, by its order number (members get payments in several tests)."""
-    page.locator("#ha-chip-all").click()
-    page.locator("#ha-search").fill(str(ha_item["order"]["id"]))
-    return page.locator("#ha-items-list > .card").filter(has_text=re.compile(rf"Commande #{ha_item['order']['id']}\b"))
+    page.get_by_test_id("ha-filter-all").click()
+    page.get_by_test_id("ha-search").fill(str(ha_item["order"]["id"]))
+    return page.get_by_test_id("ha-item").filter(has_text=re.compile(rf"Commande #{ha_item['order']['id']}\b"))
 
 
 def _participant(test_data, setup, member) -> dict:
@@ -54,31 +54,26 @@ def _participant(test_data, setup, member) -> dict:
                 if p["adherent_id"] == member["id"])
 
 
-def _office_attach(page, setup, member) -> None:
-    """Office portal: syncs HelloAsso, then links the unknown payer's item to `member` by hand."""
-    open_competitions(page)
-    bureau_go_to(page, "helloasso")
-    page.locator("#btn-sync-ha-global").click()
-    expect(page.locator("#toast")).to_contain_text("articles traités", timeout=20_000)
-    page.locator("#ha-search-input").fill(setup["unknown_payer"]["user"]["lastName"])
-    page.locator("#ha-table-tbody tr[data-item-id] .btn-open-attach").click()
-    page.locator("#attach-comp-select").select_option(str(setup["competition"]["id"]))
-    page.locator("#attach-adh-select").select_option(str(member["id"]))
-    page.locator("#ha-attach-submit").click()
-    expect(page.locator("#toast")).to_contain_text("Rattachement enregistré")
+def _link(page, setup, ha_item, member, comment=""):
+    _item_card(page, ha_item).get_by_test_id("ha-open").click()
+    page.get_by_test_id("attach-comp").select_option(str(setup["competition"]["id"]))
+    page.get_by_test_id("attach-member").select_option(str(member["id"]))
+    if comment:
+        page.get_by_test_id("attach-comment").fill(comment)
+    page.get_by_test_id("attach-save").click()
+    expect(toast(page)).to_contain_text("rattaché avec succès")
 
 
 def test_sync_links_payment_automatically(mobile_page, test_data, setup):
-    page = open_app(mobile_page)
-    _sync_on_phone(page)
-    expect(_item_card(page, setup["auto"])).to_contain_text("Rattaché")
-    expect(_item_card(page, setup["unknown_payer"])).to_contain_text("En attente")
-    expect(_item_card(page, setup["no_competition"])).to_contain_text("En attente")
+    page = open_screen(mobile_page)
+    _sync(page)
+    expect(_item_card(page, setup["auto"]).get_by_test_id("ha-state")).to_contain_text("Rattaché")
+    expect(_item_card(page, setup["unknown_payer"]).get_by_test_id("ha-state")).to_contain_text("En attente")
+    expect(_item_card(page, setup["no_competition"]).get_by_test_id("ha-state")).to_contain_text("En attente")
 
-    go_to(page, "comps")
-    open_participants(page, setup["competition"]["nom"])
-    paid = participant_card(page, setup["members"][0])
-    expect(paid).to_contain_text("Payé")
+    go_to(page, "competitions")
+    open_competition(page, setup["competition"]["nom"])
+    expect(participant_card(page, setup["members"][0]).get_by_test_id("payment-badge")).to_contain_text("Payé")
 
     def linked():
         assert test_data.helloasso_item(setup["auto"]["id"])["source"] == "auto"
@@ -87,21 +82,22 @@ def test_sync_links_payment_automatically(mobile_page, test_data, setup):
 
 def test_manual_link_marks_member_paid(mobile_page, test_data, setup):
     member = setup["members"][1]
-    page = open_app(mobile_page)
-    _sync_on_phone(page)
+    page = open_screen(mobile_page)
+    _sync(page)
+    _item_card(page, setup["unknown_payer"]).get_by_test_id("ha-open").click()
+    # Suggested from the competition number the payer typed
+    expect(page.get_by_test_id("attach-comp")).to_have_value(str(setup["competition"]["id"]))
+    page.get_by_test_id("attach-member").select_option(str(member["id"]))
+    page.get_by_test_id("attach-comment").fill("Paid by an uncle")
+    page.get_by_test_id("attach-save").click()
+    expect(toast(page)).to_contain_text("rattaché avec succès")
     card = _item_card(page, setup["unknown_payer"])
-    card.get_by_role("button", name="Rattacher").click()
-    page.locator("#ha-modal-comp-select").select_option(str(setup["competition"]["id"]))
-    page.locator("#ha-modal-adh-select").select_option(str(member["id"]))
-    page.locator("#ha-modal-comment").fill("Paid by an uncle")
-    page.locator("#ha-modal-save-btn").click()
-    expect(page.locator("#toast")).to_contain_text("rattaché avec succès")
-    expect(card).to_contain_text("Rattaché")
+    expect(card.get_by_test_id("ha-state")).to_contain_text("Rattaché")
     expect(card).to_contain_text("manuel")
 
-    go_to(page, "comps")
-    open_participants(page, setup["competition"]["nom"])
-    expect(participant_card(page, member)).to_contain_text("Payé")
+    go_to(page, "competitions")
+    open_competition(page, setup["competition"]["nom"])
+    expect(participant_card(page, member).get_by_test_id("payment-badge")).to_contain_text("Payé")
 
     def stored():
         doc = test_data.helloasso_item(setup["unknown_payer"]["id"])
@@ -112,29 +108,30 @@ def test_manual_link_marks_member_paid(mobile_page, test_data, setup):
 
 
 def test_ignore_and_restore_a_payment(mobile_page, test_data, setup):
-    page = open_app(mobile_page)
-    _sync_on_phone(page)
+    page = open_screen(mobile_page)
+    _sync(page)
     card = _item_card(page, setup["no_competition"])
-    card.get_by_role("button", name="Rattacher").click()
-    page.locator("#ha-modal-ignore-btn").click()
-    expect(page.locator("#toast")).to_contain_text("Indiquez un commentaire")
-    page.locator("#ha-modal-comment").fill("Shop purchase, not a competition")
-    page.locator("#ha-modal-ignore-btn").click()
-    expect(page.locator("#toast")).to_contain_text("Ligne ignorée")
+    card.get_by_test_id("ha-open").click()
+    page.get_by_test_id("attach-ignore").click()
+    expect(page.get_by_test_id("attach-error")).to_contain_text("Indiquez un commentaire")
+    page.get_by_test_id("attach-comment").fill("Shop purchase, not a competition")
+    page.get_by_test_id("attach-ignore").click()
+    expect(toast(page)).to_contain_text("Ligne ignorée")
 
-    # Hidden from the list while « hide ignored » is ticked (default)
+    # Hidden from « Tous » while « hide ignored » is ticked (default)
     expect(card).to_have_count(0)
-    page.locator("#ha-chip-ignored").click()
-    expect(card).to_contain_text("Ignoré")
+    page.get_by_test_id("ha-filter-ignored").click()
+    expect(card.get_by_test_id("ha-state")).to_contain_text("Ignoré")
 
     def ignored():
         doc = test_data.helloasso_item(setup["no_competition"]["id"])
         assert (doc["ignore"], doc["ignore_motif"]) == (True, "Shop purchase, not a competition")
     eventually(ignored)
 
-    card.get_by_role("button", name="Détails").click()
-    page.locator("#ha-modal-ignore-btn").click()
-    expect(page.locator("#toast")).to_contain_text("n'est plus ignorée")
+    card.get_by_test_id("ha-open").click()
+    expect(page.get_by_test_id("attach-ignored")).to_contain_text("Shop purchase, not a competition")
+    page.get_by_test_id("attach-ignore").click()
+    expect(toast(page)).to_contain_text("n'est plus ignorée")
 
     def restored():
         assert test_data.helloasso_item(setup["no_competition"]["id"])["ignore"] is False
@@ -144,20 +141,16 @@ def test_ignore_and_restore_a_payment(mobile_page, test_data, setup):
 def test_resync_keeps_coach_decisions(mobile_page, test_data, setup):
     """A new sync rewrites HelloAsso's fields only: manual links and ignored lines survive."""
     member = setup["members"][1]
-    page = open_app(mobile_page)
-    _sync_on_phone(page)
-    _item_card(page, setup["unknown_payer"]).get_by_role("button", name="Rattacher").click()
-    page.locator("#ha-modal-comp-select").select_option(str(setup["competition"]["id"]))
-    page.locator("#ha-modal-adh-select").select_option(str(member["id"]))
-    page.locator("#ha-modal-save-btn").click()
-    expect(page.locator("#toast")).to_contain_text("rattaché avec succès")
-    _item_card(page, setup["no_competition"]).get_by_role("button", name="Rattacher").click()
-    page.locator("#ha-modal-comment").fill("Duplicate")
-    page.locator("#ha-modal-ignore-btn").click()
-    expect(page.locator("#toast")).to_contain_text("Ligne ignorée")
+    page = open_screen(mobile_page)
+    _sync(page)
+    _link(page, setup, setup["unknown_payer"], member)
+    _item_card(page, setup["no_competition"]).get_by_test_id("ha-open").click()
+    page.get_by_test_id("attach-comment").fill("Duplicate")
+    page.get_by_test_id("attach-ignore").click()
+    expect(toast(page)).to_contain_text("Ligne ignorée")
 
-    page.locator("#ha-btn-sync").click()
-    expect(page.locator("#toast")).to_contain_text("Synchro terminée", timeout=20_000)
+    page.get_by_test_id("ha-sync").click()
+    expect(toast(page)).to_contain_text("Synchro terminée", timeout=20_000)
 
     def kept():
         linked = test_data.helloasso_item(setup["unknown_payer"]["id"])
@@ -193,39 +186,26 @@ def test_webhook_ignores_other_forms(page, fake_helloasso):
     assert answer.ok and answer.json()["status"] == "ignored"
 
 
-def test_office_sync_and_filters(page, setup):
-    open_competitions(page)
-    bureau_go_to(page, "helloasso")
-    page.locator("#btn-sync-ha-global").click()
-    expect(page.locator("#toast")).to_contain_text("3 articles traités", timeout=20_000)
-    page.locator("#ha-search-input").fill(setup["tag"])
-    rows = page.locator("#ha-table-tbody tr[data-item-id]")
-    expect(rows).to_have_count(2)
-    page.locator("#ha-filter-linked").click()
-    expect(rows).to_have_count(0)
-    page.locator("#ha-filter-pending").click()
-    expect(rows).to_have_count(2)
-
-
-def test_office_manual_link(page, test_data, setup):
+def test_desktop_sync_filters_and_link(page, test_data, setup):
     member = setup["members"][1]
-    _office_attach(page, setup, member)
+    open_screen(page, "admin", "/bureau/competitions")
+    _sync(page)
+    page.get_by_test_id("ha-search").fill(setup["tag"])
+    items = page.get_by_test_id("ha-item")
+    page.get_by_test_id("ha-filter-all").click()
+    expect(items).to_have_count(2)
+    page.get_by_test_id("ha-filter-linked").click()
+    expect(items).to_have_count(0)
+    page.get_by_test_id("ha-filter-unlinked").click()
+    expect(items).to_have_count(2)
+
+    _link(page, setup, setup["unknown_payer"], member)
 
     def paid():
         participant = _participant(test_data, setup, member)
         assert (participant["statut_paiement"], participant["montant_paye"]) == ("paye", 15)
+        assert participant["commande_helloasso"] == str(setup["unknown_payer"]["order"]["id"])
     eventually(paid)
-
-
-def test_office_manual_link_is_stored_like_the_phone(page, test_data, setup):
-    member = setup["members"][1]
-    _office_attach(page, setup, member)
-
-    def stored():
-        doc = test_data.helloasso_item(setup["unknown_payer"]["id"])
-        assert (doc["competition_id"], doc["adherent_id"]) == (setup["competition"]["id"], member["id"])
-        assert _participant(test_data, setup, member)["commande_helloasso"] == str(setup["unknown_payer"]["order"]["id"])
-    eventually(stored)
 
 
 def test_membership_dashboard(page, fake_helloasso):

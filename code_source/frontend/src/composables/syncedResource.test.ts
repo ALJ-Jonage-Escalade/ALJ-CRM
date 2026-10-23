@@ -109,6 +109,21 @@ describe("useSyncedResource (online)", () => {
     expect(resource.state.value).toBe("offline");
   });
 
+  it("shows the user's own write at once, until the next poll", async () => {
+    const server = fakeServer();
+    server.set("/api/members", { n: 1 });
+    const { resource } = start(server);
+    await flushPromises();
+    resource.set({ n: 2 });
+    expect(resource.data.value).toEqual({ n: 2 });
+    server.set("/api/members", { n: 3 });
+    await resource.refresh();
+    expect(resource.data.value).toEqual({ n: 3 });
+    resource.stop();
+    resource.set({ n: 4 });  // stopped: ignored
+    expect(resource.data.value).toEqual({ n: 3 });
+  });
+
   it("stops with its scope: no more polls, and an answer on its way is dropped", async () => {
     const server = fakeServer();
     server.set("/api/members", { n: 1 });

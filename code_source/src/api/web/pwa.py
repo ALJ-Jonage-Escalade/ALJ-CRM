@@ -8,7 +8,7 @@ import os
 from fastapi import APIRouter
 from fastapi.responses import FileResponse, HTMLResponse, Response
 
-from api.web.pages import COMPETITIONS_PAGE_PATH, WEB_DIR
+from api.web.pages import WEB_DIR
 from domain.constants import APP_VERSION
 from infrastructure import runtime_env
 
@@ -43,11 +43,12 @@ def get_runtime_config():
 
 
 def _read_web_version() -> str:
-    """Version de la page web (balise <meta name="alj-web-version"> de competitions.html)."""
+    """Version of the service worker's cache (CACHE_NAME = "alj-escalade-v<n>" in web/sw.js), until the build's
+    service worker replaces it (plan phase 12)."""
     import re
     try:
-        with open(COMPETITIONS_PAGE_PATH, "r", encoding="utf-8") as f:
-            m = re.search(r'<meta name="alj-web-version" content="([^"]+)"', f.read(4000))
+        with open(os.path.join(WEB_DIR, "sw.js"), "r", encoding="utf-8") as f:
+            m = re.search(r'CACHE_NAME = "alj-escalade-v(\d+)"', f.read(4000))
         return m.group(1) if m else ""
     except OSError:
         return ""

@@ -29,12 +29,15 @@ class TestCompetitions(ApiTestCase):
         listed = r.json()[0]
         parsed = CompetitionView.model_validate(listed).model_dump()
         for field in CompetitionView.model_fields:
+            if field in ("lieu", "type"):  # pass-through fields, only when the office page sent them
+                continue
             self.assertIn(field, listed)
             if field != "participants":
                 self.assertEqual(parsed[field], listed[field], field)
         (part,) = listed["participants"]
         for field in CompetitionParticipant.model_fields:
-            if field not in ("classement", "resultat_ffme"):  # set by the results fetch only
+            # Set by the results fetch, or by a check-in, only
+            if field not in ("classement", "total_categorie", "categorie_ffme", "resultat_ffme", "present"):
                 self.assertIn(field, part)
                 self.assertEqual(parsed["participants"][0][field], part[field], field)
         again = self.client.get("/api/competitions", headers={"If-None-Match": r.headers["etag"]})

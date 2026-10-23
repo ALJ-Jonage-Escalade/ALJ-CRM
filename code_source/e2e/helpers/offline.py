@@ -1,5 +1,5 @@
-"""The offline copy of the pages (IndexedDB "alj-offline", web/shared/alj-store.js and frontend/src/lib/store.ts),
-read and changed from the page under test."""
+"""The offline copy of the app (IndexedDB "alj-offline", frontend/src/lib/store.ts, same database as the former pages'
+web/shared/alj-store.js), read and changed from the page under test."""
 from playwright.sync_api import Page
 
 from helpers.data import eventually
@@ -72,3 +72,61 @@ def wait_stored(page: Page, name: str, check=lambda data: True, timeout=None):
 def age(page: Page, name: str, days: int) -> None:
     """Makes the record `days` old (and forgets the server's later confirmations of it)."""
     page.evaluate(_AGE, [name, days])
+
+
+_PUT = """async ([store, value]) => new Promise((resolve, reject) => {
+  const req = indexedDB.open("alj-offline");
+  req.onsuccess = () => {
+    const db = req.result;
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).put(value);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => reject(tx.error);
+  };
+  req.onerror = () => reject(req.error);
+})"""
+
+_OWNER = """async () => new Promise(resolve => {
+  const req = indexedDB.open("alj-offline");
+  req.onerror = () => resolve(null);
+  req.onsuccess = () => {
+    const db = req.result;
+    const get = db.transaction("meta").objectStore("meta").get("owner");
+    get.onsuccess = () => { db.close(); resolve(get.result ? get.result.uid : null); };
+    get.onerror = () => { db.close(); resolve(null); };
+  };
+})"""
+
+_QUEUED = """async () => new Promise(resolve => {
+  const req = indexedDB.open("alj-offline");
+  req.onerror = () => resolve([]);
+  req.onsuccess = () => {
+    const db = req.result;
+    const all = db.transaction("outbox").objectStore("outbox").getAll();
+    all.onsuccess = () => { db.close(); resolve(all.result); };
+    all.onerror = () => { db.close(); resolve([]); };
+  };
+})"""
+
+
+def owner(page: Page) -> str:
+    """Firebase uid of the account the store belongs to (written once signed in)."""
+    def claimed():
+        uid = page.evaluate(_OWNER)
+        assert uid, "store not claimed yet"
+        return uid
+    return eventually(claimed)
+
+
+def put_record(page: Page, record: dict) -> None:
+    """A copy as the former pages' alj-store.js wrote it ({name, uid, savedAt, etag, data}, no url)."""
+    page.evaluate(_PUT, ["resources", record])
+
+
+def put_queued(page: Page, entry: dict) -> None:
+    """A change in the outbox, as the former phone page queued it."""
+    page.evaluate(_PUT, ["outbox", entry])
+
+
+def queued(page: Page) -> list:
+    return page.evaluate(_QUEUED)

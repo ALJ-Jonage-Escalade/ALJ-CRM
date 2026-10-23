@@ -76,16 +76,6 @@ def test_coach_is_sent_back_from_an_admin_page(page, name, label):
     expect(page.locator(f"{NAV} a[data-page='{name}']")).to_have_count(0)
 
 
-def test_former_pages_hide_the_admin_links_from_a_coach(page):
-    """Pages not migrated yet: the former shell's menu follows the same rule."""
-    page.goto("/bureau/competitions-gestion")
-    login_as(page, "coach")
-    expect(page.locator("#content")).to_be_visible()
-    for admin_page in ADMIN_PAGES:
-        expect(page.locator(f"nav a[data-page='{admin_page}']")).to_be_hidden()
-    expect(page.locator("nav a[data-page='adherents']")).to_be_visible()
-
-
 def test_admin_opens_admin_pages(page):
     """Paramètres → Communications: routes of the Vue app, no page load."""
     page.goto("/bureau/parametres")

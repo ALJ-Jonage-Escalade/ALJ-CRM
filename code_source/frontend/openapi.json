@@ -45,9 +45,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Create Competition Api Competitions Post"
+                  "$ref": "#/components/schemas/Competition"
                 }
               }
             }
@@ -96,12 +94,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Update Competition Api Competitions  Competition Id  Patch"
+                  "$ref": "#/components/schemas/Competition"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -135,12 +141,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Delete Competition Api Competitions  Competition Id  Delete"
+                  "$ref": "#/components/schemas/Done"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -165,9 +179,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Archive Past Competitions Api Competitions Archive Past Post"
+                  "$ref": "#/components/schemas/PastArchived"
                 }
               }
             }
@@ -206,12 +218,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Add Participant Api Competitions  Competition Id  Participants Post"
+                  "$ref": "#/components/schemas/Competition"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -267,12 +287,30 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Update Participant Api Competitions  Competition Id  Participants  Adherent Id  Patch"
+                  "$ref": "#/components/schemas/Competition"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "description": "Validation Error",
@@ -315,12 +353,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Remove Participant Api Competitions  Competition Id  Participants  Adherent Id  Delete"
+                  "$ref": "#/components/schemas/Competition"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -375,12 +421,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Record Manual Payment Api Competitions  Competition Id  Participants  Adherent Id  Manual Payment Post"
+                  "$ref": "#/components/schemas/Competition"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -435,12 +489,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Cancel Participant Api Competitions  Competition Id  Participants  Adherent Id  Cancel Post"
+                  "$ref": "#/components/schemas/Competition"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -476,12 +538,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Load Competition Group Api Competitions  Competition Id  Load Group Post"
+                  "$ref": "#/components/schemas/GroupLoaded"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -505,7 +575,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Coach"
+                  },
+                  "type": "array",
+                  "title": "Response List Coaches Api Coaches Get"
+                }
               }
             }
           }
@@ -530,9 +606,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Create Coach Api Coaches Post"
+                  "$ref": "#/components/schemas/Coach"
                 }
               }
             }
@@ -581,12 +655,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Update Coach Api Coaches  Coach Id  Put"
+                  "$ref": "#/components/schemas/Coach"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -620,12 +702,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Delete Coach Api Coaches  Coach Id  Delete"
+                  "$ref": "#/components/schemas/Done"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -671,7 +761,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HelloAssoItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Helloasso Items Api Helloasso Items Get"
+                }
               }
             }
           }
@@ -709,12 +805,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Link Helloasso Item Api Helloasso Items  Id Item  Link Put"
+                  "$ref": "#/components/schemas/ItemLinked"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -760,12 +864,30 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Ignore Helloasso Item Api Helloasso Items  Id Item  Ignore Put"
+                  "$ref": "#/components/schemas/Done"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "description": "Validation Error",
@@ -840,7 +962,7 @@
     "/api/competitions/{comp_id}/fetch-results": {
       "post": {
         "summary": "Api Fetch Competition Results",
-        "description": "Récupère les résultats officiels depuis MyCompet FFME pour une compétition donnée,\nextrait les compétiteurs de l'Amicale Laïque de Jonage et met à jour leurs classements.",
+        "description": "Récupère les résultats officiels depuis MyCompet FFME pour une compétition donnée,\nextrait les compétiteurs de l'Amicale Laïque de Jonage et met à jour leurs classements.\n404 `needs_url`: the results page was not found automatically, the coach gives its address or number.",
         "operationId": "api_fetch_competition_results_api_competitions__comp_id__fetch_results_post",
         "parameters": [
           {
@@ -870,9 +992,31 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ResultsFetched"
+                }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Gateway"
           },
           "422": {
             "description": "Validation Error",
@@ -2558,7 +2702,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HelloAssoSync"
+                }
               }
             }
           }
@@ -3351,6 +3497,24 @@
         "title": "CloudDbSync",
         "description": "skipped: the server does not run on Firestore (no cache to sync)."
       },
+      "Coach": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "Coach"
+      },
       "CoachIn": {
         "properties": {
           "nom": {
@@ -3418,6 +3582,28 @@
             "type": "string",
             "title": "Resultats Synced At",
             "default": ""
+          },
+          "lieu": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lieu"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
           },
           "coach_ids": {
             "items": {
@@ -3563,6 +3749,21 @@
             "title": "Num Licence",
             "default": ""
           },
+          "licence_ffme": {
+            "type": "string",
+            "title": "Licence Ffme",
+            "default": ""
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "default": ""
+          },
+          "email_secondaire": {
+            "type": "string",
+            "title": "Email Secondaire",
+            "default": ""
+          },
           "tarif": {
             "type": "string",
             "title": "Tarif",
@@ -3659,9 +3860,38 @@
             "title": "Urgence Tel",
             "default": ""
           },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "description": "Copied when the member was added",
+            "default": ""
+          },
+          "present": {
+            "type": "boolean",
+            "title": "Present",
+            "description": "Checked in on the day of the competition",
+            "default": false
+          },
           "classement": {
             "type": "string",
             "title": "Classement",
+            "default": ""
+          },
+          "total_categorie": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Total Categorie",
+            "default": 0
+          },
+          "categorie_ffme": {
+            "type": "string",
+            "title": "Categorie Ffme",
             "default": ""
           },
           "resultat_ffme": {
@@ -3672,6 +3902,7 @@
           "updated_at": {
             "type": "string",
             "title": "Updated At",
+            "description": "Sent back as unchanged_since by a change queued offline",
             "default": ""
           }
         },
@@ -3910,6 +4141,21 @@
         ],
         "title": "Creneau",
         "description": "A slot group of the planning and the HelloAsso tariffs it covers."
+      },
+      "Done": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "Done",
+        "description": "A write with nothing else to return."
       },
       "EmailDispatch": {
         "properties": {
@@ -4664,6 +4910,24 @@
         ],
         "title": "GoogleTokenUpdated"
       },
+      "GroupLoaded": {
+        "properties": {
+          "added": {
+            "type": "integer",
+            "title": "Added"
+          },
+          "competition": {
+            "$ref": "#/components/schemas/Competition"
+          }
+        },
+        "type": "object",
+        "required": [
+          "added",
+          "competition"
+        ],
+        "title": "GroupLoaded",
+        "description": "Members of the competition group added to a competition (load-group)."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4676,6 +4940,229 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HelloAssoItem": {
+        "properties": {
+          "id_item": {
+            "type": "integer",
+            "title": "Id Item"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "payer_nom": {
+            "type": "string",
+            "title": "Payer Nom",
+            "default": ""
+          },
+          "payer_prenom": {
+            "type": "string",
+            "title": "Payer Prenom",
+            "default": ""
+          },
+          "montant": {
+            "type": "number",
+            "title": "Montant",
+            "default": 0.0
+          },
+          "etat": {
+            "type": "string",
+            "title": "Etat",
+            "default": ""
+          },
+          "date_item": {
+            "type": "string",
+            "title": "Date Item",
+            "default": ""
+          },
+          "licence_saisie": {
+            "type": "string",
+            "title": "Licence Saisie",
+            "default": ""
+          },
+          "competition_saisie": {
+            "type": "string",
+            "title": "Competition Saisie",
+            "default": ""
+          },
+          "campagne_slug": {
+            "type": "string",
+            "title": "Campagne Slug",
+            "default": ""
+          },
+          "raw_json": {
+            "type": "string",
+            "title": "Raw Json",
+            "description": "HelloAsso's item as received (JSON text)",
+            "default": ""
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "competition_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Id"
+          },
+          "adherent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adherent Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "auto or manuel once linked"
+          },
+          "commentaire": {
+            "type": "string",
+            "title": "Commentaire",
+            "default": ""
+          },
+          "ignore": {
+            "type": "boolean",
+            "title": "Ignore",
+            "default": false
+          },
+          "ignore_motif": {
+            "type": "string",
+            "title": "Ignore Motif",
+            "default": ""
+          },
+          "ignored_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignored By"
+          },
+          "ignored_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignored At"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id_item"
+        ],
+        "title": "HelloAssoItem",
+        "description": "An item of the HelloAsso mirror (`helloasso_items`) with the coach's link or ignore decision."
+      },
+      "HelloAssoSync": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
+          "stats": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HelloAssoSyncStats"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "HelloAssoSync",
+        "description": "error: no campaign configured or HelloAsso unreachable (HTTP 200, as the former pages expect)."
+      },
+      "HelloAssoSyncStats": {
+        "properties": {
+          "nb_items": {
+            "type": "integer",
+            "title": "Nb Items"
+          },
+          "nb_auto": {
+            "type": "integer",
+            "title": "Nb Auto"
+          },
+          "nb_manual": {
+            "type": "integer",
+            "title": "Nb Manual"
+          },
+          "nb_applied": {
+            "type": "integer",
+            "title": "Nb Applied"
+          },
+          "nb_unlinked": {
+            "type": "integer",
+            "title": "Nb Unlinked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nb_items",
+          "nb_auto",
+          "nb_manual",
+          "nb_applied",
+          "nb_unlinked"
+        ],
+        "title": "HelloAssoSyncStats"
       },
       "ItemIgnore": {
         "properties": {
@@ -4734,6 +5221,26 @@
         "additionalProperties": false,
         "type": "object",
         "title": "ItemLink"
+      },
+      "ItemLinked": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "linked": {
+            "type": "boolean",
+            "title": "Linked",
+            "description": "The item now pays for a participant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "linked"
+        ],
+        "title": "ItemLinked"
       },
       "ManualPayment": {
         "properties": {
@@ -5509,6 +6016,29 @@
         "type": "object",
         "title": "ParticipantUpdate"
       },
+      "PastArchived": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "archived": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Archived",
+            "description": "Ids of the competitions archived"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "archived"
+        ],
+        "title": "PastArchived"
+      },
       "PlanningSlot": {
         "properties": {
           "id": {
@@ -5862,6 +6392,36 @@
         "type": "object",
         "title": "PresenceExportRequest",
         "description": "Attendance sheets to generate. season: the active one when empty; dates: dd/mm/yyyy, the season's when empty.\ncours only: selected_groups (all the courses when empty) and same_sheet (one workbook, else a ZIP of one file per course)."
+      },
+      "ResultsFetched": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "total_scraped": {
+            "type": "integer",
+            "title": "Total Scraped"
+          },
+          "matched_count": {
+            "type": "integer",
+            "title": "Matched Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "url",
+          "total_scraped",
+          "matched_count"
+        ],
+        "title": "ResultsFetched",
+        "description": "MyCompet results matched to the participants (the competition is updated: reload it)."
       },
       "ResultsSettings": {
         "properties": {

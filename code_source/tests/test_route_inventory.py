@@ -85,6 +85,7 @@ EXPECTED_ROUTES = {
     ("GET", "/bureau"),
     ("GET", "/bureau/"),
     ("GET", "/bureau/adherents-fiche"),
+    ("GET", "/bureau/competitions-gestion"),
     ("GET", "/bureau/{page}"),
     ("GET", "/competitions"),
     ("GET", "/competitions/gestion"),

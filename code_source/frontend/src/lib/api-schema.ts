@@ -287,6 +287,7 @@ export interface paths {
          * Api Fetch Competition Results
          * @description Récupère les résultats officiels depuis MyCompet FFME pour une compétition donnée,
          *     extrait les compétiteurs de l'Amicale Laïque de Jonage et met à jour leurs classements.
+         *     404 `needs_url`: the results page was not found automatically, the coach gives its address or number.
          */
         post: operations["api_fetch_competition_results_api_competitions__comp_id__fetch_results_post"];
         delete?: never;
@@ -1408,6 +1409,16 @@ export interface components {
             message: string;
             result?: components["schemas"]["SyncCounters"] | null;
         };
+        /** Coach */
+        Coach: {
+            /** Id */
+            id: number;
+            /**
+             * Nom
+             * @default
+             */
+            nom?: string;
+        };
         /** CoachIn */
         CoachIn: {
             /** Nom */
@@ -1467,6 +1478,10 @@ export interface components {
              * @default
              */
             resultats_synced_at?: string;
+            /** Lieu */
+            lieu?: string | null;
+            /** Type */
+            type?: string | null;
             /** Coach Ids */
             coach_ids?: number[];
             /**
@@ -1552,6 +1567,21 @@ export interface components {
              * @default
              */
             num_licence?: string;
+            /**
+             * Licence Ffme
+             * @default
+             */
+            licence_ffme?: string;
+            /**
+             * Email
+             * @default
+             */
+            email?: string;
+            /**
+             * Email Secondaire
+             * @default
+             */
+            email_secondaire?: string;
             /**
              * Tarif
              * @default
@@ -1640,10 +1670,32 @@ export interface components {
              */
             urgence_tel?: string;
             /**
+             * Email
+             * @description Copied when the member was added
+             * @default
+             */
+            email?: string;
+            /**
+             * Present
+             * @description Checked in on the day of the competition
+             * @default false
+             */
+            present?: boolean;
+            /**
              * Classement
              * @default
              */
             classement?: string;
+            /**
+             * Total Categorie
+             * @default 0
+             */
+            total_categorie?: number | string;
+            /**
+             * Categorie Ffme
+             * @default
+             */
+            categorie_ffme?: string;
             /**
              * Resultat Ffme
              * @default
@@ -1651,6 +1703,7 @@ export interface components {
             resultat_ffme?: string;
             /**
              * Updated At
+             * @description Sent back as unchanged_since by a change queued offline
              * @default
              */
             updated_at?: string;
@@ -1725,6 +1778,17 @@ export interface components {
             categorie_age: string;
             /** Type */
             type: string;
+        };
+        /**
+         * Done
+         * @description A write with nothing else to return.
+         */
+        Done: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
         };
         /**
          * EmailDispatch
@@ -2156,10 +2220,137 @@ export interface components {
             /** User Email */
             user_email: string;
         };
+        /**
+         * GroupLoaded
+         * @description Members of the competition group added to a competition (load-group).
+         */
+        GroupLoaded: {
+            /** Added */
+            added: number;
+            competition: components["schemas"]["Competition"];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HelloAssoItem
+         * @description An item of the HelloAsso mirror (`helloasso_items`) with the coach's link or ignore decision.
+         */
+        HelloAssoItem: {
+            /** Id Item */
+            id_item: number;
+            /** Order Id */
+            order_id?: number | string | null;
+            /**
+             * Payer Nom
+             * @default
+             */
+            payer_nom?: string;
+            /**
+             * Payer Prenom
+             * @default
+             */
+            payer_prenom?: string;
+            /**
+             * Montant
+             * @default 0
+             */
+            montant?: number;
+            /**
+             * Etat
+             * @default
+             */
+            etat?: string;
+            /**
+             * Date Item
+             * @default
+             */
+            date_item?: string;
+            /**
+             * Licence Saisie
+             * @default
+             */
+            licence_saisie?: string;
+            /**
+             * Competition Saisie
+             * @default
+             */
+            competition_saisie?: string;
+            /**
+             * Campagne Slug
+             * @default
+             */
+            campagne_slug?: string;
+            /**
+             * Raw Json
+             * @description HelloAsso's item as received (JSON text)
+             * @default
+             */
+            raw_json?: string;
+            /** Synced At */
+            synced_at?: string | null;
+            /** Competition Id */
+            competition_id?: number | null;
+            /** Adherent Id */
+            adherent_id?: number | null;
+            /**
+             * Source
+             * @description auto or manuel once linked
+             */
+            source?: string | null;
+            /**
+             * Commentaire
+             * @default
+             */
+            commentaire?: string;
+            /**
+             * Ignore
+             * @default false
+             */
+            ignore?: boolean;
+            /**
+             * Ignore Motif
+             * @default
+             */
+            ignore_motif?: string;
+            /** Ignored By */
+            ignored_by?: string | null;
+            /** Ignored At */
+            ignored_at?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * HelloAssoSync
+         * @description error: no campaign configured or HelloAsso unreachable (HTTP 200, as the former pages expect).
+         */
+        HelloAssoSync: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "success" | "error";
+            /**
+             * Message
+             * @default
+             */
+            message?: string;
+            stats?: components["schemas"]["HelloAssoSyncStats"] | null;
+        };
+        /** HelloAssoSyncStats */
+        HelloAssoSyncStats: {
+            /** Nb Items */
+            nb_items: number;
+            /** Nb Auto */
+            nb_auto: number;
+            /** Nb Manual */
+            nb_manual: number;
+            /** Nb Applied */
+            nb_applied: number;
+            /** Nb Unlinked */
+            nb_unlinked: number;
         };
         /** ItemIgnore */
         ItemIgnore: {
@@ -2187,6 +2378,19 @@ export interface components {
              * @default
              */
             commentaire?: string;
+        };
+        /** ItemLinked */
+        ItemLinked: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /**
+             * Linked
+             * @description The item now pays for a participant
+             */
+            linked: boolean;
         };
         /**
          * ManualPayment
@@ -2512,6 +2716,19 @@ export interface components {
             /** Unchanged Since */
             unchanged_since?: string | null;
         };
+        /** PastArchived */
+        PastArchived: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /**
+             * Archived
+             * @description Ids of the competitions archived
+             */
+            archived: number[];
+        };
         /**
          * PlanningSlot
          * @description A weekly slot. jour: a day ("Lundi"…), or several ("Lundi / Jeudi"); horaires: "18:00 - 20:00".
@@ -2720,6 +2937,23 @@ export interface components {
              */
             same_sheet?: boolean;
         };
+        /**
+         * ResultsFetched
+         * @description MyCompet results matched to the participants (the competition is updated: reload it).
+         */
+        ResultsFetched: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Url */
+            url: string;
+            /** Total Scraped */
+            total_scraped: number;
+            /** Matched Count */
+            matched_count: number;
+        };
         /** ResultsSettings */
         ResultsSettings: {
             /**
@@ -2888,9 +3122,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Competition"];
                 };
             };
             /** @description Validation Error */
@@ -2921,9 +3153,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Done"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -2958,9 +3197,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Competition"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -2989,9 +3235,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PastArchived"];
                 };
             };
         };
@@ -3017,9 +3261,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Competition"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3051,9 +3302,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Competition"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3089,9 +3347,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Competition"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3127,9 +3401,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Competition"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3165,9 +3446,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Competition"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3198,9 +3486,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["GroupLoaded"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3229,7 +3524,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Coach"][];
                 };
             };
         };
@@ -3253,9 +3548,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Coach"];
                 };
             };
             /** @description Validation Error */
@@ -3290,9 +3583,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Coach"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3323,9 +3623,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Done"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3374,7 +3681,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HelloAssoItem"][];
                 };
             };
         };
@@ -3400,9 +3707,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ItemLinked"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3437,9 +3751,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Done"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3508,7 +3838,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ResultsFetched"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -3518,6 +3857,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4942,7 +5290,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HelloAssoSync"];
                 };
             };
         };
