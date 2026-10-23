@@ -9,7 +9,7 @@ while the page itself still loads."""
 import pytest
 from playwright.sync_api import expect
 
-from helpers.competitions import competition_card, open_competition, open_screen, participant_card, toast
+from helpers.competitions import open_competition, open_screen, participant_card, toast
 from helpers.data import eventually, unique_name
 from helpers.offline import owner, put_queued, queued, stored, wait_stored
 
@@ -27,13 +27,14 @@ def emergency_links(page, member):
 
 
 def go_offline(page, context, competition) -> None:
-    """Page restarted from the store with the API unreachable, then the network cut."""
+    """Page restarted from the store with the API unreachable, then the network cut. The competition is open: on a
+    phone its detail replaces the list."""
     # Up to one poll (20 s): the server caches the competition list for 5 s
     wait_stored(page, "competitions", lambda data: any(c["id"] == competition["id"] for c in data), timeout=30)
     wait_stored(page, "competitors")
     context.route("**/api/**", lambda route: route.abort("internetdisconnected"))
     page.reload()
-    expect(competition_card(page, competition["nom"])).to_be_visible()
+    expect(page.get_by_test_id("detail-name")).to_have_text(competition["nom"])
     context.set_offline(True)
     expect(page.locator("#sync-info")).to_contain_text("Hors ligne")
 

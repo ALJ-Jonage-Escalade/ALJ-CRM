@@ -1138,8 +1138,8 @@ export interface paths {
         };
         /**
          * Get Competitions Page
-         * @description Competitions (read only, readable offline) and the Google sign-in callback (the OAuth redirect URI
-         *     registered for the club): Vue application, on phones as on desktop. Also the PWA's start page.
+         * @description Competitions (readable offline, changed offline through the outbox) and the Google sign-in callback (the OAuth
+         *     redirect URI registered for the club): Vue application, on phones as on desktop. Also the PWA's start page.
          */
         get: operations["get_competitions_page_competitions_get"];
         put?: never;
