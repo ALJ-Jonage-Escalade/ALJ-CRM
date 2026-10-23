@@ -333,8 +333,10 @@ OAuth callback keeps working on this route. Writes still go through the old page
 
 ### What to build
 
-All competitions writes in the SPA: participant changes, HelloAsso payments, results fetching, competition e-mails.
-The outbox module queues changes made offline, replays them when the network returns, shows the pending count,
+All competitions writes in the SPA, i.e. every tool of the two former pages (`web/competitions.html`,
+`web/bureau/competitions.html`), since phase 12 deletes them: participant changes, HelloAsso payments, results
+fetching, competition e-mails, and also competition create / edit / delete, archive / restore and « archive past »,
+coaches management, the balance (bilan) report with its CSV export, and the per-competition CSV export. The outbox module queues changes made offline, replays them when the network returns, shows the pending count,
 warns before logout with unsent changes, and reports server refusals (e.g. `already_paid`). Existing queued entries
 from the old page are replayed.
 
@@ -344,6 +346,9 @@ from the old page are replayed.
 - [ ] Logout with pending changes asks for confirmation
 - [ ] A refused change shows the server's reason and leaves the queue consistent
 - [ ] HelloAsso payment and results fetching work (fakes in e2e)
+- [ ] Competitions can be created, edited, deleted, archived and restored; past ones archived in one action
+- [ ] Coaches can be added, renamed and deleted; the balance report and both CSV exports work
+- [ ] No tool of the former competitions pages is left out of the SPA before they are removed
 - [ ] Vitest covers the outbox (queue / replace by key, replay order, refusal codes, clear)
 - [ ] e2e competitions write, offline outbox and HelloAsso scenarios pass; competitions HTML string checks removed
 
