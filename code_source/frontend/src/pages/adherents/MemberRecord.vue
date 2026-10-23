@@ -15,11 +15,20 @@ const rows = computed(() => recordRows(props.member));
 <template>
   <div data-testid="member-record-view" class="flex flex-col gap-3">
     <div class="flex flex-wrap items-start justify-between gap-2">
-      <div>
-        <div data-testid="record-name" class="text-lg font-bold text-slate-800">{{ member.first_name }} {{ member.last_name }}</div>
-        <div class="text-xs text-slate-500">{{ member.tarif_name || "—" }} · Saison {{ member.season_name }}</div>
+      <div class="flex flex-col gap-3">
+        <div data-testid="record-name" class="flex flex-row justify-between text-lg font-bold text-slate-800">
+          <div>
+            {{ member.first_name }} {{ member.last_name }}
+          </div>
+          <div>
+            <slot name="status" />
+          </div>
+        </div>
+        <div class="flex flex-col gap-2 text-xs text-slate-500">
+          <div>{{ member.tarif_name || "—" }}</div>
+          <div>Saison {{ member.season_name }}</div>
+        </div>
       </div>
-      <slot name="status" />
     </div>
 
     <div class="flex flex-wrap gap-2">

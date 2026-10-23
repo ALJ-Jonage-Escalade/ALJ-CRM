@@ -50,15 +50,15 @@ watch(members.httpStatus, (status) => {
   if (status === 404 && filters.value.season) filters.value.season = "";
 });
 
-const list = computed(() => members.data.value);
-const season = computed(() => list.value?.season ?? filters.value.season);
-const all = computed<readonly Member[]>(() => list.value?.members ?? []);
-const items = computed(() => creneauItems(list.value?.creneaux ?? []));
+const membersList = computed(() => members.data.value);
+const season = computed(() => membersList.value?.season ?? filters.value.season);
+const all = computed<readonly Member[]>(() => membersList.value?.members ?? []);
+const items = computed(() => creneauItems(membersList.value?.creneaux ?? []));
 const counts = computed(() => tarifCounts(all.value, items.value));
 const otherTarifs = computed(() => Object.keys(counts.value.others).sort((a, b) => a.localeCompare(b, "fr")));
 const shown = computed(() => filterMembers(all.value, filters.value, allowedTarifs(items.value, counts.value, filters.value)));
 const chips = computed(() => statusChips(all.value));
-const summary = computed(() => (list.value ? countSummary(shown.value.length, all.value.length, season.value) : "Chargement des données…"));
+const summary = computed(() => (membersList.value ? countSummary(shown.value.length, all.value.length, season.value) : "Chargement des données…"));
 
 const TIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
 const syncInfo = computed(() => {
@@ -149,7 +149,7 @@ watch(
   },
   { immediate: true },
 );
-const recordReady = computed(() => !!list.value && (!queryText("saison") || list.value.season === queryText("saison")));
+const recordReady = computed(() => !!membersList.value && (!queryText("saison") || membersList.value.season === queryText("saison")));
 // The member of the URL, even when the filters hide it, or else the first row of the list as shown (sorted)
 const record = computed(() => {
   if (!recordReady.value) return undefined;
@@ -221,7 +221,7 @@ function sent(message: string): void {
 }
 
 // Edit and add
-const tarifs = computed(() => tarifChoices(list.value?.creneaux ?? [], all.value));
+const tarifs = computed(() => tarifChoices(membersList.value?.creneaux ?? [], all.value));
 const draft = ref<MemberDraft>(draftOf());
 const saving = ref(false);
 
@@ -391,7 +391,7 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
         :selected-key="selectedKey"
         :on-row-click="select"
         label="Adhérents"
-        :empty="list ? 'Aucun adhérent ne correspond aux filtres actifs.' : 'Chargement en cours…'"
+        :empty="membersList ? 'Aucun adhérent ne correspond aux filtres actifs.' : 'Chargement en cours…'"
       >
         <template #cell-last_name="{ row }">
           <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="font-bold text-slate-800 no-underline hover:text-accent hover:underline" title="Ouvrir la fiche adhérent">{{ row.last_name }}</RouterLink>
