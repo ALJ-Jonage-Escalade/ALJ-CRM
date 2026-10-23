@@ -1,5 +1,5 @@
-"""Office portal members (Vue app, /bureau/adherents): the list and the member record (a dialog of the page, in the
-URL as ?id=…&saison=…&achat=…): navigation and locators."""
+"""Office portal members (Vue app, /bureau/adherents): the list and the member record (side panel of the page, in the
+URL as ?id=…&saison=…&achat=…; its actions open the record dialog): navigation and locators."""
 import re
 
 from playwright.sync_api import Locator, Page, expect
@@ -28,9 +28,14 @@ def find(page: Page, member: dict) -> Locator:
 
 
 def open_record(page: Page, member: dict, role: str = "admin") -> Locator:
-    """Opens the member's record from the list (dialog of the page) and returns it."""
+    """Selects the member in the list and returns the record panel."""
     open_members(page, role)
     find(page, member).get_by_test_id("member-record").click()
-    dialog = page.get_by_test_id("record-dialog")
-    expect(dialog.get_by_test_id("record-name")).to_have_text(f"{member['prenom']} {member['nom'].upper()}")
-    return dialog
+    panel = page.get_by_test_id("record-panel")
+    expect(panel.get_by_test_id("record-name")).to_have_text(f"{member['prenom']} {member['nom'].upper()}")
+    return panel
+
+
+def record_dialog(page: Page) -> Locator:
+    """The dialog of the record's actions (e-mail, edit, certificate)."""
+    return page.get_by_test_id("record-dialog")

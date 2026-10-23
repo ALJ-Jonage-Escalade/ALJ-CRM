@@ -338,3 +338,24 @@ export function saveFilters(filters: Filters, storage: Pick<Storage, "setItem"> 
     // blocked storage: the filters last for this visit only
   }
 }
+
+// ---------------------------------------------------------------- Record panel
+
+export const PANEL_KEY = "alj_bureau_adherents_panel";
+
+/** Whether the record panel was left open on this browser (open by default). */
+export function loadPanelOpen(storage: Pick<Storage, "getItem"> | undefined = globalThis.localStorage): boolean {
+  try {
+    return storage?.getItem(PANEL_KEY) !== "closed";
+  } catch {
+    return true;  // blocked storage: open
+  }
+}
+
+export function savePanelOpen(open: boolean, storage: Pick<Storage, "setItem"> | undefined = globalThis.localStorage): void {
+  try {
+    storage?.setItem(PANEL_KEY, open ? "open" : "closed");
+  } catch {
+    // blocked storage: the choice lasts for this visit only
+  }
+}

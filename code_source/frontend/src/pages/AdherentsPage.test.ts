@@ -7,7 +7,7 @@ import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import type { Role } from "../lib/roles";
 import AdherentsPage from "./AdherentsPage.vue";
-import { FILTER_KEY, type MemberList } from "./adherents/members";
+import { FILTER_KEY, PANEL_KEY, type MemberList } from "./adherents/members";
 import { member } from "./adherents/members.fixture";
 
 function json(body: unknown, status = 200, etag?: string): Response {
@@ -216,6 +216,105 @@ describe("AdherentsPage", () => {
     expect(inBody("record-email")).not.toBeNull();
   });
 
+  it("shows the first row of the list as shown in the panel, without touching the URL", async () => {
+    const { byId, inBody, router, wrapper } = await render();
+    await flushPromises();
+    expect(inBody("record-name")!.textContent).toBe("Léa DUPONT");
+    expect(wrapper.findAll('[data-testid="data-row"]').map((r) => r.attributes("aria-selected"))).toEqual(["true", "false"]);
+    expect(router.currentRoute.value.query).toEqual({});
+    await byId("sort-last_name").trigger("click");
+    expect(inBody("record-name")!.textContent).toBe("Max MARTIN");
+    await byId("member-search").setValue("léa");
+    expect(inBody("record-name")!.textContent).toBe("Léa DUPONT");
+    await byId("member-search").setValue("personne");
+    expect(inBody("record-missing")!.textContent).toBe("Aucun adhérent à afficher.");
+  });
+
+  it("selects a member on a row click, as a history entry", async () => {
+    const { inBody, router, wrapper } = await render();
+    await flushPromises();
+    await wrapper.findAll('[data-testid="data-row"]')[1]!.find("td:nth-child(2)").trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.query).toEqual({ id: "2", saison: "2026-2027", achat: "12" });
+    expect(inBody("record-name")!.textContent).toBe("Max MARTIN");
+    router.back();
+    await flushPromises();
+    await new Promise((r) => setTimeout(r));
+    await flushPromises();
+    expect(router.currentRoute.value.query).toEqual({});
+    expect(inBody("record-name")!.textContent).toBe("Léa DUPONT");
+  });
+
+  it("collapses the panel, remembers it, shows its columns again, and opens it on a row click", async () => {
+    const { byId, inBody, wrapper } = await render();
+    await flushPromises();
+    expect(byId("sort-city").exists()).toBe(false);
+    expect(byId("sort-email_primary").exists()).toBe(false);
+    expect(byId("sort-phone").exists()).toBe(false);
+    expect(byId("panel-open").exists()).toBe(false);
+    await byId("side-panel-collapse").trigger("click");
+    await flushPromises();
+    expect(inBody("record-panel")).toBeNull();
+    expect(byId("sort-city").exists()).toBe(true);
+    expect(localStorage.getItem(PANEL_KEY)).toBe("closed");
+    wrapper.unmount();
+
+    const again = await render();
+    await flushPromises();
+    expect(again.inBody("record-panel")).toBeNull();
+    await again.wrapper.findAll('[data-testid="data-row"]')[1]!.find("td:nth-child(2)").trigger("click");
+    await flushPromises();
+    expect(again.inBody("record-name")!.textContent).toBe("Max MARTIN");
+    expect(again.byId("sort-city").exists()).toBe(false);
+    expect(localStorage.getItem(PANEL_KEY)).toBe("open");
+    await again.byId("side-panel-collapse").trigger("click");
+    await again.byId("panel-open").trigger("click");
+    expect(again.inBody("record-name")!.textContent).toBe("Max MARTIN");
+  });
+
+  it("pins the first row in the URL when an action opens: a member added by a poll does not close the form", async () => {
+    vi.useFakeTimers();
+    let polls = 0;
+    const aaron = member({ user_id: 5, purchase_id: 15, last_name: "AARON", first_name: "Abel", tarif_name: "Adulte loisir" });
+    const answers: Record<string, Answer> = {
+      ...ANSWERS,
+      "GET /api/members": () => (++polls > 1 ? json({ ...ACTIVE, members: [aaron, ...ACTIVE.members] }, 200, '"m2"') : json(ACTIVE, 200, '"m1"')),
+      "GET /api/email-templates": () => json({ status: "success", templates: [] }),
+    };
+    const { inBody, router, names } = await render("coach", answers);
+    await flushPromises();
+    inBody("record-email")!.click();
+    await flushPromises();
+    expect(router.currentRoute.value.query).toEqual({ id: "1", saison: "2026-2027", achat: "11" });
+    await vi.advanceTimersByTimeAsync(20_000);
+    await flushPromises();
+    expect(names()[0]).toBe("AARON");
+    expect(inBody("record-dialog")).not.toBeNull();
+    expect(inBody("record-name")!.textContent).toBe("Léa DUPONT");
+  });
+
+  it("keeps a linked member in the panel even when the filters hide it", async () => {
+    const { inBody, names, wrapper } = await render("admin", ANSWERS, "/bureau/adherents?id=3&saison=2026-2027");
+    await flushPromises();
+    expect(names()).toEqual(["DUPONT", "MARTIN"]);
+    expect(inBody("record-name")!.textContent).toBe("Zoé PETIT");
+    expect(wrapper.findAll('[data-testid="data-row"]').map((r) => r.attributes("aria-selected"))).toEqual(["false", "false"]);
+  });
+
+  it("opens the record's actions in a dialog over the panel, and closes it on cancel", async () => {
+    const answers: Record<string, Answer> = { ...ANSWERS, "GET /api/email-templates": () => json({ status: "success", templates: [] }) };
+    const { inBody } = await render("coach", answers);
+    await flushPromises();
+    expect(inBody("record-dialog")).toBeNull();
+    inBody("record-email")!.click();
+    await flushPromises();
+    expect(inBody("record-dialog")!.textContent).toContain("E-mail à l'adhérent");
+    expect(inBody("record-panel")!.textContent).toContain("Léa DUPONT");
+    inBody("email-cancel")!.click();
+    await flushPromises();
+    expect(inBody("record-dialog")).toBeNull();
+  });
+
   it("opens a link of the former page (?id=&saison=) on its season", async () => {
     const { inBody, calls } = await render("admin", ANSWERS, "/bureau/adherents?id=4&saison=2025-2026");
     await flushPromises();
@@ -322,7 +421,8 @@ describe("AdherentsPage", () => {
     expect(writes()[0]).toEqual(expect.objectContaining({ path: "/api/send-email" }));
     expect(writes()[0]!.body).toEqual(expect.objectContaining({ subject: "Rappel {first_name}", recipients: [expect.objectContaining({ email: "lea@example.org" })] }));
     expect(document.querySelector("#toast")!.textContent).toContain("E-mail envoyé avec succès");
-    expect(inBody("record-name")).not.toBeNull();  // back to the record
+    expect(inBody("record-dialog")).toBeNull();  // back to the record in the panel
+    expect(inBody("record-name")).not.toBeNull();
   });
 
   it("previews and sends the payment certificate of the membership", async () => {

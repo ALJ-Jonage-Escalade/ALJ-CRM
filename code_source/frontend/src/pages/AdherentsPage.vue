@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /* Adhérents (coaches and admins): the members of a season, filtered by slot / tariff, status and search, sorted,
-   paged, exported to CSV, and the member record in a dialog: read and e-mailed by coaches and admins, edited and sent
-   its payment certificate by admins, who also add members. The record is in the URL (?id=<user_id>&saison=…&achat=…, ?ajout=1:
-   recordQuery), so a record can be linked and the former page's links still open it. Online only: the list is polled
-   every 20 s (ETag, 304 when unchanged) and the record is read from it; nothing is kept on the device, only the filters
-   are remembered, without the search. */
+   paged, exported to CSV, and the member record in a collapsible side panel: read and e-mailed by coaches and admins,
+   edited and sent its payment certificate by admins (in a dialog over the page), who also add members. The panel shows
+   the member of the URL (?id=<user_id>&saison=…&achat=…: recordQuery), or else the first row of the list as shown; a
+   click on a row selects it (history entry: Back goes to the previous member) and opens the panel again if it was
+   collapsed. A record can be linked and the former page's links still open it; ?ajout=1 opens the add form. Online
+   only: the list is polled every 20 s (ETag, 304 when unchanged) and the record is read from it; nothing is kept on
+   the device, only the filters (without the search) and whether the panel is open are remembered. */
 import { computed, inject, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
@@ -13,6 +15,7 @@ import type { DataColumn } from "../components/dataTable";
 import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
 import UiDialog from "../components/ui/UiDialog.vue";
+import UiSidePanel from "../components/ui/UiSidePanel.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
@@ -25,7 +28,7 @@ import MemberForm from "./adherents/MemberForm.vue";
 import MemberRecord from "./adherents/MemberRecord.vue";
 import {
   allowedTarifs, checkAll, collator, countSummary, creneauItems, csvName, csvRows, dateValue, diplomes,
-  diplomeWeight, filterMembers, fmtDay, groupChecked, loadFilters, OTHER_PREFIX, otherChecked, recordMember, recordQuery, saveFilters,
+  diplomeWeight, filterMembers, fmtDay, groupChecked, loadFilters, loadPanelOpen, OTHER_PREFIX, otherChecked, recordMember, recordQuery, saveFilters, savePanelOpen,
   statusChips, statusClass, tarifCounts, telHref, type CreneauItem, type Member, type MemberList,
 } from "./adherents/members";
 import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft, type Template } from "./adherents/record";
@@ -134,7 +137,7 @@ async function syncNow(): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------- Member record (dialog)
+// ---------------------------------------------------------------- Member record (side panel)
 
 const queryText = (name: string) => (typeof route.query[name] === "string" ? (route.query[name] as string) : "");
 const recordId = computed(() => queryText("id"));
@@ -147,21 +150,42 @@ watch(
   { immediate: true },
 );
 const recordReady = computed(() => !!list.value && (!queryText("saison") || list.value.season === queryText("saison")));
-const record = computed(() => (recordId.value && recordReady.value ? recordMember(all.value, recordId.value, queryText("achat") || undefined) : undefined));
-const recordOpen = computed({
-  get: () => !!recordId.value,
+// The member of the URL, even when the filters hide it, or else the first row of the list as shown (sorted)
+const record = computed(() => {
+  if (!recordReady.value) return undefined;
+  if (recordId.value) return recordMember(all.value, recordId.value, queryText("achat") || undefined);
+  return tableRef.value?.sortedRows()[0];
+});
+const selectedKey = computed(() => (record.value ? String(record.value.purchase_id) : ""));
+
+// Columns the panel already shows, hidden from the table while it is open to make room. Adjust from users' feedback.
+const PANEL_HIDDEN_COLUMNS = ["city", "email_primary", "phone"];
+
+const panelOpen = ref(loadPanelOpen());
+watch(panelOpen, (open) => savePanelOpen(open));
+// A member chosen (row click, link, new member): the panel opens again
+watch(recordId, (id) => {
+  if (id) panelOpen.value = true;
+}, { immediate: true });
+
+function select(m: Member): void {
+  void router.push({ query: recordQuery(m) });
+}
+
+// The record's actions open a dialog over the page; "none": only the panel
+type Mode = "none" | "edit" | "email" | "attestation";
+const mode = ref<Mode>("none");
+watch(selectedKey, () => (mode.value = "none"));
+const TITLES: Record<Exclude<Mode, "none">, string> = { edit: "✏️ Modifier la fiche", email: "✉️ E-mail à l'adhérent", attestation: "📄 Attestation de paiement" };
+const actionOpen = computed({
+  get: () => mode.value !== "none" && !!record.value,
   set: (open) => {
-    if (!open) closeRecord();
+    if (!open) mode.value = "none";
   },
 });
 
-type Mode = "view" | "edit" | "email" | "attestation";
-const mode = ref<Mode>("view");
-watch(recordId, () => (mode.value = "view"));
-const TITLES: Record<Mode, string> = { view: "👤 Fiche adhérent", edit: "✏️ Modifier la fiche", email: "✉️ E-mail à l'adhérent", attestation: "📄 Attestation de paiement" };
-
-function closeRecord(): void {
-  const rest = Object.fromEntries(Object.entries(route.query).filter(([k]) => !["id", "saison", "achat", "ajout"].includes(k)));
+function closeAdd(): void {
+  const rest = Object.fromEntries(Object.entries(route.query).filter(([k]) => k !== "ajout"));
   void router.replace({ query: rest });
 }
 
@@ -182,6 +206,9 @@ async function loadTemplates(): Promise<void> {
 }
 
 async function open(next: Mode): Promise<void> {
+  // The first row shown by default is pinned in the URL first: a member added by a poll and sorted above it would
+  // otherwise change the record, which closes the form and loses what was typed
+  if (!recordId.value && record.value) await router.replace({ query: { ...route.query, ...recordQuery(record.value) } });
   if (next === "email" || next === "attestation") await loadTemplates();
   if (next === "edit" && record.value) draft.value = draftOf(record.value);
   mode.value = next;
@@ -189,7 +216,7 @@ async function open(next: Mode): Promise<void> {
 
 function sent(message: string): void {
   toast.show(message);
-  mode.value = "view";
+  mode.value = "none";
   void members.refresh();  // the certificate's sent date
 }
 
@@ -202,7 +229,7 @@ async function saveEdit(m: Member): Promise<void> {
   const { fields, lines } = changesOf(m, draft.value);
   if (!lines.length) {
     toast.show("ℹ️ Aucune modification détectée.");
-    mode.value = "view";
+    mode.value = "none";
     return;
   }
   if (!confirm(`Valider les modifications pour ${m.first_name} ${m.last_name} ?\n\n• ${lines.join("\n• ")}`)) return;
@@ -210,7 +237,7 @@ async function saveEdit(m: Member): Promise<void> {
   try {
     await unwrap(client.POST("/api/members/update", { body: { user_id: m.user_id, purchase_id: m.purchase_id, order_ref: m.order_ref, fields } }));
     await members.refresh();
-    mode.value = "view";
+    mode.value = "none";
     toast.show(`✅ Fiche de ${m.first_name} ${m.last_name} mise à jour avec succès !`);
   } catch (e) {
     toast.show(`❌ Échec de la mise à jour : ${errorText(e)}`, 9000);
@@ -222,7 +249,7 @@ async function saveEdit(m: Member): Promise<void> {
 const adding = computed({
   get: () => queryText("ajout") === "1",
   set: (open) => {
-    if (!open) closeRecord();
+    if (!open) closeAdd();
   },
 });
 watch(adding, (now) => {
@@ -242,7 +269,7 @@ async function saveNew(): Promise<void> {
     const created = await unwrap(client.POST("/api/members/create", { body: { season: season.value, fields: newMemberOf(d) } }));
     toast.show(`✅ ${created.message}`);
     await members.refresh();
-    // Opens the new record (its membership is the one of the new order)
+    // Selects the new member in the panel (its membership is the one of the new order)
     const added = all.value.find((m) => m.order_ref === created.order_ref);
     void router.replace({ query: added ? recordQuery(added) : {} });
   } catch (e) {
@@ -285,6 +312,16 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
         <UiButton variant="muted" small data-testid="export-csv" title="Télécharger la liste affichée en fichier CSV" @click="exportCsv">📥 Export CSV</UiButton>
         <a href="/bureau/outils?tab=ffme" :class="linkButton" title="Ouvrir l'export officiel FFME">🇫🇷 Export FFME</a>
         <a v-if="role === 'admin'" href="/bureau/outils?tab=ffme-import" :class="linkButton" title="Importer la liste Excel des licenciés FFME">📥 Import FFME</a>
+        <UiButton
+          v-if="!panelOpen"
+          variant="muted"
+          small
+          data-testid="panel-open"
+          aria-controls="record-panel"
+          :aria-expanded="false"
+          title="Afficher la fiche de l'adhérent sélectionné"
+          @click="panelOpen = true"
+        >⇤ Fiche</UiButton>
         <UiButton variant="muted" small data-testid="sync-now" :busy="syncing && 'Synchro…'" title="Synchroniser maintenant la base du serveur avec Firestore" @click="syncNow">🔄 Synchroniser BDD</UiButton>
         <RouterLink
           v-if="role === 'admin'"
@@ -341,71 +378,85 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
       </div>
     </UiCard>
 
-    <DataTable
-      ref="tableRef"
-      :rows="shown"
-      :columns="COLUMNS"
-      :row-key="(m: Member) => String(m.purchase_id)"
-      :sort="{ id: 'last_name' }"
-      :reset-key="resetKey"
-      label="Adhérents"
-      :empty="list ? 'Aucun adhérent ne correspond aux filtres actifs.' : 'Chargement en cours…'"
-    >
-      <template #cell-last_name="{ row }">
-        <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="font-bold text-slate-800 no-underline hover:text-accent hover:underline" title="Ouvrir la fiche adhérent">{{ row.last_name }}</RouterLink>
-      </template>
-      <template #cell-order_date="{ value }">{{ value || "—" }}</template>
-      <template #cell-diplome="{ row }">
-        <span v-for="d in diplomes(row)" :key="d.type" :title="d.label" class="cursor-help px-0.5">{{ d.icon }}</span>
-        <span v-if="!diplomes(row).length" class="text-slate-400">—</span>
-      </template>
-      <template #cell-status_norm="{ row }">
-        <span :class="['inline-block rounded-full px-2.5 py-0.5 text-[11.5px] font-bold whitespace-nowrap text-white', statusClass(row.status_norm)]">{{ row.status_norm || "—" }}</span>
-      </template>
-      <template #cell-creneau_groupe="{ value }">{{ value || "—" }}</template>
-      <template #cell-city="{ value }">{{ value || "—" }}</template>
-      <template #cell-email_primary="{ row }">
-        <a v-if="row.email_primary" :href="`mailto:${row.email_primary}`">{{ row.email_primary }}</a>
-        <template v-else>—</template>
-      </template>
-      <template #cell-phone="{ row }">
-        <a v-if="row.phone" :href="telHref(row.phone)">{{ row.phone }}</a>
-        <template v-else>—</template>
-      </template>
-      <template #cell-licence_ffme="{ value }">{{ value || "—" }}</template>
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-start">
+      <DataTable
+        ref="tableRef"
+        class="min-w-0 flex-1"
+        :rows="shown"
+        :columns="COLUMNS"
+        :row-key="(m: Member) => String(m.purchase_id)"
+        :sort="{ id: 'last_name' }"
+        :reset-key="resetKey"
+        :hidden="panelOpen ? PANEL_HIDDEN_COLUMNS : []"
+        :selected-key="selectedKey"
+        :on-row-click="select"
+        label="Adhérents"
+        :empty="list ? 'Aucun adhérent ne correspond aux filtres actifs.' : 'Chargement en cours…'"
+      >
+        <template #cell-last_name="{ row }">
+          <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="font-bold text-slate-800 no-underline hover:text-accent hover:underline" title="Ouvrir la fiche adhérent">{{ row.last_name }}</RouterLink>
+        </template>
+        <template #cell-order_date="{ value }">{{ value || "—" }}</template>
+        <template #cell-diplome="{ row }">
+          <span v-for="d in diplomes(row)" :key="d.type" :title="d.label" class="cursor-help px-0.5">{{ d.icon }}</span>
+          <span v-if="!diplomes(row).length" class="text-slate-400">—</span>
+        </template>
+        <template #cell-status_norm="{ row }">
+          <span :class="['inline-block rounded-full px-2.5 py-0.5 text-[11.5px] font-bold whitespace-nowrap text-white', statusClass(row.status_norm)]">{{ row.status_norm || "—" }}</span>
+        </template>
+        <template #cell-creneau_groupe="{ value }">{{ value || "—" }}</template>
+        <template #cell-city="{ value }">{{ value || "—" }}</template>
+        <template #cell-email_primary="{ row }">
+          <a v-if="row.email_primary" :href="`mailto:${row.email_primary}`">{{ row.email_primary }}</a>
+          <template v-else>—</template>
+        </template>
+        <template #cell-phone="{ row }">
+          <a v-if="row.phone" :href="telHref(row.phone)">{{ row.phone }}</a>
+          <template v-else>—</template>
+        </template>
+        <template #cell-licence_ffme="{ value }">{{ value || "—" }}</template>
 
-      <template #card="{ row }">
-        <div class="flex items-start justify-between gap-2">
-          <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="min-w-0 font-bold text-slate-800 no-underline">{{ row.last_name }} {{ row.first_name }}</RouterLink>
-          <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(row.status_norm)]">{{ row.status_norm || "—" }}</span>
-        </div>
-        <div class="mt-0.5 text-xs text-slate-500">
-          {{ [row.creneau_groupe, row.city].filter(Boolean).join(" · ") || "—" }}
-          <span v-for="d in diplomes(row)" :key="d.type" :title="d.label" class="pl-1">{{ d.icon }}</span>
-        </div>
-        <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12.5px]">
-          <a v-if="row.phone" :href="telHref(row.phone)">📞 {{ row.phone }}</a>
-          <a v-if="row.email_primary" :href="`mailto:${row.email_primary}`" class="min-w-0 break-all">✉️ {{ row.email_primary }}</a>
-          <span v-if="row.licence_ffme" class="text-slate-500">🪪 {{ row.licence_ffme }}</span>
-        </div>
-      </template>
-    </DataTable>
+        <template #card="{ row }">
+          <div class="flex items-start justify-between gap-2">
+            <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="min-w-0 font-bold text-slate-800 no-underline">{{ row.last_name }} {{ row.first_name }}</RouterLink>
+            <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(row.status_norm)]">{{ row.status_norm || "—" }}</span>
+          </div>
+          <div class="mt-0.5 text-xs text-slate-500">
+            {{ [row.creneau_groupe, row.city].filter(Boolean).join(" · ") || "—" }}
+            <span v-for="d in diplomes(row)" :key="d.type" :title="d.label" class="pl-1">{{ d.icon }}</span>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12.5px]">
+            <a v-if="row.phone" :href="telHref(row.phone)">📞 {{ row.phone }}</a>
+            <a v-if="row.email_primary" :href="`mailto:${row.email_primary}`" class="min-w-0 break-all">✉️ {{ row.email_primary }}</a>
+            <span v-if="row.licence_ffme" class="text-slate-500">🪪 {{ row.licence_ffme }}</span>
+          </div>
+        </template>
+      </DataTable>
 
-    <UiDialog v-model:open="recordOpen" :title="TITLES[mode]" :wide="mode !== 'attestation'" :xl="mode === 'attestation'" data-testid="record-dialog">
-      <p v-if="!record" data-testid="record-missing" class="text-[13px] text-slate-500">
-        {{ recordReady ? `Adhérent introuvable dans la saison ${season}.` : "Chargement de la fiche…" }}
-      </p>
-      <template v-else>
-        <MemberRecord v-if="mode === 'view'" :member="record" :admin="role === 'admin'" @email="open('email')" @attestation="open('attestation')" @edit="open('edit')">
+      <UiSidePanel id="record-panel" v-model:open="panelOpen" title="👤 Fiche adhérent" class="order-first lg:order-none" data-testid="record-panel">
+        <p v-if="!record" data-testid="record-missing" class="text-[13px] text-slate-500">
+          {{ !recordReady ? "Chargement de la fiche…" : recordId ? `Adhérent introuvable dans la saison ${season}.` : "Aucun adhérent à afficher." }}
+        </p>
+        <MemberRecord v-else :member="record" :admin="role === 'admin'" compact @email="open('email')" @attestation="open('attestation')" @edit="open('edit')">
           <template #status>
             <span :class="['rounded-full px-2.5 py-0.5 text-[11.5px] font-bold text-white', STATUS_CLASS_OF(record)]">{{ record.status_norm || "—" }}</span>
           </template>
         </MemberRecord>
-        <MemberEmail v-else-if="mode === 'email'" :member="record" :templates="templates" @sent="sent" @failed="(m) => toast.show(m, 9000)" @cancel="mode = 'view'" />
-        <template v-else-if="role === 'admin'">
-          <MemberForm v-if="mode === 'edit'" v-model="draft" :adding="false" :tarifs="tarifs" :saving="saving" @save="saveEdit(record)" @cancel="mode = 'view'" />
-          <MemberAttestation v-else :member="record" :templates="templates" @sent="sent" @failed="(m) => toast.show(m, 9000)" @cancel="mode = 'view'" />
-        </template>
+      </UiSidePanel>
+    </div>
+
+    <UiDialog
+      v-if="record && mode !== 'none'"
+      v-model:open="actionOpen"
+      :title="TITLES[mode]"
+      :wide="mode !== 'attestation'"
+      :xl="mode === 'attestation'"
+      data-testid="record-dialog"
+    >
+      <MemberEmail v-if="mode === 'email'" :member="record" :templates="templates" @sent="sent" @failed="(m) => toast.show(m, 9000)" @cancel="mode = 'none'" />
+      <template v-else-if="role === 'admin'">
+        <MemberForm v-if="mode === 'edit'" v-model="draft" :adding="false" :tarifs="tarifs" :saving="saving" @save="saveEdit(record)" @cancel="mode = 'none'" />
+        <MemberAttestation v-else :member="record" :templates="templates" @sent="sent" @failed="(m) => toast.show(m, 9000)" @cancel="mode = 'none'" />
       </template>
     </UiDialog>
 

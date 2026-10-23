@@ -72,6 +72,12 @@ no single vendor whose license change could force a rewrite**.
   filter the rows themselves; TanStack does sorting and pagination only and is not imported anywhere else.
 - **shadcn-vue** (MIT) used as a generator, not a dependency: it copies Reka + Tailwind components into the repo, which
   we then own and trim. No runtime package to follow.
+  Not run yet (2026-10-23): the `Ui*` components (`frontend/src/components/ui/`) are hand-written on Reka UI, including
+  the Adhérents record panel (`UiSidePanel.vue`; shadcn's `Sidebar` was rejected: app-wide navigation with a provider,
+  a cookie and its own mobile sheet). Introduce it in a change of its own the first time a component is hard to build
+  by hand (Combobox, DatePicker/Calendar, Command, DropdownMenu, Popover forms): `components.json`, `cn()` (`clsx`,
+  `tailwind-merge`, `class-variance-authority`, all MIT), shadcn's CSS variables mapped onto the club tokens, then move
+  the `Ui*` components over so the app keeps a single style.
 - French formatting with `Intl` (`fr-FR`); plain validation functions per form (no form library).
 - Icons: emojis as today (no dependency); Lucide (ISC) icon by icon only if needed.
 - CSV export goes through a module that applies `csvSafe()` (formula injection), or uses the server-side export.

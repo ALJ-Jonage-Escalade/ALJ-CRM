@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /* Read view of a member record: status, slot, every known field, call / write links. Coaches and admins can send an
-   e-mail; admins also get the payment certificate and the edit form. The page opens them in the same dialog. */
+   e-mail; admins also get the payment certificate and the edit form, which the page opens in a dialog. compact: a narrow
+   column (the page's side panel), each label above its value. */
 import { computed } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import { telHref, type Member } from "./members";
 import { recordRows } from "./record";
 
-const props = defineProps<{ member: Member; admin: boolean }>();
+const props = defineProps<{ member: Member; admin: boolean; compact?: boolean }>();
 const emit = defineEmits<{ email: []; attestation: []; edit: [] }>();
 const rows = computed(() => recordRows(props.member));
 </script>
@@ -35,8 +36,8 @@ const rows = computed(() => recordRows(props.member));
     </div>
 
     <dl data-testid="record-fields" class="divide-y divide-slate-100 rounded-lg border border-slate-200 text-[12.5px]">
-      <div v-for="row in rows" :key="row.label" data-testid="record-field" class="grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)] gap-3 px-3 py-1.5">
-        <dt class="font-semibold text-slate-500">{{ row.icon }} {{ row.label }}</dt>
+      <div v-for="row in rows" :key="row.label" data-testid="record-field" :class="compact ? 'px-3 py-1.5' : 'grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)] gap-3 px-3 py-1.5'">
+        <dt :class="['font-semibold text-slate-500', compact && 'text-[11.5px]']">{{ row.icon }} {{ row.label }}</dt>
         <dd class="break-words whitespace-pre-line text-slate-800">{{ row.value }}</dd>
       </div>
     </dl>

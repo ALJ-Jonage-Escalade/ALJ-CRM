@@ -10,7 +10,7 @@ from playwright.sync_api import expect
 
 from helpers.auth import login_as
 from helpers.data import unique_name
-from helpers.members import ROWS, displayed_count, find, open_members, open_record
+from helpers.members import ROWS, displayed_count, find, open_members, open_record, record_dialog
 from helpers.dialogs import accept_dialogs
 from helpers.offline import resource_names
 
@@ -32,7 +32,8 @@ def test_list_search(page, people):
 
     row = find(page, member)
     expect(row).to_have_count(1)
-    expect(row).to_contain_text(member["email"])
+    # The e-mail column is hidden while the record panel is open: the panel shows it (the only row is selected)
+    expect(page.get_by_test_id("record-fields")).to_contain_text(member["email"])
     if member.get("licence_ffme"):
         expect(row).to_contain_text(member["licence_ffme"])
     assert displayed_count(page) < total
@@ -166,14 +167,26 @@ def test_phone_shows_stacked_cards(mobile_page, people):
 
 def test_record_opens_from_the_list(page, people):
     member = people[0]
-    dialog = open_record(page, member)
-    expect(dialog.get_by_test_id("record-fields")).to_contain_text(member["email"])
+    panel = open_record(page, member)
+    expect(panel.get_by_test_id("record-fields")).to_contain_text(member["email"])
     assert re.search(r"/bureau/adherents\?id=\d+&saison=[\d-]+&achat=\d+$", page.url), page.url
     # The record is in the URL: a reload (or a shared link) opens it again
     page.reload()
     expect(page.get_by_test_id("record-name")).to_have_text(f"{member['prenom']} {member['nom'].upper()}", timeout=20_000)
-    page.keyboard.press("Escape")
-    expect(page.get_by_test_id("record-dialog")).to_be_hidden()
+    # The panel collapses (the table shows its columns again) and opens again
+    page.get_by_test_id("side-panel-collapse").click()
+    expect(page.get_by_test_id("record-panel")).to_be_hidden()
+    expect(page.get_by_test_id("sort-phone")).to_be_visible()
+    page.get_by_test_id("panel-open").click()
+    expect(page.get_by_test_id("record-name")).to_have_text(f"{member['prenom']} {member['nom'].upper()}")
+
+
+def test_first_member_shown_without_selection(page):
+    open_members(page)
+    first = page.get_by_test_id(ROWS).first
+    expect(first).to_have_attribute("aria-selected", "true")
+    last_name = first.locator("td").first.inner_text()
+    expect(page.get_by_test_id("record-name")).to_contain_text(last_name)
     assert "id=" not in page.url
 
 
@@ -196,12 +209,13 @@ def test_coach_has_no_admin_action(page):
 def test_coach_record_emails_but_does_not_edit(page, mailpit, people):
     member = people[4]
     accept_dialogs(page)
-    dialog = open_record(page, member, role="coach")
-    expect(dialog.get_by_test_id("record-readonly")).to_contain_text("réservées aux administrateurs")
+    panel = open_record(page, member, role="coach")
+    expect(panel.get_by_test_id("record-readonly")).to_contain_text("réservées aux administrateurs")
     for action in ("record-attestation", "record-edit"):
-        expect(dialog.get_by_test_id(action)).to_have_count(0)
+        expect(panel.get_by_test_id(action)).to_have_count(0)
 
-    dialog.get_by_test_id("record-email").click()
+    panel.get_by_test_id("record-email").click()
+    dialog = record_dialog(page)
     topic = unique_name("Coach note")
     dialog.get_by_test_id("email-subject").fill(topic)
     dialog.get_by_test_id("email-body").fill("Hello {first_name}.")
@@ -216,8 +230,9 @@ def test_edit_member(page, people):
     digits = "06" + str(uuid.uuid4().int)[:8]
     phone = " ".join(digits[i:i + 2] for i in range(0, 10, 2))   # as the server formats it (domain/members/view.py)
     accept_dialogs(page)
-    dialog = open_record(page, member)
-    dialog.get_by_test_id("record-edit").click()
+    panel = open_record(page, member)
+    panel.get_by_test_id("record-edit").click()
+    dialog = record_dialog(page)
     dialog.get_by_test_id("member-phone").fill("12")
     dialog.get_by_test_id("member-save").click()
     expect(dialog.get_by_test_id("member-form")).to_contain_text("Numéro de téléphone invalide.")
@@ -225,7 +240,8 @@ def test_edit_member(page, people):
     dialog.get_by_test_id("member-badge_rouge").select_option("Oui")
     dialog.get_by_test_id("member-save").click()
     expect(page.get_by_test_id("toast")).to_contain_text("mise à jour avec succès")
-    expect(dialog.get_by_test_id("record-fields")).to_contain_text(phone)
+    expect(dialog).to_be_hidden()
+    expect(panel.get_by_test_id("record-fields")).to_contain_text(phone)
 
     # Saved on the server and replicated to Firestore: still there after a reload (the record is in the URL)
     page.reload()
@@ -235,12 +251,12 @@ def test_edit_member(page, people):
 
 
 def test_edit_without_change(page, people):
-    dialog = open_record(page, people[0])
-    dialog.get_by_test_id("record-edit").click()
-    dialog.get_by_test_id("member-save").click()
+    panel = open_record(page, people[0])
+    panel.get_by_test_id("record-edit").click()
+    record_dialog(page).get_by_test_id("member-save").click()
     expect(page.get_by_test_id("toast")).to_contain_text("Aucune modification")
-    expect(dialog.get_by_test_id("member-form")).to_be_hidden()
-    expect(dialog.get_by_test_id("record-name")).to_be_visible()
+    expect(record_dialog(page)).to_be_hidden()
+    expect(panel.get_by_test_id("record-name")).to_be_visible()
 
 
 def test_add_member(page, test_data):
@@ -258,7 +274,7 @@ def test_add_member(page, test_data):
     dialog.get_by_test_id("member-email_primary").fill("nina.e2e@example.org")
     dialog.get_by_test_id("member-save").click()
     expect(page.get_by_test_id("toast")).to_contain_text("ajouté avec succès")
-    # The new record opens, read from the list reloaded from the server
+    # The new member is selected in the panel, read from the list reloaded from the server
     expect(page.get_by_test_id("record-name")).to_have_text(f"Nina {last_name}", timeout=20_000)
 
     page.reload()   # replicated: still there for a new page
@@ -268,8 +284,9 @@ def test_add_member(page, test_data):
 def test_send_email(page, mailpit, people):
     member = people[2]
     accept_dialogs(page)
-    dialog = open_record(page, member)
-    dialog.get_by_test_id("record-email").click()
+    panel = open_record(page, member)
+    panel.get_by_test_id("record-email").click()
+    dialog = record_dialog(page)
     expect(dialog.get_by_test_id("email-to")).to_contain_text(member["email"])
     topic = unique_name("Practice moved")
     dialog.get_by_test_id("email-subject").fill(topic + ", {first_name}")
@@ -285,8 +302,8 @@ def test_send_email(page, mailpit, people):
 
 def test_email_needs_subject_and_body(page, people):
     accept_dialogs(page)
-    dialog = open_record(page, people[0])
-    dialog.get_by_test_id("record-email").click()
+    open_record(page, people[0]).get_by_test_id("record-email").click()
+    dialog = record_dialog(page)
     dialog.get_by_test_id("email-send").click()
     expect(dialog.get_by_test_id("email-problem")).to_contain_text("renseigner le sujet et le message")
     expect(dialog.get_by_test_id("email-form")).to_be_visible()
@@ -295,8 +312,9 @@ def test_email_needs_subject_and_body(page, people):
 def test_payment_certificate(page, mailpit, people, tmp_path):
     member = people[3]
     accept_dialogs(page)
-    dialog = open_record(page, member)
-    dialog.get_by_test_id("record-attestation").click()
+    panel = open_record(page, member)
+    panel.get_by_test_id("record-attestation").click()
+    dialog = record_dialog(page)
     # The PDF is generated by the server (WeasyPrint), then shown in the preview frame
     expect(dialog.get_by_test_id("attestation-download")).to_be_enabled(timeout=30_000)
     expect(dialog.get_by_test_id("attestation-pdf")).to_be_visible()
@@ -318,4 +336,4 @@ def test_payment_certificate(page, mailpit, people, tmp_path):
     assert [a["ContentType"] for a in attachments] == ["application/pdf"]
     assert attachments[0]["FileName"].endswith(".pdf")
     # The sent date is recorded and shown once the list is reloaded
-    expect(dialog.get_by_test_id("record-fields")).to_contain_text("Attestation envoyée", timeout=20_000)
+    expect(panel.get_by_test_id("record-fields")).to_contain_text("Attestation envoyée", timeout=20_000)

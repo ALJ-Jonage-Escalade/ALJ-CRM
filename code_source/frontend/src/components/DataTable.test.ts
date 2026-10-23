@@ -20,21 +20,22 @@ const COLUMNS: DataColumn<Row>[] = [
 
 const rowsOf = (names: string[]): Row[] => names.map((name, i) => ({ id: i + 1, name, date: `2026-09-${String(10 + i)}`, age: i % 3 ? i : null }));
 
-function render(rows: Row[], pageSize = 50) {
+function render(rows: Row[], pageSize = 50, extra: { hidden?: string[]; selectedKey?: string; onRowClick?: (row: Row) => void } = {}) {
   const data = ref(rows);
   const reset = ref("");
+  const hidden = ref(extra.hidden ?? []);
   const wrapper = mount(
     defineComponent({
       setup: () => () =>
         h(
           DataTable<Row>,
-          { rows: data.value, columns: COLUMNS, rowKey: (r: Row) => String(r.id), sort: { id: "name" }, pageSize, resetKey: reset.value, label: "Test", empty: "Rien." },
+          { rows: data.value, columns: COLUMNS, rowKey: (r: Row) => String(r.id), sort: { id: "name" }, pageSize, resetKey: reset.value, label: "Test", empty: "Rien.", ...extra, hidden: hidden.value },
           { "cell-link": ({ row }: { row: Row }) => h("a", { href: `/r/${row.id}` }, "voir"), card: ({ row }: { row: Row }) => h("b", row.name) },
         ),
     }),
   );
   const names = () => wrapper.findAll('[data-testid="data-row"]').map((tr) => tr.find("td").text());
-  return { wrapper, data, reset, names };
+  return { wrapper, data, reset, hidden, names };
 }
 
 describe("DataTable", () => {
@@ -83,6 +84,36 @@ describe("DataTable", () => {
     reset.value = "other filters";
     await nextTick();
     expect(shown()).toEqual(["n0", "n1", "n2"]);
+  });
+
+  it("hides the given columns, keeping their sort", async () => {
+    const { wrapper, hidden } = render(rowsOf(["Ana", "Bob"]), 50, { hidden: ["date", "link"] });
+    const headers = () => wrapper.findAll("th").map((th) => th.text());
+    expect(headers()).toEqual(["Nom ▲", "Âge"]);
+    expect(wrapper.find('[data-testid="data-row"]').findAll("td")).toHaveLength(2);
+    hidden.value = [];
+    await nextTick();
+    expect(headers()).toEqual(["Nom ▲", "Date", "Âge", "Lien"]);
+  });
+
+  it("marks the selected row and card, and reports clicks on a row or card but not on a link inside", async () => {
+    const clicked: string[] = [];
+    const { wrapper } = render(rowsOf(["Ana", "Bob"]), 50, { selectedKey: "2", onRowClick: (r) => clicked.push(r.name) });
+    const rows = wrapper.findAll('[data-testid="data-row"]');
+    expect(rows.map((r) => r.attributes("aria-selected"))).toEqual(["false", "true"]);
+    expect(wrapper.findAll('[data-testid="data-card"]').map((c) => c.attributes("aria-current"))).toEqual([undefined, "true"]);
+    await rows[0]!.find("td").trigger("click");
+    rows[0]!.find("a").element.addEventListener("click", (e) => e.preventDefault());  // jsdom does not navigate
+    await rows[0]!.find("a").trigger("click");
+    await wrapper.findAll('[data-testid="data-card"]')[1]!.trigger("click");
+    expect(clicked).toEqual(["Ana", "Bob"]);
+  });
+
+  it("has no selection nor clickable rows unless asked", () => {
+    const { wrapper } = render(rowsOf(["Ana"]));
+    const row = wrapper.find('[data-testid="data-row"]');
+    expect(row.attributes("aria-selected")).toBeUndefined();
+    expect(row.classes()).not.toContain("cursor-pointer");
   });
 
   it("hides the pager when everything fits", () => {

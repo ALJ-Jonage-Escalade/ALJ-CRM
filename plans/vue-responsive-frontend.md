@@ -253,6 +253,12 @@ is cached on the device.
 > too, from the record as from a competition (the server limits them to known members); editing, adding and the
 > certificate stay admin only. The
 > server's refusal of a coach's write is covered by the `required_role` tests: the e2e stack runs without auth.
+>
+> 2026-10-23 (2.20.0): the record moved from the dialog to a collapsible side panel (`UiSidePanel.vue`), as on the
+> former page: it shows the member of the URL, or else the first row of the list as shown; a row click selects a member
+> with a history entry (Back goes to the previous one) and opens the panel again. Collapsed is remembered on the device
+> (`alj_bureau_adherents_panel`); while open, the table hides the columns the panel shows (`PANEL_HIDDEN_COLUMNS`). The
+> dialog now only holds the e-mail, the edit form and the certificate. Below `lg` the panel stacks above the list.
 
 ---
 
