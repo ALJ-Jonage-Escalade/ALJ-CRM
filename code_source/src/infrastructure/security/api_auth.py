@@ -3,7 +3,8 @@ Authentification de l'API FastAPI (Cloud Run).
 
 Principe
 --------
-- La PWA (web/competitions.html) est connectée à Firebase Authentication (Google).
+- L'application Vue (frontend/, installable en PWA) est connectée à Firebase
+  Authentication (Google).
   Chaque appel à l'API envoie le jeton d'identité Firebase de l'utilisateur dans
   l'en-tête ``Authorization: Bearer <ID token>``.
 - Le serveur vérifie la signature du jeton (clés publiques Google), son audience

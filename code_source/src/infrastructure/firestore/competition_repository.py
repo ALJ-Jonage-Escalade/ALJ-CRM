@@ -1,9 +1,9 @@
 """
 Référentiel des compétitions sur Google Cloud Firestore (source de vérité unique).
 
-Remplace l'ancienne base SQLite locale (database_Competition.db) : la page web
-PWA (web/competitions.html) et l'application de bureau partagent désormais le
-même modèle de documents Firestore :
+Remplace l'ancienne base SQLite locale (database_Competition.db) : l'API (lue et
+écrite par l'application Vue, frontend/) s'appuie sur ce modèle de documents
+Firestore :
 
 - `competitions/{id}`        : épreuve + tableau `participants` embarqué ;
 - `coaches/{id}`             : référentiel des coachs ;

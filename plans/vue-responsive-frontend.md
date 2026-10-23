@@ -342,15 +342,21 @@ from the old page are replayed.
 
 ### Acceptance criteria
 
-- [ ] Offline edits are queued, shown as pending, and sent when the network returns
-- [ ] Logout with pending changes asks for confirmation
-- [ ] A refused change shows the server's reason and leaves the queue consistent
-- [ ] HelloAsso payment and results fetching work (fakes in e2e)
-- [ ] Competitions can be created, edited, deleted, archived and restored; past ones archived in one action
-- [ ] Coaches can be added, renamed and deleted; the balance report and both CSV exports work
-- [ ] No tool of the former competitions pages is left out of the SPA before they are removed
-- [ ] Vitest covers the outbox (queue / replace by key, replay order, refusal codes, clear)
-- [ ] e2e competitions write, offline outbox and HelloAsso scenarios pass; competitions HTML string checks removed
+- [x] Offline edits are queued, shown as pending, and sent when the network returns
+- [x] Logout with pending changes asks for confirmation
+- [x] A refused change shows the server's reason and leaves the queue consistent
+- [x] HelloAsso payment and results fetching work (fakes in e2e)
+- [x] Competitions can be created, edited, deleted, archived and restored; past ones archived in one action
+- [x] Coaches can be added, renamed and deleted; the balance report and both CSV exports work
+- [x] No tool of the former competitions pages is left out of the SPA before they are removed
+- [x] Vitest covers the outbox (queue / replace by key, replay order, refusal codes, clear)
+- [x] e2e competitions write, offline outbox and HelloAsso scenarios pass; competitions HTML string checks removed
+
+> Done 2026-10-23 (in the « competition page » commit; boxes ticked with phase 12's full e2e run). Every tool of the
+> two former pages is in `CompetitionsPage.vue` and `pages/competitions/` (forms, HelloAsso, coaches, balance panes).
+> Offline, « Participe » and « Présent » of a listed competitor are queued (`outbox.ts`, same `outbox` store and entries
+> as the former phone page, Vitest `outbox.test.ts`); e2e: `test_offline.py`, `test_helloasso.py`, `test_competitors.py`,
+> `test_competitions_manage.py`, `test_coaches_balance.py`, `test_competition_email.py`.
 
 ---
 
@@ -370,7 +376,7 @@ e-mail lists and their mirror test, and the leftover HTML string tests. Every fo
 - [x] No hand-kept precache list or cache-name bump remains
 - [x] Every former URL (with and without `?vue=` parameters) opens the right screen
 - [x] No e-mail address list remains in any frontend file
-- [ ] The full e2e suite passes; docs no longer mention the old pages
+- [x] The full e2e suite passes; docs no longer mention the old pages
 - [x] Follow-up issue opened for the map rebuild and the jQuery UI upgrade (#25)
 
 > 2026-10-23 (2.18.0). Service worker: `frontend/src/sw.ts` (Workbox, `vite-plugin-pwa` in `injectManifest` mode, classic
@@ -386,3 +392,6 @@ e-mail lists and their mirror test, and the leftover HTML string tests. Every fo
 > file holds a role e-mail. `web/` keeps the manifest and the logo (`/annuaire/assets/logo.png`). Former page files of
 > the `/annuaire` mount (`/annuaire/competitions.html`, `/annuaire/bureau/…`) redirect to their screen, query kept.
 > e2e: `test_service_worker.py` covers the precache, offline pages and the update from a former worker.
+>
+> Closed 2026-10-23: full e2e suite green locally (`-n 1`), the last docstrings describing `web/competitions.html` as
+> live updated; remaining mentions are « former … » notes, and `GEMINI.md` (known stale, see `ARCHITECTURE.md`).
