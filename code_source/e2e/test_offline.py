@@ -153,23 +153,18 @@ def test_logout_with_changes_not_sent_asks_first(mobile_page, competition):
     try:
         participant_card(page, member).get_by_test_id("present-switch").click()
         expect(participant_card(page, member).get_by_test_id("queued")).to_be_visible()
-        messages = []
-
-        def answer(dialog):
-            messages.append(dialog.message)
-            if len(messages) == 1:
-                dialog.dismiss()  # kept signed in
-            else:
-                dialog.accept()
-        page.on("dialog", answer)
-        # The box opens after the click has returned (the outbox is read first). Waited through Playwright: the
-        # handler only runs inside a Playwright call, never during the time.sleep of eventually()
-        with page.expect_event("dialog"):
+        # The box opens after the click has returned (the outbox is read first). Each box is taken from expect_event
+        # and answered here: a page.on("dialog") handler runs later, on a following Playwright call, so the box could
+        # still be open (page blocked) when the test goes on
+        with page.expect_event("dialog") as first:
             page.locator("#logout-btn").click()
-        assert messages == ["1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?"]
+        assert first.value.message == "1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?"
+        first.value.dismiss()  # kept signed in
         expect(page.locator("#logout-btn")).to_be_visible()
         expect(participant_card(page, member).get_by_test_id("queued")).to_be_visible()
-        page.locator("#logout-btn").click()
+        with page.expect_event("dialog") as second:
+            page.locator("#logout-btn").click()
+        second.value.accept()
         expect(page.locator("#gate-login")).to_be_visible()
 
         def wiped():
