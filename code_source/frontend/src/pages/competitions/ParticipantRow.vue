@@ -62,7 +62,7 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
         type="checkbox"
         data-testid="present-switch"
         aria-label="Présent"
-        class="size-[18px] cursor-pointer accent-green-600"
+        class="size-4.5 cursor-pointer accent-green-600"
         :checked="row.present"
         @change="onToggle('present', $event)"
       />
@@ -79,16 +79,6 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
     <td class="px-2.5 py-2">
       <div v-if="contactsShown && (row.phone || row.emergency.length)" class="flex flex-col items-start gap-1">
         <a v-if="row.phone" :href="telHref(row.phone)" :class="[telLink, 'border-blue-200 bg-blue-50 text-blue-700']">📞 {{ row.phone }}</a>
-        <a
-          v-for="e in row.emergency"
-          :key="e.phone"
-          :href="telHref(e.phone)"
-          :title="`Contact d'urgence : ${e.name || 'Urgence'}`"
-          data-testid="emergency-link"
-          :class="[telLink, 'border-red-200 bg-red-50 text-red-700']"
-        >
-          🚨 {{ e.phone }}
-        </a>
       </div>
       <span v-else class="text-xs text-slate-400">—</span>
     </td>

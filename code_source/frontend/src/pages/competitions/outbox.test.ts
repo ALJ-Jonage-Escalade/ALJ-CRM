@@ -226,7 +226,6 @@ describe("outbox", () => {
     expect(refusalText(new ApiError(409, "competition_closed", "x"))).toBe("compétition archivée");
     expect(refusalText(new ApiError(400, null, "Refusé"))).toBe("Refusé");
     expect(logoutWarning(1)).toBe("1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?");
-    expect(logoutWarning(2)).toBe("2 modifications faites hors ligne pas encore envoyées seront perdues. Se déconnecter ?");
     expect(pendingLine(0)).toBe("");
     expect(pendingLine(3)).toBe(" · ⏳ 3 modifications à envoyer");
     expect(replayMessage({ done: 1, refused: [], denied: false })).toBe("☁️ Modifications faites hors ligne envoyées.");

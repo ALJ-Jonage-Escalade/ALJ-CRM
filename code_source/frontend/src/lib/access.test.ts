@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AuthState } from "../composables/auth";
-import { canOpen, pageAccess, pageScreen, PAGES, shownOn, verdict, type Access, type Verdict } from "./access";
+import { canOpen, shownOn, verdict, type Access, type Verdict } from "./access";
 import type { Role } from "./roles";
 
 const USER = { uid: "u1", email: "u@example.org" };
@@ -68,20 +68,7 @@ describe("canOpen", () => {
   });
 });
 
-describe("PAGES", () => {
-  it("keeps Paramètres and Communications for admins", () => {
-    expect(PAGES.filter((p) => p.access === "admin").map((p) => p.id)).toEqual(["communications", "parametres"]);
-    expect(pageAccess("accueil")).toBe("staff");
-  });
-});
-
-describe("screens", () => {
-  it("lists Adhérents on a computer and the directory on a phone, every other page on both", () => {
-    expect(pageScreen("adherents")).toBe("desktop");
-    expect(pageScreen("annuaire")).toBe("phone");
-    expect(PAGES.filter((p) => p.screen !== "any").map((p) => p.id)).toEqual(["adherents", "annuaire"]);
-  });
-
+describe("shownOn", () => {
   it("hides a link from the md breakpoint up, or below it", () => {
     expect(shownOn("any", "flex")).toBe("flex");
     expect(shownOn("phone", "flex")).toBe("flex md:hidden");

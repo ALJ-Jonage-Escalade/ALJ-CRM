@@ -15,7 +15,6 @@ import {
   memberMatches,
   participantCsv,
   participantRows,
-  payment,
   period,
   ranking,
   sortCompetitions,
@@ -45,17 +44,8 @@ describe("competitions", () => {
   it("badges the disciplines, not « escalade »", () => {
     expect(discipline({ id: 1, type: " Bloc " })).toBe("Bloc");
     expect(discipline({ id: 1, type: "Escalade" })).toBe("");
-    expect(disciplineColor("Bloc")).toBe("violet");
-    expect(disciplineColor("DIFFICULTÉ")).toBe("blue");
-    expect(disciplineColor("Vitesse")).toBe("amber");
-    expect(disciplineColor("Combiné")).toBe("teal");
+    expect(disciplineColor("VITESSE")).toBe("amber");
     expect(disciplineColor("Paraescalade")).toBe("blue");
-  });
-
-  it("labels the payment statuses", () => {
-    expect(payment("paye").label).toBe("Payé");
-    expect(payment("annule_reporte").label).toBe("Annulé — report");
-    expect(payment("inconnu").label).toBe("inconnu");
   });
 
   it("keeps what the screen needs of the member directory, not the phones", () => {

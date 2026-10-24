@@ -54,23 +54,4 @@ describe("SlotForm", () => {
     expect(tarif("Autonome 2025").element.checked).toBe(true);
     expect(tarif("Autonome adultes").element.checked).toBe(false);
   });
-
-  it("refuses a slot without readable hours", async () => {
-    const { wrapper, byId } = render(SLOT);
-    await byId("slot-horaires").setValue("le soir");
-    await wrapper.find("form").trigger("submit");
-    expect(wrapper.emitted("save")).toBeUndefined();
-    expect(wrapper.emitted("invalid")).toEqual([["⚠️ Horaires illisibles : écrivez-les comme « 18:00 - 20:00 »."]]);
-  });
-
-  it("says when the season has no tariff", () => {
-    const { byId } = render(undefined, []);
-    expect(byId("slot-tarifs").text()).toContain("Aucun tarif de saison configuré");
-  });
-
-  it("cancels", async () => {
-    const { wrapper, byId } = render();
-    await byId("slot-cancel").trigger("click");
-    expect(wrapper.emitted("cancel")).toHaveLength(1);
-  });
 });

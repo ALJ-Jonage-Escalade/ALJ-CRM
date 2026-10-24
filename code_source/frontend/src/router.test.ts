@@ -56,25 +56,15 @@ describe("router guards", () => {
     expect(at()).toBe("/bureau/?reserve=/bureau/parametres");
   });
 
-  it("sends a coach back once the role is known", async () => {
-    const { state, at } = await setup({ status: "loading" }, "/bureau/parametres");
-    state.value = signedIn("coach");
+  it.each<[string, AuthState, AuthState, string]>([
+    ["a coach once the role is known", { status: "loading" }, signedIn("coach"), "/bureau/?reserve=/bureau/parametres"],
+    ["an admin once the role is known", { status: "loading" }, signedIn("admin"), "/bureau/parametres"],
+    ["a coach signing in over an admin session", signedIn("admin"), signedIn("coach"), "/bureau/?reserve=/bureau/parametres"],
+  ])("follows the session on an admin page: %s", async (_case, initial, next, expected) => {
+    const { state, at } = await setup(initial, "/bureau/parametres");
+    state.value = next;
     await flushPromises();
-    expect(at()).toBe("/bureau/?reserve=/bureau/parametres");
-  });
-
-  it("keeps an admin on the admin page when the role is known", async () => {
-    const { state, at } = await setup({ status: "loading" }, "/bureau/parametres");
-    state.value = signedIn("admin");
-    await flushPromises();
-    expect(at()).toBe("/bureau/parametres");
-  });
-
-  it("sends the page back when a coach signs in over an admin session", async () => {
-    const { state, at } = await setup(signedIn("admin"), "/bureau/parametres");
-    state.value = signedIn("coach");
-    await flushPromises();
-    expect(at()).toBe("/bureau/?reserve=/bureau/parametres");
+    expect(at()).toBe(expected);
   });
 });
 
@@ -85,15 +75,10 @@ describe("app routes", () => {
     }
   });
 
-  it("reserve Communications and Paramètres to admins", () => {
-    const access = (name: string) => routes.find((r) => r.name === name)?.meta?.access;
-    expect([access("communications"), access("parametres")]).toEqual(["admin", "admin"]);
-  });
-
-  it("send a coach back from Communications", async () => {
+  it.each(["/bureau/communications", "/bureau/parametres"])("send a coach back from %s", async (path) => {
     const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
-    await router.push("/bureau/communications");
-    expect(router.currentRoute.value.fullPath).toBe("/bureau/?reserve=/bureau/communications");
+    await router.push(path);
+    expect(router.currentRoute.value.fullPath).toBe(`/bureau/?reserve=${path}`);
   });
 
   it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils?tab=ffme", "/index", "/index?vue=pwa"])(

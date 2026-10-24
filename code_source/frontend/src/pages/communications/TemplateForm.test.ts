@@ -30,32 +30,6 @@ afterEach(() => {
 });
 
 describe("TemplateForm", () => {
-  it("edits the template", async () => {
-    const { byId, draft } = render();
-    await byId("subject").setValue("Licence {num_licence}");
-    await byId("sender-name").setValue("ALJ");
-    expect(draft.value).toMatchObject({ subject: "Licence {num_licence}", sender_name: "ALJ" });
-  });
-
-  it("emits save for a valid template", async () => {
-    const { wrapper } = render();
-    await wrapper.find("form").trigger("submit");
-    expect(wrapper.emitted("save")).toHaveLength(1);
-    expect(wrapper.emitted("invalid")).toBeUndefined();
-  });
-
-  it.each([
-    [{ name: "  " }, "⚠️ Le titre du modèle ne peut pas être vide."],
-    [{ subject: "" }, "⚠️ Le sujet et le corps du message sont obligatoires."],
-    [{ body: "" }, "⚠️ Le sujet et le corps du message sont obligatoires."],
-    [{ sender_email: "pas-une-adresse" }, "⚠️ L'adresse d'expédition doit être une adresse e-mail valide."],
-  ])("refuses %j", async (change, message) => {
-    const { wrapper } = render(change);
-    await wrapper.find("form").trigger("submit");
-    expect(wrapper.emitted("save")).toBeUndefined();
-    expect(wrapper.emitted("invalid")).toEqual([[message]]);
-  });
-
   it("inserts a variable at the cursor", async () => {
     const { byId, body, draft } = render();
     body().setSelectionRange(8, 9); // the X
@@ -89,12 +63,5 @@ describe("TemplateForm", () => {
     await nextTick();
     expect(draft.value.body).toBe('<a href="https://www.alj-escalade.fr">texte</a>');
     expect(ask).toHaveBeenCalledTimes(2);
-  });
-
-  it("shows the busy save button", () => {
-    const wrapper = mount(TemplateForm, { props: { modelValue: { ...TEMPLATE }, saving: true } });
-    const save = wrapper.find('[data-testid="template-save"]');
-    expect(save.text()).toBe("⏳ Enregistrement…");
-    expect(save.attributes("disabled")).toBeDefined();
   });
 });

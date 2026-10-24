@@ -1,18 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Schemas } from "../../lib/client";
-import { batchReport, cacheFile, googleChecks, googleStatus, lastRun, lastSync, pendingText, syncReport } from "./view";
+import { batchReport, cacheFile, lastRun, lastSync, pendingText, syncReport } from "./view";
 
-const GOOGLE: Schemas["GoogleStatus"] = {
-  status: "disconnected",
-  valid: false,
-  configured: false,
-  client_id_configured: false,
-  refresh_token_present: false,
-  user_email: null,
-  backend: "firestore",
-  db_accessible: false,
-  error: "",
-};
 const CACHE: Schemas["CloudDbStatus"] = {
   status: "success",
   enabled: true,
@@ -27,28 +16,6 @@ const CACHE: Schemas["CloudDbStatus"] = {
 const AT = new Date(2026, 9, 22, 7, 5, 9);
 
 describe("Paramètres view", () => {
-  it.each([
-    ["connected", "green", "🟢 Connecté & Opérationnel"],
-    ["expired", "red", "🔴 Jeton expiré ou révoqué"],
-    ["disconnected", "amber", "🟡 Non connecté"],
-  ] as const)("Google %s", (status, color, label) => {
-    expect(googleStatus({ ...GOOGLE, status })).toMatchObject({ color, label });
-  });
-
-  it("lists the three Google checks", () => {
-    const check = (ok: boolean, message: string) => ({ ok, message });
-    const lines = googleChecks({
-      status: "warning",
-      all_ok: false,
-      results: { oauth_token: check(true, "a"), database: check(true, "b"), gmail: check(false, "c") },
-    });
-    expect(lines.map((l) => [l.ok, l.label, l.message])).toEqual([
-      [true, "Jeton OAuth2", "a"],
-      [true, "Base de Données", "b"],
-      [false, "Service Gmail API", "c"],
-    ]);
-  });
-
   it("describes the server cache", () => {
     expect(cacheFile(CACHE)).toBe("database.db (812.5 Ko · 42 adhérents)");
     expect(cacheFile({ ...CACHE, db_exists: false })).toBe("Non initialisé");

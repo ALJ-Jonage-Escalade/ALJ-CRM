@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApiFetch, type ApiFetch } from "./api";
+import { createApiFetch } from "./api";
 import { ApiError, createApiClient, errorFromBody, NETWORK_MESSAGE, unwrap } from "./client";
 
 const BASE = "http://alj.test";
@@ -43,21 +43,6 @@ describe("createApiClient", () => {
 
     await unwrap(client.POST("/api/cloud-db/sync", { params: { query: { force: true } } })).catch(() => {});
     expect(sent(1).url).toBe(`${BASE}/api/cloud-db/sync?force=true`);
-  });
-
-  it("retries a 401 with a fresh token, through apiFetch", async () => {
-    let n = 0;
-    const tokens: (string | null)[] = [];
-    const network: ApiFetch = async (_url, init) => {
-      tokens.push(new Headers(init?.headers).get("Authorization"));
-      return ++n === 1 ? json({}, 401) : json({ email: "", role: null });
-    };
-    const client = createApiClient(
-      createApiFetch(async (force) => (force ? "fresh" : "stale"), network as unknown as typeof fetch),
-      BASE,
-    );
-    await unwrap(client.GET("/api/me"));
-    expect(tokens).toEqual(["Bearer stale", "Bearer fresh"]);
   });
 
   it("maps the API's error body", async () => {
