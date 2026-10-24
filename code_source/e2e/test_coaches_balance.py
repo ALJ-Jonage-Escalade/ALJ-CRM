@@ -116,7 +116,9 @@ def test_season_balance_export(page, test_data, tmp_path):
     expect(page.get_by_test_id("balance-athletes")).not_to_have_text("0")
     card = page.get_by_test_id("balance-card").filter(has_text=member["prenom"]).first
     card.get_by_test_id("balance-toggle").click()
-    expect(card.get_by_test_id("balance-lines")).to_contain_text(nom)
+    # Desktop: the competitor's detail next to the list
+    expect(card.get_by_test_id("balance-toggle")).to_have_attribute("aria-current", "true")
+    expect(page.get_by_test_id("balance-detail")).to_contain_text(nom)
 
     with page.expect_download() as info:
         page.get_by_test_id("balance-export").click()

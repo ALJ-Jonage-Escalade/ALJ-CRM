@@ -8,7 +8,7 @@
 import type { Cell } from "../../lib/csv";
 import { formatEuros } from "../../lib/format";
 import { normKey } from "../adherents/members";
-import { todayIso, type Competition, type Participant } from "./competitions";
+import { isPast, ranking, todayIso, type Competition, type Participant } from "./competitions";
 
 /** « 2026-2027 » for a date from August 2026 to July 2027. */
 export function seasonOf(iso: string): string {
@@ -25,11 +25,17 @@ export function seasons(list: readonly Competition[], today: string = todayIso()
 
 export interface BalanceLine {
   competition: Competition;
+  /** The competitor's entry in it: HelloAsso order, FFME category, contact details… */
+  participant: Participant;
   due: number;
   paid: number;
   status: string;
   present: boolean;
   carriedOver: boolean;
+  /** Paid for a competition that is over without being checked in. */
+  absent: boolean;
+  /** « 🥇 1er », « 🏅 4 / 23 »… once the results are in, empty before. */
+  ranking: string;
 }
 
 export interface Balance {
@@ -37,19 +43,24 @@ export interface Balance {
   nom: string;
   prenom: string;
   licence: string;
+  /** Contact details and tariff (« Catégorie / Groupe ») of their most recent entry that has them. */
+  email: string;
+  phone: string;
+  group: string;
   lines: BalanceLine[];
   due: number;
   paid: number;
   /** Still to pay (> 0), or credit (< 0). */
   remaining: number;
-  /** Paid for a competition that is over without being checked in. */
+  /** Absent from at least one of their lines. */
   absent: boolean;
 }
 
-function line(c: Competition, p: Participant): BalanceLine | null {
+function line(c: Competition, p: Participant, today: string): BalanceLine | null {
   const status = p.statut_paiement || "non_invite";
   const paid = Number(p.montant_paye ?? 0);
-  const base = { competition: c, status, present: !!p.present };
+  const absent = isPast(c, today) && paid > 0 && status === "paye" && !p.present;
+  const base = { competition: c, participant: p, status, present: !!p.present, absent, ranking: ranking(p) };
   if (status === "annule_reporte") {
     return { ...base, due: 0, paid, carriedOver: true };
   }
@@ -73,7 +84,7 @@ export function balances(list: readonly Competition[], season: string, today: st
       continue;
     }
     for (const p of c.participants ?? []) {
-      const l = line(c, p);
+      const l = line(c, p, today);
       if (!l) {
         continue;
       }
@@ -83,6 +94,9 @@ export function balances(list: readonly Competition[], season: string, today: st
         nom: (p.nom ?? "").toUpperCase(),
         prenom: p.prenom ?? "",
         licence: p.num_licence ?? "",
+        email: "",
+        phone: "",
+        group: "",
         lines: [],
         due: 0,
         paid: 0,
@@ -93,13 +107,17 @@ export function balances(list: readonly Competition[], season: string, today: st
       b.due = round(b.due + l.due);
       b.paid = round(b.paid + l.paid);
       b.remaining = round(b.due - b.paid);
-      const over = !!c.date_competition && (c.date_fin || c.date_competition) < today;
-      b.absent ||= over && l.paid > 0 && !l.carriedOver && l.status === "paye" && !l.present;
+      b.absent ||= l.absent;
       byMember.set(key, b);
     }
   }
   for (const b of byMember.values()) {
     b.lines.sort((x, y) => (x.competition.date_competition ?? "").localeCompare(y.competition.date_competition ?? ""));
+    const latest = (field: "email" | "phone" | "tarif") =>
+      b.lines.map((l) => l.participant[field]?.trim() ?? "").reduce((found, value) => value || found, "");
+    b.email = latest("email");
+    b.phone = latest("phone");
+    b.group = latest("tarif");
   }
   return [...byMember.values()].sort((a, b) => a.nom.localeCompare(b.nom, "fr") || a.prenom.localeCompare(b.prenom, "fr"));
 }

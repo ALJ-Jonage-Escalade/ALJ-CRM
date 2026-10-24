@@ -66,6 +66,25 @@ describe("balance", () => {
     expect(balanceLabel({ remaining: 0 }).text).toBe("✅ Équilibré");
   });
 
+  it("keeps the contact details and tariff of the most recent entry that has them", () => {
+    const entries: Competition[] = [
+      {
+        id: 1,
+        nom: "Open",
+        date_competition: "2026-10-04",
+        participants: [{ adherent_id: 1, nom: "Martin", prenom: "Léo", selectionne: true, email: "old@x.fr", phone: "06", tarif: "U12" }],
+      },
+      {
+        id: 2,
+        nom: "Coupe",
+        date_competition: "2026-12-01",
+        participants: [{ adherent_id: 1, nom: "Martin", prenom: "Léo", selectionne: true, email: "new@x.fr", phone: "", tarif: "U14" }],
+      },
+    ];
+    const [martin] = balances(entries, "2026-2027", TODAY);
+    expect([martin!.email, martin!.phone, martin!.group]).toEqual(["new@x.fr", "06", "U14"]);
+  });
+
   it("searches and exports", () => {
     const list = balances(LIST, "2026-2027", TODAY);
     expect(searchBalances(list, "leo martin").map((b) => b.nom)).toEqual(["MARTIN"]);
