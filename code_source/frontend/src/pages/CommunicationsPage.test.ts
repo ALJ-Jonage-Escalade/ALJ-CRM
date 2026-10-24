@@ -5,6 +5,7 @@ import { AUTH_KEY, type Auth } from "../composables/auth";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import CommunicationsPage from "./CommunicationsPage.vue";
+import { dialogs } from "../composables/dialogs";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -134,7 +135,7 @@ describe("CommunicationsPage", () => {
   });
 
   it("deletes the template once confirmed", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const { wrapper, writes, byId } = render();
     await flushPromises();
     await wrapper.find('[data-testid="template-delete"]').trigger("click");

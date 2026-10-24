@@ -17,6 +17,7 @@ import SlotForm from "./planning/SlotForm.vue";
 import SlotList from "./planning/SlotList.vue";
 import { countLabel, draftOf, filterSlots, KINDS, updateOf, type KindFilter, type Slot, type SlotDraft } from "./planning/slots";
 import WeekGrid from "./planning/WeekGrid.vue";
+import { dialogs } from "../composables/dialogs";
 
 const client = inject(CLIENT_KEY)!;
 const activitiesApi = createActivitiesApi(client);
@@ -89,7 +90,14 @@ async function save(): Promise<void> {
 }
 
 async function remove(slot: Slot): Promise<void> {
-  if (!confirm(`Voulez-vous vraiment supprimer le créneau « ${slot.groupe} » (${slot.jour} ${slot.horaires}) ?`)) {
+  if (
+    !(await dialogs.confirm({
+      title: "Supprimer le créneau",
+      message: `Voulez-vous vraiment supprimer le créneau « ${slot.groupe} » (${slot.jour} ${slot.horaires}) ?`,
+      confirmLabel: "Supprimer",
+      variant: "danger",
+    }))
+  ) {
     return;
   }
   try {

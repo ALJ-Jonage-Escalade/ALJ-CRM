@@ -16,6 +16,7 @@ import {
   type Edit,
   type Template,
 } from "./editor";
+import { dialogs } from "../../composables/dialogs";
 
 defineProps<{ saving?: boolean }>();
 const emit = defineEmits<{ save: []; invalid: [message: string] }>();
@@ -37,8 +38,15 @@ async function edit(change: (value: string, start: number, end: number) => Edit)
 const insertVariable = (name: string) => edit((v, s, e) => insertText(v, s, e, name));
 const wrap = (tag: string) => edit((v, s, e) => wrapSelection(v, s, e, `<${tag}>`, `</${tag}>`));
 
-function addLink(): void {
-  const url = linkTarget(prompt("Entrez l'URL du lien (ex: https://www.alj-escalade.fr) :", "https://"));
+async function addLink(): Promise<void> {
+  const url = linkTarget(
+    await dialogs.prompt({
+      title: "Insérer un lien",
+      label: "URL du lien (ex : https://www.alj-escalade.fr)",
+      value: "https://",
+      confirmLabel: "Insérer",
+    }),
+  );
   if (url) {
     void edit((v, s, e) => wrapSelection(v, s, e, ...linkTags(url)));
   }

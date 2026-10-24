@@ -12,6 +12,7 @@ import { saveFile } from "../../lib/download";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
 import { attestationFileName, attestationProblem, attestationRecipient, attestationTemplates, renderFor, type Template } from "./record";
+import { dialogs } from "../../composables/dialogs";
 
 const props = defineProps<{ member: Member; templates: readonly Template[] }>();
 const emit = defineEmits<{ sent: [message: string]; failed: [message: string]; cancel: [] }>();
@@ -84,7 +85,13 @@ async function send(): Promise<void> {
     problem.value = "⚠️ Le sujet et le corps de l'e-mail ne peuvent pas être vides.";
     return;
   }
-  if (!confirm(`Envoyer l'attestation de paiement PDF à ${recipient} ?`)) {
+  if (
+    !(await dialogs.confirm({
+      title: "Envoyer l'attestation",
+      message: `Envoyer l'attestation de paiement PDF à ${recipient} ?`,
+      confirmLabel: "Envoyer",
+    }))
+  ) {
     return;
   }
   sending.value = true;

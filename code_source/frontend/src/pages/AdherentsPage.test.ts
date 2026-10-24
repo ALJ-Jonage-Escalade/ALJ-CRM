@@ -9,6 +9,7 @@ import type { Role } from "../lib/roles";
 import AdherentsPage from "./AdherentsPage.vue";
 import { FILTER_KEY, PANEL_KEY, type MemberList } from "./adherents/members";
 import { member } from "./adherents/members.fixture";
+import { dialogs } from "../composables/dialogs";
 
 function json(body: unknown, status = 200, etag?: string): Response {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -377,7 +378,7 @@ describe("AdherentsPage", () => {
   });
 
   it("edits a record: checks the fields, sends only the changes, then reloads the list", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
     const answers = { ...ANSWERS, "POST /api/members/update": () => json({ status: "success", message: "ok" }) };
     const { inBody, writes, calls } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027&achat=11");
     await flushPromises();
@@ -409,7 +410,7 @@ describe("AdherentsPage", () => {
   });
 
   it("adds a member to the season shown, then opens the new record", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
     const added = member({
       user_id: 9,
       purchase_id: 90,
@@ -469,7 +470,7 @@ describe("AdherentsPage", () => {
   });
 
   it.each<Role>(["admin", "coach"])("sends an e-mail from the record (%s)", async (role) => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
     const answers: Record<string, Answer> = {
       ...ANSWERS,
       "GET /api/email-templates": () =>
@@ -504,7 +505,7 @@ describe("AdherentsPage", () => {
   });
 
   it("previews and sends the payment certificate of the membership", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:pdf");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
     const paid = {

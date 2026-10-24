@@ -6,6 +6,7 @@ import { AUTH_KEY } from "../composables/auth";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import ParametresPage from "./ParametresPage.vue";
+import { dialogs } from "../composables/dialogs";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -98,14 +99,14 @@ describe("ParametresPage", () => {
   });
 
   it("asks before a full rebuild, and reports a failed sync", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(false);
     const { byId, calls } = render();
     await flushPromises();
     await byId("cache-rebuild").trigger("click");
     expect(confirm).toHaveBeenCalledOnce();
     expect(calls.some((c) => c.method === "POST")).toBe(false);
 
-    confirm.mockReturnValue(true);
+    confirm.mockResolvedValue(true);
     await byId("cache-rebuild").trigger("click");
     await flushPromises();
     expect(calls).toContainEqual(expect.objectContaining({ method: "POST", path: "/api/cloud-db/sync?force=true" }));

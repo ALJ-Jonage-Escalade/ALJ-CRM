@@ -8,6 +8,7 @@ import { CLIENT_KEY } from "../../lib/client";
 import { createCompetitionsApi } from "../../services/competitions";
 import { coachedBy, period, sortCompetitions, type Coach, type Competition } from "./competitions";
 import { WRITER_KEY } from "./writer";
+import { dialogs } from "../../composables/dialogs";
 
 const props = defineProps<{ coaches: readonly Coach[] | null; competitions: readonly Competition[] }>();
 const emit = defineEmits<{ changed: [] }>();
@@ -51,7 +52,14 @@ async function rename(c: Coach): Promise<void> {
 }
 
 async function remove(c: Coach): Promise<void> {
-  if (!confirm(`Supprimer le coach « ${c.nom} » ? Il sera retiré de toutes ses compétitions.`)) {
+  if (
+    !(await dialogs.confirm({
+      title: "Supprimer le coach",
+      message: `Supprimer le coach « ${c.nom} » ? Il sera retiré de toutes ses compétitions.`,
+      confirmLabel: "Supprimer",
+      variant: "danger",
+    }))
+  ) {
     return;
   }
   if (

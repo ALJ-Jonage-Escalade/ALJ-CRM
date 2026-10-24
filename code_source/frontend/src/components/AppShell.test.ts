@@ -6,6 +6,7 @@ import type { PageId } from "../lib/access";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { STORE_KEY, type OfflineStore } from "../lib/store";
 import AppShell from "./AppShell.vue";
+import { dialogs } from "../composables/dialogs";
 
 const USER = { uid: "u1", email: "albus@alj-escalade.fr" };
 
@@ -28,13 +29,15 @@ function storeWith(n: number): OfflineStore {
 
 describe("AppShell", () => {
   it("asks before a logout that would lose changes made offline", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(false);
     const { wrapper, auth } = render({ status: "signedIn", user: USER, role: "coach" }, "ok", "accueil", false, 2);
     await wrapper.find("#logout-btn").trigger("click");
     await flushPromises();
-    expect(confirm).toHaveBeenCalledWith("2 modifications faites hors ligne pas encore envoyées seront perdues. Se déconnecter ?");
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "2 modifications faites hors ligne pas encore envoyées seront perdues. Se déconnecter ?" }),
+    );
     expect(auth.logout).not.toHaveBeenCalled();
-    confirm.mockReturnValue(true);
+    confirm.mockResolvedValue(true);
     await wrapper.find("#logout-btn").trigger("click");
     await flushPromises();
     expect(auth.logout).toHaveBeenCalledOnce();
@@ -42,7 +45,7 @@ describe("AppShell", () => {
   });
 
   it("signs out at once with nothing waiting", async () => {
-    const confirm = vi.spyOn(window, "confirm");
+    const confirm = vi.spyOn(dialogs, "confirm");
     const { wrapper, auth } = render({ status: "signedIn", user: USER, role: "coach" });
     await wrapper.find("#logout-btn").trigger("click");
     await flushPromises();

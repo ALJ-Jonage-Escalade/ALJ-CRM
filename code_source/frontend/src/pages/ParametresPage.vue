@@ -29,6 +29,7 @@ import {
   type CheckLine,
   type Status,
 } from "./parametres/view";
+import { dialogs } from "../composables/dialogs";
 
 const client = inject(CLIENT_KEY)!;
 const integrationsApi = createIntegrationsApi(client);
@@ -96,7 +97,10 @@ const REBUILD_CONFIRM =
   "Cette opération va télécharger à nouveau tous les documents de Firestore pour reconstruire database.db à neuf.";
 
 async function sync(full: boolean): Promise<void> {
-  if (full && !confirm(REBUILD_CONFIRM)) {
+  if (
+    full &&
+    !(await dialogs.confirm({ title: "Reconstruire le cache", message: REBUILD_CONFIRM, confirmLabel: "Reconstruire", variant: "warning" }))
+  ) {
     return;
   }
   syncing.value = full ? "rebuild" : "update";

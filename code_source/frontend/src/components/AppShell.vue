@@ -13,6 +13,7 @@ import { offlineStore, STORE_KEY } from "../lib/store";
 import { logoutWarning } from "../pages/competitions/outbox";
 import PageLink from "./PageLink.vue";
 import VersionBadge from "./VersionBadge.vue";
+import { dialogs } from "../composables/dialogs";
 
 /** sync: freshness of the page's data, next to the title (Adhérents). offlineRead: the page shows the copy kept on the
     device when the role cannot be checked for lack of network (the directory); its slot then gets no role. */
@@ -27,7 +28,15 @@ const state = auth.state;
 async function logout(): Promise<void> {
   const s = state.value;
   const waiting = s.status === "signedIn" || s.status === "error" ? (await store.queued(s.user.uid)).length : 0;
-  if (waiting && !confirm(logoutWarning(waiting))) {
+  if (
+    waiting &&
+    !(await dialogs.confirm({
+      title: "Se déconnecter",
+      message: logoutWarning(waiting),
+      confirmLabel: "Se déconnecter",
+      variant: "warning",
+    }))
+  ) {
     return;
   }
   await auth.logout();

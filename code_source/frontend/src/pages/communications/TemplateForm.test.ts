@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
 import type { Template } from "./editor";
 import TemplateForm from "./TemplateForm.vue";
+import { dialogs } from "../../composables/dialogs";
 
 const TEMPLATE: Template = {
   name: "Relance",
@@ -78,7 +79,7 @@ describe("TemplateForm", () => {
   });
 
   it("adds a link to the address given, or nothing", async () => {
-    const ask = vi.spyOn(window, "prompt").mockReturnValueOnce("https://www.alj-escalade.fr").mockReturnValueOnce("https://");
+    const ask = vi.spyOn(dialogs, "prompt").mockResolvedValueOnce("https://www.alj-escalade.fr").mockResolvedValueOnce("https://");
     const { byId, body, draft } = render({ body: "" });
     body().setSelectionRange(0, 0);
     await byId("format-link").trigger("click");

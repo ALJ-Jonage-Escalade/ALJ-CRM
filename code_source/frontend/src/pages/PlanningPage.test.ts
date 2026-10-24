@@ -7,6 +7,7 @@ import { CLIENT_KEY, createApiClient } from "../lib/client";
 import type { Role } from "../lib/roles";
 import PlanningPage from "./PlanningPage.vue";
 import type { Slot } from "./planning/slots";
+import { dialogs } from "../composables/dialogs";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -167,7 +168,7 @@ describe("PlanningPage", () => {
   });
 
   it("deletes a slot once confirmed", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const { byId, all, writes } = render();
     await flushPromises();
     byId("view-table")!.click();
@@ -176,7 +177,9 @@ describe("PlanningPage", () => {
     expect(writes()).toEqual([]);
     all("slot-delete")[1]!.click();
     await flushPromises();
-    expect(confirm).toHaveBeenLastCalledWith("Voulez-vous vraiment supprimer le créneau « Compétition U13 » (Mercredi 18:00 - 20:00) ?");
+    expect(confirm).toHaveBeenLastCalledWith(
+      expect.objectContaining({ message: "Voulez-vous vraiment supprimer le créneau « Compétition U13 » (Mercredi 18:00 - 20:00) ?" }),
+    );
     expect(writes()).toEqual([{ method: "DELETE", path: "/api/planning/item/2", body: undefined }]);
     expect(byId("toast")!.textContent).toBe("🗑️ Créneau supprimé.");
   });

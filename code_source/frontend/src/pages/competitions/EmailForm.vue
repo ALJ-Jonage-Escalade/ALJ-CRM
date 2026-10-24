@@ -10,6 +10,7 @@ import { createCommunicationsApi } from "../../services/communications";
 import type { Competition, Row } from "./competitions";
 import { audience, AUDIENCES, defaultTemplate, hasEmail, render, sendBody, variables, type Audience, type Template } from "./email";
 import { plural } from "../../lib/text";
+import { dialogs } from "../../composables/dialogs";
 
 const props = defineProps<{ competition: Competition; rows: readonly Row[] }>();
 const emit = defineEmits<{ sent: [message: string]; cancel: [] }>();
@@ -75,7 +76,13 @@ async function send(): Promise<void> {
     problem.value = "⚠️ Aucun destinataire n'a d'adresse e-mail valide.";
     return;
   }
-  if (!confirm(`Envoyer cet e-mail à ${n} compétiteur${plural(n)} ?`)) {
+  if (
+    !(await dialogs.confirm({
+      title: "Envoyer l'e-mail",
+      message: `Envoyer cet e-mail à ${n} compétiteur${plural(n)} ?`,
+      confirmLabel: "Envoyer",
+    }))
+  ) {
     return;
   }
   sending.value = true;

@@ -22,6 +22,7 @@ import {
   type Template,
 } from "./communications/editor";
 import TemplateForm from "./communications/TemplateForm.vue";
+import { dialogs } from "../composables/dialogs";
 
 const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 const toast = useToast();
@@ -109,7 +110,15 @@ const deleting = ref(false);
 
 async function remove(): Promise<void> {
   const name = selected.value;
-  if (!name || !confirm(`Êtes-vous sûr de vouloir supprimer définitivement le modèle d'e-mail « ${name} » ?`)) {
+  if (
+    !name ||
+    !(await dialogs.confirm({
+      title: "Supprimer le modèle",
+      message: `Êtes-vous sûr de vouloir supprimer définitivement le modèle d'e-mail « ${name} » ?`,
+      confirmLabel: "Supprimer",
+      variant: "danger",
+    }))
+  ) {
     return;
   }
   deleting.value = true;

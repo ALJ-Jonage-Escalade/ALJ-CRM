@@ -7,6 +7,7 @@ import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import type { Role } from "../lib/roles";
 import OutilsPage from "./OutilsPage.vue";
+import { dialogs } from "../composables/dialogs";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -247,7 +248,7 @@ describe("OutilsPage", () => {
   });
 
   it("previews the FFME file, then applies it with a manual match", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
     const { byId, all, sent } = await render("admin", "/bureau/outils?tab=ffme-import");
     expect((byId("ffme-analyze") as HTMLButtonElement).disabled).toBe(true);
 
@@ -275,7 +276,10 @@ describe("OutilsPage", () => {
     byId("ffme-apply")!.click();
     await flushPromises();
     expect(confirm).toHaveBeenLastCalledWith(
-      "Confirmer l'enregistrement de 4 adhérents en base de données ?\n\n• 3 réconciliés automatiquement\n• 1 associés manuellement",
+      expect.objectContaining({
+        message:
+          "Confirmer l'enregistrement de 4 adhérents en base de données ?\n\n• 3 réconciliés automatiquement\n• 1 associés manuellement",
+      }),
     );
     expect(sent("POST", "/api/ffme/import")[0]!.body).toEqual({
       filename: "ffme.xlsx",
@@ -289,7 +293,7 @@ describe("OutilsPage", () => {
   });
 
   it("imports straight away once confirmed", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const { byId, sent } = await render("admin", "/bureau/outils?tab=ffme-import");
     const input = byId<HTMLInputElement>("ffme-file")!;
     Object.defineProperty(input, "files", { value: [new File(["PK"], "ffme.xlsx")], configurable: true });

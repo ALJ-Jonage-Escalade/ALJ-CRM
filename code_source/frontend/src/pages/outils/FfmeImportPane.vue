@@ -10,6 +10,7 @@ import UiTile from "../../components/ui/UiTile.vue";
 import { CLIENT_KEY, errorText, type Schemas } from "../../lib/client";
 import { createFfmeApi } from "../../services/ffme";
 import { applyConfirmation, fileLabel, isXlsx, manualMatches, memberLabel, readBase64, sortedMembers } from "./ffme";
+import { dialogs } from "../../composables/dialogs";
 
 const emit = defineEmits<{ toast: [message: string, ms?: number] }>();
 const ffmeApi = createFfmeApi(inject(CLIENT_KEY)!);
@@ -82,10 +83,13 @@ async function quickImport(): Promise<void> {
     return;
   }
   if (
-    !confirm(
-      "Voulez-vous lancer l'importation directe ? Les licenciés reconnus automatiquement par N° de licence ou " +
+    !(await dialogs.confirm({
+      title: "Importation directe",
+      message:
+        "Voulez-vous lancer l'importation directe ? Les licenciés reconnus automatiquement par N° de licence ou " +
         "Nom/Prénom seront mis à jour et basculés en statut « Terminé ».",
-    )
+      confirmLabel: "Importer",
+    }))
   ) {
     return;
   }
@@ -108,7 +112,13 @@ async function apply(): Promise<void> {
     emit("toast", "⚠️ Aucune modification à appliquer.");
     return;
   }
-  if (!confirm(applyConfirmation(preview.value.matched_count, manual.length))) {
+  if (
+    !(await dialogs.confirm({
+      title: "Appliquer les modifications",
+      message: applyConfirmation(preview.value.matched_count, manual.length),
+      confirmLabel: "Appliquer",
+    }))
+  ) {
     return;
   }
   busy.value = "apply";

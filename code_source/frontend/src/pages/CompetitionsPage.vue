@@ -46,6 +46,7 @@ import type { HelloAssoItem } from "./competitions/helloasso";
 import { createOutbox, pendingLine, replayMessage } from "./competitions/outbox";
 import { createWriter, WRITER_KEY } from "./competitions/writer";
 import { plural } from "../lib/text";
+import { dialogs } from "../composables/dialogs";
 
 const auth = inject(AUTH_KEY)!;
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
@@ -219,9 +220,11 @@ async function archivePastCompetitions(): Promise<void> {
     return;
   }
   if (
-    !confirm(
-      `Archiver ${nbPastCompetitions} compétition${plural(nbPastCompetitions)} passée${plural(nbPastCompetitions)} ?\n\n${pastCompetitionsList.map((competition) => `• ${competition.nom} (${period(competition)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`,
-    )
+    !(await dialogs.confirm({
+      title: "Archiver les compétitions passées",
+      message: `Archiver ${nbPastCompetitions} compétition${plural(nbPastCompetitions)} passée${plural(nbPastCompetitions)} ?\n\n${pastCompetitionsList.map((competition) => `• ${competition.nom} (${period(competition)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`,
+      confirmLabel: "Archiver",
+    }))
   ) {
     return;
   }

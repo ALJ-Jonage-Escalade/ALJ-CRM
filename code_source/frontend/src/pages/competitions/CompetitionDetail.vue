@@ -45,6 +45,7 @@ import PaymentForm from "./PaymentForm.vue";
 import WithdrawForm from "./WithdrawForm.vue";
 import { WRITER_KEY } from "./writer";
 import { plural } from "../../lib/text";
+import { dialogs } from "../../composables/dialogs";
 
 const props = defineProps<{
   competition: Competition;
@@ -101,7 +102,14 @@ async function save(body: Schemas["CompetitionCreate"]): Promise<void> {
 }
 
 async function remove(): Promise<void> {
-  if (!confirm(`Supprimer définitivement « ${c.value.nom} » et sa liste de compétiteurs ?`)) {
+  if (
+    !(await dialogs.confirm({
+      title: "Supprimer la compétition",
+      message: `Supprimer définitivement « ${c.value.nom} » et sa liste de compétiteurs ?`,
+      confirmLabel: "Supprimer",
+      variant: "danger",
+    }))
+  ) {
     return;
   }
   const id = c.value.id;
@@ -185,9 +193,12 @@ async function removeNotInvited(): Promise<void> {
   const n = list.length;
   if (
     !n ||
-    !confirm(
-      `Retirer les ${n} compétiteur${plural(n)} non invité${plural(n)} de cette compétition ?\n(Les adhérents restent dans la base du club.)`,
-    )
+    !(await dialogs.confirm({
+      title: "Retirer les non invités",
+      message: `Retirer les ${n} compétiteur${plural(n)} non invité${plural(n)} de cette compétition ?\n(Les adhérents restent dans la base du club.)`,
+      confirmLabel: "Retirer",
+      variant: "danger",
+    }))
   ) {
     return;
   }
@@ -265,7 +276,14 @@ async function pay(amount: number): Promise<void> {
 }
 
 async function removeOne(r: Row): Promise<void> {
-  if (!confirm(`Retirer ${named(r)} de cette compétition ?\n(L'adhérent reste dans la base du club.)`)) {
+  if (
+    !(await dialogs.confirm({
+      title: "Retirer le compétiteur",
+      message: `Retirer ${named(r)} de cette compétition ?\n(L'adhérent reste dans la base du club.)`,
+      confirmLabel: "Retirer",
+      variant: "danger",
+    }))
+  ) {
     return;
   }
   await writer.run(() => competitionsApi.removeParticipant(c.value.id, r.adherent_id!), {
@@ -274,7 +292,13 @@ async function removeOne(r: Row): Promise<void> {
 }
 
 async function restore(r: Row): Promise<void> {
-  if (!confirm(`Rétablir ${named(r)} en compétiteur actif (statut Payé) ?`)) {
+  if (
+    !(await dialogs.confirm({
+      title: "Rétablir le compétiteur",
+      message: `Rétablir ${named(r)} en compétiteur actif (statut Payé) ?`,
+      confirmLabel: "Rétablir",
+    }))
+  ) {
     return;
   }
   await writer.run(() => competitionsApi.addParticipant(c.value.id, r.adherent_id!), {

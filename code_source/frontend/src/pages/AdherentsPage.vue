@@ -61,6 +61,7 @@ import {
   type MemberList,
 } from "./adherents/members";
 import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft, type Template } from "./adherents/record";
+import { dialogs } from "../composables/dialogs";
 
 const client = inject(CLIENT_KEY)!;
 const membersApi = createMembersApi(client);
@@ -312,7 +313,13 @@ async function saveEdit(m: Member): Promise<void> {
     mode.value = "none";
     return;
   }
-  if (!confirm(`Valider les modifications pour ${m.first_name} ${m.last_name} ?\n\n• ${lines.join("\n• ")}`)) {
+  if (
+    !(await dialogs.confirm({
+      title: "Valider les modifications",
+      message: `Valider les modifications pour ${m.first_name} ${m.last_name} ?\n\n• ${lines.join("\n• ")}`,
+      confirmLabel: "Valider",
+    }))
+  ) {
     return;
   }
   saving.value = true;
@@ -357,9 +364,12 @@ async function saveNew(): Promise<void> {
   const twin = sameName(all.value, d);
   if (
     twin &&
-    !confirm(
-      `⚠️ Un adhérent « ${twin.last_name} ${twin.first_name} » existe déjà pour la saison ${season.value}.\n\nVoulez-vous quand même créer cette nouvelle fiche ?`,
-    )
+    !(await dialogs.confirm({
+      title: "Adhérent déjà existant",
+      message: `Un adhérent « ${twin.last_name} ${twin.first_name} » existe déjà pour la saison ${season.value}.\n\nVoulez-vous quand même créer cette nouvelle fiche ?`,
+      confirmLabel: "Créer quand même",
+      variant: "warning",
+    }))
   ) {
     return;
   }

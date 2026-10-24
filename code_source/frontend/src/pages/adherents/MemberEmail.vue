@@ -9,6 +9,7 @@ import { createCommunicationsApi } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
 import { renderFor, SIGNATURE_TEXT, type Template } from "./record";
+import { dialogs } from "../../composables/dialogs";
 
 const props = defineProps<{ member: Member; templates: readonly Template[] }>();
 const emit = defineEmits<{ sent: [message: string]; failed: [message: string]; cancel: [] }>();
@@ -44,7 +45,13 @@ async function send(): Promise<void> {
     return;
   }
   const m = props.member;
-  if (!confirm(`Envoyer cet e-mail à ${m.first_name} ${m.last_name} <${to.value}> ?`)) {
+  if (
+    !(await dialogs.confirm({
+      title: "Envoyer l'e-mail",
+      message: `Envoyer cet e-mail à ${m.first_name} ${m.last_name} <${to.value}> ?`,
+      confirmLabel: "Envoyer",
+    }))
+  ) {
     return;
   }
   sending.value = true;
