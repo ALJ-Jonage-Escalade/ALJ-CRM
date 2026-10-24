@@ -3,6 +3,7 @@
    The members come formatted by the server (GET /api/members, domain/members/view.py). */
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
+import { formatDayText } from "../../lib/format";
 import { plural } from "../../lib/text";
 
 export type Member = Schemas["Member"];
@@ -300,20 +301,6 @@ export function diplomeWeight(m: Member): number {
   return diplomes(m).reduce((sum, d) => sum + weights[d.type], 0);
 }
 
-/** ISO (2026-09-01, with or without time) or French (01/09/2026) date as dd/mm/yyyy; anything else as is. */
-export function fmtDay(s: string): string {
-  const str = s.trim();
-  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
-  if (iso) {
-    return `${iso[3]}/${iso[2]}/${iso[1]}`;
-  }
-  const fr = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/.exec(str);
-  if (fr) {
-    return `${fr[1]!.padStart(2, "0")}/${fr[2]!.padStart(2, "0")}/${fr[3]}`;
-  }
-  return str;
-}
-
 /** Milliseconds of an ISO or French date, 0 when empty or unreadable (sorted first). */
 export function dateValue(s: string): number {
   const str = s.trim();
@@ -397,7 +384,7 @@ export function csvRows(members: readonly Member[]): Cell[][] {
     ...members.map((m) => [
       m.last_name,
       m.first_name,
-      fmtDay(m.birth_date),
+      formatDayText(m.birth_date),
       m.age,
       m.gender,
       m.categorie,
@@ -419,7 +406,7 @@ export function csvRows(members: readonly Member[]): Cell[][] {
       m.payer,
       m.payer_email,
       m.order_ref,
-      fmtDay(m.order_date),
+      formatDayText(m.order_date),
     ]),
   ];
 }

@@ -3,7 +3,8 @@
    over to a next competition, a credit in the season balance; or lost, kept by the club), with a required comment. */
 import { ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
-import { euros, type Participant } from "./competitions";
+import { formatEuros } from "../../lib/format";
+import { type Participant } from "./competitions";
 
 defineProps<{ participant: Participant; busy: boolean }>();
 const emit = defineEmits<{ confirm: [mode: "reporte" | "perdu", note: string]; cancel: [] }>();
@@ -23,7 +24,7 @@ function confirm(): void {
 <template>
   <form novalidate class="flex flex-col gap-3" data-testid="withdraw-form" @submit.prevent="confirm">
     <p class="text-[13px] leading-normal" data-testid="withdraw-text">
-      <b>{{ participant.nom }} {{ participant.prenom }}</b> a payé <b>{{ euros(participant.montant_paye) }}</b>
+      <b>{{ participant.nom }} {{ participant.prenom }}</b> a payé <b>{{ formatEuros(participant.montant_paye) }}</b>
       <template v-if="participant.commande_helloasso"> (commande {{ participant.commande_helloasso }})</template>
       mais ne participe plus. Aucun remboursement : choisissez le sort de cet argent.
     </p>

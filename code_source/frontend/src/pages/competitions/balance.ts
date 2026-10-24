@@ -6,6 +6,7 @@
    - neither selected nor paid: not counted.
    A season runs from August to July. */
 import type { Cell } from "../../lib/csv";
+import { formatEuros } from "../../lib/format";
 import { normKey } from "../adherents/members";
 import { todayIso, type Competition, type Participant } from "./competitions";
 
@@ -119,12 +120,12 @@ export function totals(list: readonly Balance[]): { due: number; paid: number; r
 }
 
 /** « ✅ Équilibré », « ⚠️ Reste dû 15,00 € » or « Crédit 12,00 € ». */
-export function balanceLabel(b: Pick<Balance, "remaining">, euros: (n: number) => string): { text: string; tone: "ok" | "due" | "credit" } {
+export function balanceLabel(b: Pick<Balance, "remaining">): { text: string; tone: "ok" | "due" | "credit" } {
   if (b.remaining > 0.005) {
-    return { text: `⚠️ Reste dû ${euros(b.remaining)}`, tone: "due" };
+    return { text: `⚠️ Reste dû ${formatEuros(b.remaining)}`, tone: "due" };
   }
   if (b.remaining < -0.005) {
-    return { text: `💜 Crédit ${euros(-b.remaining)}`, tone: "credit" };
+    return { text: `💜 Crédit ${formatEuros(-b.remaining)}`, tone: "credit" };
   }
   return { text: "✅ Équilibré", tone: "ok" };
 }

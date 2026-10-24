@@ -10,7 +10,6 @@ import {
   diplomeWeight,
   emptyFilters,
   filterMembers,
-  fmtDay,
   loadFilters,
   matchesSearch,
   recordMember,
@@ -128,10 +127,7 @@ describe("display", () => {
     expect(diplomeWeight(member({ autonomie_bloc: "non" }))).toBe(0);
   });
 
-  it("formats and compares ISO and French dates", () => {
-    expect(fmtDay("2026-09-03T10:00:00")).toBe("03/09/2026");
-    expect(fmtDay("3/9/2026")).toBe("03/09/2026");
-    expect(fmtDay("bientôt")).toBe("bientôt");
+  it("compares ISO and French dates", () => {
     expect(dateValue("03/09/2026")).toBe(dateValue("2026-09-03"));
     expect(dateValue("")).toBe(0);
   });

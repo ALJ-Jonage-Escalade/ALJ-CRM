@@ -22,6 +22,7 @@ import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText, unwrap, type Schemas } from "../lib/client";
 import { csvBlob } from "../lib/csv";
 import { saveFile } from "../lib/download";
+import { formatDateTime, formatDayText } from "../lib/format";
 import MemberAttestation from "./adherents/MemberAttestation.vue";
 import MemberEmail from "./adherents/MemberEmail.vue";
 import MemberForm from "./adherents/MemberForm.vue";
@@ -38,7 +39,6 @@ import {
   diplomes,
   diplomeWeight,
   filterMembers,
-  fmtDay,
   groupChecked,
   loadFilters,
   loadPanelOpen,
@@ -91,7 +91,6 @@ const summary = computed(() =>
   membersList.value ? countSummary(shown.value.length, all.value.length, season.value) : "Chargement des données…",
 );
 
-const TIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
 const syncInfo = computed(() => {
   const state = members.state.value;
   if (state === "offline") {
@@ -104,7 +103,7 @@ const syncInfo = computed(() => {
     return "⚠️ Chargement des adhérents impossible — nouvel essai automatique";
   }
   const at = members.checkedAt.value;
-  return state === "ok" && at ? `☁️ À jour — ${TIME.format(at)}` : "";
+  return state === "ok" && at ? `☁️ À jour — ${formatDateTime(at)}` : "";
 });
 
 function chooseSeason(name: string): void {
@@ -139,7 +138,7 @@ const COLUMNS: DataColumn<Member>[] = [
   {
     id: "order_date",
     label: "Date d'inscription",
-    value: (m) => fmtDay(m.order_date),
+    value: (m) => formatDayText(m.order_date),
     compare: (a, b) => dateValue(a.order_date) - dateValue(b.order_date),
     descFirst: true,
     class: "whitespace-nowrap text-slate-500",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { balanceCsv, balanceLabel, balances, searchBalances, seasonOf, seasons, totals } from "./balance";
-import { euros, type Competition } from "./competitions";
+import type { Competition } from "./competitions";
 
 const TODAY = "2026-11-15";
 const LIST: Competition[] = [
@@ -61,9 +61,9 @@ describe("balance", () => {
     expect(list.find((b) => b.nom === "MARTIN")!.absent).toBe(true); // Open is over, not checked in
     const checkedIn = LIST.map((c) => (c.id === 1 ? { ...c, participants: c.participants!.map((p) => ({ ...p, present: true })) } : c));
     expect(balances(checkedIn, "2026-2027", TODAY).find((b) => b.nom === "MARTIN")!.absent).toBe(false);
-    expect(balanceLabel({ remaining: 15 }, euros).tone).toBe("due");
-    expect(balanceLabel({ remaining: -10 }, euros).tone).toBe("credit");
-    expect(balanceLabel({ remaining: 0 }, euros).text).toBe("✅ Équilibré");
+    expect(balanceLabel({ remaining: 15 }).tone).toBe("due");
+    expect(balanceLabel({ remaining: -10 }).tone).toBe("credit");
+    expect(balanceLabel({ remaining: 0 }).text).toBe("✅ Équilibré");
   });
 
   it("searches and exports", () => {

@@ -1,6 +1,7 @@
 /* What the Paramètres page shows for each server answer (texts of the former web/bureau/parametres.html). */
 import type { Tone } from "../../components/ui/UiBadge.vue";
 import type { Schemas } from "../../lib/client";
+import { formatDateTime, formatDateTimeSeconds, formatTime, parseDate } from "../../lib/format";
 
 export interface Status {
   tone: Tone;
@@ -71,13 +72,9 @@ export function pendingText(pending: number): string {
   return pending > 0 ? `⏳ ${pending} en attente` : "0 (à jour)";
 }
 
-const DATE_TIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "medium" });
-const DATE_TIME_SHORT = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
-const TIME = new Intl.DateTimeFormat("fr-FR", { timeStyle: "medium" });
-
 /** Last cache sync (Unix time in seconds; 0 or null: never). */
 export function lastSync(seconds: number | null | undefined): string {
-  return seconds ? DATE_TIME.format(new Date(seconds * 1000)) : "Non renseignée";
+  return seconds ? formatDateTimeSeconds(new Date(seconds * 1000)) : "Non renseignée";
 }
 
 /** Last run of the results batch (ISO date written by the server; shown as is when it is not one). */
@@ -85,12 +82,12 @@ export function lastRun(iso: string): string {
   if (!iso) {
     return "Jamais exécuté";
   }
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : DATE_TIME_SHORT.format(date);
+  const date = parseDate(iso);
+  return date ? formatDateTime(date) : iso;
 }
 
 export function timeNow(now: Date = new Date()): string {
-  return TIME.format(now);
+  return formatTime(now);
 }
 
 export function syncReport(r: Schemas["SyncCounters"] | null | undefined, now?: Date): string[] {

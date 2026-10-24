@@ -6,8 +6,9 @@ import { RouterLink } from "vue-router";
 import UiButton from "../../components/ui/UiButton.vue";
 import { csvBlob } from "../../lib/csv";
 import { saveFile } from "../../lib/download";
+import { formatEuros } from "../../lib/format";
 import { balanceCsv, balanceLabel, balances, searchBalances, seasonOf, seasons, totals } from "./balance";
-import { euros, payment, period, todayIso, type Competition } from "./competitions";
+import { payment, period, todayIso, type Competition } from "./competitions";
 import { plural } from "../../lib/text";
 
 const props = defineProps<{ competitions: readonly Competition[] }>();
@@ -60,15 +61,17 @@ const TONE = {
         <div class="text-[11px] font-semibold text-slate-500">Compétiteurs</div>
       </div>
       <div class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center">
-        <div class="text-lg font-extrabold">{{ euros(sum.due) }}</div>
+        <div class="text-lg font-extrabold">{{ formatEuros(sum.due) }}</div>
         <div class="text-[11px] font-semibold text-slate-500">Total dû</div>
       </div>
       <div class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center">
-        <div class="text-lg font-extrabold text-green-600">{{ euros(sum.paid) }}</div>
+        <div class="text-lg font-extrabold text-green-600">{{ formatEuros(sum.paid) }}</div>
         <div class="text-[11px] font-semibold text-slate-500">Total réglé</div>
       </div>
       <div class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center">
-        <div :class="['text-lg font-extrabold', sum.remaining > 0 ? 'text-red-600' : 'text-green-600']">{{ euros(sum.remaining) }}</div>
+        <div :class="['text-lg font-extrabold', sum.remaining > 0 ? 'text-red-600' : 'text-green-600']">
+          {{ formatEuros(sum.remaining) }}
+        </div>
         <div class="text-[11px] font-semibold text-slate-500">Reste à payer</div>
       </div>
     </div>
@@ -95,9 +98,9 @@ const TONE = {
             </span>
           </span>
           <span
-            :class="['shrink-0 rounded-md border px-2 py-0.5 text-xs font-bold', TONE[balanceLabel(b, euros).tone]]"
+            :class="['shrink-0 rounded-md border px-2 py-0.5 text-xs font-bold', TONE[balanceLabel(b).tone]]"
             data-testid="balance-state"
-            >{{ balanceLabel(b, euros).text }}</span
+            >{{ balanceLabel(b).text }}</span
           >
         </button>
         <ul v-if="open === keyOf(b) || search" class="mt-2 border-t border-slate-100 pt-1.5 text-xs" data-testid="balance-lines">
@@ -112,12 +115,12 @@ const TONE = {
               >🏆 {{ l.competition.nom }} <span class="font-normal text-slate-500">· {{ period(l.competition) }}</span></RouterLink
             >
             <span
-              >Dû : <b>{{ euros(l.due) }}</b> · Payé : <b>{{ euros(l.paid) }}</b> · {{ payment(l.status).label
+              >Dû : <b>{{ formatEuros(l.due) }}</b> · Payé : <b>{{ formatEuros(l.paid) }}</b> · {{ payment(l.status).label
               }}<template v-if="l.present"> · ✓ Présent</template></span
             >
           </li>
           <li class="flex justify-between pt-1 font-bold text-slate-700">
-            <span>Total</span><span>Dû : {{ euros(b.due) }} · Payé : {{ euros(b.paid) }}</span>
+            <span>Total</span><span>Dû : {{ formatEuros(b.due) }} · Payé : {{ formatEuros(b.paid) }}</span>
           </li>
         </ul>
       </li>

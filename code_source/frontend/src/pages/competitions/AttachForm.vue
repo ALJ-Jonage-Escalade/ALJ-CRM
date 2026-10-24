@@ -4,7 +4,8 @@
    ignored, with a reason. The competition and member are suggested from what the payer typed. */
 import { computed, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
-import { euros, sortCompetitions, isArchived, type Competition, type MemberSlot } from "./competitions";
+import { formatDateTime, formatEuros, parseDate } from "../../lib/format";
+import { sortCompetitions, isArchived, type Competition, type MemberSlot } from "./competitions";
 import {
   displayName,
   isIgnored,
@@ -38,8 +39,10 @@ const members = computed(() =>
     .slice()
     .sort((a, b) => (a.nom ?? "").localeCompare(b.nom ?? "", "fr") || (a.prenom ?? "").localeCompare(b.prenom ?? "", "fr")),
 );
-const DATE = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
-const when = (s: string) => (s && !Number.isNaN(Date.parse(s)) ? DATE.format(new Date(s)) : s);
+function when(text: string): string {
+  const date = parseDate(text);
+  return date ? formatDateTime(date) : text;
+}
 
 function ignore(): void {
   missingReason.value = !ignored.value && !comment.value.trim();
@@ -62,7 +65,7 @@ const th = "py-1 pr-3 align-top text-left font-semibold whitespace-nowrap text-s
   >
     <div class="flex items-baseline justify-between gap-2">
       <b class="text-[15px]" data-testid="attach-name">{{ displayName(item, info) }}</b>
-      <b class="text-[15px] text-accent">{{ euros(item.montant) }}</b>
+      <b class="text-[15px] text-accent">{{ formatEuros(item.montant) }}</b>
     </div>
     <p v-if="ignored" class="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs" data-testid="attach-ignored">
       🚫 <b>Ligne ignorée</b><template v-if="item.ignored_by"> par {{ item.ignored_by }}</template
@@ -105,7 +108,7 @@ const th = "py-1 pr-3 align-top text-left font-semibold whitespace-nowrap text-s
         <tr v-for="(p, i) in info.payments" :key="`p${i}`">
           <th :class="th">🏦 Paiement</th>
           <td>
-            #{{ p.id || "?" }} · {{ p.amount != null ? euros(p.amount) : ""
+            #{{ p.id || "?" }} · {{ p.amount != null ? formatEuros(p.amount) : ""
             }}<template v-if="p.state"> · {{ stateLabel(p.state) }}</template
             ><template v-if="p.means"> · {{ p.means }}</template>
           </td>
@@ -134,7 +137,7 @@ const th = "py-1 pr-3 align-top text-left font-semibold whitespace-nowrap text-s
           <tr>
             <th :class="th">➕ Option</th>
             <td>
-              {{ o.name }}<template v-if="o.amount"> · {{ euros(o.amount) }}</template>
+              {{ o.name }}<template v-if="o.amount"> · {{ formatEuros(o.amount) }}</template>
             </td>
           </tr>
           <tr v-for="(f, j) in o.fields" :key="`o${i}f${j}`">

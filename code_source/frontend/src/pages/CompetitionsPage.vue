@@ -12,6 +12,7 @@ import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
 import { pageAccess, verdict } from "../lib/access";
+import { formatDateTime, formatEuros } from "../lib/format";
 import { CLIENT_KEY, unwrap, type Schemas } from "../lib/client";
 import { isStaff } from "../lib/roles";
 import { offlineStore, STORE_KEY } from "../lib/store";
@@ -22,7 +23,6 @@ import CompetitionForm from "./competitions/CompetitionForm.vue";
 import {
   counts,
   discipline,
-  euros,
   filterCompetitions,
   hasResults,
   isArchived,
@@ -242,10 +242,9 @@ const listLine = computed(() => {
   return `${currentCount} compétition${plural(currentCount)}${archivedPart}`;
 });
 
-const TIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
 const syncInfo = computed(() => {
   const at = competitions.dataAt.value;
-  const since = at ? ` — données du ${TIME.format(at)}` : "";
+  const since = at ? ` — données du ${formatDateTime(at)}` : "";
   const state = competitions.state.value;
   const waiting = pendingLine(outbox.changes.value.size);
   if (competitions.httpStatus.value === 403) {
@@ -258,9 +257,9 @@ const syncInfo = computed(() => {
     return `⚠️ Serveur injoignable — nouvel essai automatique${since}${waiting}`;
   }
   if (state === "loading") {
-    return at ? `💾 Données du ${TIME.format(at)}${waiting}` : waiting.slice(3);
+    return at ? `💾 Données du ${formatDateTime(at)}${waiting}` : waiting.slice(3);
   }
-  return at ? `☁️ À jour — ${TIME.format(at)}${waiting}` : waiting.slice(3);
+  return at ? `☁️ À jour — ${formatDateTime(at)}${waiting}` : waiting.slice(3);
 });
 
 const chip = (active: boolean) => [
@@ -378,7 +377,8 @@ const tab = (active: boolean) => [
                 ><span v-if="hasResults(c)" title="Résultats officiels récupérés">🏆 </span>{{ c.nom }}</b
               >
               <span class="block text-xs text-slate-500">
-                🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }} · 💶 {{ euros(c.prix) }}<template v-if="c.lieu"> · 📍 {{ c.lieu }}</template
+                🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }} · 💶 {{ formatEuros(c.prix)
+                }}<template v-if="c.lieu"> · 📍 {{ c.lieu }}</template
                 ><template v-if="discipline(c)"> · {{ discipline(c) }}</template>
               </span>
               <span class="mt-0.5 block text-xs font-semibold text-blue-900">

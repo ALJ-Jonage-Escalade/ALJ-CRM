@@ -11,13 +11,13 @@ import { useMediaQuery } from "../../composables/media";
 import { CLIENT_KEY, unwrap, type Schemas } from "../../lib/client";
 import { csvBlob } from "../../lib/csv";
 import { saveFile } from "../../lib/download";
+import { formatEuros } from "../../lib/format";
 import CompetitionForm from "./CompetitionForm.vue";
 import {
   countLine,
   counts,
   csvName,
   discipline,
-  euros,
   filterRows,
   groupRows,
   isArchived,
@@ -384,7 +384,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       <div class="min-w-0">
         <h2 class="m-0 text-[17px] font-bold lg:text-lg lg:font-extrabold" data-testid="detail-name">{{ c.nom }}</h2>
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-1 lg:text-[12.5px]" data-testid="detail-meta">
-          🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }} · 💶 {{ euros(c.prix) }}<template v-if="c.lieu"> · 📍 {{ c.lieu }}</template
+          🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }} · 💶 {{ formatEuros(c.prix) }}<template v-if="c.lieu"> · 📍 {{ c.lieu }}</template
           ><template v-if="discipline(c)"> · {{ discipline(c) }}</template
           ><template v-if="isArchived(c)"> · 📦 Archivée</template>
         </p>

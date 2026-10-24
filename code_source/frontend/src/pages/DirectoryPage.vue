@@ -12,6 +12,7 @@ import UiCard from "../components/ui/UiCard.vue";
 import { AUTH_KEY } from "../composables/auth";
 import { useSyncedResource } from "../composables/syncedResource";
 import { pageAccess, verdict } from "../lib/access";
+import { formatDateTime } from "../lib/format";
 import type { Schemas } from "../lib/client";
 import {
   allowedTarifs,
@@ -95,10 +96,9 @@ const countLine = computed(() => {
   return `${n} adhérent${plural(n)} affiché${plural(n)} · saison ${season.value}${filters.value.status ? ` · statut ${filters.value.status}` : ""}`;
 });
 
-const TIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
 const syncInfo = computed(() => {
   const at = directory.dataAt.value;
-  const since = at ? ` — données du ${TIME.format(at)}` : "";
+  const since = at ? ` — données du ${formatDateTime(at)}` : "";
   const state = directory.state.value;
   if (directory.httpStatus.value === 403) {
     return "🔒 Accès réservé aux coachs";
@@ -110,9 +110,9 @@ const syncInfo = computed(() => {
     return `⚠️ Chargement impossible — nouvel essai automatique${since}`;
   }
   if (state === "loading") {
-    return at ? `💾 Données du ${TIME.format(at)}` : "";
+    return at ? `💾 Données du ${formatDateTime(at)}` : "";
   }
-  return at ? `☁️ À jour — ${TIME.format(at)}` : "";
+  return at ? `☁️ À jour — ${formatDateTime(at)}` : "";
 });
 
 // Tabs (phones); on desktop the filters stay beside the list

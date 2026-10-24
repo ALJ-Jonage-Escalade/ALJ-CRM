@@ -2,6 +2,7 @@
    former pages web/competitions.html and web/bureau/competitions.html, merged). The server checks every change. */
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
+import { formatDayText } from "../../lib/format";
 import { normKey } from "../adherents/members";
 import { plural } from "../../lib/text";
 
@@ -64,8 +65,6 @@ export function filterCompetitions(list: readonly Competition[], search: string,
   });
 }
 
-const frDate = (iso: string) => iso.split("-").reverse().join("/");
-
 /** « 15/03/2026 », « 15/03/2026 → 16/03/2026 » or « sans date ». */
 export function period(c: Competition): string {
   const start = c.date_competition ?? "";
@@ -73,11 +72,8 @@ export function period(c: Competition): string {
     return "sans date";
   }
   const end = c.date_fin ?? "";
-  return end && end > start ? `${frDate(start)} → ${frDate(end)}` : frDate(start);
+  return end && end > start ? `${formatDayText(start)} → ${formatDayText(end)}` : formatDayText(start);
 }
-
-export const euros = (n: number | null | undefined): string =>
-  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(n ?? 0));
 
 /** The discipline, when it says more than « escalade » (pass-through field of the office page). */
 export function discipline(c: Competition): string {

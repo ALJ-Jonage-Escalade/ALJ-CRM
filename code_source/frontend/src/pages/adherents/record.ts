@@ -3,7 +3,8 @@
    checks the role and the fields again (api/members/schemas.py). */
 import type { Schemas } from "../../lib/client";
 import { looksLikeEmail } from "../../lib/email";
-import { diplomes, fmtDay, normKey, type Creneau, type Member } from "./members";
+import { formatDate, formatDayText } from "../../lib/format";
+import { diplomes, normKey, type Creneau, type Member } from "./members";
 
 export type MemberChanges = Schemas["MemberChanges"];
 export type NewMember = Schemas["NewMember"];
@@ -26,7 +27,7 @@ export function recordRows(m: Member): RecordRow[] {
     }
   };
   const join = (sep: string, ...parts: string[]) => parts.filter(Boolean).join(sep);
-  add("🎂", "Date de naissance", m.birth_date ? `${fmtDay(m.birth_date)}${m.age != null ? ` (${m.age} ans)` : ""}` : "");
+  add("🎂", "Date de naissance", m.birth_date ? `${formatDayText(m.birth_date)}${m.age != null ? ` (${m.age} ans)` : ""}` : "");
   add("⚧", "Sexe", m.gender);
   add("📍", "Adresse", join(", ", m.address, join(" ", m.zip_code, m.city)));
   add("📞", "Téléphone", m.phone);
@@ -50,9 +51,9 @@ export function recordRows(m: Member): RecordRow[] {
   if (m.payer && normKey(m.payer) !== normKey(`${m.first_name} ${m.last_name}`)) {
     add("💳", "Payeur", m.payer + (m.payer_email ? ` (${m.payer_email})` : ""));
   }
-  add("🧾", "Commande HelloAsso", join(" · ", fmtDay(m.order_date), m.order_ref));
+  add("🧾", "Commande HelloAsso", join(" · ", formatDayText(m.order_date), m.order_ref));
   add("💶", "Montant réglé", m.amount != null ? `${m.amount} €` : "");
-  add("📧", "Attestation envoyée", m.email_sent_date ? fmtDay(m.email_sent_date) : "");
+  add("📧", "Attestation envoyée", m.email_sent_date ? formatDayText(m.email_sent_date) : "");
   add("🧗", "Créneau", m.creneau_groupe ? `${m.creneau_groupe}${m.creneau_details ? ` (${m.creneau_details})` : ""}` : "");
   add("💬", "Commentaire", m.commentaires_correctif);
   return rows;
@@ -282,7 +283,7 @@ export function sameName(members: readonly Member[], d: MemberDraft): Member | u
 
 /** The comment with today's date at the start of a new line: "[22/10/2026] ". */
 export function withDateTag(comment: string, today: Date = new Date()): string {
-  const tag = `[${new Intl.DateTimeFormat("fr-FR").format(today)}] `;
+  const tag = `[${formatDate(today)}] `;
   return comment && !comment.endsWith("\n") ? `${comment}\n${tag}` : comment + tag;
 }
 

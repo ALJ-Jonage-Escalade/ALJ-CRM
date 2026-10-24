@@ -5,8 +5,9 @@ import { computed, inject, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
 import { CLIENT_KEY, unwrap } from "../../lib/client";
+import { formatDate, formatEuros, parseDate } from "../../lib/format";
 import AttachForm from "./AttachForm.vue";
-import { euros, type Competition, type MemberSlot } from "./competitions";
+import { type Competition, type MemberSlot } from "./competitions";
 import {
   displayName,
   filterItems,
@@ -123,8 +124,10 @@ function close(): void {
   emit("changed");
 }
 
-const DATE = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short" });
-const day = (s: string) => (s && !Number.isNaN(Date.parse(s)) ? DATE.format(new Date(s)) : "—");
+function day(text: string): string {
+  const date = parseDate(text);
+  return date ? formatDate(date) : "—";
+}
 const chip = (active: boolean) => [
   "cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold",
   active ? "border-accent bg-accent text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
@@ -203,7 +206,7 @@ const chip = (active: boolean) => [
             >
           </span>
           <span class="text-right">
-            <b class="block text-[15px]">{{ euros(it.montant) }}</b>
+            <b class="block text-[15px]">{{ formatEuros(it.montant) }}</b>
             <span
               :class="[
                 'inline-block rounded-full px-2 py-0.5 text-[10.5px] font-bold text-white',

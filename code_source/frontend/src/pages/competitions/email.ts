@@ -2,6 +2,7 @@
    fills them again when sending: infrastructure/mail/dispatch.py get_competition_context), the request body. */
 import type { Schemas } from "../../lib/client";
 import { looksLikeEmail } from "../../lib/email";
+import { formatDayText } from "../../lib/format";
 import type { Competition, Row } from "./competitions";
 
 export type Template = Schemas["EmailTemplate"];
@@ -35,8 +36,6 @@ export function defaultTemplate(templates: readonly Template[]): Template | unde
   );
 }
 
-const frDate = (iso: string) => (iso.split("-").length === 3 ? iso.split("-").reverse().join("/") : iso);
-
 /** 15 -> « 15 », 15.5 -> « 15,50 » (domain/utils.format_montant). */
 export function amountText(prix: number | null | undefined): string {
   if (prix == null) {
@@ -47,8 +46,8 @@ export function amountText(prix: number | null | undefined): string {
 }
 
 export function variables(c: Competition, r: Row | undefined): Record<string, string> {
-  const start = frDate(c.date_competition ?? "");
-  const end = frDate(c.date_fin ?? "");
+  const start = formatDayText(c.date_competition ?? "");
+  const end = formatDayText(c.date_fin ?? "");
   const wa = (c.whatsapp_link ?? "").trim();
   return {
     first_name: (r?.prenom ?? "").trim(),

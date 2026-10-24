@@ -3,7 +3,7 @@
    and no payment (amount, order): they stay online, in the member record of Adhérents.
    Filters, search and display helpers are the ones of Adhérents (adherents/members.ts). */
 import { normKey, type Creneau, type Member, type MemberList } from "../adherents/members";
-import { fmtDay } from "../adherents/members";
+import { formatDayText } from "../../lib/format";
 
 const FIELDS = [
   "user_id",
@@ -64,7 +64,7 @@ const joined = (parts: (string | null | undefined)[], sep: string) => parts.filt
 /** Lines of a member's card, unfolded: the empty ones are left out. */
 export function detailRows(m: DirectoryMember): { label: string; value: string }[] {
   const rows: [string, string][] = [
-    ["🎂 Naissance", fmtDay(m.birth_date)],
+    ["🎂 Naissance", formatDayText(m.birth_date)],
     ["📍 Adresse", joined([m.address, joined([m.zip_code, m.city], " ")], ", ")],
     ["📞 Téléphone", m.phone],
     ["✉️ E-mail", m.email_primary],
