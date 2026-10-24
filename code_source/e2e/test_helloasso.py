@@ -162,6 +162,19 @@ def test_linking_pass_goes_from_one_pending_payment_to_the_next(mobile_page, tes
     eventually(one_ignored)
 
 
+def test_competition_links_open_the_competition(page, setup):
+    """Desktop table: the competition detected from what the payer typed, and the linked one, open that competition."""
+    page = open_screen(page)
+    _sync(page)
+    nom = setup["competition"]["nom"]
+    _item_card(page, setup["unknown_payer"]).get_by_test_id("ha-detected").click()
+    expect(page.get_by_test_id("detail-name")).to_have_text(nom)
+
+    go_to(page, "helloasso")
+    _item_card(page, setup["auto"]).get_by_test_id("ha-linked-competition").click()
+    expect(page.get_by_test_id("detail-name")).to_have_text(nom)
+
+
 def test_resync_keeps_coach_decisions(mobile_page, test_data, setup):
     """A new sync rewrites HelloAsso's fields only: manual links and ignored lines survive."""
     member = setup["members"][1]

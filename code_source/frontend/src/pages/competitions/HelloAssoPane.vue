@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* HelloAsso view */
 import { computed, inject, ref, watch } from "vue";
+import { RouterLink } from "vue-router";
 import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
@@ -21,6 +22,7 @@ import {
   nextPending,
   passSummary,
   pendingIds,
+  suggestedCompetition,
   syncMessage,
   type HelloAssoItem,
   type ItemFilter,
@@ -65,7 +67,10 @@ const search = ref("");
 const all = computed(() => props.items ?? []);
 const count = computed(() => itemCounts(all.value));
 const shown = computed(() => filterItems(all.value, filter.value, hideIgnored.value, search.value, props.competitions, props.members));
-const shownRows = computed(() => shown.value.map((it) => ({ it, info: itemInfo(it) })));
+// detected: the competition matching what the payer typed (a guess, unlike competition_id), linked from the row
+const shownRows = computed(() =>
+  shown.value.map((it) => ({ it, info: itemInfo(it), detected: suggestedCompetition(it, props.competitions) })),
+);
 const totalAmount = computed(() => all.value.reduce((sum, it) => sum + Number(it.montant ?? 0), 0));
 const compName = computed(() => new Map(props.competitions.map((c) => [c.id, c.nom])));
 const memberName = computed(() => new Map(props.members.map((m) => [m.id, `${m.nom} ${m.prenom}`])));
@@ -284,7 +289,7 @@ const chip = (active: boolean) => [
           </thead>
           <tbody>
             <tr
-              v-for="{ it, info } in shownRows"
+              v-for="{ it, info, detected } in shownRows"
               :key="it.id_item"
               data-testid="ha-item"
               :class="['border-t border-slate-100 align-top', isIgnored(it) && 'bg-slate-50 opacity-75']"
@@ -301,13 +306,35 @@ const chip = (active: boolean) => [
                 <div class="font-semibold">{{ displayName(it, info) }}</div>
                 <div class="text-[11px] text-slate-500">Licence : {{ it.licence_saisie || "—" }}</div>
               </td>
-              <td class="px-2.5 py-2 text-slate-600">{{ it.competition_saisie || info.itemName || "—" }}</td>
+              <td class="px-2.5 py-2 text-slate-600">
+                <RouterLink
+                  v-if="detected != null"
+                  :to="{ query: { id: String(detected) } }"
+                  :title="`Compétition détectée : ${compName.get(detected)}`"
+                  data-testid="ha-detected"
+                  class="text-accent no-underline hover:underline"
+                >
+                  {{ it.competition_saisie || info.itemName || compName.get(detected) }}
+                </RouterLink>
+                <template v-else>{{ it.competition_saisie || info.itemName || "—" }}</template>
+              </td>
               <td class="px-2.5 py-2 whitespace-nowrap">
                 <b>{{ formatEuros(it.montant) }}</b>
               </td>
               <td class="px-2.5 py-2">
                 <UiBadge :color="isLinked(it) ? 'blue' : isIgnored(it) ? 'slate' : 'amber'" data-testid="ha-state">
-                  <template v-if="isLinked(it)">✅ {{ compName.get(it.competition_id!) ?? `#${it.competition_id}` }}</template>
+                  <template v-if="isLinked(it)">
+                    ✅
+                    <RouterLink
+                      v-if="compName.has(it.competition_id!)"
+                      :to="{ query: { id: String(it.competition_id) } }"
+                      data-testid="ha-linked-competition"
+                      class="text-inherit no-underline hover:underline"
+                    >
+                      {{ compName.get(it.competition_id!) }}
+                    </RouterLink>
+                    <template v-else>#{{ it.competition_id }}</template>
+                  </template>
                   <template v-else-if="isIgnored(it)">🚫 Ignoré{{ it.ignore_motif ? ` (${it.ignore_motif})` : "" }}</template>
                   <template v-else>⚠️ En attente</template>
                 </UiBadge>
@@ -448,7 +475,16 @@ const chip = (active: boolean) => [
             <span class="min-w-0">
               <template v-if="isLinked(it)">
                 <b>Épreuve :</b>
-                {{ compName.get(it.competition_id!) ?? `#${it.competition_id}` }} ·
+                <RouterLink
+                  v-if="compName.has(it.competition_id!)"
+                  :to="{ query: { id: String(it.competition_id) } }"
+                  data-testid="ha-linked-competition"
+                  class="text-accent no-underline hover:underline"
+                >
+                  {{ compName.get(it.competition_id!) }}
+                </RouterLink>
+                <template v-else>#{{ it.competition_id }}</template>
+                ·
                 <b>Athlète :</b>
                 {{ memberName.get(it.adherent_id!) ?? `#${it.adherent_id}` }}
                 <span class="text-slate-500">({{ it.source || "auto" }})</span>
