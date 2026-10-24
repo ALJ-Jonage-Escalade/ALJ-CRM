@@ -9,8 +9,11 @@ export function bindOfflineStore(state: Readonly<Ref<AuthState>>, store: Offline
     // "": signed out; null: not known yet
     () => (state.value.status === "signedOut" ? "" : state.value.status === "loading" ? null : state.value.user.uid),
     (uid) => {
-      if (uid === "") void store.clearAll();
-      else if (uid) void store.start(uid);
+      if (uid === "") {
+        void store.clearAll();
+      } else if (uid) {
+        void store.start(uid);
+      }
     },
     { immediate: true },
   );

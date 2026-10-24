@@ -38,7 +38,9 @@ const loadError = ref("");
 let closed = false; // closed before the PDF came: no URL left unrevoked
 
 onMounted(async () => {
-  if (ineligible) return;
+  if (ineligible) {
+    return;
+  }
   try {
     const blob = await unwrap(
       client.POST("/api/attestations/preview", {
@@ -46,7 +48,9 @@ onMounted(async () => {
         parseAs: "blob",
       }),
     );
-    if (closed) return;
+    if (closed) {
+      return;
+    }
     pdf.value = blob;
     pdfUrl.value = URL.createObjectURL(blob);
   } catch (e) {
@@ -57,11 +61,15 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   closed = true;
-  if (pdfUrl.value) URL.revokeObjectURL(pdfUrl.value);
+  if (pdfUrl.value) {
+    URL.revokeObjectURL(pdfUrl.value);
+  }
 });
 
 function download(): void {
-  if (pdf.value) saveFile(pdf.value, attestationFileName(props.member));
+  if (pdf.value) {
+    saveFile(pdf.value, attestationFileName(props.member));
+  }
 }
 
 const sending = ref(false);
@@ -79,7 +87,9 @@ async function send(): Promise<void> {
     problem.value = "⚠️ Le sujet et le corps de l'e-mail ne peuvent pas être vides.";
     return;
   }
-  if (!confirm(`Envoyer l'attestation de paiement PDF à ${recipient} ?`)) return;
+  if (!confirm(`Envoyer l'attestation de paiement PDF à ${recipient} ?`)) {
+    return;
+  }
   sending.value = true;
   try {
     await unwrap(

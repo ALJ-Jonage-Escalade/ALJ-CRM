@@ -66,7 +66,9 @@ async function sync(): Promise<void> {
   syncing.value = true;
   try {
     const answer = await writer.run(() => unwrap(client.POST("/api/helloasso/sync")));
-    if (answer) writer.toast(syncMessage(answer), answer.status === "success" ? 5000 : 9000);
+    if (answer) {
+      writer.toast(syncMessage(answer), answer.status === "success" ? 5000 : 9000);
+    }
     emit("changed");
   } finally {
     syncing.value = false;
@@ -78,8 +80,11 @@ const dialogOpen = computed({ get: () => !!open.value, set: (v) => (open.value =
 
 function firstWaiting(): void {
   const waiting = all.value.find((it) => !isLinked(it) && !isIgnored(it));
-  if (waiting) open.value = waiting;
-  else writer.toast("🎉 Aucun paiement en attente de rattachement !");
+  if (waiting) {
+    open.value = waiting;
+  } else {
+    writer.toast("🎉 Aucun paiement en attente de rattachement !");
+  }
 }
 
 async function link(competitionId: number | null, adherentId: number | null, comment: string): Promise<void> {
@@ -95,7 +100,9 @@ async function link(competitionId: number | null, adherentId: number | null, com
       ),
     { done: both ? "✅ Paiement HelloAsso rattaché avec succès !" : "💾 Enregistré (paiement non rattaché)." },
   );
-  if (answer) close();
+  if (answer) {
+    close();
+  }
 }
 
 async function ignore(ignoreIt: boolean, note: string): Promise<void> {
@@ -105,7 +112,9 @@ async function ignore(ignoreIt: boolean, note: string): Promise<void> {
     () => unwrap(client.PUT("/api/helloasso/items/{id_item}/ignore", { params: { path: { id_item: it.id_item } }, body })),
     { done: ignoreIt ? "🚫 Ligne ignorée." : "↩️ La ligne n'est plus ignorée." },
   );
-  if (answer) close();
+  if (answer) {
+    close();
+  }
 }
 
 function close(): void {

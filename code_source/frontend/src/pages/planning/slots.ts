@@ -30,7 +30,9 @@ export function parseHours(horaires: string): [number, number] | null {
   for (const m of horaires.matchAll(/(\d{1,2})\s*[:h]\s*(\d{1,2})?/gi)) {
     const h = Number(m[1]);
     const min = Number(m[2] ?? 0);
-    if (h <= 23 && min <= 59) times.push(h + min / 60);
+    if (h <= 23 && min <= 59) {
+      times.push(h + min / 60);
+    }
   }
   const [start, end] = times;
   return start !== undefined && end !== undefined && end > start ? [start, end] : null;
@@ -42,9 +44,15 @@ export type Kind = "competition" | "perfectionnement" | "cours" | "autonome-bloc
 export function slotKind(slot: Pick<Slot, "type" | "groupe">): Kind {
   const t = slot.type.toLowerCase();
   const g = slot.groupe.toLowerCase();
-  if (t.includes("comp") || g.includes("comp")) return "competition";
-  if (t.includes("perf") || g.includes("perf")) return "perfectionnement";
-  if (t.includes("autonome") || g.includes("autonome")) return g.includes("bloc") ? "autonome-bloc" : "autonome";
+  if (t.includes("comp") || g.includes("comp")) {
+    return "competition";
+  }
+  if (t.includes("perf") || g.includes("perf")) {
+    return "perfectionnement";
+  }
+  if (t.includes("autonome") || g.includes("autonome")) {
+    return g.includes("bloc") ? "autonome-bloc" : "autonome";
+  }
   return "cours";
 }
 
@@ -66,7 +74,9 @@ export function layoutDay(slots: readonly Slot[]): Placed[] {
   const laneEnds: number[] = [];
   const placed = timed.map(({ slot, hours: [start, end] }) => {
     let lane = laneEnds.findIndex((laneEnd) => laneEnd <= start + 0.05);
-    if (lane === -1) lane = laneEnds.length;
+    if (lane === -1) {
+      lane = laneEnds.length;
+    }
     laneEnds[lane] = end;
     return { slot, top: Math.max(0, (start - FIRST_HOUR) * HOUR_PX), height: Math.max(28, (end - start) * HOUR_PX - 4), lane };
   });
@@ -92,10 +102,18 @@ export type KindFilter = (typeof KINDS)[number][0];
 function matchesKind(slot: Slot, kind: KindFilter): boolean {
   const t = slot.type.toLowerCase();
   const g = slot.groupe.toLowerCase();
-  if (kind === "cours") return t.includes("cours") || g.includes("loisir");
-  if (kind === "perfectionnement") return t.includes("perf") || g.includes("perf");
-  if (kind === "compétition") return t.includes("comp") || g.includes("comp");
-  if (kind === "autonome") return t.includes("autonome") || g.includes("autonome");
+  if (kind === "cours") {
+    return t.includes("cours") || g.includes("loisir");
+  }
+  if (kind === "perfectionnement") {
+    return t.includes("perf") || g.includes("perf");
+  }
+  if (kind === "compétition") {
+    return t.includes("comp") || g.includes("comp");
+  }
+  if (kind === "autonome") {
+    return t.includes("autonome") || g.includes("autonome");
+  }
   return true;
 }
 
@@ -103,8 +121,12 @@ function matchesKind(slot: Slot, kind: KindFilter): boolean {
 export function filterSlots(slots: readonly Slot[], search: string, kind: KindFilter): Slot[] {
   const q = search.trim().toLowerCase();
   return slots.filter((s) => {
-    if (!matchesKind(s, kind)) return false;
-    if (!q) return true;
+    if (!matchesKind(s, kind)) {
+      return false;
+    }
+    if (!q) {
+      return true;
+    }
     const text = [s.groupe, s.jour, s.horaires, s.type, s.categorie_age, s.encadrants.join(" "), s.helloasso_tarifs.join(" ")];
     return text.join(" ").toLowerCase().includes(q);
   });
@@ -166,8 +188,14 @@ export function tarifOptions(season: readonly string[], linked: readonly string[
 
 /** Why the slot cannot be saved, or null. */
 export function slotError(draft: SlotDraft): string | null {
-  if (!draft.groupe.trim()) return "⚠️ Le nom du groupe est obligatoire.";
-  if (!draft.horaires.trim()) return "⚠️ Les horaires sont obligatoires.";
-  if (!parseHours(draft.horaires)) return "⚠️ Horaires illisibles : écrivez-les comme « 18:00 - 20:00 ».";
+  if (!draft.groupe.trim()) {
+    return "⚠️ Le nom du groupe est obligatoire.";
+  }
+  if (!draft.horaires.trim()) {
+    return "⚠️ Les horaires sont obligatoires.";
+  }
+  if (!parseHours(draft.horaires)) {
+    return "⚠️ Horaires illisibles : écrivez-les comme « 18:00 - 20:00 ».";
+  }
   return null;
 }

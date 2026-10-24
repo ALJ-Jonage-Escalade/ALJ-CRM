@@ -24,24 +24,33 @@ export interface SignInDeps {
 
 function errorText(e: unknown): string {
   const code = (e as { code?: unknown } | null)?.code;
-  if (code === "auth/unauthorized-domain")
+  if (code === "auth/unauthorized-domain") {
     return "Domaine non autorisé : ajoutez l'adresse de ce site dans Firebase Authentication → Paramètres → Domaines autorisés.";
-  if (code === "auth/operation-not-allowed") return "Le fournisseur Google n'est pas activé dans Firebase Authentication.";
-  if (code === "auth/network-request-failed") return "Serveur injoignable : vérifiez la connexion réseau.";
+  }
+  if (code === "auth/operation-not-allowed") {
+    return "Le fournisseur Google n'est pas activé dans Firebase Authentication.";
+  }
+  if (code === "auth/network-request-failed") {
+    return "Serveur injoignable : vérifiez la connexion réseau.";
+  }
   return e instanceof Error && e.message ? e.message : "Connexion impossible.";
 }
 
 /** Runs the sign-in step the address asks for; resolves with the message of a failed sign-in, or null. */
 export async function handleSignIn(deps: SignInDeps): Promise<string | null> {
   const { url, storage } = deps;
-  if (url.pathname !== CALLBACK_PATH) return null;
+  if (url.pathname !== CALLBACK_PATH) {
+    return null;
+  }
   const here = url.pathname + url.search;
 
   // The page that asked for the sign-in (a path of this site only), unless it is this one
   const comeBack = (): void => {
     const back = storage.getItem(AFTER_LOGIN_KEY) ?? "";
     storage.removeItem(AFTER_LOGIN_KEY);
-    if (/^\/[^/\\]/.test(back) && back !== here) deps.navigate(back);
+    if (/^\/[^/\\]/.test(back) && back !== here) {
+      deps.navigate(back);
+    }
   };
 
   try {
@@ -50,7 +59,9 @@ export async function handleSignIn(deps: SignInDeps): Promise<string | null> {
       if (back) {
         deps.replaceUrl(here); // the token does not stay in the address (history, bookmarks)
         storage.removeItem(STATE_KEY);
-        if ("error" in back) return back.error;
+        if ("error" in back) {
+          return back.error;
+        }
         await deps.signInWithToken(back.token);
         comeBack();
         return null;

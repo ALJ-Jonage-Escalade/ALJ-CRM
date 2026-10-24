@@ -69,7 +69,9 @@ export function columnDefs<T extends RowData>(columns: readonly DataColumn<T>[])
 
 /** "1–50 sur 123" */
 export function rangeLabel(pageIndex: number, pageSize: number, total: number): string {
-  if (!total) return "0 sur 0";
+  if (!total) {
+    return "0 sur 0";
+  }
   const first = pageIndex * pageSize + 1;
   return `${first}–${Math.min(total, first + pageSize - 1)} sur ${total}`;
 }

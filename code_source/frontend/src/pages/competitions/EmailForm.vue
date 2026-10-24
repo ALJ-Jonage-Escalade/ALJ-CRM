@@ -28,7 +28,9 @@ const notConfigured = ref(false);
 
 function useTemplate(): void {
   const t = templates.value.find((x) => x.name === templateName.value);
-  if (t) [subject.value, body.value] = [t.subject, t.body];
+  if (t) {
+    [subject.value, body.value] = [t.subject, t.body];
+  }
 }
 
 void (async () => {
@@ -48,7 +50,9 @@ void (async () => {
 
 const preview = computed(() => {
   const first = reachable.value[0];
-  if (!first) return "";
+  if (!first) {
+    return "";
+  }
   const values = variables(props.competition, first);
   return `Sujet : ${render(subject.value, values)}\n\n${render(body.value, values)}`;
 });
@@ -68,19 +72,22 @@ async function send(): Promise<void> {
     problem.value = "⚠️ Aucun destinataire n'a d'adresse e-mail valide.";
     return;
   }
-  if (!confirm(`Envoyer cet e-mail à ${n} compétiteur${n > 1 ? "s" : ""} ?`)) return;
+  if (!confirm(`Envoyer cet e-mail à ${n} compétiteur${n > 1 ? "s" : ""} ?`)) {
+    return;
+  }
   sending.value = true;
   try {
     const result = await unwrap(
       client.POST("/api/send-email", { body: sendBody(props.competition, reachable.value, subject.value, body.value) }),
     );
-    if (result.status === "error")
+    if (result.status === "error") {
       problem.value = `❌ Échec d'envoi : ${result.message || result.details?.[0]?.error || "erreur d'envoi."}`;
-    else
+    } else {
       emit(
         "sent",
         `✅ ${result.sent_count} e-mail(s) envoyé(s) avec succès${result.errors_count ? `, ${result.errors_count} en échec` : ""}.`,
       );
+    }
   } catch (e) {
     problem.value = `❌ Échec d'envoi : ${errorText(e)}`;
   } finally {

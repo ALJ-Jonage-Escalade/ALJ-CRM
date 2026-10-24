@@ -37,7 +37,9 @@ const ACTIVE: MemberList = {
 
 function json(body: unknown, status = 200, etag?: string): Response {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (etag) headers.ETag = etag;
+  if (etag) {
+    headers.ETag = etag;
+  }
   return new Response(JSON.stringify(body), { status, headers });
 }
 
@@ -46,9 +48,15 @@ function fakeApi(offline = false) {
   const calls: string[] = [];
   const api: ApiFetch = vi.fn(async (url: string) => {
     calls.push(url);
-    if (offline) throw new TypeError("Failed to fetch");
-    if (url === "/api/seasons") return json({ seasons: ["2026-2027", "2025-2026"], active: "2026-2027" }, 200, '"s1"');
-    if (url.startsWith("/api/members")) return json(ACTIVE, 200, '"m1"');
+    if (offline) {
+      throw new TypeError("Failed to fetch");
+    }
+    if (url === "/api/seasons") {
+      return json({ seasons: ["2026-2027", "2025-2026"], active: "2026-2027" }, 200, '"s1"');
+    }
+    if (url.startsWith("/api/members")) {
+      return json(ACTIVE, 200, '"m1"');
+    }
     return json({}, 404);
   });
   return { api, calls };

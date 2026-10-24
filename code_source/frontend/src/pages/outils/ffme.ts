@@ -20,7 +20,9 @@ export async function readBase64(file: Blob): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = "";
   // By chunks: String.fromCharCode takes its bytes as arguments, which are limited in number
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
   return btoa(binary);
 }
 
@@ -38,7 +40,9 @@ export function sortedMembers(members: readonly Member[]): Member[] {
 export function manualMatches(unmatched: readonly Licensee[], choices: readonly (number | null)[]): ManualMatch[] {
   return unmatched.flatMap((row, i) => {
     const userId = choices[i];
-    if (userId == null) return [];
+    if (userId == null) {
+      return [];
+    }
     const { nom, prenom, licence, passeports, diplomes, document_sante } = row;
     return [{ user_id: userId, nom, prenom, licence, passeports, diplomes, document_sante }];
   });

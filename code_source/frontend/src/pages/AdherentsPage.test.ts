@@ -12,7 +12,9 @@ import { member } from "./adherents/members.fixture";
 
 function json(body: unknown, status = 200, etag?: string): Response {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (etag) headers.ETag = etag;
+  if (etag) {
+    headers.ETag = etag;
+  }
   return new Response(JSON.stringify(body), { status, headers });
 }
 
@@ -56,9 +58,15 @@ type Answer = (req: { search: string; ifNoneMatch: string | null; body?: unknown
 const ANSWERS: Record<string, Answer> = {
   "GET /api/seasons": () => json({ seasons: ["2026-2027", "2025-2026"], active: "2026-2027" }, 200, '"s1"'),
   "GET /api/members": ({ search, ifNoneMatch }) => {
-    if (search.includes("1999")) return json({ status: "error", message: "Saison inconnue", code: "not_found" }, 404);
-    if (search.includes("2025-2026")) return json(PAST, 200, '"m-past"');
-    if (ifNoneMatch === '"m1"') return new Response(null, { status: 304 });
+    if (search.includes("1999")) {
+      return json({ status: "error", message: "Saison inconnue", code: "not_found" }, 404);
+    }
+    if (search.includes("2025-2026")) {
+      return json(PAST, 200, '"m-past"');
+    }
+    if (ifNoneMatch === '"m1"') {
+      return new Response(null, { status: 304 });
+    }
     return json(ACTIVE, 200, '"m1"');
   },
   "POST /api/cloud-db/sync": () => json({ status: "success", message: "ok", result: { pulled: 1, pushed: 0, full: true } }),
@@ -418,8 +426,9 @@ describe("AdherentsPage", () => {
     await flushPromises();
     inBody("member-save")!.click();
     await flushPromises();
-    for (const field of ["last_name", "first_name", "birth_date"])
+    for (const field of ["last_name", "first_name", "birth_date"]) {
       expect(inBody(`member-${field}`)!.getAttribute("aria-invalid")).toBe("true");
+    }
     expect(writes()).toEqual([]);
 
     const type = (id: string, value: string) => {

@@ -135,11 +135,21 @@ export function filterItems(
   const compName = new Map(competitions.map((c) => [c.id, c.nom ?? ""]));
   const member = new Map(members.map((m) => [m.id, `${m.nom} ${m.prenom}`]));
   const shown = items.filter((it) => {
-    if (filter === "unlinked" && (isLinked(it) || isIgnored(it))) return false;
-    if (filter === "linked" && !isLinked(it)) return false;
-    if (filter === "ignored" && !isIgnored(it)) return false;
-    if (filter === "all" && hideIgnored && isIgnored(it)) return false;
-    if (!q) return true;
+    if (filter === "unlinked" && (isLinked(it) || isIgnored(it))) {
+      return false;
+    }
+    if (filter === "linked" && !isLinked(it)) {
+      return false;
+    }
+    if (filter === "ignored" && !isIgnored(it)) {
+      return false;
+    }
+    if (filter === "all" && hideIgnored && isIgnored(it)) {
+      return false;
+    }
+    if (!q) {
+      return true;
+    }
     const h = itemInfo(it);
     return normKey(
       [
@@ -171,9 +181,13 @@ export function filterItems(
 
 /** The competition an item is for: its link, else the one whose FFME number or name the payer typed. */
 export function suggestedCompetition(it: HelloAssoItem, competitions: readonly Competition[]): number | null {
-  if (it.competition_id != null && competitions.some((c) => c.id === it.competition_id)) return it.competition_id;
+  if (it.competition_id != null && competitions.some((c) => c.id === it.competition_id)) {
+    return it.competition_id;
+  }
   const typed = normKey([it.competition_saisie, ...itemInfo(it).fields.map((f) => f.answer)].join(" "));
-  if (!typed) return null;
+  if (!typed) {
+    return null;
+  }
   const match = sortCompetitions(competitions).find((c) => {
     const number = normKey(c.id_ffme);
     const name = normKey(c.nom);
@@ -186,11 +200,15 @@ const digits = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
 
 /** The member an item is for: its link, else the licence number typed, else the beneficiary's name. */
 export function suggestedMember(it: HelloAssoItem, members: readonly MemberSlot[]): number | null {
-  if (it.adherent_id != null && members.some((m) => m.id === it.adherent_id)) return it.adherent_id;
+  if (it.adherent_id != null && members.some((m) => m.id === it.adherent_id)) {
+    return it.adherent_id;
+  }
   const info = itemInfo(it);
   const licences = [it.licence_saisie, ...info.fields.map((f) => f.answer)].map(digits).filter((d) => d.length >= 5);
   const byLicence = members.find((m) => digits(m.licence_ffme) && licences.includes(digits(m.licence_ffme)));
-  if (byLicence) return byLicence.id ?? null;
+  if (byLicence) {
+    return byLicence.id ?? null;
+  }
   const name = normKey(`${info.beneficiary} ${it.payer_nom ?? ""} ${it.payer_prenom ?? ""}`);
   const byName = members.find(
     (m) => normKey(m.nom) && name.includes(normKey(m.nom)) && (!normKey(m.prenom) || name.includes(normKey(m.prenom))),
@@ -199,7 +217,9 @@ export function suggestedMember(it: HelloAssoItem, members: readonly MemberSlot[
 }
 
 export function syncMessage(answer: Schemas["HelloAssoSync"]): string {
-  if (answer.status !== "success") return `❌ ${answer.message || "Erreur lors de la synchronisation."}`;
+  if (answer.status !== "success") {
+    return `❌ ${answer.message || "Erreur lors de la synchronisation."}`;
+  }
   const st = answer.stats;
   return `✅ Synchro terminée : ${st?.nb_items ?? 0} article(s), ${st?.nb_auto ?? 0} auto, ${st?.nb_unlinked ?? 0} en attente.`;
 }

@@ -42,8 +42,12 @@ export interface WriterDeps {
 /** The competition carried by a write's answer: the competition itself, or { competition } (load-group). */
 export function answeredCompetition(answer: unknown): Competition | null {
   const a = answer as { id?: unknown; participants?: unknown; competition?: unknown } | null;
-  if (a && typeof a.id === "number" && Array.isArray(a.participants)) return a as Competition;
-  if (a && a.competition) return answeredCompetition(a.competition);
+  if (a && typeof a.id === "number" && Array.isArray(a.participants)) {
+    return a as Competition;
+  }
+  if (a && a.competition) {
+    return answeredCompetition(a.competition);
+  }
   return null;
 }
 
@@ -61,15 +65,20 @@ export function createWriter(deps: WriterDeps): Writer {
     try {
       const answer = await call();
       const competition = answeredCompetition(answer);
-      if (competition) deps.apply(competition);
+      if (competition) {
+        deps.apply(competition);
+      }
       deps.reload();
       const done = typeof options.done === "function" ? options.done(answer) : options.done;
-      if (done) deps.toast(done);
+      if (done) {
+        deps.toast(done);
+      }
       return answer;
     } catch (e) {
       const error = e instanceof ApiError ? e : new ApiError(0, null, "Erreur inattendue.");
-      if (!options.refused?.(error))
+      if (!options.refused?.(error)) {
         deps.toast(error.status === 0 && error.code === "network" ? NETWORK_MESSAGE : `❌ ${error.message}`, 9000);
+      }
       return undefined;
     } finally {
       busy.value = --running > 0;

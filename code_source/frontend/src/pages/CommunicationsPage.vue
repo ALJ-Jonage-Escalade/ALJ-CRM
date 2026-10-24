@@ -107,7 +107,9 @@ const deleting = ref(false);
 
 async function remove(): Promise<void> {
   const name = selected.value;
-  if (!name || !confirm(`Êtes-vous sûr de vouloir supprimer définitivement le modèle d'e-mail « ${name} » ?`)) return;
+  if (!name || !confirm(`Êtes-vous sûr de vouloir supprimer définitivement le modèle d'e-mail « ${name} » ?`)) {
+    return;
+  }
   deleting.value = true;
   try {
     await unwrap(client.DELETE("/api/email-templates/{template_name}", { params: { path: { template_name: name } } }));

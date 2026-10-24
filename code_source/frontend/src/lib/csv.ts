@@ -7,8 +7,12 @@ export type Cell = string | number | boolean | null | undefined;
 
 /** The cell, prefixed with ' when a spreadsheet would read it as a formula. Signed numbers and phone numbers are kept. */
 export function csvSafe(value: string): string {
-  if (!/^[=+\-@\t\r]/.test(value)) return value;
-  if (/^[+-][\d\s().,]*$/.test(value)) return value;
+  if (!/^[=+\-@\t\r]/.test(value)) {
+    return value;
+  }
+  if (/^[+-][\d\s().,]*$/.test(value)) {
+    return value;
+  }
   return `'${value}`;
 }
 

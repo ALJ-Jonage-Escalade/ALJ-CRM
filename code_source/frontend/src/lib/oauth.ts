@@ -30,12 +30,20 @@ export function authorizeUrl(origin: string, state: string): string {
 export type OauthReturn = null | { token: string } | { error: string };
 
 export function readFragment(hash: string, expectedState: string | null): OauthReturn {
-  if (!hash || hash.length < 2) return null;
+  if (!hash || hash.length < 2) {
+    return null;
+  }
   const params = new URLSearchParams(hash.slice(1));
-  if (params.get("error")) return { error: `Connexion Google refusée : ${params.get("error")}` };
+  if (params.get("error")) {
+    return { error: `Connexion Google refusée : ${params.get("error")}` };
+  }
   const token = params.get("access_token");
-  if (!token) return null;
+  if (!token) {
+    return null;
+  }
   const state = params.get("state");
-  if (!state || state !== expectedState) return { error: "Session de connexion invalide — cliquez à nouveau sur « Se connecter »." };
+  if (!state || state !== expectedState) {
+    return { error: "Session de connexion invalide — cliquez à nouveau sur « Se connecter »." };
+  }
   return { token };
 }

@@ -43,7 +43,9 @@ const when = (s: string) => (s && !Number.isNaN(Date.parse(s)) ? DATE.format(new
 
 function ignore(): void {
   missingReason.value = !ignored.value && !comment.value.trim();
-  if (!missingReason.value) emit("ignore", !ignored.value, comment.value.trim());
+  if (!missingReason.value) {
+    emit("ignore", !ignored.value, comment.value.trim());
+  }
 }
 
 const label = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";

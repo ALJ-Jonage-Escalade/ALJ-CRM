@@ -21,7 +21,9 @@ export interface RecordRow {
 export function recordRows(m: Member): RecordRow[] {
   const rows: RecordRow[] = [];
   const add = (icon: string, label: string, value: string) => {
-    if (value) rows.push({ icon, label, value });
+    if (value) {
+      rows.push({ icon, label, value });
+    }
   };
   const join = (sep: string, ...parts: string[]) => parts.filter(Boolean).join(sep);
   add("🎂", "Date de naissance", m.birth_date ? `${fmtDay(m.birth_date)}${m.age != null ? ` (${m.age} ans)` : ""}` : "");
@@ -41,7 +43,9 @@ export function recordRows(m: Member): RecordRow[] {
   add("📷", "Droit à l'image", m.photo_auth);
   add("🔴", "Badge rouge", m.badge_rouge);
   add("🧗", "Autonomie bloc", m.autonomie_bloc);
-  if (diplomes(m).some((d) => d.type === "passeport_orange")) add("🟠", "Passeport orange", "Oui");
+  if (diplomes(m).some((d) => d.type === "passeport_orange")) {
+    add("🟠", "Passeport orange", "Oui");
+  }
   add("🎓", "Passeports FFME", m.raw_passports);
   if (m.payer && normKey(m.payer) !== normKey(`${m.first_name} ${m.last_name}`)) {
     add("💳", "Payeur", m.payer + (m.payer_email ? ` (${m.payer_email})` : ""));
@@ -68,10 +72,18 @@ export function tarifChoices(creneaux: readonly Creneau[], members: readonly Mem
   const detail = new Map<string, string>();
   const add = (tarif: string, text: string) => {
     const t = tarif.trim();
-    if (t && (!detail.has(t) || (!detail.get(t) && text))) detail.set(t, text);
+    if (t && (!detail.has(t) || (!detail.get(t) && text))) {
+      detail.set(t, text);
+    }
   };
-  for (const c of creneaux) for (const t of c.tarifs) add(t, c.groupe);
-  for (const m of members) add(m.tarif_name, [m.creneau_groupe, m.creneau_details].filter(Boolean).join(" · "));
+  for (const c of creneaux) {
+    for (const t of c.tarifs) {
+      add(t, c.groupe);
+    }
+  }
+  for (const m of members) {
+    add(m.tarif_name, [m.creneau_groupe, m.creneau_details].filter(Boolean).join(" · "));
+  }
   add("Licence sèche", "Licence seule · Sans créneau de cours");
   return [...detail].map(([tarif, text]) => ({ tarif, detail: text })).sort((a, b) => a.tarif.localeCompare(b.tarif, "fr"));
 }
@@ -149,7 +161,9 @@ function looksLikePhone(value: string): boolean {
 /** A yyyy-mm-dd date that exists, not in the future. */
 function validBirthDate(value: string, today: Date): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return false;
+  if (!m) {
+    return false;
+  }
   const d = new Date(+m[1]!, +m[2]! - 1, +m[3]!);
   return d.getMonth() === +m[2]! - 1 && d.getDate() === +m[3]! && d <= today && +m[1]! >= 1900;
 }
@@ -158,19 +172,36 @@ function validBirthDate(value: string, today: Date): boolean {
 export function draftErrors(d: MemberDraft, adding: boolean, today: Date = new Date()): DraftErrors {
   const errors: DraftErrors = {};
   if (adding) {
-    if (!d.last_name.trim()) errors.last_name = "Le nom est obligatoire.";
-    if (!d.first_name.trim()) errors.first_name = "Le prénom est obligatoire.";
-    if (!d.birth_date) errors.birth_date = "La date de naissance est obligatoire.";
-    else if (!validBirthDate(d.birth_date, today)) errors.birth_date = "Date de naissance invalide.";
+    if (!d.last_name.trim()) {
+      errors.last_name = "Le nom est obligatoire.";
+    }
+    if (!d.first_name.trim()) {
+      errors.first_name = "Le prénom est obligatoire.";
+    }
+    if (!d.birth_date) {
+      errors.birth_date = "La date de naissance est obligatoire.";
+    } else if (!validBirthDate(d.birth_date, today)) {
+      errors.birth_date = "Date de naissance invalide.";
+    }
     const amount = Number(d.amount.replace(",", "."));
-    if (d.amount.trim() && (!Number.isFinite(amount) || amount < 0)) errors.amount = "Montant invalide (nombre positif).";
-    if (d.emergency1_phone.trim() && !looksLikePhone(d.emergency1_phone.trim())) errors.emergency1_phone = "Numéro de téléphone invalide.";
+    if (d.amount.trim() && (!Number.isFinite(amount) || amount < 0)) {
+      errors.amount = "Montant invalide (nombre positif).";
+    }
+    if (d.emergency1_phone.trim() && !looksLikePhone(d.emergency1_phone.trim())) {
+      errors.emergency1_phone = "Numéro de téléphone invalide.";
+    }
   }
-  if (!d.tarif_name.trim()) errors.tarif_name = "Choisissez un groupe (tarif).";
+  if (!d.tarif_name.trim()) {
+    errors.tarif_name = "Choisissez un groupe (tarif).";
+  }
   for (const field of ["email_primary", "email_secondary"] as const) {
-    if (d[field].trim() && !looksLikeEmail(d[field].trim())) errors[field] = "Adresse e-mail invalide.";
+    if (d[field].trim() && !looksLikeEmail(d[field].trim())) {
+      errors[field] = "Adresse e-mail invalide.";
+    }
   }
-  if (d.phone.trim() && !looksLikePhone(d.phone.trim())) errors.phone = "Numéro de téléphone invalide.";
+  if (d.phone.trim() && !looksLikePhone(d.phone.trim())) {
+    errors.phone = "Numéro de téléphone invalide.";
+  }
   return errors;
 }
 
@@ -227,7 +258,9 @@ export function changesOf(m: Member, d: MemberDraft): Changes {
   for (const [field, label] of EDITED) {
     const was = before[field].trim();
     const now = d[field].trim();
-    if (now === was) continue;
+    if (now === was) {
+      continue;
+    }
     fields[field] = now;
     lines.push(`${label} : ${was || "vide"} ➔ ${now || "vide"}`);
   }
@@ -299,8 +332,12 @@ export function attestationTemplates(templates: readonly Template[]): { list: Te
 
 /** Why no certificate can be made for this membership, or null (the server checks again). */
 export function attestationProblem(m: Member): string | null {
-  if (normKey(m.status_norm).includes("annul")) return "la commande est annulée";
-  if (!(Number(m.amount) > 0)) return "le montant est nul (0 €)";
+  if (normKey(m.status_norm).includes("annul")) {
+    return "la commande est annulée";
+  }
+  if (!(Number(m.amount) > 0)) {
+    return "le montant est nul (0 €)";
+  }
   return null;
 }
 

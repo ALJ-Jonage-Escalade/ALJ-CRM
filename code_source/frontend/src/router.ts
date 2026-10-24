@@ -51,7 +51,9 @@ export const routes: RouteRecordRaw[] = [
 ];
 
 function redirectFor(to: RouteLocationNormalized, auth: Auth): RouteLocationRaw | true {
-  if (verdict(auth.state.value, to.meta.access ?? "public") !== "adminOnly") return true;
+  if (verdict(auth.state.value, to.meta.access ?? "public") !== "adminOnly") {
+    return true;
+  }
   return { path: HOME, query: { [REFUSED_QUERY]: to.path } };
 }
 
@@ -60,7 +62,9 @@ export function installGuards(router: Router, auth: Auth): void {
   router.beforeEach((to) => redirectFor(to, auth));
   watch(auth.state, () => {
     const target = redirectFor(router.currentRoute.value, auth);
-    if (target !== true) void router.replace(target);
+    if (target !== true) {
+      void router.replace(target);
+    }
   });
 }
 

@@ -65,9 +65,15 @@ export function shownOn(screen: Screen, display: "flex" | "block"): string {
 }
 
 export function canOpen(role: Role, access: Access): boolean {
-  if (access === "public") return true;
-  if (access === "admin") return role === "admin";
-  if (access === "viewer") return role !== null;
+  if (access === "public") {
+    return true;
+  }
+  if (access === "admin") {
+    return role === "admin";
+  }
+  if (access === "viewer") {
+    return role !== null;
+  }
   return isStaff(role);
 }
 
@@ -83,10 +89,20 @@ export function canOpen(role: Role, access: Access): boolean {
 export type Verdict = "allow" | "pending" | "signIn" | "unverified" | "noAccess" | "adminOnly" | "offline";
 
 export function verdict(state: AuthState, access: Access, offlineRead = false): Verdict {
-  if (access === "public") return "allow";
-  if (state.status === "loading") return "pending";
-  if (state.status === "signedOut") return "signIn";
-  if (state.status === "error") return offlineRead && state.offline ? "offline" : "unverified";
-  if (canOpen(state.role, access)) return "allow";
+  if (access === "public") {
+    return "allow";
+  }
+  if (state.status === "loading") {
+    return "pending";
+  }
+  if (state.status === "signedOut") {
+    return "signIn";
+  }
+  if (state.status === "error") {
+    return offlineRead && state.offline ? "offline" : "unverified";
+  }
+  if (canOpen(state.role, access)) {
+    return "allow";
+  }
   return isStaff(state.role) ? "adminOnly" : "noAccess";
 }

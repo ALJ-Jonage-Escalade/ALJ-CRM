@@ -25,9 +25,15 @@ export class ApiError extends Error {
 export const NETWORK_MESSAGE = "Serveur injoignable : vérifiez la connexion réseau.";
 
 function defaultMessage(status: number): string {
-  if (status === 401) return "Session refusée par le serveur : reconnectez-vous.";
-  if (status === 403) return "Action non autorisée pour votre rôle.";
-  if (status === 404) return "Élément introuvable sur le serveur.";
+  if (status === 401) {
+    return "Session refusée par le serveur : reconnectez-vous.";
+  }
+  if (status === 403) {
+    return "Action non autorisée pour votre rôle.";
+  }
+  if (status === 404) {
+    return "Élément introuvable sur le serveur.";
+  }
   return `Le serveur ne répond pas correctement (erreur ${status}).`;
 }
 
@@ -48,8 +54,12 @@ export function errorFromBody(status: number, body: unknown): ApiError {
   if (body && typeof body === "object") {
     const { message, code, detail } = body as { message?: unknown; code?: unknown; detail?: unknown };
     const codeText = typeof code === "string" ? code : null;
-    if (typeof message === "string" && message) return new ApiError(status, codeText, message);
-    if (typeof detail === "string" && detail) return new ApiError(status, codeText, detail);
+    if (typeof message === "string" && message) {
+      return new ApiError(status, codeText, message);
+    }
+    if (typeof detail === "string" && detail) {
+      return new ApiError(status, codeText, detail);
+    }
     if (Array.isArray(detail)) {
       const fields = invalidFields(detail);
       return new ApiError(status, "validation", `Données refusées par le serveur${fields ? ` (${fields})` : ""}.`);
@@ -75,10 +85,14 @@ export async function unwrap<T>(call: Promise<{ data?: T; error?: unknown; respo
   try {
     result = await call;
   } catch (e) {
-    if (e instanceof TypeError) throw new ApiError(0, "network", NETWORK_MESSAGE); // fetch rejects offline
+    if (e instanceof TypeError) {
+      throw new ApiError(0, "network", NETWORK_MESSAGE);
+    } // fetch rejects offline
     throw new ApiError(0, null, "Réponse illisible du serveur."); // e.g. a success body that is not JSON
   }
-  if (result.response.ok) return result.data as T;
+  if (result.response.ok) {
+    return result.data as T;
+  }
   throw errorFromBody(result.response.status, result.error);
 }
 

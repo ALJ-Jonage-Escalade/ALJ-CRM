@@ -65,10 +65,18 @@ export const outboxKey = (competitionId: number | string, adherentId: number | s
   `${competitionId}:${adherentId}:${flag}`;
 
 export function refusalText(e: ApiError): string {
-  if (e.code === "changed") return "modifié entre-temps sur un autre appareil";
-  if (e.code === "already_paid") return "a payé entre-temps : passez par l'annulation";
-  if (e.code === "competition_closed") return "compétition archivée";
-  if (e.status === 404) return "n'est plus inscrit à cette compétition";
+  if (e.code === "changed") {
+    return "modifié entre-temps sur un autre appareil";
+  }
+  if (e.code === "already_paid") {
+    return "a payé entre-temps : passez par l'annulation";
+  }
+  if (e.code === "competition_closed") {
+    return "compétition archivée";
+  }
+  if (e.status === 404) {
+    return "n'est plus inscrit à cette compétition";
+  }
   return e.message || `HTTP ${e.status}`;
 }
 
@@ -94,7 +102,9 @@ export function pendingLine(n: number): string {
 /** The toast after a replay. */
 export function replayMessage(r: ReplayResult): string {
   const n = r.refused.length;
-  if (!n) return "☁️ Modifications faites hors ligne envoyées.";
+  if (!n) {
+    return "☁️ Modifications faites hors ligne envoyées.";
+  }
   return `⚠️ ${n} modification${s(n)} faite${s(n)} hors ligne refusée${s(n)} : ${r.refused.join(" ; ")}`;
 }
 
@@ -112,10 +122,14 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
   async function load(uid: string | null): Promise<void> {
     const mine = ++generation;
     changes.value = new Map();
-    if (!uid) return;
+    if (!uid) {
+      return;
+    }
     const entries = await store.queued(uid);
     // Entries are checked when sent: one written by another version is refused then, not lost silently
-    if (mine === generation) changes.value = new Map(entries.map((e) => [e.key, e as unknown as QueuedChange]));
+    if (mine === generation) {
+      changes.value = new Map(entries.map((e) => [e.key, e as unknown as QueuedChange]));
+    }
   }
 
   async function queue(uid: string, competition: Competition, participant: Participant, flag: QueuedFlag, value: boolean): Promise<void> {
@@ -146,13 +160,17 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
 
   /* Out of the outbox, unless changed again meanwhile: the newer change stays. */
   async function drop(entry: QueuedChange): Promise<void> {
-    if (changes.value.get(entry.key) !== entry) return;
+    if (changes.value.get(entry.key) !== entry) {
+      return;
+    }
     set((m) => m.delete(entry.key));
     await store.unqueue(entry.key);
   }
 
   async function replay(uid: string): Promise<ReplayResult | null> {
-    if (replaying || !changes.value.size) return null;
+    if (replaying || !changes.value.size) {
+      return null;
+    }
     replaying = true;
     const mine = generation;
     const result: ReplayResult = { done: 0, refused: [], denied: false };
@@ -160,7 +178,9 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
     const written = new Map<string, { from: string; to: string }>();
     try {
       for (const entry of [...changes.value.values()].sort((a, b) => a.queuedAt - b.queuedAt)) {
-        if (mine !== generation) return null;
+        if (mine !== generation) {
+          return null;
+        }
         if (!isValid(entry, uid)) {
           result.refused.push(`${entry.label || "?"} : modification non valide, non envoyée`);
         } else {
@@ -170,10 +190,14 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
           try {
             const competition = await send(competitionId!, adherentId!, { [entry.flag]: entry.value, unchanged_since: unchangedSince });
             const after = competition.participants?.find((p) => p.adherent_id === adherentId)?.updated_at;
-            if (after != null) written.set(entry.url, { from: entry.unchanged_since, to: String(after) });
+            if (after != null) {
+              written.set(entry.url, { from: entry.unchanged_since, to: String(after) });
+            }
           } catch (e) {
             const error = e instanceof ApiError ? e : new ApiError(0, null, "Erreur inattendue.");
-            if (retryLater(error)) break;
+            if (retryLater(error)) {
+              break;
+            }
             if (error.status === 401 || error.status === 403) {
               result.denied = true;
               return result;
@@ -181,7 +205,9 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
             result.refused.push(`${entry.label} : ${refusalText(error)}`);
           }
         }
-        if (mine !== generation) return null;
+        if (mine !== generation) {
+          return null;
+        }
         await drop(entry);
         result.done++;
       }

@@ -49,9 +49,15 @@ function line(c: Competition, p: Participant): BalanceLine | null {
   const status = p.statut_paiement || "non_invite";
   const paid = Number(p.montant_paye ?? 0);
   const base = { competition: c, status, present: !!p.present };
-  if (status === "annule_reporte") return { ...base, due: 0, paid, carriedOver: true };
-  if (status === "annule_perdu") return { ...base, due: paid, paid, carriedOver: false };
-  if (!p.selectionne && !paid) return null;
+  if (status === "annule_reporte") {
+    return { ...base, due: 0, paid, carriedOver: true };
+  }
+  if (status === "annule_perdu") {
+    return { ...base, due: paid, paid, carriedOver: false };
+  }
+  if (!p.selectionne && !paid) {
+    return null;
+  }
   return { ...base, due: p.selectionne ? Number(c.prix ?? 0) : 0, paid, carriedOver: false };
 }
 
@@ -62,10 +68,14 @@ export function balances(list: readonly Competition[], season: string, today: st
   const current = seasonOf(today);
   const byMember = new Map<string, Balance>();
   for (const c of list) {
-    if ((c.date_competition ? seasonOf(c.date_competition) : current) !== season) continue;
+    if ((c.date_competition ? seasonOf(c.date_competition) : current) !== season) {
+      continue;
+    }
     for (const p of c.participants ?? []) {
       const l = line(c, p);
-      if (!l) continue;
+      if (!l) {
+        continue;
+      }
       const key = p.adherent_id != null ? String(p.adherent_id) : `${p.nom}|${p.prenom}`;
       const b = byMember.get(key) ?? {
         adherentId: p.adherent_id ?? null,
@@ -87,8 +97,9 @@ export function balances(list: readonly Competition[], season: string, today: st
       byMember.set(key, b);
     }
   }
-  for (const b of byMember.values())
+  for (const b of byMember.values()) {
     b.lines.sort((x, y) => (x.competition.date_competition ?? "").localeCompare(y.competition.date_competition ?? ""));
+  }
   return [...byMember.values()].sort((a, b) => a.nom.localeCompare(b.nom, "fr") || a.prenom.localeCompare(b.prenom, "fr"));
 }
 
@@ -109,8 +120,12 @@ export function totals(list: readonly Balance[]): { due: number; paid: number; r
 
 /** « ✅ Équilibré », « ⚠️ Reste dû 15,00 € » or « Crédit 12,00 € ». */
 export function balanceLabel(b: Pick<Balance, "remaining">, euros: (n: number) => string): { text: string; tone: "ok" | "due" | "credit" } {
-  if (b.remaining > 0.005) return { text: `⚠️ Reste dû ${euros(b.remaining)}`, tone: "due" };
-  if (b.remaining < -0.005) return { text: `💜 Crédit ${euros(-b.remaining)}`, tone: "credit" };
+  if (b.remaining > 0.005) {
+    return { text: `⚠️ Reste dû ${euros(b.remaining)}`, tone: "due" };
+  }
+  if (b.remaining < -0.005) {
+    return { text: `💜 Crédit ${euros(-b.remaining)}`, tone: "credit" };
+  }
   return { text: "✅ Équilibré", tone: "ok" };
 }
 

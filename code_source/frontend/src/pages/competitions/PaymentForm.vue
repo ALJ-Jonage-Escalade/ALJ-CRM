@@ -13,7 +13,9 @@ const invalid = ref(false);
 
 function confirm(): void {
   invalid.value = !(value.value > 0);
-  if (!invalid.value) emit("confirm", value.value);
+  if (!invalid.value) {
+    emit("confirm", value.value);
+  }
 }
 </script>
 

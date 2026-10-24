@@ -11,11 +11,15 @@ export function createApiFetch(getToken: TokenSource, fetchImpl: typeof fetch = 
     const send = async (forceRefresh: boolean): Promise<[Response, boolean]> => {
       const headers = new Headers(init.headers);
       const token = await getToken(forceRefresh);
-      if (token) headers.set("Authorization", `Bearer ${token}`);
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
       return [await fetchImpl(url, { ...init, headers }), token !== null];
     };
     const [res, sentToken] = await send(false);
-    if (res.status !== 401 || !sentToken) return res;
+    if (res.status !== 401 || !sentToken) {
+      return res;
+    }
     return (await send(true))[0];
   };
 }

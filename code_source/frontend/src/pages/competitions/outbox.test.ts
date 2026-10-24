@@ -18,7 +18,9 @@ function server(answers: Record<string, (body: object) => unknown> = {}) {
     const url = `/api/competitions/${competitionId}/participants/${adherentId}`;
     sent.push({ url, body });
     const answer = answers[url]?.(body);
-    if (answer instanceof ApiError) throw answer;
+    if (answer instanceof ApiError) {
+      throw answer;
+    }
     return { id: competitionId, participants: [{ adherent_id: adherentId, updated_at: `t${clock++}` }] };
   });
   return { send, sent };

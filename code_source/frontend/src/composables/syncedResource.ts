@@ -54,7 +54,9 @@ export function useSyncedResource<T>(
   options: SyncedResourceOptions<T>,
 ): SyncedResource<T> {
   const fetchFn = options.fetch ?? inject(API_KEY);
-  if (!fetchFn) throw new Error(`useSyncedResource(${name}): no API fetch provided`);
+  if (!fetchFn) {
+    throw new Error(`useSyncedResource(${name}): no API fetch provided`);
+  }
   const store = options.offline ? (options.store ?? inject(STORE_KEY, null) ?? offlineStore()) : null;
   const select = options.select ?? ((answer: unknown) => answer as T);
   const data = shallowRef<T | null>(null);
@@ -74,13 +76,17 @@ export function useSyncedResource<T>(
     dataAt.value = null;
     state.value = "loading";
     httpStatus.value = null;
-    if (!target || stopped) return;
+    if (!target || stopped) {
+      return;
+    }
     const owner = store ? uid : null;
     let etag: string | null = null;
     if (store && owner) {
       await store.start(owner);
       const copy = await store.load<T>(name, owner);
-      if (mine !== generation || stopped) return;
+      if (mine !== generation || stopped) {
+        return;
+      }
       // No url: written by the former competitions page (alj-store.js), for the same fixed url
       if (copy && (copy.url === target || copy.url === null)) {
         data.value = copy.data;
@@ -95,10 +101,14 @@ export function useSyncedResource<T>(
       onData: (answer, newEtag) => {
         const value = select(answer);
         data.value = value;
-        if (store && owner) void store.save(name, owner, value, newEtag, target);
+        if (store && owner) {
+          void store.save(name, owner, value, newEtag, target);
+        }
       },
       onStatus: (status, info) => {
-        if (store && owner && status === "ok" && !info.changed) void store.touch(name, owner);
+        if (store && owner && status === "ok" && !info.changed) {
+          void store.touch(name, owner);
+        }
         onStatus(status, info);
       },
     });
@@ -107,14 +117,18 @@ export function useSyncedResource<T>(
   function onStatus(status: PollStatus, info: PollInfo): void {
     state.value = status;
     httpStatus.value = info.status ?? null;
-    if (status === "ok") checkedAt.value = dataAt.value = new Date();
+    if (status === "ok") {
+      checkedAt.value = dataAt.value = new Date();
+    }
     if (store && (info.status === 401 || info.status === 403)) {
       // Role lost: nothing kept on the device, this user's other copies included
       data.value = null;
       dataAt.value = null;
       void store.clearAll();
     }
-    if (info.status === 401 || (store && info.status === 403)) stop(); // signed out: the session watcher shows the sign-in gate
+    if (info.status === 401 || (store && info.status === 403)) {
+      stop();
+    } // signed out: the session watcher shows the sign-in gate
   }
 
   function stop(): void {
@@ -128,11 +142,15 @@ export function useSyncedResource<T>(
   watch(
     () => [toValue(url), store ? (toValue(options.uid) ?? null) : null] as const,
     (next, previous) => {
-      if (!previous || next[0] !== previous[0] || next[1] !== previous[1]) void start(next);
+      if (!previous || next[0] !== previous[0] || next[1] !== previous[1]) {
+        void start(next);
+      }
     },
     { immediate: true },
   );
-  if (getCurrentScope()) onScopeDispose(stop);
+  if (getCurrentScope()) {
+    onScopeDispose(stop);
+  }
 
   return {
     data, // not readonly(): it would wrap every member in a proxy
@@ -142,7 +160,9 @@ export function useSyncedResource<T>(
     dataAt: readonly(dataAt),
     refresh: () => current?.refresh() ?? Promise.resolve(),
     set: (value) => {
-      if (current) data.value = value; // not for a former url, nor once stopped
+      if (current) {
+        data.value = value;
+      } // not for a former url, nor once stopped
     },
     stop,
   };

@@ -26,7 +26,9 @@ const FIREBASE_CONFIG = Object.freeze({
 let auth: Auth | null = null;
 
 export function firebaseAuth(): Auth {
-  if (auth) return auth;
+  if (auth) {
+    return auth;
+  }
   const app = initializeApp(isEmulator ? { ...FIREBASE_CONFIG, projectId: runtime.projectId } : FIREBASE_CONFIG);
   // No popup/redirect resolver by default: only the emulator's sign-in redirects (devSignIn below)
   const created = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });

@@ -80,7 +80,9 @@ describe("router guards", () => {
 
 describe("app routes", () => {
   it("declare their access", () => {
-    for (const route of routes) expect(["public", "viewer", "staff", "admin"]).toContain(route.meta?.access);
+    for (const route of routes) {
+      expect(["public", "viewer", "staff", "admin"]).toContain(route.meta?.access);
+    }
   });
 
   it("reserve Communications and Paramètres to admins", () => {

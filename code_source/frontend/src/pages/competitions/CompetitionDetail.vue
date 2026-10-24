@@ -84,12 +84,15 @@ async function save(body: Schemas["CompetitionCreate"]): Promise<void> {
     await writer.run(() => unwrap(client.PATCH("/api/competitions/{competition_id}", { params: { path: path.value }, body })), {
       done: "✅ Compétition mise à jour.",
     })
-  )
+  ) {
     editing.value = false;
+  }
 }
 
 async function remove(): Promise<void> {
-  if (!confirm(`Supprimer définitivement « ${c.value.nom} » et sa liste de compétiteurs ?`)) return;
+  if (!confirm(`Supprimer définitivement « ${c.value.nom} » et sa liste de compétiteurs ?`)) {
+    return;
+  }
   const id = c.value.id;
   if (
     await writer.run(() => unwrap(client.DELETE("/api/competitions/{competition_id}", { params: { path: path.value } })), {
@@ -149,7 +152,9 @@ async function fetchResults(url = ""): Promise<void> {
       {
         done: (r) => `🏆 ${r.matched_count} résultat(s) associé(s) sur ${r.total_scraped} compétiteur(s) ALJ trouvé(s).`,
         refused: (e) => {
-          if (e.code !== "needs_url") return false;
+          if (e.code !== "needs_url") {
+            return false;
+          }
           resultsUrl.value = "";
           askUrl.value = true; // not found on MyCompet: the coach gives the page
           return true;
@@ -199,8 +204,9 @@ async function removeNotInvited(): Promise<void> {
     !confirm(
       `Retirer les ${n} compétiteur${plural(n)} non invité${plural(n)} de cette compétition ?\n(Les adhérents restent dans la base du club.)`,
     )
-  )
+  ) {
     return;
+  }
   let done = 0;
   for (const p of list) {
     const ok = await writer.run(() =>
@@ -210,7 +216,9 @@ async function removeNotInvited(): Promise<void> {
         }),
       ),
     );
-    if (!ok) return;
+    if (!ok) {
+      return;
+    }
     done++;
   }
   writer.toast(`🗑 ${done} compétiteur${plural(done)} non invité${plural(done)} retiré${plural(done)}.`);
@@ -226,7 +234,9 @@ const participantPath = (p: Participant) => ({ params: { path: { ...path.value, 
    or when the network drops during the request, the change waits in the outbox. */
 async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
   const p = server(r);
-  if (!p || p.adherent_id == null || !props.uid) return;
+  if (!p || p.adherent_id == null || !props.uid) {
+    return;
+  }
   if (flag === "selectionne" && !value && p.statut_paiement === "paye") {
     withdrawing.value = p;
     return;
@@ -235,8 +245,12 @@ async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
     await props.outbox.queue(props.uid!, c.value, p, flag, value);
     writer.toast("⏳ Hors ligne : modification gardée sur l'appareil, envoyée au retour du réseau.", 6000);
   };
-  if (!writer.online()) return queue();
-  if (props.outbox.pending(c.value.id, p.adherent_id, flag)) await props.outbox.queue(props.uid, c.value, p, flag, !!p[flag]); // superseded
+  if (!writer.online()) {
+    return queue();
+  }
+  if (props.outbox.pending(c.value.id, p.adherent_id, flag)) {
+    await props.outbox.queue(props.uid, c.value, p, flag, !!p[flag]);
+  } // superseded
   let lost = false;
   await writer.run(
     () =>
@@ -254,7 +268,9 @@ async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
       },
     },
   );
-  if (lost) await queue();
+  if (lost) {
+    await queue();
+  }
 }
 
 async function withdraw(mode: "reporte" | "perdu", note: string): Promise<void> {
@@ -271,7 +287,9 @@ async function withdraw(mode: "reporte" | "perdu", note: string): Promise<void> 
       done: mode === "reporte" ? `🔄 Désistement de ${named(p)} : paiement reporté.` : `🚫 Désistement de ${named(p)} : paiement perdu.`,
     },
   );
-  if (ok) withdrawing.value = null;
+  if (ok) {
+    withdrawing.value = null;
+  }
 }
 
 async function pay(amount: number): Promise<void> {
@@ -288,18 +306,24 @@ async function pay(amount: number): Promise<void> {
       done: `✅ Paiement manuel de ${amount} € enregistré pour ${named(p)}.`,
     },
   );
-  if (ok) paying.value = null;
+  if (ok) {
+    paying.value = null;
+  }
 }
 
 async function removeOne(r: Row): Promise<void> {
-  if (!confirm(`Retirer ${named(r)} de cette compétition ?\n(L'adhérent reste dans la base du club.)`)) return;
+  if (!confirm(`Retirer ${named(r)} de cette compétition ?\n(L'adhérent reste dans la base du club.)`)) {
+    return;
+  }
   await writer.run(() => unwrap(client.DELETE("/api/competitions/{competition_id}/participants/{adherent_id}", participantPath(r))), {
     done: `🗑 ${named(r)} retiré(e) de l'épreuve.`,
   });
 }
 
 async function restore(r: Row): Promise<void> {
-  if (!confirm(`Rétablir ${named(r)} en compétiteur actif (statut Payé) ?`)) return;
+  if (!confirm(`Rétablir ${named(r)} en compétiteur actif (statut Payé) ?`)) {
+    return;
+  }
   await writer.run(
     () =>
       unwrap(
@@ -320,7 +344,9 @@ const dialog = (r: { value: Participant | null }) =>
   computed({
     get: () => !!r.value,
     set: (open: boolean) => {
-      if (!open) r.value = null;
+      if (!open) {
+        r.value = null;
+      }
     },
   });
 const withdrawOpen = dialog(withdrawing);

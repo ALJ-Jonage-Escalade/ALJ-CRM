@@ -28,8 +28,9 @@ function writeAsFormerPage(record: object): Promise<void> {
         ["resources", "name"],
         ["meta", "key"],
         ["outbox", "key"],
-      ])
+      ]) {
         req.result.createObjectStore(name!, { keyPath });
+      }
     };
     req.onsuccess = () => {
       const tx = req.result.transaction("resources", "readwrite");

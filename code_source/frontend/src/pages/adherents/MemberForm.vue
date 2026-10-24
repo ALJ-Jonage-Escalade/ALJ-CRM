@@ -17,7 +17,11 @@ watch(
   draft,
   (d) => {
     const now = draftErrors(d, props.adding, props.today);
-    for (const field of Object.keys(errors.value) as DraftField[]) if (!now[field]) delete errors.value[field];
+    for (const field of Object.keys(errors.value) as DraftField[]) {
+      if (!now[field]) {
+        delete errors.value[field];
+      }
+    }
   },
   { deep: true },
 );

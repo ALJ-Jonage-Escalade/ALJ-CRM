@@ -23,7 +23,9 @@ const problem = ref("");
 
 function useTemplate(): void {
   const t = props.templates.find((x) => x.name === templateName.value);
-  if (!t) return;
+  if (!t) {
+    return;
+  }
   subject.value = t.subject;
   body.value = t.body;
 }
@@ -40,7 +42,9 @@ async function send(): Promise<void> {
     return;
   }
   const m = props.member;
-  if (!confirm(`Envoyer cet e-mail à ${m.first_name} ${m.last_name} <${to.value}> ?`)) return;
+  if (!confirm(`Envoyer cet e-mail à ${m.first_name} ${m.last_name} <${to.value}> ?`)) {
+    return;
+  }
   sending.value = true;
   try {
     const result = await unwrap(

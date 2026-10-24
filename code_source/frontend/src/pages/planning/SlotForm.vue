@@ -17,8 +17,11 @@ const tarifs = computed(() => tarifOptions(props.tarifs, linked));
 
 function submit(): void {
   const error = slotError(draft.value);
-  if (error) emit("invalid", error);
-  else emit("save");
+  if (error) {
+    emit("invalid", error);
+  } else {
+    emit("save");
+  }
 }
 
 const label = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";

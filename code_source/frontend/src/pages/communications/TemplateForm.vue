@@ -39,13 +39,18 @@ const wrap = (tag: string) => edit((v, s, e) => wrapSelection(v, s, e, `<${tag}>
 
 function addLink(): void {
   const url = linkTarget(prompt("Entrez l'URL du lien (ex: https://www.alj-escalade.fr) :", "https://"));
-  if (url) void edit((v, s, e) => wrapSelection(v, s, e, ...linkTags(url)));
+  if (url) {
+    void edit((v, s, e) => wrapSelection(v, s, e, ...linkTags(url)));
+  }
 }
 
 function submit(): void {
   const error = templateError(draft.value);
-  if (error) emit("invalid", error);
-  else emit("save");
+  if (error) {
+    emit("invalid", error);
+  } else {
+    emit("save");
+  }
 }
 
 const FORMATS = [

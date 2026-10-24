@@ -74,7 +74,9 @@ const membersUrl = computed(() =>
 const members = useSyncedResource<MemberList>("members", membersUrl, { offline: false });
 // A season that no longer exists (remembered from an earlier visit): back to the active one
 watch(members.httpStatus, (status) => {
-  if (status === 404 && filters.value.season) filters.value.season = "";
+  if (status === 404 && filters.value.season) {
+    filters.value.season = "";
+  }
 });
 
 const membersList = computed(() => members.data.value);
@@ -92,9 +94,15 @@ const summary = computed(() =>
 const TIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
 const syncInfo = computed(() => {
   const state = members.state.value;
-  if (state === "offline") return "📴 Hors ligne : liste non actualisée";
-  if (members.httpStatus.value === 403) return "🔒 Accès réservé aux coachs";
-  if (state === "error") return "⚠️ Chargement des adhérents impossible — nouvel essai automatique";
+  if (state === "offline") {
+    return "📴 Hors ligne : liste non actualisée";
+  }
+  if (members.httpStatus.value === 403) {
+    return "🔒 Accès réservé aux coachs";
+  }
+  if (state === "error") {
+    return "⚠️ Chargement des adhérents impossible — nouvel essai automatique";
+  }
   const at = members.checkedAt.value;
   return state === "ok" && at ? `☁️ À jour — ${TIME.format(at)}` : "";
 });
@@ -186,15 +194,21 @@ const recordId = computed(() => queryText("id"));
 watch(
   () => queryText("saison"),
   (wanted) => {
-    if (wanted && wanted !== season.value) filters.value.season = wanted;
+    if (wanted && wanted !== season.value) {
+      filters.value.season = wanted;
+    }
   },
   { immediate: true },
 );
 const recordReady = computed(() => !!membersList.value && (!queryText("saison") || membersList.value.season === queryText("saison")));
 // The member of the URL, even when the filters hide it, or else the first row of the list as shown (sorted)
 const record = computed(() => {
-  if (!recordReady.value) return undefined;
-  if (recordId.value) return recordMember(all.value, recordId.value, queryText("achat") || undefined);
+  if (!recordReady.value) {
+    return undefined;
+  }
+  if (recordId.value) {
+    return recordMember(all.value, recordId.value, queryText("achat") || undefined);
+  }
   return tableRef.value?.sortedRows()[0];
 });
 const selectedKey = computed(() => (record.value ? String(record.value.purchase_id) : ""));
@@ -208,7 +222,9 @@ watch(panelOpen, (open) => savePanelOpen(open));
 watch(
   recordId,
   (id) => {
-    if (id) panelOpen.value = true;
+    if (id) {
+      panelOpen.value = true;
+    }
   },
   { immediate: true },
 );
@@ -229,7 +245,9 @@ const TITLES: Record<Exclude<Mode, "none">, string> = {
 const actionOpen = computed({
   get: () => mode.value !== "none" && !!record.value,
   set: (open) => {
-    if (!open) mode.value = "none";
+    if (!open) {
+      mode.value = "none";
+    }
   },
 });
 
@@ -244,7 +262,9 @@ const STATUS_CLASS_OF = (m: Member) => statusClass(m.status_norm);
 const templates = ref<Template[]>([]);
 let templatesLoaded = false;
 async function loadTemplates(): Promise<void> {
-  if (templatesLoaded) return;
+  if (templatesLoaded) {
+    return;
+  }
   templatesLoaded = true;
   try {
     templates.value = (await unwrap(client.GET("/api/email-templates"))).templates;
@@ -257,9 +277,15 @@ async function loadTemplates(): Promise<void> {
 async function open(next: Mode): Promise<void> {
   // The first row shown by default is pinned in the URL first: a member added by a poll and sorted above it would
   // otherwise change the record, which closes the form and loses what was typed
-  if (!recordId.value && record.value) await router.replace({ query: { ...route.query, ...recordQuery(record.value) } });
-  if (next === "email" || next === "attestation") await loadTemplates();
-  if (next === "edit" && record.value) draft.value = draftOf(record.value);
+  if (!recordId.value && record.value) {
+    await router.replace({ query: { ...route.query, ...recordQuery(record.value) } });
+  }
+  if (next === "email" || next === "attestation") {
+    await loadTemplates();
+  }
+  if (next === "edit" && record.value) {
+    draft.value = draftOf(record.value);
+  }
   mode.value = next;
 }
 
@@ -281,7 +307,9 @@ async function saveEdit(m: Member): Promise<void> {
     mode.value = "none";
     return;
   }
-  if (!confirm(`Valider les modifications pour ${m.first_name} ${m.last_name} ?\n\n• ${lines.join("\n• ")}`)) return;
+  if (!confirm(`Valider les modifications pour ${m.first_name} ${m.last_name} ?\n\n• ${lines.join("\n• ")}`)) {
+    return;
+  }
   saving.value = true;
   try {
     await unwrap(
@@ -300,19 +328,25 @@ async function saveEdit(m: Member): Promise<void> {
 const adding = computed({
   get: () => queryText("ajout") === "1",
   set: (open) => {
-    if (!open) closeAdd();
+    if (!open) {
+      closeAdd();
+    }
   },
 });
 watch(
   adding,
   (now) => {
-    if (now) draft.value = draftOf(undefined, tarifs.value[0]?.tarif ?? "");
+    if (now) {
+      draft.value = draftOf(undefined, tarifs.value[0]?.tarif ?? "");
+    }
   },
   { immediate: true },
 );
 // Tariffs arrive with the list: the first one is chosen when the form opened before
 watch(tarifs, (now) => {
-  if (adding.value && !draft.value.tarif_name && now[0]) draft.value.tarif_name = now[0].tarif;
+  if (adding.value && !draft.value.tarif_name && now[0]) {
+    draft.value.tarif_name = now[0].tarif;
+  }
 });
 
 async function saveNew(): Promise<void> {
@@ -323,8 +357,9 @@ async function saveNew(): Promise<void> {
     !confirm(
       `⚠️ Un adhérent « ${twin.last_name} ${twin.first_name} » existe déjà pour la saison ${season.value}.\n\nVoulez-vous quand même créer cette nouvelle fiche ?`,
     )
-  )
+  ) {
     return;
+  }
   saving.value = true;
   try {
     const created = await unwrap(client.POST("/api/members/create", { body: { season: season.value, fields: newMemberOf(d) } }));

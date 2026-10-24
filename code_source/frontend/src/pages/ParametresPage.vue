@@ -92,7 +92,9 @@ const REBUILD_CONFIRM =
   "Cette opération va télécharger à nouveau tous les documents de Firestore pour reconstruire database.db à neuf.";
 
 async function sync(full: boolean): Promise<void> {
-  if (full && !confirm(REBUILD_CONFIRM)) return;
+  if (full && !confirm(REBUILD_CONFIRM)) {
+    return;
+  }
   syncing.value = full ? "rebuild" : "update";
   syncResult.value = { lines: [`⏳ Synchronisation avec Firestore en cours (${full ? "reconstruction complète" : "mode incrémental"})…`] };
   try {
@@ -123,7 +125,9 @@ const batchResult = ref<Report | null>(null);
 async function loadResults(): Promise<void> {
   try {
     results.value = await unwrap(client.GET("/api/settings/competitions-results"));
-    if (!editingEmail) email.value = results.value.notification_email;
+    if (!editingEmail) {
+      email.value = results.value.notification_email;
+    }
   } catch (e) {
     console.warn("Paramètres du batch des résultats :", e);
   }

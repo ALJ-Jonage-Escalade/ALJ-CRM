@@ -14,7 +14,9 @@ const missing = ref(false);
 
 function confirm(): void {
   missing.value = !note.value.trim();
-  if (!missing.value) emit("confirm", mode.value, note.value.trim());
+  if (!missing.value) {
+    emit("confirm", mode.value, note.value.trim());
+  }
 }
 </script>
 

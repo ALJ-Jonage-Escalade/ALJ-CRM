@@ -18,18 +18,24 @@ async function load(): Promise<void> {
   status.value = "loading";
   try {
     const res = await api(props.url);
-    if (mine !== request) return;
+    if (mine !== request) {
+      return;
+    }
     if (!res.ok) {
       message.value = `❌ Erreur lors du chargement (HTTP ${res.status}).`;
       status.value = "error";
       return;
     }
     const text = await res.text();
-    if (mine !== request) return;
+    if (mine !== request) {
+      return;
+    }
     html.value = text;
     status.value = "ready";
   } catch {
-    if (mine !== request) return;
+    if (mine !== request) {
+      return;
+    }
     message.value = "❌ Serveur injoignable : vérifiez la connexion réseau.";
     status.value = "error";
   }

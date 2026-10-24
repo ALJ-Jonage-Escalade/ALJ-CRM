@@ -82,7 +82,9 @@ export function lastSync(seconds: number | null | undefined): string {
 
 /** Last run of the results batch (ISO date written by the server; shown as is when it is not one). */
 export function lastRun(iso: string): string {
-  if (!iso) return "Jamais exécuté";
+  if (!iso) {
+    return "Jamais exécuté";
+  }
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? iso : DATE_TIME_SHORT.format(date);
 }

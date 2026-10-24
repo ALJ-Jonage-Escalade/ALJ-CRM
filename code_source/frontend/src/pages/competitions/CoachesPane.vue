@@ -20,7 +20,9 @@ const editName = ref("");
 
 async function create(): Promise<void> {
   const nom = newName.value.trim();
-  if (!nom) return writer.toast("⚠️ Le nom du coach est obligatoire.");
+  if (!nom) {
+    return writer.toast("⚠️ Le nom du coach est obligatoire.");
+  }
   if (await writer.run(() => unwrap(client.POST("/api/coaches", { body: { nom } })), { done: "✅ Coach ajouté." })) {
     newName.value = "";
     emit("changed");
@@ -34,7 +36,9 @@ function edit(c: Coach): void {
 
 async function rename(c: Coach): Promise<void> {
   const nom = editName.value.trim();
-  if (!nom) return writer.toast("⚠️ Le nom du coach est obligatoire.");
+  if (!nom) {
+    return writer.toast("⚠️ Le nom du coach est obligatoire.");
+  }
   if (
     await writer.run(() => unwrap(client.PUT("/api/coaches/{coach_id}", { params: { path: { coach_id: c.id } }, body: { nom } })), {
       done: "✅ Coach mis à jour.",
@@ -46,13 +50,16 @@ async function rename(c: Coach): Promise<void> {
 }
 
 async function remove(c: Coach): Promise<void> {
-  if (!confirm(`Supprimer le coach « ${c.nom} » ? Il sera retiré de toutes ses compétitions.`)) return;
+  if (!confirm(`Supprimer le coach « ${c.nom} » ? Il sera retiré de toutes ses compétitions.`)) {
+    return;
+  }
   if (
     await writer.run(() => unwrap(client.DELETE("/api/coaches/{coach_id}", { params: { path: { coach_id: c.id } } })), {
       done: "🗑 Coach supprimé.",
     })
-  )
+  ) {
     emit("changed");
+  }
 }
 
 const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[13px]";

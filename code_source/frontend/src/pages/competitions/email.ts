@@ -15,8 +15,12 @@ export const AUDIENCES: { id: Audience; label: string }[] = [
 
 export function audience(rows: readonly Row[], who: Audience): Row[] {
   const known = rows.filter((r) => r.adherent_id != null);
-  if (who === "selected") return known.filter((r) => r.selectionne);
-  if (who === "unpaid") return known.filter((r) => r.selectionne && r.statut_paiement !== "paye");
+  if (who === "selected") {
+    return known.filter((r) => r.selectionne);
+  }
+  if (who === "unpaid") {
+    return known.filter((r) => r.selectionne && r.statut_paiement !== "paye");
+  }
   return known;
 }
 
@@ -35,7 +39,9 @@ const frDate = (iso: string) => (iso.split("-").length === 3 ? iso.split("-").re
 
 /** 15 -> « 15 », 15.5 -> « 15,50 » (domain/utils.format_montant). */
 export function amountText(prix: number | null | undefined): string {
-  if (prix == null) return "";
+  if (prix == null) {
+    return "";
+  }
   const t = Number(prix).toFixed(2).replace(".", ",");
   return t.endsWith(",00") ? t.slice(0, -3) : t;
 }

@@ -63,13 +63,18 @@ onMounted(async () => {
 // Reload of the open tab
 const panes: Partial<Record<TabId, { reload(): unknown }>> = {};
 const keep = (id: TabId) => (pane: unknown) => {
-  if (pane) panes[id] = pane as { reload(): unknown };
-  else delete panes[id];
+  if (pane) {
+    panes[id] = pane as { reload(): unknown };
+  } else {
+    delete panes[id];
+  }
 };
 
 function refresh(): void {
   const pane = panes[tab.value];
-  if (!pane) return;
+  if (!pane) {
+    return;
+  }
   void pane.reload();
   toast.show(TABS.find((t) => t.id === tab.value)!.refreshed);
 }

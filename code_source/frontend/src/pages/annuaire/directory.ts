@@ -97,7 +97,9 @@ export const EMERGENCY_MIN_LETTERS = 2;
 
 export function emergencyMatches<M extends Pick<Member, "first_name" | "last_name">>(members: readonly M[], search: string): M[] | null {
   const q = normKey(search);
-  if (q.length < EMERGENCY_MIN_LETTERS) return null;
+  if (q.length < EMERGENCY_MIN_LETTERS) {
+    return null;
+  }
   return members.filter((m) => {
     const last = normKey(m.last_name);
     const first = normKey(m.first_name);

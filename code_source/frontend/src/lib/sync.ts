@@ -45,7 +45,9 @@ export function poll<T>(url: string, opts: PollOptions<T>): Poll {
 
   function schedule(): void {
     clearTimeout(timer);
-    if (!stopped) timer = setTimeout(tick, intervalMs);
+    if (!stopped) {
+      timer = setTimeout(tick, intervalMs);
+    }
   }
 
   function tick(): void {
@@ -62,10 +64,14 @@ export function poll<T>(url: string, opts: PollOptions<T>): Poll {
     try {
       res = await opts.fetch(url, { headers, cache: "no-store" });
     } catch (error) {
-      if (!stopped) onStatus(navigator.onLine === false ? "offline" : "error", { error });
+      if (!stopped) {
+        onStatus(navigator.onLine === false ? "offline" : "error", { error });
+      }
       return;
     }
-    if (stopped) return; // stopped while loading (logout, other season): answer dropped
+    if (stopped) {
+      return;
+    } // stopped while loading (logout, other season): answer dropped
     if (res.status === 304) {
       onStatus("ok", { changed: false });
       return;
@@ -78,17 +84,23 @@ export function poll<T>(url: string, opts: PollOptions<T>): Poll {
     try {
       data = (await res.json()) as T;
     } catch (error) {
-      if (!stopped) onStatus("error", { error });
+      if (!stopped) {
+        onStatus("error", { error });
+      }
       return;
     }
-    if (stopped) return;
+    if (stopped) {
+      return;
+    }
     etag = res.headers.get("ETag");
     opts.onData(data, etag);
     onStatus("ok", { changed: true });
   }
 
   function refresh(): Promise<void> {
-    if (stopped) return Promise.resolve();
+    if (stopped) {
+      return Promise.resolve();
+    }
     if (inFlight) {
       again = true;
       return inFlight;
@@ -106,7 +118,9 @@ export function poll<T>(url: string, opts: PollOptions<T>): Poll {
   }
 
   const onVisible = () => {
-    if (!document.hidden) void refresh();
+    if (!document.hidden) {
+      void refresh();
+    }
   };
   const onOnline = () => void refresh();
   const onOffline = () => onStatus("offline", {});

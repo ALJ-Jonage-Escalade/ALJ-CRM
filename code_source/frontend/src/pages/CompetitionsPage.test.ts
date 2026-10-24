@@ -68,19 +68,30 @@ function fakeApi(options: { down?: boolean; patch?: (body: Record<string, unknow
     const method = init?.method ?? "GET";
     const body = typeof init?.body === "string" && init.body ? JSON.parse(init.body) : undefined;
     calls.push({ method, path, body });
-    if (state.down) throw new TypeError("Failed to fetch");
-    if (method === "GET" && path === "/api/competitions") return json(competitions);
-    if (path === "/api/members/competitors") return json(CONTACTS);
-    if (path === "/api/competition-members")
+    if (state.down) {
+      throw new TypeError("Failed to fetch");
+    }
+    if (method === "GET" && path === "/api/competitions") {
+      return json(competitions);
+    }
+    if (path === "/api/members/competitors") {
+      return json(CONTACTS);
+    }
+    if (path === "/api/competition-members") {
       return json([
         { id: 1, nom: "MARTIN", prenom: "Léo", tarif: "Compétition U18", creneau_groupe: "Compét. U18", phone: "x" },
         { id: 4, nom: "NOUVEAU", prenom: "Ali" },
       ]);
-    if (path === "/api/coaches") return json([{ id: 1, nom: "Alice" }]);
+    }
+    if (path === "/api/coaches") {
+      return json([{ id: 1, nom: "Alice" }]);
+    }
     const participant = /^\/api\/competitions\/10\/participants\/(\d+)$/.exec(path);
     if (method === "PATCH" && participant) {
       const refused = options.patch?.(body);
-      if (refused) return refused;
+      if (refused) {
+        return refused;
+      }
       competitions = competitions.map((c) =>
         c.id !== 10
           ? c
@@ -200,8 +211,9 @@ describe("CompetitionsPage", () => {
     expect(calls.map((c) => c.path)).not.toContain("/api/members/competitors");
     expect(calls.map((c) => c.path)).not.toContain("/api/coaches");
     expect(byId("emergency-link").exists()).toBe(false);
-    for (const id of ["participe-switch", "participant-actions", "detail-actions", "create-comp", "sections", "add-members"])
+    for (const id of ["participe-switch", "participant-actions", "detail-actions", "create-comp", "sections", "add-members"]) {
       expect(byId(id).exists(), id).toBe(false);
+    }
     expect(byId("participe").text()).toBe("✅ Participe");
     expect(wrapper.text()).not.toContain("CMD-1");
   });

@@ -18,12 +18,18 @@ function fakeServer() {
     calls.push({ url, ifNoneMatch, cache: init?.cache });
     const answer = (): Response => {
       const status = statuses.get(url);
-      if (status) return new Response(JSON.stringify({ status: "error", message: "refusé" }), { status });
+      if (status) {
+        return new Response(JSON.stringify({ status: "error", message: "refusé" }), { status });
+      }
       const etag = etagOf(url);
-      if (ifNoneMatch === etag) return new Response(null, { status: 304, headers: { ETag: etag } });
+      if (ifNoneMatch === etag) {
+        return new Response(null, { status: 304, headers: { ETag: etag } });
+      }
       return new Response(JSON.stringify(bodies.get(url)), { status: 200, headers: { ETag: etag, "Content-Type": "application/json" } });
     };
-    if (!hold) return answer();
+    if (!hold) {
+      return answer();
+    }
     return new Promise<Response>((resolve) => pending.push(() => resolve(answer())));
   });
   return {
@@ -193,7 +199,9 @@ function memoryStore() {
       return copy && copy.uid === uid ? { data: copy.data, etag: copy.etag, savedAt: copy.savedAt, url: copy.url } : null;
     }) as OfflineStore["load"],
     save: vi.fn(async (name: string, uid: string | null, data: unknown, etag: string | null, url: string | null = null) => {
-      if (uid) copies.set(name, { uid, data, etag, savedAt: Date.now(), url });
+      if (uid) {
+        copies.set(name, { uid, data, etag, savedAt: Date.now(), url });
+      }
     }),
     touch: vi.fn(async () => {}),
     queue: vi.fn(async () => {}),

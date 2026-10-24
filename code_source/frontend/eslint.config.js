@@ -22,4 +22,9 @@ export default defineConfigWithVueTs(
     },
   },
   skipFormatting,
+  {
+    // Braces on every if/else/for/while body, even one-liners; after skipFormatting, which turns `curly` off
+    name: "app/style",
+    rules: { curly: ["error", "all"] },
+  },
 );

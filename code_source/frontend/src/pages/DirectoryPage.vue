@@ -60,13 +60,17 @@ const seasons = useSyncedResource<Schemas["Seasons"]>("seasons", () => (open.val
   intervalMs: 60_000,
 });
 const membersUrl = computed(() => {
-  if (!open.value) return null;
+  if (!open.value) {
+    return null;
+  }
   return filters.value.season ? `/api/members?${new URLSearchParams({ season: filters.value.season })}` : "/api/members";
 });
 const directory = useSyncedResource<Directory>("directory", membersUrl, { offline: true, uid, select: toDirectory });
 // A season that no longer exists (remembered from an earlier visit): back to the active one
 watch(directory.httpStatus, (status) => {
-  if (status === 404 && filters.value.season) filters.value.season = "";
+  if (status === 404 && filters.value.season) {
+    filters.value.season = "";
+  }
 });
 
 const list = computed(() => directory.data.value);
@@ -84,8 +88,9 @@ const chips = computed(() => statusChips(all.value));
 const kpis = computed(() => seasonCounts(all.value));
 const plural = (n: number) => (n > 1 ? "s" : "");
 const countLine = computed(() => {
-  if (!list.value)
+  if (!list.value) {
     return directory.state.value === "loading" ? "⏳ Chargement de l'annuaire…" : "Aucune donnée de l'annuaire sur cet appareil.";
+  }
   const n = shown.value.length;
   return `${n} adhérent${plural(n)} affiché${plural(n)} · saison ${season.value}${filters.value.status ? ` · statut ${filters.value.status}` : ""}`;
 });
@@ -95,10 +100,18 @@ const syncInfo = computed(() => {
   const at = directory.dataAt.value;
   const since = at ? ` — données du ${TIME.format(at)}` : "";
   const state = directory.state.value;
-  if (directory.httpStatus.value === 403) return "🔒 Accès réservé aux coachs";
-  if (state === "offline" || auth.state.value.status === "error") return `📴 Hors ligne${since || " : aucune donnée sur cet appareil"}`;
-  if (state === "error") return `⚠️ Chargement impossible — nouvel essai automatique${since}`;
-  if (state === "loading") return at ? `💾 Données du ${TIME.format(at)}` : "";
+  if (directory.httpStatus.value === 403) {
+    return "🔒 Accès réservé aux coachs";
+  }
+  if (state === "offline" || auth.state.value.status === "error") {
+    return `📴 Hors ligne${since || " : aucune donnée sur cet appareil"}`;
+  }
+  if (state === "error") {
+    return `⚠️ Chargement impossible — nouvel essai automatique${since}`;
+  }
+  if (state === "loading") {
+    return at ? `💾 Données du ${TIME.format(at)}` : "";
+  }
   return at ? `☁️ À jour — ${TIME.format(at)}` : "";
 });
 
@@ -114,7 +127,9 @@ const TABS: { id: Tab; label: string; desktop: boolean }[] = [
 const unfolded = ref(new Set<number>());
 function toggle(m: DirectoryMember): void {
   const next = new Set(unfolded.value);
-  if (!next.delete(m.purchase_id)) next.add(m.purchase_id);
+  if (!next.delete(m.purchase_id)) {
+    next.add(m.purchase_id);
+  }
   unfolded.value = next;
 }
 

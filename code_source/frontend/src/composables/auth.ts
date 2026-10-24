@@ -51,11 +51,17 @@ const ROLES: readonly Role[] = ["admin", "coach", "readonly", null];
 class MeError extends Error {}
 
 async function readMe(res: Response): Promise<{ email: string; role: Role }> {
-  if (res.status === 401) throw new MeError("Session refusée par le serveur : reconnectez-vous.");
-  if (!res.ok) throw new MeError(`Le serveur ne répond pas correctement (erreur ${res.status}).`);
+  if (res.status === 401) {
+    throw new MeError("Session refusée par le serveur : reconnectez-vous.");
+  }
+  if (!res.ok) {
+    throw new MeError(`Le serveur ne répond pas correctement (erreur ${res.status}).`);
+  }
   const body = (await res.json()) as { email?: unknown; role?: unknown };
   const role = ROLES.find((r) => r === body.role);
-  if (role === undefined) throw new MeError("Réponse inattendue du serveur.");
+  if (role === undefined) {
+    throw new MeError("Réponse inattendue du serveur.");
+  }
   return { email: typeof body.email === "string" ? body.email : "", role };
 }
 
@@ -65,8 +71,12 @@ function isNetworkError(e: unknown): boolean {
 }
 
 function errorMessage(e: unknown): string {
-  if (e instanceof MeError) return e.message;
-  if (isNetworkError(e)) return "Serveur injoignable : vérifiez la connexion réseau.";
+  if (e instanceof MeError) {
+    return e.message;
+  }
+  if (isNetworkError(e)) {
+    return "Serveur injoignable : vérifiez la connexion réseau.";
+  }
   return "Réponse inattendue du serveur."; // e.g. a body that is not JSON
 }
 
@@ -89,12 +99,16 @@ export function createAuth(deps: AuthDeps): Auth {
     } catch (e) {
       next = { status: "error", user, message: errorMessage(e), offline: isNetworkError(e) };
     }
-    if (mine === generation) state.value = next;
+    if (mine === generation) {
+      state.value = next;
+    }
   }
 
   const stopUser = deps.onUserChange((user) => void resolve(user));
   const stopNetwork = deps.onNetworkBack?.(() => {
-    if (state.value.status === "error") void resolve(current);
+    if (state.value.status === "error") {
+      void resolve(current);
+    }
   });
 
   return {
@@ -124,7 +138,9 @@ let shared: Auth | null = null;
 
 /** The app's session (Firebase + /api/me), created once. */
 export function sharedAuth(): Auth {
-  if (shared) return shared;
+  if (shared) {
+    return shared;
+  }
   const auth = firebaseAuth();
   shared = createAuth({
     onUserChange: (callback) => onAuthStateChanged(auth, (u) => callback(u ? { uid: u.uid, email: u.email ?? "" } : null)),

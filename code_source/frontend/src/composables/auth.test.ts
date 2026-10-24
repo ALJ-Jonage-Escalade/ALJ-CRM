@@ -94,7 +94,9 @@ describe("createAuth", () => {
     let networkBack: () => void = () => {};
     const { auth, deps, emit } = setup(
       async () => {
-        if (++calls === 1) throw new TypeError("Failed to fetch");
+        if (++calls === 1) {
+          throw new TypeError("Failed to fetch");
+        }
         return json({ email: ALBUS.email, role: "coach" });
       },
       (cb) => {

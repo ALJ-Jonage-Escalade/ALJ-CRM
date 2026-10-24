@@ -27,11 +27,15 @@ function reset(): void {
   preview.value = null;
   choices.value = [];
   done.value = null;
-  if (input.value) input.value.value = "";
+  if (input.value) {
+    input.value.value = "";
+  }
 }
 
 async function pick(picked: File | undefined): Promise<void> {
-  if (!picked) return;
+  if (!picked) {
+    return;
+  }
   if (!isXlsx(picked.name)) {
     emit("toast", "⚠️ Seuls les fichiers Excel .xlsx sont acceptés.");
     return;
@@ -46,7 +50,9 @@ function drop(event: DragEvent): void {
 }
 
 async function analyze(): Promise<void> {
-  if (!file.value) return;
+  if (!file.value) {
+    return;
+  }
   busy.value = "analyze";
   try {
     const body = { filename: file.value.name, content_base64: file.value.content };
@@ -70,14 +76,17 @@ async function send(manual: Schemas["FfmeManualMatch"][]): Promise<void> {
 }
 
 async function quickImport(): Promise<void> {
-  if (!file.value) return;
+  if (!file.value) {
+    return;
+  }
   if (
     !confirm(
       "Voulez-vous lancer l'importation directe ? Les licenciés reconnus automatiquement par N° de licence ou " +
         "Nom/Prénom seront mis à jour et basculés en statut « Terminé ».",
     )
-  )
+  ) {
     return;
+  }
   busy.value = "quick";
   try {
     await send([]);
@@ -89,13 +98,17 @@ async function quickImport(): Promise<void> {
 }
 
 async function apply(): Promise<void> {
-  if (!file.value || !preview.value) return;
+  if (!file.value || !preview.value) {
+    return;
+  }
   const manual = manualMatches(preview.value.unmatched, choices.value);
   if (preview.value.matched_count + manual.length === 0) {
     emit("toast", "⚠️ Aucune modification à appliquer.");
     return;
   }
-  if (!confirm(applyConfirmation(preview.value.matched_count, manual.length))) return;
+  if (!confirm(applyConfirmation(preview.value.matched_count, manual.length))) {
+    return;
+  }
   busy.value = "apply";
   try {
     await send(manual);

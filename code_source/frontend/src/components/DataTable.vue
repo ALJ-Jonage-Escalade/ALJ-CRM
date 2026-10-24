@@ -59,7 +59,9 @@ watch(
 watch(
   () => table.getPageCount(),
   (count) => {
-    if (table.atoms.pagination.get().pageIndex >= count) table.setPageIndex(Math.max(0, count - 1));
+    if (table.atoms.pagination.get().pageIndex >= count) {
+      table.setPageIndex(Math.max(0, count - 1));
+    }
   },
 );
 
@@ -69,7 +71,9 @@ const visibleCount = computed(() => props.columns.filter((c) => !hiddenIds.value
 
 function rowClicked(event: MouseEvent, row: T): void {
   // A link (the record, mailto, tel) or a control does its own job
-  if ((event.target as Element | null)?.closest("a, button, input, select, textarea, label")) return;
+  if ((event.target as Element | null)?.closest("a, button, input, select, textarea, label")) {
+    return;
+  }
   props.onRowClick?.(row);
 }
 const isSelected = (id: string) => props.selectedKey !== undefined && id === props.selectedKey;

@@ -45,7 +45,9 @@ describe("preview", () => {
 
   it("offers every variable of the demo member", () => {
     expect(VARIABLES).toContain("{montant_competition}");
-    for (const v of VARIABLES) expect(renderDemo(v)).not.toBe(v);
+    for (const v of VARIABLES) {
+      expect(renderDemo(v)).not.toBe(v);
+    }
   });
 });
 

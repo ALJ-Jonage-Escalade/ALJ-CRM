@@ -53,8 +53,12 @@ export type When = "all" | "upcoming" | "past";
 export function filterCompetitions(list: readonly Competition[], search: string, when: When, today: string): Competition[] {
   const q = normKey(search);
   return list.filter((c) => {
-    if (when === "upcoming" && isPast(c, today)) return false;
-    if (when === "past" && !isPast(c, today)) return false;
+    if (when === "upcoming" && isPast(c, today)) {
+      return false;
+    }
+    if (when === "past" && !isPast(c, today)) {
+      return false;
+    }
     return !q || normKey(`${c.nom} ${c.lieu ?? ""} ${c.type ?? ""} ${c.id_ffme ?? ""}`).includes(q);
   });
 }
@@ -64,7 +68,9 @@ const frDate = (iso: string) => iso.split("-").reverse().join("/");
 /** « 15/03/2026 », « 15/03/2026 → 16/03/2026 » or « sans date ». */
 export function period(c: Competition): string {
   const start = c.date_competition ?? "";
-  if (!start) return "sans date";
+  if (!start) {
+    return "sans date";
+  }
   const end = c.date_fin ?? "";
   return end && end > start ? `${frDate(start)} → ${frDate(end)}` : frDate(start);
 }
@@ -123,7 +129,9 @@ export const isNotInvited = (p: Participant): boolean =>
 /** « 🥇 1er », « 🏅 4 / 23 »… of a MyCompet result, empty without one. */
 export function ranking(p: Participant): string {
   const r = String(p.classement ?? "").trim();
-  if (!r) return p.resultat_ffme ? `🏅 ${p.resultat_ffme}` : "";
+  if (!r) {
+    return p.resultat_ffme ? `🏅 ${p.resultat_ffme}` : "";
+  }
   const icon = r === "1" ? "🥇" : r === "2" ? "🥈" : r === "3" ? "🥉" : "🏅";
   const total = Number(p.total_categorie ?? 0);
   return `${icon} ${r}${total > 0 ? ` / ${total}` : r === "1" ? "er" : "e"}`;
@@ -184,9 +192,15 @@ export type ParticipantFilter = "all" | "selected" | "unpaid" | "notInvited";
 export function filterRows(rows: readonly Row[], filter: ParticipantFilter, search = ""): Row[] {
   const q = normKey(search);
   return rows.filter((r) => {
-    if (filter === "selected" && !r.selectionne) return false;
-    if (filter === "unpaid" && r.statut_paiement !== "en_attente") return false;
-    if (filter === "notInvited" && !isNotInvited(r)) return false;
+    if (filter === "selected" && !r.selectionne) {
+      return false;
+    }
+    if (filter === "unpaid" && r.statut_paiement !== "en_attente") {
+      return false;
+    }
+    if (filter === "notInvited" && !isNotInvited(r)) {
+      return false;
+    }
     return !q || normKey(`${r.nom} ${r.prenom} ${r.num_licence ?? ""}`).includes(q);
   });
 }
@@ -194,7 +208,9 @@ export function filterRows(rows: readonly Row[], filter: ParticipantFilter, sear
 /** By slot group (French order, « Non identifiés » last), each sorted by name. */
 export function groupRows(rows: readonly Row[]): [string, Row[]][] {
   const groups = new Map<string, Row[]>();
-  for (const r of rows) groups.set(r.group, [...(groups.get(r.group) ?? []), r]);
+  for (const r of rows) {
+    groups.set(r.group, [...(groups.get(r.group) ?? []), r]);
+  }
   const byName = (a: Row, b: Row) => (a.nom ?? "").localeCompare(b.nom ?? "", "fr") || (a.prenom ?? "").localeCompare(b.prenom ?? "", "fr");
   return [...groups.entries()]
     .sort(([a], [b]) => Number(a === UNIDENTIFIED) - Number(b === UNIDENTIFIED) || a.localeCompare(b, "fr"))
@@ -203,16 +219,24 @@ export function groupRows(rows: readonly Row[]): [string, Row[]][] {
 
 export function countLine(c: Counts, filter: ParticipantFilter, shown: number): string {
   const s = (n: number) => (n > 1 ? "s" : "");
-  if (filter === "selected") return `${c.selected} compétiteur${s(c.selected)} sélectionné${s(c.selected)}`;
-  if (filter === "unpaid") return `${c.unpaid} compétiteur${s(c.unpaid)} avec paiement en attente`;
-  if (filter === "notInvited") return `${shown} compétiteur${s(shown)} non invité${s(shown)}`;
+  if (filter === "selected") {
+    return `${c.selected} compétiteur${s(c.selected)} sélectionné${s(c.selected)}`;
+  }
+  if (filter === "unpaid") {
+    return `${c.unpaid} compétiteur${s(c.unpaid)} avec paiement en attente`;
+  }
+  if (filter === "notInvited") {
+    return `${shown} compétiteur${s(shown)} non invité${s(shown)}`;
+  }
   return `${c.selected} compétiteur${s(c.selected)} sélectionné${s(c.selected)} sur ${c.all}`;
 }
 
 /** Members matching the search (name, first name, licence; 2 letters at least), not listed yet, 15 at most. */
 export function memberMatches(members: readonly MemberSlot[], c: Competition, search: string): MemberSlot[] {
   const q = normKey(search);
-  if (q.length < 2) return [];
+  if (q.length < 2) {
+    return [];
+  }
   const listed = new Set((c.participants ?? []).map((p) => p.adherent_id));
   return members
     .filter(
@@ -289,9 +313,15 @@ export function nextDay(iso: string): string {
 
 export function draftErrors(d: CompetitionDraft): Partial<Record<keyof CompetitionDraft, string>> {
   const errors: Partial<Record<keyof CompetitionDraft, string>> = {};
-  if (!d.nom.trim()) errors.nom = "Le nom de l'épreuve est obligatoire.";
-  if (d.prix.trim() && !(Number(d.prix.replace(",", ".")) >= 0)) errors.prix = "Montant invalide.";
-  if (d.date_fin && !d.date_competition) errors.date_fin = "Indiquez d'abord la date de début.";
+  if (!d.nom.trim()) {
+    errors.nom = "Le nom de l'épreuve est obligatoire.";
+  }
+  if (d.prix.trim() && !(Number(d.prix.replace(",", ".")) >= 0)) {
+    errors.prix = "Montant invalide.";
+  }
+  if (d.date_fin && !d.date_competition) {
+    errors.date_fin = "Indiquez d'abord la date de début.";
+  }
   return errors;
 }
 

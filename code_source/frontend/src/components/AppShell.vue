@@ -27,14 +27,20 @@ const state = auth.state;
 async function logout(): Promise<void> {
   const s = state.value;
   const waiting = s.status === "signedIn" || s.status === "error" ? (await store.queued(s.user.uid)).length : 0;
-  if (waiting && !confirm(logoutWarning(waiting))) return;
+  if (waiting && !confirm(logoutWarning(waiting))) {
+    return;
+  }
   await auth.logout();
 }
 
 const who = computed(() => {
   const s = state.value;
-  if (s.status === "loading") return "Vérification de la connexion…";
-  if (s.status === "signedOut") return "Non connecté";
+  if (s.status === "loading") {
+    return "Vérification de la connexion…";
+  }
+  if (s.status === "signedOut") {
+    return "Non connecté";
+  }
   return `${s.user.email || "(compte sans e-mail)"} · ${s.status === "signedIn" ? roleLabel(s.role) : "⚠️ rôle inconnu"}`;
 });
 const staff = computed(() => state.value.status === "signedIn" && isStaff(state.value.role));
@@ -50,7 +56,9 @@ watch(
   () => (staff.value && state.value.status === "signedIn" ? state.value.user.uid : null),
   async (uid) => {
     googleExpired.value = false;
-    if (!uid) return;
+    if (!uid) {
+      return;
+    }
     try {
       const res = await api("/api/auth/google/status");
       const body = res.ok ? ((await res.json()) as { status?: unknown }) : null;

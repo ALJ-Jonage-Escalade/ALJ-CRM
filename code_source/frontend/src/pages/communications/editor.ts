@@ -65,17 +65,27 @@ export function preview(t: Template): Preview {
 
 /** Why the template cannot be saved, or null. */
 export function templateError(t: Template): string | null {
-  if (!t.name.trim()) return "⚠️ Le titre du modèle ne peut pas être vide.";
-  if (!t.subject.trim() || !t.body.trim()) return "⚠️ Le sujet et le corps du message sont obligatoires.";
-  if (!looksLikeEmail(t.sender_email.trim())) return "⚠️ L'adresse d'expédition doit être une adresse e-mail valide.";
+  if (!t.name.trim()) {
+    return "⚠️ Le titre du modèle ne peut pas être vide.";
+  }
+  if (!t.subject.trim() || !t.body.trim()) {
+    return "⚠️ Le sujet et le corps du message sont obligatoires.";
+  }
+  if (!looksLikeEmail(t.sender_email.trim())) {
+    return "⚠️ L'adresse d'expédition doit être une adresse e-mail valide.";
+  }
   return null;
 }
 
 /** Why a new template cannot take this name, or null (the server checks again). */
 export function newNameError(name: string, templates: readonly Template[]): string | null {
-  if (!name) return "⚠️ Veuillez renseigner le nom du modèle.";
+  if (!name) {
+    return "⚠️ Veuillez renseigner le nom du modèle.";
+  }
   const lower = name.toLowerCase();
-  if (templates.some((t) => t.name.toLowerCase() === lower)) return `⚠️ Un modèle nommé « ${name} » existe déjà.`;
+  if (templates.some((t) => t.name.toLowerCase() === lower)) {
+    return `⚠️ Un modèle nommé « ${name} » existe déjà.`;
+  }
   return null;
 }
 

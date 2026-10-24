@@ -28,19 +28,25 @@ let endByHand = !!draft.value.date_fin;
 watch(
   () => draft.value.date_competition,
   (start) => {
-    if (!endByHand || (draft.value.date_fin && draft.value.date_fin < start)) draft.value.date_fin = "";
+    if (!endByHand || (draft.value.date_fin && draft.value.date_fin < start)) {
+      draft.value.date_fin = "";
+    }
   },
 );
 
 function twoDays(): void {
-  if (!draft.value.date_competition) return;
+  if (!draft.value.date_competition) {
+    return;
+  }
   draft.value.date_fin = nextDay(draft.value.date_competition);
   endByHand = true;
 }
 
 function save(): void {
   shown.value = true;
-  if (Object.keys(errors.value).length) return;
+  if (Object.keys(errors.value).length) {
+    return;
+  }
   // Coaches in the order shown: the competition's own keep theirs
   const ticked = new Set(draft.value.coach_ids);
   emit("save", { ...draftBody(draft.value), coach_ids: choices.value.map((c) => c.id).filter((id) => ticked.has(id)) });

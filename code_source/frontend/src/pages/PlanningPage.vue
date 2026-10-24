@@ -85,7 +85,9 @@ async function save(): Promise<void> {
 }
 
 async function remove(slot: Slot): Promise<void> {
-  if (!confirm(`Voulez-vous vraiment supprimer le créneau « ${slot.groupe} » (${slot.jour} ${slot.horaires}) ?`)) return;
+  if (!confirm(`Voulez-vous vraiment supprimer le créneau « ${slot.groupe} » (${slot.jour} ${slot.horaires}) ?`)) {
+    return;
+  }
   try {
     await unwrap(client.DELETE("/api/planning/item/{item_id}", { params: { path: { item_id: slot.id } } }));
     toast.show("🗑️ Créneau supprimé.");

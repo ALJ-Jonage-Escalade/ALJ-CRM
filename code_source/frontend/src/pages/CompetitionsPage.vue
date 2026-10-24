@@ -136,9 +136,13 @@ watch(uid, (u) => void outbox.load(u), { immediate: true });
 
 /* Sent as soon as the API answers again (each successful poll), oldest first. */
 async function replay(): Promise<void> {
-  if (!uid.value || !online.value || !outbox.changes.value.size) return;
+  if (!uid.value || !online.value || !outbox.changes.value.size) {
+    return;
+  }
   const result = await outbox.replay(uid.value);
-  if (!result) return;
+  if (!result) {
+    return;
+  }
   if (result.denied) {
     // Role lost: nothing kept on the device, unsent changes included
     outbox.forget();
@@ -209,7 +213,9 @@ const rows = computed(() =>
 const creating = ref(false);
 async function create(body: Schemas["CompetitionCreate"]): Promise<void> {
   const created = await writer.run(() => unwrap(client.POST("/api/competitions", { body })), { done: "✅ Compétition créée." });
-  if (!created) return;
+  if (!created) {
+    return;
+  }
   creating.value = false;
   await router.push({ query: { id: String(created.id) } });
 }
@@ -217,14 +223,17 @@ async function create(body: Schemas["CompetitionCreate"]): Promise<void> {
 async function archivePast(): Promise<void> {
   const list = past.value;
   const n = list.length;
-  if (!n) return;
+  if (!n) {
+    return;
+  }
   const s = n > 1 ? "s" : "";
   if (
     !confirm(
       `Archiver ${n} compétition${s} passée${s} ?\n\n${list.map((c) => `• ${c.nom} (${period(c)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`,
     )
-  )
+  ) {
     return;
+  }
   await writer.run(() => unwrap(client.POST("/api/competitions/archive-past")), {
     done: (r) => `📦 ${r.archived.length} compétition${r.archived.length > 1 ? "s" : ""} archivée${r.archived.length > 1 ? "s" : ""}.`,
   });
@@ -232,8 +241,9 @@ async function archivePast(): Promise<void> {
 
 const plural = (n: number) => (n > 1 ? "s" : "");
 const listLine = computed(() => {
-  if (!competitions.data.value)
+  if (!competitions.data.value) {
     return competitions.state.value === "loading" ? "⏳ Chargement des compétitions…" : "Aucune donnée des compétitions sur cet appareil.";
+  }
   const n = current.value.length;
   const a = archived.value.length;
   return `${n} compétition${plural(n)}${a ? ` · ${a} archivée${plural(a)}` : ""}`;
@@ -245,11 +255,18 @@ const syncInfo = computed(() => {
   const since = at ? ` — données du ${TIME.format(at)}` : "";
   const state = competitions.state.value;
   const waiting = pendingLine(outbox.changes.value.size);
-  if (competitions.httpStatus.value === 403) return "🔒 Accès restreint";
-  if (state === "offline" || auth.state.value.status === "error")
+  if (competitions.httpStatus.value === 403) {
+    return "🔒 Accès restreint";
+  }
+  if (state === "offline" || auth.state.value.status === "error") {
     return `📴 Hors ligne${since || " : aucune donnée sur cet appareil"}${waiting}`;
-  if (state === "error") return `⚠️ Serveur injoignable — nouvel essai automatique${since}${waiting}`;
-  if (state === "loading") return at ? `💾 Données du ${TIME.format(at)}${waiting}` : waiting.slice(3);
+  }
+  if (state === "error") {
+    return `⚠️ Serveur injoignable — nouvel essai automatique${since}${waiting}`;
+  }
+  if (state === "loading") {
+    return at ? `💾 Données du ${TIME.format(at)}${waiting}` : waiting.slice(3);
+  }
   return at ? `☁️ À jour — ${TIME.format(at)}${waiting}` : waiting.slice(3);
 });
 

@@ -33,9 +33,13 @@ function accentPattern(word: string): string {
 export function shortenGroupLabel(name: string, keyword: string, drop: string[] = []): string {
   const parts = name.split(new RegExp(accentPattern(keyword), "i"));
   let rest = parts.length > 1 ? parts.reduce((a, b) => (b.length > a.length ? b : a)) : name;
-  for (const pattern of drop) rest = rest.replace(new RegExp(pattern, "ig"), "");
+  for (const pattern of drop) {
+    rest = rest.replace(new RegExp(pattern, "ig"), "");
+  }
   rest = rest.replace(/\s{2,}/g, " ").replace(/^[\s–—-]+|[\s–—-]+$/g, "");
-  if (rest.startsWith("(") && rest.endsWith(")")) rest = rest.slice(1, -1).trim();
+  if (rest.startsWith("(") && rest.endsWith(")")) {
+    rest = rest.slice(1, -1).trim();
+  }
   return rest || name;
 }
 
@@ -59,14 +63,19 @@ export function creneauItems(creneaux: readonly Creneau[]): CreneauItem[] {
   for (const c of creneaux) {
     const name = c.groupe;
     const n = normKey(name);
-    if (n.includes("competition")) lists["Compétition"].push([name, shortenGroupLabel(name, "competition")]);
-    else if (n.includes("college")) lists["Collège"].push([name, shortenGroupLabel(name, "college")]);
-    else if (n.includes("enfants")) {
+    if (n.includes("competition")) {
+      lists["Compétition"].push([name, shortenGroupLabel(name, "competition")]);
+    } else if (n.includes("college")) {
+      lists["Collège"].push([name, shortenGroupLabel(name, "college")]);
+    } else if (n.includes("enfants")) {
       const years = n.match(/20\d\d\s*-\s*20\d\d/);
       const sub = years ? years[0].replace(/\s/g, "") : "Autres tranches";
       (children[sub] ??= []).push([name, shortenGroupLabel(name, "enfants", ["20\\d\\d\\s*-\\s*20\\d\\d"])]);
-    } else if (n.includes("perfectionnement")) lists.Perfectionnement.push([name, shortenGroupLabel(name, "perfectionnement")]);
-    else others.push([name, name]);
+    } else if (n.includes("perfectionnement")) {
+      lists.Perfectionnement.push([name, shortenGroupLabel(name, "perfectionnement")]);
+    } else {
+      others.push([name, name]);
+    }
   }
 
   const tarifsOf = new Map(creneaux.map((c) => [c.groupe, c.tarifs]));
@@ -78,9 +87,13 @@ export function creneauItems(creneaux: readonly Creneau[]): CreneauItem[] {
   for (const section of SECTIONS) {
     if (section === "Enfants") {
       const subs = Object.keys(children).sort();
-      if (!subs.length) continue;
+      if (!subs.length) {
+        continue;
+      }
       items.push({ kind: "section", label: section, raw: section });
-      for (const sub of subs) items.push({ kind: "sub", label: sub, raw: sub }, ...groups(children[sub]!));
+      for (const sub of subs) {
+        items.push({ kind: "sub", label: sub, raw: sub }, ...groups(children[sub]!));
+      }
     } else if (lists[section].length) {
       items.push({ kind: "section", label: section, raw: section }, ...groups(lists[section]));
     }
@@ -96,18 +109,30 @@ export interface TarifCounts {
 
 export function tarifCounts(members: readonly Pick<Member, "tarif_name">[], items: readonly CreneauItem[]): TarifCounts {
   const covered = new Set<string>();
-  for (const it of items) if (it.kind === "group") for (const t of it.tarifs) covered.add(normKey(t));
+  for (const it of items) {
+    if (it.kind === "group") {
+      for (const t of it.tarifs) {
+        covered.add(normKey(t));
+      }
+    }
+  }
   const byTarif: Record<string, number> = {};
   const others: Record<string, number> = {};
   for (const m of members) {
     const k = normKey(m.tarif_name);
-    if (!k) continue;
+    if (!k) {
+      continue;
+    }
     byTarif[k] = (byTarif[k] ?? 0) + 1;
-    if (!covered.has(k)) others[m.tarif_name] = (others[m.tarif_name] ?? 0) + 1;
+    if (!covered.has(k)) {
+      others[m.tarif_name] = (others[m.tarif_name] ?? 0) + 1;
+    }
   }
   const groups: Record<string, number> = {};
   for (const it of items) {
-    if (it.kind === "group") groups[it.raw] = it.tarifs.reduce((sum, t) => sum + (byTarif[normKey(t)] ?? 0), 0);
+    if (it.kind === "group") {
+      groups[it.raw] = it.tarifs.reduce((sum, t) => sum + (byTarif[normKey(t)] ?? 0), 0);
+    }
   }
   return { groups, others };
 }
@@ -141,9 +166,17 @@ export function otherChecked(filters: Filters, tarif: string): boolean {
 export function allowedTarifs(items: readonly CreneauItem[], counts: TarifCounts, filters: Filters): Set<string> {
   const allowed = new Set<string>();
   for (const it of items) {
-    if (it.kind === "group" && groupChecked(filters, it)) for (const t of it.tarifs) allowed.add(normKey(t));
+    if (it.kind === "group" && groupChecked(filters, it)) {
+      for (const t of it.tarifs) {
+        allowed.add(normKey(t));
+      }
+    }
   }
-  for (const t of Object.keys(counts.others)) if (otherChecked(filters, t)) allowed.add(normKey(t));
+  for (const t of Object.keys(counts.others)) {
+    if (otherChecked(filters, t)) {
+      allowed.add(normKey(t));
+    }
+  }
   return allowed;
 }
 
@@ -151,8 +184,14 @@ export function allowedTarifs(items: readonly CreneauItem[], counts: TarifCounts
 export function checkAll(filters: Filters, items: readonly CreneauItem[], counts: TarifCounts, on: boolean): Filters {
   const groups = { ...filters.groups };
   const others = { ...filters.others };
-  for (const it of items) if (it.kind === "group") groups[it.raw] = on;
-  for (const t of Object.keys(counts.others)) others[OTHER_PREFIX + t] = on;
+  for (const it of items) {
+    if (it.kind === "group") {
+      groups[it.raw] = on;
+    }
+  }
+  for (const t of Object.keys(counts.others)) {
+    others[OTHER_PREFIX + t] = on;
+  }
   return { ...filters, groups, others };
 }
 
@@ -168,9 +207,13 @@ export type FilteredMember = Pick<
 /** The search finds names (both orders), tariff, licence, e-mail, phone (4 digits at least, any spacing), city, comment. */
 export function matchesSearch(m: FilteredMember, search: string): boolean {
   const q = normKey(search);
-  if (!q) return true;
+  if (!q) {
+    return true;
+  }
   const qDigits = digits(q);
-  if (qDigits.length >= 4 && digits(m.phone).includes(qDigits)) return true;
+  if (qDigits.length >= 4 && digits(m.phone).includes(qDigits)) {
+    return true;
+  }
   return [
     m.last_name,
     m.first_name,
@@ -189,8 +232,12 @@ export function matchesSearch(m: FilteredMember, search: string): boolean {
 export function filterMembers<M extends FilteredMember>(members: readonly M[], filters: Filters, allowed: Set<string>): M[] {
   return members.filter((m) => {
     const k = normKey(m.tarif_name);
-    if (k && !allowed.has(k)) return false;
-    if (filters.status && m.status_norm !== filters.status) return false;
+    if (k && !allowed.has(k)) {
+      return false;
+    }
+    if (filters.status && m.status_norm !== filters.status) {
+      return false;
+    }
     return matchesSearch(m, filters.search);
   });
 }
@@ -204,7 +251,9 @@ export function statusChips(members: readonly Pick<Member, "status_norm">[]): { 
   const chips = [{ value: "", label: "Tous", count: members.length }];
   for (const st of STATUSES) {
     const count = members.filter((m) => m.status_norm === st).length;
-    if (count) chips.push({ value: st, label: st, count });
+    if (count) {
+      chips.push({ value: st, label: st, count });
+    }
   }
   return chips;
 }
@@ -231,8 +280,12 @@ export interface Diplome {
 /** Badges of the Diplôme column: red badge, bouldering autonomy, orange passport. */
 export function diplomes(m: Pick<Member, "badge_rouge" | "autonomie_bloc" | "raw_passports" | "passeport_orange">): Diplome[] {
   const items: Diplome[] = [];
-  if (yes(m.badge_rouge)) items.push({ type: "badge_rouge", label: "Badge rouge diff", icon: "🔴" });
-  if (yes(m.autonomie_bloc)) items.push({ type: "autonomie_bloc", label: "Autonomie bloc", icon: "🧗" });
+  if (yes(m.badge_rouge)) {
+    items.push({ type: "badge_rouge", label: "Badge rouge diff", icon: "🔴" });
+  }
+  if (yes(m.autonomie_bloc)) {
+    items.push({ type: "autonomie_bloc", label: "Autonomie bloc", icon: "🧗" });
+  }
   const passports = `${m.raw_passports} ${m.passeport_orange}`.toLowerCase();
   if (passports.includes("orange") || m.passeport_orange.toLowerCase() === "oui") {
     items.push({ type: "passeport_orange", label: "Passeport orange", icon: "🟠" });
@@ -250,23 +303,31 @@ export function diplomeWeight(m: Member): number {
 export function fmtDay(s: string): string {
   const str = s.trim();
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
-  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  if (iso) {
+    return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  }
   const fr = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/.exec(str);
-  if (fr) return `${fr[1]!.padStart(2, "0")}/${fr[2]!.padStart(2, "0")}/${fr[3]}`;
+  if (fr) {
+    return `${fr[1]!.padStart(2, "0")}/${fr[2]!.padStart(2, "0")}/${fr[3]}`;
+  }
   return str;
 }
 
 /** Milliseconds of an ISO or French date, 0 when empty or unreadable (sorted first). */
 export function dateValue(s: string): number {
   const str = s.trim();
-  if (!str) return 0;
+  if (!str) {
+    return 0;
+  }
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
   if (iso) {
     const t = Date.parse(str.length > 10 ? str : `${str}T00:00:00`);
     return Number.isNaN(t) ? new Date(+iso[1]!, +iso[2]! - 1, +iso[3]!).getTime() : t;
   }
   const fr = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/.exec(str);
-  if (fr) return new Date(+fr[3]!, +fr[2]! - 1, +fr[1]!).getTime();
+  if (fr) {
+    return new Date(+fr[3]!, +fr[2]! - 1, +fr[1]!).getTime();
+  }
   const t = Date.parse(str);
   return Number.isNaN(t) ? 0 : t;
 }
@@ -378,10 +439,16 @@ export function loadFilters(storage: Pick<Storage, "getItem"> | undefined = glob
   const filters = emptyFilters();
   try {
     const saved: unknown = JSON.parse(storage?.getItem(key) || "{}");
-    if (!saved || typeof saved !== "object") return filters;
+    if (!saved || typeof saved !== "object") {
+      return filters;
+    }
     const { season, status, groups, others } = saved as Record<string, unknown>;
-    if (typeof season === "string") filters.season = season;
-    if (typeof status === "string") filters.status = status;
+    if (typeof season === "string") {
+      filters.season = season;
+    }
+    if (typeof status === "string") {
+      filters.status = status;
+    }
     filters.groups = booleans(groups);
     filters.others = booleans(others);
   } catch {
@@ -391,7 +458,9 @@ export function loadFilters(storage: Pick<Storage, "getItem"> | undefined = glob
 }
 
 function booleans(value: unknown): Record<string, boolean> {
-  if (!value || typeof value !== "object") return {};
+  if (!value || typeof value !== "object") {
+    return {};
+  }
   return Object.fromEntries(Object.entries(value).filter((e): e is [string, boolean] => typeof e[1] === "boolean"));
 }
 

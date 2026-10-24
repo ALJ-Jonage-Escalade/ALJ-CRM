@@ -77,7 +77,9 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
     dbPromise ??= new Promise((resolve) => {
       let req: IDBOpenDBRequest;
       try {
-        if (!deps.indexedDB) throw new Error("no IndexedDB");
+        if (!deps.indexedDB) {
+          throw new Error("no IndexedDB");
+        }
         req = deps.indexedDB.open(DB_NAME, DB_VERSION);
       } catch {
         resolve(null);
@@ -90,7 +92,9 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
           ["meta", "key"],
           ["outbox", "key"],
         ] as const) {
-          if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, { keyPath });
+          if (!db.objectStoreNames.contains(store)) {
+            db.createObjectStore(store, { keyPath });
+          }
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -108,7 +112,9 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
     fn: (s: IDBObjectStore) => IDBRequest<R> | null,
   ): Promise<R | null> {
     const db = await openDb();
-    if (!db) return null;
+    if (!db) {
+      return null;
+    }
     return new Promise((resolve) => {
       try {
         const tx = db.transaction(storeName, mode);
@@ -132,7 +138,9 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
     try {
       for (let i = 0; ls && i < ls.length; i++) {
         const k = ls.key(i);
-        if (k?.startsWith(LEGACY_PREFIX)) keys.push(k);
+        if (k?.startsWith(LEGACY_PREFIX)) {
+          keys.push(k);
+        }
       }
     } catch {
       // blocked storage: nothing to move
@@ -143,7 +151,9 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
   /* Old snapshots of this user go into the store, every old key is removed. */
   async function migrateLegacy(uid: string, e: number): Promise<void> {
     const ls = deps.storage;
-    if (!ls) return;
+    if (!ls) {
+      return;
+    }
     for (const k of legacyKeys()) {
       try {
         const v = JSON.parse(ls.getItem(k) || "null") as { uid?: unknown; savedAt?: unknown; data?: unknown } | null;
@@ -154,7 +164,9 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
       } catch {
         // unreadable: dropped
       }
-      if (e !== epoch) return; // cleared meanwhile: clearAll removes the old keys itself
+      if (e !== epoch) {
+        return;
+      } // cleared meanwhile: clearAll removes the old keys itself
       try {
         ls.removeItem(k);
       } catch {
@@ -168,7 +180,9 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
     const owner = await get<{ uid: string }>("meta", "owner");
     if (owner && owner.uid !== uid) {
       await clearAll(); // another account signs in on this device
-      if (e + 1 !== epoch) return; // cleared by someone else too (logout): stop here
+      if (e + 1 !== epoch) {
+        return;
+      } // cleared by someone else too (logout): stop here
       e = epoch;
     }
     await put(e, "meta", { key: "owner", uid });
@@ -181,17 +195,25 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
   }
 
   function start(uid: string | null): Promise<void> {
-    if (!uid) return Promise.resolve();
-    if (started && started.uid === uid && started.epoch === epoch) return started.done;
+    if (!uid) {
+      return Promise.resolve();
+    }
+    if (started && started.uid === uid && started.epoch === epoch) {
+      return started.done;
+    }
     const done = doStart(uid);
     started = { uid, epoch, done };
     return done;
   }
 
   async function load<T>(name: string, uid: string | null): Promise<Stored<T> | null> {
-    if (!uid) return null;
+    if (!uid) {
+      return null;
+    }
     const rec = await get<ResourceRecord>("resources", name);
-    if (!rec || rec.uid !== uid) return null;
+    if (!rec || rec.uid !== uid) {
+      return null;
+    }
     const confirmed = await get<{ uid: string; at: number }>("meta", `confirmed:${name}`);
     const savedAt = confirmed && confirmed.uid === uid ? Math.max(rec.savedAt, confirmed.at) : rec.savedAt;
     if (!(now() - savedAt <= MAX_AGE_MS)) {
@@ -202,23 +224,31 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
   }
 
   async function save(name: string, uid: string | null, data: unknown, etag: string | null, url: string | null = null): Promise<void> {
-    if (!uid) return;
+    if (!uid) {
+      return;
+    }
     await put(epoch, "resources", { name, uid, savedAt: now(), etag: etag || null, url, data });
   }
 
   /* The data is not read nor rewritten: load() takes the later of the two dates. */
   async function touch(name: string, uid: string | null): Promise<void> {
-    if (!uid) return;
+    if (!uid) {
+      return;
+    }
     await put(epoch, "meta", { key: `confirmed:${name}`, uid, at: now() });
   }
 
   async function queue(uid: string | null, entry: OutboxEntry): Promise<void> {
-    if (!uid || !entry?.key) return;
+    if (!uid || !entry?.key) {
+      return;
+    }
     await put(epoch, "outbox", { ...entry, uid });
   }
 
   async function queued(uid: string | null): Promise<OutboxEntry[]> {
-    if (!uid) return [];
+    if (!uid) {
+      return [];
+    }
     const all = await run<OutboxEntry[]>("outbox", "readonly", (s) => s.getAll());
     return (all ?? []).filter((e) => e?.uid === uid);
   }
@@ -233,7 +263,9 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
     await run("meta", "readwrite", (s) => s.clear());
     await run("outbox", "readwrite", (s) => s.clear());
     try {
-      for (const k of legacyKeys()) deps.storage?.removeItem(k);
+      for (const k of legacyKeys()) {
+        deps.storage?.removeItem(k);
+      }
     } catch {
       // nothing stored
     }
