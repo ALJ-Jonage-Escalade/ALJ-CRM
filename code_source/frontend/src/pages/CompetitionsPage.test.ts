@@ -140,10 +140,13 @@ async function render(state: AuthState, api: ApiFetch, store: OfflineStore, path
   return { wrapper, byId, all, card, inBody, router, auth };
 }
 
+/** Waits for IndexedDB and the renders that follow. fake-indexeddb answers through setImmediate: waiting on that queue
+    keeps the steps in a fixed order (setTimeout(0) runs before or after it depending on the machine's load). 8 rounds
+    are needed, 12 for margin. */
 async function settle(): Promise<void> {
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 12; i++) {
     await flushPromises();
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setImmediate(r));
   }
 }
 
