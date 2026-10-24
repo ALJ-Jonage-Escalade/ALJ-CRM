@@ -6,7 +6,7 @@ annotated-types==0.8.0
     # via pydantic
 anyio==4.15.1
     # via starlette
-brotli==1.2.0 ; platform_python_implementation == 'CPython'
+brotli==1.2.1 ; platform_python_implementation == 'CPython'
     # via fonttools
 brotlicffi==1.2.0.2 ; platform_python_implementation != 'CPython'
     # via fonttools
