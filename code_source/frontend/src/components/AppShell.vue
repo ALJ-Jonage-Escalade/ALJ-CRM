@@ -1,7 +1,7 @@
 <script setup lang="ts">
-/* Layout of every page: navigation (side menu on desktop, bottom bar on phones), header with the
-   signed-in account, and the sign-in / access gate. The page content is only rendered for a role allowed on
-   the page (lib/access.ts), and the menu only lists those pages.
+/* Layout of every page: navigation (side menu on desktop, bottom bar on phones) with the signed-in account, header,
+   and the sign-in / access gate. The page content is only rendered for a role allowed on the page (lib/access.ts),
+   and the menu only lists those pages.
    Element ids are the ones of the former web/shared/alj-shell.js: the e2e tests rely on them.
    Printed, only the page content remains (Planning prints its grid). */
 import { computed, inject, ref, watch } from "vue";
@@ -103,24 +103,27 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
           <span class="hidden md:inline">{{ item.label }}</span>
         </PageLink>
       </nav>
+      <!-- Signed-in account: foot of the side menu on desktop, top of the page on phones (the menu is a bottom bar) -->
+      <div
+        class="flex items-center gap-2 px-4 pt-3 md:mt-auto md:flex-col md:items-start md:gap-2 md:border-t md:border-side-hover md:px-2 md:pt-4"
+      >
+        <span id="who" class="min-w-0 text-xs break-words text-slate-500 md:text-slate-400">{{ who }}</span>
+        <button
+          v-if="state.status === 'signedIn' || state.status === 'error'"
+          id="logout-btn"
+          type="button"
+          class="ml-auto shrink-0 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-300 md:ml-0"
+          @click="logout"
+        >
+          🚪 Se déconnecter
+        </button>
+      </div>
     </aside>
 
     <div class="min-w-0 px-4 pt-4 pb-28 md:px-7 md:pt-6 md:pb-10 print:p-0">
       <header class="mb-4 flex print:hidden flex-wrap items-center gap-x-4 gap-y-2">
         <h1 class="m-0 text-xl font-bold md:text-[22px]">{{ props.title }}</h1>
         <span id="sync-info" class="text-[13px] text-slate-500">{{ props.sync }}</span>
-        <div class="ml-auto flex min-w-0 items-center gap-2">
-          <span id="who" class="min-w-0 text-xs break-words text-slate-500">{{ who }}</span>
-          <button
-            v-if="state.status === 'signedIn' || state.status === 'error'"
-            id="logout-btn"
-            type="button"
-            class="shrink-0 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-300"
-            @click="logout"
-          >
-            🚪 Se déconnecter
-          </button>
-        </div>
       </header>
 
       <div
