@@ -16,8 +16,8 @@ const rows = computed(() => recordRows(props.member));
   <div data-testid="member-record-view" class="flex flex-col gap-3">
     <div class="flex flex-wrap items-start justify-between gap-2">
       <div class="flex flex-col gap-3">
-        <div data-testid="record-name" class="flex flex-row justify-between text-lg font-bold text-slate-800">
-          <div>{{ member.first_name }} {{ member.last_name }}</div>
+        <div class="flex flex-row justify-between text-lg font-bold text-slate-800">
+          <div data-testid="record-name">{{ member.first_name }} {{ member.last_name }}</div>
           <div>
             <slot name="status" />
           </div>

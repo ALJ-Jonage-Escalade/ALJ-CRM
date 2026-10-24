@@ -255,10 +255,13 @@ describe("AdherentsPage", () => {
     const { byId, inBody, router, wrapper } = await render();
     await flushPromises();
     expect(inBody("record-name")!.textContent).toBe("Léa DUPONT");
+    // Status badge next to the name
+    expect(inBody("record-panel")!.textContent).toContain("Validé");
     expect(wrapper.findAll('[data-testid="data-row"]').map((r) => r.attributes("aria-selected"))).toEqual(["true", "false"]);
     expect(router.currentRoute.value.query).toEqual({});
     await byId("sort-last_name").trigger("click");
     expect(inBody("record-name")!.textContent).toBe("Max MARTIN");
+    expect(inBody("record-panel")!.textContent).toContain("En cours");
     await byId("member-search").setValue("léa");
     expect(inBody("record-name")!.textContent).toBe("Léa DUPONT");
     await byId("member-search").setValue("personne");
