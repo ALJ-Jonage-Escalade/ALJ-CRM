@@ -2,7 +2,7 @@
 #    uv export --frozen --no-hashes --no-emit-project --only-dev
 anyio==4.15.1
     # via httpx
-ast-serialize==0.13.0
+ast-serialize==0.13.1
     # via mypy
 certifi==2026.7.22
     # via
