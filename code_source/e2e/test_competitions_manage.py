@@ -80,8 +80,9 @@ def test_edit_and_delete_competition(page, test_data):
 
     expect(page.get_by_test_id("edit-dialog")).to_be_hidden()
     card = competition_card(page, renamed)
-    expect(card).to_contain_text("22,50 €")
-    expect(card).to_contain_text("Lyon")
+    meta = page.get_by_test_id("detail-meta")
+    expect(meta).to_contain_text("22,50 €")
+    expect(meta).to_contain_text("Lyon")
     expect(card).to_contain_text("Coachs : Filius Flitwick")
     expect(competition_card(page, nom)).to_have_count(0)
 

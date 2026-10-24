@@ -538,13 +538,10 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       <div class="flex items-center gap-2 justify-between">
         <b class="text-[13.5px]">Gérer les inscriptions</b>
         <div class="flex flex-raw gap-2">
-
           <UiButton variant="muted" small data-testid="toggle-add" :aria-expanded="adding" @click="adding = !adding">
             {{ adding ? "Fermer" : "🔍 Rechercher un adhérent" }}
           </UiButton>
-          <UiButton variant="muted" small data-testid="load-group" @click="loadGroup">
-            🧗 Charger le groupe « Compétition »
-          </UiButton>
+          <UiButton variant="muted" small data-testid="load-group" @click="loadGroup">🧗 Charger le groupe « Compétition »</UiButton>
           <UiButton
             v-if="canWrite"
             variant="danger"
