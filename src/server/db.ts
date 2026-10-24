@@ -1,18 +1,20 @@
-import {
+import type {
   Member,
   PlanningItem,
   Coach,
   Competition,
   HelloAssoItem,
   EmailTemplate,
+  Participant
+} from './seedData.ts';
+import {
   SEASONS,
   INITIAL_COACHES,
   INITIAL_PLANNING,
   INITIAL_MEMBERS,
   INITIAL_COMPETITIONS,
   INITIAL_HELLOASSO_ITEMS,
-  INITIAL_EMAIL_TEMPLATES,
-  Participant
+  INITIAL_EMAIL_TEMPLATES
 } from './seedData.ts';
 
 class Database {
