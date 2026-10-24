@@ -5,6 +5,7 @@
    among the choices. */
 import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { draftErrors, STATUS_CHOICES, withDateTag, type DraftErrors, type DraftField, type MemberDraft, type TarifChoice } from "./record";
 
 const draft = defineModel<MemberDraft>({ required: true });
@@ -234,11 +235,11 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
       :class="fieldClass('commentaires_correctif')"
     />
 
-    <div class="sticky bottom-0 -mx-5 -mb-5 flex justify-end gap-2 border-t border-slate-200 bg-white px-5 py-3">
+    <UiDialogActions class="sticky bottom-0 -mx-5 -mb-5 border-t border-slate-200 bg-white px-5 py-3">
       <UiButton variant="muted" data-testid="member-cancel" @click="emit('cancel')">Annuler</UiButton>
       <UiButton type="submit" data-testid="member-save" :busy="saving && (adding ? 'Création…' : 'Enregistrement…')">
         {{ adding ? "➕ Créer l'adhérent" : "💾 Enregistrer" }}
       </UiButton>
-    </div>
+    </UiDialogActions>
   </form>
 </template>

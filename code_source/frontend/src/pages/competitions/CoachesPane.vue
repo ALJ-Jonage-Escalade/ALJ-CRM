@@ -82,8 +82,8 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       >
         <form v-if="editing === c.id" class="flex flex-wrap gap-2" @submit.prevent="rename(c)">
           <input v-model="editName" data-testid="coach-edit-name" :class="[field, 'min-w-40 flex-1']" />
-          <UiButton type="submit" small data-testid="coach-save">💾 Enregistrer</UiButton>
           <UiButton variant="muted" small @click="editing = null">Annuler</UiButton>
+          <UiButton type="submit" small data-testid="coach-save">💾 Enregistrer</UiButton>
         </form>
         <div v-else class="flex items-center justify-between gap-2">
           <b class="text-[14.5px]" data-testid="coach-name">🏃 {{ c.nom }}</b>

@@ -4,6 +4,7 @@
    ignored, with a reason. The competition and member are suggested from what the payer typed. */
 import { computed, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { formatDateTime, formatEuros, parseDate } from "../../lib/format";
 import { sortCompetitions, isArchived, type Competition, type MemberSlot } from "./competitions";
 import {
@@ -198,14 +199,14 @@ const th = "py-1 pr-3 align-top text-left font-semibold whitespace-nowrap text-s
         ✍️ Indiquez un commentaire (motif) pour ignorer cette ligne.
       </p>
     </div>
-    <div class="flex flex-wrap gap-2">
-      <UiButton v-if="!ignored" type="submit" data-testid="attach-save" :busy="busy && 'Enregistrement…'">
-        💾 Enregistrer le rattachement
-      </UiButton>
+    <UiDialogActions>
+      <UiButton variant="muted" @click="emit('cancel')">Fermer</UiButton>
       <UiButton v-if="!linked" variant="muted" data-testid="attach-ignore" :disabled="busy" @click="ignore">
         {{ ignored ? "↩️ Ne plus ignorer" : "🚫 Ignorer" }}
       </UiButton>
-      <UiButton variant="muted" @click="emit('cancel')">Fermer</UiButton>
-    </div>
+      <UiButton v-if="!ignored" type="submit" data-testid="attach-save" :busy="busy && 'Enregistrement…'">
+        💾 Enregistrer le rattachement
+      </UiButton>
+    </UiDialogActions>
   </form>
 </template>

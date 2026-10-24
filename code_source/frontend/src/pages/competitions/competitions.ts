@@ -306,13 +306,6 @@ export function draftOf(c?: Competition): CompetitionDraft {
   };
 }
 
-/** The day after (« sur 2 jours »). */
-export function nextDay(iso: string): string {
-  const d = new Date(`${iso}T12:00:00`);
-  d.setDate(d.getDate() + 1);
-  return todayIso(d);
-}
-
 export function draftErrors(d: CompetitionDraft): Partial<Record<keyof CompetitionDraft, string>> {
   const errors: Partial<Record<keyof CompetitionDraft, string>> = {};
   if (!d.nom.trim()) {

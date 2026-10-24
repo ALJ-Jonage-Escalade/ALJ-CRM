@@ -2,6 +2,7 @@
 /* A payment received outside HelloAsso (cheque, cash): the competitor becomes selected and paid. */
 import { computed, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import type { Participant } from "./competitions";
 
 const props = defineProps<{ participant: Participant; price: number; busy: boolean }>();
@@ -37,9 +38,9 @@ function confirm(): void {
       />
       <p v-if="invalid" class="mt-1 text-xs font-semibold text-red-600">Indiquez un montant positif.</p>
     </div>
-    <div class="flex gap-2">
-      <UiButton type="submit" data-testid="payment-ok" :busy="busy && 'Enregistrement…'">💶 Enregistrer le paiement</UiButton>
+    <UiDialogActions>
       <UiButton variant="muted" @click="emit('cancel')">Annuler</UiButton>
-    </div>
+      <UiButton type="submit" data-testid="payment-ok" :busy="busy && 'Enregistrement…'">💶 Enregistrer le paiement</UiButton>
+    </UiDialogActions>
   </form>
 </template>

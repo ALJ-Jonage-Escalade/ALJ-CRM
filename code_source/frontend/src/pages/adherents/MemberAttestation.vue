@@ -5,6 +5,7 @@
    the pane is open. */
 import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { CLIENT_KEY, errorText } from "../../lib/client";
 import { createCommunicationsApi } from "../../services/communications";
 import { saveFile } from "../../lib/download";
@@ -170,12 +171,12 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
     </div>
 
     <p v-if="problem" role="alert" data-testid="attestation-problem" class="text-xs font-bold text-red-600">{{ problem }}</p>
-    <div class="flex flex-wrap justify-end gap-2">
+    <UiDialogActions>
       <UiButton variant="muted" data-testid="attestation-cancel" @click="emit('cancel')">Fermer</UiButton>
       <UiButton variant="muted" data-testid="attestation-download" :disabled="!pdf" @click="download">📥 Télécharger le PDF</UiButton>
       <UiButton type="submit" data-testid="attestation-send" :disabled="!canSend" :busy="sending && 'Envoi en cours…'">
         🚀 Envoyer par e-mail
       </UiButton>
-    </div>
+    </UiDialogActions>
   </form>
 </template>

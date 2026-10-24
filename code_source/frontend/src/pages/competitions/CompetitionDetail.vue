@@ -7,6 +7,7 @@ import { computed, inject, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
 import { useMediaQuery } from "../../composables/media";
 import { CLIENT_KEY, type Schemas } from "../../lib/client";
@@ -590,7 +591,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         :coaches="coaches"
         :busy="writer.busy.value"
         @save="save"
-        @remove="remove"
         @cancel="editing = false"
       />
     </UiDialog>
@@ -619,10 +619,10 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           Si les résultats de « {{ c.nom }} » sont publiés, donnez l'adresse ou le numéro de leur page ({{ resultsUrlHint }}).
         </p>
         <input v-model="resultsUrl" data-testid="results-url" :class="field" :placeholder="resultsUrlHint" />
-        <div class="flex gap-2">
-          <UiButton type="submit" data-testid="results-ok" :disabled="!resultsUrl.trim()">🔍 Chercher</UiButton>
+        <UiDialogActions>
           <UiButton variant="muted" @click="askUrl = false">Annuler</UiButton>
-        </div>
+          <UiButton type="submit" data-testid="results-ok" :disabled="!resultsUrl.trim()">🔍 Chercher</UiButton>
+        </UiDialogActions>
       </form>
     </UiDialog>
     <UiDialog v-model:open="emailing" :title="`✉️ E-mail aux compétiteurs : ${c.nom}`" wide data-testid="email-dialog">

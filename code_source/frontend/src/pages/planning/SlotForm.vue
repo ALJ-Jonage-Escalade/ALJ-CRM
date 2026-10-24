@@ -3,6 +3,7 @@
    message to show. The day, type and tariffs a slot already has stay among the choices, so saving it keeps them. */
 import { computed } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { dayOptions, slotError, tarifOptions, typeOptions, type SlotDraft } from "./slots";
 
 const draft = defineModel<SlotDraft>({ required: true });
@@ -140,9 +141,9 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
         />
       </div>
     </div>
-    <div class="mt-1 flex justify-end gap-2 border-t border-slate-100 pt-3">
+    <UiDialogActions class="mt-1 border-t border-slate-100 pt-3">
       <UiButton variant="muted" data-testid="slot-cancel" @click="emit('cancel')">Annuler</UiButton>
       <UiButton type="submit" :busy="saving && 'Enregistrement…'" data-testid="slot-save">💾 Enregistrer le créneau</UiButton>
-    </div>
+    </UiDialogActions>
   </form>
 </template>

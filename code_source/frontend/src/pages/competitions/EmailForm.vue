@@ -4,6 +4,7 @@
    replaces the variables for each one and adds the signature. */
 import { computed, inject, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { CLIENT_KEY, errorText } from "../../lib/client";
 import { createCommunicationsApi } from "../../services/communications";
 import type { Competition, Row } from "./competitions";
@@ -165,9 +166,9 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
         >{{ preview }}</pre>
     </div>
     <p v-if="problem" role="alert" class="text-[13px] font-semibold text-red-700" data-testid="email-problem">{{ problem }}</p>
-    <div class="flex gap-2">
-      <UiButton type="submit" data-testid="email-send" :busy="sending && 'Envoi en cours…'">🚀 Envoyer ({{ reachable.length }})</UiButton>
+    <UiDialogActions>
       <UiButton variant="muted" @click="emit('cancel')">Annuler</UiButton>
-    </div>
+      <UiButton type="submit" data-testid="email-send" :busy="sending && 'Envoi en cours…'">🚀 Envoyer ({{ reachable.length }})</UiButton>
+    </UiDialogActions>
   </form>
 </template>

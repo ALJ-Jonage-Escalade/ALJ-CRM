@@ -3,6 +3,7 @@
    over to a next competition, a credit in the season balance; or lost, kept by the club), with a required comment. */
 import { ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { formatEuros } from "../../lib/format";
 import { type Participant } from "./competitions";
 
@@ -57,9 +58,9 @@ function confirm(): void {
         Un commentaire est obligatoire pour expliquer le désistement.
       </p>
     </div>
-    <div class="flex gap-2">
-      <UiButton type="submit" data-testid="withdraw-ok" :busy="busy && 'Enregistrement…'">Valider le désistement</UiButton>
+    <UiDialogActions>
       <UiButton variant="muted" data-testid="withdraw-cancel" @click="emit('cancel')">Annuler</UiButton>
-    </div>
+      <UiButton type="submit" data-testid="withdraw-ok" :busy="busy && 'Enregistrement…'">Valider le désistement</UiButton>
+    </UiDialogActions>
   </form>
 </template>

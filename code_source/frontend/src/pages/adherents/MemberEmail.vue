@@ -3,6 +3,7 @@
    sent through /api/send-email (the server replaces the variables again and adds the signature). */
 import { computed, inject, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { CLIENT_KEY, errorText } from "../../lib/client";
 import { createCommunicationsApi } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
@@ -125,9 +126,9 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
       </div>
     </div>
     <p v-if="problem" role="alert" data-testid="email-problem" class="text-xs font-bold text-red-600">{{ problem }}</p>
-    <div class="flex justify-end gap-2">
+    <UiDialogActions>
       <UiButton variant="muted" data-testid="email-cancel" @click="emit('cancel')">Annuler</UiButton>
       <UiButton type="submit" data-testid="email-send" :disabled="!canSend" :busy="sending && 'Envoi en cours…'">🚀 Envoyer</UiButton>
-    </div>
+    </UiDialogActions>
   </form>
 </template>

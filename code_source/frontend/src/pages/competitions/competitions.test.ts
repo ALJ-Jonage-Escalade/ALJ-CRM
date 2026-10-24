@@ -13,7 +13,6 @@ import {
   hasPaid,
   isNotInvited,
   memberMatches,
-  nextDay,
   participantCsv,
   participantRows,
   payment,
@@ -94,8 +93,7 @@ describe("competitions", () => {
       prix: 12.5,
       coach_ids: [3, 1],
     });
-    expect(draftBody({ ...draft, date_fin: nextDay("2026-03-14") }).date_fin).toBe("2026-03-15");
-    expect(nextDay("2026-02-28")).toBe("2026-03-01");
+    expect(draftBody({ ...draft, date_fin: "2026-03-15" }).date_fin).toBe("2026-03-15");
     const edited = draftOf(comp({ nom: "X", date_competition: "2026-03-14", date_fin: "2026-03-14", prix: 9, lieu: "Lyon" }));
     expect([edited.date_fin, edited.prix, edited.lieu]).toEqual(["", "9", "Lyon"]);
   });

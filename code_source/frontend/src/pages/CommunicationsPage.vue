@@ -4,6 +4,7 @@
 import { computed, inject, onMounted, ref } from "vue";
 import AppShell from "../components/AppShell.vue";
 import UiButton from "../components/ui/UiButton.vue";
+import UiDialogActions from "../components/ui/UiDialogActions.vue";
 import UiCard from "../components/ui/UiCard.vue";
 import UiDialog from "../components/ui/UiDialog.vue";
 import UiToast from "../components/ui/UiToast.vue";
@@ -243,10 +244,10 @@ onMounted(() => {
           placeholder="Ex : Rappel stage vacances…"
           class="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-[13px]"
         />
-        <div class="mt-4 flex justify-end gap-2">
+        <UiDialogActions class="mt-4">
           <UiButton variant="muted" @click="creating = false">Annuler</UiButton>
           <UiButton type="submit" :busy="creatingBusy && 'Création…'" data-testid="new-template-create">Créer le modèle</UiButton>
-        </div>
+        </UiDialogActions>
       </form>
     </UiDialog>
     <UiToast :message="toast.message.value" />

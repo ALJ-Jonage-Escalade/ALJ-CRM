@@ -1,29 +1,24 @@
 <script setup lang="ts">
-/* Create or edit a competition (coaches and admins). The end date follows the start until it is set by hand;
-   « Sur 2 jours » sets it to the day after. Deleting is offered when editing. */
+/* Create or edit a competition (coaches and admins). The end date is cleared when the start changes, unless it was
+   set by hand. */
 import { computed, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import type { Schemas } from "../../lib/client";
-import {
-  coachChoices,
-  DISCIPLINES,
-  draftBody,
-  draftErrors,
-  draftOf,
-  nextDay,
-  resultsUrlHint,
-  type Coach,
-  type Competition,
-} from "./competitions";
+import { type Coach, coachChoices, type Competition, DISCIPLINES, draftBody, draftErrors, draftOf, resultsUrlHint } from "./competitions";
 
 const props = defineProps<{ competition?: Competition; coaches: readonly Coach[]; busy: boolean }>();
-const emit = defineEmits<{ save: [body: Schemas["CompetitionCreate"]]; remove: []; cancel: [] }>();
+const emit = defineEmits<{ save: [body: Schemas["CompetitionCreate"]]; cancel: [] }>();
 
 const draft = ref(draftOf(props.competition));
 const shown = ref(false); // errors once the coach tried to save
 const errors = computed(() => draftErrors(draft.value));
 const choices = computed(() => coachChoices(props.coaches, props.competition?.coach_ids ?? []));
 let endByHand = !!draft.value.date_fin;
+
+function endSetByHand(): void {
+  endByHand = true;
+}
 
 watch(
   () => draft.value.date_competition,
@@ -33,14 +28,6 @@ watch(
     }
   },
 );
-
-function twoDays(): void {
-  if (!draft.value.date_competition) {
-    return;
-  }
-  draft.value.date_fin = nextDay(draft.value.date_competition);
-  endByHand = true;
-}
 
 function save(): void {
   shown.value = true;
@@ -70,20 +57,15 @@ const error = "mt-1 text-xs font-semibold text-red-600";
     </div>
     <div>
       <label for="cf-date-fin" :class="label">Date de fin</label>
-      <div class="flex gap-1.5">
-        <input
-          id="cf-date-fin"
-          v-model="draft.date_fin"
-          type="date"
-          data-testid="cf-date-fin"
-          :class="field"
-          :min="draft.date_competition || undefined"
-          @input="endByHand = true"
-        />
-        <UiButton variant="muted" small data-testid="cf-two-days" :disabled="!draft.date_competition" @click="twoDays">
-          Sur 2 jours
-        </UiButton>
-      </div>
+      <input
+        id="cf-date-fin"
+        v-model="draft.date_fin"
+        type="date"
+        data-testid="cf-date-fin"
+        :class="field"
+        :min="draft.date_competition || undefined"
+        @input="endSetByHand"
+      />
       <p v-if="shown && errors.date_fin" :class="error">{{ errors.date_fin }}</p>
     </div>
     <div>
@@ -136,14 +118,11 @@ const error = "mt-1 text-xs font-semibold text-red-600";
         <span v-if="!choices.length" class="text-xs text-slate-500">Aucun coach enregistré (onglet Coachs).</span>
       </div>
     </fieldset>
-    <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+    <UiDialogActions class="sm:col-span-2">
+      <UiButton variant="muted" @click="emit('cancel')">Annuler</UiButton>
       <UiButton type="submit" data-testid="cf-save" :busy="busy && 'Enregistrement…'">
         {{ competition ? "💾 Enregistrer" : "➕ Créer la compétition" }}
       </UiButton>
-      <UiButton variant="muted" @click="emit('cancel')">Annuler</UiButton>
-      <UiButton v-if="competition" variant="danger" class="ml-auto" data-testid="cf-delete" :disabled="busy" @click="emit('remove')">
-        🗑 Supprimer
-      </UiButton>
-    </div>
+    </UiDialogActions>
   </form>
 </template>
