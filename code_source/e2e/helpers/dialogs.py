@@ -1,7 +1,8 @@
-"""Native confirm() / prompt() boxes of the pages."""
+"""Confirmation boxes of the pages (UiDialogHost: the themed dialog that replaced the native confirm())."""
 from playwright.sync_api import Page
 
 
 def accept_dialogs(page: Page) -> None:
-    """confirm() boxes (delete, archive…) are dismissed by Playwright unless accepted."""
-    page.on("dialog", lambda dialog: dialog.accept())
+    """Confirms every confirmation box (delete, archive…) as soon as it shows up."""
+    confirm = page.get_by_test_id("dialog-confirm")
+    page.add_locator_handler(confirm, lambda: confirm.click())

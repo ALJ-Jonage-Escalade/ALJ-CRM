@@ -9,6 +9,8 @@ import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
+import UiMenu from "../../components/ui/UiMenu.vue";
+import UiMenuItem from "../../components/ui/UiMenuItem.vue";
 import { useMediaQuery } from "../../composables/media";
 import { CLIENT_KEY, type Schemas } from "../../lib/client";
 import { createCompetitionsApi } from "../../services/competitions";
@@ -386,15 +388,16 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         data-testid="detail-actions"
       >
         <UiButton variant="muted" small data-testid="edit-comp" @click="editing = true">✏️ Modifier</UiButton>
-        <UiButton variant="muted" small :data-testid="isArchived(c) ? 'unarchive-comp' : 'archive-comp'" @click="archive(!isArchived(c))">
-          {{ isArchived(c) ? "♻️ Désarchiver" : "📦 Archiver" }}
-        </UiButton>
-        <UiButton variant="muted" small data-testid="fetch-results" :busy="fetching && 'Recherche MyCompet…'" @click="fetchResults()">
-          🏆 Trouver les résultats
-        </UiButton>
         <UiButton variant="muted" small data-testid="email-comp" @click="emailing = true">✉️ E-mail aux compétiteurs</UiButton>
-        <UiButton variant="muted" small data-testid="export-csv" :disabled="!rows.length" @click="exportCsv">📥 Export CSV</UiButton>
-        <UiButton variant="danger" small data-testid="delete-comp" :disabled="writer.busy.value" @click="remove">🗑️ Supprimer</UiButton>
+        <!-- The actions rarely needed (the results are also fetched every night) -->
+        <UiMenu label="⋯ Plus" small :busy="fetching && 'Recherche MyCompet…'" aria-label="Plus d'actions" data-testid="detail-more">
+          <UiMenuItem data-testid="fetch-results" @select="fetchResults()">🏆 Trouver les résultats</UiMenuItem>
+          <UiMenuItem data-testid="export-csv" :disabled="!rows.length" @select="exportCsv">📥 Export CSV</UiMenuItem>
+          <UiMenuItem :data-testid="isArchived(c) ? 'unarchive-comp' : 'archive-comp'" @select="archive(!isArchived(c))">
+            {{ isArchived(c) ? "♻️ Désarchiver" : "📦 Archiver" }}
+          </UiMenuItem>
+          <UiMenuItem danger data-testid="delete-comp" :disabled="writer.busy.value" @select="remove">🗑️ Supprimer</UiMenuItem>
+        </UiMenu>
       </div>
     </div>
 

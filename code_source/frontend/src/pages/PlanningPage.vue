@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /* Planning (coaches and admins): the week's slots on a grid or in a table, create / edit / delete, print, Excel
    exports. Online only: nothing is kept on the device. */
-import { DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from "reka-ui";
 import { computed, inject, nextTick, onMounted, ref } from "vue";
 import AppShell from "../components/AppShell.vue";
 import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
 import UiDialog from "../components/ui/UiDialog.vue";
+import UiMenu from "../components/ui/UiMenu.vue";
+import UiMenuItem from "../components/ui/UiMenuItem.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText } from "../lib/client";
@@ -129,7 +130,6 @@ const chip = (active: boolean) => [
   "cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold",
   active ? "border-accent bg-accent text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
 ];
-const menuItem = "block cursor-pointer px-3 py-2 text-[12.5px] outline-none data-highlighted:bg-slate-100";
 </script>
 
 <template>
@@ -145,25 +145,10 @@ const menuItem = "block cursor-pointer px-3 py-2 text-[12.5px] outline-none data
         <div class="flex flex-wrap items-center gap-2">
           <UiButton data-testid="slot-new" @click="open()">➕ Nouveau créneau</UiButton>
           <UiButton variant="muted" data-testid="planning-print" @click="print">🖨️ Imprimer la grille</UiButton>
-          <DropdownMenuRoot>
-            <DropdownMenuTrigger as-child>
-              <UiButton variant="muted" data-testid="export-menu">📥 Exporter Excel ▾</UiButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuContent
-                align="end"
-                :side-offset="4"
-                class="z-50 min-w-52 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
-              >
-                <DropdownMenuItem data-testid="export-grid" :class="menuItem" @select="download('grid')">
-                  📊 Grille hebdomadaire (.xlsx)
-                </DropdownMenuItem>
-                <DropdownMenuItem data-testid="export-list" :class="menuItem" @select="download('list')">
-                  📋 Liste des créneaux (.xlsx)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenuPortal>
-          </DropdownMenuRoot>
+          <UiMenu label="📥 Exporter Excel" data-testid="export-menu">
+            <UiMenuItem data-testid="export-grid" @select="download('grid')">📊 Grille hebdomadaire (.xlsx)</UiMenuItem>
+            <UiMenuItem data-testid="export-list" @select="download('list')">📋 Liste des créneaux (.xlsx)</UiMenuItem>
+          </UiMenu>
           <UiButton
             variant="muted"
             small

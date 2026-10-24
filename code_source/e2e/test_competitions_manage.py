@@ -85,6 +85,7 @@ def test_edit_and_delete_competition(page, test_data):
     expect(card).to_contain_text("Coachs : Filius Flitwick")
     expect(competition_card(page, nom)).to_have_count(0)
 
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("delete-comp").click()
     expect(toast(page)).to_contain_text("Compétition supprimée")
     expect(competition_card(page, renamed)).to_have_count(0)
@@ -100,6 +101,7 @@ def test_archive_and_restore(mobile_page, test_data):
     test_data.create_competition(nom, date=_iso(30))
     page = open_screen(mobile_page)
     open_competition(page, nom)
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("archive-comp").click()
     expect(page.get_by_test_id("detail-meta")).to_contain_text("Archivée")
     page.get_by_test_id("back-link").click()
@@ -109,6 +111,7 @@ def test_archive_and_restore(mobile_page, test_data):
     archived = archived_card(page, nom)
     expect(archived).to_contain_text("Archivée")
     archived.click()
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("unarchive-comp").click()
     expect(page.get_by_test_id("detail-meta")).not_to_contain_text("Archivée")
 
@@ -166,6 +169,7 @@ def test_competition_csv_export(page, test_data, tmp_path):
     open_screen(page, "admin", "/bureau/competitions")
     open_competition(page, nom)
     with page.expect_download() as info:
+        page.get_by_test_id("detail-more").click()
         page.get_by_test_id("export-csv").click()
     rows = _read_csv(info.value, tmp_path)
     assert rows[0][:3] == ["Nom", "Prénom", "N° Licence"]
