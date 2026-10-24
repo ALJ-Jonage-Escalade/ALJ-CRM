@@ -1,9 +1,9 @@
 """Office portal, communications page: e-mail templates (create, edit, delete), variables, WhatsApp text."""
-import pytest
 from playwright.sync_api import expect
 
 from helpers.auth import login_as
 from helpers.data import unique_name
+from helpers.dialogs import answer_prompt, cancel_dialog, confirm_dialog
 
 
 def _open(page, role="admin"):
@@ -32,15 +32,7 @@ def _create(page, name):
     expect(page.get_by_test_id("template-select")).to_have_value(name)
 
 
-@pytest.fixture
-def accept_with(page):
-    """Accepts confirm() boxes and answers prompt() boxes with the given text."""
-    answer = {"text": ""}
-    page.on("dialog", lambda dialog: dialog.accept(answer["text"]) if dialog.type == "prompt" else dialog.accept())
-    return answer
-
-
-def test_template_lifecycle(page, accept_with):
+def test_template_lifecycle(page):
     """Create, edit (kept after a reload), rename, delete."""
     _open(page)
     name = unique_name("E2E Template")
@@ -67,6 +59,7 @@ def test_template_lifecycle(page, accept_with):
     expect(_options(page, name)).to_have_count(0)
 
     page.get_by_test_id("template-delete").click()
+    confirm_dialog(page)
     expect(page.get_by_test_id("toast")).to_contain_text(f"Modèle « {renamed} » supprimé")
     expect(_options(page, renamed)).to_have_count(0)
 
@@ -75,15 +68,15 @@ def test_delete_needs_confirmation(page):
     _open(page)
     name = unique_name("E2E Template")
     _create(page, name)
-    page.on("dialog", lambda dialog: dialog.dismiss())
     page.get_by_test_id("template-delete").click()
+    cancel_dialog(page)
     expect(page.get_by_test_id("template-select")).to_have_value(name)
     page.reload()
     _open(page)
     expect(_options(page, name)).to_have_count(1)
 
 
-def test_duplicate_name_refused(page, accept_with):
+def test_duplicate_name_refused(page):
     _open(page)
     existing = page.get_by_test_id("template-select").input_value()
     page.get_by_test_id("template-new").click()
@@ -92,7 +85,7 @@ def test_duplicate_name_refused(page, accept_with):
     expect(page.get_by_test_id("toast")).to_contain_text("existe déjà")
 
 
-def test_subject_and_sender_are_required(page, accept_with):
+def test_subject_and_sender_are_required(page):
     _open(page)
     _create(page, unique_name("E2E Template"))
     page.get_by_test_id("subject").fill("")
@@ -104,7 +97,7 @@ def test_subject_and_sender_are_required(page, accept_with):
     expect(page.get_by_test_id("toast")).to_contain_text("adresse e-mail valide")
 
 
-def test_variables_formatting_and_preview(page, accept_with):
+def test_variables_formatting_and_preview(page):
     _open(page)
     _create(page, unique_name("E2E Template"))
     body = page.get_by_test_id("body")
@@ -124,8 +117,8 @@ def test_variables_formatting_and_preview(page, accept_with):
     page.get_by_test_id("format-bold").click()
     expect(body).to_have_value("<b>texte</b>")
     body.fill("")
-    accept_with["text"] = "https://www.alj-escalade.fr"
     page.get_by_test_id("format-link").click()
+    answer_prompt(page, "https://www.alj-escalade.fr")
     expect(body).to_have_value('<a href="https://www.alj-escalade.fr">texte</a>')
 
     page.get_by_test_id("signature").uncheck()

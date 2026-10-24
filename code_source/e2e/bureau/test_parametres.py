@@ -5,6 +5,7 @@ import pytest
 from playwright.sync_api import expect
 
 from helpers.auth import login_as
+from helpers.dialogs import cancel_dialog, confirm_dialog
 
 # The full rebuild replaces the server's cache: a setting saved meanwhile by another test of this file would be lost
 pytestmark = pytest.mark.xdist_group("parametres")
@@ -51,9 +52,9 @@ def test_incremental_update_and_full_rebuild(page):
     expect(report).to_contain_text("Synchronisation réussie")
     expect(report).not_to_contain_text("reconstruction complète")
 
-    page.on("dialog", lambda dialog: dialog.accept())
     page.get_by_test_id("troubleshooting").click()  # collapsed <details>
     page.get_by_test_id("cache-rebuild").click()
+    confirm_dialog(page)
     expect(report).to_contain_text("(reconstruction complète)", timeout=30_000)
     # The rebuilt cache still holds every member
     status = page.request.get("/api/cloud-db/status").json()
@@ -63,9 +64,9 @@ def test_incremental_update_and_full_rebuild(page):
 
 def test_full_rebuild_needs_confirmation(page):
     _open(page)
-    page.on("dialog", lambda dialog: dialog.dismiss())
     page.get_by_test_id("troubleshooting").click()  # collapsed <details>
     page.get_by_test_id("cache-rebuild").click()
+    cancel_dialog(page)
     expect(page.get_by_test_id("cache-report")).to_be_hidden()
 
 

@@ -12,6 +12,7 @@ from playwright.sync_api import expect
 
 from helpers.auth import login_as
 from helpers.data import eventually
+from helpers.dialogs import confirm_dialog
 
 # Attendance sheets and exports list the planning slots, which test_planning.py creates and deletes
 pytestmark = pytest.mark.xdist_group("planning")
@@ -178,8 +179,8 @@ def test_ffme_import_preview_and_apply(page, test_data, tmp_path):
     expect(page.get_by_test_id("ffme-unmatched")).to_contain_text("INCONNU Zoé")
     expect(page.get_by_test_id("ffme-match").locator("option:checked")).to_have_text("-- Ignorer cette ligne --")
 
-    page.once("dialog", lambda dialog: dialog.accept())
     page.get_by_test_id("ffme-apply").click()
+    confirm_dialog(page)
     expect(page.get_by_test_id("ffme-import-done")).to_contain_text("1 adhérents ont été mis à jour")
     expect(page.get_by_test_id("toast")).to_contain_text("Importation FFME validée : 1 adhérents mis à jour.")
 

@@ -5,6 +5,7 @@ import datetime
 import io
 import re
 
+import pytest
 from playwright.sync_api import expect
 
 from helpers.competitions import SEEDED_COMPETITION, archived_card, competition_card, open_competition, open_screen, toast
@@ -120,6 +121,8 @@ def test_archive_and_restore(mobile_page, test_data):
     eventually(restored)
 
 
+# « Archiver les passées » archives every past competition: kept off the other workers while the filter test runs
+@pytest.mark.xdist_group("past_competitions")
 def test_archive_past_competitions(mobile_page, test_data):
     past, upcoming = unique_name("E2E Past"), unique_name("E2E Upcoming")
     test_data.create_competition(past, date=_iso(-3))
@@ -137,6 +140,7 @@ def test_archive_past_competitions(mobile_page, test_data):
     eventually(archived)
 
 
+@pytest.mark.xdist_group("past_competitions")
 def test_search_and_date_filters(page, test_data):
     tag = unique_name("E2E Filter")
     test_data.create_competition(f"{tag} past", date=_iso(-10))

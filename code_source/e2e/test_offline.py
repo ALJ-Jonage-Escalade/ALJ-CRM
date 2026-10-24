@@ -12,6 +12,7 @@ from playwright.sync_api import expect
 from helpers.competitions import open_competition, open_screen, participant_card, toast
 from helpers.data import eventually, unique_name
 from helpers.offline import owner, put_queued, queued, stored, wait_stored
+from helpers.dialogs import cancel_dialog, confirm_dialog
 
 
 @pytest.fixture
@@ -153,18 +154,12 @@ def test_logout_with_changes_not_sent_asks_first(mobile_page, competition):
     try:
         participant_card(page, member).get_by_test_id("present-switch").click()
         expect(participant_card(page, member).get_by_test_id("queued")).to_be_visible()
-        # The box opens after the click has returned (the outbox is read first). Each box is taken from expect_event
-        # and answered here: a page.on("dialog") handler runs later, on a following Playwright call, so the box could
-        # still be open (page blocked) when the test goes on
-        with page.expect_event("dialog") as first:
-            page.locator("#logout-btn").click()
-        assert first.value.message == "1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?"
-        first.value.dismiss()  # kept signed in
+        page.locator("#logout-btn").click()
+        cancel_dialog(page, "1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?")  # kept signed in
         expect(page.locator("#logout-btn")).to_be_visible()
         expect(participant_card(page, member).get_by_test_id("queued")).to_be_visible()
-        with page.expect_event("dialog") as second:
-            page.locator("#logout-btn").click()
-        second.value.accept()
+        page.locator("#logout-btn").click()
+        confirm_dialog(page)
         expect(page.locator("#gate-login")).to_be_visible()
 
         def wiped():

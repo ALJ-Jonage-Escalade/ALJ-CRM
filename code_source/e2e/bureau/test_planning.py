@@ -7,6 +7,7 @@ from playwright.sync_api import expect
 
 from helpers.auth import login_as
 from helpers.data import unique_name
+from helpers.dialogs import cancel_dialog, confirm_dialog
 
 # Tests create slots and compare counts with /api/planning: one after another, with test_outils.py
 pytestmark = pytest.mark.xdist_group("planning")
@@ -119,11 +120,10 @@ def test_create_edit_delete_slot(page, planning):
 
     page.get_by_test_id("view-table").click()
     _row(page, groupe).get_by_test_id("slot-delete").click()
-    page.get_by_test_id("dialog-cancel").click()
-    expect(page.get_by_test_id("dialog-host")).to_be_hidden()
+    cancel_dialog(page)
     expect(_row(page, groupe)).to_have_count(1)
     _row(page, groupe).get_by_test_id("slot-delete").click()
-    page.get_by_test_id("dialog-confirm").click()
+    confirm_dialog(page)
     expect(page.get_by_test_id("toast")).to_contain_text("Créneau supprimé")
     expect(_row(page, groupe)).to_have_count(0)
     assert all(s["groupe"] != groupe for s in page.request.get("/api/planning").json())
