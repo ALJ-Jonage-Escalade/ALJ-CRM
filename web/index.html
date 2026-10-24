@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Version de la page web : identique à celle de competitions.html et à CACHE_NAME dans sw.js -->
+<meta name="alj-web-version" content="25">
+<title>ALJ Escalade — Annuaire des adhérents (v25)</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1E293B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/annuaire/assets/logo.png">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='85' font-size='85'>🧗</text></svg>">
+<script src="/static-web/alj-vue.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="/runtime-config.js"></script>
+<script src="/static-web/alj-firebase.js"></script>
+<script src="/static-web/alj-sync.js"></script>
+<script src="/static-web/alj-members-sync.js"></script>
+<style>
+  /* Charte identique à competitions.html */
+  :root {
+    --bg: #F1F5F9; --card: #FFFFFF; --ink: #1E293B; --muted: #64748B;
+    --line: #E2E8F0; --blue: #2563EB; --blue-dark: #1D4ED8;
+    --green: #16A34A; --amber: #D97706; --red: #DC2626;
+    --header-h: 58px; --nav-h: 62px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; font-size: 15px; }
+  button { font-family: inherit; }
+
+  header {
+    position: fixed; inset: 0 0 auto 0; height: var(--header-h); z-index: 30;
+    display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    background: linear-gradient(135deg, #1E293B, #0F172A); color: #F8FAFC;
+    box-shadow: 0 2px 8px rgba(15,23,42,.25);
+  }
+  header .title { flex: 1; min-width: 0; }
+  header .title b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header .title .web-version { font-size: 11px; font-weight: 600; color: #94A3B8; margin-left: 4px; }
+  header .title .web-version.outdated { color: #FBBF24; cursor: pointer; text-decoration: underline; }
+  header .title small { display: block; color: #94A3B8; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .icon-btn {
+    flex: 0 0 auto; min-width: 40px; height: 40px; border: none; border-radius: 10px;
+    background: rgba(255,255,255,.12); color: #F8FAFC; font-size: 17px; cursor: pointer; padding: 0 10px;
+    font-weight: 600; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+  }
+  .icon-btn:active { background: rgba(255,255,255,.3); }
+  .icon-btn.spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  main { max-width: 720px; margin: 0 auto; padding: calc(var(--header-h) + 10px) 12px calc(var(--nav-h) + 18px); }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+  .card.member { cursor: pointer; }
+  .m-name { font-weight: 700; font-size: 15px; }
+  .m-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .badge { font-size: 10px; font-weight: 700; color: #fff; border-radius: 999px; padding: 3px 9px; white-space: nowrap; flex: 0 0 auto; }
+  .row-flex { display: flex; align-items: center; gap: 8px; }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+
+  .m-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 9px; }
+  .link-btn {
+    text-decoration: none; color: var(--blue); background: #EFF6FF; border: 1px solid #BFDBFE;
+    border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; white-space: nowrap;
+  }
+  .m-detail { display: none; margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 9px; }
+  .card.open .m-detail { display: block; }
+  .kv { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .kv th { text-align: left; vertical-align: top; color: #64748B; font-weight: 600; padding: 3px 8px 3px 0; white-space: nowrap; width: 1%; }
+  .kv td { color: #0F172A; padding: 3px 0; word-break: break-word; }
+
+  input[type="text"], input[type="search"], select {
+    width: 100%; padding: 9px 11px; border: 1px solid #CBD5E1; border-radius: 9px;
+    font-size: 14px; color: var(--ink); background: #fff; outline: none;
+  }
+  .btn { border: none; border-radius: 9px; padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-muted { background: #E2E8F0; color: #475569; }
+  .btn-mini { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btn-row .btn { flex: 1; }
+
+  .section-h { margin: 13px 0 5px; padding: 7px 12px; border-radius: 8px; background: #DBEAFE; color: #1E3A8A; font-weight: 700; font-size: 12.5px; }
+  .subsection-h { margin: 7px 0 2px 10px; color: #1D4ED8; font-weight: 700; font-style: italic; font-size: 12px; }
+  .count-line { color: #64748B; font-size: 12px; margin: 6px 2px 10px; }
+  .empty { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
+  .card h3 { margin: 0 0 10px; font-size: 13px; }
+  .hint { margin: 0 0 6px; font-size: 11.5px; color: var(--muted); }
+
+  .filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .filter-chip {
+    display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; background: #F1F5F9; color: #475569;
+    border: 1px solid #CBD5E1; cursor: pointer; user-select: none; transition: all .15s;
+  }
+  .filter-chip.active { background: #EFF6FF; color: var(--blue); border-color: var(--blue); }
+
+  .kpis { display: flex; gap: 8px; justify-content: space-between; text-align: center; padding: 10px 12px; }
+  .kpis > div { flex: 1; }
+  .kpis > div + div { border-left: 1px solid var(--line); }
+  .kpis .v { font-size: 19px; font-weight: 800; }
+  .kpis .l { font-size: 11px; color: #64748B; font-weight: 600; }
+
+  .opt { display: flex; align-items: center; gap: 9px; padding: 8px 10px 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13.5px; }
+  .opt:active { background: #F1F5F9; }
+  .opt input { width: 19px; height: 19px; accent-color: var(--blue); flex: 0 0 auto; }
+  .opt .n { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+  .urg-row { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
+  .urg-row b { flex: 0 0 auto; color: #B91C1C; }
+  .urg-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .urg-row .link-btn { margin-left: auto; }
+
+  nav {
+    position: fixed; inset: auto 0 0 0; height: var(--nav-h); display: flex; z-index: 30;
+    background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom);
+  }
+  nav button { flex: 1; border: none; background: none; display: flex; flex-direction: column; gap: 2px; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--muted); padding-top: 8px; cursor: pointer; }
+  nav button.active { color: var(--blue); }
+
+  #toast {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h) + 14px);
+    background: #0F172A; color: #F8FAFC; padding: 10px 16px; border-radius: 10px;
+    font-size: 12.5px; max-width: 90vw; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 60;
+  }
+  #toast.show { opacity: 1; }
+
+  .setup-box h2 { margin: 0 0 8px; font-size: 16px; }
+  .setup-box p, .setup-box li { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+  .setup-box code { background: #F1F5F9; border-radius: 4px; padding: 1px 5px; font-size: 11.5px; word-break: break-all; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">
+    <b>🧗 ALJ Escalade — Annuaire <span class="web-version" id="web-version">v25</span></b>
+    <small id="sync-info">Connexion à Firebase…</small>
+  </div>
+  <a class="icon-btn" id="comps-link" href="/competitions" title="Gestion des compétitions">🏆</a>
+  <button class="icon-btn" id="refresh-btn" title="Recharger l'annuaire">🔄</button>
+  <button class="icon-btn" id="config-btn" title="Compte">⚙️</button>
+</header>
+
+<main>
+  <!-- ================= Connexion (Firebase Auth) ================= -->
+  <section class="page" id="page-setup">
+    <div class="card setup-box">
+      <h2>🔐 Connexion</h2>
+      <p>L'annuaire des adhérents est réservé aux coachs et gestionnaires du club. Les données
+         sont lues dans la base du club et actualisées automatiquement (environ toutes les
+         20 secondes) : toute modification faite dans l'application de bureau apparaît ici.
+         Cette page est en <b>lecture seule</b> et nécessite une connexion internet.</p>
+      <div id="setup-not-logged">
+        <div class="btn-row">
+          <button class="btn btn-primary" id="login-btn" style="flex:2">🔑 Se connecter avec Google</button>
+        </div>
+        <p style="margin-top:8px">Utilisez votre compte <code>@alj-escalade.fr</code> ou un compte coach
+           autorisé par le club. La connexion est commune avec la page des compétitions.</p>
+      </div>
+      <div id="setup-logged" style="display:none">
+        <p>Connecté en tant que <b id="setup-email">—</b></p>
+        <div id="setup-role-badge" style="display:inline-block; margin-bottom:10px; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:700;"></div>
+        <div id="setup-unauthorized" style="display:none; background:#FEE2E2; border:1px solid #FCA5A5; border-radius:8px; padding:12px; margin-bottom:12px; color:#991B1B;">
+          <b>⛔ Accès refusé</b>
+          <p style="margin:6px 0 0; font-size:12.5px; color:#B91C1C; line-height:1.5;" id="setup-unauthorized-msg">
+            L'annuaire contient des données personnelles (contacts d'urgence, santé) : il est réservé aux coachs
+            et administrateurs du club. Déconnectez-vous et utilisez un compte autorisé, ou contactez le club.
+          </p>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-muted" id="logout-btn" style="flex:2">🚪 Se déconnecter</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Liste adhérents ================= -->
+  <section class="page active" id="page-members">
+    <div class="card kpis">
+      <div><div class="v" style="color:var(--blue)" id="kpi-shown">—</div><div class="l">Affichés</div></div>
+      <div><div class="v" style="color:#1E293B" id="kpi-season">—</div><div class="l">Inscrits saison</div></div>
+      <div><div class="v" style="color:var(--red)" id="kpi-cancel">—</div><div class="l">Annulés saison</div></div>
+    </div>
+    <input type="search" id="search" placeholder="🔍 Nom, prénom, tarif ou licence…">
+    <div class="count-line" id="count-line">⏳ Chargement de l'annuaire…</div>
+    <div id="members-list"></div>
+  </section>
+
+  <!-- ================= Contacts d'urgence ================= -->
+  <section class="page" id="page-urgency">
+    <input type="search" id="urgency-search" placeholder="🔍 Nom de l'adhérent…">
+    <div class="count-line" id="urgency-count">Tapez au moins 2 lettres du nom de l'adhérent pour afficher ses contacts.</div>
+    <div id="urgency-list"></div>
+  </section>
+
+  <!-- ================= Filtres ================= -->
+  <section class="page" id="page-filters">
+    <div class="card">
+      <h3>📅 Saison</h3>
+      <select id="season-select"></select>
+    </div>
+    <div class="card">
+      <h3>📌 Statut de l'inscription</h3>
+      <div class="filter-chips" id="status-chips"></div>
+    </div>
+    <div class="card">
+      <h3>🧗 Créneaux affichés</h3>
+      <p class="hint">Un créneau regroupe un ou plusieurs tarifs HelloAsso. Touchez une ligne pour la cocher ou la décocher.</p>
+      <div id="creneau-list"></div>
+      <div class="btn-row">
+        <button class="btn btn-muted btn-mini" id="cren-all">Tout cocher</button>
+        <button class="btn btn-muted btn-mini" id="cren-none">Tout décocher</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-page="members" class="active">👥<br>Adhérents</button>
+  <button data-page="urgency">🚨<br>Urgences</button>
+  <button data-page="filters">🔎<br>Filtres</button>
+</nav>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ===================== Firebase (sign-in) ===================== */
+// Project configuration and emulator (dev): /static-web/alj-firebase.js. Firebase only signs
+// the user in (ID token); the data comes from the API.
+const { auth } = ALJFirebase.init();
+
+/* Member list from the API (/api/members, one season), computed on the server.
+   Online only: no offline copy of member data (plan D2). */
+const FILTER_KEY = "alj_annuaire_filters";
+
+let user = null;
+let userClaims = {};
+let membersSync = null;
+
+let DATA = { members: [], creneaux: [], seasons: [], activeSeason: "", itemsCache: [], filterCache: null };
+let filters = Object.assign({ status: "", season: "", groups: {}, others: {}, search: "" },
+  (function () { try { return JSON.parse(localStorage.getItem(FILTER_KEY) || "{}"); } catch (e) { return {}; } })());
+let currentSeason = filters.season || "";
+
+/* ===================== Utilitaires ===================== */
+const $ = s => document.querySelector(s);
+const esc = s => (s == null ? "" : String(s)).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function normKey(s) {
+  return String(s || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+function toast(msg, ms = 3500) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), ms);
+}
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d) ? String(iso) : d.toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+function fmtDay(s) {
+  const m = String(s || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s || "");
+}
+function setSyncInfo(msg) { $("#sync-info").textContent = msg; }
+function showPage(name) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById("page-" + name).classList.add("active");
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.page === name));
+}
+function isSetupPageActive() {
+  const a = document.querySelector(".page.active");
+  return !a || a.id === "page-setup";
+}
+
+/* ===================== Rôles (display only; same lists as competitions.html and api_auth.py) ===================== */
+const COACH_EMAILS = [
+  "lopez.dav@gmail.com",
+  "stephane.loridant@orange.fr"
+];
+const READONLY_EMAILS = [
+  "muah.did@gmail.com",
+  "clement.dlf78@gmail.com",
+  "delphine0910@gmail.com"
+];
+function isCoachUser() {
+  if (!user || !user.email) return false;
+  const email = user.email.toLowerCase().trim();
+  if (email.endsWith("@alj-escalade.fr")) return true;
+  if (COACH_EMAILS.includes(email)) return true;
+  return !!(userClaims && (userClaims.coach || userClaims.admin));
+}
+function isReadOnlyUser() {
+  if (!user || !user.email) return false;
+  const email = user.email.toLowerCase().trim();
+  return READONLY_EMAILS.includes(email) || !!(userClaims && userClaims.readonly);
+}
+
+/* ===================== Authentification ===================== */
+/* La connexion Google se fait via la page des compétitions (même origine, même
+   compte Firebase, URI de redirection OAuth déjà autorisée), qui renvoie ensuite ici. */
+const COMPETITIONS_URL = /github\.io$/.test(location.hostname) ? "competitions.html" : "/competitions";
+function login() {
+  sessionStorage.setItem("alj_after_login", location.pathname + location.search);
+  location.assign(COMPETITIONS_URL + (COMPETITIONS_URL.includes("?") ? "&" : "?") + "login=1");
+}
+function logout() { auth.signOut().catch(() => {}); }
+
+function applyRole() {
+  const coach = isCoachUser();
+  const nav = $("nav");
+  $("#setup-unauthorized").style.display = (user && !coach) ? "block" : "none";
+  const badge = $("#setup-role-badge");
+  if (user) {
+    const r = coach ? ["🏃 Coach / administrateur", "#DCFCE7", "#166534"]
+            : isReadOnlyUser() ? ["👁 Consultation (compétitions seulement)", "#FEF3C7", "#92400E"]
+            : ["⛔ Non autorisé", "#FEE2E2", "#991B1B"];
+    badge.textContent = r[0]; badge.style.background = r[1]; badge.style.color = r[2];
+  }
+  nav.style.display = coach ? "flex" : "none";
+  if (!coach) showPage("setup");
+}
+
+auth.onAuthStateChanged(async u => {
+  user = u;
+  userClaims = {};
+  if (u) {
+    try { userClaims = ((await u.getIdTokenResult()) || {}).claims || {}; } catch (e) {}
+    $("#setup-email").textContent = u.email || "(compte sans e-mail)";
+    $("#setup-not-logged").style.display = "none";
+    $("#setup-logged").style.display = "block";
+    applyRole();
+    if (isCoachUser()) {
+      if (isSetupPageActive()) showPage("members");
+      startSync();
+    } else {
+      stopSync();
+      setSyncInfo("⛔ Accès réservé aux coachs");
+    }
+  } else {
+    stopSync();
+    $("#setup-not-logged").style.display = "block";
+    $("#setup-logged").style.display = "none";
+    applyRole();
+    setSyncInfo("Non connecté");
+    showPage("setup");
+  }
+});
+
+/* ===================== Chargement depuis l'API ===================== */
+/* Authenticated call to the server API (Firebase ID token). */
+async function apiFetch(url, opts = {}) {
+  const send = async (forceRefresh) => {
+    const headers = Object.assign({}, opts.headers || {});
+    if (user) headers["Authorization"] = "Bearer " + await user.getIdToken(forceRefresh);
+    return fetch(url, Object.assign({}, opts, { headers }));
+  };
+  let res = await send(false);
+  if (res.status === 401 && user) res = await send(true);
+  return res;
+}
+function startSync() {
+  stopSync();
+  setSyncInfo("Chargement de la base…");
+  membersSync = ALJMembersSync.start({
+    fetch: apiFetch,
+    season: currentSeason,
+    onData: data => {
+      rebuild(data);
+      setSyncInfo("☁️ À jour — " + fmtDate(new Date().toISOString()));
+      $("#refresh-btn").classList.remove("spin");
+    },
+    onStatus: onSyncStatus
+  });
+}
+function stopSync() {
+  if (membersSync) membersSync.stop();
+  membersSync = null;
+}
+function onSyncStatus(status, info) {
+  $("#refresh-btn").classList.remove("spin");
+  if (status === "offline") {
+    setSyncInfo("📴 Hors ligne : l'annuaire nécessite une connexion");
+  } else if (info && info.status === 401) {
+    stopSync();
+  } else if (info && info.status === 403) {
+    setSyncInfo("🔒 Accès refusé à la base des adhérents");
+    $("#count-line").textContent = "Accès refusé : l'annuaire est réservé aux coachs.";
+  } else if (status !== "ok") {
+    console.error("API adhérents :", info);
+    setSyncInfo("⚠️ Chargement impossible — nouvel essai automatique");
+  }
+}
+
+/* ===================== Statuts ===================== */
+const STATUS_COLORS = { "Validé": "#16A34A", "Traité": "#2563EB", "Terminé": "#8B5CF6", "En cours": "#D97706", "Annulé": "#DC2626" };
+
+function rebuild(data) {
+  DATA = Object.assign(DATA, {
+    members: data.members, creneaux: data.creneaux, seasons: data.seasons, activeSeason: data.activeSeason
+  });
+  DATA.itemsCache = buildCreneauItems(DATA.creneaux);
+  currentSeason = data.season;
+  computeFilterCache();
+  for (const it of DATA.itemsCache)
+    if (it.kind === "group" && filters.groups[it.raw] === undefined)
+      filters.groups[it.raw] = !isWaiting(it.raw, it.label);
+  for (const t of Object.keys(DATA.filterCache.others))
+    if (filters.others["other:" + t] === undefined)
+      filters.others["other:" + t] = !isWaiting(t, t);
+  renderFilters();
+  saveFilters();
+  applyFilters();
+  renderUrgency();
+}
+
+/* =============== Hiérarchie des créneaux (portage du bureau) =============== */
+function accentClassPattern(word) {
+  const tr = { "e": "[eèéêë]", "a": "[aàâä]", "i": "[iîï]", "o": "[oôö]", "u": "[uùûü]", "c": "[cç]", "y": "[yÿ]" };
+  return word.split("").map(ch => tr[ch] || ch).join("");
+}
+function shortenGroupLabel(name, keyword, dropPatterns) {
+  const parts = name.split(new RegExp(accentClassPattern(keyword), "i"));
+  let rest = parts.length > 1 ? parts.reduce((a, b) => (b.length > a.length ? b : a)) : name;
+  for (const dp of dropPatterns || []) rest = rest.replace(new RegExp(dp, "ig"), "");
+  rest = rest.replace(/\s{2,}/g, " ").replace(/^[\s\u2013\u2014-]+|[\s\u2013\u2014-]+$/g, "");
+  if (rest.startsWith("(") && rest.endsWith(")")) rest = rest.slice(1, -1).trim();
+  return rest || name;
+}
+function isWaiting(rawName, label) {
+  return normKey(rawName).includes("attente") || normKey(label).includes("attente");
+}
+function buildCreneauItems(creneaux) {
+  const SECTION_ORDER = ["Collège", "Enfants", "Perfectionnement", "Compétition"];
+  const buckets = { "Collège": [], "Enfants": {}, "Perfectionnement": [], "Compétition": [] };
+  const others = [];
+  for (const c of creneaux) {
+    const name = c.groupe, n = normKey(name);
+    if (n.includes("competition")) buckets["Compétition"].push([name, shortenGroupLabel(name, "competition")]);
+    else if (n.includes("college")) buckets["Collège"].push([name, shortenGroupLabel(name, "college")]);
+    else if (n.includes("enfants")) {
+      const m = n.match(/20\d\d\s*-\s*20\d\d/);
+      const sub = m ? m[0].replace(/\s/g, "") : "Autres tranches";
+      const short = shortenGroupLabel(name, "enfants", ["20\\d\\d\\s*-\\s*20\\d\\d"]);
+      (buckets["Enfants"][sub] = buckets["Enfants"][sub] || []).push([name, short]);
+    }
+    else if (n.includes("perfectionnement")) buckets["Perfectionnement"].push([name, shortenGroupLabel(name, "perfectionnement")]);
+    else others.push([name, name]);
+  }
+  const cmp = (a, b) => a[0].localeCompare(b[0], "fr");
+  const items = [];
+  for (const [name, short] of others.sort(cmp)) items.push({ kind: "group", label: short, raw: name });
+  for (const section of SECTION_ORDER) {
+    const entries = buckets[section];
+    const empty = Array.isArray(entries) ? !entries.length : !Object.keys(entries).length;
+    if (empty) continue;
+    items.push({ kind: "section", label: section, raw: section });
+    if (Array.isArray(entries)) {
+      for (const [name, short] of entries.sort(cmp)) items.push({ kind: "group", label: short, raw: name });
+    } else {
+      for (const sub of Object.keys(entries).sort()) {
+        items.push({ kind: "sub", label: sub, raw: sub });
+        for (const [name, short] of entries[sub].sort(cmp)) items.push({ kind: "group", label: short, raw: name });
+      }
+    }
+  }
+  for (const it of items) if (it.kind === "group")
+    it.tarifs = ((creneaux.find(c => c.groupe === it.raw) || {}).tarifs) || [];
+  return items;
+}
+
+function computeFilterCache() {
+  const seasonMembers = DATA.members.filter(m => (m.season_name || "") === currentSeason);
+  const covered = new Set();
+  for (const c of DATA.creneaux) for (const t of c.tarifs) covered.add(normKey(t));
+  const others = {}, tarifIndex = {};
+  for (const m of seasonMembers) {
+    const k = normKey(m.tarif_name);
+    if (!k) continue;
+    tarifIndex[k] = (tarifIndex[k] || 0) + 1;
+    if (!covered.has(k)) others[m.tarif_name] = (others[m.tarif_name] || 0) + 1;
+  }
+  for (const it of DATA.itemsCache) {
+    if (it.kind !== "group") continue;
+    it.count = (it.tarifs || []).reduce((s, t) => s + (tarifIndex[normKey(t)] || 0), 0);
+  }
+  DATA.filterCache = { members: seasonMembers, others };
+}
+
+/* ===================== Filtres + rendu ===================== */
+function saveFilters() {
+  filters.season = currentSeason;
+  filters.search = $("#search").value;
+  try { localStorage.setItem(FILTER_KEY, JSON.stringify(filters)); } catch (e) {}
+}
+function statusBadge(st) {
+  return `<span class="badge" style="background:${STATUS_COLORS[st] || "#94A3B8"}">${esc(st || "—")}</span>`;
+}
+function telHref(phone) { return String(phone || "").replace(/[^\d+]/g, ""); }
+
+function memberCard(m) {
+  const tel = telHref(m.phone);
+  const mail = String(m.email_primary || "").trim();
+  const rows = [];
+  const add = (k, v) => { if (v !== "" && v != null) rows.push(`<tr><th>${k}</th><td>${esc(v)}</td></tr>`); };
+  add("🎂 Naissance", fmtDay(m.birth_date));
+  add("📍 Adresse", [m.address, [m.zip_code, m.city].filter(Boolean).join(" ")].filter(Boolean).join(", "));
+  add("📞 Téléphone", m.phone);
+  add("✉️ E-mail", m.email_primary);
+  add("✉️ E-mail 2", m.email_secondary);
+  add("🪪 Licence FFME", m.licence_ffme);
+  if (m.emergency1_name || m.emergency1_phone) add("🚨 Urgence 1", [m.emergency1_name, m.emergency1_phone].filter(Boolean).join(" · "));
+  if (m.emergency2_name || m.emergency2_phone) add("🚨 Urgence 2", [m.emergency2_name, m.emergency2_phone].filter(Boolean).join(" · "));
+  add("🩺 Santé", [m.health_commitment && ("engagement : " + m.health_commitment), m.document_sante && ("document : " + m.document_sante)].filter(Boolean).join(" · "));
+  add("📷 Droit à l'image", m.photo_auth);
+  add("🔴 Badge rouge", m.badge_rouge);
+  add("🧗 Autonomie bloc", m.autonomie_bloc);
+  if (m.payer && normKey(m.payer) !== normKey(m.first_name + " " + m.last_name)) add("💳 Payeur", m.payer + (m.payer_email ? " (" + m.payer_email + ")" : ""));
+  add("🧾 Inscription", [fmtDay(m.order_date), m.order_ref, m.amount != null && m.amount !== "" ? m.amount + " €" : ""].filter(Boolean).join(" · "));
+  return `<div class="card member" onclick="this.classList.toggle('open')">
+    <div class="card-top">
+      <div><div class="m-name">${esc(m.first_name)} ${esc(m.last_name)}</div>
+      <div class="m-sub">${esc(m.tarif_name || "—")}</div></div>
+      ${statusBadge(m.status_norm)}
+    </div>
+    ${(tel || mail) ? `<div class="m-links" onclick="event.stopPropagation()">${tel ? `<a class="link-btn" href="tel:${esc(tel)}">📞 Appeler</a>` : ""}${mail ? `<a class="link-btn" href="mailto:${esc(mail)}">✉️ E-mail</a>` : ""}</div>` : ""}
+    ${rows.length ? `<div class="m-detail"><table class="kv">${rows.join("")}</table></div>` : ""}
+  </div>`;
+}
+
+function renderFilters() {
+  const sel = $("#season-select");
+  sel.innerHTML = DATA.seasons.map(s => `<option value="${esc(s)}">${esc(s)}${s === DATA.activeSeason ? " (saison active)" : ""}</option>`).join("");
+  sel.value = currentSeason;
+
+  const chips = $("#status-chips");
+  chips.innerHTML = "";
+  addChip(chips, "Tous", "", ` (${DATA.filterCache.members.length})`);
+  for (const st of ["Validé", "Traité", "Terminé", "En cours", "Annulé"]) {
+    const n = DATA.filterCache.members.filter(m => m.status_norm === st).length;
+    if (n > 0) addChip(chips, st, st, ` (${n})`);
+  }
+  updateChips();
+
+  const wrap = $("#creneau-list");
+  wrap.innerHTML = "";
+  for (const it of DATA.itemsCache) {
+    if (it.kind === "section" || it.kind === "sub") {
+      const d = document.createElement("div");
+      d.className = it.kind === "section" ? "section-h" : "subsection-h";
+      d.textContent = (it.kind === "section" ? "📁 " : "📂 ") + it.label;
+      wrap.appendChild(d);
+    } else {
+      wrap.appendChild(creneauRow(it.label, it.raw, it.count, false));
+    }
+  }
+  const otherKeys = Object.keys(DATA.filterCache.others).sort((a, b) => a.localeCompare(b, "fr"));
+  if (otherKeys.length) {
+    const d = document.createElement("div");
+    d.className = "section-h"; d.textContent = "📁 Autres tarifs (hors créneau)";
+    wrap.appendChild(d);
+    for (const t of otherKeys) wrap.appendChild(creneauRow(t, "other:" + t, DATA.filterCache.others[t], true));
+  }
+}
+function addChip(parent, label, value, suffix) {
+  const b = document.createElement("span");
+  b.className = "filter-chip";
+  b.dataset.value = value; b.textContent = label + (suffix || "");
+  b.addEventListener("click", () => { filters.status = value; saveFilters(); updateChips(); applyFilters(); });
+  parent.appendChild(b);
+}
+function updateChips() {
+  document.querySelectorAll("#status-chips .filter-chip").forEach(c =>
+    c.classList.toggle("active", (c.dataset.value || "") === (filters.status || "")));
+}
+function creneauRow(label, rawName, count, isOther) {
+  const div = document.createElement("label");
+  div.className = "opt";
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  const store = isOther ? filters.others : filters.groups;
+  cb.checked = store[rawName] !== undefined ? store[rawName] : !isWaiting(rawName, label);
+  cb.addEventListener("change", () => { store[rawName] = cb.checked; saveFilters(); applyFilters(); });
+  const span = document.createElement("span"); span.textContent = label;
+  const n = document.createElement("span"); n.className = "n"; n.textContent = count || 0;
+  div.append(cb, span, n);
+  return div;
+}
+function allowedTarifKeys() {
+  const allowed = new Set();
+  for (const it of DATA.itemsCache) {
+    if (it.kind !== "group") continue;
+    const on = filters.groups[it.raw] !== undefined ? filters.groups[it.raw] : !isWaiting(it.raw, it.label);
+    if (on) for (const t of it.tarifs) allowed.add(normKey(t));
+  }
+  // Tarifs hors créneau de la saison affichée (cochés par défaut, sauf liste d'attente)
+  for (const t of Object.keys(DATA.filterCache.others)) {
+    const k = "other:" + t;
+    const on = filters.others[k] !== undefined ? filters.others[k] : !isWaiting(t, t);
+    if (on) allowed.add(normKey(t));
+  }
+  return allowed;
+}
+function applyFilters() {
+  if (!DATA.filterCache) return;
+  const q = normKey($("#search").value);
+  const allowed = allowedTarifKeys();
+  const st = filters.status || "";
+  const rows = DATA.filterCache.members.filter(m => {
+    const k = normKey(m.tarif_name);
+    if (k && !allowed.has(k)) return false;
+    if (st && m.status_norm !== st) return false;
+    if (q && !(normKey(m.last_name).includes(q) || normKey(m.first_name).includes(q)
+      || normKey(m.first_name + " " + m.last_name).includes(q) || normKey(m.last_name + " " + m.first_name).includes(q)
+      || normKey(m.tarif_name).includes(q) || normKey(m.licence_ffme).includes(q))) return false;
+    return true;
+  });
+  $("#kpi-shown").textContent = rows.length;
+  $("#kpi-season").textContent = DATA.filterCache.members.filter(m => m.status_norm !== "Annulé").length;
+  $("#kpi-cancel").textContent = DATA.filterCache.members.filter(m => m.status_norm === "Annulé").length;
+  $("#count-line").textContent = `${rows.length} adhérent${rows.length > 1 ? "s" : ""} affiché${rows.length > 1 ? "s" : ""} · saison ${currentSeason}`
+    + (st ? ` · statut ${st}` : "");
+  $("#members-list").innerHTML = rows.map(memberCard).join("") ||
+    `<div class="empty">Aucun adhérent ne correspond aux filtres.</div>`;
+}
+
+/* ===================== Onglet Urgences ===================== */
+function renderUrgency() {
+  const q = normKey($("#urgency-search").value);
+  const listEl = $("#urgency-list");
+  if (q.length < 2 || !DATA.filterCache) {
+    $("#urgency-count").textContent = "Tapez au moins 2 lettres du nom de l'adhérent pour afficher ses contacts (téléphone et contacts d'urgence cliquables).";
+    listEl.innerHTML = "";
+    return;
+  }
+  const rows = DATA.filterCache.members.filter(m => {
+    const last = normKey(m.last_name), first = normKey(m.first_name);
+    return last.includes(q) || first.includes(q) || normKey(first + " " + last).includes(q) || normKey(last + " " + first).includes(q);
+  });
+  $("#urgency-count").textContent = `${rows.length} adhérent${rows.length > 1 ? "s" : ""} trouvé${rows.length > 1 ? "s" : ""} (saison ${currentSeason})`;
+  listEl.innerHTML = rows.map(urgencyCard).join("") || `<div class="empty">Aucun adhérent ne correspond à cette recherche.</div>`;
+}
+function urgencyRow(label, name, phone) {
+  const parts = [name, phone].filter(Boolean).map(esc);
+  if (!parts.length) return "";
+  const href = telHref(phone);
+  return `<div class="urg-row"><b>${label}</b><span>${parts.join(" · ")}</span>
+    ${href ? `<a class="link-btn" href="tel:${esc(href)}">📞 Appeler</a>` : ""}</div>`;
+}
+function urgencyCard(m) {
+  const rows = [];
+  if (m.phone) rows.push(urgencyRow("👤 Adhérent", "", m.phone));
+  if (m.emergency1_name || m.emergency1_phone) rows.push(urgencyRow("🚨 Urgence 1", m.emergency1_name, m.emergency1_phone));
+  if (m.emergency2_name || m.emergency2_phone) rows.push(urgencyRow("🚨 Urgence 2", m.emergency2_name, m.emergency2_phone));
+  return `<div class="card">
+    <div class="card-top">
+      <div><div class="m-name">${esc(m.first_name)} ${esc(m.last_name)}</div>
+      <div class="m-sub">${esc(m.tarif_name || "—")}</div></div>
+      ${statusBadge(m.status_norm)}
+    </div>
+    <div style="margin-top:9px;border-top:1px dashed var(--line);padding-top:9px;display:flex;flex-direction:column;gap:7px">
+      ${rows.length ? rows.join("") : `<div style="color:#94A3B8;font-size:12px">Aucun contact enregistré pour cet adhérent.</div>`}
+    </div>
+  </div>`;
+}
+
+/* ===================== Événements ===================== */
+function setAllCreneaux(on) {
+  for (const it of DATA.itemsCache) if (it.kind === "group") filters.groups[it.raw] = on;
+  if (DATA.filterCache) for (const t of Object.keys(DATA.filterCache.others)) filters.others["other:" + t] = on;
+  saveFilters(); renderFilters(); applyFilters();
+}
+function wireEvents() {
+  document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showPage(b.dataset.page)));
+  $("#comps-link").href = COMPETITIONS_URL + "?vue=pwa";
+  $("#refresh-btn").addEventListener("click", () => {
+    if (!isCoachUser()) { showPage("setup"); return; }
+    $("#refresh-btn").classList.add("spin");
+    if (membersSync) membersSync.refresh(); else startSync();
+  });
+  $("#config-btn").addEventListener("click", () => showPage("setup"));
+  $("#login-btn").addEventListener("click", login);
+  $("#logout-btn").addEventListener("click", logout);
+  $("#search").addEventListener("input", () => { saveFilters(); applyFilters(); });
+  $("#urgency-search").addEventListener("input", renderUrgency);
+  $("#season-select").addEventListener("change", e => {
+    currentSeason = e.target.value; saveFilters();
+    if (membersSync) membersSync.setSeason(currentSeason);  // the API sends one season at a time
+    computeFilterCache(); renderFilters(); applyFilters(); renderUrgency();
+  });
+  $("#cren-all").addEventListener("click", () => setAllCreneaux(true));
+  $("#cren-none").addEventListener("click", () => setAllCreneaux(false));
+}
+
+/* ===================== Version de la page ===================== */
+const WEB_VERSION = (document.querySelector('meta[name="alj-web-version"]') || {}).content || "?";
+async function checkWebVersion() {
+  const badge = $("#web-version");
+  badge.textContent = "v" + WEB_VERSION;
+  badge.title = "Version de la page : v" + WEB_VERSION;
+  try {
+    const r = await fetch("/api/web-version", { cache: "no-store" });
+    if (!r.ok) return;
+    const online = String((await r.json()).web_version || "");
+    if (online && online !== WEB_VERSION) {
+      badge.textContent = "v" + WEB_VERSION + " ⬆ v" + online;
+      badge.title = "Une nouvelle version est en ligne : toucher pour mettre à jour";
+      badge.classList.add("outdated");
+      badge.onclick = forceWebUpdate;
+    } else {
+      badge.title = "Version de la page : v" + WEB_VERSION + " (à jour)";
+    }
+  } catch (e) { /* hors-ligne */ }
+}
+async function forceWebUpdate() {
+  try {
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) { console.warn("Mise à jour forcée :", e); }
+  location.reload();
+}
+
+(async function boot() {
+  if ("serviceWorker" in navigator && !/github\.io$/.test(location.hostname)) {
+    navigator.serviceWorker.register("/sw.js").catch(err => console.warn("Service Worker :", err));
+  }
+  checkWebVersion();
+  wireEvents();
+  $("#search").value = filters.search || "";
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "ALJ Escalade CRM",
+  "description": "Système de gestion et CRM pour l'association ALJ Jonage Escalade (adhérents, cours, créneaux, inscriptions).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

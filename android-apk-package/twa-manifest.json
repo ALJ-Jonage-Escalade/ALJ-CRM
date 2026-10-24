@@ -1,0 +1,31 @@
+{
+  "packageId": "fr.alj_escalade.competitions",
+  "host": "ais-pre-ymsoame44dpxezzviuao6d-968086448026.europe-west2.run.app",
+  "name": "ALJ Escalade Compétitions",
+  "launcherName": "ALJ Escalade",
+  "display": "standalone",
+  "themeColor": "#163A5F",
+  "navigationColor": "#0F172A",
+  "backgroundColor": "#0F172A",
+  "enableNotifications": true,
+  "startUrl": "/competitions?vue=pwa",
+  "iconUrl": "https://ais-pre-ymsoame44dpxezzviuao6d-968086448026.europe-west2.run.app/pwa-512x512.png",
+  "maskableIconUrl": "https://ais-pre-ymsoame44dpxezzviuao6d-968086448026.europe-west2.run.app/pwa-maskable-512x512.png",
+  "appVersionName": "2.7.11",
+  "appVersionCode": 25,
+  "shortcuts": [
+    {
+      "name": "Compétitions",
+      "shortName": "Compets",
+      "url": "/competitions",
+      "icon": "https://ais-pre-ymsoame44dpxezzviuao6d-968086448026.europe-west2.run.app/pwa-192x192.png"
+    },
+    {
+      "name": "Annuaire",
+      "shortName": "Annuaire",
+      "url": "/index?vue=pwa",
+      "icon": "https://ais-pre-ymsoame44dpxezzviuao6d-968086448026.europe-west2.run.app/pwa-192x192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli"
+}
