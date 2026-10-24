@@ -34,6 +34,9 @@ Run from `code_source/` (the script always uploads `code_source/`); Windows scri
 - The test revision uses **production data and secrets**: actions there (e-mails, member edits) are real
 
 ## Rules
+- Clarity first: names say what a value holds (`competition`, `archivedCount`), without going overlong. One-letter or
+  abbreviated names only in one-line callbacks and short loops (`(c) => c.id`); never for a local read on later lines
+  (`const a = archived.length` → `archivedCount`), a parameter of a named function, or an export
 - Never commit or print secrets: `code_source/.env` holds HelloAsso, Google OAuth and SMTP credentials
 - Never commit personal data (databases, exports, `tests/fixtures/`): members' health, emergency contacts, minors (GDPR)
 - Never point dev tools at production: dev mode only works against the `demo-alj` emulator project

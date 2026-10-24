@@ -19,6 +19,7 @@ import {
   type ItemFilter,
 } from "./helloasso";
 import { WRITER_KEY } from "./writer";
+import { plural } from "../../lib/text";
 
 const props = defineProps<{
   items: readonly HelloAssoItem[] | null;
@@ -177,7 +178,7 @@ const chip = (active: boolean) => [
     <p class="mb-2 text-xs text-slate-500" data-testid="ha-count">
       {{
         items
-          ? `${shown.length} paiement${shown.length > 1 ? "s" : ""}`
+          ? `${shown.length} paiement${plural(shown.length)}`
           : loading
             ? "⏳ Chargement des paiements…"
             : "Paiements HelloAsso indisponibles (réseau ?)."

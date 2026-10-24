@@ -1,13 +1,6 @@
 <script setup lang="ts">
 /* Compétitions (/competitions and /bureau/competitions, any role: read-only accounts too, as on the former phone
-   page): the competitions, then one competition's participants with their payment status. On phones the list or the
-   competition (?id=<id>); on desktop both side by side. Kept up to date by polling, readable offline (plan D2): the
-   competitions, and for coaches and admins the competitors' contacts, are kept on the device under the former page's
-   names, so what it stored is shown too.
-   Coaches and admins change everything here (plan phase 11): competitions, competitors, HelloAsso payments
-   (?section=helloasso), the season balance (bilan) and the coaches (coachs). Offline, « Participe » and « Présent »
-   still change: the outbox keeps them on the device and sends them when the network comes back (outbox.ts).
-   /competitions is also where the Google sign-in ends (composables/signIn.ts): its error shows here. */
+   page). Coaches and admins change everything here. */
 import { computed, inject, onScopeDispose, provide, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
@@ -49,6 +42,7 @@ import HelloAssoPane from "./competitions/HelloAssoPane.vue";
 import type { HelloAssoItem } from "./competitions/helloasso";
 import { createOutbox, pendingLine, replayMessage } from "./competitions/outbox";
 import { createWriter, WRITER_KEY } from "./competitions/writer";
+import { plural } from "../lib/text";
 
 const auth = inject(AUTH_KEY)!;
 const client = inject(CLIENT_KEY)!;
@@ -61,8 +55,8 @@ const toast = useToast();
 const access = computed(() => verdict(auth.state.value, pageAccess("competitions"), true));
 const open = computed(() => access.value === "allow" || access.value === "offline");
 const uid = computed(() => {
-  const s = auth.state.value;
-  return open.value && (s.status === "signedIn" || s.status === "error") ? s.user.uid : null;
+  const authState = auth.state.value;
+  return open.value && (authState.status === "signedIn" || authState.status === "error") ? authState.user.uid : null;
 });
 const signedIn = computed(() => auth.state.value.status === "signedIn");
 // Coaches and admins see the contacts; offline the role is unknown: only a copy kept for this user can show
@@ -100,8 +94,8 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: "coachs", label: "🏃 Coachs" },
 ];
 const section = computed<Section>(() => {
-  const s = route.query.section;
-  return canWrite.value && SECTIONS.some((x) => x.id === s) ? (s as Section) : "competitions";
+  const requested = route.query.section;
+  return canWrite.value && SECTIONS.some((x) => x.id === requested) ? (requested as Section) : "competitions";
 });
 const items = useSyncedResource<HelloAssoItem[]>(
   "helloasso-items",
@@ -120,8 +114,8 @@ onScopeDispose(() => {
   window.removeEventListener("offline", onNetwork);
 });
 const online = computed(() => {
-  const s = auth.state.value;
-  return networkUp.value && competitions.state.value !== "offline" && !(s.status === "error" && s.offline);
+  const authState = auth.state.value;
+  return networkUp.value && competitions.state.value !== "offline" && !(authState.status === "error" && authState.offline);
 });
 
 const outbox = createOutbox(store, (competitionId, adherentId, body) =>
@@ -188,8 +182,8 @@ const current = computed(() =>
     today,
   ),
 );
-const archived = computed(() => filterCompetitions(all.value.filter(isArchived), search.value, when.value, today));
-const past = computed(() => all.value.filter((c) => !isArchived(c) && isPast(c, today)));
+const archivedCompetitions = computed(() => filterCompetitions(all.value.filter(isArchived), search.value, when.value, today));
+const pastCompetitions = computed(() => all.value.filter((c) => !isArchived(c) && isPast(c, today)));
 const showArchived = ref(false);
 const WHEN: { id: When; label: string }[] = [
   { id: "all", label: "Toutes" },
@@ -220,33 +214,32 @@ async function create(body: Schemas["CompetitionCreate"]): Promise<void> {
   await router.push({ query: { id: String(created.id) } });
 }
 
-async function archivePast(): Promise<void> {
-  const list = past.value;
-  const n = list.length;
-  if (!n) {
+async function archivePastCompetitions(): Promise<void> {
+  const pastCompetitionsList = pastCompetitions.value;
+  const nbPastCompetitions = pastCompetitionsList.length;
+  if (!nbPastCompetitions) {
     return;
   }
-  const s = n > 1 ? "s" : "";
   if (
     !confirm(
-      `Archiver ${n} compétition${s} passée${s} ?\n\n${list.map((c) => `• ${c.nom} (${period(c)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`,
+      `Archiver ${nbPastCompetitions} compétition${plural(nbPastCompetitions)} passée${plural(nbPastCompetitions)} ?\n\n${pastCompetitionsList.map((competition) => `• ${competition.nom} (${period(competition)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`,
     )
   ) {
     return;
   }
   await writer.run(() => unwrap(client.POST("/api/competitions/archive-past")), {
-    done: (r) => `📦 ${r.archived.length} compétition${r.archived.length > 1 ? "s" : ""} archivée${r.archived.length > 1 ? "s" : ""}.`,
+    done: (r) => `📦 ${r.archived.length} compétition${plural(r.archived.length)} archivée${plural(r.archived.length)}.`,
   });
 }
 
-const plural = (n: number) => (n > 1 ? "s" : "");
 const listLine = computed(() => {
   if (!competitions.data.value) {
     return competitions.state.value === "loading" ? "⏳ Chargement des compétitions…" : "Aucune donnée des compétitions sur cet appareil.";
   }
-  const n = current.value.length;
-  const a = archived.value.length;
-  return `${n} compétition${plural(n)}${a ? ` · ${a} archivée${plural(a)}` : ""}`;
+  const currentCount = current.value.length;
+  const archivedCount = archivedCompetitions.value.length;
+  const archivedPart = archivedCount ? ` · ${archivedCount} archivée${plural(archivedCount)}` : "";
+  return `${currentCount} compétition${plural(currentCount)}${archivedPart}`;
 });
 
 const TIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
@@ -314,9 +307,18 @@ const tab = (active: boolean) => [
     <BalancePane v-else-if="section === 'bilan'" :competitions="all" />
     <CoachesPane v-else-if="section === 'coachs'" :coaches="coaches.data.value" :competitions="all" @changed="competitions.refresh()" />
 
-    <div v-else class="md:grid md:grid-cols-[minmax(0,360px)_minmax(0,1fr)] md:items-start md:gap-4">
-      <!-- The competitions: always on desktop, on phones until one is opened -->
-      <section :class="selected ? 'hidden md:block' : ''" aria-label="Liste des compétitions">
+    <div
+      v-else
+      class="md:grid md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-start md:gap-4 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]"
+    >
+      <!-- The competitions: always on desktop (a panel scrolling on its own), on phones until one is opened -->
+      <section
+        :class="[
+          selected ? 'hidden md:block' : '',
+          'md:sticky md:top-3 md:max-h-[calc(100dvh-1.5rem)] md:overflow-y-auto md:rounded-xl md:border md:border-slate-200 md:bg-white md:p-3 md:shadow-sm',
+        ]"
+        aria-label="Liste des compétitions"
+      >
         <div v-if="canWrite" class="mb-2 flex flex-wrap gap-1.5">
           <UiButton
             small
@@ -324,8 +326,8 @@ const tab = (active: boolean) => [
             @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')"
             >➕ Nouvelle compétition</UiButton
           >
-          <UiButton v-if="past.length" variant="muted" small data-testid="archive-past" @click="archivePast"
-            >📦 Archiver les passées ({{ past.length }})</UiButton
+          <UiButton v-if="pastCompetitions.length" variant="muted" small data-testid="archive-past" @click="archivePastCompetitions"
+            >📦 Archiver les passées ({{ pastCompetitions.length }})</UiButton
           >
         </div>
         <div class="mb-2 flex flex-wrap items-center gap-1.5">
@@ -334,7 +336,7 @@ const tab = (active: boolean) => [
             type="search"
             data-testid="comp-search"
             placeholder="Rechercher (nom, lieu, discipline)…"
-            class="min-w-32 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px]"
+            class="min-w-32 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px] md:basis-full"
           />
           <button
             v-for="w in WHEN"
@@ -357,7 +359,7 @@ const tab = (active: boolean) => [
             {{
               search || when !== "all"
                 ? "Aucune compétition correspondante."
-                : archived.length
+                : archivedCompetitions.length
                   ? "Aucune compétition en cours : toutes sont archivées."
                   : "Aucune compétition enregistrée."
             }}
@@ -392,17 +394,17 @@ const tab = (active: boolean) => [
           </li>
         </ul>
         <button
-          v-if="archived.length"
+          v-if="archivedCompetitions.length"
           type="button"
           data-testid="toggle-archives"
           :aria-expanded="showArchived"
           class="mt-2.5 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300"
           @click="showArchived = !showArchived"
         >
-          {{ showArchived ? "🙈 Masquer les archives" : `🗂 Afficher les archives (${archived.length})` }}
+          {{ showArchived ? "🙈 Masquer les archives" : `🗂 Afficher les archives (${archivedCompetitions.length})` }}
         </button>
         <ul v-if="showArchived" class="mt-2 flex flex-col gap-2" data-testid="archived-list">
-          <li v-for="c in archived" :key="c.id">
+          <li v-for="c in archivedCompetitions" :key="c.id">
             <RouterLink
               :to="{ query: { id: String(c.id) } }"
               data-testid="comp-card"

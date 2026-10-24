@@ -14,6 +14,7 @@ import { shallowRef, type Ref } from "vue";
 import { ApiError } from "../../lib/client";
 import type { OfflineStore } from "../../lib/store";
 import type { Competition, Participant } from "./competitions";
+import { plural } from "../../lib/text";
 
 export type QueuedFlag = "selectionne" | "present";
 export const QUEUED_FLAGS: readonly QueuedFlag[] = ["selectionne", "present"];
@@ -88,15 +89,13 @@ function isValid(entry: QueuedChange, uid: string): boolean {
   return entry.uid === uid && QUEUED_URL.test(String(entry.url)) && QUEUED_FLAGS.includes(entry.flag) && typeof entry.value === "boolean";
 }
 
-const s = (n: number) => (n > 1 ? "s" : "");
-
 /** Confirmation asked before signing out with changes not sent yet (they are lost with the store). */
 export function logoutWarning(n: number): string {
-  return `${n} modification${s(n)} faite${s(n)} hors ligne pas encore envoyée${s(n)} ser${n > 1 ? "ont" : "a"} perdue${s(n)}. Se déconnecter ?`;
+  return `${n} modification${plural(n)} faite${plural(n)} hors ligne pas encore envoyée${plural(n)} ser${plural(n, "ont", "a")} perdue${plural(n)}. Se déconnecter ?`;
 }
 
 export function pendingLine(n: number): string {
-  return n ? ` · ⏳ ${n} modification${s(n)} à envoyer` : "";
+  return n ? ` · ⏳ ${n} modification${plural(n)} à envoyer` : "";
 }
 
 /** The toast after a replay. */
@@ -105,7 +104,7 @@ export function replayMessage(r: ReplayResult): string {
   if (!n) {
     return "☁️ Modifications faites hors ligne envoyées.";
   }
-  return `⚠️ ${n} modification${s(n)} faite${s(n)} hors ligne refusée${s(n)} : ${r.refused.join(" ; ")}`;
+  return `⚠️ ${n} modification${plural(n)} faite${plural(n)} hors ligne refusée${plural(n)} : ${r.refused.join(" ; ")}`;
 }
 
 export function createOutbox(store: OfflineStore, send: SendChange, now: () => number = Date.now): Outbox {

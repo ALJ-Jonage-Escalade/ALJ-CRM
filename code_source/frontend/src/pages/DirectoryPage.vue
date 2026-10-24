@@ -41,6 +41,7 @@ import {
   type Directory,
   type DirectoryMember,
 } from "./annuaire/directory";
+import { plural } from "../lib/text";
 
 const auth = inject(AUTH_KEY)!;
 
@@ -86,7 +87,6 @@ const shown = computed(() =>
 );
 const chips = computed(() => statusChips(all.value));
 const kpis = computed(() => seasonCounts(all.value));
-const plural = (n: number) => (n > 1 ? "s" : "");
 const countLine = computed(() => {
   if (!list.value) {
     return directory.state.value === "loading" ? "⏳ Chargement de l'annuaire…" : "Aucune donnée de l'annuaire sur cet appareil.";

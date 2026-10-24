@@ -3,6 +3,7 @@
    The members come formatted by the server (GET /api/members, domain/members/view.py). */
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
+import { plural } from "../../lib/text";
 
 export type Member = Schemas["Member"];
 export type Creneau = Schemas["Creneau"];
@@ -356,8 +357,7 @@ export function recordMember(members: readonly Member[], id: string, achat?: str
 }
 
 export function countSummary(shown: number, total: number, season: string): string {
-  const s = shown > 1 ? "s" : "";
-  return `${shown} adhérent${s} affiché${s} sur ${total} (saison ${season})`;
+  return `${shown} adhérent${plural(shown)} affiché${plural(shown)} sur ${total} (saison ${season})`;
 }
 
 // ---------------------------------------------------------------- CSV export

@@ -3,6 +3,7 @@
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { normKey } from "../adherents/members";
+import { plural } from "../../lib/text";
 
 export type Competition = Schemas["Competition"];
 export type Participant = Schemas["CompetitionParticipant"];
@@ -218,17 +219,16 @@ export function groupRows(rows: readonly Row[]): [string, Row[]][] {
 }
 
 export function countLine(c: Counts, filter: ParticipantFilter, shown: number): string {
-  const s = (n: number) => (n > 1 ? "s" : "");
   if (filter === "selected") {
-    return `${c.selected} compétiteur${s(c.selected)} sélectionné${s(c.selected)}`;
+    return `${c.selected} compétiteur${plural(c.selected)} sélectionné${plural(c.selected)}`;
   }
   if (filter === "unpaid") {
-    return `${c.unpaid} compétiteur${s(c.unpaid)} avec paiement en attente`;
+    return `${c.unpaid} compétiteur${plural(c.unpaid)} avec paiement en attente`;
   }
   if (filter === "notInvited") {
-    return `${shown} compétiteur${s(shown)} non invité${s(shown)}`;
+    return `${shown} compétiteur${plural(shown)} non invité${plural(shown)}`;
   }
-  return `${c.selected} compétiteur${s(c.selected)} sélectionné${s(c.selected)} sur ${c.all}`;
+  return `${c.selected} compétiteur${plural(c.selected)} sélectionné${plural(c.selected)} sur ${c.all}`;
 }
 
 /** Members matching the search (name, first name, licence; 2 letters at least), not listed yet, 15 at most. */

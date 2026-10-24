@@ -8,6 +8,7 @@ import { csvBlob } from "../../lib/csv";
 import { saveFile } from "../../lib/download";
 import { balanceCsv, balanceLabel, balances, searchBalances, seasonOf, seasons, totals } from "./balance";
 import { euros, payment, period, todayIso, type Competition } from "./competitions";
+import { plural } from "../../lib/text";
 
 const props = defineProps<{ competitions: readonly Competition[] }>();
 
@@ -88,7 +89,7 @@ const TONE = {
           <span class="min-w-0">
             <b class="block text-[14.5px]" data-testid="balance-name">{{ b.nom }} {{ b.prenom }}</b>
             <span class="block text-xs text-slate-500">
-              🪪 {{ b.licence || "sans licence" }} · 🏃 {{ b.lines.length }} épreuve{{ b.lines.length > 1 ? "s" : "" }}
+              🪪 {{ b.licence || "sans licence" }} · 🏃 {{ b.lines.length }} épreuve{{ plural(b.lines.length) }}
               <template v-if="b.lines.some((l) => l.carriedOver)"> · 🔄 Report</template>
               <template v-if="b.absent"> · ⚠️ Absent</template>
             </span>

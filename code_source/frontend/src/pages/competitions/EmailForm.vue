@@ -7,6 +7,7 @@ import UiButton from "../../components/ui/UiButton.vue";
 import { CLIENT_KEY, errorText, unwrap } from "../../lib/client";
 import type { Competition, Row } from "./competitions";
 import { audience, AUDIENCES, defaultTemplate, hasEmail, render, sendBody, variables, type Audience, type Template } from "./email";
+import { plural } from "../../lib/text";
 
 const props = defineProps<{ competition: Competition; rows: readonly Row[] }>();
 const emit = defineEmits<{ sent: [message: string]; cancel: [] }>();
@@ -72,7 +73,7 @@ async function send(): Promise<void> {
     problem.value = "⚠️ Aucun destinataire n'a d'adresse e-mail valide.";
     return;
   }
-  if (!confirm(`Envoyer cet e-mail à ${n} compétiteur${n > 1 ? "s" : ""} ?`)) {
+  if (!confirm(`Envoyer cet e-mail à ${n} compétiteur${plural(n)} ?`)) {
     return;
   }
   sending.value = true;
@@ -136,7 +137,7 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
       </span>
     </div>
     <p class="text-xs text-slate-500" data-testid="email-count">
-      {{ reachable.length }} destinataire{{ reachable.length > 1 ? "s" : "" }} avec une adresse e-mail
+      {{ reachable.length }} destinataire{{ plural(reachable.length) }} avec une adresse e-mail
     </p>
     <div>
       <label for="ce-template" :class="label">Modèle d'e-mail</label>
