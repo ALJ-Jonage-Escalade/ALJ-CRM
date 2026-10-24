@@ -1,9 +1,14 @@
 """Office portal, communications page: e-mail templates (create, edit, delete), variables, WhatsApp text."""
+import pytest
 from playwright.sync_api import expect
 
 from helpers.auth import login_as
 from helpers.data import unique_name
 from helpers.dialogs import answer_prompt, cancel_dialog, confirm_dialog
+
+# One worker for the module: test_whatsapp_text saves the shared WhatsApp text, which _open of a test running on
+# another worker would compare against a page loaded before that save
+pytestmark = pytest.mark.xdist_group("communications")
 
 
 def _open(page, role="admin"):

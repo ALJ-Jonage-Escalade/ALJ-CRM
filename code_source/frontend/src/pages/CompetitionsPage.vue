@@ -443,7 +443,7 @@ const tab = (active: boolean) => [
         :outbox="outbox"
         :uid="uid"
       />
-      <p v-else class="hidden rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center text-slate-500 md:block">
+      <p v-else class="hidden rounded-xl border border-dashed bg-white border-slate-300 px-4 py-10 text-center text-slate-500 md:block">
         {{
           selectedId && competitions.data.value ? "Compétition introuvable." : "Sélectionnez une compétition pour voir ses compétiteurs."
         }}
