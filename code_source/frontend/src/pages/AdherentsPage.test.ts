@@ -24,12 +24,33 @@ const ACTIVE: MemberList = {
   season: "2026-2027",
   creneaux: CRENEAUX,
   members: [
-    member({ user_id: 1, purchase_id: 11, last_name: "DUPONT", first_name: "Léa", tarif_name: "Adulte loisir", status_norm: "Validé", phone: "+33 6 12 34 56 78", email_primary: "lea@example.org" }),
-    member({ user_id: 2, purchase_id: 12, last_name: "MARTIN", first_name: "Max", tarif_name: "Adulte loisir", status_norm: "En cours", badge_rouge: "Oui" }),
+    member({
+      user_id: 1,
+      purchase_id: 11,
+      last_name: "DUPONT",
+      first_name: "Léa",
+      tarif_name: "Adulte loisir",
+      status_norm: "Validé",
+      phone: "+33 6 12 34 56 78",
+      email_primary: "lea@example.org",
+    }),
+    member({
+      user_id: 2,
+      purchase_id: 12,
+      last_name: "MARTIN",
+      first_name: "Max",
+      tarif_name: "Adulte loisir",
+      status_norm: "En cours",
+      badge_rouge: "Oui",
+    }),
     member({ user_id: 3, purchase_id: 13, last_name: "PETIT", first_name: "Zoé", tarif_name: "Attente", status_norm: "Validé" }),
   ],
 };
-const PAST: MemberList = { season: "2025-2026", creneaux: CRENEAUX, members: [member({ user_id: 4, purchase_id: 21, last_name: "ANCIEN", season_name: "2025-2026", tarif_name: "Adulte loisir" })] };
+const PAST: MemberList = {
+  season: "2025-2026",
+  creneaux: CRENEAUX,
+  members: [member({ user_id: 4, purchase_id: 21, last_name: "ANCIEN", season_name: "2025-2026", tarif_name: "Adulte loisir" })],
+};
 
 type Answer = (req: { search: string; ifNoneMatch: string | null; body?: unknown }) => Response;
 const ANSWERS: Record<string, Answer> = {
@@ -56,12 +77,18 @@ async function render(role: Role = "admin", answers: Record<string, Answer> = AN
   });
   const router: Router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: "/bureau/adherents", component: AdherentsPage }, { path: "/:any(.*)*", component: defineComponent({ render: () => null }) }],
+    routes: [
+      { path: "/bureau/adherents", component: AdherentsPage },
+      { path: "/:any(.*)*", component: defineComponent({ render: () => null }) },
+    ],
   });
   await router.push(path);
   const auth: Auth = {
     state: ref({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role }),
-    login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(async () => {}),
+    retry: vi.fn(async () => {}),
+    stop: vi.fn(),
   };
   const wrapper = mount(AdherentsPage, {
     attachTo: document.body,
@@ -145,7 +172,7 @@ describe("AdherentsPage", () => {
     await flushPromises();
     await byId("sort-last_name").trigger("click");
     expect(names()).toEqual(["MARTIN", "DUPONT"]);
-    await byId("sort-diplome").trigger("click");  // the red badge first
+    await byId("sort-diplome").trigger("click"); // the red badge first
     expect(names()).toEqual(["MARTIN", "DUPONT"]);
   });
 
@@ -278,7 +305,8 @@ describe("AdherentsPage", () => {
     const aaron = member({ user_id: 5, purchase_id: 15, last_name: "AARON", first_name: "Abel", tarif_name: "Adulte loisir" });
     const answers: Record<string, Answer> = {
       ...ANSWERS,
-      "GET /api/members": () => (++polls > 1 ? json({ ...ACTIVE, members: [aaron, ...ACTIVE.members] }, 200, '"m2"') : json(ACTIVE, 200, '"m1"')),
+      "GET /api/members": () =>
+        ++polls > 1 ? json({ ...ACTIVE, members: [aaron, ...ACTIVE.members] }, 200, '"m2"') : json(ACTIVE, 200, '"m1"'),
       "GET /api/email-templates": () => json({ status: "success", templates: [] }),
     };
     const { inBody, router, names } = await render("coach", answers);
@@ -350,24 +378,38 @@ describe("AdherentsPage", () => {
     inBody("member-badge_rouge")!.dispatchEvent(new Event("change"));
     inBody("member-save")!.click();
     await flushPromises();
-    expect(writes()).toEqual([expect.objectContaining({
-      path: "/api/members/update",
-      body: { user_id: 1, purchase_id: 11, order_ref: "", fields: { phone: "06 99 88 77 66", badge_rouge: "Oui" } },
-    })]);
-    expect(calls.filter((c) => c.path.startsWith("/api/members")).length).toBeGreaterThan(1);  // reloaded after the write
+    expect(writes()).toEqual([
+      expect.objectContaining({
+        path: "/api/members/update",
+        body: { user_id: 1, purchase_id: 11, order_ref: "", fields: { phone: "06 99 88 77 66", badge_rouge: "Oui" } },
+      }),
+    ]);
+    expect(calls.filter((c) => c.path.startsWith("/api/members")).length).toBeGreaterThan(1); // reloaded after the write
     expect(document.querySelector("#toast")!.textContent).toContain("mise à jour avec succès");
   });
 
   it("adds a member to the season shown, then opens the new record", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    const added = member({ user_id: 9, purchase_id: 90, last_name: "NOUVEAU", first_name: "Nina", order_ref: "MANUEL-1", tarif_name: "Adulte loisir" });
+    const added = member({
+      user_id: 9,
+      purchase_id: 90,
+      last_name: "NOUVEAU",
+      first_name: "Nina",
+      order_ref: "MANUEL-1",
+      tarif_name: "Adulte loisir",
+    });
     let created = false;
     const answers: Record<string, Answer> = {
       ...ANSWERS,
       "GET /api/members": () => json(created ? { ...ACTIVE, members: [...ACTIVE.members, added] } : ACTIVE, 200, created ? '"m2"' : '"m1"'),
       "POST /api/members/create": () => {
         created = true;
-        return json({ status: "success", message: "Adhérent Nina NOUVEAU ajouté avec succès.", order_ref: "MANUEL-1", season: "2026-2027" });
+        return json({
+          status: "success",
+          message: "Adhérent Nina NOUVEAU ajouté avec succès.",
+          order_ref: "MANUEL-1",
+          season: "2026-2027",
+        });
       },
     };
     const { inBody, writes, router, byId } = await render("admin", answers);
@@ -376,7 +418,8 @@ describe("AdherentsPage", () => {
     await flushPromises();
     inBody("member-save")!.click();
     await flushPromises();
-    for (const field of ["last_name", "first_name", "birth_date"]) expect(inBody(`member-${field}`)!.getAttribute("aria-invalid")).toBe("true");
+    for (const field of ["last_name", "first_name", "birth_date"])
+      expect(inBody(`member-${field}`)!.getAttribute("aria-invalid")).toBe("true");
     expect(writes()).toEqual([]);
 
     const type = (id: string, value: string) => {
@@ -389,10 +432,18 @@ describe("AdherentsPage", () => {
     type("member-birth_date", "2012-04-05");
     inBody("member-save")!.click();
     await flushPromises();
-    expect(writes()[0]!.body).toEqual(expect.objectContaining({
-      season: "2026-2027",
-      fields: expect.objectContaining({ last_name: "NOUVEAU", first_name: "Nina", birth_date: "2012-04-05", tarif_name: "Adulte loisir", amount: 0 }),
-    }));
+    expect(writes()[0]!.body).toEqual(
+      expect.objectContaining({
+        season: "2026-2027",
+        fields: expect.objectContaining({
+          last_name: "NOUVEAU",
+          first_name: "Nina",
+          birth_date: "2012-04-05",
+          tarif_name: "Adulte loisir",
+          amount: 0,
+        }),
+      }),
+    );
     expect(router.currentRoute.value.query).toEqual({ id: "9", saison: "2026-2027", achat: "90" });
   });
 
@@ -400,7 +451,11 @@ describe("AdherentsPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const answers: Record<string, Answer> = {
       ...ANSWERS,
-      "GET /api/email-templates": () => json({ status: "success", templates: [{ name: "Rappel", subject: "Rappel {first_name}", body: "Bonjour {first_name}", sender_email: "", sender_name: "" }] }),
+      "GET /api/email-templates": () =>
+        json({
+          status: "success",
+          templates: [{ name: "Rappel", subject: "Rappel {first_name}", body: "Bonjour {first_name}", sender_email: "", sender_name: "" }],
+        }),
       "POST /api/send-email": () => json({ status: "success", sent_count: 1 }),
     };
     const { inBody, writes } = await render(role, answers, "/bureau/adherents?id=1&saison=2026-2027");
@@ -419,9 +474,11 @@ describe("AdherentsPage", () => {
     inBody("email-send")!.click();
     await flushPromises();
     expect(writes()[0]).toEqual(expect.objectContaining({ path: "/api/send-email" }));
-    expect(writes()[0]!.body).toEqual(expect.objectContaining({ subject: "Rappel {first_name}", recipients: [expect.objectContaining({ email: "lea@example.org" })] }));
+    expect(writes()[0]!.body).toEqual(
+      expect.objectContaining({ subject: "Rappel {first_name}", recipients: [expect.objectContaining({ email: "lea@example.org" })] }),
+    );
     expect(document.querySelector("#toast")!.textContent).toContain("E-mail envoyé avec succès");
-    expect(inBody("record-dialog")).toBeNull();  // back to the record in the panel
+    expect(inBody("record-dialog")).toBeNull(); // back to the record in the panel
     expect(inBody("record-name")).not.toBeNull();
   });
 
@@ -429,12 +486,16 @@ describe("AdherentsPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:pdf");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-    const paid = { ...ACTIVE, members: [{ ...ACTIVE.members[0]!, amount: 180, payer_email: "parent@example.org" }, ...ACTIVE.members.slice(1)] };
+    const paid = {
+      ...ACTIVE,
+      members: [{ ...ACTIVE.members[0]!, amount: 180, payer_email: "parent@example.org" }, ...ACTIVE.members.slice(1)],
+    };
     const answers: Record<string, Answer> = {
       ...ANSWERS,
       "GET /api/members": () => json(paid, 200, '"paid"'),
       "GET /api/email-templates": () => json({ status: "success", templates: [] }),
-      "POST /api/attestations/preview": () => new Response(new Blob(["%PDF"]), { status: 200, headers: { "Content-Type": "application/pdf" } }),
+      "POST /api/attestations/preview": () =>
+        new Response(new Blob(["%PDF"]), { status: 200, headers: { "Content-Type": "application/pdf" } }),
       "POST /api/attestations/send": () => json({ status: "success", message: "ok", email_sent_date: "22/10/2026", filename: "a.pdf" }),
     };
     const { inBody, writes } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027");
@@ -448,7 +509,9 @@ describe("AdherentsPage", () => {
     await flushPromises();
     expect(writes().map((w) => w.path)).toEqual(["/api/attestations/preview", "/api/attestations/send"]);
     expect(writes()[0]!.body).toEqual({ purchase_id: 11, season: "2026-2027" });
-    expect(writes()[1]!.body).toEqual(expect.objectContaining({ purchase_id: 11, to_email: "parent@example.org", template_name: "Attestation échéance" }));
+    expect(writes()[1]!.body).toEqual(
+      expect.objectContaining({ purchase_id: 11, to_email: "parent@example.org", template_name: "Attestation échéance" }),
+    );
     expect(document.querySelector("#toast")!.textContent).toContain("Attestation envoyée avec succès");
   });
 

@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
-  initialTemplate, insertText, linkTags, linkTarget, newNameError, newTemplate, preview, renderDemo, templateError, VARIABLES, wrapSelection,
+  initialTemplate,
+  insertText,
+  linkTags,
+  linkTarget,
+  newNameError,
+  newTemplate,
+  preview,
+  renderDemo,
+  templateError,
+  VARIABLES,
+  wrapSelection,
   type Template,
 } from "./editor";
 
@@ -60,7 +70,11 @@ describe("new templates", () => {
   });
 
   it("start from the sender being edited", () => {
-    expect(newTemplate("Stage", TEMPLATE)).toMatchObject({ name: "Stage", subject: "Sujet du courriel", sender_email: "competitions@alj-escalade.fr" });
+    expect(newTemplate("Stage", TEMPLATE)).toMatchObject({
+      name: "Stage",
+      subject: "Sujet du courriel",
+      sender_email: "competitions@alj-escalade.fr",
+    });
     expect(newTemplate("Stage", { sender_email: "", sender_name: "" }).sender_name).toBe("Amicale Laïque Jonage - Inscriptions");
   });
 

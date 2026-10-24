@@ -13,8 +13,18 @@ function json(body: unknown, status = 200): Response {
 }
 
 const SLOT = (change: Partial<Slot>): Slot => ({
-  id: 1, groupe: "Loisir", type: "cours", categorie_age: "", jour: "Lundi", horaires: "18:00 - 20:00",
-  encadrants: [], helloasso_tarifs: [], whatsapp_link: "", naissance_min: "", naissance_max: "", ...change,
+  id: 1,
+  groupe: "Loisir",
+  type: "cours",
+  categorie_age: "",
+  jour: "Lundi",
+  horaires: "18:00 - 20:00",
+  encadrants: [],
+  helloasso_tarifs: [],
+  whatsapp_link: "",
+  naissance_min: "",
+  naissance_max: "",
+  ...change,
 });
 const SLOTS = [
   SLOT({ id: 1, groupe: "Loisir collège", encadrants: ["Remus Lupin"] }),
@@ -42,7 +52,10 @@ function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS)
   });
   const auth: Auth = {
     state: ref({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role }),
-    login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(async () => {}),
+    retry: vi.fn(async () => {}),
+    stop: vi.fn(),
   };
   const wrapper = mount(PlanningPage, {
     attachTo: document.body,
@@ -101,17 +114,28 @@ describe("PlanningPage", () => {
     coaches.dispatchEvent(new Event("input"));
     byId("slot-save")!.click();
     await flushPromises();
-    expect(writes()).toEqual([{
-      method: "POST",
-      path: "/api/planning/item",
-      body: {
-        id: 0, groupe: "Stage d'été", jour: "Lundi", horaires: "18:00 - 20:00", type: "cours", categorie_age: "",
-        encadrants: ["Remus Lupin", "Rubeus Hagrid"], helloasso_tarifs: [], whatsapp_link: "", naissance_min: "", naissance_max: "",
+    expect(writes()).toEqual([
+      {
+        method: "POST",
+        path: "/api/planning/item",
+        body: {
+          id: 0,
+          groupe: "Stage d'été",
+          jour: "Lundi",
+          horaires: "18:00 - 20:00",
+          type: "cours",
+          categorie_age: "",
+          encadrants: ["Remus Lupin", "Rubeus Hagrid"],
+          helloasso_tarifs: [],
+          whatsapp_link: "",
+          naissance_min: "",
+          naissance_max: "",
+        },
       },
-    }]);
+    ]);
     expect(byId("toast")!.textContent).toBe("✅ Créneau « Stage d'été » enregistré !");
     expect(byId("slot-dialog")).toBeNull();
-    expect(calls.filter((c) => c.path === "/api/planning")).toHaveLength(2);  // reloaded
+    expect(calls.filter((c) => c.path === "/api/planning")).toHaveLength(2); // reloaded
   });
 
   it("edits a slot from its card, and shows a refusal", async () => {

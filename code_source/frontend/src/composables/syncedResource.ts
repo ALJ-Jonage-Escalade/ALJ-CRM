@@ -48,7 +48,11 @@ export interface SyncedResource<T> {
   stop(): void;
 }
 
-export function useSyncedResource<T>(name: string, url: MaybeRefOrGetter<string | null>, options: SyncedResourceOptions<T>): SyncedResource<T> {
+export function useSyncedResource<T>(
+  name: string,
+  url: MaybeRefOrGetter<string | null>,
+  options: SyncedResourceOptions<T>,
+): SyncedResource<T> {
   const fetchFn = options.fetch ?? inject(API_KEY);
   if (!fetchFn) throw new Error(`useSyncedResource(${name}): no API fetch provided`);
   const store = options.offline ? (options.store ?? inject(STORE_KEY, null) ?? offlineStore()) : null;
@@ -59,7 +63,7 @@ export function useSyncedResource<T>(name: string, url: MaybeRefOrGetter<string 
   const checkedAt = ref<Date | null>(null);
   const dataAt = ref<Date | null>(null);
   let current: Poll | null = null;
-  let generation = 0;  // a start for a former url or user, still reading the store, is dropped
+  let generation = 0; // a start for a former url or user, still reading the store, is dropped
   let stopped = false;
 
   async function start([target, uid]: readonly [string | null, string | null]): Promise<void> {
@@ -110,7 +114,7 @@ export function useSyncedResource<T>(name: string, url: MaybeRefOrGetter<string 
       dataAt.value = null;
       void store.clearAll();
     }
-    if (info.status === 401 || (store && info.status === 403)) stop();  // signed out: the session watcher shows the sign-in gate
+    if (info.status === 401 || (store && info.status === 403)) stop(); // signed out: the session watcher shows the sign-in gate
   }
 
   function stop(): void {
@@ -131,14 +135,14 @@ export function useSyncedResource<T>(name: string, url: MaybeRefOrGetter<string 
   if (getCurrentScope()) onScopeDispose(stop);
 
   return {
-    data,  // not readonly(): it would wrap every member in a proxy
+    data, // not readonly(): it would wrap every member in a proxy
     state: readonly(state),
     httpStatus: readonly(httpStatus),
     checkedAt: readonly(checkedAt),
     dataAt: readonly(dataAt),
     refresh: () => current?.refresh() ?? Promise.resolve(),
     set: (value) => {
-      if (current) data.value = value;  // not for a former url, nor once stopped
+      if (current) data.value = value; // not for a former url, nor once stopped
     },
     stop,
   };

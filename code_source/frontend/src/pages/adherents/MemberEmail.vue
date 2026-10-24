@@ -28,8 +28,10 @@ function useTemplate(): void {
   body.value = t.body;
 }
 
-const preview = computed(() =>
-  `Sujet : ${renderFor(subject.value, props.member)}\n\n${renderFor(body.value, props.member)}${signature.value ? `\n\n---\n${SIGNATURE_TEXT}` : ""}`);
+const preview = computed(
+  () =>
+    `Sujet : ${renderFor(subject.value, props.member)}\n\n${renderFor(body.value, props.member)}${signature.value ? `\n\n---\n${SIGNATURE_TEXT}` : ""}`,
+);
 
 async function send(): Promise<void> {
   problem.value = "";
@@ -41,17 +43,26 @@ async function send(): Promise<void> {
   if (!confirm(`Envoyer cet e-mail à ${m.first_name} ${m.last_name} <${to.value}> ?`)) return;
   sending.value = true;
   try {
-    const result = await unwrap(client.POST("/api/send-email", {
-      body: {
-        subject: subject.value.trim(),
-        body: body.value.trim(),
-        add_signature: signature.value,
-        recipients: [{
-          id: m.user_id, first_name: m.first_name, last_name: m.last_name, email: to.value,
-          num_licence: m.licence_ffme, tarif: m.tarif_name, season: m.season_name,
-        }],
-      },
-    }));
+    const result = await unwrap(
+      client.POST("/api/send-email", {
+        body: {
+          subject: subject.value.trim(),
+          body: body.value.trim(),
+          add_signature: signature.value,
+          recipients: [
+            {
+              id: m.user_id,
+              first_name: m.first_name,
+              last_name: m.last_name,
+              email: to.value,
+              num_licence: m.licence_ffme,
+              tarif: m.tarif_name,
+              season: m.season_name,
+            },
+          ],
+        },
+      }),
+    );
     if (result.status === "error") {
       emit("failed", `❌ Échec d'envoi : ${result.message || result.details?.[0]?.error || "erreur d'envoi."}`);
       return;
@@ -73,7 +84,9 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
     <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
       <b class="text-sm text-slate-800">{{ member.first_name }} {{ member.last_name }}</b>
       <div data-testid="email-to" class="text-[12.5px] text-accent">{{ to ? `✉️ ${to}` : "Aucune adresse e-mail" }}</div>
-      <p v-if="!canSend" class="mt-1 text-xs font-bold text-red-600">⚠️ Cet adhérent n'a pas d'adresse e-mail valide : l'envoi est impossible.</p>
+      <p v-if="!canSend" class="mt-1 text-xs font-bold text-red-600">
+        ⚠️ Cet adhérent n'a pas d'adresse e-mail valide : l'envoi est impossible.
+      </p>
     </div>
     <div>
       <label for="email-template" :class="label">Modèle d'e-mail</label>
@@ -84,19 +97,31 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
     </div>
     <div>
       <label for="email-subject" :class="label">Sujet *</label>
-      <input id="email-subject" v-model="subject" data-testid="email-subject" type="text" placeholder="Sujet de votre message…" :class="field">
+      <input
+        id="email-subject"
+        v-model="subject"
+        data-testid="email-subject"
+        type="text"
+        placeholder="Sujet de votre message…"
+        :class="field"
+      />
     </div>
     <div>
       <label for="email-body" :class="label">Message * (variables : {first_name}, {last_name}, {num_licence}, {tarif}, {season})</label>
       <textarea id="email-body" v-model="body" data-testid="email-body" rows="6" placeholder="Bonjour {first_name}, …" :class="field" />
     </div>
     <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-slate-700">
-      <input v-model="signature" type="checkbox" data-testid="email-signature" class="accent-accent">
+      <input v-model="signature" type="checkbox" data-testid="email-signature" class="accent-accent" />
       Ajouter la signature officielle ALJ Escalade
     </label>
     <div>
       <div :class="label">👁 Aperçu</div>
-      <div data-testid="email-preview" class="max-h-40 overflow-y-auto rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-[12.5px] leading-normal whitespace-pre-wrap">{{ preview }}</div>
+      <div
+        data-testid="email-preview"
+        class="max-h-40 overflow-y-auto rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-[12.5px] leading-normal whitespace-pre-wrap"
+      >
+        {{ preview }}
+      </div>
     </div>
     <p v-if="problem" role="alert" data-testid="email-problem" class="text-xs font-bold text-red-600">{{ problem }}</p>
     <div class="flex justify-end gap-2">

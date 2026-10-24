@@ -38,10 +38,12 @@ export interface ItemInfo {
 type Raw = Record<string, unknown>;
 const obj = (v: unknown): Raw => (v && typeof v === "object" && !Array.isArray(v) ? (v as Raw) : {});
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
-const text = (v: unknown): string => (v == null ? "" : String(v));
+// Scalars only: a nested object has no meaningful text
+const text = (v: unknown): string => (typeof v === "string" ? v : typeof v === "number" || typeof v === "boolean" ? String(v) : "");
 const cents = (v: unknown): number | null => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Number(v) / 100);
 const fullName = (o: Raw) => [o.firstName, o.lastName].filter(Boolean).map(text).join(" ").trim();
-const fields = (v: unknown): Field[] => list(v).map((c) => ({ name: text(obj(c).name).trim(), answer: text(obj(c).answer ?? obj(c).value) }));
+const fields = (v: unknown): Field[] =>
+  list(v).map((c) => ({ name: text(obj(c).name).trim(), answer: text(obj(c).answer ?? obj(c).value) }));
 
 function parseRaw(it: HelloAssoItem): Raw {
   try {
@@ -69,9 +71,17 @@ export function itemInfo(it: HelloAssoItem): ItemInfo {
     state: it.etat || text(r.state),
     amount: Number(it.montant ?? 0),
     initialAmount: cents(r.initialAmount),
-    payments: payments.map((p) => ({ id: text(p.id), amount: cents(p.amount ?? p.shareAmount), state: text(p.state), date: text(p.date), means: text(p.paymentMeans) })),
+    payments: payments.map((p) => ({
+      id: text(p.id),
+      amount: cents(p.amount ?? p.shareAmount),
+      state: text(p.state),
+      date: text(p.date),
+      means: text(p.paymentMeans),
+    })),
     fields: fields(r.customFields),
-    options: list(r.options).map(obj).map((o) => ({ name: text(o.name), amount: cents(o.amount), fields: fields(o.customFields) })),
+    options: list(r.options)
+      .map(obj)
+      .map((o) => ({ name: text(o.name), amount: cents(o.amount), fields: fields(o.customFields) })),
     raw: r,
   };
 }
@@ -81,8 +91,15 @@ export function displayName(it: HelloAssoItem, info: ItemInfo = itemInfo(it)): s
 }
 
 const STATES: Record<string, string> = {
-  processed: "Payé", registered: "Enregistré", authorized: "Autorisé", refused: "Refusé", refunded: "Remboursé",
-  refunding: "Remboursement en cours", canceled: "Annulé", contested: "Contesté", waiting: "En attente",
+  processed: "Payé",
+  registered: "Enregistré",
+  authorized: "Autorisé",
+  refused: "Refusé",
+  refunded: "Remboursé",
+  refunding: "Remboursement en cours",
+  canceled: "Annulé",
+  contested: "Contesté",
+  waiting: "En attente",
 };
 
 export function stateLabel(state: string): string {
@@ -106,8 +123,14 @@ export function itemCounts(items: readonly HelloAssoItem[]): ItemCounts {
 }
 
 /** The items shown: by filter (« all » without the ignored ones unless asked) and search, the ones to link first, then the newest. */
-export function filterItems(items: readonly HelloAssoItem[], filter: ItemFilter, hideIgnored: boolean, search: string,
-                            competitions: readonly Competition[], members: readonly MemberSlot[]): HelloAssoItem[] {
+export function filterItems(
+  items: readonly HelloAssoItem[],
+  filter: ItemFilter,
+  hideIgnored: boolean,
+  search: string,
+  competitions: readonly Competition[],
+  members: readonly MemberSlot[],
+): HelloAssoItem[] {
   const q = normKey(search);
   const compName = new Map(competitions.map((c) => [c.id, c.nom ?? ""]));
   const member = new Map(members.map((m) => [m.id, `${m.nom} ${m.prenom}`]));
@@ -118,11 +141,28 @@ export function filterItems(items: readonly HelloAssoItem[], filter: ItemFilter,
     if (filter === "all" && hideIgnored && isIgnored(it)) return false;
     if (!q) return true;
     const h = itemInfo(it);
-    return normKey([
-      it.payer_nom, it.payer_prenom, h.beneficiary, h.payerName, h.payerEmail, h.orderId, it.id_item, it.licence_saisie, it.competition_saisie,
-      h.itemName, h.formName, it.commentaire, it.ignore_motif, compName.get(it.competition_id ?? -1), member.get(it.adherent_id ?? -1),
-      ...h.fields.map((f) => f.answer),
-    ].filter((v) => v != null).join(" ")).includes(q);
+    return normKey(
+      [
+        it.payer_nom,
+        it.payer_prenom,
+        h.beneficiary,
+        h.payerName,
+        h.payerEmail,
+        h.orderId,
+        it.id_item,
+        it.licence_saisie,
+        it.competition_saisie,
+        h.itemName,
+        h.formName,
+        it.commentaire,
+        it.ignore_motif,
+        compName.get(it.competition_id ?? -1),
+        member.get(it.adherent_id ?? -1),
+        ...h.fields.map((f) => f.answer),
+      ]
+        .filter((v) => v != null)
+        .join(" "),
+    ).includes(q);
   });
   const rank = (it: HelloAssoItem) => (isLinked(it) ? 1 : isIgnored(it) ? 2 : 0);
   const dates = new Map(shown.map((it) => [it, itemInfo(it).date]));
@@ -142,7 +182,7 @@ export function suggestedCompetition(it: HelloAssoItem, competitions: readonly C
   return match?.id ?? null;
 }
 
-const digits = (s: unknown) => String(s ?? "").replace(/\D/g, "");
+const digits = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
 
 /** The member an item is for: its link, else the licence number typed, else the beneficiary's name. */
 export function suggestedMember(it: HelloAssoItem, members: readonly MemberSlot[]): number | null {
@@ -152,7 +192,9 @@ export function suggestedMember(it: HelloAssoItem, members: readonly MemberSlot[
   const byLicence = members.find((m) => digits(m.licence_ffme) && licences.includes(digits(m.licence_ffme)));
   if (byLicence) return byLicence.id ?? null;
   const name = normKey(`${info.beneficiary} ${it.payer_nom ?? ""} ${it.payer_prenom ?? ""}`);
-  const byName = members.find((m) => normKey(m.nom) && name.includes(normKey(m.nom)) && (!normKey(m.prenom) || name.includes(normKey(m.prenom))));
+  const byName = members.find(
+    (m) => normKey(m.nom) && name.includes(normKey(m.nom)) && (!normKey(m.prenom) || name.includes(normKey(m.prenom))),
+  );
   return byName?.id ?? null;
 }
 

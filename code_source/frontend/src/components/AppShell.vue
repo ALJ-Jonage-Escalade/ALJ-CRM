@@ -109,7 +109,9 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
             type="button"
             class="shrink-0 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-300"
             @click="logout"
-          >🚪 Se déconnecter</button>
+          >
+            🚪 Se déconnecter
+          </button>
         </div>
       </header>
 
@@ -127,7 +129,9 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         id="offline-notice"
         role="status"
         class="mb-3.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-900 print:hidden"
-      >📴 Hors ligne : consultation des dernières données reçues sur cet appareil.</p>
+      >
+        📴 Hors ligne : consultation des dernières données reçues sur cet appareil.
+      </p>
 
       <section
         v-if="access !== 'allow' && access !== 'pending' && access !== 'offline'"
@@ -136,23 +140,52 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
       >
         <template v-if="access === 'signIn'">
           <h2 class="mb-2 text-[17px] font-bold">🔐 Connexion</h2>
-          <p class="my-1.5 leading-normal">Le bureau est réservé aux coachs et administrateurs du club. Connectez-vous avec votre compte Google.</p>
-          <button id="gate-login" type="button" class="mt-2 cursor-pointer rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:bg-accent-dark" @click="auth.login()">🔑 Se connecter avec Google</button>
+          <p class="my-1.5 leading-normal">
+            Le bureau est réservé aux coachs et administrateurs du club. Connectez-vous avec votre compte Google.
+          </p>
+          <button
+            id="gate-login"
+            type="button"
+            class="mt-2 cursor-pointer rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:bg-accent-dark"
+            @click="auth.login()"
+          >
+            🔑 Se connecter avec Google
+          </button>
         </template>
         <template v-else-if="access === 'unverified' && state.status === 'error'">
           <h2 class="mb-2 text-[17px] font-bold">⚠️ Droits non vérifiés</h2>
           <p class="my-1.5 leading-normal">{{ state.message }}</p>
-          <button id="gate-retry" type="button" class="mt-2 cursor-pointer rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:bg-accent-dark" @click="auth.retry()">🔄 Réessayer</button>
+          <button
+            id="gate-retry"
+            type="button"
+            class="mt-2 cursor-pointer rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:bg-accent-dark"
+            @click="auth.retry()"
+          >
+            🔄 Réessayer
+          </button>
         </template>
         <template v-else-if="access === 'adminOnly'">
           <h2 class="mb-2 text-[17px] font-bold">⛔ Réservé aux administrateurs</h2>
           <p class="my-1.5 leading-normal">Cette page est réservée aux administrateurs du club.</p>
-          <a href="/bureau/" class="mt-2 inline-block rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white no-underline hover:bg-accent-dark">🏠 Retour à l'accueil</a>
+          <a
+            href="/bureau/"
+            class="mt-2 inline-block rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white no-underline hover:bg-accent-dark"
+            >🏠 Retour à l'accueil</a
+          >
         </template>
         <template v-else>
           <h2 class="mb-2 text-[17px] font-bold">⛔ Accès réservé</h2>
-          <p class="my-1.5 leading-normal">Ce compte n'est pas autorisé à consulter le bureau. Déconnectez-vous et utilisez un compte coach ou administrateur.</p>
-          <button id="gate-logout" type="button" class="mt-2 cursor-pointer rounded-lg bg-slate-200 px-3.5 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-300" @click="auth.logout()">🚪 Se déconnecter</button>
+          <p class="my-1.5 leading-normal">
+            Ce compte n'est pas autorisé à consulter le bureau. Déconnectez-vous et utilisez un compte coach ou administrateur.
+          </p>
+          <button
+            id="gate-logout"
+            type="button"
+            class="mt-2 cursor-pointer rounded-lg bg-slate-200 px-3.5 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-300"
+            @click="auth.logout()"
+          >
+            🚪 Se déconnecter
+          </button>
         </template>
       </section>
 

@@ -32,7 +32,9 @@ const open = defineModel<boolean>("open", { required: true });
           data-testid="side-panel-collapse"
           class="cursor-pointer rounded-md px-1.5 py-0.5 text-base leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-800"
           @click="open = false"
-        >⇥</button>
+        >
+          ⇥
+        </button>
       </header>
       <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         <slot />

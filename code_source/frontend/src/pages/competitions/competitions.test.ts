@@ -1,7 +1,27 @@
 import { describe, expect, it } from "vitest";
 import {
-  coachChoices, counts, draftBody, draftErrors, draftOf, filterCompetitions, filterRows, groupRows, hasPaid, isNotInvited, memberMatches, nextDay,
-  participantCsv, participantRows, payment, period, ranking, sortCompetitions, toMemberSlots, UNIDENTIFIED, type Competition, type MemberSlot,
+  coachChoices,
+  counts,
+  draftBody,
+  draftErrors,
+  draftOf,
+  filterCompetitions,
+  filterRows,
+  groupRows,
+  hasPaid,
+  isNotInvited,
+  memberMatches,
+  nextDay,
+  participantCsv,
+  participantRows,
+  payment,
+  period,
+  ranking,
+  sortCompetitions,
+  toMemberSlots,
+  UNIDENTIFIED,
+  type Competition,
+  type MemberSlot,
 } from "./competitions";
 
 const comp = (change: Partial<Competition>): Competition => ({ id: 1, nom: "C", participants: [], ...change });
@@ -28,7 +48,9 @@ describe("competitions", () => {
   });
 
   it("keeps what the screen needs of the member directory, not the phones", () => {
-    expect(toMemberSlots([{ id: 1, nom: "X", prenom: "Y", num_licence: "123", email: "x@y.fr", tarif: "T", creneau_groupe: "G", phone: "06" }])).toEqual([
+    expect(
+      toMemberSlots([{ id: 1, nom: "X", prenom: "Y", num_licence: "123", email: "x@y.fr", tarif: "T", creneau_groupe: "G", phone: "06" }]),
+    ).toEqual([
       { id: 1, nom: "X", prenom: "Y", licence_ffme: "123", email: "x@y.fr", email_secondaire: "", tarif: "T", creneau_groupe: "G" },
     ]);
   });
@@ -48,9 +70,18 @@ describe("competitions", () => {
 
   it("checks and builds the form", () => {
     expect(draftErrors(draftOf())).toEqual({ nom: "Le nom de l'épreuve est obligatoire." });
-    expect(draftErrors({ ...draftOf(), nom: "A", prix: "-2", date_fin: "2026-01-01" })).toEqual({ prix: "Montant invalide.", date_fin: "Indiquez d'abord la date de début." });
+    expect(draftErrors({ ...draftOf(), nom: "A", prix: "-2", date_fin: "2026-01-01" })).toEqual({
+      prix: "Montant invalide.",
+      date_fin: "Indiquez d'abord la date de début.",
+    });
     const draft = { ...draftOf(), nom: " Open ", date_competition: "2026-03-14", date_fin: "2026-03-13", prix: "12,5", coach_ids: [3, 1] };
-    expect(draftBody(draft)).toMatchObject({ nom: "Open", date_competition: "2026-03-14", date_fin: "2026-03-14", prix: 12.5, coach_ids: [3, 1] });
+    expect(draftBody(draft)).toMatchObject({
+      nom: "Open",
+      date_competition: "2026-03-14",
+      date_fin: "2026-03-14",
+      prix: 12.5,
+      coach_ids: [3, 1],
+    });
     expect(draftBody({ ...draft, date_fin: nextDay("2026-03-14") }).date_fin).toBe("2026-03-15");
     expect(nextDay("2026-02-28")).toBe("2026-03-01");
     const edited = draftOf(comp({ nom: "X", date_competition: "2026-03-14", date_fin: "2026-03-14", prix: 9, lieu: "Lyon" }));
@@ -58,7 +89,11 @@ describe("competitions", () => {
   });
 
   it("offers the competition's coaches first, in their order, then the others by name", () => {
-    const coaches = [{ id: 1, nom: "Zoé" }, { id: 2, nom: "Alice" }, { id: 3, nom: "Bob" }];
+    const coaches = [
+      { id: 1, nom: "Zoé" },
+      { id: 2, nom: "Alice" },
+      { id: 3, nom: "Bob" },
+    ];
     expect(coachChoices(coaches, [3, 1]).map((c) => c.id)).toEqual([3, 1, 2]);
     expect(coachChoices(coaches, []).map((c) => c.nom)).toEqual(["Alice", "Bob", "Zoé"]);
   });
@@ -67,22 +102,54 @@ describe("competitions", () => {
 describe("participants", () => {
   const c = comp({
     participants: [
-      { adherent_id: 1, nom: "MARTIN", prenom: "Léo", selectionne: true, statut_paiement: "paye", montant_paye: 12, tarif: "Ancien", urgence_nom: "Copie", urgence_tel: "0600", classement: "1" },
-      { adherent_id: 2, nom: "DURAND", prenom: "Zoé", selectionne: true, statut_paiement: "en_attente", urgence_tel: "0611", email: "copie@x.fr" },
+      {
+        adherent_id: 1,
+        nom: "MARTIN",
+        prenom: "Léo",
+        selectionne: true,
+        statut_paiement: "paye",
+        montant_paye: 12,
+        tarif: "Ancien",
+        urgence_nom: "Copie",
+        urgence_tel: "0600",
+        classement: "1",
+      },
+      {
+        adherent_id: 2,
+        nom: "DURAND",
+        prenom: "Zoé",
+        selectionne: true,
+        statut_paiement: "en_attente",
+        urgence_tel: "0611",
+        email: "copie@x.fr",
+      },
       { adherent_id: 3, nom: "ABEL", prenom: "Max", selectionne: false, statut_paiement: "non_invite", present: true },
     ],
   });
   const members: MemberSlot[] = [{ id: 1, tarif: "Compétition U18", creneau_groupe: "Compét. U18", email: "leo@x.fr" }];
-  const contacts = [{
-    adherent_id: 2, last_name: "DURAND", first_name: "Zoé", phone: "06 22", creneau_groupe: "Compét. U14",
-    emergency1_name: "Paul", emergency1_phone: "06 01", emergency2_name: "", emergency2_phone: "",
-  }];
+  const contacts = [
+    {
+      adherent_id: 2,
+      last_name: "DURAND",
+      first_name: "Zoé",
+      phone: "06 22",
+      creneau_groupe: "Compét. U14",
+      emergency1_name: "Paul",
+      emergency1_phone: "06 01",
+      emergency2_name: "",
+      emergency2_phone: "",
+    },
+  ];
 
   it("takes the current tariff and slot group, phone, e-mail and emergency contacts when known", () => {
     const rows = participantRows(c, members, contacts);
-    expect(rows.map((r) => [r.group, r.tarif])).toEqual([["Compét. U18", "Compétition U18"], ["Compét. U14", ""], [UNIDENTIFIED, ""]]);
-    expect(rows[0]!.emergency).toEqual([{ name: "Copie", phone: "0600" }]);  // copied when added
-    expect(rows[1]!.emergency).toEqual([{ name: "Paul", phone: "06 01" }]);  // the competitor's contacts
+    expect(rows.map((r) => [r.group, r.tarif])).toEqual([
+      ["Compét. U18", "Compétition U18"],
+      ["Compét. U14", ""],
+      [UNIDENTIFIED, ""],
+    ]);
+    expect(rows[0]!.emergency).toEqual([{ name: "Copie", phone: "0600" }]); // copied when added
+    expect(rows[1]!.emergency).toEqual([{ name: "Paul", phone: "06 01" }]); // the competitor's contacts
     expect(rows[1]!.phone).toBe("06 22");
     expect(rows.map((r) => r.email)).toEqual(["leo@x.fr", "copie@x.fr", ""]);
   });
@@ -113,7 +180,10 @@ describe("participants", () => {
   });
 
   it("finds members to add, not listed yet", () => {
-    const all: MemberSlot[] = [{ id: 1, nom: "MARTIN", prenom: "Léo" }, { id: 4, nom: "MARTINEZ", prenom: "Éva", licence_ffme: "123456" }];
+    const all: MemberSlot[] = [
+      { id: 1, nom: "MARTIN", prenom: "Léo" },
+      { id: 4, nom: "MARTINEZ", prenom: "Éva", licence_ffme: "123456" },
+    ];
     expect(memberMatches(all, c, "m")).toEqual([]);
     expect(memberMatches(all, c, "mart").map((m) => m.id)).toEqual([4]);
     expect(memberMatches(all, c, "eva").map((m) => m.id)).toEqual([4]);
@@ -124,7 +194,9 @@ describe("participants", () => {
     const rows = participantCsv(participantRows(c, members, contacts));
     expect(rows[0]!.slice(0, 3)).toEqual(["Nom", "Prénom", "N° Licence"]);
     expect(rows.slice(1).map((r) => [r[0], r[4], r[5], r[6]])).toEqual([
-      ["DURAND", "", "Oui", "En attente"], ["MARTIN", "1er", "Oui", "Payé"], ["ABEL", "", "Non", "Non invité"],
+      ["DURAND", "", "Oui", "En attente"],
+      ["MARTIN", "1er", "Oui", "Payé"],
+      ["ABEL", "", "Non", "Non invité"],
     ]);
   });
 });

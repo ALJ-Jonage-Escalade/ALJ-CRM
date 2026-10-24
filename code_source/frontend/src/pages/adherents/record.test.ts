@@ -1,16 +1,41 @@
 import { describe, expect, it } from "vitest";
 import { member } from "./members.fixture";
 import {
-  attestationFileName, attestationProblem, attestationRecipient, attestationTemplates, changesOf, DEFAULT_ATTESTATION_TEMPLATE,
-  draftOf, newMemberOf, recordRows, renderFor, sameName, tarifChoices, withDateTag,
+  attestationFileName,
+  attestationProblem,
+  attestationRecipient,
+  attestationTemplates,
+  changesOf,
+  DEFAULT_ATTESTATION_TEMPLATE,
+  draftOf,
+  newMemberOf,
+  recordRows,
+  renderFor,
+  sameName,
+  tarifChoices,
+  withDateTag,
 } from "./record";
 
 describe("record", () => {
   it("lists the known fields only, with the payer when it is someone else", () => {
-    const rows = recordRows(member({ first_name: "Léa", last_name: "DUPONT", birth_date: "2012-05-04", age: 14, city: "Jonage", zip_code: "69330",
-      payer: "Paul DUPONT", payer_email: "paul@example.org", amount: 180 }));
+    const rows = recordRows(
+      member({
+        first_name: "Léa",
+        last_name: "DUPONT",
+        birth_date: "2012-05-04",
+        age: 14,
+        city: "Jonage",
+        zip_code: "69330",
+        payer: "Paul DUPONT",
+        payer_email: "paul@example.org",
+        amount: 180,
+      }),
+    );
     expect(rows.map((r) => `${r.label}=${r.value}`)).toEqual([
-      "Date de naissance=04/05/2012 (14 ans)", "Adresse=69330 Jonage", "Payeur=Paul DUPONT (paul@example.org)", "Montant réglé=180 €",
+      "Date de naissance=04/05/2012 (14 ans)",
+      "Adresse=69330 Jonage",
+      "Payeur=Paul DUPONT (paul@example.org)",
+      "Montant réglé=180 €",
     ]);
     expect(recordRows(member({ first_name: "Léa", last_name: "DUPONT", payer: "Léa DUPONT" }))).toEqual([]);
   });
@@ -18,7 +43,10 @@ describe("record", () => {
   it("offers the slots' tariffs, the members' ones and the licence alone", () => {
     const choices = tarifChoices(
       [{ groupe: "Loisir adultes", tarifs: ["Adulte loisir"], categorie_age: "", type: "" }],
-      [member({ tarif_name: "Ancien tarif" }), member({ tarif_name: "Adulte loisir", creneau_groupe: "Loisir adultes", creneau_details: "Lundi 19h" })],
+      [
+        member({ tarif_name: "Ancien tarif" }),
+        member({ tarif_name: "Adulte loisir", creneau_groupe: "Loisir adultes", creneau_details: "Lundi 19h" }),
+      ],
     );
     expect(choices).toEqual([
       { tarif: "Adulte loisir", detail: "Loisir adultes" },
@@ -31,7 +59,7 @@ describe("record", () => {
 describe("edit and add", () => {
   it("sends only what changed, with a line per change", () => {
     const m = member({ phone: "06 12 34 56 78", badge_rouge: "x", status_norm: "Validé", commentaires_correctif: "" });
-    expect(changesOf(m, draftOf(m))).toEqual({ fields: {}, lines: [] });  // "x" reads as Oui: no change
+    expect(changesOf(m, draftOf(m))).toEqual({ fields: {}, lines: [] }); // "x" reads as Oui: no change
     const d = { ...draftOf(m), phone: "06 99 99 99 99", badge_rouge: "Non" as const, commentaires_correctif: "Certificat remis" };
     expect(changesOf(m, d)).toEqual({
       fields: { phone: "06 99 99 99 99", badge_rouge: "Non", commentaires_correctif: "Certificat remis" },
@@ -40,8 +68,16 @@ describe("edit and add", () => {
   });
 
   it("builds the new member: last name in capitals, French decimal amount", () => {
-    const d = { ...draftOf(undefined, "Adulte loisir"), last_name: " dupont ", first_name: "Léa", birth_date: "2012-05-04", amount: "12,50" };
-    expect(newMemberOf(d)).toEqual(expect.objectContaining({ last_name: "DUPONT", first_name: "Léa", amount: 12.5, tarif_name: "Adulte loisir", status: "Validé" }));
+    const d = {
+      ...draftOf(undefined, "Adulte loisir"),
+      last_name: " dupont ",
+      first_name: "Léa",
+      birth_date: "2012-05-04",
+      amount: "12,50",
+    };
+    expect(newMemberOf(d)).toEqual(
+      expect.objectContaining({ last_name: "DUPONT", first_name: "Léa", amount: 12.5, tarif_name: "Adulte loisir", status: "Validé" }),
+    );
   });
 
   it("finds a member of the same name, accents and case ignored", () => {
@@ -61,7 +97,9 @@ describe("e-mail and certificate", () => {
   const m = member({ first_name: "LÉA-MARIE", last_name: "dupont", licence_ffme: "123456", amount: 180, season_name: "2026-2027" });
 
   it("replaces the variables, names case-insensitive, unknown ones kept", () => {
-    expect(renderFor("{Prénom} {NOM} {num_licence} {montant} {saison} {inconnue}", m)).toBe("Léa-Marie DUPONT 123456 180 € 2026-2027 {inconnue}");
+    expect(renderFor("{Prénom} {NOM} {num_licence} {montant} {saison} {inconnue}", m)).toBe(
+      "Léa-Marie DUPONT 123456 180 € 2026-2027 {inconnue}",
+    );
   });
 
   it("offers the default certificate template when the club has none named « échéance »", () => {
@@ -76,6 +114,8 @@ describe("e-mail and certificate", () => {
     expect(attestationProblem(member({ amount: 50, status_norm: "Annulé" }))).toBe("la commande est annulée");
     expect(attestationRecipient(member({ payer_email: " p@x.org ", email_primary: "m@x.org" }))).toBe("p@x.org");
     expect(attestationRecipient(member({ email_primary: "m@x.org" }))).toBe("m@x.org");
-    expect(attestationFileName(member({ last_name: "DE LA FONTAINE", first_name: "élodie" }))).toBe("Attestation_DE_LA_FONTAINE_Elodie.pdf");
+    expect(attestationFileName(member({ last_name: "DE LA FONTAINE", first_name: "élodie" }))).toBe(
+      "Attestation_DE_LA_FONTAINE_Elodie.pdf",
+    );
   });
 });

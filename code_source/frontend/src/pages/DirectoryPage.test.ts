@@ -20,8 +20,16 @@ const ACTIVE: MemberList = {
   members: [
     member({ user_id: 2, purchase_id: 12, last_name: "MARTIN", first_name: "Max", tarif_name: "Adulte loisir", status_norm: "Annulé" }),
     member({
-      user_id: 1, purchase_id: 11, last_name: "DUPONT", first_name: "Léa", tarif_name: "Adulte loisir", status_norm: "Validé",
-      phone: "+33 6 12 34 56 78", emergency1_name: "Paul", emergency1_phone: "06 00 00 00 01", health_commitment: "Oui",
+      user_id: 1,
+      purchase_id: 11,
+      last_name: "DUPONT",
+      first_name: "Léa",
+      tarif_name: "Adulte loisir",
+      status_norm: "Validé",
+      phone: "+33 6 12 34 56 78",
+      emergency1_name: "Paul",
+      emergency1_phone: "06 00 00 00 01",
+      health_commitment: "Oui",
     }),
     member({ user_id: 3, purchase_id: 13, last_name: "PETIT", first_name: "Zoé", tarif_name: "Attente", status_norm: "Validé" }),
   ],
@@ -164,7 +172,9 @@ describe("DirectoryPage", () => {
   it("wipes the device's copy when the server refuses the list (403)", async () => {
     render(coach, fakeApi().api, store);
     await settle();
-    const refusing: ApiFetch = vi.fn(async (url: string) => (url.startsWith("/api/members") ? json({ status: "error" }, 403) : json({ seasons: [], active: "" })));
+    const refusing: ApiFetch = vi.fn(async (url: string) =>
+      url.startsWith("/api/members") ? json({ status: "error" }, 403) : json({ seasons: [], active: "" }),
+    );
     const { wrapper } = render(coach, refusing, store);
     await settle();
     expect(await store.load("directory", USER.uid)).toBeNull();

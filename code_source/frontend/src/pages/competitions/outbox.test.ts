@@ -37,21 +37,44 @@ describe("outbox", () => {
   it("queues a change, replaces it by key, and cancels it when back to the server's value", async () => {
     const outbox = createOutbox(store, server().send, clock);
     await outbox.queue(UID, COMP, LEO, "selectionne", false);
-    expect(outbox.pending(10, 1, "selectionne")).toMatchObject({ value: false, unchanged_since: "t1", label: "MARTIN Léo (Coupe)", queuedAt: 1000 });
+    expect(outbox.pending(10, 1, "selectionne")).toMatchObject({
+      value: false,
+      unchanged_since: "t1",
+      label: "MARTIN Léo (Coupe)",
+      queuedAt: 1000,
+    });
     await outbox.queue(UID, COMP, LEO, "present", true);
-    await outbox.queue(UID, COMP, LEO, "present", false);  // back to the server's value
+    await outbox.queue(UID, COMP, LEO, "present", false); // back to the server's value
     expect([...outbox.changes.value.keys()]).toEqual([outboxKey(10, 1, "selectionne")]);
     expect((await store.queued(UID)).map((e) => e.key)).toEqual(["10:1:selectionne"]);
 
     await outbox.queue(UID, COMP, ZOE, "selectionne", true);
-    await outbox.queue(UID, COMP, LEO, "selectionne", false);  // again: keeps its place in the queue
+    await outbox.queue(UID, COMP, LEO, "selectionne", false); // again: keeps its place in the queue
     expect(outbox.pending(10, 1, "selectionne")!.queuedAt).toBe(1000);
   });
 
   it("reads what the former page queued and sends it oldest first", async () => {
     // As web/competitions.html wrote it
-    await store.queue(UID, { key: "10:2:selectionne", uid: UID, flag: "selectionne", value: true, url: "/api/competitions/10/participants/2", unchanged_since: "t2", label: "DURAND Zoé (Coupe)", queuedAt: 5 });
-    await store.queue(UID, { key: "10:1:selectionne", uid: UID, flag: "selectionne", value: false, url: "/api/competitions/10/participants/1", unchanged_since: "t1", label: "MARTIN Léo (Coupe)", queuedAt: 2 });
+    await store.queue(UID, {
+      key: "10:2:selectionne",
+      uid: UID,
+      flag: "selectionne",
+      value: true,
+      url: "/api/competitions/10/participants/2",
+      unchanged_since: "t2",
+      label: "DURAND Zoé (Coupe)",
+      queuedAt: 5,
+    });
+    await store.queue(UID, {
+      key: "10:1:selectionne",
+      uid: UID,
+      flag: "selectionne",
+      value: false,
+      url: "/api/competitions/10/participants/1",
+      unchanged_since: "t1",
+      label: "MARTIN Léo (Coupe)",
+      queuedAt: 2,
+    });
     const { send, sent } = server();
     const outbox = createOutbox(store, send, clock);
     await outbox.load(UID);
@@ -64,7 +87,7 @@ describe("outbox", () => {
     ]);
     expect(outbox.changes.value.size).toBe(0);
     expect(await store.queued(UID)).toEqual([]);
-    expect(await outbox.replay(UID)).toBeNull();  // nothing left
+    expect(await outbox.replay(UID)).toBeNull(); // nothing left
   });
 
   it("sends a second change of the same competitor with the updated_at the first produced", async () => {
@@ -73,7 +96,10 @@ describe("outbox", () => {
     await outbox.queue(UID, COMP, LEO, "selectionne", false);
     await outbox.queue(UID, COMP, LEO, "present", true);
     await outbox.replay(UID);
-    expect(sent.map((s) => s.body)).toEqual([{ selectionne: false, unchanged_since: "t1" }, { present: true, unchanged_since: "t100" }]);
+    expect(sent.map((s) => s.body)).toEqual([
+      { selectionne: false, unchanged_since: "t1" },
+      { present: true, unchanged_since: "t100" },
+    ]);
   });
 
   it("drops a refused change with the server's reason and goes on", async () => {
@@ -86,12 +112,18 @@ describe("outbox", () => {
     await outbox.queue(UID, COMP, ZOE, "selectionne", true);
     const result = await outbox.replay(UID);
     expect(result).toEqual({
-      done: 2, denied: false,
-      refused: ["MARTIN Léo (Coupe) : modifié entre-temps sur un autre appareil", "DURAND Zoé (Coupe) : a payé entre-temps : passez par l'annulation"],
+      done: 2,
+      denied: false,
+      refused: [
+        "MARTIN Léo (Coupe) : modifié entre-temps sur un autre appareil",
+        "DURAND Zoé (Coupe) : a payé entre-temps : passez par l'annulation",
+      ],
     });
     expect(outbox.changes.value.size).toBe(0);
     expect(await store.queued(UID)).toEqual([]);
-    expect(replayMessage(result!)).toBe("⚠️ 2 modifications faites hors ligne refusées : MARTIN Léo (Coupe) : modifié entre-temps sur un autre appareil ; DURAND Zoé (Coupe) : a payé entre-temps : passez par l'annulation");
+    expect(replayMessage(result!)).toBe(
+      "⚠️ 2 modifications faites hors ligne refusées : MARTIN Léo (Coupe) : modifié entre-temps sur un autre appareil ; DURAND Zoé (Coupe) : a payé entre-temps : passez par l'annulation",
+    );
   });
 
   it.each([
@@ -105,7 +137,7 @@ describe("outbox", () => {
     await outbox.queue(UID, COMP, ZOE, "selectionne", true);
     await outbox.queue(UID, COMP, LEO, "present", true);
     expect(await outbox.replay(UID)).toEqual({ done: 1, refused: [], denied: false });
-    expect(sent).toHaveLength(2);  // stopped at the failure
+    expect(sent).toHaveLength(2); // stopped at the failure
     expect([...outbox.changes.value.keys()]).toEqual(["10:2:selectionne", "10:1:present"]);
     expect((await store.queued(UID)).length).toBe(2);
   });
@@ -119,8 +151,24 @@ describe("outbox", () => {
   });
 
   it("refuses an entry it does not allow, without sending it", async () => {
-    await store.queue(UID, { key: "x", uid: UID, flag: "statut_paiement", value: "paye", url: "/api/competitions/10/participants/1", label: "MARTIN Léo", queuedAt: 1 });
-    await store.queue(UID, { key: "y", uid: UID, flag: "selectionne", value: true, url: "/api/competitions/10", label: "Coupe", queuedAt: 2 });
+    await store.queue(UID, {
+      key: "x",
+      uid: UID,
+      flag: "statut_paiement",
+      value: "paye",
+      url: "/api/competitions/10/participants/1",
+      label: "MARTIN Léo",
+      queuedAt: 1,
+    });
+    await store.queue(UID, {
+      key: "y",
+      uid: UID,
+      flag: "selectionne",
+      value: true,
+      url: "/api/competitions/10",
+      label: "Coupe",
+      queuedAt: 2,
+    });
     const { send, sent } = server();
     const outbox = createOutbox(store, send, clock);
     await outbox.load(UID);
@@ -137,8 +185,8 @@ describe("outbox", () => {
     await outbox.queue(UID, COMP, LEO, "present", true);
     const replay = outbox.replay(UID);
     await vi.waitFor(() => expect(send).toHaveBeenCalled());
-    await outbox.queue(UID, COMP, LEO, "present", true);  // changed again (same value, new entry)
-    expect(await outbox.replay(UID)).toBeNull();  // already sending
+    await outbox.queue(UID, COMP, LEO, "present", true); // changed again (same value, new entry)
+    expect(await outbox.replay(UID)).toBeNull(); // already sending
     release();
     await replay;
     expect(outbox.pending(10, 1, "present")).toBeDefined();

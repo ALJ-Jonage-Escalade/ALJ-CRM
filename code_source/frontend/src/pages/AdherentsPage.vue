@@ -27,9 +27,34 @@ import MemberEmail from "./adherents/MemberEmail.vue";
 import MemberForm from "./adherents/MemberForm.vue";
 import MemberRecord from "./adherents/MemberRecord.vue";
 import {
-  allowedTarifs, checkAll, collator, countSummary, creneauItems, csvName, csvRows, dateValue, diplomes,
-  diplomeWeight, filterMembers, fmtDay, groupChecked, loadFilters, loadPanelOpen, OTHER_PREFIX, otherChecked, recordMember, recordQuery, saveFilters, savePanelOpen,
-  statusChips, statusClass, tarifCounts, telHref, type CreneauItem, type Member, type MemberList,
+  allowedTarifs,
+  checkAll,
+  collator,
+  countSummary,
+  creneauItems,
+  csvName,
+  csvRows,
+  dateValue,
+  diplomes,
+  diplomeWeight,
+  filterMembers,
+  fmtDay,
+  groupChecked,
+  loadFilters,
+  loadPanelOpen,
+  OTHER_PREFIX,
+  otherChecked,
+  recordMember,
+  recordQuery,
+  saveFilters,
+  savePanelOpen,
+  statusChips,
+  statusClass,
+  tarifCounts,
+  telHref,
+  type CreneauItem,
+  type Member,
+  type MemberList,
 } from "./adherents/members";
 import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft, type Template } from "./adherents/record";
 
@@ -43,7 +68,9 @@ watch(filters, (f) => saveFilters(f), { deep: true });
 
 // Data: the seasons, and the members of the chosen season (the active one when none is chosen)
 const seasons = useSyncedResource<Schemas["Seasons"]>("seasons", "/api/seasons", { offline: false, intervalMs: 60_000 });
-const membersUrl = computed(() => (filters.value.season ? `/api/members?${new URLSearchParams({ season: filters.value.season })}` : "/api/members"));
+const membersUrl = computed(() =>
+  filters.value.season ? `/api/members?${new URLSearchParams({ season: filters.value.season })}` : "/api/members",
+);
 const members = useSyncedResource<MemberList>("members", membersUrl, { offline: false });
 // A season that no longer exists (remembered from an earlier visit): back to the active one
 watch(members.httpStatus, (status) => {
@@ -58,7 +85,9 @@ const counts = computed(() => tarifCounts(all.value, items.value));
 const otherTarifs = computed(() => Object.keys(counts.value.others).sort((a, b) => a.localeCompare(b, "fr")));
 const shown = computed(() => filterMembers(all.value, filters.value, allowedTarifs(items.value, counts.value, filters.value)));
 const chips = computed(() => statusChips(all.value));
-const summary = computed(() => (membersList.value ? countSummary(shown.value.length, all.value.length, season.value) : "Chargement des données…"));
+const summary = computed(() =>
+  membersList.value ? countSummary(shown.value.length, all.value.length, season.value) : "Chargement des données…",
+);
 
 const TIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
 const syncInfo = computed(() => {
@@ -99,10 +128,22 @@ const resetKey = computed(() => [season.value, filters.value.status, filters.val
 const COLUMNS: DataColumn<Member>[] = [
   { id: "last_name", label: "Nom", value: (m) => m.last_name, class: "font-bold" },
   { id: "first_name", label: "Prénom", value: (m) => m.first_name },
-  { id: "order_date", label: "Date d'inscription", value: (m) => fmtDay(m.order_date), compare: (a, b) => dateValue(a.order_date) - dateValue(b.order_date), descFirst: true, class: "whitespace-nowrap text-slate-500" },
   {
-    id: "diplome", label: "Diplôme", title: "Diplômes & autonomie (🔴 Badge rouge, 🧗 Autonomie bloc, 🟠 Passeport orange)", value: (m) => diplomeWeight(m),
-    compare: (a, b) => diplomeWeight(a) - diplomeWeight(b) || collator.compare(a.last_name, b.last_name), descFirst: true, class: "text-center",
+    id: "order_date",
+    label: "Date d'inscription",
+    value: (m) => fmtDay(m.order_date),
+    compare: (a, b) => dateValue(a.order_date) - dateValue(b.order_date),
+    descFirst: true,
+    class: "whitespace-nowrap text-slate-500",
+  },
+  {
+    id: "diplome",
+    label: "Diplôme",
+    title: "Diplômes & autonomie (🔴 Badge rouge, 🧗 Autonomie bloc, 🟠 Passeport orange)",
+    value: (m) => diplomeWeight(m),
+    compare: (a, b) => diplomeWeight(a) - diplomeWeight(b) || collator.compare(a.last_name, b.last_name),
+    descFirst: true,
+    class: "text-center",
   },
   { id: "status_norm", label: "Statut", value: (m) => m.status_norm },
   { id: "creneau_groupe", label: "Créneau", value: (m) => m.creneau_groupe, class: "text-slate-500" },
@@ -139,7 +180,7 @@ async function syncNow(): Promise<void> {
 
 // ---------------------------------------------------------------- Member record (side panel)
 
-const queryText = (name: string) => (typeof route.query[name] === "string" ? (route.query[name] as string) : "");
+const queryText = (name: string) => (typeof route.query[name] === "string" ? route.query[name] : "");
 const recordId = computed(() => queryText("id"));
 // A record of another season (link): the list follows it
 watch(
@@ -164,9 +205,13 @@ const PANEL_HIDDEN_COLUMNS = ["city", "email_primary", "phone"];
 const panelOpen = ref(loadPanelOpen());
 watch(panelOpen, (open) => savePanelOpen(open));
 // A member chosen (row click, link, new member): the panel opens again
-watch(recordId, (id) => {
-  if (id) panelOpen.value = true;
-}, { immediate: true });
+watch(
+  recordId,
+  (id) => {
+    if (id) panelOpen.value = true;
+  },
+  { immediate: true },
+);
 
 function select(m: Member): void {
   void router.push({ query: recordQuery(m) });
@@ -176,7 +221,11 @@ function select(m: Member): void {
 type Mode = "none" | "edit" | "email" | "attestation";
 const mode = ref<Mode>("none");
 watch(selectedKey, () => (mode.value = "none"));
-const TITLES: Record<Exclude<Mode, "none">, string> = { edit: "✏️ Modifier la fiche", email: "✉️ E-mail à l'adhérent", attestation: "📄 Attestation de paiement" };
+const TITLES: Record<Exclude<Mode, "none">, string> = {
+  edit: "✏️ Modifier la fiche",
+  email: "✉️ E-mail à l'adhérent",
+  attestation: "📄 Attestation de paiement",
+};
 const actionOpen = computed({
   get: () => mode.value !== "none" && !!record.value,
   set: (open) => {
@@ -217,7 +266,7 @@ async function open(next: Mode): Promise<void> {
 function sent(message: string): void {
   toast.show(message);
   mode.value = "none";
-  void members.refresh();  // the certificate's sent date
+  void members.refresh(); // the certificate's sent date
 }
 
 // Edit and add
@@ -235,7 +284,9 @@ async function saveEdit(m: Member): Promise<void> {
   if (!confirm(`Valider les modifications pour ${m.first_name} ${m.last_name} ?\n\n• ${lines.join("\n• ")}`)) return;
   saving.value = true;
   try {
-    await unwrap(client.POST("/api/members/update", { body: { user_id: m.user_id, purchase_id: m.purchase_id, order_ref: m.order_ref, fields } }));
+    await unwrap(
+      client.POST("/api/members/update", { body: { user_id: m.user_id, purchase_id: m.purchase_id, order_ref: m.order_ref, fields } }),
+    );
     await members.refresh();
     mode.value = "none";
     toast.show(`✅ Fiche de ${m.first_name} ${m.last_name} mise à jour avec succès !`);
@@ -252,9 +303,13 @@ const adding = computed({
     if (!open) closeAdd();
   },
 });
-watch(adding, (now) => {
-  if (now) draft.value = draftOf(undefined, tarifs.value[0]?.tarif ?? "");
-}, { immediate: true });
+watch(
+  adding,
+  (now) => {
+    if (now) draft.value = draftOf(undefined, tarifs.value[0]?.tarif ?? "");
+  },
+  { immediate: true },
+);
 // Tariffs arrive with the list: the first one is chosen when the form opened before
 watch(tarifs, (now) => {
   if (adding.value && !draft.value.tarif_name && now[0]) draft.value.tarif_name = now[0].tarif;
@@ -263,7 +318,13 @@ watch(tarifs, (now) => {
 async function saveNew(): Promise<void> {
   const d = draft.value;
   const twin = sameName(all.value, d);
-  if (twin && !confirm(`⚠️ Un adhérent « ${twin.last_name} ${twin.first_name} » existe déjà pour la saison ${season.value}.\n\nVoulez-vous quand même créer cette nouvelle fiche ?`)) return;
+  if (
+    twin &&
+    !confirm(
+      `⚠️ Un adhérent « ${twin.last_name} ${twin.first_name} » existe déjà pour la saison ${season.value}.\n\nVoulez-vous quand même créer cette nouvelle fiche ?`,
+    )
+  )
+    return;
   saving.value = true;
   try {
     const created = await unwrap(client.POST("/api/members/create", { body: { season: season.value, fields: newMemberOf(d) } }));
@@ -283,7 +344,8 @@ const chip = (active: boolean) => [
   "cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold",
   active ? "border-accent bg-accent text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
 ];
-const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 no-underline hover:bg-slate-300";
+const linkButton =
+  "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 no-underline hover:bg-slate-300";
 </script>
 
 <template>
@@ -298,7 +360,9 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
           @change="chooseSeason(($event.target as HTMLSelectElement).value)"
         >
           <option v-if="!seasons.data.value && season" :value="season">{{ season }}</option>
-          <option v-for="s in seasons.data.value?.seasons ?? []" :key="s" :value="s">{{ s }}{{ s === seasons.data.value?.active ? " (active)" : "" }}</option>
+          <option v-for="s in seasons.data.value?.seasons ?? []" :key="s" :value="s">
+            {{ s }}{{ s === seasons.data.value?.active ? " (active)" : "" }}
+          </option>
         </select>
         <input
           v-model="filters.search"
@@ -307,11 +371,26 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
           aria-label="Rechercher un adhérent"
           placeholder="🔍 Rechercher (nom, prénom, ville, tarif, licence, e-mail, tél.)…"
           class="min-w-0 flex-1 basis-60 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[12.5px]"
+        />
+        <UiButton
+          :variant="filterOpen ? 'primary' : 'muted'"
+          small
+          data-testid="filter-toggle"
+          :aria-expanded="filterOpen"
+          @click="filterOpen = !filterOpen"
+          >📂 Créneaux / Tarifs</UiButton
         >
-        <UiButton :variant="filterOpen ? 'primary' : 'muted'" small data-testid="filter-toggle" :aria-expanded="filterOpen" @click="filterOpen = !filterOpen">📂 Créneaux / Tarifs</UiButton>
-        <UiButton variant="muted" small data-testid="export-csv" title="Télécharger la liste affichée en fichier CSV" @click="exportCsv">📥 Export CSV</UiButton>
+        <UiButton variant="muted" small data-testid="export-csv" title="Télécharger la liste affichée en fichier CSV" @click="exportCsv"
+          >📥 Export CSV</UiButton
+        >
         <a href="/bureau/outils?tab=ffme" :class="linkButton" title="Ouvrir l'export officiel FFME">🇫🇷 Export FFME</a>
-        <a v-if="role === 'admin'" href="/bureau/outils?tab=ffme-import" :class="linkButton" title="Importer la liste Excel des licenciés FFME">📥 Import FFME</a>
+        <a
+          v-if="role === 'admin'"
+          href="/bureau/outils?tab=ffme-import"
+          :class="linkButton"
+          title="Importer la liste Excel des licenciés FFME"
+          >📥 Import FFME</a
+        >
         <UiButton
           v-if="!panelOpen"
           variant="muted"
@@ -321,15 +400,25 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
           :aria-expanded="false"
           title="Afficher la fiche de l'adhérent sélectionné"
           @click="panelOpen = true"
-        >⇤ Fiche</UiButton>
-        <UiButton variant="muted" small data-testid="sync-now" :busy="syncing && 'Synchro…'" title="Synchroniser maintenant la base du serveur avec Firestore" @click="syncNow">🔄 Synchroniser BDD</UiButton>
+          >⇤ Fiche</UiButton
+        >
+        <UiButton
+          variant="muted"
+          small
+          data-testid="sync-now"
+          :busy="syncing && 'Synchro…'"
+          title="Synchroniser maintenant la base du serveur avec Firestore"
+          @click="syncNow"
+          >🔄 Synchroniser BDD</UiButton
+        >
         <RouterLink
           v-if="role === 'admin'"
           :to="{ query: { ...route.query, ajout: '1' } }"
           data-testid="member-add"
           class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-bold text-white no-underline hover:bg-accent-dark"
           title="Ajouter un adhérent à la saison affichée"
-        >➕ Ajouter un adhérent</RouterLink>
+          >➕ Ajouter un adhérent</RouterLink
+        >
       </div>
 
       <div v-if="filterOpen" data-testid="filter-box" class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -340,23 +429,46 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
             <UiButton variant="muted" small data-testid="filter-none" @click="setAll(false)">Tout décocher</UiButton>
           </div>
         </div>
-        <p class="mb-2 text-[11.5px] text-slate-500">Cochez ou décochez les groupes pour affiner l'affichage. Par défaut, les listes d'attente sont exclues.</p>
+        <p class="mb-2 text-[11.5px] text-slate-500">
+          Cochez ou décochez les groupes pour affiner l'affichage. Par défaut, les listes d'attente sont exclues.
+        </p>
         <div class="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-3">
           <template v-for="it in items" :key="`${it.kind}:${it.raw}`">
             <div v-if="it.kind === 'section'" class="col-span-full mt-2 text-xs font-bold text-slate-700">📁 {{ it.label }}</div>
-            <div v-else-if="it.kind === 'sub'" class="col-span-full mt-1 pl-2 text-[11.5px] font-semibold text-slate-500">📂 {{ it.label }}</div>
+            <div v-else-if="it.kind === 'sub'" class="col-span-full mt-1 pl-2 text-[11.5px] font-semibold text-slate-500">
+              📂 {{ it.label }}
+            </div>
             <label v-else data-testid="filter-group" class="flex cursor-pointer items-center gap-2 py-0.5 text-[12.5px]">
-              <input type="checkbox" class="accent-accent" :checked="groupChecked(filters, it)" @change="toggleGroup(it, ($event.target as HTMLInputElement).checked)">
+              <input
+                type="checkbox"
+                class="accent-accent"
+                :checked="groupChecked(filters, it)"
+                @change="toggleGroup(it, ($event.target as HTMLInputElement).checked)"
+              />
               <span class="min-w-0 flex-1 truncate" :title="it.raw">{{ it.label }}</span>
-              <span data-testid="filter-count" class="rounded-full bg-slate-200 px-2 text-[11px] font-semibold text-slate-600">{{ counts.groups[it.raw] ?? 0 }}</span>
+              <span data-testid="filter-count" class="rounded-full bg-slate-200 px-2 text-[11px] font-semibold text-slate-600">{{
+                counts.groups[it.raw] ?? 0
+              }}</span>
             </label>
           </template>
           <template v-if="otherTarifs.length">
             <div class="col-span-full mt-2 text-xs font-bold text-slate-700">📁 Autres tarifs (hors créneau)</div>
-            <label v-for="t in otherTarifs" :key="t" data-testid="filter-group" class="flex cursor-pointer items-center gap-2 py-0.5 text-[12.5px]">
-              <input type="checkbox" class="accent-accent" :checked="otherChecked(filters, t)" @change="toggleOther(t, ($event.target as HTMLInputElement).checked)">
+            <label
+              v-for="t in otherTarifs"
+              :key="t"
+              data-testid="filter-group"
+              class="flex cursor-pointer items-center gap-2 py-0.5 text-[12.5px]"
+            >
+              <input
+                type="checkbox"
+                class="accent-accent"
+                :checked="otherChecked(filters, t)"
+                @change="toggleOther(t, ($event.target as HTMLInputElement).checked)"
+              />
               <span class="min-w-0 flex-1 truncate">{{ t }}</span>
-              <span data-testid="filter-count" class="rounded-full bg-slate-200 px-2 text-[11px] font-semibold text-slate-600">{{ counts.others[t] }}</span>
+              <span data-testid="filter-count" class="rounded-full bg-slate-200 px-2 text-[11px] font-semibold text-slate-600">{{
+                counts.others[t]
+              }}</span>
             </label>
           </template>
         </div>
@@ -372,7 +484,9 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
             :aria-pressed="filters.status === c.value"
             :class="chip(filters.status === c.value)"
             @click="toggleStatus(c.value)"
-          >{{ c.label }} ({{ c.count }})</button>
+          >
+            {{ c.label }} ({{ c.count }})
+          </button>
         </div>
         <span data-testid="member-count" class="text-xs text-slate-500">{{ summary }}</span>
       </div>
@@ -394,7 +508,13 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
         :empty="membersList ? 'Aucun adhérent ne correspond aux filtres actifs.' : 'Chargement en cours…'"
       >
         <template #cell-last_name="{ row }">
-          <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="font-bold text-slate-800 no-underline hover:text-accent hover:underline" title="Ouvrir la fiche adhérent">{{ row.last_name }}</RouterLink>
+          <RouterLink
+            :to="{ query: recordQuery(row) }"
+            data-testid="member-record"
+            class="font-bold text-slate-800 no-underline hover:text-accent hover:underline"
+            title="Ouvrir la fiche adhérent"
+            >{{ row.last_name }}</RouterLink
+          >
         </template>
         <template #cell-order_date="{ value }">{{ value || "—" }}</template>
         <template #cell-diplome="{ row }">
@@ -402,7 +522,13 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
           <span v-if="!diplomes(row).length" class="text-slate-400">—</span>
         </template>
         <template #cell-status_norm="{ row }">
-          <span :class="['inline-block rounded-full px-2.5 py-0.5 text-[11.5px] font-bold whitespace-nowrap text-white', statusClass(row.status_norm)]">{{ row.status_norm || "—" }}</span>
+          <span
+            :class="[
+              'inline-block rounded-full px-2.5 py-0.5 text-[11.5px] font-bold whitespace-nowrap text-white',
+              statusClass(row.status_norm),
+            ]"
+            >{{ row.status_norm || "—" }}</span
+          >
         </template>
         <template #cell-creneau_groupe="{ value }">{{ value || "—" }}</template>
         <template #cell-city="{ value }">{{ value || "—" }}</template>
@@ -418,8 +544,12 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
 
         <template #card="{ row }">
           <div class="flex items-start justify-between gap-2">
-            <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="min-w-0 font-bold text-slate-800 no-underline">{{ row.last_name }} {{ row.first_name }}</RouterLink>
-            <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(row.status_norm)]">{{ row.status_norm || "—" }}</span>
+            <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="min-w-0 font-bold text-slate-800 no-underline"
+              >{{ row.last_name }} {{ row.first_name }}</RouterLink
+            >
+            <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(row.status_norm)]">{{
+              row.status_norm || "—"
+            }}</span>
           </div>
           <div class="mt-0.5 text-xs text-slate-500">
             {{ [row.creneau_groupe, row.city].filter(Boolean).join(" · ") || "—" }}
@@ -433,13 +563,35 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
         </template>
       </DataTable>
 
-      <UiSidePanel id="record-panel" v-model:open="panelOpen" title="👤 Fiche adhérent" class="order-first lg:order-none" data-testid="record-panel">
+      <UiSidePanel
+        id="record-panel"
+        v-model:open="panelOpen"
+        title="👤 Fiche adhérent"
+        class="order-first lg:order-none"
+        data-testid="record-panel"
+      >
         <p v-if="!record" data-testid="record-missing" class="text-[13px] text-slate-500">
-          {{ !recordReady ? "Chargement de la fiche…" : recordId ? `Adhérent introuvable dans la saison ${season}.` : "Aucun adhérent à afficher." }}
+          {{
+            !recordReady
+              ? "Chargement de la fiche…"
+              : recordId
+                ? `Adhérent introuvable dans la saison ${season}.`
+                : "Aucun adhérent à afficher."
+          }}
         </p>
-        <MemberRecord v-else :member="record" :admin="role === 'admin'" compact @email="open('email')" @attestation="open('attestation')" @edit="open('edit')">
+        <MemberRecord
+          v-else
+          :member="record"
+          :admin="role === 'admin'"
+          compact
+          @email="open('email')"
+          @attestation="open('attestation')"
+          @edit="open('edit')"
+        >
           <template #status>
-            <span :class="['rounded-full px-2.5 py-0.5 text-[11.5px] font-bold text-white', STATUS_CLASS_OF(record)]">{{ record.status_norm || "—" }}</span>
+            <span :class="['rounded-full px-2.5 py-0.5 text-[11.5px] font-bold text-white', STATUS_CLASS_OF(record)]">{{
+              record.status_norm || "—"
+            }}</span>
           </template>
         </MemberRecord>
       </UiSidePanel>
@@ -453,10 +605,32 @@ const linkButton = "inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-
       :xl="mode === 'attestation'"
       data-testid="record-dialog"
     >
-      <MemberEmail v-if="mode === 'email'" :member="record" :templates="templates" @sent="sent" @failed="(m) => toast.show(m, 9000)" @cancel="mode = 'none'" />
+      <MemberEmail
+        v-if="mode === 'email'"
+        :member="record"
+        :templates="templates"
+        @sent="sent"
+        @failed="(m) => toast.show(m, 9000)"
+        @cancel="mode = 'none'"
+      />
       <template v-else-if="role === 'admin'">
-        <MemberForm v-if="mode === 'edit'" v-model="draft" :adding="false" :tarifs="tarifs" :saving="saving" @save="saveEdit(record)" @cancel="mode = 'none'" />
-        <MemberAttestation v-else :member="record" :templates="templates" @sent="sent" @failed="(m) => toast.show(m, 9000)" @cancel="mode = 'none'" />
+        <MemberForm
+          v-if="mode === 'edit'"
+          v-model="draft"
+          :adding="false"
+          :tarifs="tarifs"
+          :saving="saving"
+          @save="saveEdit(record)"
+          @cancel="mode = 'none'"
+        />
+        <MemberAttestation
+          v-else
+          :member="record"
+          :templates="templates"
+          @sent="sent"
+          @failed="(m) => toast.show(m, 9000)"
+          @cancel="mode = 'none'"
+        />
       </template>
     </UiDialog>
 

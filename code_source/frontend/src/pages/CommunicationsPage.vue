@@ -10,7 +10,15 @@ import UiToast from "../components/ui/UiToast.vue";
 import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText, unwrap } from "../lib/client";
 import EmailPreview from "./communications/EmailPreview.vue";
-import { DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, initialTemplate, newNameError, newTemplate, preview, type Template } from "./communications/editor";
+import {
+  DEFAULT_SENDER_EMAIL,
+  DEFAULT_SENDER_NAME,
+  initialTemplate,
+  newNameError,
+  newTemplate,
+  preview,
+  type Template,
+} from "./communications/editor";
 import TemplateForm from "./communications/TemplateForm.vue";
 
 const client = inject(CLIENT_KEY)!;
@@ -155,7 +163,9 @@ onMounted(() => {
           <h2 class="mb-2.5 text-[15px] font-bold">📄 Modèle d'e-mail</h2>
           <div class="flex flex-wrap items-end gap-2">
             <div class="min-w-48 flex-1">
-              <label for="template-select" class="mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase">Sélectionner un modèle</label>
+              <label for="template-select" class="mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase"
+                >Sélectionner un modèle</label
+              >
               <select
                 id="template-select"
                 data-testid="template-select"
@@ -169,13 +179,21 @@ onMounted(() => {
             </div>
             <div class="flex gap-1.5">
               <UiButton variant="muted" data-testid="template-new" @click="openNew">➕ Nouveau</UiButton>
-              <UiButton variant="danger" :busy="deleting && 'Suppression…'" :disabled="!selected" data-testid="template-delete" @click="remove">
+              <UiButton
+                variant="danger"
+                :busy="deleting && 'Suppression…'"
+                :disabled="!selected"
+                data-testid="template-delete"
+                @click="remove"
+              >
                 🗑️ Supprimer
               </UiButton>
             </div>
           </div>
           <p v-if="loadError" class="mt-2.5 text-[13px] text-red-600">❌ {{ loadError }}</p>
-          <p v-else-if="loaded && !templates.length" class="mt-2.5 text-[13px] text-slate-500">Aucun modèle pour l'instant : créez-en un avec « Nouveau ».</p>
+          <p v-else-if="loaded && !templates.length" class="mt-2.5 text-[13px] text-slate-500">
+            Aucun modèle pour l'instant : créez-en un avec « Nouveau ».
+          </p>
         </UiCard>
 
         <TemplateForm v-if="draft" v-model="draft" v-model:signature="signature" :saving="saving" @save="save" @invalid="toast.show" />
@@ -184,9 +202,13 @@ onMounted(() => {
           <form class="flex flex-col gap-2" @submit.prevent="saveWhatsapp">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-[15px] font-bold"><label for="whatsapp">📱 Texte d'invitation WhatsApp</label></h2>
-              <UiButton type="submit" variant="muted" small :busy="savingWhatsapp && 'Enregistrement…'" data-testid="whatsapp-save">💾 Enregistrer WhatsApp</UiButton>
+              <UiButton type="submit" variant="muted" small :busy="savingWhatsapp && 'Enregistrement…'" data-testid="whatsapp-save"
+                >💾 Enregistrer WhatsApp</UiButton
+              >
             </div>
-            <p class="text-[11.5px] text-slate-500">Modèle d'invitation envoyé pour rejoindre le groupe WhatsApp du créneau ou de la compétition :</p>
+            <p class="text-[11.5px] text-slate-500">
+              Modèle d'invitation envoyé pour rejoindre le groupe WhatsApp du créneau ou de la compétition :
+            </p>
             <textarea
               id="whatsapp"
               v-model="whatsapp"
@@ -207,7 +229,9 @@ onMounted(() => {
 
     <UiDialog v-model:open="creating" title="➕ Nouveau modèle d'e-mail" data-testid="new-template-dialog">
       <form novalidate @submit.prevent="create">
-        <label for="new-template-name" class="mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase">Nom du nouveau modèle *</label>
+        <label for="new-template-name" class="mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase"
+          >Nom du nouveau modèle *</label
+        >
         <input
           id="new-template-name"
           v-model="newName"
@@ -215,7 +239,7 @@ onMounted(() => {
           data-testid="new-template-name"
           placeholder="Ex : Rappel stage vacances…"
           class="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-[13px]"
-        >
+        />
         <div class="mt-4 flex justify-end gap-2">
           <UiButton variant="muted" @click="creating = false">Annuler</UiButton>
           <UiButton type="submit" :busy="creatingBusy && 'Création…'" data-testid="new-template-create">Créer le modèle</UiButton>

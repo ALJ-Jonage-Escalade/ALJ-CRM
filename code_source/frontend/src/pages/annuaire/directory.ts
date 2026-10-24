@@ -6,10 +6,33 @@ import { normKey, type Creneau, type Member, type MemberList } from "../adherent
 import { fmtDay } from "../adherents/members";
 
 const FIELDS = [
-  "user_id", "purchase_id", "season_name", "last_name", "first_name", "birth_date", "tarif_name", "creneau_groupe", "status_norm",
-  "address", "zip_code", "city", "phone", "email_primary", "email_secondary", "licence_ffme",
-  "emergency1_name", "emergency1_phone", "emergency2_name", "emergency2_phone",
-  "photo_auth", "badge_rouge", "autonomie_bloc", "passeport_orange", "raw_passports", "payer", "payer_email",
+  "user_id",
+  "purchase_id",
+  "season_name",
+  "last_name",
+  "first_name",
+  "birth_date",
+  "tarif_name",
+  "creneau_groupe",
+  "status_norm",
+  "address",
+  "zip_code",
+  "city",
+  "phone",
+  "email_primary",
+  "email_secondary",
+  "licence_ffme",
+  "emergency1_name",
+  "emergency1_phone",
+  "emergency2_name",
+  "emergency2_phone",
+  "photo_auth",
+  "badge_rouge",
+  "autonomie_bloc",
+  "passeport_orange",
+  "raw_passports",
+  "payer",
+  "payer_email",
 ] as const satisfies readonly (keyof Member)[];
 
 export type DirectoryMember = Pick<Member, (typeof FIELDS)[number]>;

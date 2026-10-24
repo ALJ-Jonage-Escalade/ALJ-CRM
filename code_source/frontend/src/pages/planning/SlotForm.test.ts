@@ -5,8 +5,17 @@ import { draftOf, type Slot, type SlotDraft } from "./slots";
 import SlotForm from "./SlotForm.vue";
 
 const SLOT: Slot = {
-  id: 7, groupe: "Autonome", type: "autonome", categorie_age: "Adultes", jour: "Lundi / Jeudi", horaires: "20:00 - 22:30",
-  encadrants: [], helloasso_tarifs: ["Autonome 2025"], whatsapp_link: "", naissance_min: "", naissance_max: "",
+  id: 7,
+  groupe: "Autonome",
+  type: "autonome",
+  categorie_age: "Adultes",
+  jour: "Lundi / Jeudi",
+  horaires: "20:00 - 22:30",
+  encadrants: [],
+  helloasso_tarifs: ["Autonome 2025"],
+  whatsapp_link: "",
+  naissance_min: "",
+  naissance_max: "",
 };
 
 function render(slot?: Slot, tarifs = ["Autonome adultes", "Licence sèche"]) {
@@ -15,7 +24,8 @@ function render(slot?: Slot, tarifs = ["Autonome adultes", "Licence sèche"]) {
     props: { modelValue: draft.value, "onUpdate:modelValue": (v: SlotDraft) => (draft.value = v), tarifs },
   });
   const byId = (id: string) => wrapper.find(`[data-testid="${id}"]`);
-  const tarif = (name: string) => wrapper.findAll<HTMLInputElement>('[data-testid="slot-tarifs"] input').find((i) => i.element.value === name)!;
+  const tarif = (name: string) =>
+    wrapper.findAll<HTMLInputElement>('[data-testid="slot-tarifs"] input').find((i) => i.element.value === name)!;
   return { wrapper, draft, byId, tarif };
 }
 
@@ -28,7 +38,13 @@ describe("SlotForm", () => {
     await byId("slot-encadrants").setValue("Remus Lupin, Rubeus Hagrid");
     await tarif("Licence sèche").setValue(true);
     await wrapper.find("form").trigger("submit");
-    expect(draft.value).toMatchObject({ groupe: "Loisir collège", jour: "Mercredi", type: "compétition", encadrants: "Remus Lupin, Rubeus Hagrid", helloasso_tarifs: ["Licence sèche"] });
+    expect(draft.value).toMatchObject({
+      groupe: "Loisir collège",
+      jour: "Mercredi",
+      type: "compétition",
+      encadrants: "Remus Lupin, Rubeus Hagrid",
+      helloasso_tarifs: ["Licence sèche"],
+    });
     expect(wrapper.emitted("save")).toHaveLength(1);
   });
 

@@ -33,7 +33,11 @@ export interface QueuedChange {
 }
 
 /** Sends one change; resolves with the competition as written, rejects with an ApiError. */
-export type SendChange = (competitionId: number, adherentId: number, body: { selectionne?: boolean; present?: boolean; unchanged_since: string }) => Promise<Competition>;
+export type SendChange = (
+  competitionId: number,
+  adherentId: number,
+  body: { selectionne?: boolean; present?: boolean; unchanged_since: string },
+) => Promise<Competition>;
 
 export interface ReplayResult {
   /** Changes taken out of the outbox (sent or refused). */
@@ -57,7 +61,8 @@ export interface Outbox {
   forget(): void;
 }
 
-export const outboxKey = (competitionId: number | string, adherentId: number | string, flag: string): string => `${competitionId}:${adherentId}:${flag}`;
+export const outboxKey = (competitionId: number | string, adherentId: number | string, flag: string): string =>
+  `${competitionId}:${adherentId}:${flag}`;
 
 export function refusalText(e: ApiError): string {
   if (e.code === "changed") return "modifié entre-temps sur un autre appareil";
@@ -96,7 +101,7 @@ export function replayMessage(r: ReplayResult): string {
 export function createOutbox(store: OfflineStore, send: SendChange, now: () => number = Date.now): Outbox {
   const changes = shallowRef<ReadonlyMap<string, QueuedChange>>(new Map());
   let replaying = false;
-  let generation = 0;  // forget() or another load: a replay or load still running is dropped
+  let generation = 0; // forget() or another load: a replay or load still running is dropped
 
   function set(update: (m: Map<string, QueuedChange>) => void): void {
     const next = new Map(changes.value);
@@ -122,7 +127,10 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
       return;
     }
     const change: QueuedChange = {
-      key, uid, flag, value,
+      key,
+      uid,
+      flag,
+      value,
       url: `/api/competitions/${competition.id}/participants/${adherentId}`,
       unchanged_since: String(participant.updated_at ?? ""),
       label: `${participant.nom ?? ""} ${participant.prenom ?? ""} (${competition.nom || "compétition"})`.trim(),

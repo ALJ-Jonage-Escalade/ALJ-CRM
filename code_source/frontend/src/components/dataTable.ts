@@ -63,7 +63,7 @@ export function columnDefs<T extends RowData>(columns: readonly DataColumn<T>[])
       sortDescFirst: c.descFirst ?? false,
       enableSorting: !c.fixed,
       sortUndefined: false,
-    } as ColumnDef<Features, T>;
+    };
   });
 }
 

@@ -3,7 +3,15 @@
    Every route declares meta.access (lib/access.ts); the guards send a coach who opens an admin page back to
    Accueil. Signed-out, unverified and non-staff visitors stay on the page, which shows the sign-in gate. */
 import { watch } from "vue";
-import { createRouter, createWebHistory, type RouteLocationNormalized, type RouteLocationRaw, type Router, type RouteRecordRaw, type RouterHistory } from "vue-router";
+import {
+  createRouter,
+  createWebHistory,
+  type RouteLocationNormalized,
+  type RouteLocationRaw,
+  type Router,
+  type RouteRecordRaw,
+  type RouterHistory,
+} from "vue-router";
 import type { Auth } from "./composables/auth";
 import { HOME, pageAccess, REFUSED_QUERY, verdict, type Access } from "./lib/access";
 import AccueilPage from "./pages/AccueilPage.vue";

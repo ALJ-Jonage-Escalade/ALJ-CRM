@@ -3,12 +3,26 @@ import type { Schemas } from "../../lib/client";
 import { batchReport, cacheFile, googleChecks, googleStatus, lastRun, lastSync, pendingText, syncReport } from "./view";
 
 const GOOGLE: Schemas["GoogleStatus"] = {
-  status: "disconnected", valid: false, configured: false, client_id_configured: false, refresh_token_present: false,
-  user_email: null, backend: "firestore", db_accessible: false, error: "",
+  status: "disconnected",
+  valid: false,
+  configured: false,
+  client_id_configured: false,
+  refresh_token_present: false,
+  user_email: null,
+  backend: "firestore",
+  db_accessible: false,
+  error: "",
 };
 const CACHE: Schemas["CloudDbStatus"] = {
-  status: "success", enabled: true, db_exists: true, db_filename: "database.db", db_size_kb: 812.5, member_count: 42,
-  pending: 0, last_error: "", last_sync: 0,
+  status: "success",
+  enabled: true,
+  db_exists: true,
+  db_filename: "database.db",
+  db_size_kb: 812.5,
+  member_count: 42,
+  pending: 0,
+  last_error: "",
+  last_sync: 0,
 };
 const AT = new Date(2026, 9, 22, 7, 5, 9);
 
@@ -23,9 +37,15 @@ describe("Paramètres view", () => {
 
   it("lists the three Google checks", () => {
     const check = (ok: boolean, message: string) => ({ ok, message });
-    const lines = googleChecks({ status: "warning", all_ok: false, results: { oauth_token: check(true, "a"), database: check(true, "b"), gmail: check(false, "c") } });
+    const lines = googleChecks({
+      status: "warning",
+      all_ok: false,
+      results: { oauth_token: check(true, "a"), database: check(true, "b"), gmail: check(false, "c") },
+    });
     expect(lines.map((l) => [l.ok, l.label, l.message])).toEqual([
-      [true, "Jeton OAuth2", "a"], [true, "Base de Données", "b"], [false, "Service Gmail API", "c"],
+      [true, "Jeton OAuth2", "a"],
+      [true, "Base de Données", "b"],
+      [false, "Service Gmail API", "c"],
     ]);
   });
 
@@ -55,11 +75,23 @@ describe("Paramètres view", () => {
   });
 
   it("reports a results batch", () => {
-    const comp = (nom: string, status: "found" | "pending", athletes: number) =>
-      ({ id: nom, nom, date: "", lieu: "", url: "", status, athletes: Array.from({ length: athletes }, () => ({})) });
+    const comp = (nom: string, status: "found" | "pending", athletes: number) => ({
+      id: nom,
+      nom,
+      date: "",
+      lieu: "",
+      url: "",
+      status,
+      athletes: Array.from({ length: athletes }, () => ({})),
+    });
     const report: Schemas["BatchReport"] = {
-      status: "success", executed_at: "", competitions_checked: 2, competitions_updated: 1, email_sent: true,
-      notification_email: "n@x.fr", details: [comp("Open de Lyon", "found", 3), comp("Coupe", "pending", 0)],
+      status: "success",
+      executed_at: "",
+      competitions_checked: 2,
+      competitions_updated: 1,
+      email_sent: true,
+      notification_email: "n@x.fr",
+      details: [comp("Open de Lyon", "found", 3), comp("Coupe", "pending", 0)],
     };
     expect(batchReport(report, AT)).toEqual([
       "🟢 Analyse MyCompet terminée à 07:05:09",
@@ -70,6 +102,8 @@ describe("Paramètres view", () => {
       "⏳ Coupe : pas encore de résultats publiés",
     ]);
     expect(batchReport({ ...report, email_sent: false }, AT)[3]).toBe("• E-mail récapitulatif expédié : Erreur envoi");
-    expect(batchReport({ ...report, email_sent: false, competitions_updated: 0 }, AT)[3]).toBe("• E-mail récapitulatif expédié : Non (aucun nouveau résultat)");
+    expect(batchReport({ ...report, email_sent: false, competitions_updated: 0 }, AT)[3]).toBe(
+      "• E-mail récapitulatif expédié : Non (aucun nouveau résultat)",
+    );
   });
 });

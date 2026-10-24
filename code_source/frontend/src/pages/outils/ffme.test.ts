@@ -1,13 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { applyConfirmation, fileLabel, isXlsx, manualMatches, memberLabel, readBase64, sortedMembers, type Licensee, type Member } from "./ffme";
+import {
+  applyConfirmation,
+  fileLabel,
+  isXlsx,
+  manualMatches,
+  memberLabel,
+  readBase64,
+  sortedMembers,
+  type Licensee,
+  type Member,
+} from "./ffme";
 
 const ROW = (nom: string): Licensee => ({
-  nom, prenom: "Tom", licence: "998877", birth_date: "22/07/2009", passeports: "Bleu", diplomes: "", document_sante: "Certificat",
+  nom,
+  prenom: "Tom",
+  licence: "998877",
+  birth_date: "22/07/2009",
+  passeports: "Bleu",
+  diplomes: "",
+  document_sante: "Certificat",
 });
 const MEMBER = (id: number, last_name: string, first_name: string, birth_date = ""): Member => ({ id, last_name, first_name, birth_date });
 
 describe("ffme import", () => {
-  it.each([["liste.xlsx", true], ["LISTE.XLSX", true], ["liste.xls", false], ["liste.csv", false]])("isXlsx(%s)", (name, ok) => {
+  it.each([
+    ["liste.xlsx", true],
+    ["LISTE.XLSX", true],
+    ["liste.xls", false],
+    ["liste.csv", false],
+  ])("isXlsx(%s)", (name, ok) => {
     expect(isXlsx(name)).toBe(ok);
   });
 

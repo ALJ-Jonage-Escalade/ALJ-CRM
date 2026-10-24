@@ -39,7 +39,10 @@ describe("authorizeUrl", () => {
     const url = new URL(authorizeUrl("https://alj.example", "abc"));
     expect(url.origin + url.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
-      redirect_uri: "https://alj.example/competitions", response_type: "token", state: "abc", prompt: "select_account",
+      redirect_uri: "https://alj.example/competitions",
+      response_type: "token",
+      state: "abc",
+      prompt: "select_account",
     });
   });
 });
@@ -65,7 +68,7 @@ describe("handleSignIn", () => {
     sessionStorage.setItem(AFTER_LOGIN_KEY, "/bureau/adherents?id=3");
     const deps = setup("/competitions#access_token=tok&state=s1&token_type=Bearer");
     expect(await handleSignIn(deps)).toBeNull();
-    expect(deps.replaceUrl).toHaveBeenCalledWith("/competitions");  // token out of the address
+    expect(deps.replaceUrl).toHaveBeenCalledWith("/competitions"); // token out of the address
     expect(deps.signInWithToken).toHaveBeenCalledWith("tok");
     expect(deps.navigate).toHaveBeenCalledWith("/bureau/adherents?id=3");
     expect(sessionStorage.getItem(AFTER_LOGIN_KEY)).toBeNull();

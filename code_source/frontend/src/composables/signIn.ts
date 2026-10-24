@@ -24,7 +24,8 @@ export interface SignInDeps {
 
 function errorText(e: unknown): string {
   const code = (e as { code?: unknown } | null)?.code;
-  if (code === "auth/unauthorized-domain") return "Domaine non autorisé : ajoutez l'adresse de ce site dans Firebase Authentication → Paramètres → Domaines autorisés.";
+  if (code === "auth/unauthorized-domain")
+    return "Domaine non autorisé : ajoutez l'adresse de ce site dans Firebase Authentication → Paramètres → Domaines autorisés.";
   if (code === "auth/operation-not-allowed") return "Le fournisseur Google n'est pas activé dans Firebase Authentication.";
   if (code === "auth/network-request-failed") return "Serveur injoignable : vérifiez la connexion réseau.";
   return e instanceof Error && e.message ? e.message : "Connexion impossible.";
@@ -47,7 +48,7 @@ export async function handleSignIn(deps: SignInDeps): Promise<string | null> {
     if (url.hash.length > 1) {
       const back = readFragment(url.hash, storage.getItem(STATE_KEY));
       if (back) {
-        deps.replaceUrl(here);  // the token does not stay in the address (history, bookmarks)
+        deps.replaceUrl(here); // the token does not stay in the address (history, bookmarks)
         storage.removeItem(STATE_KEY);
         if ("error" in back) return back.error;
         await deps.signInWithToken(back.token);

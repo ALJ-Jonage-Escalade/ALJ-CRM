@@ -55,7 +55,9 @@ afterEach(() => {
 
 function start(server: ReturnType<typeof fakeServer>, url: Ref<string | null> | string = "/api/members") {
   const scope = effectScope();
-  const resource = scope.run(() => useSyncedResource<{ n: number }>("members", url, { offline: false, intervalMs: 1000, fetch: server.fetch }))!;
+  const resource = scope.run(() =>
+    useSyncedResource<{ n: number }>("members", url, { offline: false, intervalMs: 1000, fetch: server.fetch }),
+  )!;
   return { scope, resource };
 }
 
@@ -74,7 +76,7 @@ describe("useSyncedResource (online)", () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(server.calls).toHaveLength(2);
     expect(server.calls[1]!.ifNoneMatch).not.toBeNull();
-    expect(resource.data.value).toBe(first);  // 304: same object, nothing re-rendered
+    expect(resource.data.value).toBe(first); // 304: same object, nothing re-rendered
 
     server.set("/api/members", { n: 2 });
     await vi.advanceTimersByTimeAsync(1000);
@@ -120,7 +122,7 @@ describe("useSyncedResource (online)", () => {
     await resource.refresh();
     expect(resource.data.value).toEqual({ n: 3 });
     resource.stop();
-    resource.set({ n: 4 });  // stopped: ignored
+    resource.set({ n: 4 }); // stopped: ignored
     expect(resource.data.value).toEqual({ n: 3 });
   });
 
@@ -170,7 +172,7 @@ describe("useSyncedResource (online)", () => {
     await flushPromises();
     expect([resource.state.value, resource.httpStatus.value, resource.data.value]).toEqual(["error", 404, null]);
     await vi.advanceTimersByTimeAsync(1000);
-    expect(server.calls).toHaveLength(2);  // still polling: a temporary error is retried
+    expect(server.calls).toHaveLength(2); // still polling: a temporary error is retried
 
     server.refuse("/api/members", 401);
     await vi.advanceTimersByTimeAsync(1000);
@@ -210,7 +212,14 @@ function startOffline(
 ) {
   const scope = effectScope();
   const resource = scope.run(() =>
-    useSyncedResource<{ n: number }>("directory", "/api/members", { offline: true, uid, select, intervalMs: 1000, fetch: server.fetch, store }),
+    useSyncedResource<{ n: number }>("directory", "/api/members", {
+      offline: true,
+      uid,
+      select,
+      intervalMs: 1000,
+      fetch: server.fetch,
+      store,
+    }),
   )!;
   return { scope, resource };
 }

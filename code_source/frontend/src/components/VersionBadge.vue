@@ -23,6 +23,10 @@ onMounted(async () => {
     class="cursor-pointer text-[11px] font-semibold text-amber-400 underline"
     :title="`Une nouvelle version (v${online}) est en ligne : toucher pour mettre à jour`"
     @click="forceUpdate"
-  >v{{ APP_VERSION }} ⬆ v{{ online }}</button>
-  <span v-else class="text-[11px] font-semibold text-slate-400" :title="`Version de l'application : v${APP_VERSION}`">v{{ APP_VERSION }}</span>
+  >
+    v{{ APP_VERSION }} ⬆ v{{ online }}
+  </button>
+  <span v-else class="text-[11px] font-semibold text-slate-400" :title="`Version de l'application : v${APP_VERSION}`"
+    >v{{ APP_VERSION }}</span
+  >
 </template>

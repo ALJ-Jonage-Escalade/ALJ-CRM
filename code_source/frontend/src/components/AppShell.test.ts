@@ -81,7 +81,7 @@ describe("AppShell", () => {
     expect(wrapper.find("#content").exists()).toBe(false);
     await wrapper.find("#gate-logout").trigger("click");
     expect(auth.logout).toHaveBeenCalledOnce();
-    expect(api).not.toHaveBeenCalled();  // no club data asked for a non-staff account
+    expect(api).not.toHaveBeenCalled(); // no club data asked for a non-staff account
   });
 
   it("offers a retry when the role could not be checked", async () => {
@@ -136,10 +136,12 @@ describe("AppShell", () => {
   ] as const)("lists the pages %s may open", (role, count) => {
     const { wrapper } = render({ status: "signedIn", user: USER, role });
     expect(wrapper.findAll("nav a")).toHaveLength(count);
-    if (role === "coach") {
-      expect(wrapper.find('nav a[data-page="parametres"]').exists()).toBe(false);
-      expect(wrapper.find('nav a[data-page="communications"]').exists()).toBe(false);
-    }
+  });
+
+  it("hides the admin pages from a coach", () => {
+    const { wrapper } = render({ status: "signedIn", user: USER, role: "coach" });
+    expect(wrapper.find('nav a[data-page="parametres"]').exists()).toBe(false);
+    expect(wrapper.find('nav a[data-page="communications"]').exists()).toBe(false);
   });
 
   it("keeps an admin page from a coach", async () => {
@@ -147,7 +149,7 @@ describe("AppShell", () => {
     expect(wrapper.find("#gate").text()).toContain("Réservé aux administrateurs");
     expect(wrapper.find("#content").exists()).toBe(false);
     await flushPromises();
-    expect(api).toHaveBeenCalledOnce();  // the shell's Google token check only, nothing for the page
+    expect(api).toHaveBeenCalledOnce(); // the shell's Google token check only, nothing for the page
   });
 
   it("renders an admin page for an admin", () => {

@@ -57,9 +57,11 @@ describe("TemplateForm", () => {
 
   it("inserts a variable at the cursor", async () => {
     const { byId, body, draft } = render();
-    body().setSelectionRange(8, 9);  // the X
+    body().setSelectionRange(8, 9); // the X
     await byId("variables-toggle").trigger("click");
-    const button = byId("variables").findAll("button").find((b) => b.text() === "{first_name}")!;
+    const button = byId("variables")
+      .findAll("button")
+      .find((b) => b.text() === "{first_name}")!;
     await button.trigger("click");
     await nextTick();
     expect(draft.value.body).toBe("Bonjour {first_name} !");

@@ -1,7 +1,13 @@
 <script setup lang="ts">
 /* Button of the club theme. busy: disabled, with the given label instead of the slot (an action in progress). */
 withDefaults(
-  defineProps<{ variant?: "primary" | "muted" | "warning" | "danger"; small?: boolean; busy?: string | false; disabled?: boolean; type?: "button" | "submit" }>(),
+  defineProps<{
+    variant?: "primary" | "muted" | "warning" | "danger";
+    small?: boolean;
+    busy?: string | false;
+    disabled?: boolean;
+    type?: "button" | "submit";
+  }>(),
   { variant: "primary", small: false, busy: false, disabled: false, type: "button" },
 );
 </script>

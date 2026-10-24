@@ -9,5 +9,7 @@ import { isEmulator, runtime } from "../lib/runtime";
     id="alj-dev-banner"
     role="status"
     class="pointer-events-none fixed inset-x-0 bottom-16 z-50 print:hidden bg-amber-700/90 px-3 py-1 text-center text-xs font-semibold text-white md:bottom-0"
-  >DEV — Firebase emulator ({{ runtime.projectId }}): fake data</div>
+  >
+    DEV — Firebase emulator ({{ runtime.projectId }}): fake data
+  </div>
 </template>

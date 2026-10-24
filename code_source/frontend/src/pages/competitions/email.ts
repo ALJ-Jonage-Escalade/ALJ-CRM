@@ -24,9 +24,11 @@ export const hasEmail = (r: Row): boolean => looksLikeEmail(r.email ?? "");
 
 /** The template offered first: the club's « Compétition - 1er Inscription », else any about competitions, else the first. */
 export function defaultTemplate(templates: readonly Template[]): Template | undefined {
-  return templates.find((t) => t.name === "Compétition - 1er Inscription")
-    ?? templates.find((t) => /comp[ée]tition/i.test(t.name))
-    ?? templates[0];
+  return (
+    templates.find((t) => t.name === "Compétition - 1er Inscription") ??
+    templates.find((t) => /comp[ée]tition/i.test(t.name)) ??
+    templates[0]
+  );
 }
 
 const frDate = (iso: string) => (iso.split("-").length === 3 ? iso.split("-").reverse().join("/") : iso);
@@ -43,10 +45,17 @@ export function variables(c: Competition, r: Row | undefined): Record<string, st
   const end = frDate(c.date_fin ?? "");
   const wa = (c.whatsapp_link ?? "").trim();
   return {
-    first_name: (r?.prenom ?? "").trim(), last_name: (r?.nom ?? "").trim().toUpperCase(), num_licence: r?.num_licence ?? "",
-    nom: c.nom ?? "", name_competition: c.nom ?? "", no_competition: c.id_ffme ?? "", montant_competition: amountText(c.prix),
+    first_name: (r?.prenom ?? "").trim(),
+    last_name: (r?.nom ?? "").trim().toUpperCase(),
+    num_licence: r?.num_licence ?? "",
+    nom: c.nom ?? "",
+    name_competition: c.nom ?? "",
+    no_competition: c.id_ffme ?? "",
+    montant_competition: amountText(c.prix),
     date_competition: !end || end === start || !start ? start : `${start} au ${end}`,
-    whatapp_id: wa, whatsapp_link: wa, bloc_whatsapp: wa ? `Voici le lien du groupe WhatApp dédié à cette compétition : ${wa}` : "",
+    whatapp_id: wa,
+    whatsapp_link: wa,
+    bloc_whatsapp: wa ? `Voici le lien du groupe WhatApp dédié à cette compétition : ${wa}` : "",
   };
 }
 
@@ -58,9 +67,15 @@ export function render(text: string, values: Record<string, string>): string {
 /** Body of POST /api/send-email; the server checks a coach writes to known members only. */
 export function sendBody(c: Competition, recipients: readonly Row[], subject: string, body: string) {
   return {
-    subject: subject.trim(), body: body.trim(), competition_id: c.id,
+    subject: subject.trim(),
+    body: body.trim(),
+    competition_id: c.id,
     recipients: recipients.filter(hasEmail).map((r) => ({
-      id: r.adherent_id, first_name: r.prenom ?? "", last_name: r.nom ?? "", email: (r.email ?? "").trim(), num_licence: r.num_licence ?? "",
+      id: r.adherent_id,
+      first_name: r.prenom ?? "",
+      last_name: r.nom ?? "",
+      email: (r.email ?? "").trim(),
+      num_licence: r.num_licence ?? "",
     })),
   };
 }

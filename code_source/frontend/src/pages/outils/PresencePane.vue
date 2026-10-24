@@ -54,7 +54,10 @@ async function generate(body: Request, fallback: string): Promise<void> {
 
 function downloadAutonomous(): void {
   const { start, end, health } = autonomous.value;
-  void generate({ variant: "autonome", start_date: start, end_date: end, show_health_col: health }, "Feuille_Presence_Adultes_Autonomes.xlsx");
+  void generate(
+    { variant: "autonome", start_date: start, end_date: end, show_health_col: health },
+    "Feuille_Presence_Adultes_Autonomes.xlsx",
+  );
 }
 
 function downloadCourses(): void {
@@ -64,7 +67,14 @@ function downloadCourses(): void {
   }
   const { start, end, health, oneWorkbook } = courses.value;
   void generate(
-    { variant: "cours", selected_groups: selected.value, start_date: start, end_date: end, same_sheet: oneWorkbook, show_health_col: health },
+    {
+      variant: "cours",
+      selected_groups: selected.value,
+      start_date: start,
+      end_date: end,
+      same_sheet: oneWorkbook,
+      show_health_col: health,
+    },
     oneWorkbook ? "Feuilles_Presence_Toutes_Activites.xlsx" : "Fiches_Presence_Cours.zip",
   );
 }
@@ -86,31 +96,43 @@ const label = "mb-0.5 block text-[11.5px] font-semibold text-slate-500";
           <span class="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] text-sky-700">A3 Paysage</span>
         </h2>
         <p class="mb-3 text-[13px] text-slate-500">
-          Fusionne l'ensemble des créneaux autonomes en <b>un seul tableau Excel</b>. Intègre automatiquement les jeunes
-          mineurs avec autorisation parentale (Autonomes / Famille) issus des autres cours.
+          Fusionne l'ensemble des créneaux autonomes en <b>un seul tableau Excel</b>. Intègre automatiquement les jeunes mineurs avec
+          autorisation parentale (Autonomes / Famille) issus des autres cours.
         </p>
-        <div data-testid="presence-autonomous-summary" class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12.5px]">
+        <div
+          data-testid="presence-autonomous-summary"
+          class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12.5px]"
+        >
           <template v-if="config">
             <div class="mb-1 font-bold">Total adhérents : {{ config.autonome.total }}</div>
             <div class="text-slate-500">
-              • {{ config.autonome.adultes }} adulte(s) & {{ config.autonome.mineurs }} mineur(s) inscrits en autonome<br>
+              • {{ config.autonome.adultes }} adulte(s) & {{ config.autonome.mineurs }} mineur(s) inscrits en autonome<br />
               • <b>+ {{ config.autonome.mineurs_autorises }} jeune(s) mineur(s) autorisés</b> ajoutés d'autres groupes
             </div>
           </template>
           <span v-else>⏳ Chargement de l'effectif autonome…</span>
         </div>
         <div class="mb-2 grid grid-cols-2 gap-2.5">
-          <label><span :class="label">Date début (facultatif)</span>
-            <input v-model.trim="autonomous.start" data-testid="autonomous-start" placeholder="JJ/MM/AAAA" :class="field"></label>
-          <label><span :class="label">Date fin (facultatif)</span>
-            <input v-model.trim="autonomous.end" data-testid="autonomous-end" placeholder="JJ/MM/AAAA" :class="field"></label>
+          <label
+            ><span :class="label">Date début (facultatif)</span>
+            <input v-model.trim="autonomous.start" data-testid="autonomous-start" placeholder="JJ/MM/AAAA" :class="field"
+          /></label>
+          <label
+            ><span :class="label">Date fin (facultatif)</span>
+            <input v-model.trim="autonomous.end" data-testid="autonomous-end" placeholder="JJ/MM/AAAA" :class="field"
+          /></label>
         </div>
         <label class="flex cursor-pointer items-center gap-2 text-[12.5px]">
-          <input v-model="autonomous.health" type="checkbox" data-testid="autonomous-health">
+          <input v-model="autonomous.health" type="checkbox" data-testid="autonomous-health" />
           Afficher la colonne « Santé » (✗ si document en attente)
         </label>
       </div>
-      <UiButton data-testid="download-autonomous" class="w-full justify-center" :busy="busy === 'autonome' && 'Génération en cours…'" @click="downloadAutonomous">
+      <UiButton
+        data-testid="download-autonomous"
+        class="w-full justify-center"
+        :busy="busy === 'autonome' && 'Génération en cours…'"
+        @click="downloadAutonomous"
+      >
         📥 Télécharger la fiche Autonome (.xlsx)
       </UiButton>
     </UiCard>
@@ -130,28 +152,34 @@ const label = "mb-0.5 block text-[11.5px] font-semibold text-slate-500";
           <legend class="sr-only">Format du téléchargement</legend>
           <div class="mb-1.5 text-xs font-semibold text-slate-500">FORMAT DU TÉLÉCHARGEMENT</div>
           <label class="flex cursor-pointer items-center gap-2">
-            <input v-model="courses.oneWorkbook" type="radio" :value="true" data-testid="courses-one-workbook">
+            <input v-model="courses.oneWorkbook" type="radio" :value="true" data-testid="courses-one-workbook" />
             <span><b>Un seul classeur Excel</b> (tous les cours empilés, 1 page A3 par créneau)</span>
           </label>
           <label class="mt-1 flex cursor-pointer items-center gap-2">
-            <input v-model="courses.oneWorkbook" type="radio" :value="false" data-testid="courses-zip">
+            <input v-model="courses.oneWorkbook" type="radio" :value="false" data-testid="courses-zip" />
             <span><b>Un fichier Excel distinct par créneau</b> (archive ZIP)</span>
           </label>
         </fieldset>
         <div class="mb-2 grid grid-cols-2 gap-2.5">
-          <label><span :class="label">Date début (facultatif)</span>
-            <input v-model.trim="courses.start" data-testid="courses-start" placeholder="JJ/MM/AAAA" :class="field"></label>
-          <label><span :class="label">Date fin (facultatif)</span>
-            <input v-model.trim="courses.end" data-testid="courses-end" placeholder="JJ/MM/AAAA" :class="field"></label>
+          <label
+            ><span :class="label">Date début (facultatif)</span>
+            <input v-model.trim="courses.start" data-testid="courses-start" placeholder="JJ/MM/AAAA" :class="field"
+          /></label>
+          <label
+            ><span :class="label">Date fin (facultatif)</span>
+            <input v-model.trim="courses.end" data-testid="courses-end" placeholder="JJ/MM/AAAA" :class="field"
+          /></label>
         </div>
         <label class="mb-3 flex cursor-pointer items-center gap-2 text-[12.5px]">
-          <input v-model="courses.health" type="checkbox" data-testid="courses-health">
+          <input v-model="courses.health" type="checkbox" data-testid="courses-health" />
           Afficher la colonne « Santé » (✗ si document en attente)
         </label>
         <div class="mb-1.5 flex items-center justify-between">
           <span class="text-xs font-semibold text-slate-500">CHOIX DES GROUPES DE COURS</span>
           <div class="flex gap-1.5">
-            <UiButton variant="muted" small data-testid="courses-all" @click="selected = config ? config.cours.map((c) => c.groupe) : []">Tout cocher</UiButton>
+            <UiButton variant="muted" small data-testid="courses-all" @click="selected = config ? config.cours.map((c) => c.groupe) : []"
+              >Tout cocher</UiButton
+            >
             <UiButton variant="muted" small data-testid="courses-none" @click="selected = []">Tout décocher</UiButton>
           </div>
         </div>
@@ -164,14 +192,21 @@ const label = "mb-0.5 block text-[11.5px] font-semibold text-slate-500";
             class="flex cursor-pointer items-center justify-between gap-2 border-b border-slate-100 py-1 text-[12.5px] last:border-0"
           >
             <span class="flex min-w-0 items-center gap-2">
-              <input v-model="selected" type="checkbox" :value="c.groupe" data-testid="course">
-              <span><b>{{ c.groupe }}</b> <span class="text-[11.5px] text-slate-500">({{ c.slots || "-" }})</span></span>
+              <input v-model="selected" type="checkbox" :value="c.groupe" data-testid="course" />
+              <span
+                ><b>{{ c.groupe }}</b> <span class="text-[11.5px] text-slate-500">({{ c.slots || "-" }})</span></span
+              >
             </span>
             <span class="shrink-0 rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-600">{{ c.count }} inscrit(s)</span>
           </label>
         </div>
       </div>
-      <UiButton data-testid="download-courses" class="w-full justify-center" :busy="busy === 'cours' && 'Génération en cours…'" @click="downloadCourses">
+      <UiButton
+        data-testid="download-courses"
+        class="w-full justify-center"
+        :busy="busy === 'cours' && 'Génération en cours…'"
+        @click="downloadCourses"
+      >
         📥 Télécharger les fiches de cours (.xlsx)
       </UiButton>
     </UiCard>

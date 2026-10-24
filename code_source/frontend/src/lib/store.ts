@@ -19,11 +19,11 @@
 import type { InjectionKey } from "vue";
 
 const DB_NAME = "alj-offline";
-const DB_VERSION = 2;  // 2: outbox
-export const MAX_AGE_DAYS = 30;  // limits what a lost phone exposes
+const DB_VERSION = 2; // 2: outbox
+export const MAX_AGE_DAYS = 30; // limits what a lost phone exposes
 const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 3600 * 1000;
-const LEGACY_PREFIX = "alj_snapshot:";  // snapshots of the first phone pages, in localStorage
-const OPEN_TIMEOUT_MS = 3000;  // some WebKit versions never answer indexedDB.open
+const LEGACY_PREFIX = "alj_snapshot:"; // snapshots of the first phone pages, in localStorage
+const OPEN_TIMEOUT_MS = 3000; // some WebKit versions never answer indexedDB.open
 
 export interface Stored<T = unknown> {
   data: T;
@@ -70,7 +70,7 @@ type StoreName = "resources" | "meta" | "outbox";
 export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
   const now = deps.now ?? Date.now;
   let dbPromise: Promise<IDBDatabase | null> | null = null;
-  let epoch = 0;  // bumped by clearAll: writes started before it are dropped
+  let epoch = 0; // bumped by clearAll: writes started before it are dropped
   let started: { uid: string; epoch: number; done: Promise<void> } | null = null;
 
   function openDb(): Promise<IDBDatabase | null> {
@@ -85,20 +85,28 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
       }
       req.onupgradeneeded = () => {
         const db = req.result;
-        for (const [store, keyPath] of [["resources", "name"], ["meta", "key"], ["outbox", "key"]] as const) {
+        for (const [store, keyPath] of [
+          ["resources", "name"],
+          ["meta", "key"],
+          ["outbox", "key"],
+        ] as const) {
           if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, { keyPath });
         }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
       req.onblocked = () => resolve(null);
-      setTimeout(() => resolve(null), OPEN_TIMEOUT_MS);  // no answer: online only
+      setTimeout(() => resolve(null), OPEN_TIMEOUT_MS); // no answer: online only
     });
     return dbPromise;
   }
 
   /* Runs fn(store) in one transaction; resolves with the result of the last request (or null on any failure). */
-  async function run<R>(storeName: StoreName, mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<R> | null): Promise<R | null> {
+  async function run<R>(
+    storeName: StoreName,
+    mode: IDBTransactionMode,
+    fn: (s: IDBObjectStore) => IDBRequest<R> | null,
+  ): Promise<R | null> {
     const db = await openDb();
     if (!db) return null;
     return new Promise((resolve) => {
@@ -146,7 +154,7 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
       } catch {
         // unreadable: dropped
       }
-      if (e !== epoch) return;  // cleared meanwhile: clearAll removes the old keys itself
+      if (e !== epoch) return; // cleared meanwhile: clearAll removes the old keys itself
       try {
         ls.removeItem(k);
       } catch {
@@ -159,8 +167,8 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
     let e = epoch;
     const owner = await get<{ uid: string }>("meta", "owner");
     if (owner && owner.uid !== uid) {
-      await clearAll();  // another account signs in on this device
-      if (e + 1 !== epoch) return;  // cleared by someone else too (logout): stop here
+      await clearAll(); // another account signs in on this device
+      if (e + 1 !== epoch) return; // cleared by someone else too (logout): stop here
       e = epoch;
     }
     await put(e, "meta", { key: "owner", uid });
@@ -238,7 +246,7 @@ function localStorageOrNone(): Storage | undefined {
   try {
     return globalThis.localStorage;
   } catch {
-    return undefined;  // blocked storage
+    return undefined; // blocked storage
   }
 }
 

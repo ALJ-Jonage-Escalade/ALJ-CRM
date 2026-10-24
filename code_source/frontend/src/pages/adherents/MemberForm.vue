@@ -24,10 +24,14 @@ watch(
 
 const initialTarif = draft.value.tarif_name;
 const tarifs = computed<TarifChoice[]>(() =>
-  initialTarif && !props.tarifs.some((t) => t.tarif === initialTarif) ? [{ tarif: initialTarif, detail: "" }, ...props.tarifs] : [...props.tarifs],
+  initialTarif && !props.tarifs.some((t) => t.tarif === initialTarif)
+    ? [{ tarif: initialTarif, detail: "" }, ...props.tarifs]
+    : [...props.tarifs],
 );
 const statuses = computed(() =>
-  STATUS_CHOICES.some(([v]) => v === draft.value.status) || props.adding ? STATUS_CHOICES : [[draft.value.status, draft.value.status] as const, ...STATUS_CHOICES],
+  STATUS_CHOICES.some(([v]) => v === draft.value.status) || props.adding
+    ? STATUS_CHOICES
+    : [[draft.value.status, draft.value.status] as const, ...STATUS_CHOICES],
 );
 
 const root = ref<HTMLFormElement | null>(null);
@@ -79,17 +83,31 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
       <div class="grid gap-3 sm:grid-cols-2">
         <div>
           <label for="member-last_name" :class="label">Nom de famille *</label>
-          <input v-model="draft.last_name" v-bind="attrs('last_name')" type="text" placeholder="DUPONT" autocomplete="off" :class="[fieldClass('last_name'), 'uppercase']">
+          <input
+            v-model="draft.last_name"
+            v-bind="attrs('last_name')"
+            type="text"
+            placeholder="DUPONT"
+            autocomplete="off"
+            :class="[fieldClass('last_name'), 'uppercase']"
+          />
           <p v-if="errors.last_name" id="member-last_name-error" class="mt-1 text-xs text-red-600">{{ errors.last_name }}</p>
         </div>
         <div>
           <label for="member-first_name" :class="label">Prénom *</label>
-          <input v-model="draft.first_name" v-bind="attrs('first_name')" type="text" placeholder="Jean" autocomplete="off" :class="fieldClass('first_name')">
+          <input
+            v-model="draft.first_name"
+            v-bind="attrs('first_name')"
+            type="text"
+            placeholder="Jean"
+            autocomplete="off"
+            :class="fieldClass('first_name')"
+          />
           <p v-if="errors.first_name" id="member-first_name-error" class="mt-1 text-xs text-red-600">{{ errors.first_name }}</p>
         </div>
         <div>
           <label for="member-birth_date" :class="label">Date de naissance *</label>
-          <input v-model="draft.birth_date" v-bind="attrs('birth_date')" type="date" :class="fieldClass('birth_date')">
+          <input v-model="draft.birth_date" v-bind="attrs('birth_date')" type="date" :class="fieldClass('birth_date')" />
           <p v-if="errors.birth_date" id="member-birth_date-error" class="mt-1 text-xs text-red-600">{{ errors.birth_date }}</p>
         </div>
         <div>
@@ -112,7 +130,7 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
       </div>
       <div v-if="adding">
         <label for="member-amount" :class="label">Montant payé (€)</label>
-        <input v-model="draft.amount" v-bind="attrs('amount')" type="text" inputmode="decimal" :class="fieldClass('amount')">
+        <input v-model="draft.amount" v-bind="attrs('amount')" type="text" inputmode="decimal" :class="fieldClass('amount')" />
         <p v-if="errors.amount" id="member-amount-error" class="mt-1 text-xs text-red-600">{{ errors.amount }}</p>
       </div>
     </div>
@@ -121,14 +139,27 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
       <div
         role="radiogroup"
         data-testid="member-tarifs"
-        :class="['flex max-h-44 flex-col gap-1 overflow-y-auto rounded-lg border bg-slate-50 p-1.5', errors.tarif_name ? 'border-red-500' : 'border-slate-300']"
+        :class="[
+          'flex max-h-44 flex-col gap-1 overflow-y-auto rounded-lg border bg-slate-50 p-1.5',
+          errors.tarif_name ? 'border-red-500' : 'border-slate-300',
+        ]"
       >
         <label
           v-for="(t, i) in tarifs"
           :key="t.tarif"
-          :class="['flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs', draft.tarif_name === t.tarif ? 'border-accent bg-blue-50' : 'border-transparent bg-white']"
+          :class="[
+            'flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs',
+            draft.tarif_name === t.tarif ? 'border-accent bg-blue-50' : 'border-transparent bg-white',
+          ]"
         >
-          <input v-model="draft.tarif_name" type="radio" name="member-tarif" :value="t.tarif" :data-field="i === 0 ? 'tarif_name' : undefined" class="accent-accent">
+          <input
+            v-model="draft.tarif_name"
+            type="radio"
+            name="member-tarif"
+            :value="t.tarif"
+            :data-field="i === 0 ? 'tarif_name' : undefined"
+            class="accent-accent"
+          />
           <span class="min-w-0">
             <b class="block font-semibold text-slate-800">{{ t.tarif }}</b>
             <span v-if="t.detail" class="block text-[11px] text-slate-500">{{ t.detail }}</span>
@@ -143,7 +174,13 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
     <div class="grid gap-3 sm:grid-cols-3">
       <div>
         <label for="member-licence_ffme" :class="label">N° licence FFME</label>
-        <input v-model="draft.licence_ffme" v-bind="attrs('licence_ffme')" type="text" placeholder="123456" :class="fieldClass('licence_ffme')">
+        <input
+          v-model="draft.licence_ffme"
+          v-bind="attrs('licence_ffme')"
+          type="text"
+          placeholder="123456"
+          :class="fieldClass('licence_ffme')"
+        />
       </div>
       <div>
         <label for="member-badge_rouge" :class="label">🔴 Badge rouge diff</label>
@@ -170,7 +207,13 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
     <div class="grid gap-3 sm:grid-cols-2">
       <div v-for="f in textFields" :key="f.name">
         <label :for="`member-${f.name}`" :class="label">{{ f.label }}</label>
-        <input v-model="draft[f.name]" v-bind="attrs(f.name)" :type="f.type ?? 'text'" :placeholder="f.placeholder" :class="fieldClass(f.name)">
+        <input
+          v-model="draft[f.name]"
+          v-bind="attrs(f.name)"
+          :type="f.type ?? 'text'"
+          :placeholder="f.placeholder"
+          :class="fieldClass(f.name)"
+        />
         <p v-if="errors[f.name]" :id="`member-${f.name}-error`" class="mt-1 text-xs text-red-600">{{ errors[f.name] }}</p>
       </div>
     </div>

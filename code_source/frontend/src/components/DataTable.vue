@@ -50,7 +50,11 @@ const table = useTable({
   autoResetPageIndex: false,
 });
 
-watch(() => props.resetKey, () => table.setPageIndex(0), { deep: true });
+watch(
+  () => props.resetKey,
+  () => table.setPageIndex(0),
+  { deep: true },
+);
 // Fewer rows than before (a member left the season): stay on a page that exists
 watch(
   () => table.getPageCount(),
@@ -120,15 +124,25 @@ const sortIcon = (dir: false | "asc" | "desc") => (dir === "asc" ? "▲" : dir =
             data-testid="data-row"
             :data-id="row.id"
             :aria-selected="selectedKey !== undefined ? isSelected(row.id) : undefined"
-            :class="['border-b border-slate-100 last:border-0', isSelected(row.id) ? 'bg-accent/10' : 'hover:bg-slate-50', onRowClick && 'cursor-pointer']"
+            :class="[
+              'border-b border-slate-100 last:border-0',
+              isSelected(row.id) ? 'bg-accent/10' : 'hover:bg-slate-50',
+              onRowClick && 'cursor-pointer',
+            ]"
             @click="rowClicked($event, row.original)"
           >
             <td
               v-for="(cell, i) in row.getAllCells().filter((c) => !hiddenIds.has(c.column.id))"
               :key="cell.id"
-              :class="['px-2.5 py-1.5 align-middle', byId.get(cell.column.id)?.class, i === 0 && isSelected(row.id) && 'shadow-[inset_3px_0_0_var(--color-accent)]']"
+              :class="[
+                'px-2.5 py-1.5 align-middle',
+                byId.get(cell.column.id)?.class,
+                i === 0 && isSelected(row.id) && 'shadow-[inset_3px_0_0_var(--color-accent)]',
+              ]"
             >
-              <slot :name="`cell-${cell.column.id}`" :row="row.original" :value="cell.getValue() as CellValue">{{ cell.getValue() ?? "" }}</slot>
+              <slot :name="`cell-${cell.column.id}`" :row="row.original" :value="cell.getValue() as CellValue">{{
+                cell.getValue() ?? ""
+              }}</slot>
             </td>
           </tr>
         </tbody>
@@ -144,14 +158,23 @@ const sortIcon = (dir: false | "asc" | "desc") => (dir === "asc" ? "▲" : dir =
         data-testid="data-card"
         :data-id="row.id"
         :aria-current="isSelected(row.id) || undefined"
-        :class="['rounded-xl border bg-white px-3.5 py-3 shadow-sm', isSelected(row.id) ? 'border-accent ring-1 ring-accent' : 'border-slate-200', onRowClick && 'cursor-pointer']"
+        :class="[
+          'rounded-xl border bg-white px-3.5 py-3 shadow-sm',
+          isSelected(row.id) ? 'border-accent ring-1 ring-accent' : 'border-slate-200',
+          onRowClick && 'cursor-pointer',
+        ]"
         @click="rowClicked($event, row.original)"
       >
         <slot name="card" :row="row.original" />
       </li>
     </ul>
 
-    <nav v-if="table.getPageCount() > 1" class="mt-2.5 flex flex-wrap items-center justify-end gap-2 text-xs text-slate-600" aria-label="Pages" data-testid="pager">
+    <nav
+      v-if="table.getPageCount() > 1"
+      class="mt-2.5 flex flex-wrap items-center justify-end gap-2 text-xs text-slate-600"
+      aria-label="Pages"
+      data-testid="pager"
+    >
       <span data-testid="pager-range">{{ rangeLabel(pageIndex, pageSize, total) }}</span>
       <button
         type="button"
@@ -159,14 +182,18 @@ const sortIcon = (dir: false | "asc" | "desc") => (dir === "asc" ? "▲" : dir =
         class="cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 font-bold hover:bg-slate-300 disabled:cursor-default disabled:opacity-50"
         :disabled="!table.getCanPreviousPage()"
         @click="table.previousPage()"
-      >‹ Précédents</button>
+      >
+        ‹ Précédents
+      </button>
       <button
         type="button"
         data-testid="pager-next"
         class="cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 font-bold hover:bg-slate-300 disabled:cursor-default disabled:opacity-50"
         :disabled="!table.getCanNextPage()"
         @click="table.nextPage()"
-      >Suivants ›</button>
+      >
+        Suivants ›
+      </button>
     </nav>
   </div>
 </template>

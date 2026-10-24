@@ -18,7 +18,8 @@ const COLUMNS: DataColumn<Row>[] = [
   { id: "link", label: "Lien", value: () => "", fixed: true },
 ];
 
-const rowsOf = (names: string[]): Row[] => names.map((name, i) => ({ id: i + 1, name, date: `2026-09-${String(10 + i)}`, age: i % 3 ? i : null }));
+const rowsOf = (names: string[]): Row[] =>
+  names.map((name, i) => ({ id: i + 1, name, date: `2026-09-${String(10 + i)}`, age: i % 3 ? i : null }));
 
 function render(rows: Row[], pageSize = 50, extra: { hidden?: string[]; selectedKey?: string; onRowClick?: (row: Row) => void } = {}) {
   const data = ref(rows);
@@ -29,8 +30,22 @@ function render(rows: Row[], pageSize = 50, extra: { hidden?: string[]; selected
       setup: () => () =>
         h(
           DataTable<Row>,
-          { rows: data.value, columns: COLUMNS, rowKey: (r: Row) => String(r.id), sort: { id: "name" }, pageSize, resetKey: reset.value, label: "Test", empty: "Rien.", ...extra, hidden: hidden.value },
-          { "cell-link": ({ row }: { row: Row }) => h("a", { href: `/r/${row.id}` }, "voir"), card: ({ row }: { row: Row }) => h("b", row.name) },
+          {
+            rows: data.value,
+            columns: COLUMNS,
+            rowKey: (r: Row) => String(r.id),
+            sort: { id: "name" },
+            pageSize,
+            resetKey: reset.value,
+            label: "Test",
+            empty: "Rien.",
+            ...extra,
+            hidden: hidden.value,
+          },
+          {
+            "cell-link": ({ row }: { row: Row }) => h("a", { href: `/r/${row.id}` }, "voir"),
+            card: ({ row }: { row: Row }) => h("b", row.name),
+          },
         ),
     }),
   );
@@ -41,7 +56,7 @@ function render(rows: Row[], pageSize = 50, extra: { hidden?: string[]; selected
 describe("DataTable", () => {
   it("sorts by the initial column, then by the clicked one (dates from the latest first)", async () => {
     const { wrapper, names } = render(rowsOf(["émile", "Zoé", "adam", "Élodie"]));
-    expect(names()).toEqual(["adam", "Élodie", "émile", "Zoé"]);  // accents and case ignored
+    expect(names()).toEqual(["adam", "Élodie", "émile", "Zoé"]); // accents and case ignored
     expect(wrapper.find("th[aria-sort]").attributes("aria-sort")).toBe("ascending");
 
     await wrapper.find('[data-testid="sort-name"]').trigger("click");
@@ -72,11 +87,11 @@ describe("DataTable", () => {
     expect(shown()).toEqual(["n6"]);
     expect(wrapper.find('[data-testid="pager-next"]').attributes("disabled")).toBeDefined();
 
-    data.value = rowsOf([...names, "n7"]);  // polled again: same page
+    data.value = rowsOf([...names, "n7"]); // polled again: same page
     await nextTick();
     expect(shown()).toEqual(["n6", "n7"]);
 
-    data.value = rowsOf(names.slice(0, 4));  // the page no longer exists: last page
+    data.value = rowsOf(names.slice(0, 4)); // the page no longer exists: last page
     await nextTick();
     await nextTick();
     expect(shown()).toEqual(["n3"]);
@@ -103,7 +118,7 @@ describe("DataTable", () => {
     expect(rows.map((r) => r.attributes("aria-selected"))).toEqual(["false", "true"]);
     expect(wrapper.findAll('[data-testid="data-card"]').map((c) => c.attributes("aria-current"))).toEqual([undefined, "true"]);
     await rows[0]!.find("td").trigger("click");
-    rows[0]!.find("a").element.addEventListener("click", (e) => e.preventDefault());  // jsdom does not navigate
+    rows[0]!.find("a").element.addEventListener("click", (e) => e.preventDefault()); // jsdom does not navigate
     await rows[0]!.find("a").trigger("click");
     await wrapper.findAll('[data-testid="data-card"]')[1]!.trigger("click");
     expect(clicked).toEqual(["Ana", "Bob"]);

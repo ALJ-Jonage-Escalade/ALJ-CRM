@@ -94,11 +94,14 @@ describe("app routes", () => {
     expect(router.currentRoute.value.fullPath).toBe("/bureau/?reserve=/bureau/communications");
   });
 
-  it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils?tab=ffme", "/index", "/index?vue=pwa"])("open %s to a coach", async (path) => {
-    const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
-    await router.push(path);
-    expect(router.currentRoute.value.fullPath).toBe(path);
-  });
+  it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils?tab=ffme", "/index", "/index?vue=pwa"])(
+    "open %s to a coach",
+    async (path) => {
+      const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
+      await router.push(path);
+      expect(router.currentRoute.value.fullPath).toBe(path);
+    },
+  );
 
   it("open the member record links of the former page in Adhérents itself", async () => {
     const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());

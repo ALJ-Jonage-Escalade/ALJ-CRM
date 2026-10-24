@@ -35,7 +35,11 @@ function edit(c: Coach): void {
 async function rename(c: Coach): Promise<void> {
   const nom = editName.value.trim();
   if (!nom) return writer.toast("⚠️ Le nom du coach est obligatoire.");
-  if (await writer.run(() => unwrap(client.PUT("/api/coaches/{coach_id}", { params: { path: { coach_id: c.id } }, body: { nom } })), { done: "✅ Coach mis à jour." })) {
+  if (
+    await writer.run(() => unwrap(client.PUT("/api/coaches/{coach_id}", { params: { path: { coach_id: c.id } }, body: { nom } })), {
+      done: "✅ Coach mis à jour.",
+    })
+  ) {
     editing.value = null;
     emit("changed");
   }
@@ -43,7 +47,12 @@ async function rename(c: Coach): Promise<void> {
 
 async function remove(c: Coach): Promise<void> {
   if (!confirm(`Supprimer le coach « ${c.nom} » ? Il sera retiré de toutes ses compétitions.`)) return;
-  if (await writer.run(() => unwrap(client.DELETE("/api/coaches/{coach_id}", { params: { path: { coach_id: c.id } } })), { done: "🗑 Coach supprimé." })) emit("changed");
+  if (
+    await writer.run(() => unwrap(client.DELETE("/api/coaches/{coach_id}", { params: { path: { coach_id: c.id } } })), {
+      done: "🗑 Coach supprimé.",
+    })
+  )
+    emit("changed");
 }
 
 const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[13px]";
@@ -57,7 +66,12 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
     </form>
     <p v-if="!coaches" class="text-xs text-slate-500">⏳ Chargement des coachs…</p>
     <ul class="grid gap-2 xl:grid-cols-2">
-      <li v-for="c in sorted" :key="c.id" data-testid="coach-card" class="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm">
+      <li
+        v-for="c in sorted"
+        :key="c.id"
+        data-testid="coach-card"
+        class="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm"
+      >
         <form v-if="editing === c.id" class="flex flex-wrap gap-2" @submit.prevent="rename(c)">
           <input v-model="editName" data-testid="coach-edit-name" :class="[field, 'min-w-40 flex-1']" />
           <UiButton type="submit" small data-testid="coach-save">💾 Enregistrer</UiButton>
@@ -72,12 +86,19 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         </div>
         <ul class="mt-1.5 text-xs" data-testid="coach-competitions">
           <li v-for="comp in sortCompetitions(coachedBy(competitions, c))" :key="comp.id">
-            <RouterLink :to="{ query: { id: String(comp.id) } }" data-testid="coach-competition" class="text-slate-700 no-underline hover:text-accent">🏆 {{ comp.nom }} · {{ period(comp) }}</RouterLink>
+            <RouterLink
+              :to="{ query: { id: String(comp.id) } }"
+              data-testid="coach-competition"
+              class="text-slate-700 no-underline hover:text-accent"
+              >🏆 {{ comp.nom }} · {{ period(comp) }}</RouterLink
+            >
           </li>
           <li v-if="!coachedBy(competitions, c).length" class="text-slate-400">Aucune épreuve assignée.</li>
         </ul>
       </li>
-      <li v-if="coaches && !coaches.length" class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500">Aucun coach enregistré.</li>
+      <li v-if="coaches && !coaches.length" class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500">
+        Aucun coach enregistré.
+      </li>
     </ul>
   </section>
 </template>

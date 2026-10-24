@@ -52,8 +52,8 @@ const count = (n: number | undefined) => (n === undefined ? "…" : String(n));
           <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">Format Fédéral</span>
         </h2>
         <p class="text-[13px] text-slate-500">
-          Génère le fichier CSV normalisé prêt à être importé dans l'intranet fédéral FFME (séparateur point-virgule,
-          codification automatique des assurances, options ski/vtt/trail et numéros de licence existants).
+          Génère le fichier CSV normalisé prêt à être importé dans l'intranet fédéral FFME (séparateur point-virgule, codification
+          automatique des assurances, options ski/vtt/trail et numéros de licence existants).
         </p>
       </div>
       <a
@@ -61,32 +61,52 @@ const count = (n: number | undefined) => (n === undefined ? "…" : String(n));
         target="_blank"
         rel="noopener"
         class="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300"
-      >🌐 Ouvrir MyFFME (Import CSV)</a>
+        >🌐 Ouvrir MyFFME (Import CSV)</a
+      >
     </div>
 
     <div class="mb-4 grid grid-cols-2 gap-2.5 md:grid-cols-4">
-      <UiTile label="Total éligibles"><span data-testid="ffme-total" class="text-lg">{{ count(stats?.estimated_total) }}</span></UiTile>
-      <UiTile label="Renouvellements"><span data-testid="ffme-renewals" class="text-lg text-green-600">{{ count(stats?.renewals_count) }}</span></UiTile>
-      <UiTile label="Nouvelles licences"><span data-testid="ffme-new" class="text-lg text-blue-600">{{ count(stats?.new_licences_count) }}</span></UiTile>
-      <UiTile label="Lignes ignorées"><span data-testid="ffme-ignored" class="text-lg text-club-orange">{{ count(stats?.ignored_count) }}</span></UiTile>
+      <UiTile label="Total éligibles"
+        ><span data-testid="ffme-total" class="text-lg">{{ count(stats?.estimated_total) }}</span></UiTile
+      >
+      <UiTile label="Renouvellements"
+        ><span data-testid="ffme-renewals" class="text-lg text-green-600">{{ count(stats?.renewals_count) }}</span></UiTile
+      >
+      <UiTile label="Nouvelles licences"
+        ><span data-testid="ffme-new" class="text-lg text-blue-600">{{ count(stats?.new_licences_count) }}</span></UiTile
+      >
+      <UiTile label="Lignes ignorées"
+        ><span data-testid="ffme-ignored" class="text-lg text-club-orange">{{ count(stats?.ignored_count) }}</span></UiTile
+      >
     </div>
 
     <div class="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
       <div class="mb-2 text-[12.5px] font-semibold">OPTIONS D'EXPORTATION</div>
       <label class="flex cursor-pointer items-start gap-2 text-[13px]">
-        <input v-model="includeFinished" type="checkbox" data-testid="ffme-include-finished" class="mt-1">
-        <span><b>Inclure les adhérents dont le statut est « Terminé »</b> (permet d'exporter l'intégralité des adhérents validés de la saison)</span>
+        <input v-model="includeFinished" type="checkbox" data-testid="ffme-include-finished" class="mt-1" />
+        <span
+          ><b>Inclure les adhérents dont le statut est « Terminé »</b> (permet d'exporter l'intégralité des adhérents validés de la
+          saison)</span
+        >
       </label>
-      <p class="mt-1 ml-6 text-[11.5px] text-slate-500">Décochez cette option si vous souhaitez exporter uniquement les nouveaux inscrits non encore traités.</p>
+      <p class="mt-1 ml-6 text-[11.5px] text-slate-500">
+        Décochez cette option si vous souhaitez exporter uniquement les nouveaux inscrits non encore traités.
+      </p>
     </div>
 
-    <div v-if="stats?.ignored_details.length" data-testid="ffme-ignored-details" class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+    <div
+      v-if="stats?.ignored_details.length"
+      data-testid="ffme-ignored-details"
+      class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800"
+    >
       <b>⚠️ Adhérents ignorés (données incomplètes) :</b>
       <ul class="mt-1 list-disc pl-5">
         <li v-for="(item, i) in stats.ignored_details" :key="i">{{ item }}</li>
       </ul>
     </div>
 
-    <UiButton data-testid="ffme-download" :busy="busy && 'Génération du CSV FFME…'" @click="download">📥 Télécharger le fichier CSV FFME</UiButton>
+    <UiButton data-testid="ffme-download" :busy="busy && 'Génération du CSV FFME…'" @click="download"
+      >📥 Télécharger le fichier CSV FFME</UiButton
+    >
   </UiCard>
 </template>

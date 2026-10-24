@@ -12,7 +12,14 @@ describe("verdict", () => {
     ["loading", { status: "loading" }, "allow", "pending", "pending", "pending"],
     ["signed out", { status: "signedOut" }, "allow", "signIn", "signIn", "signIn"],
     ["role not checked", { status: "error", user: USER, message: "x", offline: false }, "allow", "unverified", "unverified", "unverified"],
-    ["role not checked, offline", { status: "error", user: USER, message: "x", offline: true }, "allow", "unverified", "unverified", "unverified"],
+    [
+      "role not checked, offline",
+      { status: "error", user: USER, message: "x", offline: true },
+      "allow",
+      "unverified",
+      "unverified",
+      "unverified",
+    ],
     ["admin", signedIn("admin"), "allow", "allow", "allow", "allow"],
     ["coach", signedIn("coach"), "allow", "allow", "allow", "adminOnly"],
     ["readonly", signedIn("readonly"), "allow", "allow", "noAccess", "noAccess"],
@@ -34,7 +41,7 @@ describe("verdict of a page readable offline", () => {
     expect(verdict({ ...offline, offline: false }, "staff", true)).toBe("unverified");
   });
   it.each([
-    [{ status: "signedOut" } as AuthState, "signIn"],
+    [{ status: "signedOut" } satisfies AuthState, "signIn"],
     [signedIn("readonly"), "noAccess"],
     [signedIn("coach"), "allow"],
   ])("otherwise as any page", (state, expected) => {
@@ -44,10 +51,17 @@ describe("verdict of a page readable offline", () => {
 
 describe("canOpen", () => {
   const CASES: [Role, Access, boolean][] = [
-    ["admin", "admin", true], ["admin", "staff", true],
-    ["coach", "admin", false], ["coach", "staff", true],
-    ["readonly", "admin", false], ["readonly", "staff", false], ["readonly", "viewer", true], ["readonly", "public", true],
-    [null, "viewer", false], [null, "staff", false], [null, "public", true],
+    ["admin", "admin", true],
+    ["admin", "staff", true],
+    ["coach", "admin", false],
+    ["coach", "staff", true],
+    ["readonly", "admin", false],
+    ["readonly", "staff", false],
+    ["readonly", "viewer", true],
+    ["readonly", "public", true],
+    [null, "viewer", false],
+    [null, "staff", false],
+    [null, "public", true],
   ];
   it.each(CASES)("%s on a %s page: %s", (role, access, expected) => {
     expect(canOpen(role, access)).toBe(expected);

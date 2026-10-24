@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApiFetch } from "./api";
 
+/** The URL a fetch was called with, whatever its form. */
+const href = (url: RequestInfo | URL): string => (url instanceof Request ? url.url : url.toString());
+
 function recorder(statuses: number[]) {
   const calls: { url: string; headers: Headers; method?: string }[] = [];
   const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
-    calls.push({ url: String(url), headers: new Headers(init?.headers), method: init?.method });
+    calls.push({ url: href(url), headers: new Headers(init?.headers), method: init?.method });
     return new Response(null, { status: statuses[calls.length - 1] ?? 200 });
   });
   return { calls, fetchImpl: fetchImpl as unknown as typeof fetch };

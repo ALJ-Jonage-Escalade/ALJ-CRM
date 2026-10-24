@@ -15,7 +15,7 @@ const client = inject(CLIENT_KEY)!;
 const file = ref<{ name: string; label: string; content: string } | null>(null);
 const preview = ref<Schemas["FfmePreview"] | null>(null);
 const choices = ref<(number | null)[]>([]);
-const done = ref<number | null>(null);  // members updated by the last import
+const done = ref<number | null>(null); // members updated by the last import
 const busy = ref<"analyze" | "quick" | "apply" | null>(null);
 const dragging = ref(false);
 const input = ref<HTMLInputElement | null>(null);
@@ -71,8 +71,13 @@ async function send(manual: Schemas["FfmeManualMatch"][]): Promise<void> {
 
 async function quickImport(): Promise<void> {
   if (!file.value) return;
-  if (!confirm("Voulez-vous lancer l'importation directe ? Les licenciés reconnus automatiquement par N° de licence ou "
-    + "Nom/Prénom seront mis à jour et basculés en statut « Terminé ».")) return;
+  if (
+    !confirm(
+      "Voulez-vous lancer l'importation directe ? Les licenciés reconnus automatiquement par N° de licence ou " +
+        "Nom/Prénom seront mis à jour et basculés en statut « Terminé ».",
+    )
+  )
+    return;
   busy.value = "quick";
   try {
     await send([]);
@@ -113,26 +118,27 @@ defineExpose({ reload: reset });
           <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-800">Synchronisation Fédérale</span>
         </h2>
         <p class="text-[13px] text-slate-500">
-          Téléversez le fichier Excel exporté depuis le portail <b>MyFFME</b>. Le système analyse la liste, réconcilie les
-          licenciés avec la base du club (par N° de licence ou par Nom/Prénom), enregistre les licences, diplômes et documents
-          de santé, et bascule les adhérents associés en statut <b>« Terminé »</b>.
+          Téléversez le fichier Excel exporté depuis le portail <b>MyFFME</b>. Le système analyse la liste, réconcilie les licenciés avec la
+          base du club (par N° de licence ou par Nom/Prénom), enregistre les licences, diplômes et documents de santé, et bascule les
+          adhérents associés en statut <b>« Terminé »</b>.
         </p>
       </div>
-      <a href="https://myffme.fr" target="_blank" rel="noopener" class="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300">
+      <a
+        href="https://myffme.fr"
+        target="_blank"
+        rel="noopener"
+        class="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300"
+      >
         🌐 Portail MyFFME
       </a>
     </div>
 
-    <div
-      v-if="done !== null"
-      data-testid="ffme-import-done"
-      class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center"
-    >
+    <div v-if="done !== null" data-testid="ffme-import-done" class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center">
       <div class="mb-1 text-2xl">🎉</div>
       <div class="mb-1 text-[15px] font-bold text-emerald-800">Importation FFME enregistrée avec succès !</div>
       <p class="mb-3 text-[13px] text-emerald-700">
-        {{ done }} adhérents ont été mis à jour avec leurs licences, diplômes et documents de santé. Leurs statuts sont
-        désormais passés en <b>« Terminé »</b>.
+        {{ done }} adhérents ont été mis à jour avec leurs licences, diplômes et documents de santé. Leurs statuts sont désormais passés en
+        <b>« Terminé »</b>.
       </p>
       <UiButton variant="muted" small data-testid="ffme-import-again" @click="reset">🔄 Importer un autre fichier</UiButton>
     </div>
@@ -159,7 +165,7 @@ defineExpose({ reload: reset });
           accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           class="hidden"
           @change="pick(($event.target as HTMLInputElement).files?.[0])"
-        >
+        />
         <UiButton variant="muted" small @click.stop="input?.click()">📁 Parcourir un fichier…</UiButton>
         <div v-if="file" data-testid="ffme-file-name" class="mt-2.5 text-[13px] font-semibold text-blue-600">{{ file.label }}</div>
       </div>
@@ -168,17 +174,31 @@ defineExpose({ reload: reset });
         <UiButton data-testid="ffme-analyze" :disabled="!file || !!busy" :busy="busy === 'analyze' && 'Analyse en cours…'" @click="analyze">
           🔍 Analyser & Prévisualiser le fichier
         </UiButton>
-        <UiButton variant="muted" data-testid="ffme-quick-import" :disabled="!file || !!busy" :busy="busy === 'quick' && 'Importation en cours…'" @click="quickImport">
+        <UiButton
+          variant="muted"
+          data-testid="ffme-quick-import"
+          :disabled="!file || !!busy"
+          :busy="busy === 'quick' && 'Importation en cours…'"
+          @click="quickImport"
+        >
           ⚡ Importer & Fusionner directement
         </UiButton>
       </div>
 
       <div v-if="preview" data-testid="ffme-preview" class="border-t border-slate-200 pt-4">
         <div class="mb-4 grid grid-cols-2 gap-2.5 md:grid-cols-4">
-          <UiTile label="Lignes Excel traitées"><span data-testid="ffme-rows" class="text-lg">{{ preview.stats.total_processed }}</span></UiTile>
-          <UiTile label="🟢 Trouvés par N° licence"><span data-testid="ffme-by-licence" class="text-lg text-green-600">{{ preview.stats.matched_by_licence }}</span></UiTile>
-          <UiTile label="🔵 Trouvés par nom & prénom"><span data-testid="ffme-by-name" class="text-lg text-blue-600">{{ preview.stats.matched_by_name }}</span></UiTile>
-          <UiTile label="⚠️ Non trouvés dans la base"><span data-testid="ffme-unmatched-count" class="text-lg text-red-600">{{ preview.unmatched.length }}</span></UiTile>
+          <UiTile label="Lignes Excel traitées"
+            ><span data-testid="ffme-rows" class="text-lg">{{ preview.stats.total_processed }}</span></UiTile
+          >
+          <UiTile label="🟢 Trouvés par N° licence"
+            ><span data-testid="ffme-by-licence" class="text-lg text-green-600">{{ preview.stats.matched_by_licence }}</span></UiTile
+          >
+          <UiTile label="🔵 Trouvés par nom & prénom"
+            ><span data-testid="ffme-by-name" class="text-lg text-blue-600">{{ preview.stats.matched_by_name }}</span></UiTile
+          >
+          <UiTile label="⚠️ Non trouvés dans la base"
+            ><span data-testid="ffme-unmatched-count" class="text-lg text-red-600">{{ preview.unmatched.length }}</span></UiTile
+          >
         </div>
 
         <div v-if="preview.unmatched.length" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3">
@@ -186,8 +206,8 @@ defineExpose({ reload: reset });
             ⚠️ Licenciés FFME non reconnus automatiquement dans la base ({{ preview.unmatched.length }})
           </div>
           <p class="mb-2.5 text-xs text-red-900">
-            Ces licenciés sont présents dans le fichier FFME mais n'ont pas pu être associés de façon certaine. Vous pouvez
-            associer chaque ligne à un adhérent du club ou la laisser ignorée.
+            Ces licenciés sont présents dans le fichier FFME mais n'ont pas pu être associés de façon certaine. Vous pouvez associer chaque
+            ligne à un adhérent du club ou la laisser ignorée.
           </p>
           <div class="max-h-72 overflow-auto rounded-md border border-red-200 bg-white">
             <table class="w-full text-xs">
@@ -225,7 +245,9 @@ defineExpose({ reload: reset });
           <UiButton data-testid="ffme-apply" :disabled="!!busy" :busy="busy === 'apply' && 'Enregistrement…'" @click="apply">
             ✅ Appliquer et enregistrer en base de données
           </UiButton>
-          <span data-testid="ffme-matched" class="text-xs text-slate-500">{{ preview.matched_count }} adhérents réconciliés automatiquement.</span>
+          <span data-testid="ffme-matched" class="text-xs text-slate-500"
+            >{{ preview.matched_count }} adhérents réconciliés automatiquement.</span
+          >
         </div>
       </div>
     </template>

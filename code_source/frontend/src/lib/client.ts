@@ -75,8 +75,8 @@ export async function unwrap<T>(call: Promise<{ data?: T; error?: unknown; respo
   try {
     result = await call;
   } catch (e) {
-    if (e instanceof TypeError) throw new ApiError(0, "network", NETWORK_MESSAGE);  // fetch rejects offline
-    throw new ApiError(0, null, "Réponse illisible du serveur.");  // e.g. a success body that is not JSON
+    if (e instanceof TypeError) throw new ApiError(0, "network", NETWORK_MESSAGE); // fetch rejects offline
+    throw new ApiError(0, null, "Réponse illisible du serveur."); // e.g. a success body that is not JSON
   }
   if (result.response.ok) return result.data as T;
   throw errorFromBody(result.response.status, result.error);

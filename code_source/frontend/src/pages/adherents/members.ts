@@ -9,16 +9,19 @@ export type Creneau = Schemas["Creneau"];
 export type MemberList = Schemas["MemberList"];
 
 /** Lower case, without accents nor surrounding spaces: the key of every comparison. */
-export function normKey(s: unknown): string {
-  return String(s ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+export function normKey(s: string | null | undefined): string {
+  return (s ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 // ---------------------------------------------------------------- Slot groups and tariffs
 
 /** A line of the slot filter: a section title, a sub-section (birth years) or a slot group with its tariffs. */
 export type CreneauItem =
-  | { kind: "section" | "sub"; label: string; raw: string }
-  | { kind: "group"; label: string; raw: string; tarifs: string[] };
+  { kind: "section" | "sub"; label: string; raw: string } | { kind: "group"; label: string; raw: string; tarifs: string[] };
 
 const ACCENTS: Record<string, string> = { e: "[eèéêë]", a: "[aàâä]", i: "[iîï]", o: "[oôö]", u: "[uùûü]", c: "[cç]", y: "[yÿ]" };
 
@@ -45,7 +48,11 @@ const SECTIONS = ["Collège", "Enfants", "Perfectionnement", "Compétition"] as 
 
 /** Lines of the slot filter: groups outside the sections first, then each section (Enfants by birth years). */
 export function creneauItems(creneaux: readonly Creneau[]): CreneauItem[] {
-  const lists: Record<Exclude<(typeof SECTIONS)[number], "Enfants">, [string, string][]> = { "Collège": [], Perfectionnement: [], "Compétition": [] };
+  const lists: Record<Exclude<(typeof SECTIONS)[number], "Enfants">, [string, string][]> = {
+    Collège: [],
+    Perfectionnement: [],
+    Compétition: [],
+  };
   const children: Record<string, [string, string][]> = {};
   const others: [string, string][] = [];
 
@@ -152,8 +159,11 @@ export function checkAll(filters: Filters, items: readonly CreneauItem[], counts
 const digits = (s: string) => s.replace(/\D/g, "");
 
 /** What the search and the filters read of a member (the directory keeps fewer fields: no comment). */
-export type FilteredMember = Pick<Member, "last_name" | "first_name" | "tarif_name" | "licence_ffme" | "email_primary" | "phone" | "city" | "status_norm">
-  & Partial<Pick<Member, "commentaires_correctif">>;
+export type FilteredMember = Pick<
+  Member,
+  "last_name" | "first_name" | "tarif_name" | "licence_ffme" | "email_primary" | "phone" | "city" | "status_norm"
+> &
+  Partial<Pick<Member, "commentaires_correctif">>;
 
 /** The search finds names (both orders), tariff, licence, e-mail, phone (4 digits at least, any spacing), city, comment. */
 export function matchesSearch(m: FilteredMember, search: string): boolean {
@@ -162,8 +172,16 @@ export function matchesSearch(m: FilteredMember, search: string): boolean {
   const qDigits = digits(q);
   if (qDigits.length >= 4 && digits(m.phone).includes(qDigits)) return true;
   return [
-    m.last_name, m.first_name, `${m.first_name} ${m.last_name}`, `${m.last_name} ${m.first_name}`,
-    m.tarif_name, m.licence_ffme, m.email_primary, m.phone, m.city, m.commentaires_correctif,
+    m.last_name,
+    m.first_name,
+    `${m.first_name} ${m.last_name}`,
+    `${m.last_name} ${m.first_name}`,
+    m.tarif_name,
+    m.licence_ffme,
+    m.email_primary,
+    m.phone,
+    m.city,
+    m.commentaires_correctif,
   ].some((field) => normKey(field).includes(q));
 }
 
@@ -192,7 +210,11 @@ export function statusChips(members: readonly Pick<Member, "status_norm">[]): { 
 }
 
 const STATUS_CLASS: Record<string, string> = {
-  "Validé": "bg-green-600", "Traité": "bg-blue-600", "Terminé": "bg-violet-500", "En cours": "bg-amber-600", "Annulé": "bg-red-600",
+  Validé: "bg-green-600",
+  Traité: "bg-blue-600",
+  Terminé: "bg-violet-500",
+  "En cours": "bg-amber-600",
+  Annulé: "bg-red-600",
 };
 
 /** Background (Tailwind class) of a status badge. */
@@ -280,10 +302,31 @@ export function countSummary(shown: number, total: number, season: string): stri
 // ---------------------------------------------------------------- CSV export
 
 const CSV_HEADERS = [
-  "Nom", "Prénom", "Date de naissance", "Âge", "Sexe", "Catégorie", "Créneau", "Tarif",
-  "Montant (€)", "Statut", "N° Licence FFME", "E-mail principal", "E-mail secondaire",
-  "Téléphone", "Adresse", "Code postal", "Ville", "Urgence 1 - Nom", "Urgence 1 - Tél",
-  "Urgence 2 - Nom", "Urgence 2 - Tél", "Payeur", "E-mail payeur", "Réf Commande", "Date commande",
+  "Nom",
+  "Prénom",
+  "Date de naissance",
+  "Âge",
+  "Sexe",
+  "Catégorie",
+  "Créneau",
+  "Tarif",
+  "Montant (€)",
+  "Statut",
+  "N° Licence FFME",
+  "E-mail principal",
+  "E-mail secondaire",
+  "Téléphone",
+  "Adresse",
+  "Code postal",
+  "Ville",
+  "Urgence 1 - Nom",
+  "Urgence 1 - Tél",
+  "Urgence 2 - Nom",
+  "Urgence 2 - Tél",
+  "Payeur",
+  "E-mail payeur",
+  "Réf Commande",
+  "Date commande",
 ];
 
 /** Rows of the CSV export of the list shown (same columns as the former page), for lib/csv.ts. */
@@ -291,10 +334,31 @@ export function csvRows(members: readonly Member[]): Cell[][] {
   return [
     CSV_HEADERS,
     ...members.map((m) => [
-      m.last_name, m.first_name, fmtDay(m.birth_date), m.age, m.gender, m.categorie, m.creneau_groupe, m.tarif_name,
-      m.amount, m.status_norm, m.licence_ffme, m.email_primary, m.email_secondary,
-      m.phone, m.address, m.zip_code, m.city, m.emergency1_name, m.emergency1_phone,
-      m.emergency2_name, m.emergency2_phone, m.payer, m.payer_email, m.order_ref, fmtDay(m.order_date),
+      m.last_name,
+      m.first_name,
+      fmtDay(m.birth_date),
+      m.age,
+      m.gender,
+      m.categorie,
+      m.creneau_groupe,
+      m.tarif_name,
+      m.amount,
+      m.status_norm,
+      m.licence_ffme,
+      m.email_primary,
+      m.email_secondary,
+      m.phone,
+      m.address,
+      m.zip_code,
+      m.city,
+      m.emergency1_name,
+      m.emergency1_phone,
+      m.emergency2_name,
+      m.emergency2_phone,
+      m.payer,
+      m.payer_email,
+      m.order_ref,
+      fmtDay(m.order_date),
     ]),
   ];
 }
@@ -331,7 +395,11 @@ function booleans(value: unknown): Record<string, boolean> {
   return Object.fromEntries(Object.entries(value).filter((e): e is [string, boolean] => typeof e[1] === "boolean"));
 }
 
-export function saveFilters(filters: Filters, storage: Pick<Storage, "setItem"> | undefined = globalThis.localStorage, key = FILTER_KEY): void {
+export function saveFilters(
+  filters: Filters,
+  storage: Pick<Storage, "setItem"> | undefined = globalThis.localStorage,
+  key = FILTER_KEY,
+): void {
   try {
     storage?.setItem(key, JSON.stringify({ ...filters, search: "" }));
   } catch {
@@ -348,7 +416,7 @@ export function loadPanelOpen(storage: Pick<Storage, "getItem"> | undefined = gl
   try {
     return storage?.getItem(PANEL_KEY) !== "closed";
   } catch {
-    return true;  // blocked storage: open
+    return true; // blocked storage: open
   }
 }
 

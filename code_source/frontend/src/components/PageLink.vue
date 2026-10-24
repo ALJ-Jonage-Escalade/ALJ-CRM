@@ -4,7 +4,7 @@ import { computed } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 
 const props = defineProps<{ href: string }>();
-const router = useRouter();  // undefined in the components' tests mounted without a router
+const router = useRouter(); // undefined in the components' tests mounted without a router
 const inApp = computed(() => !!router && router.resolve(props.href).name !== undefined);
 </script>
 

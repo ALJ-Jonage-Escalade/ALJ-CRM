@@ -7,7 +7,12 @@ export type Template = Schemas["EmailTemplate"];
 
 export const DEFAULT_SENDER_EMAIL = "inscription@alj-escalade.fr";
 export const DEFAULT_SENDER_NAME = "Amicale Laïque Jonage - Inscriptions";
-export const SENDER_SUGGESTIONS = ["inscription@alj-escalade.fr", "contact@alj-escalade.fr", "competitions@alj-escalade.fr", "admin@alj-escalade.fr"];
+export const SENDER_SUGGESTIONS = [
+  "inscription@alj-escalade.fr",
+  "contact@alj-escalade.fr",
+  "competitions@alj-escalade.fr",
+  "admin@alj-escalade.fr",
+];
 
 /** Contents of a new template; the sender is the one being edited. */
 export function newTemplate(name: string, sender: Pick<Template, "sender_email" | "sender_name">): Template {

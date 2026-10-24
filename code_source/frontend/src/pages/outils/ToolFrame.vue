@@ -14,7 +14,7 @@ const message = ref("");
 let request = 0;
 
 async function load(): Promise<void> {
-  const mine = ++request;  // a slower answer for a former url is dropped
+  const mine = ++request; // a slower answer for a former url is dropped
   status.value = "loading";
   try {
     const res = await api(props.url);
@@ -43,8 +43,13 @@ defineExpose({ reload: load });
   <div
     v-if="status !== 'ready'"
     :data-testid="`${testid}-status`"
-    :class="['flex min-h-40 items-center justify-center rounded-xl border border-slate-200 bg-white p-6 text-[13px]', status === 'error' ? 'text-red-600' : 'text-slate-500']"
-  >{{ status === "loading" ? `⏳ ${loading}` : message }}</div>
+    :class="[
+      'flex min-h-40 items-center justify-center rounded-xl border border-slate-200 bg-white p-6 text-[13px]',
+      status === 'error' ? 'text-red-600' : 'text-slate-500',
+    ]"
+  >
+    {{ status === "loading" ? `⏳ ${loading}` : message }}
+  </div>
   <iframe
     v-show="status === 'ready'"
     :data-testid="testid"

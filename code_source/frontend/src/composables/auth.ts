@@ -67,13 +67,13 @@ function isNetworkError(e: unknown): boolean {
 function errorMessage(e: unknown): string {
   if (e instanceof MeError) return e.message;
   if (isNetworkError(e)) return "Serveur injoignable : vérifiez la connexion réseau.";
-  return "Réponse inattendue du serveur.";  // e.g. a body that is not JSON
+  return "Réponse inattendue du serveur."; // e.g. a body that is not JSON
 }
 
 export function createAuth(deps: AuthDeps): Auth {
   const state = ref<AuthState>({ status: "loading" });
   let current: SessionUser | null = null;
-  let generation = 0;  // an answer for a previous user (or an older request) is dropped
+  let generation = 0; // an answer for a previous user (or an older request) is dropped
 
   async function resolve(user: SessionUser | null): Promise<void> {
     const mine = ++generation;

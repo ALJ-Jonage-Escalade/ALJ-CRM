@@ -6,7 +6,10 @@ import { member } from "./members.fixture";
 import { draftOf, type MemberDraft } from "./record";
 
 const TODAY = new Date(2026, 9, 22);
-const TARIFS = [{ tarif: "Adulte loisir", detail: "Loisir adultes" }, { tarif: "Licence sèche", detail: "" }];
+const TARIFS = [
+  { tarif: "Adulte loisir", detail: "Loisir adultes" },
+  { tarif: "Licence sèche", detail: "" },
+];
 
 function render(draft: MemberDraft, adding: boolean) {
   const wrapper = mount(MemberForm, {
@@ -46,7 +49,7 @@ describe("MemberForm validation", () => {
   it("editing: checks e-mails and phone, clears a message once the field is corrected, then saves", async () => {
     const d = reactive({ ...draftOf(member({ tarif_name: "Adulte loisir" })), email_primary: "pas-une-adresse", phone: "12" });
     const { wrapper, field, error } = render(d, false);
-    expect(field("last_name").exists()).toBe(false);  // identity is not edited
+    expect(field("last_name").exists()).toBe(false); // identity is not edited
     await wrapper.find("form").trigger("submit");
     expect(error("email_primary").text()).toBe("Adresse e-mail invalide.");
     expect(error("phone").text()).toBe("Numéro de téléphone invalide.");

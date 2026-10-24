@@ -10,7 +10,10 @@ export type CompetitorContact = Schemas["CompetitorContact"];
 export type Coach = Schemas["Coach"];
 /** What the screen keeps of the member directory (GET /api/competition-members, online only): the current tariff and
     slot group to group the participants, the names, licence and e-mail to add one or write to them. */
-export type MemberSlot = Pick<Schemas["CompetitionMember"], "id" | "nom" | "prenom" | "licence_ffme" | "email" | "email_secondaire" | "tarif" | "creneau_groupe">;
+export type MemberSlot = Pick<
+  Schemas["CompetitionMember"],
+  "id" | "nom" | "prenom" | "licence_ffme" | "email" | "email_secondaire" | "tarif" | "creneau_groupe"
+>;
 
 export const ARCHIVED = "close";
 export const PREPARING = "en_preparation";
@@ -18,8 +21,14 @@ export const PREPARING = "en_preparation";
 /** The answer of GET /api/competition-members reduced to the fields above (phones and emergency contacts stay on the server). */
 export function toMemberSlots(answer: unknown): MemberSlot[] {
   return (answer as Schemas["CompetitionMember"][]).map((m) => ({
-    id: m.id, nom: m.nom ?? "", prenom: m.prenom ?? "", licence_ffme: m.licence_ffme || m.num_licence || "",
-    email: m.email ?? "", email_secondaire: m.email_secondaire ?? "", tarif: m.tarif ?? "", creneau_groupe: m.creneau_groupe ?? "",
+    id: m.id,
+    nom: m.nom ?? "",
+    prenom: m.prenom ?? "",
+    licence_ffme: m.licence_ffme || m.num_licence || "",
+    email: m.email ?? "",
+    email_secondaire: m.email_secondaire ?? "",
+    tarif: m.tarif ?? "",
+    creneau_groupe: m.creneau_groupe ?? "",
   }));
 }
 
@@ -35,9 +44,7 @@ export const isPast = (c: Competition, today: string): boolean => !!c.date_compe
 
 /** Most recent first; undated ones last, then by id (newest first). */
 export function sortCompetitions(list: readonly Competition[]): Competition[] {
-  return list
-    .slice()
-    .sort((a, b) => (b.date_competition ?? "").localeCompare(a.date_competition ?? "") || (b.id ?? 0) - (a.id ?? 0));
+  return list.slice().sort((a, b) => (b.date_competition ?? "").localeCompare(a.date_competition ?? "") || (b.id ?? 0) - (a.id ?? 0));
 }
 
 export type When = "all" | "upcoming" | "past";
@@ -138,7 +145,12 @@ export type PendingValue = (adherentId: number | null | undefined, flag: "select
 
 /** The participants of a competition with what the other lists know of them. contacts: coaches only (kept offline);
     without them, the emergency contact copied when the member was added. */
-export function participantRows(c: Competition, members: readonly MemberSlot[], contacts: readonly CompetitorContact[], pending: PendingValue = () => undefined): Row[] {
+export function participantRows(
+  c: Competition,
+  members: readonly MemberSlot[],
+  contacts: readonly CompetitorContact[],
+  pending: PendingValue = () => undefined,
+): Row[] {
   const memberOf = new Map(members.map((m) => [m.id, m]));
   const contactOf = new Map(contacts.map((k) => [k.adherent_id, k]));
   return (c.participants ?? []).map((p) => {
@@ -146,7 +158,10 @@ export function participantRows(c: Competition, members: readonly MemberSlot[], 
     const contact = p.adherent_id != null ? contactOf.get(p.adherent_id) : undefined;
     const tarif = member?.tarif || p.tarif || "";
     const emergency = contact
-      ? [{ name: contact.emergency1_name, phone: contact.emergency1_phone }, { name: contact.emergency2_name, phone: contact.emergency2_phone }]
+      ? [
+          { name: contact.emergency1_name, phone: contact.emergency1_phone },
+          { name: contact.emergency2_name, phone: contact.emergency2_phone },
+        ]
       : [{ name: p.urgence_nom ?? "", phone: p.urgence_tel ?? "" }];
     const selectionne = pending(p.adherent_id, "selectionne");
     const present = pending(p.adherent_id, "present");
@@ -200,7 +215,11 @@ export function memberMatches(members: readonly MemberSlot[], c: Competition, se
   if (q.length < 2) return [];
   const listed = new Set((c.participants ?? []).map((p) => p.adherent_id));
   return members
-    .filter((m) => !listed.has(m.id) && (normKey(`${m.nom} ${m.prenom}`).includes(q) || normKey(`${m.prenom} ${m.nom}`).includes(q) || normKey(m.licence_ffme).includes(q)))
+    .filter(
+      (m) =>
+        !listed.has(m.id) &&
+        (normKey(`${m.nom} ${m.prenom}`).includes(q) || normKey(`${m.prenom} ${m.nom}`).includes(q) || normKey(m.licence_ffme).includes(q)),
+    )
     .sort((a, b) => (a.nom ?? "").localeCompare(b.nom ?? "", "fr") || (a.prenom ?? "").localeCompare(b.prenom ?? "", "fr"))
     .slice(0, 15);
 }
@@ -209,10 +228,21 @@ export function memberMatches(members: readonly MemberSlot[], c: Competition, se
 export function participantCsv(rows: readonly Row[]): Cell[][] {
   return [
     ["Nom", "Prénom", "N° Licence", "Créneau", "Résultat FFME", "Participe", "Paiement", "Montant", "Commande", "Présent", "Téléphone"],
-    ...groupRows(rows).flatMap(([, list]) => list).map((p) => [
-      p.nom, p.prenom, p.num_licence, p.group === UNIDENTIFIED ? "" : p.group, ranking(p).replace(/^\S+ /, ""), p.selectionne ? "Oui" : "Non",
-      payment(p.statut_paiement).label, p.montant_paye ? `${p.montant_paye} €` : "", p.commande_helloasso, p.present ? "Présent" : "Absent", p.phone,
-    ]),
+    ...groupRows(rows)
+      .flatMap(([, list]) => list)
+      .map((p) => [
+        p.nom,
+        p.prenom,
+        p.num_licence,
+        p.group === UNIDENTIFIED ? "" : p.group,
+        ranking(p).replace(/^\S+ /, ""),
+        p.selectionne ? "Oui" : "Non",
+        payment(p.statut_paiement).label,
+        p.montant_paye ? `${p.montant_paye} €` : "",
+        p.commande_helloasso,
+        p.present ? "Présent" : "Absent",
+        p.phone,
+      ]),
   ];
 }
 
@@ -237,10 +267,16 @@ export interface CompetitionDraft {
 
 export function draftOf(c?: Competition): CompetitionDraft {
   return {
-    nom: c?.nom ?? "", id_ffme: c?.id_ffme ?? "", date_competition: c?.date_competition ?? "",
+    nom: c?.nom ?? "",
+    id_ffme: c?.id_ffme ?? "",
+    date_competition: c?.date_competition ?? "",
     date_fin: c?.date_fin && c.date_fin !== c.date_competition ? c.date_fin : "",
-    lieu: c?.lieu ?? "", type: c?.type ?? "", prix: c ? String(c.prix ?? 0) : "",
-    url_resultats: c?.url_resultats ?? "", whatsapp_link: c?.whatsapp_link ?? "", coach_ids: [...(c?.coach_ids ?? [])],
+    lieu: c?.lieu ?? "",
+    type: c?.type ?? "",
+    prix: c ? String(c.prix ?? 0) : "",
+    url_resultats: c?.url_resultats ?? "",
+    whatsapp_link: c?.whatsapp_link ?? "",
+    coach_ids: [...(c?.coach_ids ?? [])],
   };
 }
 
@@ -263,10 +299,16 @@ export function draftErrors(d: CompetitionDraft): Partial<Record<keyof Competiti
 export function draftBody(d: CompetitionDraft): Schemas["CompetitionCreate"] {
   const start = d.date_competition;
   return {
-    nom: d.nom.trim(), id_ffme: d.id_ffme.trim(), date_competition: start,
+    nom: d.nom.trim(),
+    id_ffme: d.id_ffme.trim(),
+    date_competition: start,
     date_fin: start && d.date_fin > start ? d.date_fin : start,
-    lieu: d.lieu.trim(), type: d.type, prix: Number(d.prix.replace(",", ".")) || 0,
-    url_resultats: d.url_resultats.trim(), whatsapp_link: d.whatsapp_link.trim(), coach_ids: d.coach_ids,
+    lieu: d.lieu.trim(),
+    type: d.type,
+    prix: Number(d.prix.replace(",", ".")) || 0,
+    url_resultats: d.url_resultats.trim(),
+    whatsapp_link: d.whatsapp_link.trim(),
+    coach_ids: d.coach_ids,
   };
 }
 
@@ -279,7 +321,8 @@ export function coachChoices(coaches: readonly Coach[], selected: readonly numbe
 }
 
 /** The competitions a coach follows. */
-export const coachedBy = (list: readonly Competition[], coach: Coach): Competition[] => list.filter((c) => (c.coach_ids ?? []).includes(coach.id));
+export const coachedBy = (list: readonly Competition[], coach: Coach): Competition[] =>
+  list.filter((c) => (c.coach_ids ?? []).includes(coach.id));
 
 /** A MyCompet results page, or its number (13660), as the server takes it. */
 export const resultsUrlHint = "https://mycompet.ffme.fr/resultat/resultat_13660 ou 13660";

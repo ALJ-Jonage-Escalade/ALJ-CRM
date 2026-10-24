@@ -45,6 +45,8 @@ export function manualMatches(unmatched: readonly Licensee[], choices: readonly 
 }
 
 export function applyConfirmation(matched: number, manual: number): string {
-  return `Confirmer l'enregistrement de ${matched + manual} adhérents en base de données ?\n\n`
-    + `• ${matched} réconciliés automatiquement\n• ${manual} associés manuellement`;
+  return (
+    `Confirmer l'enregistrement de ${matched + manual} adhérents en base de données ?\n\n` +
+    `• ${matched} réconciliés automatiquement\n• ${manual} associés manuellement`
+  );
 }

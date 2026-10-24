@@ -29,7 +29,14 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
   <form novalidate class="flex flex-col gap-3" @submit.prevent="submit">
     <div>
       <label for="slot-groupe" :class="label">Nom du groupe *</label>
-      <input id="slot-groupe" v-model="draft.groupe" type="text" data-testid="slot-groupe" placeholder="Ex : Loisir collège - lundi 18h30" :class="field">
+      <input
+        id="slot-groupe"
+        v-model="draft.groupe"
+        type="text"
+        data-testid="slot-groupe"
+        placeholder="Ex : Loisir collège - lundi 18h30"
+        :class="field"
+      />
     </div>
     <div class="grid gap-3 sm:grid-cols-2">
       <div>
@@ -40,7 +47,14 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
       </div>
       <div>
         <label for="slot-horaires" :class="label">Horaires * (ex : 18:00 - 20:00)</label>
-        <input id="slot-horaires" v-model="draft.horaires" type="text" data-testid="slot-horaires" placeholder="18:00 - 20:00" :class="field">
+        <input
+          id="slot-horaires"
+          v-model="draft.horaires"
+          type="text"
+          data-testid="slot-horaires"
+          placeholder="18:00 - 20:00"
+          :class="field"
+        />
       </div>
       <div>
         <label for="slot-type" :class="label">Type de groupe</label>
@@ -50,35 +64,77 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
       </div>
       <div>
         <label for="slot-categorie" :class="label">Catégorie d'âge</label>
-        <input id="slot-categorie" v-model="draft.categorie_age" type="text" data-testid="slot-categorie" placeholder="Ex : U11-U13, Collège, Adultes…" :class="field">
+        <input
+          id="slot-categorie"
+          v-model="draft.categorie_age"
+          type="text"
+          data-testid="slot-categorie"
+          placeholder="Ex : U11-U13, Collège, Adultes…"
+          :class="field"
+        />
       </div>
     </div>
     <div>
       <label for="slot-encadrants" :class="label">Encadrant(s) (séparés par des virgules)</label>
-      <input id="slot-encadrants" v-model="draft.encadrants" type="text" data-testid="slot-encadrants" placeholder="Ex : Antoine GAUTHIER, Rodolphe JULLIEN" :class="field">
+      <input
+        id="slot-encadrants"
+        v-model="draft.encadrants"
+        type="text"
+        data-testid="slot-encadrants"
+        placeholder="Ex : Antoine GAUTHIER, Rodolphe JULLIEN"
+        :class="field"
+      />
     </div>
     <div>
       <label for="slot-whatsapp" :class="label">Lien d'invitation WhatsApp (optionnel)</label>
-      <input id="slot-whatsapp" v-model="draft.whatsapp_link" type="url" data-testid="slot-whatsapp" placeholder="https://chat.whatsapp.com/…" :class="field">
+      <input
+        id="slot-whatsapp"
+        v-model="draft.whatsapp_link"
+        type="url"
+        data-testid="slot-whatsapp"
+        placeholder="https://chat.whatsapp.com/…"
+        :class="field"
+      />
     </div>
     <fieldset>
       <legend :class="label">Tarifs HelloAsso associés (cocher les tarifs de la campagne)</legend>
-      <div data-testid="slot-tarifs" class="flex max-h-32 flex-col gap-1 overflow-y-auto rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-2">
+      <div
+        data-testid="slot-tarifs"
+        class="flex max-h-32 flex-col gap-1 overflow-y-auto rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-2"
+      >
         <label v-for="tarif in tarifs" :key="tarif" class="flex cursor-pointer items-center gap-2 text-xs">
-          <input v-model="draft.helloasso_tarifs" type="checkbox" :value="tarif">
+          <input v-model="draft.helloasso_tarifs" type="checkbox" :value="tarif" />
           <span>{{ tarif }}</span>
         </label>
-        <span v-if="!tarifs.length" class="text-[11.5px] text-slate-500">Aucun tarif de saison configuré. Saisissez le tarif dans le nom de groupe.</span>
+        <span v-if="!tarifs.length" class="text-[11.5px] text-slate-500"
+          >Aucun tarif de saison configuré. Saisissez le tarif dans le nom de groupe.</span
+        >
       </div>
     </fieldset>
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label for="slot-naissance-min" :class="label">Année naissance min</label>
-        <input id="slot-naissance-min" v-model="draft.naissance_min" type="text" inputmode="numeric" data-testid="slot-naissance-min" placeholder="2015" :class="field">
+        <input
+          id="slot-naissance-min"
+          v-model="draft.naissance_min"
+          type="text"
+          inputmode="numeric"
+          data-testid="slot-naissance-min"
+          placeholder="2015"
+          :class="field"
+        />
       </div>
       <div>
         <label for="slot-naissance-max" :class="label">Année naissance max</label>
-        <input id="slot-naissance-max" v-model="draft.naissance_max" type="text" inputmode="numeric" data-testid="slot-naissance-max" placeholder="2018" :class="field">
+        <input
+          id="slot-naissance-max"
+          v-model="draft.naissance_max"
+          type="text"
+          inputmode="numeric"
+          data-testid="slot-naissance-max"
+          placeholder="2018"
+          :class="field"
+        />
       </div>
     </div>
     <div class="mt-1 flex justify-end gap-2 border-t border-slate-100 pt-3">

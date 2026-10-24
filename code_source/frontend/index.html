@@ -1,43 +1,61 @@
 <!doctype html>
 <html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0F172A">
-<title>ALJ Escalade</title>
-<!-- Installed app (PWA): /competitions is its start page; manifest and service worker served by FastAPI -->
-<link rel="manifest" href="/manifest.webmanifest">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="/annuaire/assets/logo.png">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='85' font-size='85'>🧗</text></svg>">
-<!-- window.ALJ_RUNTIME: Firebase emulator in dev, nothing in production (served by FastAPI, never built in) -->
-<script src="/runtime-config.js"></script>
-<script>
-  /* Browsers older than the build target (Vite default: about Safari 16.4 / Chrome 111 / Firefox 128;
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0F172A" />
+    <title>ALJ Escalade</title>
+    <!-- Installed app (PWA): /competitions is its start page; manifest and service worker served by FastAPI -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/annuaire/assets/logo.png" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='85' font-size='85'>🧗</text></svg>"
+    />
+    <!-- window.ALJ_RUNTIME: Firebase emulator in dev, nothing in production (served by FastAPI, never built in) -->
+    <script src="/runtime-config.js"></script>
+    <script>
+      /* Browsers older than the build target (Vite default: about Safari 16.4 / Chrome 111 / Firefox 128;
      Tailwind v4 needs color-mix) get a message instead of a blank page. Classic script on purpose:
      it must run where the app's modules cannot. */
-  window.ALJ_UNSUPPORTED = !(
-    "noModule" in document.createElement("script") &&
-    typeof structuredClone === "function" &&
-    typeof Array.prototype.at === "function" &&
-    window.CSS && CSS.supports && CSS.supports("color", "color-mix(in srgb, red, blue)")
-  );
-  if (window.ALJ_UNSUPPORTED) {
-    document.addEventListener("DOMContentLoaded", function () {
-      document.getElementById("unsupported").hidden = false;
-    });
-  }
-</script>
-</head>
-<body>
-<div id="unsupported" hidden style="max-width:560px;margin:40px auto;padding:16px 18px;font:15px/1.5 sans-serif;color:#1E293B;background:#fff;border:1px solid #E2E8F0;border-radius:12px">
-  <h1 style="font-size:19px;margin:0 0 8px">🧗 ALJ Escalade</h1>
-  <p>Votre navigateur est trop ancien pour cette application.</p>
-  <p>Mettez-le à jour (Safari 16.4, Chrome 111, Firefox 128 ou plus récent), puis rechargez la page.</p>
-</div>
-<noscript>JavaScript doit être activé pour utiliser l'application ALJ Escalade.</noscript>
-<div id="app"></div>
-<script type="module" src="/src/main.ts"></script>
-</body>
+      window.ALJ_UNSUPPORTED = !(
+        "noModule" in document.createElement("script") &&
+        typeof structuredClone === "function" &&
+        typeof Array.prototype.at === "function" &&
+        window.CSS &&
+        CSS.supports &&
+        CSS.supports("color", "color-mix(in srgb, red, blue)")
+      );
+      if (window.ALJ_UNSUPPORTED) {
+        document.addEventListener("DOMContentLoaded", function () {
+          document.getElementById("unsupported").hidden = false;
+        });
+      }
+    </script>
+  </head>
+  <body>
+    <div
+      id="unsupported"
+      hidden
+      style="
+        max-width: 560px;
+        margin: 40px auto;
+        padding: 16px 18px;
+        font: 15px/1.5 sans-serif;
+        color: #1e293b;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+      "
+    >
+      <h1 style="font-size: 19px; margin: 0 0 8px">🧗 ALJ Escalade</h1>
+      <p>Votre navigateur est trop ancien pour cette application.</p>
+      <p>Mettez-le à jour (Safari 16.4, Chrome 111, Firefox 128 ou plus récent), puis rechargez la page.</p>
+    </div>
+    <noscript>JavaScript doit être activé pour utiliser l'application ALJ Escalade.</noscript>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

@@ -40,21 +40,52 @@ const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_minmax(0,1fr)
             Nés entre {{ slot.naissance_min || "…" }} et {{ slot.naissance_max || "…" }}
           </div>
         </div>
-        <div><span :class="['inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold', KIND_CLASS[slotKind(slot)]]">{{ slot.type || "cours" }}</span></div>
+        <div>
+          <span :class="['inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold', KIND_CLASS[slotKind(slot)]]">{{
+            slot.type || "cours"
+          }}</span>
+        </div>
         <div class="text-xs"><span class="text-slate-500 md:hidden">👤 </span>{{ slot.encadrants.join(", ") || "—" }}</div>
         <div class="flex flex-wrap gap-1">
-          <span v-for="tarif in slot.helloasso_tarifs" :key="tarif" class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px]">{{ tarif }}</span>
+          <span v-for="tarif in slot.helloasso_tarifs" :key="tarif" class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px]">{{
+            tarif
+          }}</span>
           <span v-if="!slot.helloasso_tarifs.length" class="text-slate-500">Aucun tarif lié</span>
         </div>
         <div class="md:text-center">
-          <a v-if="slot.whatsapp_link" :href="slot.whatsapp_link" target="_blank" rel="noopener" title="Ouvrir le groupe WhatsApp" class="no-underline">
+          <a
+            v-if="slot.whatsapp_link"
+            :href="slot.whatsapp_link"
+            target="_blank"
+            rel="noopener"
+            title="Ouvrir le groupe WhatsApp"
+            class="no-underline"
+          >
             🟢<span class="md:sr-only"> Groupe WhatsApp</span>
           </a>
           <span v-else class="hidden text-[11px] text-slate-500 md:inline">—</span>
         </div>
         <div class="flex gap-1.5 md:justify-center">
-          <button type="button" data-testid="slot-edit" :aria-label="`Modifier ${slot.groupe}`" title="Modifier" class="cursor-pointer rounded-lg bg-slate-200 px-2 py-1 hover:bg-slate-300" @click="emit('edit', slot)">✏️</button>
-          <button type="button" data-testid="slot-delete" :aria-label="`Supprimer ${slot.groupe}`" title="Supprimer" class="cursor-pointer rounded-lg bg-slate-200 px-2 py-1 text-red-600 hover:bg-slate-300" @click="emit('remove', slot)">🗑️</button>
+          <button
+            type="button"
+            data-testid="slot-edit"
+            :aria-label="`Modifier ${slot.groupe}`"
+            title="Modifier"
+            class="cursor-pointer rounded-lg bg-slate-200 px-2 py-1 hover:bg-slate-300"
+            @click="emit('edit', slot)"
+          >
+            ✏️
+          </button>
+          <button
+            type="button"
+            data-testid="slot-delete"
+            :aria-label="`Supprimer ${slot.groupe}`"
+            title="Supprimer"
+            class="cursor-pointer rounded-lg bg-slate-200 px-2 py-1 text-red-600 hover:bg-slate-300"
+            @click="emit('remove', slot)"
+          >
+            🗑️
+          </button>
         </div>
       </li>
     </ul>

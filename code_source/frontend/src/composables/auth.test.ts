@@ -54,14 +54,33 @@ describe("createAuth", () => {
   it("reports a refused session", async () => {
     const { auth, emit } = setup(async () => json({ status: "error" }, 401));
     await emit(ALBUS);
-    expect(auth.state.value).toEqual({ status: "error", user: ALBUS, message: "Session refusée par le serveur : reconnectez-vous.", offline: false });
+    expect(auth.state.value).toEqual({
+      status: "error",
+      user: ALBUS,
+      message: "Session refusée par le serveur : reconnectez-vous.",
+      offline: false,
+    });
   });
 
   const UNREACHABLE = "Serveur injoignable : vérifiez la connexion réseau.";
   it.each([
     ["a server error", async () => json({}, 500), "Le serveur ne répond pas correctement (erreur 500).", false],
-    ["no network", async () => { throw new TypeError("Failed to fetch"); }, UNREACHABLE, true],
-    ["no network to renew the token", async () => { throw Object.assign(new Error("x"), { code: "auth/network-request-failed" }); }, UNREACHABLE, true],
+    [
+      "no network",
+      async () => {
+        throw new TypeError("Failed to fetch");
+      },
+      UNREACHABLE,
+      true,
+    ],
+    [
+      "no network to renew the token",
+      async () => {
+        throw Object.assign(new Error("x"), { code: "auth/network-request-failed" });
+      },
+      UNREACHABLE,
+      true,
+    ],
     ["an unknown role", async () => json({ email: "x", role: "superuser" }), "Réponse inattendue du serveur.", false],
     ["a body that is not JSON", async () => new Response("<html>", { status: 200 }), "Réponse inattendue du serveur.", false],
   ])("reports %s without granting access", async (_case, fetchMe, message, offline) => {
@@ -73,13 +92,16 @@ describe("createAuth", () => {
   it("asks the server again when the network comes back, only while the role is unknown", async () => {
     let calls = 0;
     let networkBack: () => void = () => {};
-    const { auth, deps, emit } = setup(async () => {
-      if (++calls === 1) throw new TypeError("Failed to fetch");
-      return json({ email: ALBUS.email, role: "coach" });
-    }, (cb) => {
-      networkBack = cb;
-      return () => {};
-    });
+    const { auth, deps, emit } = setup(
+      async () => {
+        if (++calls === 1) throw new TypeError("Failed to fetch");
+        return json({ email: ALBUS.email, role: "coach" });
+      },
+      (cb) => {
+        networkBack = cb;
+        return () => {};
+      },
+    );
     await emit(ALBUS);
     expect(auth.state.value.status).toBe("error");
     networkBack();
@@ -100,9 +122,14 @@ describe("createAuth", () => {
 
   it("drops the answer meant for a previous user", async () => {
     let releaseAlbus: (r: Response) => void = () => {};
-    const { auth, change } = setup((): Promise<Response> => new Promise((resolve) => { releaseAlbus = resolve; }));
-    change(ALBUS);  // /api/me still on its way
-    change(null);  // signed out meanwhile
+    const { auth, change } = setup(
+      (): Promise<Response> =>
+        new Promise((resolve) => {
+          releaseAlbus = resolve;
+        }),
+    );
+    change(ALBUS); // /api/me still on its way
+    change(null); // signed out meanwhile
     expect(auth.state.value).toEqual({ status: "signedOut" });
     releaseAlbus(json({ email: ALBUS.email, role: "admin" }));
     await new Promise((r) => setTimeout(r, 0));

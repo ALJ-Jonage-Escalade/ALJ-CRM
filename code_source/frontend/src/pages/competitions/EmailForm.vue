@@ -71,9 +71,16 @@ async function send(): Promise<void> {
   if (!confirm(`Envoyer cet e-mail à ${n} compétiteur${n > 1 ? "s" : ""} ?`)) return;
   sending.value = true;
   try {
-    const result = await unwrap(client.POST("/api/send-email", { body: sendBody(props.competition, reachable.value, subject.value, body.value) }));
-    if (result.status === "error") problem.value = `❌ Échec d'envoi : ${result.message || result.details?.[0]?.error || "erreur d'envoi."}`;
-    else emit("sent", `✅ ${result.sent_count} e-mail(s) envoyé(s) avec succès${result.errors_count ? `, ${result.errors_count} en échec` : ""}.`);
+    const result = await unwrap(
+      client.POST("/api/send-email", { body: sendBody(props.competition, reachable.value, subject.value, body.value) }),
+    );
+    if (result.status === "error")
+      problem.value = `❌ Échec d'envoi : ${result.message || result.details?.[0]?.error || "erreur d'envoi."}`;
+    else
+      emit(
+        "sent",
+        `✅ ${result.sent_count} e-mail(s) envoyé(s) avec succès${result.errors_count ? `, ${result.errors_count} en échec` : ""}.`,
+      );
   } catch (e) {
     problem.value = `❌ Échec d'envoi : ${errorText(e)}`;
   } finally {
@@ -87,7 +94,9 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
 
 <template>
   <form novalidate class="flex flex-col gap-3" data-testid="email-form" @submit.prevent="send">
-    <p v-if="notConfigured" class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">⚠️ Envoi d'e-mails non configuré sur le serveur (identifiants Gmail ou SMTP manquants).</p>
+    <p v-if="notConfigured" class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      ⚠️ Envoi d'e-mails non configuré sur le serveur (identifiants Gmail ou SMTP manquants).
+    </p>
     <fieldset>
       <legend :class="label">Destinataires</legend>
       <label v-for="a in AUDIENCES" :key="a.id" class="mr-3 inline-flex cursor-pointer items-center gap-1.5 text-[13px]">
@@ -95,18 +104,33 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
         {{ a.label }} ({{ audience(rows, a.id).length }})
       </label>
     </fieldset>
-    <div class="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2" data-testid="email-recipients">
+    <div
+      class="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2"
+      data-testid="email-recipients"
+    >
       <span v-if="!recipients.length" class="text-xs text-slate-500">Aucun destinataire.</span>
       <span
         v-for="r in recipients"
         :key="r.adherent_id ?? r.nom"
-        :class="['inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11.5px]', hasEmail(r) ? 'border-slate-300 bg-white' : 'border-red-200 bg-red-50 text-red-600']"
+        :class="[
+          'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11.5px]',
+          hasEmail(r) ? 'border-slate-300 bg-white' : 'border-red-200 bg-red-50 text-red-600',
+        ]"
       >
         {{ r.prenom }} {{ r.nom }} &lt;{{ r.email || "sans e-mail" }}&gt;
-        <button type="button" class="cursor-pointer text-slate-400 hover:text-slate-700" :aria-label="`Retirer ${r.prenom} ${r.nom}`" @click="take(r.adherent_id)">✕</button>
+        <button
+          type="button"
+          class="cursor-pointer text-slate-400 hover:text-slate-700"
+          :aria-label="`Retirer ${r.prenom} ${r.nom}`"
+          @click="take(r.adherent_id)"
+        >
+          ✕
+        </button>
       </span>
     </div>
-    <p class="text-xs text-slate-500" data-testid="email-count">{{ reachable.length }} destinataire{{ reachable.length > 1 ? "s" : "" }} avec une adresse e-mail</p>
+    <p class="text-xs text-slate-500" data-testid="email-count">
+      {{ reachable.length }} destinataire{{ reachable.length > 1 ? "s" : "" }} avec une adresse e-mail
+    </p>
     <div>
       <label for="ce-template" :class="label">Modèle d'e-mail</label>
       <select id="ce-template" v-model="templateName" data-testid="email-template" :class="field" @change="useTemplate">
@@ -121,11 +145,17 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
     <div>
       <label for="ce-body" :class="label">Message</label>
       <textarea id="ce-body" v-model="body" rows="7" data-testid="email-body" :class="field" />
-      <p class="mt-1 text-[11px] text-slate-500">Variables : {first_name} {last_name} {num_licence} {name_competition} {no_competition} {date_competition} {montant_competition} {bloc_whatsapp}</p>
+      <p class="mt-1 text-[11px] text-slate-500">
+        Variables : {first_name} {last_name} {num_licence} {name_competition} {no_competition} {date_competition} {montant_competition}
+        {bloc_whatsapp}
+      </p>
     </div>
     <div v-if="preview">
       <span :class="label">Aperçu pour {{ reachable[0]!.prenom }} {{ reachable[0]!.nom }}</span>
-      <pre class="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-sans text-xs whitespace-pre-wrap" data-testid="email-preview">{{ preview }}</pre>
+      <pre
+        class="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-sans text-xs whitespace-pre-wrap"
+        data-testid="email-preview"
+        >{{ preview }}</pre>
     </div>
     <p v-if="problem" role="alert" class="text-[13px] font-semibold text-red-700" data-testid="email-problem">{{ problem }}</p>
     <div class="flex gap-2">

@@ -122,15 +122,30 @@ export interface SlotDraft extends Omit<Required<SlotUpdate>, "encadrants"> {
 export function draftOf(slot?: Slot): SlotDraft {
   if (!slot) {
     return {
-      id: 0, groupe: "", jour: "Lundi", horaires: "18:00 - 20:00", type: "cours", categorie_age: "", encadrants: "",
-      helloasso_tarifs: [], whatsapp_link: "", naissance_min: "", naissance_max: "",
+      id: 0,
+      groupe: "",
+      jour: "Lundi",
+      horaires: "18:00 - 20:00",
+      type: "cours",
+      categorie_age: "",
+      encadrants: "",
+      helloasso_tarifs: [],
+      whatsapp_link: "",
+      naissance_min: "",
+      naissance_max: "",
     };
   }
   return { ...slot, helloasso_tarifs: [...slot.helloasso_tarifs], encadrants: slot.encadrants.join(", ") };
 }
 
 export function updateOf(draft: SlotDraft): SlotUpdate {
-  return { ...draft, encadrants: draft.encadrants.split(",").map((e) => e.trim()).filter(Boolean) };
+  return {
+    ...draft,
+    encadrants: draft.encadrants
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean),
+  };
 }
 
 /** The form's days: the week, plus the slot's own when it is not one of them ("Lundi / Jeudi" stays as it is). */

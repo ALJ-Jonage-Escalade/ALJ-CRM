@@ -24,7 +24,12 @@ function writeAsFormerPage(record: object): Promise<void> {
   return new Promise((resolve, reject) => {
     const req = idb.open("alj-offline", 2);
     req.onupgradeneeded = () => {
-      for (const [name, keyPath] of [["resources", "name"], ["meta", "key"], ["outbox", "key"]]) req.result.createObjectStore(name!, { keyPath });
+      for (const [name, keyPath] of [
+        ["resources", "name"],
+        ["meta", "key"],
+        ["outbox", "key"],
+      ])
+        req.result.createObjectStore(name!, { keyPath });
     };
     req.onsuccess = () => {
       const tx = req.result.transaction("resources", "readwrite");
@@ -33,7 +38,7 @@ function writeAsFormerPage(record: object): Promise<void> {
         req.result.close();
         resolve();
       };
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = () => reject(tx.error ?? new Error("transaction failed"));
     };
   });
 }
@@ -60,7 +65,7 @@ describe("offline store", () => {
     await store.save("competitions", "u1", [1], null);
     await store.queue("u1", { key: "k1" });
     clock += (MAX_AGE_DAYS - 1) * DAY;
-    expect(await store.load("directory", "u1")).toBeNull();  // 31 days old
+    expect(await store.load("directory", "u1")).toBeNull(); // 31 days old
     expect(await store.load("competitions", "u1")).toBeNull();
     expect(await store.queued("u1")).toEqual([]);
   });
@@ -77,12 +82,12 @@ describe("offline store", () => {
     await store.start("u1");
     await store.save("directory", "u1", { n: 1 }, null);
     await store.queue("u1", { key: "k1" });
-    const other = newStore();  // next visit
+    const other = newStore(); // next visit
     await other.start("u2");
     expect(await other.load("directory", "u1")).toBeNull();
     expect(await other.queued("u1")).toEqual([]);
     await other.save("directory", "u2", { n: 2 }, null);
-    await newStore().start("u2");  // same user again: kept
+    await newStore().start("u2"); // same user again: kept
     expect((await other.load("directory", "u2"))?.data).toEqual({ n: 2 });
   });
 

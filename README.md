@@ -109,7 +109,7 @@ cd code_source
 uv run pytest tests                               # après uv sync --group web (comme la CI)
 uv run ruff check src tests
 uv run mypy                                       # fichiers listés dans [tool.mypy] de pyproject.toml
-cd frontend && npm run lint && npm run typecheck && npm test   # application Vue (ESLint, vue-tsc, Vitest)
+cd frontend && npm run lint && npm run format:check && npm run typecheck && npm test   # application Vue (ESLint, Prettier, vue-tsc, Vitest)
 ```
 
 Contrat de l'API : les types TypeScript de l'application Vue sont générés à partir des modèles Pydantic des routes.

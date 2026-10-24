@@ -50,7 +50,7 @@ export function poll<T>(url: string, opts: PollOptions<T>): Poll {
 
   function tick(): void {
     if (document.hidden) {
-      schedule();  // paused while hidden
+      schedule(); // paused while hidden
       return;
     }
     void refresh();
@@ -65,7 +65,7 @@ export function poll<T>(url: string, opts: PollOptions<T>): Poll {
       if (!stopped) onStatus(navigator.onLine === false ? "offline" : "error", { error });
       return;
     }
-    if (stopped) return;  // stopped while loading (logout, other season): answer dropped
+    if (stopped) return; // stopped while loading (logout, other season): answer dropped
     if (res.status === 304) {
       onStatus("ok", { changed: false });
       return;

@@ -1,7 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
-  allowedTarifs, checkAll, creneauItems, csvName, csvRows, dateValue, diplomes, diplomeWeight, emptyFilters, filterMembers,
-  fmtDay, loadFilters, matchesSearch, recordMember, recordQuery, saveFilters, shortenGroupLabel, statusChips, tarifCounts,
+  allowedTarifs,
+  checkAll,
+  creneauItems,
+  csvName,
+  csvRows,
+  dateValue,
+  diplomes,
+  diplomeWeight,
+  emptyFilters,
+  filterMembers,
+  fmtDay,
+  loadFilters,
+  matchesSearch,
+  recordMember,
+  recordQuery,
+  saveFilters,
+  shortenGroupLabel,
+  statusChips,
+  tarifCounts,
   type Creneau,
 } from "./members";
 import { member } from "./members.fixture";
@@ -18,9 +35,15 @@ describe("slot filter", () => {
   it("groups the slots by section, Enfants by birth years, with short labels", () => {
     expect(creneauItems(CRENEAUX).map((it) => `${it.kind}:${it.label}`)).toEqual([
       "group:Loisir adultes",
-      "section:Collège", "group:Liste d'attente",
-      "section:Enfants", "sub:2015-2016", "group:mercredi", "sub:2017-2018", "group:samedi",
-      "section:Compétition", "group:U13",
+      "section:Collège",
+      "group:Liste d'attente",
+      "section:Enfants",
+      "sub:2015-2016",
+      "group:mercredi",
+      "sub:2017-2018",
+      "group:samedi",
+      "section:Compétition",
+      "group:U13",
     ]);
     expect(shortenGroupLabel("Perfectionnement (ados)", "perfectionnement")).toBe("ados");
   });
@@ -28,8 +51,11 @@ describe("slot filter", () => {
   it("counts the members of each slot and of the tariffs no slot covers; waiting lists are left out by default", () => {
     const items = creneauItems(CRENEAUX);
     const members = [
-      member({ tarif_name: "Adulte loisir" }), member({ tarif_name: "adulte LOISIR" }), member({ tarif_name: "Attente collège" }),
-      member({ tarif_name: "Licence sèche" }), member({ tarif_name: "" }),
+      member({ tarif_name: "Adulte loisir" }),
+      member({ tarif_name: "adulte LOISIR" }),
+      member({ tarif_name: "Attente collège" }),
+      member({ tarif_name: "Licence sèche" }),
+      member({ tarif_name: "" }),
     ];
     const counts = tarifCounts(members, items);
     expect(counts.groups["Loisir adultes"]).toBe(2);
@@ -39,25 +65,45 @@ describe("slot filter", () => {
     const allowed = allowedTarifs(items, counts, filters);
     expect(allowed.has("attente college")).toBe(false);
     // The member without a tariff stays listed
-    expect(filterMembers(members, filters, allowed).map((m) => m.tarif_name)).toEqual(["Adulte loisir", "adulte LOISIR", "Licence sèche", ""]);
+    expect(filterMembers(members, filters, allowed).map((m) => m.tarif_name)).toEqual([
+      "Adulte loisir",
+      "adulte LOISIR",
+      "Licence sèche",
+      "",
+    ]);
 
     const none = checkAll(filters, items, counts, false);
     expect(filterMembers(members, none, allowedTarifs(items, counts, none))).toHaveLength(1);
     const every = checkAll(filters, items, counts, true);
     expect(filterMembers(members, every, allowedTarifs(items, counts, every))).toHaveLength(5);
-    expect(filters.groups).toEqual({});  // checkAll returns new filters
+    expect(filters.groups).toEqual({}); // checkAll returns new filters
   });
 });
 
 describe("search and status", () => {
   const m = member({
-    last_name: "DUPONT", first_name: "Éloïse", city: "Villette d'Anthon", phone: "06 12 34 56 78", email_primary: "e.dupont@example.org",
-    licence_ffme: "123456", tarif_name: "Adulte loisir", commentaires_correctif: "certificat à revoir",
+    last_name: "DUPONT",
+    first_name: "Éloïse",
+    city: "Villette d'Anthon",
+    phone: "06 12 34 56 78",
+    email_primary: "e.dupont@example.org",
+    licence_ffme: "123456",
+    tarif_name: "Adulte loisir",
+    commentaires_correctif: "certificat à revoir",
   });
 
   it.each([
-    ["dupont", true], ["eloise dupont", true], ["DUPONT ELOISE", true], ["villette", true], ["0612 3456", true],
-    ["12 34", true], ["e.dupont@", true], ["123456", true], ["certificat", true], ["martin", false], ["", true],
+    ["dupont", true],
+    ["eloise dupont", true],
+    ["DUPONT ELOISE", true],
+    ["villette", true],
+    ["0612 3456", true],
+    ["12 34", true],
+    ["e.dupont@", true],
+    ["123456", true],
+    ["certificat", true],
+    ["martin", false],
+    ["", true],
   ])("search %j → %s", (q, found) => {
     expect(matchesSearch(m, q)).toBe(found);
   });
@@ -65,7 +111,9 @@ describe("search and status", () => {
   it("filters on the status, and lists the statuses present with their counts", () => {
     const members = [member({ status_norm: "Validé" }), member({ status_norm: "Validé" }), member({ status_norm: "Annulé" })];
     expect(statusChips(members)).toEqual([
-      { value: "", label: "Tous", count: 3 }, { value: "Validé", label: "Validé", count: 2 }, { value: "Annulé", label: "Annulé", count: 1 },
+      { value: "", label: "Tous", count: 3 },
+      { value: "Validé", label: "Validé", count: 2 },
+      { value: "Annulé", label: "Annulé", count: 1 },
     ]);
     const filters = { ...emptyFilters(), status: "Annulé" };
     expect(filterMembers(members, filters, new Set())).toHaveLength(1);
@@ -89,17 +137,27 @@ describe("display", () => {
   });
 
   it("names the member record by member, season and membership", () => {
-    expect(recordQuery(member({ user_id: 42, purchase_id: 7, season_name: "2025-2026" }))).toEqual({ id: "42", saison: "2025-2026", achat: "7" });
-    const both = [member({ user_id: 42, purchase_id: 7 }), member({ user_id: 42, purchase_id: 8 }), member({ user_id: 43, purchase_id: 9 })];
+    expect(recordQuery(member({ user_id: 42, purchase_id: 7, season_name: "2025-2026" }))).toEqual({
+      id: "42",
+      saison: "2025-2026",
+      achat: "7",
+    });
+    const both = [
+      member({ user_id: 42, purchase_id: 7 }),
+      member({ user_id: 42, purchase_id: 8 }),
+      member({ user_id: 43, purchase_id: 9 }),
+    ];
     expect(recordMember(both, "42", "8")?.purchase_id).toBe(8);
-    expect(recordMember(both, "42")?.purchase_id).toBe(7);  // a link of the former page: the first membership
+    expect(recordMember(both, "42")?.purchase_id).toBe(7); // a link of the former page: the first membership
     expect(recordMember(both, "44")).toBeUndefined();
   });
 });
 
 describe("CSV export", () => {
   it("has the columns of the former page, one row per member", () => {
-    const rows = csvRows([member({ last_name: "DUPONT", first_name: "Léa", birth_date: "2012-05-04", age: 14, amount: 180, order_date: "2026-09-01T12:00:00" })]);
+    const rows = csvRows([
+      member({ last_name: "DUPONT", first_name: "Léa", birth_date: "2012-05-04", age: 14, amount: 180, order_date: "2026-09-01T12:00:00" }),
+    ]);
     expect(rows[0]!.slice(0, 4)).toEqual(["Nom", "Prénom", "Date de naissance", "Âge"]);
     expect(rows[0]).toHaveLength(25);
     expect(rows[1]!.slice(0, 4)).toEqual(["DUPONT", "Léa", "04/05/2012", 14]);
@@ -114,13 +172,34 @@ describe("saved filters", () => {
     const store = new Map<string, string>();
     const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
     saveFilters({ season: "2025-2026", status: "Validé", search: "dupont", groups: { "Loisir adultes": false }, others: {} }, storage);
-    expect(loadFilters(storage)).toEqual({ season: "2025-2026", status: "Validé", search: "", groups: { "Loisir adultes": false }, others: {} });
+    expect(loadFilters(storage)).toEqual({
+      season: "2025-2026",
+      status: "Validé",
+      search: "",
+      groups: { "Loisir adultes": false },
+      others: {},
+    });
   });
 
   it("falls back to the defaults on unreadable or blocked storage", () => {
     expect(loadFilters({ getItem: () => "{oops" })).toEqual(emptyFilters());
-    expect(loadFilters({ getItem: () => JSON.stringify({ season: 3, groups: { a: "yes", b: true } }) })).toEqual({ ...emptyFilters(), groups: { b: true } });
-    expect(loadFilters({ getItem: () => { throw new Error("blocked"); } })).toEqual(emptyFilters());
-    expect(() => saveFilters(emptyFilters(), { setItem: () => { throw new Error("full"); } })).not.toThrow();
+    expect(loadFilters({ getItem: () => JSON.stringify({ season: 3, groups: { a: "yes", b: true } }) })).toEqual({
+      ...emptyFilters(),
+      groups: { b: true },
+    });
+    expect(
+      loadFilters({
+        getItem: () => {
+          throw new Error("blocked");
+        },
+      }),
+    ).toEqual(emptyFilters());
+    expect(() =>
+      saveFilters(emptyFilters(), {
+        setItem: () => {
+          throw new Error("full");
+        },
+      }),
+    ).not.toThrow();
   });
 });

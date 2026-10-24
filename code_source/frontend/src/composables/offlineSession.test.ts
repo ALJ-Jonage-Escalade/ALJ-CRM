@@ -25,7 +25,7 @@ describe("bindOfflineStore", () => {
 
     state.value = { status: "error", user: { uid: "u1", email: "a@x" }, message: "x", offline: true };
     await nextTick();
-    expect(store.start).toHaveBeenCalledTimes(1);  // same user: nothing to do
+    expect(store.start).toHaveBeenCalledTimes(1); // same user: nothing to do
 
     state.value = { status: "signedOut" };
     await nextTick();
@@ -33,7 +33,7 @@ describe("bindOfflineStore", () => {
 
     state.value = { status: "signedIn", user: { uid: "u2", email: "b@x" }, role: null };
     await nextTick();
-    expect(store.start).toHaveBeenLastCalledWith("u2");  // another account: start() wipes u1's data
+    expect(store.start).toHaveBeenLastCalledWith("u2"); // another account: start() wipes u1's data
   });
 
   it("wipes at once when the page opens signed out", () => {

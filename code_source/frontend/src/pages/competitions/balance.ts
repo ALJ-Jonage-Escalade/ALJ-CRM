@@ -68,8 +68,15 @@ export function balances(list: readonly Competition[], season: string, today: st
       if (!l) continue;
       const key = p.adherent_id != null ? String(p.adherent_id) : `${p.nom}|${p.prenom}`;
       const b = byMember.get(key) ?? {
-        adherentId: p.adherent_id ?? null, nom: (p.nom ?? "").toUpperCase(), prenom: p.prenom ?? "", licence: p.num_licence ?? "",
-        lines: [], due: 0, paid: 0, remaining: 0, absent: false,
+        adherentId: p.adherent_id ?? null,
+        nom: (p.nom ?? "").toUpperCase(),
+        prenom: p.prenom ?? "",
+        licence: p.num_licence ?? "",
+        lines: [],
+        due: 0,
+        paid: 0,
+        remaining: 0,
+        absent: false,
       };
       b.lines.push(l);
       b.due = round(b.due + l.due);
@@ -80,13 +87,18 @@ export function balances(list: readonly Competition[], season: string, today: st
       byMember.set(key, b);
     }
   }
-  for (const b of byMember.values()) b.lines.sort((x, y) => (x.competition.date_competition ?? "").localeCompare(y.competition.date_competition ?? ""));
+  for (const b of byMember.values())
+    b.lines.sort((x, y) => (x.competition.date_competition ?? "").localeCompare(y.competition.date_competition ?? ""));
   return [...byMember.values()].sort((a, b) => a.nom.localeCompare(b.nom, "fr") || a.prenom.localeCompare(b.prenom, "fr"));
 }
 
 export function searchBalances(list: readonly Balance[], search: string): Balance[] {
   const q = normKey(search);
-  return q ? list.filter((b) => normKey(`${b.nom} ${b.prenom}`).includes(q) || normKey(`${b.prenom} ${b.nom}`).includes(q) || normKey(b.licence).includes(q)) : list.slice();
+  return q
+    ? list.filter(
+        (b) => normKey(`${b.nom} ${b.prenom}`).includes(q) || normKey(`${b.prenom} ${b.nom}`).includes(q) || normKey(b.licence).includes(q),
+      )
+    : list.slice();
 }
 
 export function totals(list: readonly Balance[]): { due: number; paid: number; remaining: number } {
@@ -106,8 +118,18 @@ export function balanceCsv(list: readonly Balance[]): Cell[][] {
   return [
     ["Nom", "Prénom", "N° Licence FFME", "Épreuves", "Total dû (€)", "Total payé (€)", "Reste dû (€)", "Remarques (reports / absences)"],
     ...list.map((b) => [
-      b.nom, b.prenom, b.licence, b.lines.length, b.due.toFixed(2), b.paid.toFixed(2), b.remaining.toFixed(2),
-      b.lines.filter((l) => l.carriedOver).map((l) => `${l.competition.nom} : reporté`).concat(b.absent ? ["Absent à une épreuve payée"] : []).join(" | "),
+      b.nom,
+      b.prenom,
+      b.licence,
+      b.lines.length,
+      b.due.toFixed(2),
+      b.paid.toFixed(2),
+      b.remaining.toFixed(2),
+      b.lines
+        .filter((l) => l.carriedOver)
+        .map((l) => `${l.competition.nom} : reporté`)
+        .concat(b.absent ? ["Absent à une épreuve payée"] : [])
+        .join(" | "),
     ]),
   ];
 }

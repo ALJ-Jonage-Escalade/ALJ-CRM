@@ -6,7 +6,8 @@ import { ref, type InjectionKey, type Ref } from "vue";
 import { ApiError } from "../../lib/client";
 import type { Competition } from "./competitions";
 
-export const OFFLINE_MESSAGE = "📴 Hors ligne : seules les cases « Participe » et « Présent » d'un compétiteur inscrit peuvent être modifiées.";
+export const OFFLINE_MESSAGE =
+  "📴 Hors ligne : seules les cases « Participe » et « Présent » d'un compétiteur inscrit peuvent être modifiées.";
 export const NETWORK_MESSAGE = "📴 Réseau indisponible : modification non enregistrée.";
 
 export interface RunOptions<T> {
@@ -67,14 +68,15 @@ export function createWriter(deps: WriterDeps): Writer {
       return answer;
     } catch (e) {
       const error = e instanceof ApiError ? e : new ApiError(0, null, "Erreur inattendue.");
-      if (!options.refused?.(error)) deps.toast(error.status === 0 && error.code === "network" ? NETWORK_MESSAGE : `❌ ${error.message}`, 9000);
+      if (!options.refused?.(error))
+        deps.toast(error.status === 0 && error.code === "network" ? NETWORK_MESSAGE : `❌ ${error.message}`, 9000);
       return undefined;
     } finally {
       busy.value = --running > 0;
     }
   }
 
-  return { busy, online: deps.online, dropped: deps.dropped, run, toast: deps.toast };
+  return { busy, online: () => deps.online(), dropped: (id) => deps.dropped(id), run, toast: (message, ms) => deps.toast(message, ms) };
 }
 
 export const WRITER_KEY: InjectionKey<Writer> = Symbol("competition-writer");

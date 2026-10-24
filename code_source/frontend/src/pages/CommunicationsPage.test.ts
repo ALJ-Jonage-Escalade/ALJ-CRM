@@ -27,12 +27,16 @@ function render(answers: Record<string, Answer> = ANSWERS) {
     const method = init?.method ?? "GET";
     const body = init?.body ? JSON.parse(init.body as string) : undefined;
     calls.push({ method, path: decodeURIComponent(u.pathname), body });
-    const answer = answers[`${method} ${u.pathname}`] ?? (method === "DELETE" ? () => json({ status: "success", message: "ok" }) : undefined);
+    const answer =
+      answers[`${method} ${u.pathname}`] ?? (method === "DELETE" ? () => json({ status: "success", message: "ok" }) : undefined);
     return answer ? answer(body) : json({}, 404);
   });
   const auth: Auth = {
     state: ref({ status: "signedIn", user: { uid: "u1", email: "admin@alj.example" }, role: "admin" }),
-    login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(async () => {}),
+    retry: vi.fn(async () => {}),
+    stop: vi.fn(),
   };
   const wrapper = mount(CommunicationsPage, {
     attachTo: document.body,
@@ -76,11 +80,13 @@ describe("CommunicationsPage", () => {
     expect(byId("preview-subject")!.textContent).toBe("Dernier rappel Alex");
     await wrapper.find('[data-testid="template-save"]').trigger("click");
     await flushPromises();
-    expect(writes()).toEqual([{
-      method: "POST",
-      path: "/api/email-templates",
-      body: { ...RELANCE, name: "Relance finale", subject: "Dernier rappel {first_name}", old_name: "Relance 2" },
-    }]);
+    expect(writes()).toEqual([
+      {
+        method: "POST",
+        path: "/api/email-templates",
+        body: { ...RELANCE, name: "Relance finale", subject: "Dernier rappel {first_name}", old_name: "Relance 2" },
+      },
+    ]);
     expect(byId("toast")!.textContent).toBe("💾 Modèle « Relance finale » enregistré avec succès !");
   });
 
@@ -96,7 +102,8 @@ describe("CommunicationsPage", () => {
   it("shows the server's refusal", async () => {
     const { wrapper, byId } = render({
       ...ANSWERS,
-      "POST /api/email-templates": () => json({ status: "error", message: "Un modèle nommé « X » existe déjà.", code: "duplicate_name" }, 409),
+      "POST /api/email-templates": () =>
+        json({ status: "error", message: "Un modèle nommé « X » existe déjà.", code: "duplicate_name" }, 409),
     });
     await flushPromises();
     await wrapper.find("form").trigger("submit");

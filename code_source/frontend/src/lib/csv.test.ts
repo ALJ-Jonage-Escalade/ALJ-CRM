@@ -3,7 +3,7 @@ import { csvBlob, csvSafe, toCsv } from "./csv";
 
 describe("csvSafe", () => {
   it.each([
-    ["=HYPERLINK(\"http://x\")", "'=HYPERLINK(\"http://x\")"],
+    ['=HYPERLINK("http://x")', '\'=HYPERLINK("http://x")'],
     ["+cmd|' /C calc'!A0", "'+cmd|' /C calc'!A0"],
     ["-2+3+cmd|' /C calc'!A0", "'-2+3+cmd|' /C calc'!A0"],
     ["@SUM(A1:A2)", "'@SUM(A1:A2)"],
@@ -25,7 +25,12 @@ describe("csvSafe", () => {
 
 describe("toCsv", () => {
   it("quotes every cell, doubles the quotes, separates with ; and CRLF, starts with a BOM", () => {
-    expect(toCsv([["Nom", "Prénom"], ['Le "Roc"', "Léo"]])).toBe('\uFEFF"Nom";"Prénom"\r\n"Le ""Roc""";"Léo"');
+    expect(
+      toCsv([
+        ["Nom", "Prénom"],
+        ['Le "Roc"', "Léo"],
+      ]),
+    ).toBe('\uFEFF"Nom";"Prénom"\r\n"Le ""Roc""";"Léo"');
   });
 
   it("writes numbers, booleans and empty cells", () => {
@@ -33,12 +38,12 @@ describe("toCsv", () => {
   });
 
   it("neutralises the formulas of the cells", () => {
-    expect(toCsv([["=1+1", "+33 6 12 34 56 78"]])).toBe("\uFEFF\"'=1+1\";\"+33 6 12 34 56 78\"");
+    expect(toCsv([["=1+1", "+33 6 12 34 56 78"]])).toBe('\uFEFF"\'=1+1";"+33 6 12 34 56 78"');
   });
 
   it("gives a CSV file", async () => {
     const blob = csvBlob([["a"]]);
     expect(blob.type).toBe("text/csv;charset=utf-8");
-    expect([...new Uint8Array(await blob.arrayBuffer())]).toEqual([0xef, 0xbb, 0xbf, 0x22, 0x61, 0x22]);  // BOM, then "a"
+    expect([...new Uint8Array(await blob.arrayBuffer())]).toEqual([0xef, 0xbb, 0xbf, 0x22, 0x61, 0x22]); // BOM, then "a"
   });
 });

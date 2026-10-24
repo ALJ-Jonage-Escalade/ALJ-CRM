@@ -10,7 +10,7 @@ export async function deployedVersion(fetchImpl: typeof fetch = (...args) => fet
     const version = (body as { app_version?: unknown }).app_version;
     return typeof version === "string" && version ? version : null;
   } catch {
-    return null;  // offline
+    return null; // offline
   }
 }
 

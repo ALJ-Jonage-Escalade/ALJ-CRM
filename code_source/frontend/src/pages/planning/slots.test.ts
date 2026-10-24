@@ -1,13 +1,32 @@
 import { describe, expect, it } from "vitest";
 import {
-  dayOptions, draftOf, filterSlots, layoutDay, parseHours, slotError, slotKind, tarifOptions, typeOptions, updateOf, week,
+  dayOptions,
+  draftOf,
+  filterSlots,
+  layoutDay,
+  parseHours,
+  slotError,
+  slotKind,
+  tarifOptions,
+  typeOptions,
+  updateOf,
+  week,
   type Slot,
 } from "./slots";
 
 function slot(change: Partial<Slot> = {}): Slot {
   return {
-    id: 1, groupe: "Loisir collège", type: "cours", categorie_age: "U12-U15", jour: "Lundi", horaires: "18:30 - 20:00",
-    encadrants: ["Remus Lupin"], helloasso_tarifs: ["Loisir collège"], whatsapp_link: "", naissance_min: "", naissance_max: "",
+    id: 1,
+    groupe: "Loisir collège",
+    type: "cours",
+    categorie_age: "U12-U15",
+    jour: "Lundi",
+    horaires: "18:30 - 20:00",
+    encadrants: ["Remus Lupin"],
+    helloasso_tarifs: ["Loisir collège"],
+    whatsapp_link: "",
+    naissance_min: "",
+    naissance_max: "",
     ...change,
   };
 }
@@ -39,11 +58,20 @@ describe("week grid", () => {
       slot({ id: 2, horaires: "19:00 - 21:00" }),
       slot({ id: 3, horaires: "20:00 - 22:00" }),
     ]);
-    expect(placed.map((p) => [p.slot.id, p.lane, p.lanes])).toEqual([[1, 0, 2], [2, 1, 2], [3, 0, 2]]);
+    expect(placed.map((p) => [p.slot.id, p.lane, p.lanes])).toEqual([
+      [1, 0, 2],
+      [2, 1, 2],
+      [3, 0, 2],
+    ]);
   });
 
   it("leaves out unreadable hours, several days and Sunday", () => {
-    const days = week([slot({ jour: "lundi" }), slot({ jour: "Lundi / Jeudi" }), slot({ jour: "Dimanche" }), slot({ jour: "Mardi", horaires: "?" })]);
+    const days = week([
+      slot({ jour: "lundi" }),
+      slot({ jour: "Lundi / Jeudi" }),
+      slot({ jour: "Dimanche" }),
+      slot({ jour: "Mardi", horaires: "?" }),
+    ]);
     expect(days.map((d) => d.day)).toEqual(["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]);
     expect(days.map((d) => d.placed.length)).toEqual([1, 0, 0, 0, 0, 0]);
   });
@@ -86,7 +114,10 @@ describe("slot form", () => {
   it("edits the coaches as one text", () => {
     const draft = draftOf(slot({ encadrants: ["Remus Lupin", "Rubeus Hagrid"] }));
     expect(draft.encadrants).toBe("Remus Lupin, Rubeus Hagrid");
-    expect(updateOf({ ...draft, encadrants: " Remus Lupin,, Minerva McGonagall , " }).encadrants).toEqual(["Remus Lupin", "Minerva McGonagall"]);
+    expect(updateOf({ ...draft, encadrants: " Remus Lupin,, Minerva McGonagall , " }).encadrants).toEqual([
+      "Remus Lupin",
+      "Minerva McGonagall",
+    ]);
   });
 
   it("keeps the slot's own day, type and tariffs among the choices", () => {

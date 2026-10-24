@@ -27,8 +27,23 @@ import CoachesPane from "./competitions/CoachesPane.vue";
 import CompetitionDetail from "./competitions/CompetitionDetail.vue";
 import CompetitionForm from "./competitions/CompetitionForm.vue";
 import {
-  counts, discipline, euros, filterCompetitions, hasResults, isArchived, isPast, participantRows, period, sortCompetitions, todayIso, toMemberSlots,
-  type Coach, type Competition, type CompetitorContact, type MemberSlot, type When,
+  counts,
+  discipline,
+  euros,
+  filterCompetitions,
+  hasResults,
+  isArchived,
+  isPast,
+  participantRows,
+  period,
+  sortCompetitions,
+  todayIso,
+  toMemberSlots,
+  type Coach,
+  type Competition,
+  type CompetitorContact,
+  type MemberSlot,
+  type When,
 } from "./competitions/competitions";
 import HelloAssoPane from "./competitions/HelloAssoPane.vue";
 import type { HelloAssoItem } from "./competitions/helloasso";
@@ -54,14 +69,27 @@ const signedIn = computed(() => auth.state.value.status === "signedIn");
 const staff = computed(() => auth.state.value.status === "signedIn" && isStaff(auth.state.value.role));
 const contactsShown = computed(() => staff.value || access.value === "offline");
 
-const competitions = useSyncedResource<Competition[]>("competitions", () => (open.value ? "/api/competitions" : null), { offline: true, uid });
-const competitors = useSyncedResource<CompetitorContact[]>("competitors", () => (open.value && contactsShown.value ? "/api/members/competitors" : null), { offline: true, uid });
+const competitions = useSyncedResource<Competition[]>("competitions", () => (open.value ? "/api/competitions" : null), {
+  offline: true,
+  uid,
+});
+const competitors = useSyncedResource<CompetitorContact[]>(
+  "competitors",
+  () => (open.value && contactsShown.value ? "/api/members/competitors" : null),
+  { offline: true, uid },
+);
 // Offline the role cannot be checked: a device keeping the contacts is a coach's (they are never kept for others)
 const canWrite = computed(() => staff.value || (access.value === "offline" && competitors.data.value !== null));
 // Tariffs and slot groups to group the participants, names and e-mails to add or write to them: online only
-const members = useSyncedResource<MemberSlot[]>("competition-members", () => (open.value && signedIn.value ? "/api/competition-members" : null), {
-  offline: false, select: toMemberSlots, intervalMs: 60_000,
-});
+const members = useSyncedResource<MemberSlot[]>(
+  "competition-members",
+  () => (open.value && signedIn.value ? "/api/competition-members" : null),
+  {
+    offline: false,
+    select: toMemberSlots,
+    intervalMs: 60_000,
+  },
+);
 const coaches = useSyncedResource<Coach[]>("coaches", () => (staff.value ? "/api/coaches" : null), { offline: false, intervalMs: 60_000 });
 
 type Section = "competitions" | "helloasso" | "bilan" | "coachs";
@@ -75,7 +103,11 @@ const section = computed<Section>(() => {
   const s = route.query.section;
   return canWrite.value && SECTIONS.some((x) => x.id === s) ? (s as Section) : "competitions";
 });
-const items = useSyncedResource<HelloAssoItem[]>("helloasso-items", () => (staff.value && section.value === "helloasso" ? "/api/helloasso/items" : null), { offline: false });
+const items = useSyncedResource<HelloAssoItem[]>(
+  "helloasso-items",
+  () => (staff.value && section.value === "helloasso" ? "/api/helloasso/items" : null),
+  { offline: false },
+);
 
 // ---------------------------------------------------------------- Network and outbox
 
@@ -93,7 +125,13 @@ const online = computed(() => {
 });
 
 const outbox = createOutbox(store, (competitionId, adherentId, body) =>
-  unwrap(client.PATCH("/api/competitions/{competition_id}/participants/{adherent_id}", { params: { path: { competition_id: competitionId, adherent_id: adherentId } }, body })));
+  unwrap(
+    client.PATCH("/api/competitions/{competition_id}/participants/{adherent_id}", {
+      params: { path: { competition_id: competitionId, adherent_id: adherentId } },
+      body,
+    }),
+  ),
+);
 watch(uid, (u) => void outbox.load(u), { immediate: true });
 
 /* Sent as soon as the API answers again (each successful poll), oldest first. */
@@ -138,17 +176,35 @@ const today = todayIso();
 const all = computed(() => sortCompetitions(competitions.data.value ?? []));
 const search = ref("");
 const when = ref<When>("all");
-const current = computed(() => filterCompetitions(all.value.filter((c) => !isArchived(c)), search.value, when.value, today));
+const current = computed(() =>
+  filterCompetitions(
+    all.value.filter((c) => !isArchived(c)),
+    search.value,
+    when.value,
+    today,
+  ),
+);
 const archived = computed(() => filterCompetitions(all.value.filter(isArchived), search.value, when.value, today));
 const past = computed(() => all.value.filter((c) => !isArchived(c) && isPast(c, today)));
 const showArchived = ref(false);
-const WHEN: { id: When; label: string }[] = [{ id: "all", label: "Toutes" }, { id: "upcoming", label: "À venir" }, { id: "past", label: "Passées" }];
+const WHEN: { id: When; label: string }[] = [
+  { id: "all", label: "Toutes" },
+  { id: "upcoming", label: "À venir" },
+  { id: "past", label: "Passées" },
+];
 
 const selectedId = computed(() => (typeof route.query.id === "string" ? route.query.id : ""));
 const selected = computed(() => all.value.find((c) => String(c.id) === selectedId.value));
-const rows = computed(() => (selected.value
-  ? participantRows(selected.value, members.data.value ?? [], contactsShown.value ? (competitors.data.value ?? []) : [], (id, flag) => outbox.pending(selected.value!.id, id, flag)?.value)
-  : []));
+const rows = computed(() =>
+  selected.value
+    ? participantRows(
+        selected.value,
+        members.data.value ?? [],
+        contactsShown.value ? (competitors.data.value ?? []) : [],
+        (id, flag) => outbox.pending(selected.value!.id, id, flag)?.value,
+      )
+    : [],
+);
 
 const creating = ref(false);
 async function create(body: Schemas["CompetitionCreate"]): Promise<void> {
@@ -163,7 +219,12 @@ async function archivePast(): Promise<void> {
   const n = list.length;
   if (!n) return;
   const s = n > 1 ? "s" : "";
-  if (!confirm(`Archiver ${n} compétition${s} passée${s} ?\n\n${list.map((c) => `• ${c.nom} (${period(c)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`)) return;
+  if (
+    !confirm(
+      `Archiver ${n} compétition${s} passée${s} ?\n\n${list.map((c) => `• ${c.nom} (${period(c)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`,
+    )
+  )
+    return;
   await writer.run(() => unwrap(client.POST("/api/competitions/archive-past")), {
     done: (r) => `📦 ${r.archived.length} compétition${r.archived.length > 1 ? "s" : ""} archivée${r.archived.length > 1 ? "s" : ""}.`,
   });
@@ -171,7 +232,8 @@ async function archivePast(): Promise<void> {
 
 const plural = (n: number) => (n > 1 ? "s" : "");
 const listLine = computed(() => {
-  if (!competitions.data.value) return competitions.state.value === "loading" ? "⏳ Chargement des compétitions…" : "Aucune donnée des compétitions sur cet appareil.";
+  if (!competitions.data.value)
+    return competitions.state.value === "loading" ? "⏳ Chargement des compétitions…" : "Aucune donnée des compétitions sur cet appareil.";
   const n = current.value.length;
   const a = archived.value.length;
   return `${n} compétition${plural(n)}${a ? ` · ${a} archivée${plural(a)}` : ""}`;
@@ -184,7 +246,8 @@ const syncInfo = computed(() => {
   const state = competitions.state.value;
   const waiting = pendingLine(outbox.changes.value.size);
   if (competitions.httpStatus.value === 403) return "🔒 Accès restreint";
-  if (state === "offline" || auth.state.value.status === "error") return `📴 Hors ligne${since || " : aucune donnée sur cet appareil"}${waiting}`;
+  if (state === "offline" || auth.state.value.status === "error")
+    return `📴 Hors ligne${since || " : aucune donnée sur cet appareil"}${waiting}`;
   if (state === "error") return `⚠️ Serveur injoignable — nouvel essai automatique${since}${waiting}`;
   if (state === "loading") return at ? `💾 Données du ${TIME.format(at)}${waiting}` : waiting.slice(3);
   return at ? `☁️ À jour — ${TIME.format(at)}${waiting}` : waiting.slice(3);
@@ -202,7 +265,14 @@ const tab = (active: boolean) => [
 
 <template>
   <AppShell page="competitions" title="Compétitions" :sync="syncInfo" offline-read>
-    <p v-if="signInError" data-testid="sign-in-error" role="alert" class="mb-3 rounded-lg border border-red-300 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800">❌ {{ signInError }}</p>
+    <p
+      v-if="signInError"
+      data-testid="sign-in-error"
+      role="alert"
+      class="mb-3 rounded-lg border border-red-300 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800"
+    >
+      ❌ {{ signInError }}
+    </p>
 
     <nav v-if="canWrite" aria-label="Sections des compétitions" class="mb-3 flex gap-1.5 overflow-x-auto" data-testid="sections">
       <RouterLink
@@ -212,10 +282,18 @@ const tab = (active: boolean) => [
         :data-testid="`section-${s.id}`"
         :aria-current="section === s.id ? 'page' : undefined"
         :class="tab(section === s.id)"
-      >{{ s.label }}</RouterLink>
+        >{{ s.label }}</RouterLink
+      >
     </nav>
 
-    <HelloAssoPane v-if="section === 'helloasso'" :items="items.data.value" :loading="items.state.value === 'loading'" :competitions="all" :members="members.data.value ?? []" @changed="items.refresh()" />
+    <HelloAssoPane
+      v-if="section === 'helloasso'"
+      :items="items.data.value"
+      :loading="items.state.value === 'loading'"
+      :competitions="all"
+      :members="members.data.value ?? []"
+      @changed="items.refresh()"
+    />
     <BalancePane v-else-if="section === 'bilan'" :competitions="all" />
     <CoachesPane v-else-if="section === 'coachs'" :coaches="coaches.data.value" :competitions="all" @changed="competitions.refresh()" />
 
@@ -223,33 +301,76 @@ const tab = (active: boolean) => [
       <!-- The competitions: always on desktop, on phones until one is opened -->
       <section :class="selected ? 'hidden md:block' : ''" aria-label="Liste des compétitions">
         <div v-if="canWrite" class="mb-2 flex flex-wrap gap-1.5">
-          <UiButton small data-testid="create-comp" @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')">➕ Nouvelle compétition</UiButton>
-          <UiButton v-if="past.length" variant="muted" small data-testid="archive-past" @click="archivePast">📦 Archiver les passées ({{ past.length }})</UiButton>
+          <UiButton
+            small
+            data-testid="create-comp"
+            @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')"
+            >➕ Nouvelle compétition</UiButton
+          >
+          <UiButton v-if="past.length" variant="muted" small data-testid="archive-past" @click="archivePast"
+            >📦 Archiver les passées ({{ past.length }})</UiButton
+          >
         </div>
         <div class="mb-2 flex flex-wrap items-center gap-1.5">
-          <input v-model="search" type="search" data-testid="comp-search" placeholder="Rechercher (nom, lieu, discipline)…" class="min-w-32 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px]" />
-          <button v-for="w in WHEN" :key="w.id" type="button" :data-testid="`when-${w.id}`" :aria-pressed="when === w.id" :class="chip(when === w.id)" @click="when = w.id">{{ w.label }}</button>
+          <input
+            v-model="search"
+            type="search"
+            data-testid="comp-search"
+            placeholder="Rechercher (nom, lieu, discipline)…"
+            class="min-w-32 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px]"
+          />
+          <button
+            v-for="w in WHEN"
+            :key="w.id"
+            type="button"
+            :data-testid="`when-${w.id}`"
+            :aria-pressed="when === w.id"
+            :class="chip(when === w.id)"
+            @click="when = w.id"
+          >
+            {{ w.label }}
+          </button>
         </div>
         <p class="mb-2 text-xs text-slate-500" data-testid="comp-count">{{ listLine }}</p>
         <ul class="flex flex-col gap-2">
-          <li v-if="competitions.data.value && !current.length" class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500">
-            {{ search || when !== "all" ? "Aucune compétition correspondante." : archived.length ? "Aucune compétition en cours : toutes sont archivées." : "Aucune compétition enregistrée." }}
+          <li
+            v-if="competitions.data.value && !current.length"
+            class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500"
+          >
+            {{
+              search || when !== "all"
+                ? "Aucune compétition correspondante."
+                : archived.length
+                  ? "Aucune compétition en cours : toutes sont archivées."
+                  : "Aucune compétition enregistrée."
+            }}
           </li>
           <li v-for="c in current" :key="c.id">
             <RouterLink
               :to="{ query: { id: String(c.id) } }"
               data-testid="comp-card"
               :aria-current="selected?.id === c.id ? 'true' : undefined"
-              :class="['block rounded-xl border bg-white px-3.5 py-3 text-slate-800 no-underline shadow-sm hover:border-accent', selected?.id === c.id ? 'border-accent' : 'border-slate-200']"
+              :class="[
+                'block rounded-xl border bg-white px-3.5 py-3 text-slate-800 no-underline shadow-sm hover:border-accent',
+                selected?.id === c.id ? 'border-accent' : 'border-slate-200',
+              ]"
             >
-              <b class="block text-[15px]" data-testid="comp-name"><span v-if="hasResults(c)" title="Résultats officiels récupérés">🏆 </span>{{ c.nom }}</b>
+              <b class="block text-[15px]" data-testid="comp-name"
+                ><span v-if="hasResults(c)" title="Résultats officiels récupérés">🏆 </span>{{ c.nom }}</b
+              >
               <span class="block text-xs text-slate-500">
-                🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }} · 💶 {{ euros(c.prix) }}<template v-if="c.lieu"> · 📍 {{ c.lieu }}</template><template v-if="discipline(c)"> · {{ discipline(c) }}</template>
+                🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }} · 💶 {{ euros(c.prix) }}<template v-if="c.lieu"> · 📍 {{ c.lieu }}</template
+                ><template v-if="discipline(c)"> · {{ discipline(c) }}</template>
               </span>
               <span class="mt-0.5 block text-xs font-semibold text-blue-900">
-                ({{ counts(c.participants ?? []).selected }} participant{{ plural(counts(c.participants ?? []).selected) }} · {{ counts(c.participants ?? []).unpaid }} en attente · {{ counts(c.participants ?? []).paid }} payé{{ plural(counts(c.participants ?? []).paid) }})
+                ({{ counts(c.participants ?? []).selected }} participant{{ plural(counts(c.participants ?? []).selected) }} ·
+                {{ counts(c.participants ?? []).unpaid }} en attente · {{ counts(c.participants ?? []).paid }} payé{{
+                  plural(counts(c.participants ?? []).paid)
+                }})
               </span>
-              <span class="block text-xs text-slate-500">🏃 {{ c.coaches?.length ? `Coachs : ${c.coaches.join(", ")}` : "Aucun coach" }}</span>
+              <span class="block text-xs text-slate-500"
+                >🏃 {{ c.coaches?.length ? `Coachs : ${c.coaches.join(", ")}` : "Aucun coach" }}</span
+              >
             </RouterLink>
           </li>
         </ul>
@@ -260,10 +381,16 @@ const tab = (active: boolean) => [
           :aria-expanded="showArchived"
           class="mt-2.5 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300"
           @click="showArchived = !showArchived"
-        >{{ showArchived ? "🙈 Masquer les archives" : `🗂 Afficher les archives (${archived.length})` }}</button>
+        >
+          {{ showArchived ? "🙈 Masquer les archives" : `🗂 Afficher les archives (${archived.length})` }}
+        </button>
         <ul v-if="showArchived" class="mt-2 flex flex-col gap-2" data-testid="archived-list">
           <li v-for="c in archived" :key="c.id">
-            <RouterLink :to="{ query: { id: String(c.id) } }" data-testid="comp-card" class="block rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-slate-700 no-underline hover:border-accent">
+            <RouterLink
+              :to="{ query: { id: String(c.id) } }"
+              data-testid="comp-card"
+              class="block rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-slate-700 no-underline hover:border-accent"
+            >
               <b class="block text-[14px]" data-testid="comp-name">{{ c.nom }}</b>
               <span class="block text-xs text-slate-500">📅 {{ period(c) }} · 📦 Archivée</span>
             </RouterLink>
@@ -285,12 +412,20 @@ const tab = (active: boolean) => [
         :uid="uid"
       />
       <p v-else class="hidden rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center text-slate-500 md:block">
-        {{ selectedId && competitions.data.value ? "Compétition introuvable." : "Sélectionnez une compétition pour voir ses compétiteurs." }}
+        {{
+          selectedId && competitions.data.value ? "Compétition introuvable." : "Sélectionnez une compétition pour voir ses compétiteurs."
+        }}
       </p>
     </div>
 
     <UiDialog v-model:open="creating" title="➕ Nouvelle compétition" wide data-testid="create-dialog">
-      <CompetitionForm v-if="creating" :coaches="coaches.data.value ?? []" :busy="writer.busy.value" @save="create" @cancel="creating = false" />
+      <CompetitionForm
+        v-if="creating"
+        :coaches="coaches.data.value ?? []"
+        :busy="writer.busy.value"
+        @save="create"
+        @cancel="creating = false"
+      />
     </UiDialog>
     <UiToast :message="toast.message.value" />
   </AppShell>

@@ -125,7 +125,9 @@ const menuItem = "block cursor-pointer px-3 py-2 text-[12.5px] outline-none data
       <div class="flex flex-wrap items-center justify-between gap-2.5">
         <div class="min-w-0">
           <h2 class="text-base font-bold">📅 Planning & gestion des créneaux</h2>
-          <p class="text-xs text-slate-500">Création, modification des créneaux, animateurs, tarifs HelloAsso et impression de la grille.</p>
+          <p class="text-xs text-slate-500">
+            Création, modification des créneaux, animateurs, tarifs HelloAsso et impression de la grille.
+          </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <UiButton data-testid="slot-new" @click="open()">➕ Nouveau créneau</UiButton>
@@ -135,21 +137,55 @@ const menuItem = "block cursor-pointer px-3 py-2 text-[12.5px] outline-none data
               <UiButton variant="muted" data-testid="export-menu">📥 Exporter Excel ▾</UiButton>
             </DropdownMenuTrigger>
             <DropdownMenuPortal>
-              <DropdownMenuContent align="end" :side-offset="4" class="z-50 min-w-52 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                <DropdownMenuItem data-testid="export-grid" :class="menuItem" @select="download('grid')">📊 Grille hebdomadaire (.xlsx)</DropdownMenuItem>
-                <DropdownMenuItem data-testid="export-list" :class="menuItem" @select="download('list')">📋 Liste des créneaux (.xlsx)</DropdownMenuItem>
+              <DropdownMenuContent
+                align="end"
+                :side-offset="4"
+                class="z-50 min-w-52 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+              >
+                <DropdownMenuItem data-testid="export-grid" :class="menuItem" @select="download('grid')"
+                  >📊 Grille hebdomadaire (.xlsx)</DropdownMenuItem
+                >
+                <DropdownMenuItem data-testid="export-list" :class="menuItem" @select="download('list')"
+                  >📋 Liste des créneaux (.xlsx)</DropdownMenuItem
+                >
               </DropdownMenuContent>
             </DropdownMenuPortal>
           </DropdownMenuRoot>
-          <UiButton variant="muted" small data-testid="planning-refresh" aria-label="Recharger le planning" title="Recharger le planning" @click="refresh">🔄</UiButton>
+          <UiButton
+            variant="muted"
+            small
+            data-testid="planning-refresh"
+            aria-label="Recharger le planning"
+            title="Recharger le planning"
+            @click="refresh"
+            >🔄</UiButton
+          >
         </div>
       </div>
       <div class="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
         <div class="flex flex-wrap gap-1.5">
-          <button type="button" data-testid="view-week" :aria-pressed="view === 'week'" :class="chip(view === 'week')" @click="view = 'week'">🗓️ Vue semaine</button>
-          <button type="button" data-testid="view-table" :aria-pressed="view === 'table'" :class="chip(view === 'table')" @click="view = 'table'">📋 Tableau des créneaux</button>
+          <button
+            type="button"
+            data-testid="view-week"
+            :aria-pressed="view === 'week'"
+            :class="chip(view === 'week')"
+            @click="view = 'week'"
+          >
+            🗓️ Vue semaine
+          </button>
+          <button
+            type="button"
+            data-testid="view-table"
+            :aria-pressed="view === 'table'"
+            :class="chip(view === 'table')"
+            @click="view = 'table'"
+          >
+            📋 Tableau des créneaux
+          </button>
         </div>
-        <span data-testid="slot-count" class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{{ status }}</span>
+        <span data-testid="slot-count" class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{{
+          status
+        }}</span>
       </div>
     </UiCard>
 
@@ -164,7 +200,7 @@ const menuItem = "block cursor-pointer px-3 py-2 text-[12.5px] outline-none data
           aria-label="Filtrer les créneaux"
           placeholder="🔍 Filtrer les créneaux (nom, jour, encadrant, tarif)…"
           class="min-w-0 flex-1 basis-60 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[12.5px]"
-        >
+        />
         <div class="flex flex-wrap gap-1.5">
           <button
             v-for="[value, label] in KINDS"
@@ -174,14 +210,24 @@ const menuItem = "block cursor-pointer px-3 py-2 text-[12.5px] outline-none data
             :aria-pressed="kind === value"
             :class="chip(kind === value)"
             @click="kind = value"
-          >{{ label }}</button>
+          >
+            {{ label }}
+          </button>
         </div>
       </UiCard>
       <SlotList :slots="shown" @edit="open" @remove="remove" />
     </div>
 
     <UiDialog v-model:open="editing" :title="dialogTitle" wide data-testid="slot-dialog">
-      <SlotForm v-if="editing" v-model="draft" :tarifs="tarifs" :saving="saving" @save="save" @invalid="toast.show" @cancel="editing = false" />
+      <SlotForm
+        v-if="editing"
+        v-model="draft"
+        :tarifs="tarifs"
+        :saving="saving"
+        @save="save"
+        @invalid="toast.show"
+        @cancel="editing = false"
+      />
     </UiDialog>
     <UiToast :message="toast.message.value" />
   </AppShell>

@@ -17,7 +17,9 @@ function file(name: string): Response {
 }
 
 const CONFIG = {
-  status: "success", season: "2026-2027", default_dates: { start: "07/09/2026", end: "27/06/2027" },
+  status: "success",
+  season: "2026-2027",
+  default_dates: { start: "07/09/2026", end: "27/06/2027" },
   autonome: { adultes: 12, mineurs: 3, mineurs_autorises: 2, total: 17, groups: ["Autonome"] },
   cours: [
     { groupe: "Loisir collège", slots: "Lundi 18:00 - 20:00", tarifs: ["Loisir"], count: 8 },
@@ -25,14 +27,37 @@ const CONFIG = {
   ],
 };
 const STATS = {
-  status: "success", season: "2026-2027", produced_count: 20, termine_count: 10, ignored_count: 2, estimated_total: 30,
-  renewals_count: 18, new_licences_count: 12, ignored_details: ["PETIT Max (date de naissance manquante/invalide)"],
+  status: "success",
+  season: "2026-2027",
+  produced_count: 20,
+  termine_count: 10,
+  ignored_count: 2,
+  estimated_total: 30,
+  renewals_count: 18,
+  new_licences_count: 12,
+  ignored_details: ["PETIT Max (date de naissance manquante/invalide)"],
 };
 const PREVIEW = {
-  status: "success", filename: "ffme.xlsx", matched_count: 3, unmatched_count: 1,
+  status: "success",
+  filename: "ffme.xlsx",
+  matched_count: 3,
+  unmatched_count: 1,
   stats: { total_processed: 4, matched_by_licence: 2, matched_by_name: 1, matched_manually: 0, errors: [] },
-  unmatched: [{ nom: "DUPONT", prenom: "Tom", licence: "998877", birth_date: "22/07/2009", passeports: "", diplomes: "", document_sante: "Certificat" }],
-  users: [{ id: 7, last_name: "PETIT", first_name: "Max", birth_date: "2009-07-22" }, { id: 4, last_name: "DURAND", first_name: "Léa", birth_date: "" }],
+  unmatched: [
+    {
+      nom: "DUPONT",
+      prenom: "Tom",
+      licence: "998877",
+      birth_date: "22/07/2009",
+      passeports: "",
+      diplomes: "",
+      document_sante: "Certificat",
+    },
+  ],
+  users: [
+    { id: 7, last_name: "PETIT", first_name: "Max", birth_date: "2009-07-22" },
+    { id: 4, last_name: "DURAND", first_name: "Léa", birth_date: "" },
+  ],
 };
 
 type Answer = (body: unknown, url: URL) => Response;
@@ -45,10 +70,15 @@ const ANSWERS: Record<string, Answer> = {
   "GET /api/ffme/stats": () => json(STATS),
   "GET /api/ffme/export": () => file("import_ffme_20261022.csv"),
   "POST /api/ffme/preview": () => json(PREVIEW),
-  "POST /api/ffme/import": () => json({
-    status: "success", message: "Importation FFME validée : 4 adhérents mis à jour.", updated_count: 4, matched_manually: 1,
-    season: "2026-2027", stats: PREVIEW.stats,
-  }),
+  "POST /api/ffme/import": () =>
+    json({
+      status: "success",
+      message: "Importation FFME validée : 4 adhérents mis à jour.",
+      updated_count: 4,
+      matched_manually: 1,
+      season: "2026-2027",
+      stats: PREVIEW.stats,
+    }),
 };
 
 async function render(role: Role = "admin", path = "/bureau/outils") {
@@ -63,7 +93,10 @@ async function render(role: Role = "admin", path = "/bureau/outils") {
   });
   const auth: Auth = {
     state: ref({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role }),
-    login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(async () => {}),
+    retry: vi.fn(async () => {}),
+    stop: vi.fn(),
   };
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/bureau/outils", component: OutilsPage }] });
   await router.push(path);
@@ -110,7 +143,11 @@ describe("OutilsPage", () => {
     const pivot = byId<HTMLIFrameElement>("pivot-frame")!;
     expect(pivot.getAttribute("sandbox")).toBe("allow-scripts allow-popups allow-modals");
     expect(pivot.getAttribute("srcdoc")).toBe("<p>tcd 2026-2027</p>");
-    expect([...byId<HTMLSelectElement>("pivot-season")!.options].map((o) => o.value)).toEqual(["2026-2027", "2025-2026", "Toutes les saisons"]);
+    expect([...byId<HTMLSelectElement>("pivot-season")!.options].map((o) => o.value)).toEqual([
+      "2026-2027",
+      "2025-2026",
+      "Toutes les saisons",
+    ]);
 
     const select = byId<HTMLSelectElement>("pivot-season")!;
     select.value = "Toutes les saisons";
@@ -156,14 +193,17 @@ describe("OutilsPage", () => {
     stubDownloads();
     const { byId, all, open, sent } = await render("coach", "/bureau/outils?tab=presence");
     expect(byId("presence-autonomous-summary")!.textContent).toContain("Total adhérents : 17");
-    expect(byId("course-count")!.textContent!.trim()).toBe("2 créneau(x)");
+    expect(byId("course-count")!.textContent.trim()).toBe("2 créneau(x)");
     expect(all("course").map((c) => (c as HTMLInputElement).checked)).toEqual([true, true]);
     expect(byId<HTMLInputElement>("courses-start")!.value).toBe("07/09/2026");
 
     byId("download-autonomous")!.click();
     await flushPromises();
     expect(sent("POST", "/api/presence/export").at(-1)!.body).toEqual({
-      variant: "autonome", start_date: "07/09/2026", end_date: "27/06/2027", show_health_col: false,
+      variant: "autonome",
+      start_date: "07/09/2026",
+      end_date: "27/06/2027",
+      show_health_col: false,
     });
     expect(byId("toast")!.textContent).toBe("✅ Fichier « Feuilles.xlsx » téléchargé !");
 
@@ -181,8 +221,12 @@ describe("OutilsPage", () => {
     byId("download-courses")!.click();
     await flushPromises();
     expect(sent("POST", "/api/presence/export").at(-1)!.body).toEqual({
-      variant: "cours", selected_groups: ["Compétition U13"], start_date: "07/09/2026", end_date: "27/06/2027",
-      same_sheet: false, show_health_col: true,
+      variant: "cours",
+      selected_groups: ["Compétition U13"],
+      start_date: "07/09/2026",
+      end_date: "27/06/2027",
+      same_sheet: false,
+      show_health_col: true,
     });
     await open("ffme");
     await open("presence");
@@ -234,8 +278,11 @@ describe("OutilsPage", () => {
       "Confirmer l'enregistrement de 4 adhérents en base de données ?\n\n• 3 réconciliés automatiquement\n• 1 associés manuellement",
     );
     expect(sent("POST", "/api/ffme/import")[0]!.body).toEqual({
-      filename: "ffme.xlsx", content_base64: btoa("PK"),
-      manual_matches: [{ user_id: 7, nom: "DUPONT", prenom: "Tom", licence: "998877", passeports: "", diplomes: "", document_sante: "Certificat" }],
+      filename: "ffme.xlsx",
+      content_base64: btoa("PK"),
+      manual_matches: [
+        { user_id: 7, nom: "DUPONT", prenom: "Tom", licence: "998877", passeports: "", diplomes: "", document_sante: "Certificat" },
+      ],
     });
     expect(byId("ffme-import-done")!.textContent).toContain("4 adhérents ont été mis à jour");
     expect(all("ffme-preview")).toHaveLength(0);

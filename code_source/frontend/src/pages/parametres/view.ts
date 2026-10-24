@@ -50,9 +50,17 @@ export function googleChecks(t: Schemas["GoogleTest"]): CheckLine[] {
 
 export function cacheStatus(s: Schemas["CloudDbStatus"]): Status {
   if (s.db_exists) {
-    return { tone: "success", label: "🟢 Cache opérationnel", text: "Le cache SQLite du serveur est initialisé et actif pour les requêtes rapides et les exports." };
+    return {
+      tone: "success",
+      label: "🟢 Cache opérationnel",
+      text: "Le cache SQLite du serveur est initialisé et actif pour les requêtes rapides et les exports.",
+    };
   }
-  return { tone: "warning", label: "🟡 Cache non trouvé", text: "Le cache SQLite du serveur n'est pas encore créé. Lancez une synchronisation." };
+  return {
+    tone: "warning",
+    label: "🟡 Cache non trouvé",
+    text: "Le cache SQLite du serveur n'est pas encore créé. Lancez une synchronisation.",
+  };
 }
 
 export function cacheFile(s: Schemas["CloudDbStatus"]): string {
@@ -94,13 +102,18 @@ export function syncReport(r: Schemas["SyncCounters"] | null | undefined, now?: 
 export function batchReport(b: Schemas["BatchReport"], now?: Date): string[] {
   const email = b.email_sent
     ? `Oui (à ${b.notification_email})`
-    : b.competitions_updated > 0 ? "Erreur envoi" : "Non (aucun nouveau résultat)";
+    : b.competitions_updated > 0
+      ? "Erreur envoi"
+      : "Non (aucun nouveau résultat)";
   return [
     `🟢 Analyse MyCompet terminée à ${timeNow(now)}`,
     `• Compétitions passées vérifiées : ${b.competitions_checked}`,
     `• Résultats officiels trouvés : ${b.competitions_updated}`,
     `• E-mail récapitulatif expédié : ${email}`,
     ...b.details.map((c) =>
-      c.status === "found" ? `🏆 ${c.nom} : ${c.athletes.length} athlète(s) classé(s) pour le club` : `⏳ ${c.nom} : pas encore de résultats publiés`),
+      c.status === "found"
+        ? `🏆 ${c.nom} : ${c.athletes.length} athlète(s) classé(s) pour le club`
+        : `⏳ ${c.nom} : pas encore de résultats publiés`,
+    ),
   ];
 }

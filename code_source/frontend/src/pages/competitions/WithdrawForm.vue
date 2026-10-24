@@ -35,8 +35,16 @@ function confirm(): void {
     </label>
     <div>
       <label for="withdraw-note" class="mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase">Commentaire (motif) *</label>
-      <textarea id="withdraw-note" v-model="note" rows="2" data-testid="withdraw-note" class="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-[13px]" />
-      <p v-if="missing" class="mt-1 text-xs font-semibold text-red-600" data-testid="withdraw-error">Un commentaire est obligatoire pour expliquer le désistement.</p>
+      <textarea
+        id="withdraw-note"
+        v-model="note"
+        rows="2"
+        data-testid="withdraw-note"
+        class="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-[13px]"
+      />
+      <p v-if="missing" class="mt-1 text-xs font-semibold text-red-600" data-testid="withdraw-error">
+        Un commentaire est obligatoire pour expliquer le désistement.
+      </p>
     </div>
     <div class="flex gap-2">
       <UiButton type="submit" data-testid="withdraw-ok" :busy="busy && 'Enregistrement…'">Valider le désistement</UiButton>

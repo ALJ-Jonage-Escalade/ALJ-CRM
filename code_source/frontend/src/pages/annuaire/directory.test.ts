@@ -3,9 +3,23 @@ import { member } from "../adherents/members.fixture";
 import { detailRows, emergencyMatches, emergencyRows, seasonCounts, toDirectory } from "./directory";
 
 const LEA = member({
-  user_id: 1, purchase_id: 11, last_name: "DUPONT", first_name: "Léa", birth_date: "2014-03-02", phone: "06 12 34 56 78",
-  address: "1 rue A", zip_code: "69330", city: "Jonage", emergency1_name: "Paul Dupont", emergency1_phone: "06 00 00 00 01",
-  health_commitment: "Oui", document_sante: "Certificat", amount: 180, order_ref: "R-1", payer: "Paul Dupont", payer_email: "paul@example.org",
+  user_id: 1,
+  purchase_id: 11,
+  last_name: "DUPONT",
+  first_name: "Léa",
+  birth_date: "2014-03-02",
+  phone: "06 12 34 56 78",
+  address: "1 rue A",
+  zip_code: "69330",
+  city: "Jonage",
+  emergency1_name: "Paul Dupont",
+  emergency1_phone: "06 00 00 00 01",
+  health_commitment: "Oui",
+  document_sante: "Certificat",
+  amount: 180,
+  order_ref: "R-1",
+  payer: "Paul Dupont",
+  payer_email: "paul@example.org",
   commentaires_correctif: "à vérifier",
 });
 
@@ -13,8 +27,21 @@ describe("toDirectory", () => {
   it("keeps contacts and emergency contacts, no health nor payment data", () => {
     const d = toDirectory({ season: "2026-2027", creneaux: [], members: [LEA] });
     const kept = d.members[0]!;
-    expect(kept).toMatchObject({ last_name: "DUPONT", phone: "06 12 34 56 78", emergency1_phone: "06 00 00 00 01", payer_email: "paul@example.org" });
-    for (const field of ["health_commitment", "document_sante", "amount", "order_ref", "order_date", "commentaires_correctif", "email_sent_date"]) {
+    expect(kept).toMatchObject({
+      last_name: "DUPONT",
+      phone: "06 12 34 56 78",
+      emergency1_phone: "06 00 00 00 01",
+      payer_email: "paul@example.org",
+    });
+    for (const field of [
+      "health_commitment",
+      "document_sante",
+      "amount",
+      "order_ref",
+      "order_date",
+      "commentaires_correctif",
+      "email_sent_date",
+    ]) {
       expect(kept).not.toHaveProperty(field);
     }
     expect(d.season).toBe("2026-2027");
@@ -56,6 +83,9 @@ describe("emergency search", () => {
 
 describe("seasonCounts", () => {
   it("counts the cancelled memberships apart", () => {
-    expect(seasonCounts([{ status_norm: "Validé" }, { status_norm: "Annulé" }, { status_norm: "En cours" }])).toEqual({ registered: 2, cancelled: 1 });
+    expect(seasonCounts([{ status_norm: "Validé" }, { status_norm: "Annulé" }, { status_norm: "En cours" }])).toEqual({
+      registered: 2,
+      cancelled: 1,
+    });
   });
 });

@@ -47,3 +47,6 @@ desktop.ini
 .idea
 .jolli/
 .claude/settings.local.json
+
+# npm (only code_source/frontend/ has a package)
+node_modules/

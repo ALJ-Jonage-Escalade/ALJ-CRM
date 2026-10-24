@@ -46,7 +46,7 @@ function show(id: TabId): void {
 // Pivot table: the active season, or every season
 const ALL_SEASONS = "Toutes les saisons";
 const seasons = ref<string[]>([]);
-const season = ref("");  // empty until the seasons are known
+const season = ref(""); // empty until the seasons are known
 const pivotUrl = computed(() => `/pivot?season=${encodeURIComponent(season.value)}`);
 
 onMounted(async () => {
@@ -56,7 +56,7 @@ onMounted(async () => {
     season.value = data.seasons.includes(data.active) ? data.active : (data.seasons[0] ?? "active");
   } catch (e) {
     console.warn("Saisons des outils :", e);
-    season.value = "active";  // the server's active season
+    season.value = "active"; // the server's active season
   }
 });
 
@@ -99,7 +99,9 @@ const chip = (active: boolean) => [
           :aria-pressed="tab === t.id"
           :class="chip(tab === t.id)"
           @click="show(t.id)"
-        >{{ t.label }}</button>
+        >
+          {{ t.label }}
+        </button>
       </div>
     </UiCard>
 
@@ -117,7 +119,11 @@ const chip = (active: boolean) => [
     <section v-if="isOpen('pivot')" v-show="tab === 'pivot'" data-testid="pane-pivot">
       <label class="mb-2 flex items-center gap-2 text-[12.5px] font-semibold text-slate-500">
         Saison à analyser :
-        <select v-model="season" data-testid="pivot-season" class="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12.5px] text-slate-800">
+        <select
+          v-model="season"
+          data-testid="pivot-season"
+          class="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12.5px] text-slate-800"
+        >
           <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
           <option :value="ALL_SEASONS">{{ ALL_SEASONS }}</option>
         </select>

@@ -1,22 +1,25 @@
-import { defineConfig } from "eslint/config";
+import { globalIgnores } from "eslint/config";
+import { defineConfigWithVueTs, vueTsConfigs } from "@vue/eslint-config-typescript";
 import pluginVue from "eslint-plugin-vue";
-import tseslint from "typescript-eslint";
+import pluginVitest from "@vitest/eslint-plugin";
+import skipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 
-export default defineConfig(
-  { ignores: ["dist/", "node_modules/"] },
-  tseslint.configs.recommended,
+// Official Vue preset (same shape as `npm create vue`), type-aware rules; formatting is left to Prettier
+export default defineConfigWithVueTs(
+  { name: "app/files-to-lint", files: ["**/*.{ts,mts,vue}"] },
+  globalIgnores(["dist/", "src/lib/api-schema.ts"]),
   pluginVue.configs["flat/recommended"],
+  vueTsConfigs.recommendedTypeChecked,
+  { ...pluginVitest.configs.recommended, files: ["src/**/*.test.ts"] },
   {
-    files: ["**/*.vue"],
-    languageOptions: { parserOptions: { parser: tseslint.parser } },
-  },
-  {
+    // Mocks: `vi.fn(async () => value)` and `expect(obj.method).toHaveBeenCalled()` are idiomatic in tests
+    files: ["src/**/*.test.ts"],
     rules: {
-      // Formatting is not enforced (same as ruff format on the Python side)
-      "vue/max-attributes-per-line": "off",
-      "vue/singleline-html-element-content-newline": "off",
-      "vue/html-self-closing": "off",
-      "vue/multiline-html-element-content-newline": "off",
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/unbound-method": "off",
+      // Vitest accepts a failure message: expect(value, message)
+      "vitest/valid-expect": ["error", { maxArgs: 2 }],
     },
   },
+  skipFormatting,
 );

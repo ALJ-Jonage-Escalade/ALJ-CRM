@@ -14,12 +14,32 @@ import { useSyncedResource } from "../composables/syncedResource";
 import { pageAccess, verdict } from "../lib/access";
 import type { Schemas } from "../lib/client";
 import {
-  allowedTarifs, checkAll, creneauItems, diplomes, filterMembers, groupChecked, loadFilters, OTHER_PREFIX, otherChecked,
-  saveFilters, statusChips, statusClass, tarifCounts, telHref, type CreneauItem,
+  allowedTarifs,
+  checkAll,
+  creneauItems,
+  diplomes,
+  filterMembers,
+  groupChecked,
+  loadFilters,
+  OTHER_PREFIX,
+  otherChecked,
+  saveFilters,
+  statusChips,
+  statusClass,
+  tarifCounts,
+  telHref,
+  type CreneauItem,
 } from "./adherents/members";
 import {
-  detailRows, DIRECTORY_FILTER_KEY, emergencyMatches, emergencyRows, EMERGENCY_MIN_LETTERS, seasonCounts, toDirectory,
-  type Directory, type DirectoryMember,
+  detailRows,
+  DIRECTORY_FILTER_KEY,
+  emergencyMatches,
+  emergencyRows,
+  EMERGENCY_MIN_LETTERS,
+  seasonCounts,
+  toDirectory,
+  type Directory,
+  type DirectoryMember,
 } from "./annuaire/directory";
 
 const auth = inject(AUTH_KEY)!;
@@ -34,7 +54,11 @@ const uid = computed(() => {
   return open.value && (s.status === "signedIn" || s.status === "error") ? s.user.uid : null;
 });
 
-const seasons = useSyncedResource<Schemas["Seasons"]>("seasons", () => (open.value ? "/api/seasons" : null), { offline: true, uid, intervalMs: 60_000 });
+const seasons = useSyncedResource<Schemas["Seasons"]>("seasons", () => (open.value ? "/api/seasons" : null), {
+  offline: true,
+  uid,
+  intervalMs: 60_000,
+});
 const membersUrl = computed(() => {
   if (!open.value) return null;
   return filters.value.season ? `/api/members?${new URLSearchParams({ season: filters.value.season })}` : "/api/members";
@@ -60,7 +84,8 @@ const chips = computed(() => statusChips(all.value));
 const kpis = computed(() => seasonCounts(all.value));
 const plural = (n: number) => (n > 1 ? "s" : "");
 const countLine = computed(() => {
-  if (!list.value) return directory.state.value === "loading" ? "⏳ Chargement de l'annuaire…" : "Aucune donnée de l'annuaire sur cet appareil.";
+  if (!list.value)
+    return directory.state.value === "loading" ? "⏳ Chargement de l'annuaire…" : "Aucune donnée de l'annuaire sur cet appareil.";
   const n = shown.value.length;
   return `${n} adhérent${plural(n)} affiché${plural(n)} · saison ${season.value}${filters.value.status ? ` · statut ${filters.value.status}` : ""}`;
 });
@@ -116,7 +141,8 @@ const chip = (active: boolean) => [
   "cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold",
   active ? "border-accent bg-accent text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
 ];
-const callButton = "inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-bold text-slate-700 no-underline hover:bg-slate-200";
+const callButton =
+  "inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-bold text-slate-700 no-underline hover:bg-slate-200";
 const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[15px] md:text-[13px]";
 </script>
 
@@ -132,12 +158,18 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
         :aria-selected="tab === t.id"
         :class="[chip(tab === t.id), 'px-3.5 py-1.5 text-[13px]', !t.desktop && 'md:hidden']"
         @click="tab = t.id"
-      >{{ t.label }}</button>
+      >
+        {{ t.label }}
+      </button>
     </div>
 
     <div class="md:grid md:grid-cols-[260px_minmax(0,1fr)] md:items-start md:gap-4">
       <!-- Filters: a tab on phones, beside the list on desktop -->
-      <aside :class="[tab === 'filters' ? 'flex' : 'hidden md:flex', 'flex-col gap-3']" data-testid="directory-filters" aria-label="Filtres">
+      <aside
+        :class="[tab === 'filters' ? 'flex' : 'hidden md:flex', 'flex-col gap-3']"
+        data-testid="directory-filters"
+        aria-label="Filtres"
+      >
         <UiCard>
           <h3 class="mb-1.5 text-sm font-bold">📅 Saison</h3>
           <select
@@ -148,7 +180,9 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
             @change="chooseSeason(($event.target as HTMLSelectElement).value)"
           >
             <option v-if="!seasons.data.value?.seasons.includes(season) && season" :value="season">{{ season }}</option>
-            <option v-for="s in seasons.data.value?.seasons ?? []" :key="s" :value="s">{{ s }}{{ s === seasons.data.value?.active ? " (saison active)" : "" }}</option>
+            <option v-for="s in seasons.data.value?.seasons ?? []" :key="s" :value="s">
+              {{ s }}{{ s === seasons.data.value?.active ? " (saison active)" : "" }}
+            </option>
           </select>
         </UiCard>
         <UiCard>
@@ -162,25 +196,44 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
               :aria-pressed="filters.status === c.value"
               :class="chip(filters.status === c.value)"
               @click="chooseStatus(c.value)"
-            >{{ c.label }} ({{ c.count }})</button>
+            >
+              {{ c.label }} ({{ c.count }})
+            </button>
           </div>
         </UiCard>
         <UiCard>
           <h3 class="mb-1 text-sm font-bold">🧗 Créneaux affichés</h3>
-          <p class="mb-2 text-[11.5px] text-slate-500">Un créneau regroupe un ou plusieurs tarifs HelloAsso. Par défaut, les listes d'attente sont exclues.</p>
+          <p class="mb-2 text-[11.5px] text-slate-500">
+            Un créneau regroupe un ou plusieurs tarifs HelloAsso. Par défaut, les listes d'attente sont exclues.
+          </p>
           <template v-for="it in items" :key="`${it.kind}:${it.raw}`">
             <div v-if="it.kind === 'section'" class="mt-2 text-xs font-bold text-slate-700">📁 {{ it.label }}</div>
             <div v-else-if="it.kind === 'sub'" class="mt-1 pl-2 text-[11.5px] font-semibold text-slate-500">📂 {{ it.label }}</div>
             <label v-else data-testid="filter-group" class="flex cursor-pointer items-center gap-2 py-1 text-[13px]">
-              <input type="checkbox" class="size-4 accent-accent" :checked="groupChecked(filters, it)" @change="toggleGroup(it, ($event.target as HTMLInputElement).checked)">
+              <input
+                type="checkbox"
+                class="size-4 accent-accent"
+                :checked="groupChecked(filters, it)"
+                @change="toggleGroup(it, ($event.target as HTMLInputElement).checked)"
+              />
               <span class="min-w-0 flex-1 truncate" :title="it.raw">{{ it.label }}</span>
               <span class="rounded-full bg-slate-200 px-2 text-[11px] font-semibold text-slate-600">{{ counts.groups[it.raw] ?? 0 }}</span>
             </label>
           </template>
           <template v-if="otherTarifs.length">
             <div class="mt-2 text-xs font-bold text-slate-700">📁 Autres tarifs (hors créneau)</div>
-            <label v-for="t in otherTarifs" :key="t" data-testid="filter-group" class="flex cursor-pointer items-center gap-2 py-1 text-[13px]">
-              <input type="checkbox" class="size-4 accent-accent" :checked="otherChecked(filters, t)" @change="toggleOther(t, ($event.target as HTMLInputElement).checked)">
+            <label
+              v-for="t in otherTarifs"
+              :key="t"
+              data-testid="filter-group"
+              class="flex cursor-pointer items-center gap-2 py-1 text-[13px]"
+            >
+              <input
+                type="checkbox"
+                class="size-4 accent-accent"
+                :checked="otherChecked(filters, t)"
+                @change="toggleOther(t, ($event.target as HTMLInputElement).checked)"
+              />
               <span class="min-w-0 flex-1 truncate">{{ t }}</span>
               <span class="rounded-full bg-slate-200 px-2 text-[11px] font-semibold text-slate-600">{{ counts.others[t] }}</span>
             </label>
@@ -195,9 +248,18 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
       <!-- Members -->
       <section v-if="tab === 'members' || tab === 'filters'" :class="tab === 'filters' && 'hidden md:block'" aria-label="Adhérents">
         <div class="mb-3 grid grid-cols-3 gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-center shadow-sm">
-          <div><div class="text-xl font-bold text-blue-600" data-testid="kpi-shown">{{ list ? shown.length : "—" }}</div><div class="text-[11px] text-slate-500">Affichés</div></div>
-          <div><div class="text-xl font-bold" data-testid="kpi-season">{{ list ? kpis.registered : "—" }}</div><div class="text-[11px] text-slate-500">Inscrits saison</div></div>
-          <div><div class="text-xl font-bold text-red-600" data-testid="kpi-cancelled">{{ list ? kpis.cancelled : "—" }}</div><div class="text-[11px] text-slate-500">Annulés saison</div></div>
+          <div>
+            <div class="text-xl font-bold text-blue-600" data-testid="kpi-shown">{{ list ? shown.length : "—" }}</div>
+            <div class="text-[11px] text-slate-500">Affichés</div>
+          </div>
+          <div>
+            <div class="text-xl font-bold" data-testid="kpi-season">{{ list ? kpis.registered : "—" }}</div>
+            <div class="text-[11px] text-slate-500">Inscrits saison</div>
+          </div>
+          <div>
+            <div class="text-xl font-bold text-red-600" data-testid="kpi-cancelled">{{ list ? kpis.cancelled : "—" }}</div>
+            <div class="text-[11px] text-slate-500">Annulés saison</div>
+          </div>
         </div>
         <input
           v-model="filters.search"
@@ -206,11 +268,21 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
           aria-label="Rechercher un adhérent"
           placeholder="🔍 Nom, prénom, tarif, licence, ville, téléphone…"
           :class="searchInput"
-        >
+        />
         <p class="my-2 text-xs text-slate-500" data-testid="directory-count">{{ countLine }}</p>
         <ul class="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
-          <li v-if="list && !shown.length" class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500 lg:col-span-full">Aucun adhérent ne correspond aux filtres.</li>
-          <li v-for="m in shown" :key="m.purchase_id" data-testid="directory-card" class="rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm">
+          <li
+            v-if="list && !shown.length"
+            class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500 lg:col-span-full"
+          >
+            Aucun adhérent ne correspond aux filtres.
+          </li>
+          <li
+            v-for="m in shown"
+            :key="m.purchase_id"
+            data-testid="directory-card"
+            class="rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm"
+          >
             <button
               type="button"
               class="flex w-full cursor-pointer items-start justify-between gap-2 text-left"
@@ -225,13 +297,19 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
                   <span v-for="d in diplomes(m)" :key="d.type" :title="d.label" class="pl-1">{{ d.icon }}</span>
                 </span>
               </span>
-              <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(m.status_norm)]">{{ m.status_norm || "—" }}</span>
+              <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(m.status_norm)]">{{
+                m.status_norm || "—"
+              }}</span>
             </button>
             <div v-if="m.phone || m.email_primary" class="mt-2 flex flex-wrap gap-1.5">
               <a v-if="m.phone" :href="telHref(m.phone)" :class="callButton">📞 Appeler</a>
               <a v-if="m.email_primary" :href="`mailto:${m.email_primary}`" :class="callButton">✉️ E-mail</a>
             </div>
-            <table v-if="unfolded.has(m.purchase_id)" class="mt-2.5 w-full border-t border-dashed border-slate-200 text-[12.5px]" data-testid="card-details">
+            <table
+              v-if="unfolded.has(m.purchase_id)"
+              class="mt-2.5 w-full border-t border-dashed border-slate-200 text-[12.5px]"
+              data-testid="card-details"
+            >
               <tbody>
                 <tr v-for="r in detailRows(m)" :key="r.label" class="align-top">
                   <th scope="row" class="w-32 py-1 pr-2 text-left font-semibold whitespace-nowrap text-slate-500">{{ r.label }}</th>
@@ -252,20 +330,36 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
           aria-label="Nom de l'adhérent"
           placeholder="🔍 Nom de l'adhérent…"
           :class="searchInput"
-        >
+        />
         <p class="my-2 text-xs text-slate-500" data-testid="urgency-count">
-          <template v-if="urgency === null">Tapez au moins {{ EMERGENCY_MIN_LETTERS }} lettres du nom de l'adhérent pour afficher ses contacts.</template>
-          <template v-else>{{ urgency.length }} adhérent{{ plural(urgency.length) }} trouvé{{ plural(urgency.length) }} (saison {{ season }})</template>
+          <template v-if="urgency === null"
+            >Tapez au moins {{ EMERGENCY_MIN_LETTERS }} lettres du nom de l'adhérent pour afficher ses contacts.</template
+          >
+          <template v-else
+            >{{ urgency.length }} adhérent{{ plural(urgency.length) }} trouvé{{ plural(urgency.length) }} (saison {{ season }})</template
+          >
         </p>
         <ul class="grid gap-2 lg:grid-cols-2">
-          <li v-if="urgency && !urgency.length" class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500 lg:col-span-full">Aucun adhérent ne correspond à cette recherche.</li>
-          <li v-for="m in urgency ?? []" :key="m.purchase_id" data-testid="urgency-card" class="rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm">
+          <li
+            v-if="urgency && !urgency.length"
+            class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500 lg:col-span-full"
+          >
+            Aucun adhérent ne correspond à cette recherche.
+          </li>
+          <li
+            v-for="m in urgency ?? []"
+            :key="m.purchase_id"
+            data-testid="urgency-card"
+            class="rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm"
+          >
             <div class="flex items-start justify-between gap-2">
               <span class="min-w-0">
                 <b class="block text-[15px]">{{ m.first_name }} {{ m.last_name }}</b>
                 <span class="block text-xs text-slate-500">{{ m.tarif_name || "—" }}</span>
               </span>
-              <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(m.status_norm)]">{{ m.status_norm || "—" }}</span>
+              <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(m.status_norm)]">{{
+                m.status_norm || "—"
+              }}</span>
             </div>
             <div class="mt-2.5 flex flex-col gap-2 border-t border-dashed border-slate-200 pt-2.5">
               <div v-for="r in emergencyRows(m)" :key="r.label" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">

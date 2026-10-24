@@ -35,15 +35,17 @@ const pdf = ref<Blob | null>(null);
 const pdfUrl = ref("");
 const loading = ref(!ineligible);
 const loadError = ref("");
-let closed = false;  // closed before the PDF came: no URL left unrevoked
+let closed = false; // closed before the PDF came: no URL left unrevoked
 
 onMounted(async () => {
   if (ineligible) return;
   try {
-    const blob = await unwrap(client.POST("/api/attestations/preview", {
-      body: { purchase_id: props.member.purchase_id, season: props.member.season_name },
-      parseAs: "blob",
-    }));
+    const blob = await unwrap(
+      client.POST("/api/attestations/preview", {
+        body: { purchase_id: props.member.purchase_id, season: props.member.season_name },
+        parseAs: "blob",
+      }),
+    );
     if (closed) return;
     pdf.value = blob;
     pdfUrl.value = URL.createObjectURL(blob);
@@ -80,12 +82,19 @@ async function send(): Promise<void> {
   if (!confirm(`Envoyer l'attestation de paiement PDF à ${recipient} ?`)) return;
   sending.value = true;
   try {
-    await unwrap(client.POST("/api/attestations/send", {
-      body: {
-        purchase_id: props.member.purchase_id, season: props.member.season_name, to_email: recipient,
-        template_name: templateName.value, subject: subject.value.trim(), body: body.value.trim(), add_signature: signature.value,
-      },
-    }));
+    await unwrap(
+      client.POST("/api/attestations/send", {
+        body: {
+          purchase_id: props.member.purchase_id,
+          season: props.member.season_name,
+          to_email: recipient,
+          template_name: templateName.value,
+          subject: subject.value.trim(),
+          body: body.value.trim(),
+          add_signature: signature.value,
+        },
+      }),
+    );
     emit("sent", `✅ Attestation envoyée avec succès à ${recipient} !`);
   } catch (e) {
     emit("failed", `❌ Échec d'envoi de l'attestation : ${errorText(e)}`);
@@ -122,23 +131,36 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
         </div>
         <div>
           <label for="attestation-to" :class="label">Destinataire (payeur ou adhérent) *</label>
-          <input id="attestation-to" v-model="to" data-testid="attestation-to" type="email" placeholder="destinataire@example.com" :class="field">
+          <input
+            id="attestation-to"
+            v-model="to"
+            data-testid="attestation-to"
+            type="email"
+            placeholder="destinataire@example.com"
+            :class="field"
+          />
         </div>
         <div>
           <label for="attestation-subject" :class="label">Sujet *</label>
-          <input id="attestation-subject" v-model="subject" data-testid="attestation-subject" type="text" :class="field">
+          <input id="attestation-subject" v-model="subject" data-testid="attestation-subject" type="text" :class="field" />
         </div>
         <div>
           <label for="attestation-body" :class="label">Message d'accompagnement *</label>
           <textarea id="attestation-body" v-model="body" data-testid="attestation-body" rows="7" :class="field" />
         </div>
         <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-slate-700">
-          <input v-model="signature" type="checkbox" class="accent-accent">
+          <input v-model="signature" type="checkbox" class="accent-accent" />
           Ajouter la signature officielle ALJ Escalade
         </label>
       </div>
       <div class="flex min-h-80 flex-col overflow-hidden rounded-lg bg-slate-200">
-        <iframe v-if="pdfUrl" :src="pdfUrl" title="Aperçu de l'attestation" data-testid="attestation-pdf" class="min-h-96 w-full flex-1 border-0" />
+        <iframe
+          v-if="pdfUrl"
+          :src="pdfUrl"
+          title="Aperçu de l'attestation"
+          data-testid="attestation-pdf"
+          class="min-h-96 w-full flex-1 border-0"
+        />
         <p v-else data-testid="attestation-status" class="m-auto p-5 text-center text-[13px] text-slate-500">
           {{ ineligible ? "Document non disponible pour cette inscription." : loadError || "⏳ Génération du PDF en mémoire…" }}
         </p>
@@ -149,7 +171,9 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
     <div class="flex flex-wrap justify-end gap-2">
       <UiButton variant="muted" data-testid="attestation-cancel" @click="emit('cancel')">Fermer</UiButton>
       <UiButton variant="muted" data-testid="attestation-download" :disabled="!pdf" @click="download">📥 Télécharger le PDF</UiButton>
-      <UiButton type="submit" data-testid="attestation-send" :disabled="!canSend" :busy="sending && 'Envoi en cours…'">🚀 Envoyer par e-mail</UiButton>
+      <UiButton type="submit" data-testid="attestation-send" :disabled="!canSend" :busy="sending && 'Envoi en cours…'"
+        >🚀 Envoyer par e-mail</UiButton
+      >
     </div>
   </form>
 </template>

@@ -3,8 +3,16 @@
    no new sign-in after the update. */
 import { initializeApp } from "@firebase/app";
 import {
-  browserLocalPersistence, browserPopupRedirectResolver, connectAuthEmulator, getRedirectResult, GoogleAuthProvider,
-  indexedDBLocalPersistence, initializeAuth, signInWithCredential, signInWithRedirect, type Auth,
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  connectAuthEmulator,
+  getRedirectResult,
+  GoogleAuthProvider,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  signInWithCredential,
+  signInWithRedirect,
+  type Auth,
 } from "@firebase/auth";
 import { isEmulator, runtime } from "./runtime";
 

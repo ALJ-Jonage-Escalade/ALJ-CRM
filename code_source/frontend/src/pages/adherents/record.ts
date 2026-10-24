@@ -33,7 +33,11 @@ export function recordRows(m: Member): RecordRow[] {
   add("🪪", "Licence FFME", m.licence_ffme);
   add("🚨", "Urgence 1", join(" · ", m.emergency1_name, m.emergency1_phone));
   add("🚨", "Urgence 2", join(" · ", m.emergency2_name, m.emergency2_phone));
-  add("🩺", "Santé & Engagement", join(" · ", m.health_commitment && `engagement : ${m.health_commitment}`, m.document_sante && `document : ${m.document_sante}`));
+  add(
+    "🩺",
+    "Santé & Engagement",
+    join(" · ", m.health_commitment && `engagement : ${m.health_commitment}`, m.document_sante && `document : ${m.document_sante}`),
+  );
   add("📷", "Droit à l'image", m.photo_auth);
   add("🔴", "Badge rouge", m.badge_rouge);
   add("🧗", "Autonomie bloc", m.autonomie_bloc);
@@ -178,7 +182,7 @@ export function newMemberOf(d: MemberDraft): NewMember {
     birth_date: d.birth_date,
     gender: d.gender,
     tarif_name: d.tarif_name.trim(),
-    status: d.status as NewMember["status"],  // the add form offers STATUS_CHOICES only
+    status: d.status as NewMember["status"], // the add form offers STATUS_CHOICES only
     amount: Number(d.amount.replace(",", ".")) || 0,
     licence_ffme: d.licence_ffme.trim(),
     badge_rouge: d.badge_rouge,
@@ -233,7 +237,7 @@ export function changesOf(m: Member, d: MemberDraft): Changes {
     fields.commentaires_correctif = now;
     lines.push(now ? (was ? "Commentaire mis à jour" : "Commentaire ajouté") : "Commentaire effacé");
   }
-  return { fields: fields as MemberChanges, lines };
+  return { fields, lines };
 }
 
 /** Another member of the season with the same name (asked before adding). */
@@ -256,9 +260,16 @@ export function memberVariables(m: Member): Record<string, string> {
   const first = m.first_name.toLowerCase().replace(/(^|[\s\-'’])(\p{L})/gu, (_, sep: string, l: string) => sep + l.toUpperCase());
   const last = m.last_name.toUpperCase();
   return {
-    first_name: first, last_name: last, prénom: first, nom: last,
-    num_licence: m.licence_ffme, tarif: m.tarif_name, season: m.season_name, saison: m.season_name,
-    amount: m.amount != null ? `${m.amount} €` : "", montant: m.amount != null ? `${m.amount} €` : "",
+    first_name: first,
+    last_name: last,
+    prénom: first,
+    nom: last,
+    num_licence: m.licence_ffme,
+    tarif: m.tarif_name,
+    season: m.season_name,
+    saison: m.season_name,
+    amount: m.amount != null ? `${m.amount} €` : "",
+    montant: m.amount != null ? `${m.amount} €` : "",
   };
 }
 
@@ -300,7 +311,11 @@ export function attestationRecipient(m: Member): string {
 
 /** File name of the downloaded certificate: Attestation_DUPONT_Lea.pdf. */
 export function attestationFileName(m: Member): string {
-  const clean = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w-]+/g, "_");
+  const clean = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w-]+/g, "_");
   const first = m.first_name ? m.first_name.charAt(0).toUpperCase() + m.first_name.slice(1).toLowerCase() : "Adherent";
   return `Attestation_${clean(m.last_name.toUpperCase() || "ADHERENT")}_${clean(first)}.pdf`;
 }

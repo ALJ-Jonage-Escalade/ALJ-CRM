@@ -25,7 +25,11 @@ const open = defineModel<boolean>("open", { required: true });
         <DialogDescription v-if="description" class="mb-3 text-[13px] text-slate-500">{{ description }}</DialogDescription>
         <slot />
         <!-- After the content: the dialog focuses its first field, not this button -->
-        <DialogClose aria-label="Fermer" class="absolute top-4 right-4 cursor-pointer text-xl leading-none text-slate-500 hover:text-slate-800">✕</DialogClose>
+        <DialogClose
+          aria-label="Fermer"
+          class="absolute top-4 right-4 cursor-pointer text-xl leading-none text-slate-500 hover:text-slate-800"
+          >✕</DialogClose
+        >
       </DialogContent>
     </DialogPortal>
   </DialogRoot>
