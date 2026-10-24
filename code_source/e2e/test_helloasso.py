@@ -46,7 +46,7 @@ def _item_card(page, ha_item):
     """Card (table row on desktop) of a HelloAsso item, by its order number (members get payments in several tests)."""
     page.get_by_test_id("ha-filter-all").click()
     page.get_by_test_id("ha-search").fill(str(ha_item["order"]["id"]))
-    return page.get_by_test_id("ha-item").filter(has_text=re.compile(rf"#{ha_item['order']['id']}\b"))
+    return page.get_by_test_id("ha-item").filter(has_text=re.compile(rf"#{ha_item['order']['id']}(?!\d)"))
 
 
 def _participant(test_data, setup, member) -> dict:
