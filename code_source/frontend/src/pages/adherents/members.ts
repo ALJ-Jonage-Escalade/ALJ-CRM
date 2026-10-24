@@ -1,6 +1,7 @@
 /* Member list of Adhérents: slot / tariff filters, search, status, sorting and CSV export (port of the former
    web/shared/alj-filters.js and alj-members.js).
    The members come formatted by the server (GET /api/members, domain/members/view.py). */
+import type { BadgeColor } from "../../components/ui/UiBadge.vue";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
@@ -260,16 +261,16 @@ export function statusChips(members: readonly Pick<Member, "status_norm">[]): { 
   return chips;
 }
 
-const STATUS_CLASS: Record<string, string> = {
-  Validé: "bg-green-600",
-  Traité: "bg-blue-600",
-  Terminé: "bg-violet-500",
-  "En cours": "bg-amber-600",
-  Annulé: "bg-red-600",
+const STATUS_COLOR: Record<string, BadgeColor> = {
+  Validé: "green",
+  Traité: "blue",
+  Terminé: "violet",
+  "En cours": "amber",
+  Annulé: "red",
 };
 
-/** Background (Tailwind class) of a status badge. */
-export const statusClass = (status: string): string => STATUS_CLASS[status] ?? "bg-slate-400";
+/** Colour of a status badge. */
+export const statusColor = (status: string): BadgeColor => STATUS_COLOR[status] ?? "slate";
 
 const yes = (v: string) => ["oui", "x", "true", "1"].includes(v.trim().toLowerCase());
 

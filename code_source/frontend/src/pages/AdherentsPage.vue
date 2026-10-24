@@ -12,6 +12,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import DataTable from "../components/DataTable.vue";
 import type { DataColumn } from "../components/dataTable";
+import UiBadge from "../components/ui/UiBadge.vue";
 import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
 import UiDialog from "../components/ui/UiDialog.vue";
@@ -52,7 +53,7 @@ import {
   saveFilters,
   savePanelOpen,
   statusChips,
-  statusClass,
+  statusColor,
   tarifCounts,
   telHref,
   type CreneauItem,
@@ -262,8 +263,6 @@ function closeAdd(): void {
   void router.replace({ query: rest });
 }
 
-const STATUS_CLASS_OF = (m: Member) => statusClass(m.status_norm);
-
 // Email templates, for the e-mail (coaches and admins) and the certificate (admins), loaded once
 const templates = ref<Template[]>([]);
 let templatesLoaded = false;
@@ -417,19 +416,21 @@ const linkButton =
           data-testid="filter-toggle"
           :aria-expanded="filterOpen"
           @click="filterOpen = !filterOpen"
-          >📂 Créneaux / Tarifs</UiButton
         >
-        <UiButton variant="muted" small data-testid="export-csv" title="Télécharger la liste affichée en fichier CSV" @click="exportCsv"
-          >📥 Export CSV</UiButton
-        >
+          📂 Créneaux / Tarifs
+        </UiButton>
+        <UiButton variant="muted" small data-testid="export-csv" title="Télécharger la liste affichée en fichier CSV" @click="exportCsv">
+          📥 Export CSV
+        </UiButton>
         <a href="/bureau/outils?tab=ffme" :class="linkButton" title="Ouvrir l'export officiel FFME">🇫🇷 Export FFME</a>
         <a
           v-if="role === 'admin'"
           href="/bureau/outils?tab=ffme-import"
           :class="linkButton"
           title="Importer la liste Excel des licenciés FFME"
-          >📥 Import FFME</a
         >
+          📥 Import FFME
+        </a>
         <UiButton
           v-if="!panelOpen"
           variant="muted"
@@ -439,8 +440,9 @@ const linkButton =
           :aria-expanded="false"
           title="Afficher la fiche de l'adhérent sélectionné"
           @click="panelOpen = true"
-          >⇤ Fiche</UiButton
         >
+          ⇤ Fiche
+        </UiButton>
         <UiButton
           variant="muted"
           small
@@ -448,16 +450,18 @@ const linkButton =
           :busy="syncing && 'Synchro…'"
           title="Synchroniser maintenant la base du serveur avec Firestore"
           @click="syncNow"
-          >🔄 Synchroniser BDD</UiButton
         >
+          🔄 Synchroniser BDD
+        </UiButton>
         <RouterLink
           v-if="role === 'admin'"
           :to="{ query: { ...route.query, ajout: '1' } }"
           data-testid="member-add"
           class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-bold text-white no-underline hover:bg-accent-dark"
           title="Ajouter un adhérent à la saison affichée"
-          >➕ Ajouter un adhérent</RouterLink
         >
+          ➕ Ajouter un adhérent
+        </RouterLink>
       </div>
 
       <div v-if="filterOpen" data-testid="filter-box" class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -485,9 +489,9 @@ const linkButton =
                 @change="toggleGroup(it, ($event.target as HTMLInputElement).checked)"
               />
               <span class="min-w-0 flex-1 truncate" :title="it.raw">{{ it.label }}</span>
-              <span data-testid="filter-count" class="rounded-full bg-slate-200 px-2 text-[11px] font-semibold text-slate-600">{{
-                counts.groups[it.raw] ?? 0
-              }}</span>
+              <span data-testid="filter-count" class="rounded-full bg-slate-200 px-2 text-[11px] font-semibold text-slate-600">
+                {{ counts.groups[it.raw] ?? 0 }}
+              </span>
             </label>
           </template>
           <template v-if="otherTarifs.length">
@@ -505,9 +509,9 @@ const linkButton =
                 @change="toggleOther(t, ($event.target as HTMLInputElement).checked)"
               />
               <span class="min-w-0 flex-1 truncate">{{ t }}</span>
-              <span data-testid="filter-count" class="rounded-full bg-slate-200 px-2 text-[11px] font-semibold text-slate-600">{{
-                counts.others[t]
-              }}</span>
+              <span data-testid="filter-count" class="rounded-full bg-slate-200 px-2 text-[11px] font-semibold text-slate-600">
+                {{ counts.others[t] }}
+              </span>
             </label>
           </template>
         </div>
@@ -553,8 +557,9 @@ const linkButton =
             class="font-bold text-slate-800 no-underline hover:text-accent hover:underline"
             title="Ouvrir la fiche adhérent"
             @click="panelOpen = true"
-            >{{ row.last_name }}</RouterLink
           >
+            {{ row.last_name }}
+          </RouterLink>
         </template>
         <template #cell-order_date="{ value }">{{ value || "—" }}</template>
         <template #cell-diplome="{ row }">
@@ -562,13 +567,7 @@ const linkButton =
           <span v-if="!diplomes(row).length" class="text-slate-400">—</span>
         </template>
         <template #cell-status_norm="{ row }">
-          <span
-            :class="[
-              'inline-block rounded-full px-2.5 py-0.5 text-[11.5px] font-bold whitespace-nowrap text-white',
-              statusClass(row.status_norm),
-            ]"
-            >{{ row.status_norm || "—" }}</span
-          >
+          <UiBadge :color="statusColor(row.status_norm)">{{ row.status_norm || "—" }}</UiBadge>
         </template>
         <template #cell-creneau_groupe="{ value }">{{ value || "—" }}</template>
         <template #cell-city="{ value }">{{ value || "—" }}</template>
@@ -589,11 +588,10 @@ const linkButton =
               data-testid="member-record"
               class="min-w-0 font-bold text-slate-800 no-underline"
               @click="panelOpen = true"
-              >{{ row.last_name }} {{ row.first_name }}</RouterLink
             >
-            <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(row.status_norm)]">{{
-              row.status_norm || "—"
-            }}</span>
+              {{ row.last_name }} {{ row.first_name }}
+            </RouterLink>
+            <UiBadge :color="statusColor(row.status_norm)" class="shrink-0">{{ row.status_norm || "—" }}</UiBadge>
           </div>
           <div class="mt-0.5 text-xs text-slate-500">
             {{ [row.creneau_groupe, row.city].filter(Boolean).join(" · ") || "—" }}
@@ -633,9 +631,7 @@ const linkButton =
           @edit="open('edit')"
         >
           <template #status>
-            <span :class="['rounded-full px-2.5 py-0.5 text-[11.5px] font-bold text-white', STATUS_CLASS_OF(record)]">{{
-              record.status_norm || "—"
-            }}</span>
+            <UiBadge :color="statusColor(record.status_norm)">{{ record.status_norm || "—" }}</UiBadge>
           </template>
         </MemberRecord>
       </UiSidePanel>

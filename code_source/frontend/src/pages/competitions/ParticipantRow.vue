@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* A competitor as a row of the wide-screen table (the former desktop page); ParticipantCard elsewhere. Same test ids,
    events and rules as the card: « Participe » and « Présent » switches, then the action allowed by the payment. */
+import UiBadge from "../../components/ui/UiBadge.vue";
 import { telHref } from "../adherents/members";
 import { hasPaid, isCancelled, payment, ranking, type Row } from "./competitions";
 
@@ -24,18 +25,13 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
     <td class="px-2.5 py-2">
       <b class="block text-[13.5px] whitespace-nowrap" data-testid="participant-name">{{ row.nom }} {{ row.prenom }}</b>
       <span class="block text-[11px] text-slate-500">
-        🪪 {{ row.num_licence || "sans licence"
-        }}<template v-if="staff && row.commande_helloasso"> · 🧾 {{ row.commande_helloasso }}</template
-        ><template v-if="staff && row.note_paiement"> · 📝 {{ row.note_paiement }}</template>
+        🪪 {{ row.num_licence || "sans licence" }}
+        <template v-if="staff && row.commande_helloasso">· 🧾 {{ row.commande_helloasso }}</template>
+        <template v-if="staff && row.note_paiement">· 📝 {{ row.note_paiement }}</template>
       </span>
     </td>
     <td class="px-2.5 py-2 text-center">
-      <span
-        v-if="ranking(row)"
-        class="inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-extrabold whitespace-nowrap text-amber-800"
-        data-testid="ranking"
-        >{{ ranking(row) }}</span
-      >
+      <UiBadge v-if="ranking(row)" color="amber" variant="soft" data-testid="ranking">{{ ranking(row) }}</UiBadge>
       <span v-else class="text-xs text-slate-400">—</span>
       <span v-if="ranking(row) && row.categorie_ffme" class="block text-[10.5px] text-slate-500">{{ row.categorie_ffme }}</span>
     </td>
@@ -55,16 +51,10 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       </span>
     </td>
     <td class="px-2.5 py-2">
-      <span
-        :class="[
-          'inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-white',
-          payment(row.statut_paiement).class,
-        ]"
-        data-testid="payment-badge"
-        title="Statut de paiement"
-      >
-        {{ payment(row.statut_paiement).label }}<template v-if="row.montant_paye"> ({{ row.montant_paye }} €)</template>
-      </span>
+      <UiBadge :color="payment(row.statut_paiement).color" data-testid="payment-badge" title="Statut de paiement">
+        {{ payment(row.statut_paiement).label }}
+        <template v-if="row.montant_paye">({{ row.montant_paye }} €)</template>
+      </UiBadge>
     </td>
     <td class="px-2.5 py-2 text-center">
       <input
@@ -82,8 +72,9 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
         data-testid="queued"
         title="Modifié hors ligne : sera envoyé au retour du réseau"
         class="block text-[10.5px] font-bold whitespace-nowrap text-amber-700"
-        >⏳ à envoyer</span
       >
+        ⏳ à envoyer
+      </span>
     </td>
     <td class="px-2.5 py-2">
       <div v-if="contactsShown && (row.phone || row.emergency.length)" class="flex flex-col items-start gap-1">
@@ -95,20 +86,23 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
           :title="`Contact d'urgence : ${e.name || 'Urgence'}`"
           data-testid="emergency-link"
           :class="[telLink, 'border-red-200 bg-red-50 text-red-700']"
-          >🚨 {{ e.phone }}</a
         >
+          🚨 {{ e.phone }}
+        </a>
       </div>
       <span v-else class="text-xs text-slate-400">—</span>
     </td>
     <td v-if="canWrite" class="px-2.5 py-2 text-center">
       <div class="inline-flex flex-wrap justify-center gap-1" data-testid="participant-actions">
-        <span
+        <UiBadge
           v-if="row.present"
-          class="rounded-md border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-bold whitespace-nowrap text-green-700"
+          color="green"
+          variant="soft"
           data-testid="on-site"
           title="Pointé présent : décochez « Présent » après une erreur pour retrouver les actions"
-          >✓ Sur place</span
         >
+          ✓ Sur place
+        </UiBadge>
         <button
           v-else-if="hasPaid(row)"
           type="button"

@@ -28,11 +28,11 @@ const AT = new Date(2026, 9, 22, 7, 5, 9);
 
 describe("Paramètres view", () => {
   it.each([
-    ["connected", "success", "🟢 Connecté & Opérationnel"],
-    ["expired", "danger", "🔴 Jeton expiré ou révoqué"],
-    ["disconnected", "warning", "🟡 Non connecté"],
-  ] as const)("Google %s", (status, tone, label) => {
-    expect(googleStatus({ ...GOOGLE, status })).toMatchObject({ tone, label });
+    ["connected", "green", "🟢 Connecté & Opérationnel"],
+    ["expired", "red", "🔴 Jeton expiré ou révoqué"],
+    ["disconnected", "amber", "🟡 Non connecté"],
+  ] as const)("Google %s", (status, color, label) => {
+    expect(googleStatus({ ...GOOGLE, status })).toMatchObject({ color, label });
   });
 
   it("lists the three Google checks", () => {

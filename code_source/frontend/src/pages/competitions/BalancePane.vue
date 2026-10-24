@@ -3,6 +3,7 @@
    the season's totals and a spreadsheet export. Computed from the competitions only: readable offline. */
 import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
+import UiBadge, { type BadgeColor } from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import { csvBlob } from "../../lib/csv";
 import { saveFile } from "../../lib/download";
@@ -27,11 +28,7 @@ function exportCsv(): void {
   saveFile(csvBlob(balanceCsv(shown.value)), `bilan_competitions_${season.value}.csv`);
 }
 
-const TONE = {
-  ok: "border-green-200 bg-green-50 text-green-700",
-  due: "border-red-200 bg-red-50 text-red-700",
-  credit: "border-violet-200 bg-violet-50 text-violet-700",
-};
+const TONE_COLOR = { ok: "green", due: "red", credit: "violet" } satisfies Record<string, BadgeColor>;
 </script>
 
 <template>
@@ -93,15 +90,13 @@ const TONE = {
             <b class="block text-[14.5px]" data-testid="balance-name">{{ b.nom }} {{ b.prenom }}</b>
             <span class="block text-xs text-slate-500">
               🪪 {{ b.licence || "sans licence" }} · 🏃 {{ b.lines.length }} épreuve{{ plural(b.lines.length) }}
-              <template v-if="b.lines.some((l) => l.carriedOver)"> · 🔄 Report</template>
-              <template v-if="b.absent"> · ⚠️ Absent</template>
+              <template v-if="b.lines.some((l) => l.carriedOver)">· 🔄 Report</template>
+              <template v-if="b.absent">· ⚠️ Absent</template>
             </span>
           </span>
-          <span
-            :class="['shrink-0 rounded-md border px-2 py-0.5 text-xs font-bold', TONE[balanceLabel(b).tone]]"
-            data-testid="balance-state"
-            >{{ balanceLabel(b).text }}</span
-          >
+          <UiBadge :color="TONE_COLOR[balanceLabel(b).tone]" variant="soft" class="shrink-0" data-testid="balance-state">
+            {{ balanceLabel(b).text }}
+          </UiBadge>
         </button>
         <ul v-if="open === keyOf(b) || search" class="mt-2 border-t border-slate-100 pt-1.5 text-xs" data-testid="balance-lines">
           <li
@@ -112,15 +107,22 @@ const TONE = {
             <RouterLink
               :to="{ query: { id: String(l.competition.id) } }"
               class="font-semibold text-slate-700 no-underline hover:text-accent"
-              >🏆 {{ l.competition.nom }} <span class="font-normal text-slate-500">· {{ period(l.competition) }}</span></RouterLink
             >
-            <span
-              >Dû : <b>{{ formatEuros(l.due) }}</b> · Payé : <b>{{ formatEuros(l.paid) }}</b> · {{ payment(l.status).label
-              }}<template v-if="l.present"> · ✓ Présent</template></span
-            >
+              🏆 {{ l.competition.nom }}
+              <span class="font-normal text-slate-500">· {{ period(l.competition) }}</span>
+            </RouterLink>
+            <span>
+              Dû :
+              <b>{{ formatEuros(l.due) }}</b>
+              · Payé :
+              <b>{{ formatEuros(l.paid) }}</b>
+              · {{ payment(l.status).label }}
+              <template v-if="l.present">· ✓ Présent</template>
+            </span>
           </li>
           <li class="flex justify-between pt-1 font-bold text-slate-700">
-            <span>Total</span><span>Dû : {{ formatEuros(b.due) }} · Payé : {{ formatEuros(b.paid) }}</span>
+            <span>Total</span>
+            <span>Dû : {{ formatEuros(b.due) }} · Payé : {{ formatEuros(b.paid) }}</span>
           </li>
         </ul>
       </li>

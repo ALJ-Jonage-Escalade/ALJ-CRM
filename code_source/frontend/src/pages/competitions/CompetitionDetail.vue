@@ -5,6 +5,7 @@
    spreadsheet export. « Participe » and « Présent » also change offline (the outbox, sent when the network comes back). */
 import { computed, inject, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
+import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
 import { useMediaQuery } from "../../composables/media";
@@ -19,6 +20,7 @@ import {
   counts,
   csvName,
   discipline,
+  disciplineColor,
   filterRows,
   groupRows,
   isArchived,
@@ -307,27 +309,26 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       :to="{ query: {} }"
       data-testid="back-link"
       class="mb-2 inline-block text-[13px] font-semibold text-accent no-underline md:hidden"
-      >‹ Toutes les compétitions</RouterLink
     >
+      ‹ Toutes les compétitions
+    </RouterLink>
     <div
       class="order-1 mb-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex lg:items-start lg:justify-between lg:gap-4 lg:p-4"
     >
       <div class="min-w-0">
         <h2 class="m-0 text-[17px] font-bold lg:text-lg lg:font-extrabold" data-testid="detail-name">{{ c.nom }}</h2>
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-1 lg:text-[12.5px]" data-testid="detail-meta">
-          🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }} · 💶 {{ formatEuros(c.prix) }}<template v-if="c.lieu"> · 📍 {{ c.lieu }}</template
-          ><template v-if="discipline(c)"> · {{ discipline(c) }}</template
-          ><template v-if="isArchived(c)"> · 📦 Archivée</template>
+          🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }} · 💶 {{ formatEuros(c.prix) }}
+          <template v-if="c.lieu">· 📍 {{ c.lieu }}</template>
+          <template v-if="isArchived(c)">· 📦 Archivée</template>
+          <UiBadge v-if="discipline(c)" :color="disciplineColor(discipline(c))" variant="soft" class="ml-1" data-testid="discipline">
+            {{ discipline(c) }}
+          </UiBadge>
         </p>
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-2 lg:flex lg:flex-wrap lg:items-center lg:gap-1.5" data-testid="detail-coaches">
           <template v-if="wide">
             <b class="text-slate-600">🏃 Coachs :</b>
-            <span
-              v-for="name in c.coaches ?? []"
-              :key="name"
-              class="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11.5px] font-semibold text-blue-700"
-              >{{ name }}</span
-            >
+            <UiBadge v-for="name in c.coaches ?? []" :key="name" color="blue" variant="soft">{{ name }}</UiBadge>
             <i v-if="!c.coaches?.length">Aucun coach assigné</i>
           </template>
           <template v-else>🏃 {{ c.coaches?.length ? `Coachs : ${c.coaches.join(", ")}` : "Aucun coach" }}</template>
@@ -339,8 +340,9 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
             target="_blank"
             rel="noopener noreferrer"
             class="inline-flex items-center gap-1 rounded-md border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700 no-underline"
-            >💬 Groupe WhatsApp ↗</a
           >
+            💬 Groupe WhatsApp ↗
+          </a>
           <a
             v-if="c.url_resultats"
             :href="c.url_resultats"
@@ -348,8 +350,9 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
             rel="noopener noreferrer"
             data-testid="results-link"
             class="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 no-underline"
-            >🏆 Résultats MyCompet ↗</a
           >
+            🏆 Résultats MyCompet ↗
+          </a>
         </div>
       </div>
       <div
@@ -358,12 +361,12 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         data-testid="detail-actions"
       >
         <UiButton variant="muted" small data-testid="edit-comp" @click="editing = true">✏️ Modifier</UiButton>
-        <UiButton variant="muted" small :data-testid="isArchived(c) ? 'unarchive-comp' : 'archive-comp'" @click="archive(!isArchived(c))">{{
-          isArchived(c) ? "♻️ Désarchiver" : "📦 Archiver"
-        }}</UiButton>
-        <UiButton variant="muted" small data-testid="fetch-results" :busy="fetching && 'Recherche MyCompet…'" @click="fetchResults()"
-          >🏆 Trouver les résultats</UiButton
-        >
+        <UiButton variant="muted" small :data-testid="isArchived(c) ? 'unarchive-comp' : 'archive-comp'" @click="archive(!isArchived(c))">
+          {{ isArchived(c) ? "♻️ Désarchiver" : "📦 Archiver" }}
+        </UiButton>
+        <UiButton variant="muted" small data-testid="fetch-results" :busy="fetching && 'Recherche MyCompet…'" @click="fetchResults()">
+          🏆 Trouver les résultats
+        </UiButton>
         <UiButton variant="muted" small data-testid="email-comp" @click="emailing = true">✉️ E-mail aux compétiteurs</UiButton>
         <UiButton variant="muted" small data-testid="export-csv" :disabled="!rows.length" @click="exportCsv">📥 Export CSV</UiButton>
         <UiButton variant="danger" small data-testid="delete-comp" :disabled="writer.busy.value" @click="remove">🗑️ Supprimer</UiButton>
@@ -433,29 +436,43 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           <div class="rounded-md border border-l-[3px] border-blue-200 border-l-blue-600 bg-white px-2.5 py-2">
             <b class="text-blue-700">1. ☑️ Participe (sélection, convocation)</b>
             <div class="mt-0.5 text-slate-600">
-              <b>Quand :</b> pour convoquer un athlète à l'épreuve, en composant l'équipe.<br />
-              <b>Conséquences :</b> l'athlète entre dans le quota des inscrits, passe en <i>En attente</i> de règlement HelloAsso, reçoit
-              les e-mails de convocation et le tarif de l'épreuve s'ajoute à son dû dans la balance financière.
+              <b>Quand :</b>
+              pour convoquer un athlète à l'épreuve, en composant l'équipe.
+              <br />
+              <b>Conséquences :</b>
+              l'athlète entre dans le quota des inscrits, passe en
+              <i>En attente</i>
+              de règlement HelloAsso, reçoit les e-mails de convocation et le tarif de l'épreuve s'ajoute à son dû dans la balance
+              financière.
             </div>
           </div>
           <div class="rounded-md border border-l-[3px] border-green-200 border-l-green-600 bg-white px-2.5 py-2">
             <b class="text-green-700">2. ☑️ Présent (pointage le jour J)</b>
             <div class="mt-0.5 text-slate-600">
-              <b>Quand :</b> sur place, le jour de la compétition, à l'arrivée de l'athlète.<br />
-              <b>Conséquences :</b> valide sa présence. <b>Une fois pointé présent, le retrait et le désistement sont verrouillés</b> (badge
-              <i>✓ Sur place</i>) ; décochez la case après une erreur de pointage pour les retrouver.
+              <b>Quand :</b>
+              sur place, le jour de la compétition, à l'arrivée de l'athlète.
+              <br />
+              <b>Conséquences :</b>
+              valide sa présence.
+              <b>Une fois pointé présent, le retrait et le désistement sont verrouillés</b>
+              (badge
+              <i>✓ Sur place</i>
+              ) ; décochez la case après une erreur de pointage pour les retrouver.
             </div>
           </div>
           <div class="rounded-md border border-l-[3px] border-red-200 border-l-red-600 bg-white px-2.5 py-2">
             <b class="text-red-700">3. ✕ Retirer de l'épreuve</b>
             <div class="mt-0.5 text-slate-600">
-              <b>Quand :</b> athlète ajouté par erreur, ou nettoyage des non-invités.<br />
-              <b>Conséquences :</b> supprime sa ligne de cette compétition (« Retirer tous les compétiteurs non invités » nettoie la liste
-              en un clic).<br />
-              <i
-                >⚠️ Un athlète qui a payé ne peut pas être retiré : « 🔒 Désister… » le passe en « Annulé — report » ou « Annulé — perdu »,
-                la trace comptable est conservée.</i
-              >
+              <b>Quand :</b>
+              athlète ajouté par erreur, ou nettoyage des non-invités.
+              <br />
+              <b>Conséquences :</b>
+              supprime sa ligne de cette compétition (« Retirer tous les compétiteurs non invités » nettoie la liste en un clic).
+              <br />
+              <i>
+                ⚠️ Un athlète qui a payé ne peut pas être retiré : « 🔒 Désister… » le passe en « Annulé — report » ou « Annulé — perdu »,
+                la trace comptable est conservée.
+              </i>
             </div>
           </div>
         </div>
@@ -532,12 +549,12 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
     >
       <div class="flex flex-wrap items-center gap-2">
         <b class="text-[13.5px]">➕ Inscrire des adhérents</b>
-        <UiButton variant="muted" small class="ml-auto" data-testid="load-group" @click="loadGroup"
-          >🧗 Charger le groupe « Compétition »</UiButton
-        >
-        <UiButton variant="muted" small data-testid="toggle-add" :aria-expanded="adding" @click="adding = !adding">{{
-          adding ? "Fermer" : "🔍 Rechercher un adhérent"
-        }}</UiButton>
+        <UiButton variant="muted" small class="ml-auto" data-testid="load-group" @click="loadGroup">
+          🧗 Charger le groupe « Compétition »
+        </UiButton>
+        <UiButton variant="muted" small data-testid="toggle-add" :aria-expanded="adding" @click="adding = !adding">
+          {{ adding ? "Fermer" : "🔍 Rechercher un adhérent" }}
+        </UiButton>
       </div>
       <template v-if="adding">
         <input

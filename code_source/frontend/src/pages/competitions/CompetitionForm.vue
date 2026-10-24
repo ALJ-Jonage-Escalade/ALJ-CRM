@@ -80,9 +80,9 @@ const error = "mt-1 text-xs font-semibold text-red-600";
           :min="draft.date_competition || undefined"
           @input="endByHand = true"
         />
-        <UiButton variant="muted" small data-testid="cf-two-days" :disabled="!draft.date_competition" @click="twoDays"
-          >Sur 2 jours</UiButton
-        >
+        <UiButton variant="muted" small data-testid="cf-two-days" :disabled="!draft.date_competition" @click="twoDays">
+          Sur 2 jours
+        </UiButton>
       </div>
       <p v-if="shown && errors.date_fin" :class="error">{{ errors.date_fin }}</p>
     </div>
@@ -130,19 +130,20 @@ const error = "mt-1 text-xs font-semibold text-red-600";
           :key="c.id"
           class="flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-[13px]"
         >
-          <input v-model="draft.coach_ids" type="checkbox" :value="c.id" class="accent-accent" /> {{ c.nom }}
+          <input v-model="draft.coach_ids" type="checkbox" :value="c.id" class="accent-accent" />
+          {{ c.nom }}
         </label>
         <span v-if="!choices.length" class="text-xs text-slate-500">Aucun coach enregistré (onglet Coachs).</span>
       </div>
     </fieldset>
     <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
-      <UiButton type="submit" data-testid="cf-save" :busy="busy && 'Enregistrement…'">{{
-        competition ? "💾 Enregistrer" : "➕ Créer la compétition"
-      }}</UiButton>
+      <UiButton type="submit" data-testid="cf-save" :busy="busy && 'Enregistrement…'">
+        {{ competition ? "💾 Enregistrer" : "➕ Créer la compétition" }}
+      </UiButton>
       <UiButton variant="muted" @click="emit('cancel')">Annuler</UiButton>
-      <UiButton v-if="competition" variant="danger" class="ml-auto" data-testid="cf-delete" :disabled="busy" @click="emit('remove')"
-        >🗑 Supprimer</UiButton
-      >
+      <UiButton v-if="competition" variant="danger" class="ml-auto" data-testid="cf-delete" :disabled="busy" @click="emit('remove')">
+        🗑 Supprimer
+      </UiButton>
     </div>
   </form>
 </template>

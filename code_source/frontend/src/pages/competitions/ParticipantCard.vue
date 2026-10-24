@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /* A competitor of the competition. */
+import UiBadge from "../../components/ui/UiBadge.vue";
 import { telHref } from "../adherents/members";
 import { hasPaid, isCancelled, payment, ranking, type Row } from "./competitions";
 
@@ -25,17 +26,14 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
         <b class="block text-[14.5px]" data-testid="participant-name">{{ row.nom }} {{ row.prenom }}</b>
         <span class="block text-xs text-slate-500">
           🪪 {{ row.num_licence || "sans licence" }} · {{ row.tarif || "—" }}
-          <template v-if="staff && row.commande_helloasso"> · 🧾 {{ row.commande_helloasso }}</template>
-          <template v-if="staff && row.note_paiement"> · 📝 {{ row.note_paiement }}</template>
+          <template v-if="staff && row.commande_helloasso">· 🧾 {{ row.commande_helloasso }}</template>
+          <template v-if="staff && row.note_paiement">· 📝 {{ row.note_paiement }}</template>
         </span>
       </span>
-      <span
-        :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', payment(row.statut_paiement).class]"
-        data-testid="payment-badge"
-        title="Statut de paiement"
-      >
-        {{ payment(row.statut_paiement).label }}<template v-if="row.montant_paye"> ({{ row.montant_paye }} €)</template>
-      </span>
+      <UiBadge :color="payment(row.statut_paiement).color" class="shrink-0" data-testid="payment-badge" title="Statut de paiement">
+        {{ payment(row.statut_paiement).label }}
+        <template v-if="row.montant_paye">({{ row.montant_paye }} €)</template>
+      </UiBadge>
     </div>
 
     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -56,16 +54,9 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
         />
         Participe
       </label>
-      <span
-        v-else
-        data-testid="participe"
-        :class="[
-          'rounded-md px-2 py-0.5 text-[11.5px] font-bold',
-          row.selectionne ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500',
-        ]"
-      >
+      <UiBadge v-else :color="row.selectionne ? 'blue' : 'slate'" variant="soft" data-testid="participe">
         {{ row.selectionne ? "✅ Participe" : "— Ne participe pas" }}
-      </span>
+      </UiBadge>
       <label
         v-if="canWrite"
         :class="[
@@ -87,15 +78,17 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
         data-testid="queued"
         title="Modifié hors ligne : sera envoyé au retour du réseau"
         class="text-[11px] font-bold text-amber-700"
-        >⏳ à envoyer</span
       >
-      <span v-if="ranking(row)" class="rounded-md bg-amber-50 px-2 py-0.5 text-[11.5px] font-bold text-amber-800" data-testid="ranking">
-        {{ ranking(row) }}<template v-if="row.categorie_ffme"> · {{ row.categorie_ffme }}</template>
+        ⏳ à envoyer
       </span>
+      <UiBadge v-if="ranking(row)" color="amber" variant="soft" data-testid="ranking">
+        {{ ranking(row) }}
+        <template v-if="row.categorie_ffme">· {{ row.categorie_ffme }}</template>
+      </UiBadge>
       <template v-if="contactsShown">
-        <a v-if="row.phone" :href="telHref(row.phone)" :class="[telButton, 'border-blue-200 bg-blue-50 text-blue-700']"
-          >📞 {{ row.phone }}</a
-        >
+        <a v-if="row.phone" :href="telHref(row.phone)" :class="[telButton, 'border-blue-200 bg-blue-50 text-blue-700']">
+          📞 {{ row.phone }}
+        </a>
         <a
           v-for="e in row.emergency"
           :key="e.phone"
@@ -103,19 +96,22 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
           title="Contact d'urgence"
           data-testid="emergency-link"
           :class="[telButton, 'border-red-200 bg-red-50 text-red-700']"
-          >🚨 {{ e.name || "Urgence" }} · {{ e.phone }}</a
         >
+          🚨 {{ e.name || "Urgence" }} · {{ e.phone }}
+        </a>
       </template>
     </div>
 
     <div v-if="canWrite" class="mt-1.5 flex flex-wrap gap-1.5" data-testid="participant-actions">
-      <span
+      <UiBadge
         v-if="row.present"
-        class="rounded-md bg-green-50 px-2 py-0.5 text-[11.5px] font-bold text-green-700"
+        color="green"
+        variant="soft"
         data-testid="on-site"
         title="Pointé présent : décochez « Présent » après une erreur pour retrouver les actions"
-        >✓ Sur place</span
       >
+        ✓ Sur place
+      </UiBadge>
       <button
         v-else-if="hasPaid(row)"
         type="button"

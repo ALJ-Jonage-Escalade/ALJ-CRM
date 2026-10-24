@@ -22,8 +22,9 @@ function confirm(): void {
 <template>
   <form novalidate class="flex flex-col gap-3" data-testid="payment-form" @submit.prevent="confirm">
     <p class="text-[13px]">
-      Paiement par chèque ou en espèces de <b>{{ participant.prenom }} {{ participant.nom }}</b
-      >.
+      Paiement par chèque ou en espèces de
+      <b>{{ participant.prenom }} {{ participant.nom }}</b>
+      .
     </p>
     <div>
       <label for="payment-amount" class="mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase">Montant reçu (€)</label>

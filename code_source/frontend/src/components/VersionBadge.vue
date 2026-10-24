@@ -26,7 +26,7 @@ onMounted(async () => {
   >
     v{{ APP_VERSION }} ⬆ v{{ online }}
   </button>
-  <span v-else class="text-[11px] font-semibold text-slate-400" :title="`Version de l'application : v${APP_VERSION}`"
-    >v{{ APP_VERSION }}</span
-  >
+  <span v-else class="text-[11px] font-semibold text-slate-400" :title="`Version de l'application : v${APP_VERSION}`">
+    v{{ APP_VERSION }}
+  </span>
 </template>

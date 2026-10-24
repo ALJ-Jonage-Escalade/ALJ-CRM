@@ -68,11 +68,15 @@ const th = "py-1 pr-3 align-top text-left font-semibold whitespace-nowrap text-s
       <b class="text-[15px] text-accent">{{ formatEuros(item.montant) }}</b>
     </div>
     <p v-if="ignored" class="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs" data-testid="attach-ignored">
-      🚫 <b>Ligne ignorée</b><template v-if="item.ignored_by"> par {{ item.ignored_by }}</template
-      ><template v-if="item.ignored_at"> le {{ when(item.ignored_at) }}</template>
-      <template v-if="item.ignore_motif"
-        ><br />Motif : <i>{{ item.ignore_motif }}</i></template
-      >
+      🚫
+      <b>Ligne ignorée</b>
+      <template v-if="item.ignored_by">par {{ item.ignored_by }}</template>
+      <template v-if="item.ignored_at">le {{ when(item.ignored_at) }}</template>
+      <template v-if="item.ignore_motif">
+        <br />
+        Motif :
+        <i>{{ item.ignore_motif }}</i>
+      </template>
     </p>
     <table class="w-full text-xs">
       <tbody>
@@ -95,10 +99,12 @@ const th = "py-1 pr-3 align-top text-left font-semibold whitespace-nowrap text-s
         <tr v-if="info.payerName || info.payerEmail">
           <th :class="th">💳 Payeur</th>
           <td>
-            {{ info.payerName
-            }}<template v-if="info.payerEmail">
-              · <a :href="`mailto:${info.payerEmail}`">{{ info.payerEmail }}</a></template
-            ><template v-if="info.payerCity"> · {{ info.payerCity }}</template>
+            {{ info.payerName }}
+            <template v-if="info.payerEmail">
+              ·
+              <a :href="`mailto:${info.payerEmail}`">{{ info.payerEmail }}</a>
+            </template>
+            <template v-if="info.payerCity">· {{ info.payerCity }}</template>
           </td>
         </tr>
         <tr v-if="info.state">
@@ -108,9 +114,9 @@ const th = "py-1 pr-3 align-top text-left font-semibold whitespace-nowrap text-s
         <tr v-for="(p, i) in info.payments" :key="`p${i}`">
           <th :class="th">🏦 Paiement</th>
           <td>
-            #{{ p.id || "?" }} · {{ p.amount != null ? formatEuros(p.amount) : ""
-            }}<template v-if="p.state"> · {{ stateLabel(p.state) }}</template
-            ><template v-if="p.means"> · {{ p.means }}</template>
+            #{{ p.id || "?" }} · {{ p.amount != null ? formatEuros(p.amount) : "" }}
+            <template v-if="p.state">· {{ stateLabel(p.state) }}</template>
+            <template v-if="p.means">· {{ p.means }}</template>
           </td>
         </tr>
         <tr v-for="(f, i) in info.fields" :key="`f${i}`">
@@ -137,7 +143,8 @@ const th = "py-1 pr-3 align-top text-left font-semibold whitespace-nowrap text-s
           <tr>
             <th :class="th">➕ Option</th>
             <td>
-              {{ o.name }}<template v-if="o.amount"> · {{ formatEuros(o.amount) }}</template>
+              {{ o.name }}
+              <template v-if="o.amount">· {{ formatEuros(o.amount) }}</template>
             </td>
           </tr>
           <tr v-for="(f, j) in o.fields" :key="`o${i}f${j}`">
@@ -183,21 +190,21 @@ const th = "py-1 pr-3 align-top text-left font-semibold whitespace-nowrap text-s
       </div>
     </template>
     <div>
-      <label for="attach-comment" :class="label">{{
-        ignored ? "Motif / commentaire" : linked ? "Commentaire (optionnel)" : "Commentaire (obligatoire pour ignorer la ligne)"
-      }}</label>
+      <label for="attach-comment" :class="label">
+        {{ ignored ? "Motif / commentaire" : linked ? "Commentaire (optionnel)" : "Commentaire (obligatoire pour ignorer la ligne)" }}
+      </label>
       <textarea id="attach-comment" v-model="comment" rows="2" data-testid="attach-comment" :class="field" />
       <p v-if="missingReason" class="mt-1 text-xs font-semibold text-red-600" data-testid="attach-error">
         ✍️ Indiquez un commentaire (motif) pour ignorer cette ligne.
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
-      <UiButton v-if="!ignored" type="submit" data-testid="attach-save" :busy="busy && 'Enregistrement…'"
-        >💾 Enregistrer le rattachement</UiButton
-      >
-      <UiButton v-if="!linked" variant="muted" data-testid="attach-ignore" :disabled="busy" @click="ignore">{{
-        ignored ? "↩️ Ne plus ignorer" : "🚫 Ignorer"
-      }}</UiButton>
+      <UiButton v-if="!ignored" type="submit" data-testid="attach-save" :busy="busy && 'Enregistrement…'">
+        💾 Enregistrer le rattachement
+      </UiButton>
+      <UiButton v-if="!linked" variant="muted" data-testid="attach-ignore" :disabled="busy" @click="ignore">
+        {{ ignored ? "↩️ Ne plus ignorer" : "🚫 Ignorer" }}
+      </UiButton>
       <UiButton variant="muted" @click="emit('cancel')">Fermer</UiButton>
     </div>
   </form>

@@ -1,16 +1,17 @@
 <script setup lang="ts">
 /* Table view of the slots: columns on a wide screen, one card per slot on a phone, with edit and delete buttons. */
+import UiBadge, { type BadgeColor } from "../../components/ui/UiBadge.vue";
 import { slotKind, type Kind, type Slot } from "./slots";
 
 defineProps<{ slots: readonly Slot[] }>();
 const emit = defineEmits<{ edit: [slot: Slot]; remove: [slot: Slot] }>();
 
-const KIND_CLASS: Record<Kind, string> = {
-  competition: "bg-[#E8F5E9] text-[#1B5E20]",
-  perfectionnement: "bg-[#FCE4EC] text-[#880E4F]",
-  cours: "bg-[#E8EAF6] text-[#1A237E]",
-  "autonome-bloc": "bg-[#FFF3E0] text-[#E65100]",
-  autonome: "bg-[#F3F4F6] text-[#374151]",
+const KIND_COLOR: Record<Kind, BadgeColor> = {
+  competition: "green",
+  perfectionnement: "pink",
+  cours: "indigo",
+  "autonome-bloc": "orange",
+  autonome: "slate",
 };
 
 const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_minmax(0,1fr)_minmax(0,1.3fr)_40px_84px] md:items-start md:gap-3";
@@ -19,8 +20,13 @@ const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_minmax(0,1fr)
 <template>
   <div class="rounded-xl border border-slate-200 bg-white text-[12.5px] shadow-sm">
     <div :class="['hidden border-b border-slate-200 bg-slate-50 px-3 py-2 font-bold', COLUMNS]" aria-hidden="true">
-      <span>Jour & horaires</span><span>Groupe & catégorie</span><span>Type</span><span>Encadrant(s)</span><span>Tarif(s) HelloAsso</span>
-      <span class="text-center">WA</span><span class="text-center">Actions</span>
+      <span>Jour & horaires</span>
+      <span>Groupe & catégorie</span>
+      <span>Type</span>
+      <span>Encadrant(s)</span>
+      <span>Tarif(s) HelloAsso</span>
+      <span class="text-center">WA</span>
+      <span class="text-center">Actions</span>
     </div>
     <ul v-if="slots.length">
       <li
@@ -41,15 +47,16 @@ const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_minmax(0,1fr)
           </div>
         </div>
         <div>
-          <span :class="['inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold', KIND_CLASS[slotKind(slot)]]">{{
-            slot.type || "cours"
-          }}</span>
+          <UiBadge :color="KIND_COLOR[slotKind(slot)]" variant="soft">{{ slot.type || "cours" }}</UiBadge>
         </div>
-        <div class="text-xs"><span class="text-slate-500 md:hidden">👤 </span>{{ slot.encadrants.join(", ") || "—" }}</div>
+        <div class="text-xs">
+          <span class="text-slate-500 md:hidden">👤</span>
+          {{ slot.encadrants.join(", ") || "—" }}
+        </div>
         <div class="flex flex-wrap gap-1">
-          <span v-for="tarif in slot.helloasso_tarifs" :key="tarif" class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px]">{{
-            tarif
-          }}</span>
+          <span v-for="tarif in slot.helloasso_tarifs" :key="tarif" class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px]">
+            {{ tarif }}
+          </span>
           <span v-if="!slot.helloasso_tarifs.length" class="text-slate-500">Aucun tarif lié</span>
         </div>
         <div class="md:text-center">
@@ -61,7 +68,8 @@ const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_minmax(0,1fr)
             title="Ouvrir le groupe WhatsApp"
             class="no-underline"
           >
-            🟢<span class="md:sr-only"> Groupe WhatsApp</span>
+            🟢
+            <span class="md:sr-only">Groupe WhatsApp</span>
           </a>
           <span v-else class="hidden text-[11px] text-slate-500 md:inline">—</span>
         </div>

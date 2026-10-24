@@ -82,9 +82,9 @@ function tip(slot: Slot): string {
               <b class="block truncate text-[11px]">{{ p.slot.groupe }}</b>
               <span class="block text-[10.5px] opacity-90">🕒 {{ p.slot.horaires }}</span>
             </span>
-            <span v-if="p.slot.encadrants.length" class="block truncate text-[10px] opacity-85"
-              >👤 {{ p.slot.encadrants.join(" / ") }}</span
-            >
+            <span v-if="p.slot.encadrants.length" class="block truncate text-[10px] opacity-85">
+              👤 {{ p.slot.encadrants.join(" / ") }}
+            </span>
           </button>
         </div>
       </section>

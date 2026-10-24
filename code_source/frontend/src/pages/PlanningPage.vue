@@ -147,12 +147,12 @@ const menuItem = "block cursor-pointer px-3 py-2 text-[12.5px] outline-none data
                 :side-offset="4"
                 class="z-50 min-w-52 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
               >
-                <DropdownMenuItem data-testid="export-grid" :class="menuItem" @select="download('grid')"
-                  >📊 Grille hebdomadaire (.xlsx)</DropdownMenuItem
-                >
-                <DropdownMenuItem data-testid="export-list" :class="menuItem" @select="download('list')"
-                  >📋 Liste des créneaux (.xlsx)</DropdownMenuItem
-                >
+                <DropdownMenuItem data-testid="export-grid" :class="menuItem" @select="download('grid')">
+                  📊 Grille hebdomadaire (.xlsx)
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="export-list" :class="menuItem" @select="download('list')">
+                  📋 Liste des créneaux (.xlsx)
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenuPortal>
           </DropdownMenuRoot>
@@ -163,8 +163,9 @@ const menuItem = "block cursor-pointer px-3 py-2 text-[12.5px] outline-none data
             aria-label="Recharger le planning"
             title="Recharger le planning"
             @click="refresh"
-            >🔄</UiButton
           >
+            🔄
+          </UiButton>
         </div>
       </div>
       <div class="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
@@ -188,9 +189,9 @@ const menuItem = "block cursor-pointer px-3 py-2 text-[12.5px] outline-none data
             📋 Tableau des créneaux
           </button>
         </div>
-        <span data-testid="slot-count" class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{{
-          status
-        }}</span>
+        <span data-testid="slot-count" class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+          {{ status }}
+        </span>
       </div>
     </UiCard>
 

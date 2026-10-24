@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   coachChoices,
   counts,
+  discipline,
+  disciplineColor,
   draftBody,
   draftErrors,
   draftOf,
@@ -39,6 +41,16 @@ describe("competitions", () => {
     [{ date_competition: "2026-03-15", date_fin: "2026-03-15" }, "15/03/2026"],
   ])("period %j", (change, expected) => {
     expect(period(comp(change))).toBe(expected);
+  });
+
+  it("badges the disciplines, not « escalade »", () => {
+    expect(discipline({ id: 1, type: " Bloc " })).toBe("Bloc");
+    expect(discipline({ id: 1, type: "Escalade" })).toBe("");
+    expect(disciplineColor("Bloc")).toBe("violet");
+    expect(disciplineColor("DIFFICULTÉ")).toBe("blue");
+    expect(disciplineColor("Vitesse")).toBe("amber");
+    expect(disciplineColor("Combiné")).toBe("teal");
+    expect(disciplineColor("Paraescalade")).toBe("blue");
   });
 
   it("labels the payment statuses", () => {

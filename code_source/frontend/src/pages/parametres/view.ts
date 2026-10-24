@@ -1,33 +1,33 @@
 /* What the Paramètres page shows for each server answer (texts of the former web/bureau/parametres.html). */
-import type { Tone } from "../../components/ui/UiBadge.vue";
+import type { BadgeColor } from "../../components/ui/UiBadge.vue";
 import type { Schemas } from "../../lib/client";
 import { formatDateTime, formatDateTimeSeconds, formatTime, parseDate } from "../../lib/format";
 
 export interface Status {
-  tone: Tone;
+  color: BadgeColor;
   label: string;
   text: string;
 }
 
-export const CHECKING: Status = { tone: "neutral", label: "Vérification…", text: "" };
-export const UNAVAILABLE: Status = { tone: "neutral", label: "Indisponible", text: "" };
+export const CHECKING: Status = { color: "slate", label: "Vérification…", text: "" };
+export const UNAVAILABLE: Status = { color: "slate", label: "Indisponible", text: "" };
 
 export function googleStatus(s: Schemas["GoogleStatus"]): Status {
   if (s.status === "connected") {
     return {
-      tone: "success",
+      color: "green",
       label: "🟢 Connecté & Opérationnel",
       text: "Le jeton Google OAuth2 est valide. L'accès à la BDD et aux envois d'e-mails est pleinement fonctionnel.",
     };
   }
   if (s.status === "expired") {
     return {
-      tone: "danger",
+      color: "red",
       label: "🔴 Jeton expiré ou révoqué",
       text: "Le jeton de connexion Google a expiré. Cliquez sur « Renouveler la connexion Google » pour rétablir les accès.",
     };
   }
-  return { tone: "warning", label: "🟡 Non connecté", text: "Aucun jeton Google n'est configuré. Connectez le compte de l'association." };
+  return { color: "amber", label: "🟡 Non connecté", text: "Aucun jeton Google n'est configuré. Connectez le compte de l'association." };
 }
 
 export function dbMode(s: Schemas["GoogleStatus"]): string {
@@ -52,13 +52,13 @@ export function googleChecks(t: Schemas["GoogleTest"]): CheckLine[] {
 export function cacheStatus(s: Schemas["CloudDbStatus"]): Status {
   if (s.db_exists) {
     return {
-      tone: "success",
+      color: "green",
       label: "🟢 Cache opérationnel",
       text: "Le cache SQLite du serveur est initialisé et actif pour les requêtes rapides et les exports.",
     };
   }
   return {
-    tone: "warning",
+    color: "amber",
     label: "🟡 Cache non trouvé",
     text: "Le cache SQLite du serveur n'est pas encore créé. Lancez une synchronisation.",
   };

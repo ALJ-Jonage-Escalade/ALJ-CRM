@@ -144,9 +144,9 @@ const sortIcon = (dir: false | "asc" | "desc") => (dir === "asc" ? "▲" : dir =
                 i === 0 && isSelected(row.id) && 'shadow-[inset_3px_0_0_var(--color-accent)]',
               ]"
             >
-              <slot :name="`cell-${cell.column.id}`" :row="row.original" :value="cell.getValue() as CellValue">{{
-                cell.getValue() ?? ""
-              }}</slot>
+              <slot :name="`cell-${cell.column.id}`" :row="row.original" :value="cell.getValue() as CellValue">
+                {{ cell.getValue() ?? "" }}
+              </slot>
             </td>
           </tr>
         </tbody>

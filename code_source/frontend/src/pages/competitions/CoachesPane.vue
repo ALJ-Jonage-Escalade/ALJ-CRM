@@ -98,8 +98,9 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
               :to="{ query: { id: String(comp.id) } }"
               data-testid="coach-competition"
               class="text-slate-700 no-underline hover:text-accent"
-              >🏆 {{ comp.nom }} · {{ period(comp) }}</RouterLink
             >
+              🏆 {{ comp.nom }} · {{ period(comp) }}
+            </RouterLink>
           </li>
           <li v-if="!coachedBy(competitions, c).length" class="text-slate-400">Aucune épreuve assignée.</li>
         </ul>

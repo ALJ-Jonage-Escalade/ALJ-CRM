@@ -2,6 +2,7 @@
 /* « HelloAsso » (coaches and admins, online): the payments of the annual campaign, linked to a competitor or waiting
    for a coach. « Synchroniser » reads the campaign again from HelloAsso and links what it can by itself. */
 import { computed, inject, ref, watch } from "vue";
+import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
 import { CLIENT_KEY } from "../../lib/client";
@@ -171,9 +172,10 @@ const chip = (active: boolean) => [
       >
         {{ f.label }} ({{ f.n }})
       </button>
-      <label class="ml-auto inline-flex items-center gap-1.5 text-xs text-slate-600"
-        ><input v-model="hideIgnored" type="checkbox" data-testid="ha-hide-ignored" /> Masquer les ignorés dans « Tous »</label
-      >
+      <label class="ml-auto inline-flex items-center gap-1.5 text-xs text-slate-600">
+        <input v-model="hideIgnored" type="checkbox" data-testid="ha-hide-ignored" />
+        Masquer les ignorés dans « Tous »
+      </label>
     </div>
     <p class="mb-2 text-xs text-slate-500" data-testid="ha-count">
       {{
@@ -198,35 +200,34 @@ const chip = (active: boolean) => [
         <div class="flex items-start justify-between gap-2">
           <span class="min-w-0">
             <b class="block text-[14.5px]">{{ displayName(it) }}</b>
-            <span class="block text-xs text-slate-500"
-              >Commande <b>#{{ itemInfo(it).orderId || "—" }}</b> · 📅 {{ day(itemInfo(it).date) }}</span
-            >
+            <span class="block text-xs text-slate-500">
+              Commande
+              <b>#{{ itemInfo(it).orderId || "—" }}</b>
+              · 📅 {{ day(itemInfo(it).date) }}
+            </span>
           </span>
           <span class="text-right">
             <b class="block text-[15px]">{{ formatEuros(it.montant) }}</b>
-            <span
-              :class="[
-                'inline-block rounded-full px-2 py-0.5 text-[10.5px] font-bold text-white',
-                isLinked(it) ? 'bg-green-600' : isIgnored(it) ? 'bg-slate-400' : 'bg-amber-500',
-              ]"
-              data-testid="ha-state"
-            >
+            <UiBadge :color="isLinked(it) ? 'green' : isIgnored(it) ? 'slate' : 'amber'" data-testid="ha-state">
               {{ isLinked(it) ? "✅ Rattaché" : isIgnored(it) ? "🚫 Ignoré" : "⚠️ En attente" }}
-            </span>
+            </UiBadge>
           </span>
         </div>
         <div class="mt-1.5 rounded-md bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
           <template v-if="itemInfo(it).fields.length">
             <div v-for="(f, i) in itemInfo(it).fields" :key="i">
-              {{ f.name }} : <b class="text-slate-800">{{ f.answer || "—" }}</b>
+              {{ f.name }} :
+              <b class="text-slate-800">{{ f.answer || "—" }}</b>
             </div>
           </template>
           <template v-else>
             <div>
-              🪪 Licence saisie : <b class="text-slate-800">{{ it.licence_saisie || "— non renseignée —" }}</b>
+              🪪 Licence saisie :
+              <b class="text-slate-800">{{ it.licence_saisie || "— non renseignée —" }}</b>
             </div>
             <div>
-              🏆 Compétition saisie : <b class="text-slate-800">{{ it.competition_saisie || "— non renseignée —" }}</b>
+              🏆 Compétition saisie :
+              <b class="text-slate-800">{{ it.competition_saisie || "— non renseignée —" }}</b>
             </div>
           </template>
           <div v-if="it.commentaire" class="mt-0.5 italic">💬 {{ it.commentaire }}</div>
@@ -234,14 +235,17 @@ const chip = (active: boolean) => [
         <div class="mt-1.5 flex items-center justify-between gap-2 text-xs">
           <span class="min-w-0">
             <template v-if="isLinked(it)">
-              <b>Épreuve :</b> {{ compName.get(it.competition_id!) ?? `#${it.competition_id}` }} · <b>Athlète :</b>
+              <b>Épreuve :</b>
+              {{ compName.get(it.competition_id!) ?? `#${it.competition_id}` }} ·
+              <b>Athlète :</b>
               {{ memberName.get(it.adherent_id!) ?? `#${it.adherent_id}` }}
               <span class="text-slate-500">({{ it.source || "auto" }})</span>
             </template>
-            <span v-else-if="isIgnored(it)" class="text-slate-500"
-              >🚫 Ignoré<template v-if="it.ignored_by"> par {{ it.ignored_by }}</template
-              ><template v-if="it.ignore_motif"> · {{ it.ignore_motif }}</template></span
-            >
+            <span v-else-if="isIgnored(it)" class="text-slate-500">
+              🚫 Ignoré
+              <template v-if="it.ignored_by">par {{ it.ignored_by }}</template>
+              <template v-if="it.ignore_motif">· {{ it.ignore_motif }}</template>
+            </span>
             <span v-else class="font-semibold text-red-600">⚠️ À attribuer à une compétition et un athlète</span>
           </span>
           <UiButton :variant="isLinked(it) || isIgnored(it) ? 'muted' : 'primary'" small data-testid="ha-open" @click="open = it">

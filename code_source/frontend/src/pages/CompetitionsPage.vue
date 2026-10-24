@@ -4,6 +4,7 @@
 import { computed, inject, onScopeDispose, provide, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
+import UiBadge from "../components/ui/UiBadge.vue";
 import UiButton from "../components/ui/UiButton.vue";
 import UiDialog from "../components/ui/UiDialog.vue";
 import UiToast from "../components/ui/UiToast.vue";
@@ -24,6 +25,7 @@ import CompetitionForm from "./competitions/CompetitionForm.vue";
 import {
   counts,
   discipline,
+  disciplineColor,
   filterCompetitions,
   hasResults,
   isArchived,
@@ -285,8 +287,9 @@ const tab = (active: boolean) => [
         :data-testid="`section-${s.id}`"
         :aria-current="section === s.id ? 'page' : undefined"
         :class="tab(section === s.id)"
-        >{{ s.label }}</RouterLink
       >
+        {{ s.label }}
+      </RouterLink>
     </nav>
 
     <HelloAssoPane
@@ -317,11 +320,12 @@ const tab = (active: boolean) => [
             small
             data-testid="create-comp"
             @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')"
-            >➕ Nouvelle compétition</UiButton
           >
-          <UiButton v-if="pastCompetitions.length" variant="muted" small data-testid="archive-past" @click="archivePastCompetitions"
-            >📦 Archiver les passées ({{ pastCompetitions.length }})</UiButton
-          >
+            ➕ Nouvelle compétition
+          </UiButton>
+          <UiButton v-if="pastCompetitions.length" variant="muted" small data-testid="archive-past" @click="archivePastCompetitions">
+            📦 Archiver les passées ({{ pastCompetitions.length }})
+          </UiButton>
         </div>
         <div class="mb-2 flex flex-wrap items-center gap-1.5">
           <input
@@ -367,21 +371,31 @@ const tab = (active: boolean) => [
                 selected?.id === competition.id ? 'border-accent' : 'border-slate-200',
               ]"
             >
-              <b class="block text-[15px]" data-testid="comp-name"
-                ><span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆 </span>{{ competition.nom }}</b
-              >
-              <span class="block text-xs text-slate-500">
-                📅 {{ period(competition) }}<template v-if="discipline(competition)"> · {{ discipline(competition) }}</template>
-              </span>
+              <b class="block text-[15px]" data-testid="comp-name">
+                <span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆</span>
+                <span>{{ competition.nom }}</span>
+                <UiBadge
+                  v-if="discipline(competition)"
+                  :color="disciplineColor(discipline(competition))"
+                  variant="soft"
+                  class="ml-1"
+                  data-testid="discipline"
+                >
+                  {{ discipline(competition) }}
+                </UiBadge>
+              </b>
+              <span class="block text-xs text-slate-500">📅 {{ period(competition) }}</span>
               <span class="mt-0.5 block text-xs font-semibold text-blue-900">
-                ({{ counts(competition.participants ?? []).selected }} participant{{ plural(counts(competition.participants ?? []).selected) }} ·
-                {{ counts(competition.participants ?? []).unpaid }} en attente · {{ counts(competition.participants ?? []).paid }} payé{{
+                ({{ counts(competition.participants ?? []).selected }} participant{{
+                  plural(counts(competition.participants ?? []).selected)
+                }}
+                · {{ counts(competition.participants ?? []).unpaid }} en attente · {{ counts(competition.participants ?? []).paid }} payé{{
                   plural(counts(competition.participants ?? []).paid)
                 }})
               </span>
-              <span class="block text-xs text-slate-500"
-                >🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}</span
-              >
+              <span class="block text-xs text-slate-500">
+                🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}
+              </span>
             </RouterLink>
           </li>
         </ul>

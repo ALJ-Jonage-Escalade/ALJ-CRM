@@ -109,9 +109,9 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
           <input v-model="draft.helloasso_tarifs" type="checkbox" :value="tarif" />
           <span>{{ tarif }}</span>
         </label>
-        <span v-if="!tarifs.length" class="text-[11.5px] text-slate-500"
-          >Aucun tarif de saison configuré. Saisissez le tarif dans le nom de groupe.</span
-        >
+        <span v-if="!tarifs.length" class="text-[11.5px] text-slate-500">
+          Aucun tarif de saison configuré. Saisissez le tarif dans le nom de groupe.
+        </span>
       </div>
     </fieldset>
     <div class="grid grid-cols-2 gap-3">

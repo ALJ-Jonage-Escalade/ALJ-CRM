@@ -28,8 +28,9 @@ const open = defineModel<boolean>("open", { required: true });
         <DialogClose
           aria-label="Fermer"
           class="absolute top-4 right-4 cursor-pointer text-xl leading-none text-slate-500 hover:text-slate-800"
-          >✕</DialogClose
         >
+          ✕
+        </DialogClose>
       </DialogContent>
     </DialogPortal>
   </DialogRoot>

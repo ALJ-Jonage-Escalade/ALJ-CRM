@@ -166,9 +166,9 @@ onMounted(() => {
           <h2 class="mb-2.5 text-[15px] font-bold">📄 Modèle d'e-mail</h2>
           <div class="flex flex-wrap items-end gap-2">
             <div class="min-w-48 flex-1">
-              <label for="template-select" class="mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase"
-                >Sélectionner un modèle</label
-              >
+              <label for="template-select" class="mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase">
+                Sélectionner un modèle
+              </label>
               <select
                 id="template-select"
                 data-testid="template-select"
@@ -205,9 +205,9 @@ onMounted(() => {
           <form class="flex flex-col gap-2" @submit.prevent="saveWhatsapp">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-[15px] font-bold"><label for="whatsapp">📱 Texte d'invitation WhatsApp</label></h2>
-              <UiButton type="submit" variant="muted" small :busy="savingWhatsapp && 'Enregistrement…'" data-testid="whatsapp-save"
-                >💾 Enregistrer WhatsApp</UiButton
-              >
+              <UiButton type="submit" variant="muted" small :busy="savingWhatsapp && 'Enregistrement…'" data-testid="whatsapp-save">
+                💾 Enregistrer WhatsApp
+              </UiButton>
             </div>
             <p class="text-[11.5px] text-slate-500">
               Modèle d'invitation envoyé pour rejoindre le groupe WhatsApp du créneau ou de la compétition :
@@ -232,9 +232,9 @@ onMounted(() => {
 
     <UiDialog v-model:open="creating" title="➕ Nouveau modèle d'e-mail" data-testid="new-template-dialog">
       <form novalidate @submit.prevent="create">
-        <label for="new-template-name" class="mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase"
-          >Nom du nouveau modèle *</label
-        >
+        <label for="new-template-name" class="mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase">
+          Nom du nouveau modèle *
+        </label>
         <input
           id="new-template-name"
           v-model="newName"

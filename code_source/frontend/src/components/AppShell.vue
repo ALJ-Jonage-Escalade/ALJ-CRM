@@ -78,7 +78,10 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
     <aside class="print:hidden md:sticky md:top-0 md:flex md:h-dvh md:flex-col md:gap-5 md:bg-side md:px-3 md:py-5 md:text-side-text">
       <div class="hidden px-2 md:block">
         <b class="block text-base text-slate-50">🧗 ALJ Escalade</b>
-        <span class="mt-0.5 block text-xs text-slate-400">Bureau · <VersionBadge /></span>
+        <span class="mt-0.5 block text-xs text-slate-400">
+          Bureau ·
+          <VersionBadge />
+        </span>
       </div>
       <nav
         v-if="nav.length"
@@ -131,7 +134,11 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         id="google-auth-warning"
         class="mb-3.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-300 print:hidden bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800"
       >
-        <span>⚠️ <b>Accès Google & BDD suspendus :</b> le jeton de connexion Google du club a expiré ou a été révoqué.</span>
+        <span>
+          ⚠️
+          <b>Accès Google & BDD suspendus :</b>
+          le jeton de connexion Google du club a expiré ou a été révoqué.
+        </span>
         <a :href="renewUrl" class="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-bold text-white no-underline">🔄 Renouveler l'accès</a>
       </div>
 
@@ -181,8 +188,9 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
           <a
             href="/bureau/"
             class="mt-2 inline-block rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white no-underline hover:bg-accent-dark"
-            >🏠 Retour à l'accueil</a
           >
+            🏠 Retour à l'accueil
+          </a>
         </template>
         <template v-else>
           <h2 class="mb-2 text-[17px] font-bold">⛔ Accès réservé</h2>
@@ -204,7 +212,10 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         <slot :role="role" />
       </div>
 
-      <p class="mt-8 text-center text-[11px] text-slate-400 md:hidden print:hidden">🧗 ALJ Escalade · <VersionBadge /></p>
+      <p class="mt-8 text-center text-[11px] text-slate-400 md:hidden print:hidden">
+        🧗 ALJ Escalade ·
+        <VersionBadge />
+      </p>
     </div>
   </div>
 </template>

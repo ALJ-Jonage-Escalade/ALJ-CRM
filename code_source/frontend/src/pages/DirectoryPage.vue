@@ -7,6 +7,7 @@
    The filters are remembered as on the former page (web/index.html), without the search. */
 import { computed, inject, ref, watch } from "vue";
 import AppShell from "../components/AppShell.vue";
+import UiBadge from "../components/ui/UiBadge.vue";
 import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
 import { AUTH_KEY } from "../composables/auth";
@@ -26,7 +27,7 @@ import {
   otherChecked,
   saveFilters,
   statusChips,
-  statusClass,
+  statusColor,
   tarifCounts,
   telHref,
   type CreneauItem,
@@ -312,9 +313,7 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
                   <span v-for="d in diplomes(m)" :key="d.type" :title="d.label" class="pl-1">{{ d.icon }}</span>
                 </span>
               </span>
-              <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(m.status_norm)]">{{
-                m.status_norm || "—"
-              }}</span>
+              <UiBadge :color="statusColor(m.status_norm)" class="shrink-0">{{ m.status_norm || "—" }}</UiBadge>
             </button>
             <div v-if="m.phone || m.email_primary" class="mt-2 flex flex-wrap gap-1.5">
               <a v-if="m.phone" :href="telHref(m.phone)" :class="callButton">📞 Appeler</a>
@@ -347,12 +346,12 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
           :class="searchInput"
         />
         <p class="my-2 text-xs text-slate-500" data-testid="urgency-count">
-          <template v-if="urgency === null"
-            >Tapez au moins {{ EMERGENCY_MIN_LETTERS }} lettres du nom de l'adhérent pour afficher ses contacts.</template
-          >
-          <template v-else
-            >{{ urgency.length }} adhérent{{ plural(urgency.length) }} trouvé{{ plural(urgency.length) }} (saison {{ season }})</template
-          >
+          <template v-if="urgency === null">
+            Tapez au moins {{ EMERGENCY_MIN_LETTERS }} lettres du nom de l'adhérent pour afficher ses contacts.
+          </template>
+          <template v-else>
+            {{ urgency.length }} adhérent{{ plural(urgency.length) }} trouvé{{ plural(urgency.length) }} (saison {{ season }})
+          </template>
         </p>
         <ul class="grid gap-2 lg:grid-cols-2">
           <li
@@ -372,9 +371,7 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
                 <b class="block text-[15px]">{{ m.first_name }} {{ m.last_name }}</b>
                 <span class="block text-xs text-slate-500">{{ m.tarif_name || "—" }}</span>
               </span>
-              <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(m.status_norm)]">{{
-                m.status_norm || "—"
-              }}</span>
+              <UiBadge :color="statusColor(m.status_norm)" class="shrink-0">{{ m.status_norm || "—" }}</UiBadge>
             </div>
             <div class="mt-2.5 flex flex-col gap-2 border-t border-dashed border-slate-200 pt-2.5">
               <div v-for="r in emergencyRows(m)" :key="r.label" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">

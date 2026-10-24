@@ -32,35 +32,38 @@ const rows = computed(() => recordRows(props.member));
     <div class="flex flex-wrap gap-2">
       <UiButton small data-testid="record-email" title="Envoyer un e-mail à cet adhérent" @click="emit('email')">✉️ E-mail</UiButton>
       <template v-if="admin">
-        <UiButton variant="muted" small data-testid="record-attestation" title="Attestation de paiement (PDF)" @click="emit('attestation')"
-          >📄 Attestation</UiButton
-        >
+        <UiButton variant="muted" small data-testid="record-attestation" title="Attestation de paiement (PDF)" @click="emit('attestation')">
+          📄 Attestation
+        </UiButton>
         <UiButton
           variant="muted"
           small
           data-testid="record-edit"
           title="Modifier le créneau, les badges et les coordonnées"
           @click="emit('edit')"
-          >✏️ Modifier</UiButton
         >
+          ✏️ Modifier
+        </UiButton>
       </template>
-      <span v-else data-testid="record-readonly" class="self-center text-[11.5px] text-slate-500 italic"
-        >👁️ Modification et attestation réservées aux administrateurs</span
-      >
+      <span v-else data-testid="record-readonly" class="self-center text-[11.5px] text-slate-500 italic">
+        👁️ Modification et attestation réservées aux administrateurs
+      </span>
     </div>
     <div class="flex flex-wrap gap-2">
       <a
         v-if="member.phone"
         :href="telHref(member.phone)"
         class="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 no-underline"
-        >📞 Appeler</a
       >
+        📞 Appeler
+      </a>
       <a
         v-if="member.email_primary"
         :href="`mailto:${member.email_primary}`"
         class="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 no-underline"
-        >✉️ Écrire</a
       >
+        ✉️ Écrire
+      </a>
     </div>
 
     <dl data-testid="record-fields" class="divide-y divide-slate-100 rounded-lg border border-slate-200 text-[12.5px]">

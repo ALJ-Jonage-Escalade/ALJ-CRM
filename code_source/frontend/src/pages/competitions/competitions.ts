@@ -1,5 +1,6 @@
 /* Competitions screen: the competitions, their participants and payment status, and what coaches change on them (the
    former pages web/competitions.html and web/bureau/competitions.html, merged). The server checks every change. */
+import type { BadgeColor } from "../../components/ui/UiBadge.vue";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
@@ -81,6 +82,11 @@ export function discipline(c: Competition): string {
   return t && t.toLowerCase() !== "escalade" ? t : "";
 }
 
+const DISCIPLINE_COLOR: Record<string, BadgeColor> = { bloc: "violet", difficulté: "blue", vitesse: "amber", combiné: "teal" };
+
+/** Badge colour of a discipline (former office page colours), blue for any other. */
+export const disciplineColor = (name: string): BadgeColor => DISCIPLINE_COLOR[name.toLowerCase()] ?? "blue";
+
 export interface Counts {
   all: number;
   selected: number;
@@ -103,16 +109,16 @@ export function hasResults(c: Competition): boolean {
   return !!c.resultats_synced_at || (c.participants ?? []).some((p) => p.resultat_ffme || p.classement);
 }
 
-export const PAYMENT: Record<string, { label: string; class: string }> = {
-  paye: { label: "Payé", class: "bg-green-600" },
-  en_attente: { label: "En attente", class: "bg-amber-600" },
-  non_invite: { label: "Non invité", class: "bg-slate-400" },
-  annule_perdu: { label: "Annulé — perdu", class: "bg-red-600" },
-  annule_reporte: { label: "Annulé — report", class: "bg-violet-600" },
+export const PAYMENT: Record<string, { label: string; color: BadgeColor }> = {
+  paye: { label: "Payé", color: "green" },
+  en_attente: { label: "En attente", color: "amber" },
+  non_invite: { label: "Non invité", color: "slate" },
+  annule_perdu: { label: "Annulé — perdu", color: "red" },
+  annule_reporte: { label: "Annulé — report", color: "violet" },
 };
 
-export function payment(status: string | undefined): { label: string; class: string } {
-  return PAYMENT[status ?? ""] ?? { label: status || "—", class: "bg-slate-400" };
+export function payment(status: string | undefined): { label: string; color: BadgeColor } {
+  return PAYMENT[status ?? ""] ?? { label: status || "—", color: "slate" };
 }
 
 export const isCancelled = (p: Participant): boolean => p.statut_paiement === "annule_reporte" || p.statut_paiement === "annule_perdu";

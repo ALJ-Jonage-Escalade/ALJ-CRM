@@ -227,7 +227,7 @@ onMounted(() => {
           <div class="min-w-0">
             <h2 class="flex flex-wrap items-center gap-2 text-[15px] font-bold">
               🔐 Connexion Google & Accès Cloud
-              <UiBadge :tone="google.tone" data-testid="google-status">{{ google.label }}</UiBadge>
+              <UiBadge :color="google.color" data-testid="google-status">{{ google.label }}</UiBadge>
             </h2>
             <p class="mt-1 text-[13px] text-slate-500">
               {{ google.text || "Vérification de la validité du jeton Google OAuth2 en cours…" }}
@@ -237,20 +237,21 @@ onMounted(() => {
             <a
               :href="RENEW_URL"
               class="inline-flex items-center rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white no-underline hover:bg-accent-dark"
-              >🔄 Renouveler la connexion Google</a
             >
-            <UiButton variant="muted" :busy="testing && 'Test en cours…'" data-testid="google-test" @click="testGoogle"
-              >🔍 Tester l'accès</UiButton
-            >
+              🔄 Renouveler la connexion Google
+            </a>
+            <UiButton variant="muted" :busy="testing && 'Test en cours…'" data-testid="google-test" @click="testGoogle">
+              🔍 Tester l'accès
+            </UiButton>
           </div>
         </div>
         <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-          <UiTile label="Compte Google du club"
-            ><span data-testid="google-account">{{ googleInfo ? googleInfo.user_email || "Non configuré" : "—" }}</span></UiTile
-          >
-          <UiTile label="Mode base de données"
-            ><span data-testid="db-mode">{{ googleInfo ? dbMode(googleInfo) : "Firestore (Google Cloud)" }}</span></UiTile
-          >
+          <UiTile label="Compte Google du club">
+            <span data-testid="google-account">{{ googleInfo ? googleInfo.user_email || "Non configuré" : "—" }}</span>
+          </UiTile>
+          <UiTile label="Mode base de données">
+            <span data-testid="db-mode">{{ googleInfo ? dbMode(googleInfo) : "Firestore (Google Cloud)" }}</span>
+          </UiTile>
           <UiTile label="Services associés"><span class="text-xs font-semibold">BDD, Google Drive & Gmail API</span></UiTile>
         </div>
         <div v-if="testing || checks || checksError" class="mt-3.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[12.5px]">
@@ -259,7 +260,8 @@ onMounted(() => {
             <div v-if="testing">Test des accès Google en cours…</div>
             <div v-else-if="checksError" class="text-red-600">{{ checksError }}</div>
             <div v-for="line in checks ?? []" v-else :key="line.label">
-              <b>{{ line.ok ? "🟢" : "🔴" }} {{ line.label }} :</b> {{ line.message }}
+              <b>{{ line.ok ? "🟢" : "🔴" }} {{ line.label }} :</b>
+              {{ line.message }}
             </div>
           </div>
         </div>
@@ -270,7 +272,7 @@ onMounted(() => {
           <div class="min-w-0 flex-1 basis-72">
             <h2 class="flex flex-wrap items-center gap-2 text-[15px] font-bold">
               🗄️ Base de Données (SQLite ↔ Firestore)
-              <UiBadge :tone="cache.tone" data-testid="cache-status">{{ cache.label }}</UiBadge>
+              <UiBadge :color="cache.color" data-testid="cache-status">{{ cache.label }}</UiBadge>
             </h2>
             <p class="mt-1 text-[13px] text-slate-500">
               {{
@@ -279,21 +281,21 @@ onMounted(() => {
               }}
             </p>
           </div>
-          <UiButton :busy="syncing === 'update' && 'Mise à jour…'" :disabled="!!syncing" data-testid="cache-sync" @click="sync(false)"
-            >🔄 Synchroniser la BDD (Envoi & Réception)</UiButton
-          >
+          <UiButton :busy="syncing === 'update' && 'Mise à jour…'" :disabled="!!syncing" data-testid="cache-sync" @click="sync(false)">
+            🔄 Synchroniser la BDD (Envoi & Réception)
+          </UiButton>
         </div>
         <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-          <UiTile label="Fichier du cache (serveur)"
-            ><span data-testid="cache-file">{{ cacheInfo ? cacheFile(cacheInfo) : "—" }}</span></UiTile
-          >
-          <UiTile label="Dernière synchro cloud"
-            ><span data-testid="cache-last-sync">{{ cacheInfo ? lastSync(cacheInfo.last_sync) : "—" }}</span></UiTile
-          >
+          <UiTile label="Fichier du cache (serveur)">
+            <span data-testid="cache-file">{{ cacheInfo ? cacheFile(cacheInfo) : "—" }}</span>
+          </UiTile>
+          <UiTile label="Dernière synchro cloud">
+            <span data-testid="cache-last-sync">{{ cacheInfo ? lastSync(cacheInfo.last_sync) : "—" }}</span>
+          </UiTile>
           <UiTile label="Modifications en attente d'envoi">
-            <span data-testid="cache-pending" :class="cacheInfo && cacheInfo.pending > 0 && 'text-amber-600'">{{
-              cacheInfo ? pendingText(cacheInfo.pending) : "—"
-            }}</span>
+            <span data-testid="cache-pending" :class="cacheInfo && cacheInfo.pending > 0 && 'text-amber-600'">
+              {{ cacheInfo ? pendingText(cacheInfo.pending) : "—" }}
+            </span>
           </UiTile>
           <UiTile label="Source cloud"><span class="text-[12.5px]">Firestore</span></UiTile>
         </div>
@@ -311,8 +313,9 @@ onMounted(() => {
           </summary>
           <div class="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-amber-800">
             <p class="mb-2">
-              <b>Attention :</b> cette opération télécharge à nouveau toutes les collections Firestore pour remplacer le cache du serveur.
-              Ne l'utilisez que si le cache est corrompu, après avoir envoyé les modifications en attente.
+              <b>Attention :</b>
+              cette opération télécharge à nouveau toutes les collections Firestore pour remplacer le cache du serveur. Ne l'utilisez que si
+              le cache est corrompu, après avoir envoyé les modifications en attente.
             </p>
             <UiButton
               variant="warning"
@@ -321,8 +324,9 @@ onMounted(() => {
               :disabled="!!syncing"
               data-testid="cache-rebuild"
               @click="sync(true)"
-              >⚠️ Forcer la reconstruction complète depuis Firestore</UiButton
             >
+              ⚠️ Forcer la reconstruction complète depuis Firestore
+            </UiButton>
           </div>
         </details>
       </UiCard>
@@ -332,22 +336,22 @@ onMounted(() => {
           <div class="min-w-0 flex-1 basis-72">
             <h2 class="flex flex-wrap items-center gap-2 text-[15px] font-bold">
               🏆 Suivi Automatique des Résultats MyCompet & Notifications
-              <UiBadge tone="success">{{ results?.cron_schedule || "Tous les jours à 07h00" }}</UiBadge>
+              <UiBadge color="green">{{ results?.cron_schedule || "Tous les jours à 07h00" }}</UiBadge>
             </h2>
             <p class="mt-1 text-[13px] text-slate-500">
               Un batch quotidien recherche les résultats officiels des compétitions passées sur MyCompet FFME, met à jour les classements
               des compétiteurs du club et envoie un e-mail récapitulatif dès que des résultats sont disponibles.
             </p>
           </div>
-          <UiButton :busy="running && 'Détection en cours…'" data-testid="results-run" @click="runBatch"
-            >🚀 Lancer la détection maintenant</UiButton
-          >
+          <UiButton :busy="running && 'Détection en cours…'" data-testid="results-run" @click="runBatch">
+            🚀 Lancer la détection maintenant
+          </UiButton>
         </div>
         <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
           <form class="rounded-lg border border-slate-200 bg-slate-50 p-3" novalidate @submit.prevent="saveEmail">
-            <label for="results-email" class="mb-1.5 block text-[11.5px] font-semibold text-slate-500 uppercase"
-              >E-mail de notification des résultats</label
-            >
+            <label for="results-email" class="mb-1.5 block text-[11.5px] font-semibold text-slate-500 uppercase">
+              E-mail de notification des résultats
+            </label>
             <div class="flex items-center gap-2">
               <input
                 id="results-email"
@@ -358,16 +362,16 @@ onMounted(() => {
                 class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[13px]"
                 @focus="editingEmail = true"
               />
-              <UiButton type="submit" variant="muted" small :busy="savingEmail && 'Enregistrement…'" data-testid="results-email-save"
-                >Enregistrer</UiButton
-              >
+              <UiButton type="submit" variant="muted" small :busy="savingEmail && 'Enregistrement…'" data-testid="results-email-save">
+                Enregistrer
+              </UiButton>
             </div>
           </form>
           <UiTile label="Dernière exécution du batch">
             <span data-testid="results-last-run">{{ results ? lastRun(results.last_run) : "—" }}</span>
-            <span data-testid="results-last-status" class="mt-0.5 block text-[11.5px] font-normal text-slate-500">{{
-              results?.last_status || "En attente du prochain passage à 07h00"
-            }}</span>
+            <span data-testid="results-last-status" class="mt-0.5 block text-[11.5px] font-normal text-slate-500">
+              {{ results?.last_status || "En attente du prochain passage à 07h00" }}
+            </span>
           </UiTile>
         </div>
         <div
@@ -384,13 +388,20 @@ onMounted(() => {
         <h2 class="mb-1.5 text-[15px] font-bold">ℹ️ Pourquoi renouveler le jeton ?</h2>
         <p class="mb-2.5 text-[13px] text-slate-500">
           Le serveur utilise ce jeton Google pour synchroniser la base de données des adhérents, accéder au Drive et expédier les e-mails et
-          attestations. Si le statut indique <b>« Jeton expiré »</b>, cliquez sur « Renouveler la connexion Google » pour vous reconnecter
-          avec le compte Google de l'association.
+          attestations. Si le statut indique
+          <b>« Jeton expiré »</b>
+          , cliquez sur « Renouveler la connexion Google » pour vous reconnecter avec le compte Google de l'association.
         </p>
         <p class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs text-club-blue">
-          💡 <b>Conseil Google Cloud :</b> si vous devez renouveler le jeton tous les 7 jours, le projet Google Cloud est en statut
-          <i>« En test »</i>. Dans la <b>Google Cloud Console → Écran de consentement OAuth</b>, cliquez sur
-          <b>« Publier l'application »</b> pour rendre le jeton permanent.
+          💡
+          <b>Conseil Google Cloud :</b>
+          si vous devez renouveler le jeton tous les 7 jours, le projet Google Cloud est en statut
+          <i>« En test »</i>
+          . Dans la
+          <b>Google Cloud Console → Écran de consentement OAuth</b>
+          , cliquez sur
+          <b>« Publier l'application »</b>
+          pour rendre le jeton permanent.
         </p>
       </UiCard>
 
@@ -401,8 +412,9 @@ onMounted(() => {
           </summary>
           <form class="mt-3 flex flex-col gap-2" @submit.prevent="saveToken">
             <label for="manual-token" class="text-[12.5px] text-slate-500">
-              Permet de coller un nouveau <code>refresh_token</code> si la redirection Google automatique n'est pas configurée dans la
-              console.
+              Permet de coller un nouveau
+              <code>refresh_token</code>
+              si la redirection Google automatique n'est pas configurée dans la console.
             </label>
             <input
               id="manual-token"
@@ -415,9 +427,9 @@ onMounted(() => {
               class="w-full rounded-lg border border-slate-300 px-2.5 py-2 font-mono text-xs"
             />
             <div class="flex justify-end">
-              <UiButton type="submit" variant="muted" small :busy="savingToken && 'Validation…'" data-testid="manual-token-save"
-                >Enregistrer et tester le jeton</UiButton
-              >
+              <UiButton type="submit" variant="muted" small :busy="savingToken && 'Validation…'" data-testid="manual-token-save">
+                Enregistrer et tester le jeton
+              </UiButton>
             </div>
           </form>
         </details>

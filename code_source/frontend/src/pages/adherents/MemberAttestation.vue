@@ -173,9 +173,9 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
     <div class="flex flex-wrap justify-end gap-2">
       <UiButton variant="muted" data-testid="attestation-cancel" @click="emit('cancel')">Fermer</UiButton>
       <UiButton variant="muted" data-testid="attestation-download" :disabled="!pdf" @click="download">📥 Télécharger le PDF</UiButton>
-      <UiButton type="submit" data-testid="attestation-send" :disabled="!canSend" :busy="sending && 'Envoi en cours…'"
-        >🚀 Envoyer par e-mail</UiButton
-      >
+      <UiButton type="submit" data-testid="attestation-send" :disabled="!canSend" :busy="sending && 'Envoi en cours…'">
+        🚀 Envoyer par e-mail
+      </UiButton>
     </div>
   </form>
 </template>
