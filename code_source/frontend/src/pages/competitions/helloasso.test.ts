@@ -7,6 +7,9 @@ import {
   isLinked,
   itemCounts,
   itemInfo,
+  nextPending,
+  passSummary,
+  pendingIds,
   stateLabel,
   suggestedCompetition,
   suggestedMember,
@@ -97,5 +100,27 @@ describe("helloasso", () => {
       "✅ Synchro terminée : 3 article(s), 1 auto, 2 en attente.",
     );
     expect(syncMessage({ status: "error", message: "Aucune campagne" })).toBe("❌ Aucune campagne");
+  });
+
+  it("walks a linking pass through the payments still pending, in the order shown", () => {
+    const linked = item({ id_item: 2, competition_id: 10, adherent_id: 1 });
+    const ignored = item({ id_item: 3, ignore: true });
+    const shown = [item({ id_item: 5 }), linked, item({ id_item: 4 }), ignored, item({ id_item: 6 })];
+    const ids = pendingIds(shown);
+    expect(ids).toEqual([5, 4, 6]);
+    expect(nextPending(ids, -1, shown)).toBe(0);
+    // 4 linked meanwhile (a sync): passed over; 5, saved without a link, stays behind
+    const later = [item({ id_item: 5 }), item({ id_item: 4, competition_id: 10, adherent_id: 2 }), item({ id_item: 6 })];
+    expect(nextPending(ids, 0, later)).toBe(2);
+    expect(nextPending(ids, 2, later)).toBe(-1);
+    expect(nextPending(ids, 0, [item({ id_item: 5 })])).toBe(-1);
+  });
+
+  it("sums up a linking pass", () => {
+    expect(passSummary({ linked: 3, saved: 1, ignored: 0, skipped: 2 })).toBe(
+      "✅ 3 rattachés · 💾 1 enregistré sans rattachement · ⏭ 2 passés",
+    );
+    expect(passSummary({ linked: 0, saved: 0, ignored: 1, skipped: 0 })).toBe("🚫 1 ignoré");
+    expect(passSummary({ linked: 0, saved: 0, ignored: 0, skipped: 0 })).toBe("");
   });
 });

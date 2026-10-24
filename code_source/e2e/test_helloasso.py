@@ -138,6 +138,30 @@ def test_ignore_and_restore_a_payment(mobile_page, test_data, setup):
     eventually(restored)
 
 
+def test_linking_pass_goes_from_one_pending_payment_to_the_next(mobile_page, test_data, setup):
+    """« Rattacher les paiements en attente »: the pending payments of the list shown, one after another, each decision
+    saved at once, then a summary."""
+    page = open_screen(mobile_page)
+    _sync(page)
+    page.get_by_test_id("ha-filter-all").click()
+    page.get_by_test_id("ha-search").fill(setup["tag"])
+    expect(page.get_by_test_id("ha-item")).to_have_count(2)  # the list reloaded after the sync
+    page.get_by_test_id("ha-first").click()
+    dialog = page.get_by_test_id("attach-dialog")
+    expect(dialog).to_contain_text("1 / 2")
+    page.get_by_test_id("attach-skip").click()
+    expect(dialog).to_contain_text("2 / 2")
+    page.get_by_test_id("attach-comment").fill("Not a competition")
+    page.get_by_test_id("attach-ignore").click()
+    expect(dialog).to_have_count(0)
+    expect(toast(page)).to_contain_text("🚫 1 ignoré · ⏭ 1 passé")
+
+    def one_ignored():
+        docs = [test_data.helloasso_item(setup[key]["id"]) for key in ("unknown_payer", "no_competition")]
+        assert sorted(bool(doc.get("ignore")) for doc in docs) == [False, True]
+    eventually(one_ignored)
+
+
 def test_resync_keeps_coach_decisions(mobile_page, test_data, setup):
     """A new sync rewrites HelloAsso's fields only: manual links and ignored lines survive."""
     member = setup["members"][1]

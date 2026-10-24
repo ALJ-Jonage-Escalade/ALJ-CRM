@@ -2,6 +2,7 @@
    mirrored by POST /api/helloasso/sync), linked to a participant automatically or by a coach, or ignored. Port of the
    former phone page's HelloAsso tab. HelloAsso custom fields carry the answer in `answer` or `value`: both are read. */
 import type { Schemas } from "../../lib/client";
+import { plural } from "../../lib/text";
 import { normKey } from "../adherents/members";
 import { sortCompetitions, type Competition, type MemberSlot } from "./competitions";
 
@@ -177,6 +178,43 @@ export function filterItems(
   const rank = (it: HelloAssoItem) => (isLinked(it) ? 1 : isIgnored(it) ? 2 : 0);
   const dates = new Map(shown.map((it) => [it, itemInfo(it).date]));
   return shown.sort((a, b) => rank(a) - rank(b) || (dates.get(b) ?? "").localeCompare(dates.get(a) ?? ""));
+}
+
+const isPending = (it: HelloAssoItem): boolean => !isLinked(it) && !isIgnored(it);
+
+/** The items of a linking pass (« Rattacher les paiements en attente »): the pending ones of the list shown, in its order. */
+export function pendingIds(shown: readonly HelloAssoItem[]): number[] {
+  return shown.filter(isPending).map((it) => it.id_item);
+}
+
+/** Position in `ids` of the next item still pending after `after` (a sync may have linked some meanwhile), -1 at the end
+    of the pass. Only the items after `after` count: one saved without being linked stays behind. */
+export function nextPending(ids: readonly number[], after: number, items: readonly HelloAssoItem[]): number {
+  const byId = new Map(items.map((it) => [it.id_item, it]));
+  return ids.findIndex((id, position) => {
+    const it = byId.get(id);
+    return position > after && it != null && isPending(it);
+  });
+}
+
+export interface PassTally {
+  linked: number;
+  /** saved with a competition or a member only: still pending */
+  saved: number;
+  ignored: number;
+  skipped: number;
+}
+
+/** What a linking pass did, for the toast closing it; empty when nothing was done. */
+export function passSummary(tally: PassTally): string {
+  return [
+    tally.linked && `✅ ${tally.linked} rattaché${plural(tally.linked)}`,
+    tally.saved && `💾 ${tally.saved} enregistré${plural(tally.saved)} sans rattachement`,
+    tally.ignored && `🚫 ${tally.ignored} ignoré${plural(tally.ignored)}`,
+    tally.skipped && `⏭ ${tally.skipped} passé${plural(tally.skipped)}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** The competition an item is for: its link, else the one whose FFME number or name the payer typed. */

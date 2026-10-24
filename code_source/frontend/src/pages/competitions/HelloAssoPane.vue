@@ -18,10 +18,14 @@ import {
   isLinked,
   itemCounts,
   itemInfo,
+  nextPending,
+  passSummary,
+  pendingIds,
   syncMessage,
   type HelloAssoItem,
   type ItemFilter,
   type ItemInfo,
+  type PassTally,
 } from "./helloasso";
 import { WRITER_KEY } from "./writer";
 import { plural } from "../../lib/text";
@@ -87,14 +91,75 @@ async function sync(): Promise<void> {
 }
 
 const open = ref<HelloAssoItem | null>(null);
-const dialogOpen = computed({ get: () => !!open.value, set: (v) => (open.value = v ? open.value : null) });
+const dialogOpen = computed({
+  get: () => !!open.value,
+  set: (v) => {
+    if (!v) {
+      stop();
+    }
+  },
+});
 
-function firstWaiting(): void {
-  const waiting = all.value.find((it) => !isLinked(it) && !isIgnored(it));
-  if (waiting) {
-    open.value = waiting;
+/* Linking pass: the pending payments of the list shown, one after another. Each decision is saved at once; the pass
+   only chooses what the dialog shows next. A row's own button opens that payment alone (no pass). */
+interface Pass {
+  ids: number[];
+  position: number;
+  tally: PassTally;
+}
+const pass = ref<Pass | null>(null);
+const pending = computed(() => pendingIds(shown.value));
+const dialogTitle = computed(() =>
+  pass.value ? `🔗 Paiement HelloAsso — ${pass.value.position + 1} / ${pass.value.ids.length}` : "🔗 Paiement HelloAsso",
+);
+
+function startPass(): void {
+  if (!pending.value.length) {
+    writer.toast(
+      count.value.unlinked ? "Aucun paiement en attente dans la liste affichée." : "🎉 Aucun paiement en attente de rattachement !",
+    );
+    return;
+  }
+  pass.value = { ids: pending.value, position: -1, tally: { linked: 0, saved: 0, ignored: 0, skipped: 0 } };
+  advance();
+}
+
+/** Shows the next payment of the pass, or ends it. The payment saved just before is behind: the list reloads meanwhile. */
+function advance(): void {
+  const current = pass.value!;
+  const position = nextPending(current.ids, current.position, all.value);
+  const next = position < 0 ? undefined : all.value.find((it) => it.id_item === current.ids[position]);
+  if (next) {
+    current.position = position;
+    open.value = next;
   } else {
-    writer.toast("🎉 Aucun paiement en attente de rattachement !");
+    stop();
+  }
+}
+
+function skip(): void {
+  pass.value!.tally.skipped++;
+  advance();
+}
+
+/** Closes the dialog; ending a pass tells what it did. */
+function stop(): void {
+  const summary = pass.value && passSummary(pass.value.tally);
+  pass.value = null;
+  open.value = null;
+  if (summary) {
+    writer.toast(summary, 6000);
+  }
+}
+
+/** After a saved decision: the next payment of the pass, else the dialog closes. */
+function decided(outcome: keyof PassTally): void {
+  emit("changed");
+  if (pass.value) {
+    pass.value.tally[outcome]++;
+    advance();
+  } else {
+    open.value = null;
   }
 }
 
@@ -106,7 +171,7 @@ async function link(competitionId: number | null, adherentId: number | null, com
     { done: both ? "✅ Paiement HelloAsso rattaché avec succès !" : "💾 Enregistré (paiement non rattaché)." },
   );
   if (answer) {
-    close();
+    decided(both ? "linked" : "saved");
   }
 }
 
@@ -117,13 +182,8 @@ async function ignore(ignoreIt: boolean, note: string): Promise<void> {
     done: ignoreIt ? "🚫 Ligne ignorée." : "↩️ La ligne n'est plus ignorée.",
   });
   if (answer) {
-    close();
+    decided(ignoreIt ? "ignored" : "saved");
   }
-}
-
-function close(): void {
-  open.value = null;
-  emit("changed");
 }
 
 function payer(it: HelloAssoItem, info: ItemInfo): string {
@@ -154,8 +214,8 @@ const chip = (active: boolean) => [
           <UiButton small data-testid="ha-sync" :busy="syncing && 'Synchro…'" @click="sync">
             🔄 Lancer la synchronisation HelloAsso
           </UiButton>
-          <UiButton variant="muted" small data-testid="ha-first" @click="firstWaiting">
-            🔗 Rattacher les paiements en attente ({{ count.unlinked }})
+          <UiButton variant="muted" small data-testid="ha-first" @click="startPass">
+            🔗 Rattacher les paiements en attente ({{ pending.length }})
           </UiButton>
         </div>
       </div>
@@ -247,18 +307,14 @@ const chip = (active: boolean) => [
               </td>
               <td class="px-2.5 py-2">
                 <UiBadge :color="isLinked(it) ? 'blue' : isIgnored(it) ? 'slate' : 'amber'" data-testid="ha-state">
-                  <template v-if="isLinked(it)">
-                    ✅ {{ compName.get(it.competition_id!) ?? `#${it.competition_id}` }}
-                  </template>
+                  <template v-if="isLinked(it)">✅ {{ compName.get(it.competition_id!) ?? `#${it.competition_id}` }}</template>
                   <template v-else-if="isIgnored(it)">🚫 Ignoré{{ it.ignore_motif ? ` (${it.ignore_motif})` : "" }}</template>
                   <template v-else>⚠️ En attente</template>
                 </UiBadge>
                 <div v-if="it.commentaire" class="mt-0.5 text-[11px] text-slate-500 italic">💬 {{ it.commentaire }}</div>
               </td>
               <td class="px-2.5 py-2">
-                <span v-if="it.adherent_id != null" class="font-semibold text-slate-800">
-
-                </span>
+                <span v-if="it.adherent_id != null" class="font-semibold text-slate-800"></span>
                 <span v-else-if="isIgnored(it)" class="text-[11px] text-slate-500 italic">
                   Écarté
                   <template v-if="it.ignored_by">par {{ it.ignored_by }}</template>
@@ -305,7 +361,9 @@ const chip = (active: boolean) => [
       </div>
       <div class="mb-3 flex flex-wrap items-center gap-2">
         <UiButton data-testid="ha-sync" :busy="syncing && 'Synchro…'" @click="sync">🔄 Synchroniser</UiButton>
-        <UiButton variant="muted" data-testid="ha-first" @click="firstWaiting">🔗 Rattacher le premier en attente</UiButton>
+        <UiButton variant="muted" data-testid="ha-first" @click="startPass">
+          🔗 Rattacher les paiements en attente ({{ pending.length }})
+        </UiButton>
         <input
           v-model="search"
           type="search"
@@ -413,7 +471,7 @@ const chip = (active: boolean) => [
       </ul>
     </template>
 
-    <UiDialog v-model:open="dialogOpen" title="🔗 Paiement HelloAsso" wide data-testid="attach-dialog">
+    <UiDialog v-model:open="dialogOpen" :title="dialogTitle" wide data-testid="attach-dialog">
       <AttachForm
         v-if="open"
         :key="open.id_item"
@@ -421,9 +479,11 @@ const chip = (active: boolean) => [
         :competitions="competitions"
         :members="members"
         :busy="writer.busy.value"
+        :skippable="!!pass"
         @link="link"
         @ignore="ignore"
-        @cancel="open = null"
+        @cancel="stop"
+        @skip="skip"
       />
     </UiDialog>
   </section>

@@ -18,11 +18,19 @@ import {
   type HelloAssoItem,
 } from "./helloasso";
 
-const props = defineProps<{ item: HelloAssoItem; competitions: readonly Competition[]; members: readonly MemberSlot[]; busy: boolean }>();
+// skippable: in a linking pass, « Passer » goes to the next payment without saving this one
+const props = defineProps<{
+  item: HelloAssoItem;
+  competitions: readonly Competition[];
+  members: readonly MemberSlot[];
+  busy: boolean;
+  skippable?: boolean;
+}>();
 const emit = defineEmits<{
   link: [competitionId: number | null, adherentId: number | null, comment: string];
   ignore: [ignore: boolean, note: string];
   cancel: [];
+  skip: [];
 }>();
 
 const info = computed(() => itemInfo(props.item));
@@ -201,6 +209,7 @@ const th = "py-1 pr-3 align-top text-left font-semibold whitespace-nowrap text-s
     </div>
     <UiDialogActions>
       <UiButton variant="muted" @click="emit('cancel')">Fermer</UiButton>
+      <UiButton v-if="skippable" variant="muted" data-testid="attach-skip" :disabled="busy" @click="emit('skip')">⏭ Passer</UiButton>
       <UiButton v-if="!linked" variant="muted" data-testid="attach-ignore" :disabled="busy" @click="ignore">
         {{ ignored ? "↩️ Ne plus ignorer" : "🚫 Ignorer" }}
       </UiButton>
