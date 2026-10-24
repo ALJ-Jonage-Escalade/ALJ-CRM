@@ -10,13 +10,14 @@ import UiCard from "../components/ui/UiCard.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { AUTH_KEY } from "../composables/auth";
 import { useToast } from "../composables/toast";
-import { CLIENT_KEY, unwrap } from "../lib/client";
+import { CLIENT_KEY } from "../lib/client";
+import { createMembersApi } from "../services/members";
 import FfmeExportPane from "./outils/FfmeExportPane.vue";
 import FfmeImportPane from "./outils/FfmeImportPane.vue";
 import PresencePane from "./outils/PresencePane.vue";
 import ToolFrame from "./outils/ToolFrame.vue";
 
-const client = inject(CLIENT_KEY)!;
+const membersApi = createMembersApi(inject(CLIENT_KEY)!);
 const auth = inject(AUTH_KEY)!;
 const route = useRoute();
 const router = useRouter();
@@ -51,7 +52,7 @@ const pivotUrl = computed(() => `/pivot?season=${encodeURIComponent(season.value
 
 onMounted(async () => {
   try {
-    const data = await unwrap(client.GET("/api/seasons"));
+    const data = await membersApi.seasons();
     seasons.value = data.seasons;
     season.value = data.seasons.includes(data.active) ? data.active : (data.seasons[0] ?? "active");
   } catch (e) {

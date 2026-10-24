@@ -9,7 +9,9 @@ import UiCard from "../components/ui/UiCard.vue";
 import UiDialog from "../components/ui/UiDialog.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useToast } from "../composables/toast";
-import { CLIENT_KEY, errorText, unwrap } from "../lib/client";
+import { CLIENT_KEY, errorText } from "../lib/client";
+import { createActivitiesApi } from "../services/activities";
+import { createMembersApi } from "../services/members";
 import { saveExport } from "../lib/download";
 import SlotForm from "./planning/SlotForm.vue";
 import SlotList from "./planning/SlotList.vue";
@@ -17,6 +19,8 @@ import { countLabel, draftOf, filterSlots, KINDS, updateOf, type KindFilter, typ
 import WeekGrid from "./planning/WeekGrid.vue";
 
 const client = inject(CLIENT_KEY)!;
+const activitiesApi = createActivitiesApi(client);
+const membersApi = createMembersApi(client);
 const toast = useToast();
 
 const slots = ref<Slot[]>([]);
@@ -26,7 +30,7 @@ const tarifs = ref<string[]>([]);
 async function loadPlanning(): Promise<void> {
   status.value = "Chargement…";
   try {
-    slots.value = await unwrap(client.GET("/api/planning"));
+    slots.value = await activitiesApi.planning();
     status.value = countLabel(slots.value.length);
   } catch (e) {
     status.value = "Erreur chargement";
@@ -36,7 +40,7 @@ async function loadPlanning(): Promise<void> {
 
 async function loadTarifs(): Promise<void> {
   try {
-    tarifs.value = (await unwrap(client.GET("/api/season-tarifs"))).tarifs;
+    tarifs.value = (await membersApi.seasonTarifs()).tarifs;
   } catch (e) {
     console.warn("Tarifs de la saison :", e);
   }
@@ -73,7 +77,7 @@ function open(slot?: Slot): void {
 async function save(): Promise<void> {
   saving.value = true;
   try {
-    const saved = await unwrap(client.POST("/api/planning/item", { body: updateOf(draft.value) }));
+    const saved = await activitiesApi.saveSlot(updateOf(draft.value));
     editing.value = false;
     toast.show(`✅ Créneau « ${saved.item.groupe} » enregistré !`);
     await loadPlanning();
@@ -89,7 +93,7 @@ async function remove(slot: Slot): Promise<void> {
     return;
   }
   try {
-    await unwrap(client.DELETE("/api/planning/item/{item_id}", { params: { path: { item_id: slot.id } } }));
+    await activitiesApi.removeSlot(slot.id);
     toast.show("🗑️ Créneau supprimé.");
     await loadPlanning();
   } catch (e) {
@@ -101,8 +105,7 @@ async function remove(slot: Slot): Promise<void> {
 async function download(mode: "grid" | "list"): Promise<void> {
   toast.show("⏳ Génération du fichier Excel en cours…", 60_000);
   try {
-    const call = client.GET("/api/planning/export", { params: { query: { mode } }, parseAs: "blob" });
-    const name = await saveExport(call, mode === "list" ? "Planning_Liste.xlsx" : "Planning_Grille.xlsx");
+    const name = await saveExport(activitiesApi.planningFile(mode), mode === "list" ? "Planning_Liste.xlsx" : "Planning_Grille.xlsx");
     toast.show(`✅ Fichier « ${name} » téléchargé !`);
   } catch (e) {
     toast.show(`❌ Échec lors de la génération Excel : ${errorText(e)}`, 8000);

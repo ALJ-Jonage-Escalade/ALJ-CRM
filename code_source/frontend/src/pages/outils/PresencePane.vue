@@ -4,11 +4,12 @@
 import { inject, onMounted, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
-import { CLIENT_KEY, errorText, unwrap, type Schemas } from "../../lib/client";
+import { CLIENT_KEY, errorText, type Schemas } from "../../lib/client";
+import { createActivitiesApi } from "../../services/activities";
 import { saveExport } from "../../lib/download";
 
 const emit = defineEmits<{ toast: [message: string, ms?: number] }>();
-const client = inject(CLIENT_KEY)!;
+const activitiesApi = createActivitiesApi(inject(CLIENT_KEY)!);
 
 type Request = Schemas["PresenceExportRequest"];
 
@@ -24,7 +25,7 @@ const selected = ref<string[]>([]);
 async function load(): Promise<void> {
   failure.value = "";
   try {
-    const data = await unwrap(client.GET("/api/presence/config"));
+    const data = await activitiesApi.presenceConfig();
     const { start, end } = data.default_dates;
     // Dates typed by the user are kept on reload
     autonomous.value.start ||= start;
@@ -43,7 +44,7 @@ const busy = ref<"autonome" | "cours" | null>(null);
 async function generate(body: Request, fallback: string): Promise<void> {
   busy.value = body.variant ?? "cours";
   try {
-    const name = await saveExport(client.POST("/api/presence/export", { body, parseAs: "blob" }), fallback);
+    const name = await saveExport(activitiesApi.presenceFile(body), fallback);
     emit("toast", `✅ Fichier « ${name} » téléchargé !`);
   } catch (e) {
     emit("toast", `❌ ${errorText(e)}`, 8000);

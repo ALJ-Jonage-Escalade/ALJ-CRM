@@ -8,7 +8,8 @@ import { RouterLink, useRouter } from "vue-router";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
 import { useMediaQuery } from "../../composables/media";
-import { CLIENT_KEY, unwrap, type Schemas } from "../../lib/client";
+import { CLIENT_KEY, type Schemas } from "../../lib/client";
+import { createCompetitionsApi } from "../../services/competitions";
 import { csvBlob } from "../../lib/csv";
 import { saveFile } from "../../lib/download";
 import { formatEuros } from "../../lib/format";
@@ -24,8 +25,6 @@ import {
   isNotInvited,
   memberMatches,
   participantCsv,
-  PREPARING,
-  ARCHIVED,
   period,
   resultsUrlHint,
   type Coach,
@@ -56,12 +55,11 @@ const props = defineProps<{
   outbox: Outbox;
   uid: string | null;
 }>();
-const client = inject(CLIENT_KEY)!;
+const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const writer = inject(WRITER_KEY)!;
 const router = useRouter();
 
 const c = computed(() => props.competition);
-const path = computed(() => ({ competition_id: c.value.id }));
 const kpis = computed(() => counts(props.rows));
 const KPIS = computed(() => [
   { id: "selected", label: "Participe", value: String(kpis.value.selected), color: "text-blue-600" },
@@ -91,7 +89,7 @@ const editing = ref(false);
 
 async function save(body: Schemas["CompetitionCreate"]): Promise<void> {
   if (
-    await writer.run(() => unwrap(client.PATCH("/api/competitions/{competition_id}", { params: { path: path.value }, body })), {
+    await writer.run(() => competitionsApi.update(c.value.id, body), {
       done: "✅ Compétition mise à jour.",
     })
   ) {
@@ -105,7 +103,7 @@ async function remove(): Promise<void> {
   }
   const id = c.value.id;
   if (
-    await writer.run(() => unwrap(client.DELETE("/api/competitions/{competition_id}", { params: { path: path.value } })), {
+    await writer.run(() => competitionsApi.remove(id), {
       done: "🗑 Compétition supprimée.",
     })
   ) {
@@ -117,18 +115,9 @@ async function remove(): Promise<void> {
 
 async function archive(archived: boolean): Promise<void> {
   const nom = c.value.nom;
-  await writer.run(
-    () =>
-      unwrap(
-        client.PATCH("/api/competitions/{competition_id}", {
-          params: { path: path.value },
-          body: { statut: archived ? ARCHIVED : PREPARING },
-        }),
-      ),
-    {
-      done: archived ? `📦 « ${nom} » archivée.` : `♻️ « ${nom} » désarchivée.`,
-    },
-  );
+  await writer.run(() => competitionsApi.setArchived(c.value.id, archived), {
+    done: archived ? `📦 « ${nom} » archivée.` : `♻️ « ${nom} » désarchivée.`,
+  });
 }
 
 function exportCsv(): void {
@@ -151,26 +140,17 @@ async function fetchResults(url = ""): Promise<void> {
     6000,
   );
   try {
-    await writer.run(
-      () =>
-        unwrap(
-          client.POST("/api/competitions/{comp_id}/fetch-results", {
-            params: { path: { comp_id: String(c.value.id) } },
-            body: { url, club: "JONAGE" },
-          }),
-        ),
-      {
-        done: (r) => `🏆 ${r.matched_count} résultat(s) associé(s) sur ${r.total_scraped} compétiteur(s) ALJ trouvé(s).`,
-        refused: (e) => {
-          if (e.code !== "needs_url") {
-            return false;
-          }
-          resultsUrl.value = "";
-          askUrl.value = true; // not found on MyCompet: the coach gives the page
-          return true;
-        },
+    await writer.run(() => competitionsApi.fetchResults(c.value.id, url), {
+      done: (r) => `🏆 ${r.matched_count} résultat(s) associé(s) sur ${r.total_scraped} compétiteur(s) ALJ trouvé(s).`,
+      refused: (e) => {
+        if (e.code !== "needs_url") {
+          return false;
+        }
+        resultsUrl.value = "";
+        askUrl.value = true; // not found on MyCompet: the coach gives the page
+        return true;
       },
-    );
+    });
   } finally {
     fetching.value = false;
   }
@@ -183,22 +163,13 @@ const memberSearch = ref("");
 const matches = computed(() => memberMatches(props.members, c.value, memberSearch.value));
 
 async function add(m: MemberSlot): Promise<void> {
-  await writer.run(
-    () =>
-      unwrap(
-        client.POST("/api/competitions/{competition_id}/participants", {
-          params: { path: path.value },
-          body: { adherent_id: m.id!, selectionne: true },
-        }),
-      ),
-    {
-      done: `➕ ${m.prenom} ${m.nom} ajouté(e) à la compétition.`,
-    },
-  );
+  await writer.run(() => competitionsApi.addParticipant(c.value.id, m.id!), {
+    done: `➕ ${m.prenom} ${m.nom} ajouté(e) à la compétition.`,
+  });
 }
 
 async function loadGroup(): Promise<void> {
-  await writer.run(() => unwrap(client.POST("/api/competitions/{competition_id}/load-group", { params: { path: path.value } })), {
+  await writer.run(() => competitionsApi.loadGroup(c.value.id), {
     done: (r) =>
       r.added
         ? `🧗 ${r.added} compétiteur(s) du groupe « Compétition » ajouté(s) à la liste.`
@@ -219,13 +190,7 @@ async function removeNotInvited(): Promise<void> {
   }
   let done = 0;
   for (const p of list) {
-    const ok = await writer.run(() =>
-      unwrap(
-        client.DELETE("/api/competitions/{competition_id}/participants/{adherent_id}", {
-          params: { path: { ...path.value, adherent_id: p.adherent_id! } },
-        }),
-      ),
-    );
+    const ok = await writer.run(() => competitionsApi.removeParticipant(c.value.id, p.adherent_id!));
     if (!ok) {
       return;
     }
@@ -238,7 +203,6 @@ async function removeNotInvited(): Promise<void> {
 
 const withdrawing = ref<Participant | null>(null);
 const paying = ref<Participant | null>(null);
-const participantPath = (p: Participant) => ({ params: { path: { ...path.value, adherent_id: p.adherent_id! } } });
 
 /* « Participe » / « Présent ». Unselecting a competitor who paid needs a decision on the money (withdrawal). Offline,
    or when the network drops during the request, the change waits in the outbox. */
@@ -262,22 +226,16 @@ async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
     await props.outbox.queue(props.uid, c.value, p, flag, !!p[flag]);
   } // superseded
   let lost = false;
-  await writer.run(
-    () =>
-      unwrap(
-        client.PATCH("/api/competitions/{competition_id}/participants/{adherent_id}", { ...participantPath(p), body: { [flag]: value } }),
-      ),
-    {
-      refused: (e) => {
-        if (e.code === "already_paid") {
-          withdrawing.value = p; // paid meanwhile (HelloAsso): the coach decides what happens to the money
-          return true;
-        }
-        lost = e.status === 0 && e.code === "network";
-        return lost;
-      },
+  await writer.run(() => competitionsApi.updateParticipant(c.value.id, p.adherent_id!, { [flag]: value }), {
+    refused: (e) => {
+      if (e.code === "already_paid") {
+        withdrawing.value = p; // paid meanwhile (HelloAsso): the coach decides what happens to the money
+        return true;
+      }
+      lost = e.status === 0 && e.code === "network";
+      return lost;
     },
-  );
+  });
   if (lost) {
     await queue();
   }
@@ -285,18 +243,9 @@ async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
 
 async function withdraw(mode: "reporte" | "perdu", note: string): Promise<void> {
   const p = withdrawing.value!;
-  const ok = await writer.run(
-    () =>
-      unwrap(
-        client.POST("/api/competitions/{competition_id}/participants/{adherent_id}/cancel", {
-          ...participantPath(p),
-          body: { mode, note },
-        }),
-      ),
-    {
-      done: mode === "reporte" ? `🔄 Désistement de ${named(p)} : paiement reporté.` : `🚫 Désistement de ${named(p)} : paiement perdu.`,
-    },
-  );
+  const ok = await writer.run(() => competitionsApi.withdraw(c.value.id, p.adherent_id!, { mode, note }), {
+    done: mode === "reporte" ? `🔄 Désistement de ${named(p)} : paiement reporté.` : `🚫 Désistement de ${named(p)} : paiement perdu.`,
+  });
   if (ok) {
     withdrawing.value = null;
   }
@@ -304,18 +253,9 @@ async function withdraw(mode: "reporte" | "perdu", note: string): Promise<void> 
 
 async function pay(amount: number): Promise<void> {
   const p = paying.value!;
-  const ok = await writer.run(
-    () =>
-      unwrap(
-        client.POST("/api/competitions/{competition_id}/participants/{adherent_id}/manual-payment", {
-          ...participantPath(p),
-          body: { montant: amount },
-        }),
-      ),
-    {
-      done: `✅ Paiement manuel de ${amount} € enregistré pour ${named(p)}.`,
-    },
-  );
+  const ok = await writer.run(() => competitionsApi.payManually(c.value.id, p.adherent_id!, amount), {
+    done: `✅ Paiement manuel de ${amount} € enregistré pour ${named(p)}.`,
+  });
   if (ok) {
     paying.value = null;
   }
@@ -325,7 +265,7 @@ async function removeOne(r: Row): Promise<void> {
   if (!confirm(`Retirer ${named(r)} de cette compétition ?\n(L'adhérent reste dans la base du club.)`)) {
     return;
   }
-  await writer.run(() => unwrap(client.DELETE("/api/competitions/{competition_id}/participants/{adherent_id}", participantPath(r))), {
+  await writer.run(() => competitionsApi.removeParticipant(c.value.id, r.adherent_id!), {
     done: `🗑 ${named(r)} retiré(e) de l'épreuve.`,
   });
 }
@@ -334,18 +274,9 @@ async function restore(r: Row): Promise<void> {
   if (!confirm(`Rétablir ${named(r)} en compétiteur actif (statut Payé) ?`)) {
     return;
   }
-  await writer.run(
-    () =>
-      unwrap(
-        client.POST("/api/competitions/{competition_id}/participants", {
-          params: { path: path.value },
-          body: { adherent_id: r.adherent_id!, selectionne: true },
-        }),
-      ),
-    {
-      done: `✅ ${named(r)} rétabli(e) en compétiteur actif.`,
-    },
-  );
+  await writer.run(() => competitionsApi.addParticipant(c.value.id, r.adherent_id!), {
+    done: `✅ ${named(r)} rétabli(e) en compétiteur actif.`,
+  });
 }
 
 const emailing = ref(false);

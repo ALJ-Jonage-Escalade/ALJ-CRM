@@ -3,14 +3,15 @@
    sent through /api/send-email (the server replaces the variables again and adds the signature). */
 import { computed, inject, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
-import { CLIENT_KEY, errorText, unwrap } from "../../lib/client";
+import { CLIENT_KEY, errorText } from "../../lib/client";
+import { createCommunicationsApi } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
 import { renderFor, SIGNATURE_TEXT, type Template } from "./record";
 
 const props = defineProps<{ member: Member; templates: readonly Template[] }>();
 const emit = defineEmits<{ sent: [message: string]; failed: [message: string]; cancel: [] }>();
-const client = inject(CLIENT_KEY)!;
+const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 
 const to = computed(() => props.member.email_primary.trim());
 const canSend = computed(() => looksLikeEmail(to.value));
@@ -47,26 +48,22 @@ async function send(): Promise<void> {
   }
   sending.value = true;
   try {
-    const result = await unwrap(
-      client.POST("/api/send-email", {
-        body: {
-          subject: subject.value.trim(),
-          body: body.value.trim(),
-          add_signature: signature.value,
-          recipients: [
-            {
-              id: m.user_id,
-              first_name: m.first_name,
-              last_name: m.last_name,
-              email: to.value,
-              num_licence: m.licence_ffme,
-              tarif: m.tarif_name,
-              season: m.season_name,
-            },
-          ],
+    const result = await communicationsApi.sendEmail({
+      subject: subject.value.trim(),
+      body: body.value.trim(),
+      add_signature: signature.value,
+      recipients: [
+        {
+          id: m.user_id,
+          first_name: m.first_name,
+          last_name: m.last_name,
+          email: to.value,
+          num_licence: m.licence_ffme,
+          tarif: m.tarif_name,
+          season: m.season_name,
         },
-      }),
-    );
+      ],
+    });
     if (result.status === "error") {
       emit("failed", `❌ Échec d'envoi : ${result.message || result.details?.[0]?.error || "erreur d'envoi."}`);
       return;

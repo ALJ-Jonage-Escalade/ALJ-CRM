@@ -13,7 +13,8 @@ import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
 import { pageAccess, verdict } from "../lib/access";
 import { formatDateTime, formatEuros } from "../lib/format";
-import { CLIENT_KEY, unwrap, type Schemas } from "../lib/client";
+import { CLIENT_KEY, type Schemas } from "../lib/client";
+import { createCompetitionsApi } from "../services/competitions";
 import { isStaff } from "../lib/roles";
 import { offlineStore, STORE_KEY } from "../lib/store";
 import BalancePane from "./competitions/BalancePane.vue";
@@ -45,7 +46,7 @@ import { createWriter, WRITER_KEY } from "./competitions/writer";
 import { plural } from "../lib/text";
 
 const auth = inject(AUTH_KEY)!;
-const client = inject(CLIENT_KEY)!;
+const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const store = inject(STORE_KEY, null) ?? offlineStore();
 const signInError = inject(SIGN_IN_ERROR_KEY, ref(null));
 const route = useRoute();
@@ -118,14 +119,7 @@ const online = computed(() => {
   return networkUp.value && competitions.state.value !== "offline" && !(authState.status === "error" && authState.offline);
 });
 
-const outbox = createOutbox(store, (competitionId, adherentId, body) =>
-  unwrap(
-    client.PATCH("/api/competitions/{competition_id}/participants/{adherent_id}", {
-      params: { path: { competition_id: competitionId, adherent_id: adherentId } },
-      body,
-    }),
-  ),
-);
+const outbox = createOutbox(store, (competitionId, adherentId, body) => competitionsApi.updateParticipant(competitionId, adherentId, body));
 watch(uid, (u) => void outbox.load(u), { immediate: true });
 
 /* Sent as soon as the API answers again (each successful poll), oldest first. */
@@ -206,7 +200,7 @@ const rows = computed(() =>
 
 const creating = ref(false);
 async function create(body: Schemas["CompetitionCreate"]): Promise<void> {
-  const created = await writer.run(() => unwrap(client.POST("/api/competitions", { body })), { done: "✅ Compétition créée." });
+  const created = await writer.run(() => competitionsApi.create(body), { done: "✅ Compétition créée." });
   if (!created) {
     return;
   }
@@ -227,7 +221,7 @@ async function archivePastCompetitions(): Promise<void> {
   ) {
     return;
   }
-  await writer.run(() => unwrap(client.POST("/api/competitions/archive-past")), {
+  await writer.run(() => competitionsApi.archivePast(), {
     done: (r) => `📦 ${r.archived.length} compétition${plural(r.archived.length)} archivée${plural(r.archived.length)}.`,
   });
 }

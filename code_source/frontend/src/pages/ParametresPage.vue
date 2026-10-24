@@ -9,7 +9,9 @@ import UiCard from "../components/ui/UiCard.vue";
 import UiTile from "../components/ui/UiTile.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useToast } from "../composables/toast";
-import { CLIENT_KEY, errorText, unwrap, type Schemas } from "../lib/client";
+import { CLIENT_KEY, errorText, type Schemas } from "../lib/client";
+import { createCompetitionsApi } from "../services/competitions";
+import { createIntegrationsApi } from "../services/integrations";
 import { looksLikeEmail } from "../lib/email";
 import {
   batchReport,
@@ -29,6 +31,8 @@ import {
 } from "./parametres/view";
 
 const client = inject(CLIENT_KEY)!;
+const integrationsApi = createIntegrationsApi(client);
+const competitionsApi = createCompetitionsApi(client);
 const toast = useToast();
 const RENEW_URL = "/api/auth/google/login?return_to=/bureau/parametres";
 
@@ -48,7 +52,7 @@ const testing = ref(false);
 async function loadGoogle(): Promise<void> {
   google.value = CHECKING;
   try {
-    googleInfo.value = await unwrap(client.GET("/api/auth/google/status"));
+    googleInfo.value = await integrationsApi.googleStatus();
     google.value = googleStatus(googleInfo.value);
   } catch (e) {
     google.value = { ...UNAVAILABLE, text: errorText(e) };
@@ -60,7 +64,7 @@ async function testGoogle(): Promise<void> {
   checks.value = null;
   checksError.value = "";
   try {
-    const result = await unwrap(client.POST("/api/auth/google/test"));
+    const result = await integrationsApi.testGoogle();
     checks.value = googleChecks(result);
     toast.show(result.all_ok ? "✅ Tous les services Google sont fonctionnels !" : "⚠️ Un ou plusieurs services Google ont échoué.");
     void loadGoogle();
@@ -80,7 +84,7 @@ const syncResult = ref<Report | null>(null);
 async function loadCache(): Promise<void> {
   cache.value = CHECKING;
   try {
-    cacheInfo.value = await unwrap(client.GET("/api/cloud-db/status"));
+    cacheInfo.value = await integrationsApi.cacheStatus();
     cache.value = cacheStatus(cacheInfo.value);
   } catch (e) {
     cache.value = { ...UNAVAILABLE, text: errorText(e) };
@@ -98,7 +102,7 @@ async function sync(full: boolean): Promise<void> {
   syncing.value = full ? "rebuild" : "update";
   syncResult.value = { lines: [`⏳ Synchronisation avec Firestore en cours (${full ? "reconstruction complète" : "mode incrémental"})…`] };
   try {
-    const result = await unwrap(client.POST("/api/cloud-db/sync", { params: { query: { force: full } } }));
+    const result = await integrationsApi.syncCache(full);
     if (result.status === "skipped") {
       syncResult.value = { lines: [`ℹ️ ${result.message}`] };
     } else {
@@ -124,7 +128,7 @@ const batchResult = ref<Report | null>(null);
 
 async function loadResults(): Promise<void> {
   try {
-    results.value = await unwrap(client.GET("/api/settings/competitions-results"));
+    results.value = await competitionsApi.resultsSettings();
     if (!editingEmail) {
       email.value = results.value.notification_email;
     }
@@ -141,7 +145,7 @@ async function saveEmail(): Promise<void> {
   }
   savingEmail.value = true;
   try {
-    await unwrap(client.POST("/api/settings/competitions-results", { body: { notification_email: value } }));
+    await competitionsApi.saveResultsSettings(value);
     toast.show(`✅ Adresse de notification enregistrée : ${value}`);
     editingEmail = false;
     await loadResults();
@@ -156,7 +160,7 @@ async function runBatch(): Promise<void> {
   running.value = true;
   batchResult.value = { lines: ["⏳ Analyse des compétitions passées et recherche MyCompet en cours…"] };
   try {
-    const report = await unwrap(client.POST("/api/competitions/cron/fetch-results", { params: { query: { force: true } } }));
+    const report = await competitionsApi.fetchAllResults();
     toast.show(
       `✅ Détection terminée : ${report.competitions_checked} analysée(s), ${report.competitions_updated} résultat(s) trouvé(s) !`,
     );
@@ -182,7 +186,7 @@ async function saveToken(): Promise<void> {
   }
   savingToken.value = true;
   try {
-    await unwrap(client.POST("/api/auth/google/update-token", { body: { refresh_token: value } }));
+    await integrationsApi.updateGoogleToken(value);
     toast.show("✅ Jeton Google mis à jour et validé !");
     manualToken.value = "";
     void loadGoogle();

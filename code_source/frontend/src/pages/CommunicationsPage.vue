@@ -8,7 +8,8 @@ import UiCard from "../components/ui/UiCard.vue";
 import UiDialog from "../components/ui/UiDialog.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useToast } from "../composables/toast";
-import { CLIENT_KEY, errorText, unwrap } from "../lib/client";
+import { CLIENT_KEY, errorText } from "../lib/client";
+import { createCommunicationsApi } from "../services/communications";
 import EmailPreview from "./communications/EmailPreview.vue";
 import {
   DEFAULT_SENDER_EMAIL,
@@ -21,7 +22,7 @@ import {
 } from "./communications/editor";
 import TemplateForm from "./communications/TemplateForm.vue";
 
-const client = inject(CLIENT_KEY)!;
+const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 const toast = useToast();
 
 // E-mail templates
@@ -42,7 +43,7 @@ function select(template: Template | undefined): void {
 
 async function loadTemplates(wanted?: string): Promise<void> {
   try {
-    templates.value = (await unwrap(client.GET("/api/email-templates"))).templates;
+    templates.value = (await communicationsApi.emailTemplates()).templates;
     loadError.value = "";
     select(initialTemplate(templates.value, wanted));
   } catch (e) {
@@ -62,7 +63,7 @@ async function save(): Promise<void> {
   const template = draft.value!;
   saving.value = true;
   try {
-    const saved = await unwrap(client.POST("/api/email-templates", { body: { ...template, old_name: selected.value } }));
+    const saved = await communicationsApi.saveEmailTemplate({ ...template, old_name: selected.value });
     toast.show(`💾 Modèle « ${saved.template.name} » enregistré avec succès !`);
     await loadTemplates(saved.template.name);
   } catch (e) {
@@ -92,7 +93,7 @@ async function create(): Promise<void> {
   creatingBusy.value = true;
   try {
     const sender = draft.value ?? { sender_email: DEFAULT_SENDER_EMAIL, sender_name: DEFAULT_SENDER_NAME };
-    await unwrap(client.POST("/api/email-templates", { body: newTemplate(name, sender) }));
+    await communicationsApi.saveEmailTemplate(newTemplate(name, sender));
     creating.value = false;
     toast.show(`➕ Nouveau modèle « ${name} » créé avec succès !`);
     await loadTemplates(name);
@@ -112,7 +113,7 @@ async function remove(): Promise<void> {
   }
   deleting.value = true;
   try {
-    await unwrap(client.DELETE("/api/email-templates/{template_name}", { params: { path: { template_name: name } } }));
+    await communicationsApi.removeEmailTemplate(name);
     toast.show(`🗑️ Modèle « ${name} » supprimé.`);
     await loadTemplates();
   } catch (e) {
@@ -128,7 +129,7 @@ const savingWhatsapp = ref(false);
 
 async function loadWhatsapp(): Promise<void> {
   try {
-    whatsapp.value = (await unwrap(client.GET("/api/whatsapp-template"))).template;
+    whatsapp.value = (await communicationsApi.whatsappTemplate()).template;
   } catch (e) {
     console.warn("Texte WhatsApp :", e);
   }
@@ -142,7 +143,7 @@ async function saveWhatsapp(): Promise<void> {
   }
   savingWhatsapp.value = true;
   try {
-    await unwrap(client.POST("/api/whatsapp-template", { body: { template: text } }));
+    await communicationsApi.saveWhatsappTemplate(text);
     toast.show("💾 Texte WhatsApp enregistré avec succès !");
   } catch (e) {
     toast.show(`❌ Erreur : ${errorText(e)}`, 8000);

@@ -6,11 +6,12 @@ import { computed, inject, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
 import UiTile from "../../components/ui/UiTile.vue";
-import { CLIENT_KEY, errorText, unwrap, type Schemas } from "../../lib/client";
+import { CLIENT_KEY, errorText, type Schemas } from "../../lib/client";
+import { createFfmeApi } from "../../services/ffme";
 import { applyConfirmation, fileLabel, isXlsx, manualMatches, memberLabel, readBase64, sortedMembers } from "./ffme";
 
 const emit = defineEmits<{ toast: [message: string, ms?: number] }>();
-const client = inject(CLIENT_KEY)!;
+const ffmeApi = createFfmeApi(inject(CLIENT_KEY)!);
 
 const file = ref<{ name: string; label: string; content: string } | null>(null);
 const preview = ref<Schemas["FfmePreview"] | null>(null);
@@ -56,7 +57,7 @@ async function analyze(): Promise<void> {
   busy.value = "analyze";
   try {
     const body = { filename: file.value.name, content_base64: file.value.content };
-    const data = await unwrap(client.POST("/api/ffme/preview", { body }));
+    const data = await ffmeApi.preview(body);
     choices.value = data.unmatched.map(() => null);
     preview.value = data;
     emit("toast", "✅ Analyse terminée ! Vous pouvez vérifier les correspondances ci-dessous.");
@@ -69,7 +70,7 @@ async function analyze(): Promise<void> {
 
 async function send(manual: Schemas["FfmeManualMatch"][]): Promise<void> {
   const body = { filename: file.value!.name, content_base64: file.value!.content, manual_matches: manual };
-  const data = await unwrap(client.POST("/api/ffme/import", { body }));
+  const data = await ffmeApi.import(body);
   emit("toast", `🎉 ${data.message}`);
   reset();
   done.value = data.updated_count;

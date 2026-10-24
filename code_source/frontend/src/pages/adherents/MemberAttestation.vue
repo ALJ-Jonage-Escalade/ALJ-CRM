@@ -5,7 +5,8 @@
    the pane is open. */
 import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
-import { CLIENT_KEY, errorText, unwrap } from "../../lib/client";
+import { CLIENT_KEY, errorText } from "../../lib/client";
+import { createCommunicationsApi } from "../../services/communications";
 import { saveFile } from "../../lib/download";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
@@ -13,7 +14,7 @@ import { attestationFileName, attestationProblem, attestationRecipient, attestat
 
 const props = defineProps<{ member: Member; templates: readonly Template[] }>();
 const emit = defineEmits<{ sent: [message: string]; failed: [message: string]; cancel: [] }>();
-const client = inject(CLIENT_KEY)!;
+const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 
 const choices = computed(() => attestationTemplates(props.templates));
 const templateName = ref(choices.value.initial.name);
@@ -42,12 +43,7 @@ onMounted(async () => {
     return;
   }
   try {
-    const blob = await unwrap(
-      client.POST("/api/attestations/preview", {
-        body: { purchase_id: props.member.purchase_id, season: props.member.season_name },
-        parseAs: "blob",
-      }),
-    );
+    const blob = await communicationsApi.attestationPdf({ purchase_id: props.member.purchase_id, season: props.member.season_name });
     if (closed) {
       return;
     }
@@ -92,19 +88,15 @@ async function send(): Promise<void> {
   }
   sending.value = true;
   try {
-    await unwrap(
-      client.POST("/api/attestations/send", {
-        body: {
-          purchase_id: props.member.purchase_id,
-          season: props.member.season_name,
-          to_email: recipient,
-          template_name: templateName.value,
-          subject: subject.value.trim(),
-          body: body.value.trim(),
-          add_signature: signature.value,
-        },
-      }),
-    );
+    await communicationsApi.sendAttestation({
+      purchase_id: props.member.purchase_id,
+      season: props.member.season_name,
+      to_email: recipient,
+      template_name: templateName.value,
+      subject: subject.value.trim(),
+      body: body.value.trim(),
+      add_signature: signature.value,
+    });
     emit("sent", `✅ Attestation envoyée avec succès à ${recipient} !`);
   } catch (e) {
     emit("failed", `❌ Échec d'envoi de l'attestation : ${errorText(e)}`);

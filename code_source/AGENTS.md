@@ -13,7 +13,8 @@ All commands run from `code_source/`. Python 3.14 (`.python-version`), `requires
 - frontend (Vue 3 + Vite + TypeScript, in `frontend/`, Node version from `frontend/.nvmrc`):
   `cd frontend && npm ci && npm run check:api && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`
   - API types: `src/lib/api-schema.ts` is generated from `openapi.json` (`uv run python dev/export_openapi.py`, then
-    `npm run gen:api`); never edit either by hand. Pages call the API through the typed client (`src/lib/client.ts`)
+    `npm run gen:api`); never edit either by hand. Pages call the API through the services of
+    `src/services/` (built on the typed client `src/lib/client.ts`)
   - dev: `npm run dev` → http://localhost:5173/bureau/, next to `uv run dev/run_server.sh` (Vite proxies the API, `/map`, `/pivot` and the PWA files)
   - lint: official Vue preset (`@vue/eslint-config-typescript`, type-aware rules) in `eslint.config.js`; format: Prettier
     (`.prettierrc.json`, width 140), enforced in CI — run `npm run format` before committing

@@ -5,11 +5,12 @@ import { inject, onMounted, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
 import UiTile from "../../components/ui/UiTile.vue";
-import { CLIENT_KEY, errorText, unwrap, type Schemas } from "../../lib/client";
+import { CLIENT_KEY, errorText, type Schemas } from "../../lib/client";
+import { createFfmeApi } from "../../services/ffme";
 import { saveExport } from "../../lib/download";
 
 const emit = defineEmits<{ toast: [message: string, ms?: number] }>();
-const client = inject(CLIENT_KEY)!;
+const ffmeApi = createFfmeApi(inject(CLIENT_KEY)!);
 
 const stats = ref<Schemas["FfmeStats"] | null>(null);
 const includeFinished = ref(true);
@@ -18,7 +19,7 @@ const busy = ref(false);
 async function load(): Promise<void> {
   stats.value = null;
   try {
-    stats.value = await unwrap(client.GET("/api/ffme/stats"));
+    stats.value = await ffmeApi.stats();
   } catch (e) {
     emit("toast", `❌ Impossible de charger les statistiques FFME : ${errorText(e)}`, 8000);
   }
@@ -27,8 +28,7 @@ async function load(): Promise<void> {
 async function download(): Promise<void> {
   busy.value = true;
   try {
-    const call = client.GET("/api/ffme/export", { params: { query: { include_termine: includeFinished.value } }, parseAs: "blob" });
-    const name = await saveExport(call, "import_ffme.csv");
+    const name = await saveExport(ffmeApi.exportFile(includeFinished.value), "import_ffme.csv");
     emit("toast", `✅ Fichier FFME « ${name} » téléchargé !`);
   } catch (e) {
     emit("toast", `❌ Échec de génération du CSV FFME : ${errorText(e)}`, 8000);

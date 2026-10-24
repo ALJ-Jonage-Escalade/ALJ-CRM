@@ -4,7 +4,9 @@
 import { computed, inject, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
-import { CLIENT_KEY, unwrap } from "../../lib/client";
+import { CLIENT_KEY } from "../../lib/client";
+import { createCompetitionsApi } from "../../services/competitions";
+import { createIntegrationsApi } from "../../services/integrations";
 import { formatDate, formatEuros, parseDate } from "../../lib/format";
 import AttachForm from "./AttachForm.vue";
 import { type Competition, type MemberSlot } from "./competitions";
@@ -30,6 +32,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ changed: [] }>();
 const client = inject(CLIENT_KEY)!;
+const competitionsApi = createCompetitionsApi(client);
+const integrationsApi = createIntegrationsApi(client);
 const writer = inject(WRITER_KEY)!;
 
 const HIDE_KEY = "alj_ha_hide_ignored"; // same choice as on the former page
@@ -67,7 +71,7 @@ const syncing = ref(false);
 async function sync(): Promise<void> {
   syncing.value = true;
   try {
-    const answer = await writer.run(() => unwrap(client.POST("/api/helloasso/sync")));
+    const answer = await writer.run(() => integrationsApi.syncHelloAsso());
     if (answer) {
       writer.toast(syncMessage(answer), answer.status === "success" ? 5000 : 9000);
     }
@@ -93,13 +97,7 @@ async function link(competitionId: number | null, adherentId: number | null, com
   const it = open.value!;
   const both = competitionId != null && adherentId != null;
   const answer = await writer.run(
-    () =>
-      unwrap(
-        client.PUT("/api/helloasso/items/{id_item}/link", {
-          params: { path: { id_item: it.id_item } },
-          body: { competition_id: competitionId, adherent_id: adherentId, commentaire: comment },
-        }),
-      ),
+    () => competitionsApi.linkPayment(it.id_item, { competition_id: competitionId, adherent_id: adherentId, commentaire: comment }),
     { done: both ? "✅ Paiement HelloAsso rattaché avec succès !" : "💾 Enregistré (paiement non rattaché)." },
   );
   if (answer) {
@@ -110,10 +108,9 @@ async function link(competitionId: number | null, adherentId: number | null, com
 async function ignore(ignoreIt: boolean, note: string): Promise<void> {
   const it = open.value!;
   const body = ignoreIt ? { ignore: true, motif: note, commentaire: note } : { ignore: false, commentaire: note };
-  const answer = await writer.run(
-    () => unwrap(client.PUT("/api/helloasso/items/{id_item}/ignore", { params: { path: { id_item: it.id_item } }, body })),
-    { done: ignoreIt ? "🚫 Ligne ignorée." : "↩️ La ligne n'est plus ignorée." },
-  );
+  const answer = await writer.run(() => competitionsApi.ignorePayment(it.id_item, body), {
+    done: ignoreIt ? "🚫 Ligne ignorée." : "↩️ La ligne n'est plus ignorée.",
+  });
   if (answer) {
     close();
   }

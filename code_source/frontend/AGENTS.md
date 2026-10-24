@@ -18,9 +18,21 @@ All commands run from `code_source/frontend/`, Node version from `.nvmrc`.
 
 - `openapi.json` and `src/lib/api-schema.ts` are generated, never edit them by hand: after a server model change, run
   `uv run python dev/export_openapi.py` in `code_source/`, then `npm run gen:api` here, and commit both
-- Pages call the API through the typed client (`src/lib/client.ts`, injected with `CLIENT_KEY`); body types come from
-  `Schemas["ModelName"]`, not hand-written interfaces
+- Pages call the API through the services of `src/services/` (below), never `client.GET/POST/...` directly; body types
+  come from `Schemas["ModelName"]`, not hand-written interfaces
 - No runtime schema library (no Zod): the types come from the contract, forms use plain validation functions
+
+## API services
+
+- One file per server theme, mirroring `src/api/<theme>/` on the server: `src/services/<theme>.ts` exports
+  `create<Theme>Api(client)`, e.g. `createCompetitionsApi`. A new route goes in the service of its server theme
+- A component injects the client once and names each service after it:
+  `const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!)`, then `await competitionsApi.archivePast()`
+- A method takes what the page knows (ids, values, `Schemas[...]` bodies) and returns the answer's body, unwrapped
+  (throws an `ApiError`, `lib/client.ts`); paths, query parameters and fixed request values (`club: "JONAGE"`,
+  `selectionne: true`) stay in the service. File exports (`parseAs: "blob"`) return the call itself, for `saveExport()`
+- Messages, confirmations and error display stay in the page; the return type of `create<Theme>Api` is inferred (the
+  contract's answer types)
 
 ## Layout
 
@@ -30,6 +42,7 @@ All commands run from `code_source/frontend/`, Node version from `.nvmrc`.
   reka-ui underneath)
 - `src/composables/` state and side effects (`useX()`); `useSyncedResource` for data polled from the API and kept offline
 - `src/lib/` plain TypeScript (no Vue components): API client, roles, IndexedDB store, CSV, downloads
+- `src/services/` the API calls, one file per server theme (see API services)
 - No global store (no Pinia): shared services are provided in `main.ts` (`provide(KEY, value)`) and injected
 
 ## Code style

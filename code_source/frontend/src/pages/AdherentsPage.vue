@@ -19,7 +19,10 @@ import UiSidePanel from "../components/ui/UiSidePanel.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
-import { CLIENT_KEY, errorText, unwrap, type Schemas } from "../lib/client";
+import { CLIENT_KEY, errorText, type Schemas } from "../lib/client";
+import { createCommunicationsApi } from "../services/communications";
+import { createIntegrationsApi } from "../services/integrations";
+import { createMembersApi } from "../services/members";
 import { csvBlob } from "../lib/csv";
 import { saveFile } from "../lib/download";
 import { formatDateTime, formatDayText } from "../lib/format";
@@ -59,6 +62,9 @@ import {
 import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft, type Template } from "./adherents/record";
 
 const client = inject(CLIENT_KEY)!;
+const membersApi = createMembersApi(client);
+const communicationsApi = createCommunicationsApi(client);
+const integrationsApi = createIntegrationsApi(client);
 const toast = useToast();
 const route = useRoute();
 const router = useRouter();
@@ -175,7 +181,7 @@ const syncing = ref(false);
 async function syncNow(): Promise<void> {
   syncing.value = true;
   try {
-    await unwrap(client.POST("/api/cloud-db/sync", { params: { query: { force: true } } }));
+    await integrationsApi.syncCache(true);
     toast.show("✅ Base de données locale synchronisée depuis Firestore !");
     await members.refresh();
   } catch (e) {
@@ -267,7 +273,7 @@ async function loadTemplates(): Promise<void> {
   }
   templatesLoaded = true;
   try {
-    templates.value = (await unwrap(client.GET("/api/email-templates"))).templates;
+    templates.value = (await communicationsApi.emailTemplates()).templates;
   } catch (e) {
     templatesLoaded = false;
     console.warn("Modèles d'e-mails :", e);
@@ -312,9 +318,7 @@ async function saveEdit(m: Member): Promise<void> {
   }
   saving.value = true;
   try {
-    await unwrap(
-      client.POST("/api/members/update", { body: { user_id: m.user_id, purchase_id: m.purchase_id, order_ref: m.order_ref, fields } }),
-    );
+    await membersApi.update({ user_id: m.user_id, purchase_id: m.purchase_id, order_ref: m.order_ref, fields });
     await members.refresh();
     mode.value = "none";
     toast.show(`✅ Fiche de ${m.first_name} ${m.last_name} mise à jour avec succès !`);
@@ -362,7 +366,7 @@ async function saveNew(): Promise<void> {
   }
   saving.value = true;
   try {
-    const created = await unwrap(client.POST("/api/members/create", { body: { season: season.value, fields: newMemberOf(d) } }));
+    const created = await membersApi.create({ season: season.value, fields: newMemberOf(d) });
     toast.show(`✅ ${created.message}`);
     await members.refresh();
     // Selects the new member in the panel (its membership is the one of the new order)

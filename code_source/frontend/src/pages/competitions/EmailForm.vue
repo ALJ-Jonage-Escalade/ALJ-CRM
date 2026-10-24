@@ -4,14 +4,15 @@
    replaces the variables for each one and adds the signature. */
 import { computed, inject, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
-import { CLIENT_KEY, errorText, unwrap } from "../../lib/client";
+import { CLIENT_KEY, errorText } from "../../lib/client";
+import { createCommunicationsApi } from "../../services/communications";
 import type { Competition, Row } from "./competitions";
 import { audience, AUDIENCES, defaultTemplate, hasEmail, render, sendBody, variables, type Audience, type Template } from "./email";
 import { plural } from "../../lib/text";
 
 const props = defineProps<{ competition: Competition; rows: readonly Row[] }>();
 const emit = defineEmits<{ sent: [message: string]; cancel: [] }>();
-const client = inject(CLIENT_KEY)!;
+const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 
 const who = ref<Audience>("selected");
 const removed = ref(new Set<number | null | undefined>());
@@ -36,14 +37,14 @@ function useTemplate(): void {
 
 void (async () => {
   try {
-    templates.value = (await unwrap(client.GET("/api/email-templates"))).templates;
+    templates.value = (await communicationsApi.emailTemplates()).templates;
     templateName.value = defaultTemplate(templates.value)?.name ?? "";
     useTemplate();
   } catch {
     problem.value = "⚠️ Modèles d'e-mails indisponibles : saisissez le message.";
   }
   try {
-    notConfigured.value = !(await unwrap(client.GET("/api/email-status"))).configured;
+    notConfigured.value = !(await communicationsApi.emailStatus()).configured;
   } catch {
     // checked again by the server when sending
   }
@@ -78,9 +79,7 @@ async function send(): Promise<void> {
   }
   sending.value = true;
   try {
-    const result = await unwrap(
-      client.POST("/api/send-email", { body: sendBody(props.competition, reachable.value, subject.value, body.value) }),
-    );
+    const result = await communicationsApi.sendEmail(sendBody(props.competition, reachable.value, subject.value, body.value));
     if (result.status === "error") {
       problem.value = `❌ Échec d'envoi : ${result.message || result.details?.[0]?.error || "erreur d'envoi."}`;
     } else {

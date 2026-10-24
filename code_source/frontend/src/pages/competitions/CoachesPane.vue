@@ -4,13 +4,14 @@
 import { computed, inject, ref } from "vue";
 import { RouterLink } from "vue-router";
 import UiButton from "../../components/ui/UiButton.vue";
-import { CLIENT_KEY, unwrap } from "../../lib/client";
+import { CLIENT_KEY } from "../../lib/client";
+import { createCompetitionsApi } from "../../services/competitions";
 import { coachedBy, period, sortCompetitions, type Coach, type Competition } from "./competitions";
 import { WRITER_KEY } from "./writer";
 
 const props = defineProps<{ coaches: readonly Coach[] | null; competitions: readonly Competition[] }>();
 const emit = defineEmits<{ changed: [] }>();
-const client = inject(CLIENT_KEY)!;
+const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const writer = inject(WRITER_KEY)!;
 
 const sorted = computed(() => (props.coaches ?? []).slice().sort((a, b) => (a.nom ?? "").localeCompare(b.nom ?? "", "fr")));
@@ -23,7 +24,7 @@ async function create(): Promise<void> {
   if (!nom) {
     return writer.toast("⚠️ Le nom du coach est obligatoire.");
   }
-  if (await writer.run(() => unwrap(client.POST("/api/coaches", { body: { nom } })), { done: "✅ Coach ajouté." })) {
+  if (await writer.run(() => competitionsApi.createCoach(nom), { done: "✅ Coach ajouté." })) {
     newName.value = "";
     emit("changed");
   }
@@ -40,7 +41,7 @@ async function rename(c: Coach): Promise<void> {
     return writer.toast("⚠️ Le nom du coach est obligatoire.");
   }
   if (
-    await writer.run(() => unwrap(client.PUT("/api/coaches/{coach_id}", { params: { path: { coach_id: c.id } }, body: { nom } })), {
+    await writer.run(() => competitionsApi.renameCoach(c.id, nom), {
       done: "✅ Coach mis à jour.",
     })
   ) {
@@ -54,7 +55,7 @@ async function remove(c: Coach): Promise<void> {
     return;
   }
   if (
-    await writer.run(() => unwrap(client.DELETE("/api/coaches/{coach_id}", { params: { path: { coach_id: c.id } } })), {
+    await writer.run(() => competitionsApi.removeCoach(c.id), {
       done: "🗑 Coach supprimé.",
     })
   ) {
