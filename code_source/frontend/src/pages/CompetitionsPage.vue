@@ -1,23 +1,23 @@
 <script setup lang="ts">
 /* Compétitions (/competitions and /bureau/competitions, any role: read-only accounts too, as on the former phone
    page). Coaches and admins change everything here. */
-import { computed, inject, onScopeDispose, provide, ref, watch } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import {computed, inject, onScopeDispose, provide, ref, watch} from "vue";
+import {RouterLink, useRoute, useRouter} from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import UiBadge from "../components/ui/UiBadge.vue";
 import UiButton from "../components/ui/UiButton.vue";
 import UiDialog from "../components/ui/UiDialog.vue";
 import UiToast from "../components/ui/UiToast.vue";
-import { AUTH_KEY } from "../composables/auth";
-import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
-import { useSyncedResource } from "../composables/syncedResource";
-import { useToast } from "../composables/toast";
-import { pageAccess, verdict } from "../lib/access";
-import { formatDateTime } from "../lib/format";
-import { CLIENT_KEY, type Schemas } from "../lib/client";
-import { createCompetitionsApi } from "../services/competitions";
-import { isStaff } from "../lib/roles";
-import { offlineStore, STORE_KEY } from "../lib/store";
+import {AUTH_KEY} from "../composables/auth";
+import {SIGN_IN_ERROR_KEY} from "../composables/signIn";
+import {useSyncedResource} from "../composables/syncedResource";
+import {useToast} from "../composables/toast";
+import {pageAccess, verdict} from "../lib/access";
+import {formatDateTime} from "../lib/format";
+import {CLIENT_KEY, type Schemas} from "../lib/client";
+import {createCompetitionsApi} from "../services/competitions";
+import {isStaff} from "../lib/roles";
+import {offlineStore, STORE_KEY} from "../lib/store";
 import BalancePane from "./competitions/BalancePane.vue";
 import CoachesPane from "./competitions/CoachesPane.vue";
 import CompetitionDetail from "./competitions/CompetitionDetail.vue";
@@ -42,10 +42,10 @@ import {
   type When,
 } from "./competitions/competitions";
 import HelloAssoPane from "./competitions/HelloAssoPane.vue";
-import type { HelloAssoItem } from "./competitions/helloasso";
-import { createOutbox, pendingLine, replayMessage } from "./competitions/outbox";
-import { createWriter, WRITER_KEY } from "./competitions/writer";
-import { plural } from "../lib/text";
+import type {HelloAssoItem} from "./competitions/helloasso";
+import {createOutbox, pendingLine, replayMessage} from "./competitions/outbox";
+import {createWriter, WRITER_KEY} from "./competitions/writer";
+import {plural} from "../lib/text";
 
 const auth = inject(AUTH_KEY)!;
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
@@ -73,7 +73,7 @@ const competitions = useSyncedResource<Competition[]>("competitions", () => (ope
 const competitors = useSyncedResource<CompetitorContact[]>(
   "competitors",
   () => (open.value && contactsShown.value ? "/api/members/competitors" : null),
-  { offline: true, uid },
+  {offline: true, uid},
 );
 // Offline the role cannot be checked: a device keeping the contacts is a coach's (they are never kept for others)
 const canWrite = computed(() => staff.value || (access.value === "offline" && competitors.data.value !== null));
@@ -87,14 +87,14 @@ const members = useSyncedResource<MemberSlot[]>(
     intervalMs: 60_000,
   },
 );
-const coaches = useSyncedResource<Coach[]>("coaches", () => (staff.value ? "/api/coaches" : null), { offline: false, intervalMs: 60_000 });
+const coaches = useSyncedResource<Coach[]>("coaches", () => (staff.value ? "/api/coaches" : null), {offline: false, intervalMs: 60_000});
 
 type Section = "competitions" | "helloasso" | "bilan" | "coachs";
 const SECTIONS: { id: Section; label: string }[] = [
-  { id: "competitions", label: "🏆 Compétitions" },
-  { id: "helloasso", label: "💳 HelloAsso" },
-  { id: "bilan", label: "📊 Bilan" },
-  { id: "coachs", label: "🏃 Coachs" },
+  {id: "competitions", label: "🏆 Compétitions"},
+  {id: "helloasso", label: "💳 HelloAsso"},
+  {id: "bilan", label: "📊 Bilan"},
+  {id: "coachs", label: "🏃 Coachs"},
 ];
 const section = computed<Section>(() => {
   const requested = route.query.section;
@@ -103,7 +103,7 @@ const section = computed<Section>(() => {
 const items = useSyncedResource<HelloAssoItem[]>(
   "helloasso-items",
   () => (staff.value && section.value === "helloasso" ? "/api/helloasso/items" : null),
-  { offline: false },
+  {offline: false},
 );
 
 // ---------------------------------------------------------------- Network and outbox
@@ -122,7 +122,7 @@ const online = computed(() => {
 });
 
 const outbox = createOutbox(store, (competitionId, adherentId, body) => competitionsApi.updateParticipant(competitionId, adherentId, body));
-watch(uid, (u) => void outbox.load(u), { immediate: true });
+watch(uid, (u) => void outbox.load(u), {immediate: true});
 
 /* Sent as soon as the API answers again (each successful poll), oldest first. */
 async function replay(): Promise<void> {
@@ -143,6 +143,7 @@ async function replay(): Promise<void> {
   toast.show(replayMessage(result), result.refused.length ? 15_000 : 4000);
   void competitions.refresh();
 }
+
 watch([() => competitions.checkedAt.value, uid, online, () => outbox.changes.value.size], () => void replay());
 
 // ---------------------------------------------------------------- Writes
@@ -182,9 +183,9 @@ const archivedCompetitions = computed(() => filterCompetitions(all.value.filter(
 const pastCompetitions = computed(() => all.value.filter((c) => !isArchived(c) && isPast(c, today)));
 const showArchived = ref(false);
 const WHEN: { id: When; label: string }[] = [
-  { id: "all", label: "Toutes" },
-  { id: "upcoming", label: "À venir" },
-  { id: "past", label: "Passées" },
+  {id: "all", label: "Toutes"},
+  {id: "upcoming", label: "À venir"},
+  {id: "past", label: "Passées"},
 ];
 
 const selectedId = computed(() => (typeof route.query.id === "string" ? route.query.id : ""));
@@ -192,22 +193,23 @@ const selected = computed(() => all.value.find((c) => String(c.id) === selectedI
 const rows = computed(() =>
   selected.value
     ? participantRows(
-        selected.value,
-        members.data.value ?? [],
-        contactsShown.value ? (competitors.data.value ?? []) : [],
-        (id, flag) => outbox.pending(selected.value!.id, id, flag)?.value,
-      )
+      selected.value,
+      members.data.value ?? [],
+      contactsShown.value ? (competitors.data.value ?? []) : [],
+      (id, flag) => outbox.pending(selected.value!.id, id, flag)?.value,
+    )
     : [],
 );
 
 const creating = ref(false);
+
 async function create(body: Schemas["CompetitionCreate"]): Promise<void> {
-  const created = await writer.run(() => competitionsApi.create(body), { done: "✅ Compétition créée." });
+  const created = await writer.run(() => competitionsApi.create(body), {done: "✅ Compétition créée."});
   if (!created) {
     return;
   }
   creating.value = false;
-  await router.push({ query: { id: String(created.id) } });
+  await router.push({query: {id: String(created.id)}});
 }
 
 async function archivePastCompetitions(): Promise<void> {
@@ -300,8 +302,8 @@ const tab = (active: boolean) => [
       :members="members.data.value ?? []"
       @changed="items.refresh()"
     />
-    <BalancePane v-else-if="section === 'bilan'" :competitions="all" />
-    <CoachesPane v-else-if="section === 'coachs'" :coaches="coaches.data.value" :competitions="all" @changed="competitions.refresh()" />
+    <BalancePane v-else-if="section === 'bilan'" :competitions="all"/>
+    <CoachesPane v-else-if="section === 'coachs'" :coaches="coaches.data.value" :competitions="all" @changed="competitions.refresh()"/>
 
     <div
       v-else
@@ -327,7 +329,7 @@ const tab = (active: boolean) => [
             📦 Archiver les passées ({{ pastCompetitions.length }})
           </UiButton>
         </div>
-        <div class="mb-2 flex flex-wrap items-center gap-1.5">
+        <div class="flex flex-wrap items-center gap-1.5 mb-2">
           <input
             v-model="search"
             type="search"
@@ -371,9 +373,10 @@ const tab = (active: boolean) => [
                 selected?.id === competition.id ? 'border-accent' : 'border-slate-200',
               ]"
             >
-              <b class="block text-[15px]" data-testid="comp-name">
-                <span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆</span>
-                <span>{{ competition.nom }}</span>
+              <span class="flex flex-row justify-between pb-2">
+                <b class="block text-[15px]" data-testid="comp-name">
+                  <span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆</span>{{ competition.nom }}
+                </b>
                 <UiBadge
                   v-if="discipline(competition)"
                   :color="disciplineColor(discipline(competition))"
@@ -383,8 +386,11 @@ const tab = (active: boolean) => [
                 >
                   {{ discipline(competition) }}
                 </UiBadge>
-              </b>
-              <span class="block text-xs text-slate-500">📅 {{ period(competition) }}</span>
+              </span>
+              <span class="block text-xs text-slate-500 pb-2">📅 {{ period(competition) }}</span>
+              <span class="block text-xs text-slate-500">
+                🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}
+              </span>
               <span class="mt-0.5 block text-xs font-semibold text-blue-900">
                 ({{ counts(competition.participants ?? []).selected }} participant{{
                   plural(counts(competition.participants ?? []).selected)
@@ -392,9 +398,6 @@ const tab = (active: boolean) => [
                 · {{ counts(competition.participants ?? []).unpaid }} en attente · {{ counts(competition.participants ?? []).paid }} payé{{
                   plural(counts(competition.participants ?? []).paid)
                 }})
-              </span>
-              <span class="block text-xs text-slate-500">
-                🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}
               </span>
             </RouterLink>
           </li>
@@ -452,6 +455,6 @@ const tab = (active: boolean) => [
         @cancel="creating = false"
       />
     </UiDialog>
-    <UiToast :message="toast.message.value" />
+    <UiToast :message="toast.message.value"/>
   </AppShell>
 </template>
