@@ -230,6 +230,7 @@ watch(
 );
 
 function select(m: Member): void {
+  panelOpen.value = true; // also for the member already in the URL, whose recordId does not change
   void router.push({ query: recordQuery(m) });
 }
 
@@ -548,6 +549,7 @@ const linkButton =
             data-testid="member-record"
             class="font-bold text-slate-800 no-underline hover:text-accent hover:underline"
             title="Ouvrir la fiche adhérent"
+            @click="panelOpen = true"
             >{{ row.last_name }}</RouterLink
           >
         </template>
@@ -579,7 +581,11 @@ const linkButton =
 
         <template #card="{ row }">
           <div class="flex items-start justify-between gap-2">
-            <RouterLink :to="{ query: recordQuery(row) }" data-testid="member-record" class="min-w-0 font-bold text-slate-800 no-underline"
+            <RouterLink
+              :to="{ query: recordQuery(row) }"
+              data-testid="member-record"
+              class="min-w-0 font-bold text-slate-800 no-underline"
+              @click="panelOpen = true"
               >{{ row.last_name }} {{ row.first_name }}</RouterLink
             >
             <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white', statusClass(row.status_norm)]">{{

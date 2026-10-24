@@ -308,6 +308,15 @@ describe("AdherentsPage", () => {
     await again.byId("side-panel-collapse").trigger("click");
     await again.byId("panel-open").trigger("click");
     expect(again.inBody("record-name")!.textContent).toBe("Max MARTIN");
+    // The member already in the URL: the click does not change the route, the panel opens all the same
+    await again.byId("side-panel-collapse").trigger("click");
+    await again.wrapper.findAll('[data-testid="data-row"]')[1]!.find("td:nth-child(2)").trigger("click");
+    await flushPromises();
+    expect(again.inBody("record-name")!.textContent).toBe("Max MARTIN");
+    await again.byId("side-panel-collapse").trigger("click");
+    await again.wrapper.findAll('[data-testid="member-record"]')[1]!.trigger("click");
+    await flushPromises();
+    expect(again.inBody("record-name")!.textContent).toBe("Max MARTIN");
   });
 
   it("pins the first row in the URL when an action opens: a member added by a poll does not close the form", async () => {

@@ -8,12 +8,15 @@ from helpers.data import unique_name
 
 def _open(page, role="admin"):
     with page.expect_response(lambda r: r.url.endswith("/api/whatsapp-template") and r.request.method == "GET",
-                              timeout=20_000) as whatsapp:
+                              timeout=20_000):
         page.goto("/bureau/communications")
         login_as(page, role)
     expect(page.get_by_test_id("template-select").locator("option").first).to_be_attached(timeout=20_000)
-    # Loaded apart from the templates: once shown, it can no longer overwrite a fill() of the test
-    expect(page.get_by_test_id("whatsapp")).to_have_value(whatsapp.value.json().get("template") or "")
+    # Loaded apart from the templates: once shown, it can no longer overwrite a fill() of the test. The expected
+    # value comes from a request of its own: the page's response may belong to a page already navigated away
+    # from, and reading its body then fails or never returns (worker killed by the test timeout on CI).
+    stored = page.request.get("/api/whatsapp-template").json().get("template") or ""
+    expect(page.get_by_test_id("whatsapp")).to_have_value(stored)
     return page
 
 
@@ -135,8 +138,7 @@ def test_whatsapp_text(page):
     page.get_by_test_id("whatsapp").fill(text)
     page.get_by_test_id("whatsapp-save").click()
     expect(page.get_by_test_id("toast")).to_contain_text("Texte WhatsApp enregistré")
-    page.reload()
-    _open(page)
+    _open(page)  # loads the page again (goto), so the text below comes from the server
     expect(page.get_by_test_id("whatsapp")).to_have_value(text)
 
 
