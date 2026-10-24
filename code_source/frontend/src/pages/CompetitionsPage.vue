@@ -260,7 +260,7 @@ const syncInfo = computed(() => {
   if (state === "loading") {
     return at ? `💾 Données du ${formatDateTime(at)}${waiting}` : waiting.slice(3);
   }
-  return at ? `☁️ À jour — ${formatDateTime(at)}${waiting}` : waiting.slice(3);
+  return waiting.slice(3);
 });
 
 const chip = (active: boolean) => [

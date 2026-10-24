@@ -135,7 +135,7 @@ describe("AdherentsPage", () => {
     expect(wrapper.find('a[href="tel:+33612345678"]').exists()).toBe(true);
     expect((byId("season-select").element as HTMLSelectElement).value).toBe("2026-2027");
     expect(byId("season-select").text()).toContain("2026-2027 (active)");
-    expect(wrapper.find("#sync-info").text()).toMatch(/^☁️ À jour — /);
+    expect(wrapper.find("#sync-info").text()).toBe("");
     expect(byId("member-add").attributes("href")).toBe("/bureau/adherents?ajout=1");
   });
 

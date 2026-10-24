@@ -102,7 +102,7 @@ describe("DirectoryPage", () => {
     expect([byId("kpi-shown").text(), byId("kpi-season").text(), byId("kpi-cancelled").text()]).toEqual(["2", "2", "1"]);
     expect(byId("directory-count").text()).toBe("2 adhérents affichés · saison 2026-2027");
     expect(wrapper.find('a[href="tel:+33612345678"]').exists()).toBe(true);
-    expect(wrapper.find("#sync-info").text()).toMatch(/^☁️ À jour — /);
+    expect(wrapper.find("#sync-info").text()).toBe("");
   });
 
   it("unfolds a card on demand, without health data", async () => {

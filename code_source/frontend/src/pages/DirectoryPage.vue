@@ -113,7 +113,7 @@ const syncInfo = computed(() => {
   if (state === "loading") {
     return at ? `💾 Données du ${formatDateTime(at)}` : "";
   }
-  return at ? `☁️ À jour — ${formatDateTime(at)}` : "";
+  return "";
 });
 
 // Tabs (phones); on desktop the filters stay beside the list

@@ -131,7 +131,7 @@ def test_shown_offline_with_its_date(mobile_page, member):
     # Network back: the role is checked again and the list follows the server
     page.evaluate("() => window.dispatchEvent(new Event('online'))")
     expect(page.locator("#offline-notice")).to_have_count(0, timeout=20_000)
-    expect(page.locator("#sync-info")).to_contain_text("À jour", timeout=20_000)
+    expect(page.locator("#sync-info")).to_have_text("", timeout=20_000)
 
 
 def test_logout_wipes_the_copy(mobile_page):

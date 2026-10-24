@@ -26,7 +26,7 @@ import { createIntegrationsApi } from "../services/integrations";
 import { createMembersApi } from "../services/members";
 import { csvBlob } from "../lib/csv";
 import { saveFile } from "../lib/download";
-import { formatDateTime, formatDayText } from "../lib/format";
+import { formatDayText } from "../lib/format";
 import MemberAttestation from "./adherents/MemberAttestation.vue";
 import MemberEmail from "./adherents/MemberEmail.vue";
 import MemberForm from "./adherents/MemberForm.vue";
@@ -110,8 +110,7 @@ const syncInfo = computed(() => {
   if (state === "error") {
     return "⚠️ Chargement des adhérents impossible — nouvel essai automatique";
   }
-  const at = members.checkedAt.value;
-  return state === "ok" && at ? `☁️ À jour — ${formatDateTime(at)}` : "";
+  return "";
 });
 
 function chooseSeason(name: string): void {
