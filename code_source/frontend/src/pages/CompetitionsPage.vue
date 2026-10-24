@@ -12,7 +12,7 @@ import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
 import { pageAccess, verdict } from "../lib/access";
-import { formatDateTime, formatEuros } from "../lib/format";
+import { formatDateTime } from "../lib/format";
 import { CLIENT_KEY, type Schemas } from "../lib/client";
 import { createCompetitionsApi } from "../services/competitions";
 import { isStaff } from "../lib/roles";
@@ -357,32 +357,30 @@ const tab = (active: boolean) => [
                   : "Aucune compétition enregistrée."
             }}
           </li>
-          <li v-for="c in current" :key="c.id">
+          <li v-for="competition in current" :key="competition.id">
             <RouterLink
-              :to="{ query: { id: String(c.id) } }"
+              :to="{ query: { id: String(competition.id) } }"
               data-testid="comp-card"
-              :aria-current="selected?.id === c.id ? 'true' : undefined"
+              :aria-current="selected?.id === competition.id ? 'true' : undefined"
               :class="[
                 'block rounded-xl border bg-white px-3.5 py-3 text-slate-800 no-underline shadow-sm hover:border-accent',
-                selected?.id === c.id ? 'border-accent' : 'border-slate-200',
+                selected?.id === competition.id ? 'border-accent' : 'border-slate-200',
               ]"
             >
               <b class="block text-[15px]" data-testid="comp-name"
-                ><span v-if="hasResults(c)" title="Résultats officiels récupérés">🏆 </span>{{ c.nom }}</b
+                ><span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆 </span>{{ competition.nom }}</b
               >
               <span class="block text-xs text-slate-500">
-                🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }} · 💶 {{ formatEuros(c.prix)
-                }}<template v-if="c.lieu"> · 📍 {{ c.lieu }}</template
-                ><template v-if="discipline(c)"> · {{ discipline(c) }}</template>
+                📅 {{ period(competition) }}<template v-if="discipline(competition)"> · {{ discipline(competition) }}</template>
               </span>
               <span class="mt-0.5 block text-xs font-semibold text-blue-900">
-                ({{ counts(c.participants ?? []).selected }} participant{{ plural(counts(c.participants ?? []).selected) }} ·
-                {{ counts(c.participants ?? []).unpaid }} en attente · {{ counts(c.participants ?? []).paid }} payé{{
-                  plural(counts(c.participants ?? []).paid)
+                ({{ counts(competition.participants ?? []).selected }} participant{{ plural(counts(competition.participants ?? []).selected) }} ·
+                {{ counts(competition.participants ?? []).unpaid }} en attente · {{ counts(competition.participants ?? []).paid }} payé{{
+                  plural(counts(competition.participants ?? []).paid)
                 }})
               </span>
               <span class="block text-xs text-slate-500"
-                >🏃 {{ c.coaches?.length ? `Coachs : ${c.coaches.join(", ")}` : "Aucun coach" }}</span
+                >🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}</span
               >
             </RouterLink>
           </li>

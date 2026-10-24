@@ -1,10 +1,5 @@
 <script setup lang="ts">
-/* A competitor of the competition. Coaches and admins switch « Participe » (the call-up) and « Présent » (checked in on
-   the day; offline too: the change waits in the outbox), and act on the registration according to the payment:
-   - not paid: remove from the list, or record a payment by cheque or cash;
-   - paid: no removal (the accounts keep it), a withdrawal instead (money carried over or lost);
-   - withdrawn: restore;
-   - checked in: nothing to do (uncheck « Présent » after a mistake). */
+/* A competitor of the competition. */
 import { telHref } from "../adherents/members";
 import { hasPaid, isCancelled, payment, ranking, type Row } from "./competitions";
 
