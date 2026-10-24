@@ -1,7 +1,5 @@
 <script setup lang="ts">
-/* « HelloAsso » (coaches and admins, online): the payments of the annual campaign, linked to a competitor or waiting
-   for a coach (a table on wide screens, cards elsewhere). « Synchroniser » reads the campaign again from HelloAsso and
-   links what it can by itself. */
+/* HelloAsso view */
 import { computed, inject, ref, watch } from "vue";
 import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
@@ -49,7 +47,7 @@ function readHide(): boolean {
     return true;
   }
 }
-const filter = ref<ItemFilter>("unlinked");
+const filter = ref<ItemFilter>("all");
 const hideIgnored = ref(readHide());
 watch(hideIgnored, (v) => {
   try {
@@ -68,10 +66,10 @@ const totalAmount = computed(() => all.value.reduce((sum, it) => sum + Number(it
 const compName = computed(() => new Map(props.competitions.map((c) => [c.id, c.nom])));
 const memberName = computed(() => new Map(props.members.map((m) => [m.id, `${m.nom} ${m.prenom}`])));
 const FILTERS = computed(() => [
+  { id: "all" as const, label: "📋 Tous", n: hideIgnored.value ? count.value.all - count.value.ignored : count.value.all },
   { id: "unlinked" as const, label: "⚠️ En attente", n: count.value.unlinked },
   { id: "linked" as const, label: "✅ Rattachés", n: count.value.linked },
   { id: "ignored" as const, label: "🚫 Ignorés", n: count.value.ignored },
-  { id: "all" as const, label: "📋 Tous", n: hideIgnored.value ? count.value.all - count.value.ignored : count.value.all },
 ]);
 
 const syncing = ref(false);
@@ -183,7 +181,7 @@ const chip = (active: boolean) => [
           type="search"
           data-testid="ha-search"
           placeholder="Rechercher (nom, commande, licence…)"
-          class="w-full max-w-[480px] flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px]"
+          class="w-full max-w-120 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px]"
         />
         <div class="flex flex-wrap items-center gap-3">
           <div class="flex flex-wrap gap-1.5">
@@ -219,7 +217,7 @@ const chip = (active: boolean) => [
               <th class="px-2.5 py-2">Épreuve détectée</th>
               <th class="px-2.5 py-2">Montant</th>
               <th class="px-2.5 py-2">Compétition rattachée</th>
-              <th class="px-2.5 py-2">Athlète ALJ</th>
+              <th class="px-2.5 py-2">Commentaire</th>
               <th class="px-2.5 py-2">Source</th>
               <th class="px-2.5 py-2 text-center">Action</th>
             </tr>
@@ -250,7 +248,7 @@ const chip = (active: boolean) => [
               <td class="px-2.5 py-2">
                 <UiBadge :color="isLinked(it) ? 'blue' : isIgnored(it) ? 'slate' : 'amber'" data-testid="ha-state">
                   <template v-if="isLinked(it)">
-                    ✅ Rattaché · 🏆 {{ compName.get(it.competition_id!) ?? `#${it.competition_id}` }}
+                    ✅ {{ compName.get(it.competition_id!) ?? `#${it.competition_id}` }}
                   </template>
                   <template v-else-if="isIgnored(it)">🚫 Ignoré{{ it.ignore_motif ? ` (${it.ignore_motif})` : "" }}</template>
                   <template v-else>⚠️ En attente</template>
@@ -259,7 +257,7 @@ const chip = (active: boolean) => [
               </td>
               <td class="px-2.5 py-2">
                 <span v-if="it.adherent_id != null" class="font-semibold text-slate-800">
-                  {{ memberName.get(it.adherent_id) ?? `Adhérent #${it.adherent_id}` }}
+
                 </span>
                 <span v-else-if="isIgnored(it)" class="text-[11px] text-slate-500 italic">
                   Écarté
