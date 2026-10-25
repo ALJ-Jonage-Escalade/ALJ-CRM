@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import time
 from typing import Any, Dict, Optional
 
@@ -17,6 +18,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from api.integrations.schemas import GoogleChecks, GoogleStatus, GoogleTest, GoogleTokenUpdate, GoogleTokenUpdated, ServiceCheck
 from api.responses import error, error_responses, internal_error
 from infrastructure.security.secret_store import SecretStore
+
+logger = logging.getLogger("alj")
 
 router = APIRouter()
 
@@ -211,7 +214,7 @@ def google_auth_callback(
             return_to = _safe_return_to(state_data.get("return_to"))
             redirect_uri = state_data.get("redirect_uri", "")
         except Exception:
-            pass
+            logger.warning("Paramètre state OAuth illisible, valeurs par défaut utilisées", exc_info=True)
 
     if not redirect_uri:
         proto = request.headers.get("x-forwarded-proto") or request.url.scheme
@@ -232,7 +235,7 @@ def google_auth_callback(
             <p><a href="/bureau/parametres" class="btn">Retour aux paramètres</a></p>"""
         )
 
-    token_url = "https://oauth2.googleapis.com/token"
+    token_url = "https://oauth2.googleapis.com/token"  # noqa: S105 - URL of the token endpoint, not a secret
     token_params = {
         "code": code,
         "client_id": client_id,
@@ -294,7 +297,7 @@ def google_auth_callback(
             if userinfo_resp.status_code == 200:
                 user_email = userinfo_resp.json().get("email", "")
         except Exception:
-            pass
+            logger.warning("Lecture de l'e-mail du compte Google impossible (userinfo)", exc_info=True)
 
     # Sauvegarder dans SecretStore
     SecretStore.set_secret("GMAIL_CLIENT_ID", client_id)
@@ -312,7 +315,8 @@ def google_auth_callback(
             sync_ok = False
             internal_error(se, "google_auth_callback sync")
 
-    email_display = f"Compte connecté : <b>{html.escape(user_email)}</b>" if user_email else "Compte Google connecté"
+    # user_email is escaped with html.escape
+    email_display = f"Compte connecté : <b>{html.escape(user_email)}</b>" if user_email else "Compte Google connecté"  # nosemgrep: python.django.security.injection.raw-html-format.raw-html-format
     sync_display = ("✅ Base de données synchronisée avec succès." if sync_ok
                     else "⚠️ Connexion rétablie, mais synchro en attente (détails dans les journaux).")
 
@@ -459,7 +463,7 @@ def update_google_token(data: GoogleTokenUpdate) -> GoogleTokenUpdated | JSONRes
             if u_resp.status_code == 200:
                 user_email = u_resp.json().get("email") or ""
         except Exception:
-            pass
+            logger.warning("Lecture de l'e-mail du compte Google impossible (userinfo)", exc_info=True)
 
     SecretStore.set_secret("GMAIL_CLIENT_ID", final_cid)
     SecretStore.set_secret("GMAIL_CLIENT_SECRET", final_sec)
@@ -471,6 +475,6 @@ def update_google_token(data: GoogleTokenUpdate) -> GoogleTokenUpdated | JSONRes
         try:
             CloudDatabase.sync()
         except Exception:
-            pass
+            logger.warning("Synchronisation Firestore après mise à jour du jeton Gmail échouée", exc_info=True)
 
     return GoogleTokenUpdated(status="success", message="Jeton Google mis à jour et validé avec succès.", user_email=user_email)

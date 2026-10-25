@@ -50,7 +50,7 @@ def normalized_copy(src: str, workdir: str) -> str:
 def counts(path: str) -> dict:
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
-        return {t: conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in cdb.tracked_tables(conn)}
+        return {t: conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in cdb.tracked_tables(conn)}  # noqa: S608 - noms de tables/colonnes issus de tracked_tables et PRAGMA table_info
     finally:
         conn.close()
 
@@ -74,8 +74,8 @@ def compare(source: str, cache: str) -> list:
             cols = cdb.table_columns(s, t)
             order = ", ".join(f'"{k}"' for k in pk)
             col_sql = ", ".join(f'"{k}"' for k in cols)
-            a = s.execute(f'SELECT {col_sql} FROM "{t}" ORDER BY {order}').fetchall()
-            b = c.execute(f'SELECT {col_sql} FROM "{t}" ORDER BY {order}').fetchall()
+            a = s.execute(f'SELECT {col_sql} FROM "{t}" ORDER BY {order}').fetchall()  # noqa: S608 - noms de tables/colonnes issus de tracked_tables et PRAGMA table_info
+            b = c.execute(f'SELECT {col_sql} FROM "{t}" ORDER BY {order}').fetchall()  # noqa: S608 - noms de tables/colonnes issus de tracked_tables et PRAGMA table_info
             if len(a) != len(b):
                 problems.append(f"{t} : {len(a)} lignes en source, {len(b)} dans Firestore")
             diff = 0

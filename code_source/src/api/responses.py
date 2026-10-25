@@ -26,7 +26,7 @@ def _etag_matches(header: str, etag: str) -> bool:
 def json_with_etag(request: Request, payload: Any) -> Response:  # Any: any JSON-serializable value
     """JSON response with a strong ETag (hash of the body); 304 when the client already has it."""
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str).encode("utf-8")
-    etag = '"' + hashlib.sha1(body).hexdigest() + '"'
+    etag = '"' + hashlib.sha256(body, usedforsecurity=False).hexdigest() + '"'
     headers = {"ETag": etag, "Cache-Control": NO_STORE}
     if _etag_matches(request.headers.get("if-none-match", ""), etag):
         return Response(status_code=304, headers=headers)

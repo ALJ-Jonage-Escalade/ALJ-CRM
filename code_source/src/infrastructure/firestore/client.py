@@ -139,7 +139,8 @@ class FirestoreClient:
             try:
                 url = ("http://metadata.google.internal/computeMetadata/v1/instance/"
                        "service-accounts/default/token")
-                resp = requests.get(url, headers={"Metadata-Flavor": "Google"}, timeout=5)
+                # The GCP metadata server only answers over http (link-local, never leaves the host)
+                resp = requests.get(url, headers={"Metadata-Flavor": "Google"}, timeout=5)  # nosemgrep: python.lang.security.audit.insecure-transport.requests.request-with-http.request-with-http
                 if resp.status_code == 200:
                     return resp.json().get("access_token", "")
             except requests.RequestException:

@@ -1,8 +1,11 @@
+import logging
 import os
 import requests
 import lxml.html
 import pandas as pd
 from paths import ROOT_DIR
+
+logger = logging.getLogger("alj")
 
 def scrape_mycompet(progress_callback=None) -> str:
     """
@@ -330,6 +333,7 @@ def find_mycompet_result_url(comp_nom: str, comp_date: str = "", comp_lieu: str 
                     if words and sum(1 for w in words if w in probe_title) >= max(1, len(words) - 1):
                         return url_test
             except Exception:
+                logger.debug("Sondage de l'URL MyCompet échoué : %s", url_test, exc_info=True)
                 continue
     except Exception as e:
         print(f"⚠️ [MYCOMPET] Erreur sonde récente MyCompet : {e}")

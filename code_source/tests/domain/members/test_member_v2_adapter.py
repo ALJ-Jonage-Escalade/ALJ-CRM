@@ -83,7 +83,7 @@ class TestGetMembersLoader(unittest.TestCase):
         if os.path.exists(self.test_db_path):
             try:
                 os.remove(self.test_db_path)
-            except Exception:
+            except OSError:
                 pass
 
     def test_get_members_returns_typed_members(self):

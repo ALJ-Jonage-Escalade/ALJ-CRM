@@ -61,7 +61,7 @@ def build_cache(path: str, store, schema_factory: Callable[[str], None] = create
         conn.execute("BEGIN")
         for t in TRACKED_TABLES:
             if table_exists(conn, t):
-                conn.execute(f'DELETE FROM "{t}"')
+                conn.execute(f'DELETE FROM "{t}"')  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
         conn.execute("COMMIT")
         install_tracking(conn)
         conn.execute("BEGIN")
@@ -124,7 +124,7 @@ def cache_is_valid(path: str, project_id: str) -> bool:
 
 
 def export_rows(conn, table: str) -> List[Dict[str, Any]]:
-    return [dict(r) for r in conn.execute(f'SELECT * FROM "{table}"')]
+    return [dict(r) for r in conn.execute(f'SELECT * FROM "{table}"')]  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
 
 
 def import_database(src_path: str, store, by: str = "migration") -> Dict[str, int]:

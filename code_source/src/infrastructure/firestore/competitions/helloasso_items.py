@@ -1,6 +1,7 @@
 """HelloAsso mirror: `helloasso_items` documents with their embedded link to a participant,
 and the payments those links carry over to the participants."""
 import json
+import logging
 import re
 from typing import Dict, Any, List, Optional
 
@@ -12,6 +13,8 @@ from domain.competitions.models import (
 )
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions.participants import MANUAL_PAYMENT_REF, ParticipantsMixin
+
+logger = logging.getLogger("alj")
 
 
 class ItemAlreadyLinked(Exception):
@@ -288,7 +291,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
                     comp_name_val = competition_matching.extract_competition_name(raw_data)
                     comp_num_val = competition_matching.extract_competition_number(raw_data, fallback=False)
                 except Exception:
-                    pass
+                    logger.warning("raw_json HelloAsso illisible pour l'item %s", it.get("id_item"), exc_info=True)
             result.append({
                 "id_item": it["id_item"],
                 "payer": f"{it.get('payer_nom') or ''} {it.get('payer_prenom') or ''}".strip() or "Inconnu",

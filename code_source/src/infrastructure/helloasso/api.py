@@ -1,12 +1,8 @@
 import os
 import requests
-import urllib3
 from dotenv import load_dotenv
 
 from infrastructure import runtime_env
-
-# Désactiver les avertissements SSL lors de l'utilisation de verify=False
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
@@ -14,6 +10,8 @@ load_dotenv()
 CLIENT_ID = os.getenv("HELLOASSO_CLIENT_ID")
 CLIENT_SECRET = os.getenv("HELLOASSO_CLIENT_SECRET")
 ORG_SLUG = os.getenv("HELLOASSO_ORG_SLUG")
+# Délai max d'une requête HelloAsso (connexion + lecture), en secondes
+REQUEST_TIMEOUT_SECONDS = 30
 
 def get_access_token():
     """Récupère un jeton d'accès OAuth2 auprès de HelloAsso."""
@@ -29,7 +27,7 @@ def get_access_token():
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     
     try:
-        response = requests.post(url, data=data, headers=headers, verify=False)
+        response = requests.post(url, data=data, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
         response.raise_for_status()
         return response.json().get("access_token")
     except requests.exceptions.RequestException as e:
@@ -56,7 +54,7 @@ def fetch_all_pages(url, headers, params=None):
             
         try:
             print(f" -> Requête page {page_count}...")
-            response = requests.get(url, headers=headers, params=params, verify=False)
+            response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
             response.raise_for_status()
             data = response.json()
             

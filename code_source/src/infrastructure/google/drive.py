@@ -1,6 +1,9 @@
+import logging
 import os
 import requests
 from infrastructure.security.secret_store import SecretStore
+
+logger = logging.getLogger("alj")
 
 class GoogleDriveClient:
     """
@@ -92,7 +95,7 @@ class GoogleDriveClient:
                         if key and "client_id" in data[key] and "client_secret" in data[key]:
                             return data[key]["client_id"], data[key]["client_secret"]
                     except Exception:
-                        pass
+                        logger.warning("Fichier d'identifiants OAuth illisible : %s", fpath, exc_info=True)
 
         return cid, sec
 

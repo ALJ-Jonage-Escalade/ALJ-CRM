@@ -42,7 +42,7 @@ def run_migration(interactive=None):
     if os.path.exists(temp_excel):
         try:
             os.remove(temp_excel)
-        except Exception:
+        except OSError:
             pass
 
     print("📥 Téléchargement de l'Excel de référence depuis Google Drive...")
@@ -91,7 +91,7 @@ def run_migration(interactive=None):
     if os.path.exists(db_local_path):
         try:
             os.remove(db_local_path)
-        except Exception:
+        except OSError:
             pass
 
     SqliteDatabase.setup_database()
@@ -117,7 +117,7 @@ def run_migration(interactive=None):
     # Nettoyage
     try:
         os.remove(temp_excel)
-    except Exception:
+    except OSError:
         pass
 
 if __name__ == "__main__":

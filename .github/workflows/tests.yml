@@ -53,7 +53,8 @@ jobs:
 
     - name: Lint (ruff)
       working-directory: code_source
-      run: uv run --no-sync ruff check src tests
+      # github format: findings show as annotations in the PR "Files changed" tab (security rules S included)
+      run: uv run --no-sync ruff check src tests --output-format=github
 
     - name: Type check (mypy)
       working-directory: code_source
@@ -83,6 +84,14 @@ jobs:
     - name: Install Dependencies (package-lock.json)
       run: npm ci --no-fund
 
+    - name: Audit runtime dependencies (npm audit)
+      run: npm audit --omit=dev --audit-level=high
+
+    - name: Audit dev dependencies (npm audit, informational)
+      # Build and test tools only: reported here, fixed through Dependabot, does not block
+      continue-on-error: true
+      run: npm audit --audit-level=high
+
     - name: Check the API types match the contract (src/lib/api-schema.ts)
       run: npm run check:api
 
@@ -100,6 +109,27 @@ jobs:
 
     - name: Build
       run: npm run build
+
+  security:
+    # Semgrep CE with the open-source rules (Python + TypeScript/Vue): replaces CodeQL, which needs the
+    # paid GitHub Code Security on a private repository. Output in the job log only (SARIF upload needs it too).
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v7
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v10.3.0
+      with:
+        version: "0.13.1"
+
+    - name: Scan (Semgrep)
+      # Engine pinned; the p/ rule sets come from the registry and can gain rules over time.
+      # False positive: `# nosemgrep: <rule-id>` on the line, with the reason in a comment above it
+      run: >
+        uvx semgrep@1.182.1 scan --config p/python --config p/typescript --config p/owasp-top-ten
+        --metrics=off --error --exclude code_source/frontend/src/lib/api-schema.ts
+        code_source/src code_source/frontend/src
 
   e2e:
     # Browser tests (Playwright) against a throwaway stack started by the tests: Firebase emulator +
@@ -152,7 +182,7 @@ jobs:
       run: npm ci --no-fund && npm run build
 
     - name: Lint (ruff)
-      run: python -m ruff check e2e
+      run: python -m ruff check e2e --output-format=github
 
     - name: Run e2e tests (pytest + Playwright)
       # Below the job's 30 min: a hung run fails here, so the logs and artifacts below are still uploaded

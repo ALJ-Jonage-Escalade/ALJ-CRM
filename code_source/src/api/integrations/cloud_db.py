@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 
 from fastapi import APIRouter, Query
@@ -9,6 +10,8 @@ from fastapi.responses import JSONResponse
 
 from api.integrations.schemas import CloudDbStatus, CloudDbSync, SyncCounters
 from api.responses import error, error_responses, internal_error
+
+logger = logging.getLogger("alj")
 
 router = APIRouter()
 
@@ -33,7 +36,7 @@ def get_cloud_db_status_api() -> CloudDbStatus | JSONResponse:
                 member_count = row[0] if row else 0
                 conn.close()
             except Exception:
-                pass
+                logger.warning("Lecture du nombre d'adhérents du cache SQLite impossible", exc_info=True)
 
         return CloudDbStatus(
             status="success",

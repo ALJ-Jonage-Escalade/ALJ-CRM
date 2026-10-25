@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import glob
@@ -12,6 +13,8 @@ from domain.constants import (
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.google.drive import GoogleDriveClient
 from domain.utils import normalize_name
+
+logger = logging.getLogger("alj")
 
 # S'assurer que le répertoire de travail et le répertoire du script sont dans le chemin de recherche
 script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # src/
@@ -120,7 +123,7 @@ def parse_date_to_datetime(val):
             if "T" in val_str and fmt == "%Y-%m-%dT%H:%M:%S":
                 return datetime.datetime.strptime(val_str[:19], fmt)
             return datetime.datetime.strptime(val_str, fmt)
-        except Exception:
+        except ValueError:
             pass
             
     # Si on n'a pas réussi à parser mais que c'est une chaîne non vide, on la renvoie brute
@@ -389,7 +392,7 @@ def generate_ffme_csv(participants_data, output_path=None, include_termine=False
                     shutil.move(old_file, os.path.join(archive_dir, os.path.basename(old_file)))
                     print(f"📦 Ancien fichier CSV FFME archivé : {os.path.basename(old_file)}")
                 except Exception:
-                    pass
+                    logger.warning("Archivage de l'ancien CSV FFME impossible : %s", old_file, exc_info=True)
     
     headers = [
         "numero de licence", "nom", "prenom", "date de naissance", "sexe", "nationalite",

@@ -46,7 +46,7 @@ exclude = ["build", "dist"]
 
 [tool.ruff.lint]
 # Démarrage progressif : erreurs d'exécution + imports/variables inutilisés.
-select = ["E4", "E7", "E9", "F", "B"]
+select = ["E4", "E7", "E9", "F", "B", "S"]
 ignore = [
     "B008",  # injections de dépendances FastAPI (Body(...) en défaut)
     "B904",  # raise ... from : chantier séparé
@@ -56,6 +56,13 @@ ignore = [
     "F841",  # variables locales assignées non relues (récupération de boutons Qt, styles)
     "E402",  # imports après configuration sys.path (structure des entry points du projet)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Règles de sécurité (S) : les tests utilisent assert, de faux secrets, un RNG à graine fixe,
+# du SQL de vérification et urlopen vers l'émulateur local.
+"tests/**" = ["S101", "S105", "S310", "S311", "S608"]
+# e2e : assert Playwright, faux jeton de webhook, subprocess docker à argv fixe, urlopen vers la pile locale.
+"e2e/**" = ["S101", "S105", "S310", "S603"]
 
 [tool.mypy]
 ignore_missing_imports = true

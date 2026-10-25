@@ -93,7 +93,8 @@ def doc_id_for(pk_values: List[Any]) -> str:
     if len(pk_values) == 1 and isinstance(pk_values[0], int) and not isinstance(pk_values[0], bool):
         return str(pk_values[0])
     raw = json.dumps(pk_values, ensure_ascii=False, separators=(",", ":"))
-    return "h" + hashlib.sha1(raw.encode("utf-8")).hexdigest()
+    # sha1 kept on purpose: changing the hash would change the IDs of the existing Firestore documents
+    return "h" + hashlib.sha1(raw.encode("utf-8"), usedforsecurity=False).hexdigest()  # nosemgrep: python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1
 
 
 def ts_key(ts: Optional[str]) -> Tuple:

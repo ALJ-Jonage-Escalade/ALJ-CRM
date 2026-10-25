@@ -1,3 +1,4 @@
+import logging
 import os
 import base64
 import smtplib
@@ -11,6 +12,8 @@ from email import encoders
 from paths import DATA_ROOT
 from infrastructure.security.secret_store import SecretStore
 from domain.utils import sanitize_email_header
+
+logger = logging.getLogger("alj")
 
 class EmailRepository:
     """
@@ -199,7 +202,7 @@ class EmailRepository:
                         server.starttls()
                         server.ehlo()
                     except Exception:
-                        pass
+                        logger.warning("STARTTLS indisponible sur %s, envoi sans chiffrement", smtp_host, exc_info=True)
                 
                 server.login(smtp_user, smtp_password)
                 # Diviser les e-mails en liste pour assurer l'envoi SMTP multipart.
