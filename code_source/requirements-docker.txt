@@ -33,7 +33,7 @@ fonttools==4.67.0
     # via weasyprint
 geographiclib==2.1
     # via geopy
-geopy==2.4.1
+geopy==2.5.0
     # via alj-escalade-manager
 h11==0.16.0
     # via uvicorn
