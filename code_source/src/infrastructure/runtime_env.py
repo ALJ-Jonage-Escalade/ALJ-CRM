@@ -22,7 +22,7 @@ PROD_FIRESTORE_BASE_URL = "https://firestore.googleapis.com/v1"
 PROD_HELLOASSO_API_URL = "https://api.helloasso.com/v5"
 PROD_HELLOASSO_OAUTH_URL = "https://api.helloasso.com/oauth2/token"
 DEV_PROJECT_ID = "demo-alj"
-EMULATOR_ADMIN_TOKEN = "owner"  # emulator admin token: bypasses the security rules
+EMULATOR_ADMIN_TOKEN = "owner"  # noqa: S105 - public emulator admin token (bypasses the security rules), only sent to the emulator
 
 DEFAULT_PUBLIC_AUTH_EMULATOR = "http://localhost:9099"
 

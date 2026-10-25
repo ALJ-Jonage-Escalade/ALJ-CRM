@@ -276,7 +276,8 @@ def emulator_claims(authorization: Optional[str]) -> Optional[Dict[str, Any]]:
     import jwt  # PyJWT
 
     try:
-        return jwt.decode(token, options={"verify_signature": False})
+        # Dev only (checked above): the emulator's tokens are unsigned by design
+        return jwt.decode(token, options={"verify_signature": False})  # nosemgrep: python.jwt.security.unverified-jwt-decode.unverified-jwt-decode
     except jwt.PyJWTError:
         return None
 

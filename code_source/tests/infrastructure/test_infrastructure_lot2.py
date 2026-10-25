@@ -31,7 +31,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         if os.path.exists(self.test_db_path):
             try:
                 os.remove(self.test_db_path)
-            except Exception:
+            except OSError:
                 pass
 
     def test_sqlite_repository_crud(self):
@@ -103,7 +103,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         if os.path.exists(test_export_path):
             try:
                 os.remove(test_export_path)
-            except Exception:
+            except OSError:
                 pass
 
     def test_secret_store_set_get(self):
@@ -126,7 +126,7 @@ class TestInfrastructureLot2(unittest.TestCase):
                 new_lines = [line for line in lines if not line.startswith(f"{test_key}=")]
                 with open(env_path, "w", encoding="utf-8") as f:
                     f.writelines(new_lines)
-            except Exception:
+            except OSError:
                 pass
 
     def test_email_repository_audit_logging(self):
@@ -138,7 +138,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         if os.path.exists(EmailRepository.AUDIT_FILE_PATH):
             try:
                 os.remove(EmailRepository.AUDIT_FILE_PATH)
-            except Exception:
+            except OSError:
                 pass
                 
         EmailRepository.log_audit(test_dest, test_subj, "SUCCESS")
@@ -157,7 +157,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         # Nettoyage
         try:
             os.remove(EmailRepository.AUDIT_FILE_PATH)
-        except Exception:
+        except OSError:
             pass
 
     def test_merge_ffme_licensees(self):
@@ -240,7 +240,7 @@ class TestInfrastructureLot2(unittest.TestCase):
             if os.path.exists(test_excel_path):
                 try:
                     os.remove(test_excel_path)
-                except Exception:
+                except OSError:
                     pass
 
     def test_merge_autonomes_data(self):
@@ -333,7 +333,7 @@ class TestInfrastructureLot2(unittest.TestCase):
             if os.path.exists(test_excel_path):
                 try:
                     os.remove(test_excel_path)
-                except Exception:
+                except OSError:
                     pass
 
     def test_already_member_detection(self):
@@ -425,7 +425,7 @@ class TestInfrastructureLot2(unittest.TestCase):
             if os.path.exists(temp_excel):
                 try:
                     os.remove(temp_excel)
-                except Exception:
+                except OSError:
                     pass
 
     def test_upsert_members_status_priority(self):

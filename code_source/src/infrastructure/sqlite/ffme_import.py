@@ -50,7 +50,7 @@ class FfmeImportRepository:
                     if all(col in df_h1.columns for col in required_cols):
                         df = df_h1
                 except Exception:
-                    pass
+                    logger.debug("Lecture de l'export FFME avec l'en-tête en ligne 2 impossible", exc_info=True)
         except Exception:
             logger.exception("FFME import: Excel file unreadable")
             stats["errors"].append(UNREADABLE_EXCEL)

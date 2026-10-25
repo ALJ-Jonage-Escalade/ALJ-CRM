@@ -325,7 +325,7 @@ class MemberRepository:
         try:
             placeholders = ",".join("?" * len(ids))
             rows = conn.execute(
-                "SELECT id, first_name, last_name, email_primary, email_secondary, phone, licence_ffme "
+                "SELECT id, first_name, last_name, email_primary, email_secondary, phone, licence_ffme "  # noqa: S608 - uniquement des marqueurs ?
                 f"FROM users WHERE id IN ({placeholders})",
                 ids,
             ).fetchall()
@@ -473,7 +473,7 @@ class MemberRepository:
                 sets = [f'"{col}" = ?' for col in user_updates.keys()]
                 sets.append('updated_at = ?')
                 params = list(user_updates.values()) + [now_iso, int(resolved_uid)]
-                cursor.execute(f'UPDATE users SET {", ".join(sets)} WHERE id = ?', params)
+                cursor.execute(f'UPDATE users SET {", ".join(sets)} WHERE id = ?', params)  # noqa: S608 - colonnes de la liste fixe ci-dessus
 
             # 2. Mise à jour de la table purchases (créneau / tarif)
             if "tarif_name" in fields:

@@ -26,6 +26,7 @@ Mécanisme :
 Le réglage `MEMBER_BACKEND` (`firestore` par défaut, `drive` pour revenir à
 l'ancien partage du fichier par Google Drive) permet un retour arrière.
 """
+import logging
 import os
 import socket
 import sqlite3
@@ -76,6 +77,8 @@ from infrastructure.firestore.cloud_sync.common import (  # noqa: F401
 )
 from infrastructure.firestore.cloud_sync.rest_store import RestStore
 from infrastructure.firestore.cloud_sync.sync import apply_remote_docs, flush, pull, renumber_row  # noqa: F401
+
+logger = logging.getLogger("alj")
 
 
 class CloudDatabase:
@@ -237,7 +240,7 @@ class CloudDatabase:
                 pending = pending_count(conn)
                 conn.close()
             except Exception:
-                pass
+                logger.warning("Comptage des modifications en attente impossible", exc_info=True)
         return {"pending": pending, "last_error": cls._last_error, "last_sync": cls._last_sync}
 
     @classmethod

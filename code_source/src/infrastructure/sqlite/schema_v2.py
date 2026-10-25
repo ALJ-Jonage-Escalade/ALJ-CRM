@@ -331,14 +331,14 @@ def upsert_user_v2(cur, rec, now_iso, field_map):
                 if dst_col == "gender":
                     new_val = normalize_gender(new_val)
                 cur.execute(
-                    f'UPDATE users SET "{dst_col}" = ?, updated_at = ? '
+                    f'UPDATE users SET "{dst_col}" = ?, updated_at = ? '  # noqa: S608 - dst_col issu de USER_FIELD_MAP
                     f'WHERE id = ? AND (("{dst_col}" IS NULL) OR (TRIM("{dst_col}") = ""))',
                     (new_val, now_iso, user_id),
                 )
         for dst_col, new_val in dyn.items():
             if new_val:
                 cur.execute(
-                    f'UPDATE users SET "{dst_col}" = ?, updated_at = ? '
+                    f'UPDATE users SET "{dst_col}" = ?, updated_at = ? '  # noqa: S608 - dst_col issu de DYNAMIC_USER_FIELDS
                     f'WHERE id = ? AND (("{dst_col}" IS NULL) OR (TRIM("{dst_col}") = ""))',
                     (new_val, now_iso, user_id),
                 )
@@ -358,7 +358,7 @@ def upsert_user_v2(cur, rec, now_iso, field_map):
     cols = list(values.keys())
     try:
         cur.execute(
-            f'INSERT INTO users ({", ".join(chr(34) + c + chr(34) for c in cols)}) '
+            f'INSERT INTO users ({", ".join(chr(34) + c + chr(34) for c in cols)}) '  # noqa: S608 - colonnes issues de USER_FIELD_MAP, DYNAMIC_USER_FIELDS et de littéraux
             f'VALUES ({", ".join("?" for _ in cols)})',
             [values[c] for c in cols],
         )
@@ -393,7 +393,7 @@ def upsert_order_v2(cur, order_ref, order_date, status,
             v = str(val or "").strip()
             existing = found[col] if isinstance(found, sqlite3.Row) else found[2 + i]
             if v and not str(existing or "").strip():
-                cur.execute(f"UPDATE orders SET {col}=?, updated_at=? WHERE id=?", (v, now_iso, order_id))
+                cur.execute(f"UPDATE orders SET {col}=?, updated_at=? WHERE id=?", (v, now_iso, order_id))  # noqa: S608 - noms de colonnes littéraux du code
         if season_id and not (found["season_id"] if isinstance(found, sqlite3.Row) else found[5]):
             cur.execute("UPDATE orders SET season_id=? WHERE id=?", (season_id, order_id))
         return order_id
@@ -576,7 +576,7 @@ def apply_member_update(cur, user_id, order_ref, updated_fields, comment_text):
     # Champs personnels -> users
     for ihm_key, users_col in IHM_TO_USERS.items():
         if ihm_key in updated_fields:
-            cur.execute(f'UPDATE users SET "{users_col}"=?, updated_at=? WHERE id=?',
+            cur.execute(f'UPDATE users SET "{users_col}"=?, updated_at=? WHERE id=?',  # noqa: S608 - users_col issu de IHM_TO_USERS
                         (updated_fields[ihm_key], now_iso, user_id))
     if "user_last_name" in updated_fields:
         cur.execute("UPDATE users SET last_name=?, last_name_key=? WHERE id=?",
@@ -598,7 +598,7 @@ def apply_member_update(cur, user_id, order_ref, updated_fields, comment_text):
         sets += ["status=?", "status_normalized=?"]
         params += [str(updated_fields["status"]), normalize_status(updated_fields["status"])]
     cur.execute(
-        f'UPDATE purchases SET {", ".join(sets)} '
+        f'UPDATE purchases SET {", ".join(sets)} '  # noqa: S608 - fragments SET littéraux du code
         f'WHERE user_id=? AND order_id IN (SELECT id FROM orders WHERE order_ref=?)',
         params + [user_id, str(order_ref or "").strip()],
     )
@@ -642,7 +642,7 @@ def mirror_adherent_personal(cur, adherent_id, **fields):
     cols.append("updated_at=?")
     params.append(datetime.datetime.now().isoformat(timespec="seconds"))
     params.append(adherent_id)
-    cur.execute(f'UPDATE users SET {", ".join(cols)} WHERE legacy_adherent_id=?', params)
+    cur.execute(f'UPDATE users SET {", ".join(cols)} WHERE legacy_adherent_id=?', params)  # noqa: S608 - colonnes = arguments nommés passés par le code
 
 
 # Phase 2 — Vue de compatibilité : reproduit le format plat legacy (colonnes champ_* / opt_*)

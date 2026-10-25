@@ -1,7 +1,10 @@
+import logging
 import os
 import sys
 from dotenv import load_dotenv
 from paths import CODE_ROOT, ROOT_DIR
+
+logger = logging.getLogger("alj")
 
 # Charger le .env embarqué et surcharger avec le .env local
 load_dotenv(os.path.join(CODE_ROOT, ".env"))
@@ -39,7 +42,8 @@ class SecretStore:
                 if secret:
                     return secret
             except Exception:
-                pass
+                # Logs the key name, never the secret value
+                logger.debug("Lecture du secret %s dans le trousseau impossible", key, exc_info=True)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
 
         # Vérification Firestore sur Cloud Run
         global _FIRESTORE_SECRETS_CACHE, _FIRESTORE_SECRETS_LOADED
@@ -52,7 +56,7 @@ class SecretStore:
                 if doc:
                     _FIRESTORE_SECRETS_CACHE = doc
             except Exception:
-                pass
+                logger.warning("Chargement des secrets Firestore (server_credentials) impossible", exc_info=True)
 
         if _FIRESTORE_SECRETS_CACHE and key in ("GMAIL_REFRESH_TOKEN", "GMAIL_USER_EMAIL"):
             field_map = {"GMAIL_REFRESH_TOKEN": "refresh_token", "GMAIL_USER_EMAIL": "user_email"}
@@ -76,7 +80,8 @@ class SecretStore:
                 keyring.set_password(SERVICE_NAME, key, value)
                 success_keyring = True
             except Exception:
-                pass
+                # Logs the key name, never the secret value
+                logger.debug("Écriture du secret %s dans le trousseau impossible", key, exc_info=True)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
 
         # Persistance Firestore sur Cloud Run
         is_cloud = bool(os.environ.get("K_SERVICE") or os.environ.get("K_CONFIGURATION"))
@@ -100,7 +105,8 @@ class SecretStore:
                         {target: value, "updated_at": datetime.datetime.utcnow().isoformat()}
                     )
                 except Exception:
-                    pass
+                    # Logs the key name, never the secret value
+                    logger.warning("Écriture du secret %s dans Firestore (server_credentials) impossible", key, exc_info=True)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         
         # Enregistrement dans le .env pour assurer la persistance et la compatibilité historique
         # Racine du pack portable si un .env y vit déjà (survit aux mises à jour qui

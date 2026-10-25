@@ -155,7 +155,7 @@ class TestJsonWithEtag(unittest.TestCase):
         self.assertEqual(r.json(), {"nom": "Épreuve", "ids": [1, 2]})
         self.assertEqual(r.headers["cache-control"], "no-store")
         etag = r.headers["etag"]
-        self.assertRegex(etag, r'^"[0-9a-f]{40}"$')
+        self.assertRegex(etag, r'^"[0-9a-f]{64}"$')
         r2 = client.get("/data", headers={"If-None-Match": etag})
         self.assertEqual(r2.status_code, 304)
         self.assertEqual(r2.content, b"")

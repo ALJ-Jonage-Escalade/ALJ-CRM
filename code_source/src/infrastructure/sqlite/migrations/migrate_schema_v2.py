@@ -280,7 +280,7 @@ def recover_from_excel(cur):
         for col_db, col_x in (("payer_last_name", c_pnom), ("payer_first_name", c_pprenom), ("payer_email", c_pemail)):
             v = str(row[col_x] or "").strip() if col_x else ""
             if v and not str(found[col_db] or "").strip():
-                cur.execute(f"UPDATE orders SET {col_db}=?, updated_at=? WHERE id=?", (v, now_iso, found["id"]))
+                cur.execute(f"UPDATE orders SET {col_db}=?, updated_at=? WHERE id=?", (v, now_iso, found["id"]))  # noqa: S608 - noms de colonnes littéraux du code
                 stats["payer_filled"] += 1
 
         for col_db, col_x, key in (("payment_method", c_paiement, "payment_method"),
@@ -288,7 +288,7 @@ def recover_from_excel(cur):
                                    ("comment", c_comment, "comment")):
             v = str(row[col_x] or "").strip() if col_x else ""
             if v:
-                cur.execute(f"UPDATE orders SET {col_db}=? WHERE id=?", (v, found["id"]))
+                cur.execute(f"UPDATE orders SET {col_db}=? WHERE id=?", (v, found["id"]))  # noqa: S608 - noms de colonnes littéraux du code
                 stats[key] += 1
 
         if c_promo_amt:

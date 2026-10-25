@@ -50,7 +50,7 @@ def install_tracking(conn):
             return "json_array(" + ", ".join(f'{prefix}."{c}"' for c in pk) + ")"
 
         def log(prefix):
-            return (f"DELETE FROM _fs_changes WHERE tbl = '{t}' AND pk = {pk_expr(prefix)}; "
+            return (f"DELETE FROM _fs_changes WHERE tbl = '{t}' AND pk = {pk_expr(prefix)}; "  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
                     f"INSERT INTO _fs_changes (tbl, pk, seq) VALUES ('{t}', {pk_expr(prefix)}, "
                     f"(SELECT n FROM _fs_counter WHERE id = 1)); ")
         guard = "WHEN NOT EXISTS (SELECT 1 FROM _fs_state WHERE k = 'applying' AND v = '1')"
@@ -94,7 +94,7 @@ def _where(pk: List[str]) -> str:
 
 
 def _read_row(conn, table: str, pk: List[str], values: List[Any]) -> Optional[Dict[str, Any]]:
-    r = conn.execute(f'SELECT * FROM "{table}" WHERE {_where(pk)}', values).fetchone()
+    r = conn.execute(f'SELECT * FROM "{table}" WHERE {_where(pk)}', values).fetchone()  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
     return dict(r) if r else None
 
 
@@ -105,7 +105,7 @@ def _upsert_row(conn, table: str, cols: List[str], pk: List[str], data: Dict[str
     placeholders = ", ".join("?" for _ in use)
     col_sql = ", ".join(f'"{c}"' for c in use)
     upd = [c for c in use if c not in pk]
-    sql = f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders}) ON CONFLICT({", ".join(chr(34) + c + chr(34) for c in pk)}) '
+    sql = f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders}) ON CONFLICT({", ".join(chr(34) + c + chr(34) for c in pk)}) '  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
     sql += ("DO UPDATE SET " + ", ".join(f'"{c}" = excluded."{c}"' for c in upd)) if upd else "DO NOTHING"
     conn.execute(sql, [data[c] for c in use])
 

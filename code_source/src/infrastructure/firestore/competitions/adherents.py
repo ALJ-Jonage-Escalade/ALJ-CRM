@@ -66,7 +66,7 @@ class AdherentsMixin(CompetitionStoreBase):
                 if enc.startswith("["):
                     try:
                         enc = ", ".join(json.loads(enc))
-                    except Exception:
+                    except (ValueError, TypeError):
                         pass
                 planning_writes.append({
                     "path": f"{cls.COLLECTION_PLANNING}/{pr['id']}",

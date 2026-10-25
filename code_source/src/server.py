@@ -116,5 +116,5 @@ if __name__ == "__main__":
     import uvicorn
     # Support de la variable d'environnement PORT (Cloud Run injecte PORT=8080)
     port = int(os.environ.get("PORT", 8000))
-    host = os.environ.get("HOST", "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1")
+    host = os.environ.get("HOST", "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1")  # noqa: S104 - Cloud Run (PORT set) needs all interfaces
     uvicorn.run("server:app", host=host, port=port, reload=(port == 8000))

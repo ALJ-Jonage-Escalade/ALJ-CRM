@@ -6,12 +6,13 @@ All commands run from `code_source/`. Python 3.14 (`.python-version`), `requires
 - install: `uv sync --group web` (dev group by default, `web` adds WeasyPrint for the attestation PDFs and their tests, which needs Pango, see `README.md`; CI: `uv sync --frozen --group web`)
 - test: `uv run pytest tests` — always pass `tests`: bare `uv run pytest` also collects `e2e/` and fails without Playwright
 - e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker and `npm run build` in `frontend/`; see `dev/README.md`)
-- lint: `uv run ruff check src tests`
+- lint: `uv run ruff check src tests` (security rules `S` included; `tests/` and `e2e/` ignore a few of them, see `[tool.ruff.lint.per-file-ignores]`)
+- security scan (Semgrep CE, as CI, from the repo root): `uvx semgrep@1.182.1 scan --config p/python --config p/typescript --config p/owasp-top-ten --metrics=off --error --exclude code_source/frontend/src/lib/api-schema.ts code_source/src code_source/frontend/src`
 - typecheck: `uv run mypy` (no path: checks the files listed under `[tool.mypy] files` in pyproject.toml; `mypy src/` fails on module-path errors)
 - all checks (as CI): `uv lock --check && uv run python dev/export_requirements.py --check && uv run ruff check src tests && uv run mypy && uv run pytest tests`
 - API contract: `uv run python dev/export_openapi.py --check` (`frontend/openapi.json` matches the Pydantic models)
 - frontend (Vue 3 + Vite + TypeScript, in `frontend/`, Node version from `frontend/.nvmrc`):
-  `cd frontend && npm ci && npm run check:api && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`
+  `cd frontend && npm ci && npm audit --omit=dev --audit-level=high && npm run check:api && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`
   - API types: `src/lib/api-schema.ts` is generated from `openapi.json` (`uv run python dev/export_openapi.py`, then
     `npm run gen:api`); never edit either by hand. Pages call the API through the services of
     `src/services/` (built on the typed client `src/lib/client.ts`)
@@ -30,6 +31,7 @@ All commands run from `code_source/`. Python 3.14 (`.python-version`), `requires
 
 ## Code Style
 - Linter: ruff (not flake8); rule set and ignores in `[tool.ruff.lint]`
+- Security rules (ruff `S`, Semgrep) are on: fix findings; a false positive gets `# noqa: S…` / `# nosemgrep: <rule-id>` with the reason
 - Formatting: `ruff format` is not enforced yet (most files are unformatted) — do not run `ruff format .` on the whole tree; it creates huge unrelated diffs
 - Line length: 140 characters (pyproject.toml)
 - Import sorting: ruff handles this (not isort)

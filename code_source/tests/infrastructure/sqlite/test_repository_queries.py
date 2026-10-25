@@ -40,7 +40,7 @@ class TestRepositoryQueries(unittest.TestCase):
             if os.path.exists(self.test_db_path + suffix):
                 try:
                     os.remove(self.test_db_path + suffix)
-                except Exception:
+                except OSError:
                     pass
 
     def _seed(self, ref, first_name, last_name, tarif, payer_email):

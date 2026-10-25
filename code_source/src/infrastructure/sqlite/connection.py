@@ -64,7 +64,7 @@ _COMPETITION_EMAIL_TEMPLATES = [
 def _add_missing_column(conn: sqlite3.Connection, cursor: sqlite3.Cursor, table: str, column: str, ddl: str) -> None:
     """Migration auto des BDD existantes : ajoute la colonne si elle manque."""
     try:
-        cursor.execute(f"SELECT {column} FROM {table} LIMIT 1")
+        cursor.execute(f"SELECT {column} FROM {table} LIMIT 1")  # noqa: S608 - noms de table/colonne littéraux du code
     except sqlite3.OperationalError:
         print(f"🔧 [SQLITE] Ajout de la colonne '{column}' à la table {table}...")
         cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
@@ -88,9 +88,9 @@ def _ensure_email_templates(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
 
     # Renseigner l'adresse et le nom d'expédition par défaut sur les modèles qui n'en ont pas encore
     for column, default in (("sender_email", DEFAULT_SENDER_EMAIL), ("sender_name", DEFAULT_SENDER_NAME)):
-        cursor.execute(f"SELECT COUNT(*) FROM email_templates WHERE {column} IS NULL OR TRIM({column}) = ''")
+        cursor.execute(f"SELECT COUNT(*) FROM email_templates WHERE {column} IS NULL OR TRIM({column}) = ''")  # noqa: S608 - noms de table/colonne littéraux du code
         if cursor.fetchone()[0] > 0:
-            cursor.execute(f"UPDATE email_templates SET {column} = ? WHERE {column} IS NULL OR TRIM({column}) = ''", (default,))
+            cursor.execute(f"UPDATE email_templates SET {column} = ? WHERE {column} IS NULL OR TRIM({column}) = ''", (default,))  # noqa: S608 - noms de table/colonne littéraux du code
             conn.commit()
 
     # Seed des templates par défaut si vides

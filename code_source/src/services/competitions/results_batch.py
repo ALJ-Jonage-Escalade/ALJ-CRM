@@ -11,10 +11,13 @@ Exécute chaque jour (par exemple à 07h00) :
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import datetime
 from typing import List, Dict, Any, Optional, Tuple
+
+logger = logging.getLogger("alj")
 
 # Injection du dossier src dans sys.path si nécessaire
 _src_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,7 +46,7 @@ class CompetitionResultsBatchService:
             if val and "@" in str(val).strip():
                 return str(val).strip()
         except Exception:
-            pass
+            logger.warning("Lecture de l'e-mail de notification des résultats impossible", exc_info=True)
         return DEFAULT_NOTIFICATION_EMAIL
 
     @classmethod
@@ -240,7 +243,7 @@ class CompetitionResultsBatchService:
             try:
                 d = datetime.date.fromisoformat(date_comp[:10])
                 date_formatted = d.strftime("%d/%m/%Y")
-            except Exception:
+            except (ValueError, TypeError):
                 pass
 
             meta_parts = [p for p in [date_formatted, lieu_comp] if p]

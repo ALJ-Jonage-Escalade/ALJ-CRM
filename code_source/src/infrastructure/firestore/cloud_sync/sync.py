@@ -37,13 +37,13 @@ def renumber_row(conn, store, table: str, old_id: int, report: Dict[str, Any]) -
     dans Firestore par une autre ligne (deux postes ont créé en même temps).
     Les références (REFERENCES) sont mises à jour ; les déclencheurs notent tout."""
     pk = table_pk(conn, table)[0]
-    local_max = conn.execute(f'SELECT COALESCE(MAX("{pk}"), 0) FROM "{table}"').fetchone()[0]
+    local_max = conn.execute(f'SELECT COALESCE(MAX("{pk}"), 0) FROM "{table}"').fetchone()[0]  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
     remote_max = store.max_int_id(collection_for(table), pk)
     new_id = max(local_max, remote_max) + 1
-    conn.execute(f'UPDATE "{table}" SET "{pk}" = ? WHERE "{pk}" = ?', (new_id, old_id))
+    conn.execute(f'UPDATE "{table}" SET "{pk}" = ? WHERE "{pk}" = ?', (new_id, old_id))  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
     for ref_table, ref_col in REFERENCES.get(table, []):
         if table_exists(conn, ref_table):
-            conn.execute(f'UPDATE "{ref_table}" SET "{ref_col}" = ? WHERE "{ref_col}" = ?', (new_id, old_id))
+            conn.execute(f'UPDATE "{ref_table}" SET "{ref_col}" = ? WHERE "{ref_col}" = ?', (new_id, old_id))  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
     report.setdefault("renumbered", []).append(f"{table} {old_id} -> {new_id}")
     return new_id
 
@@ -72,7 +72,7 @@ def apply_remote_docs(conn, store, table: str, docs: List[Dict[str, Any]], repor
                     if base is None and dirty and local is not None:
                         # Ligne créée ici avec un ID supprimé ailleurs : on la garde.
                         continue
-                    conn.execute(f'DELETE FROM "{table}" WHERE {_where(pk)}', vals)
+                    conn.execute(f'DELETE FROM "{table}" WHERE {_where(pk)}', vals)  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
                     conn.execute("DELETE FROM _fs_base WHERE tbl = ? AND pk = ?", (table, pk_str))
                     conn.execute("DELETE FROM _fs_changes WHERE tbl = ? AND pk = ?", (table, pk_str))
                     report["pulled"] = report.get("pulled", 0) + 1
