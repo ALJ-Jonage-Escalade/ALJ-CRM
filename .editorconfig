@@ -1,0 +1,22 @@
+# Editor defaults shared by every IDE (VS Code, JetBrains...), matching Prettier, ruff and .gitattributes
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+max_line_length = 140
+
+[*.py]
+indent_size = 4
+
+# Markdown: two trailing spaces are a line break
+[*.md]
+trim_trailing_whitespace = false
+
+# Windows scripts stay CRLF (.gitattributes)
+[*.{bat,cmd}]
+end_of_line = crlf

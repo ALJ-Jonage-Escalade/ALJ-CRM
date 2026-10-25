@@ -1,0 +1,6736 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Admin Escalade API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/competitions": {
+      "get": {
+        "summary": "List Competitions",
+        "operationId": "list_competitions_api_competitions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Competition"
+                  },
+                  "type": "array",
+                  "title": "Response List Competitions Api Competitions Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Competition",
+        "operationId": "create_competition_api_competitions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompetitionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Competition"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competition_id}": {
+      "patch": {
+        "summary": "Update Competition",
+        "operationId": "update_competition_api_competitions__competition_id__patch",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompetitionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Competition"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Competition",
+        "operationId": "delete_competition_api_competitions__competition_id__delete",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/archive-past": {
+      "post": {
+        "summary": "Archive Past Competitions",
+        "operationId": "archive_past_competitions_api_competitions_archive_past_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PastArchived"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competition_id}/participants": {
+      "post": {
+        "summary": "Add Participant",
+        "operationId": "add_participant_api_competitions__competition_id__participants_post",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantAdd"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Competition"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competition_id}/participants/{adherent_id}": {
+      "patch": {
+        "summary": "Update Participant",
+        "description": "409 `already_paid` when unselecting a participant who paid: the page then asks the\ncoach whether the money is lost or carried over (cancel route). With `unchanged_since`\n(offline queue): 409 `changed` or `competition_closed`, see the service.",
+        "operationId": "update_participant_api_competitions__competition_id__participants__adherent_id__patch",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          },
+          {
+            "name": "adherent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Adherent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Competition"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove Participant",
+        "operationId": "remove_participant_api_competitions__competition_id__participants__adherent_id__delete",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          },
+          {
+            "name": "adherent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Adherent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Competition"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competition_id}/participants/{adherent_id}/manual-payment": {
+      "post": {
+        "summary": "Record Manual Payment",
+        "operationId": "record_manual_payment_api_competitions__competition_id__participants__adherent_id__manual_payment_post",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          },
+          {
+            "name": "adherent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Adherent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualPayment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Competition"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competition_id}/participants/{adherent_id}/cancel": {
+      "post": {
+        "summary": "Cancel Participant",
+        "operationId": "cancel_participant_api_competitions__competition_id__participants__adherent_id__cancel_post",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          },
+          {
+            "name": "adherent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Adherent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantCancel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Competition"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competition_id}/load-group": {
+      "post": {
+        "summary": "Load Competition Group",
+        "operationId": "load_competition_group_api_competitions__competition_id__load_group_post",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupLoaded"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coaches": {
+      "get": {
+        "summary": "List Coaches",
+        "operationId": "list_coaches_api_coaches_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Coach"
+                  },
+                  "type": "array",
+                  "title": "Response List Coaches Api Coaches Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Coach",
+        "operationId": "create_coach_api_coaches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Coach"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coaches/{coach_id}": {
+      "put": {
+        "summary": "Update Coach",
+        "operationId": "update_coach_api_coaches__coach_id__put",
+        "parameters": [
+          {
+            "name": "coach_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Coach Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Coach"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Coach",
+        "operationId": "delete_coach_api_coaches__coach_id__delete",
+        "parameters": [
+          {
+            "name": "coach_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Coach Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competition-members": {
+      "get": {
+        "summary": "List Competition Members",
+        "operationId": "list_competition_members_api_competition_members_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CompetitionMember"
+                  },
+                  "type": "array",
+                  "title": "Response List Competition Members Api Competition Members Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/items": {
+      "get": {
+        "summary": "List Helloasso Items",
+        "operationId": "list_helloasso_items_api_helloasso_items_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HelloAssoItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Helloasso Items Api Helloasso Items Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/items/{id_item}/link": {
+      "put": {
+        "summary": "Link Helloasso Item",
+        "operationId": "link_helloasso_item_api_helloasso_items__id_item__link_put",
+        "parameters": [
+          {
+            "name": "id_item",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Item"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemLink"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemLinked"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/items/{id_item}/ignore": {
+      "put": {
+        "summary": "Ignore Helloasso Item",
+        "operationId": "ignore_helloasso_item_api_helloasso_items__id_item__ignore_put",
+        "parameters": [
+          {
+            "name": "id_item",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Id Item"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemIgnore"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/cron/fetch-results": {
+      "post": {
+        "summary": "Api Cron Fetch Competition Results",
+        "description": "Exécute le batch de récupération des résultats MyCompet FFME pour les compétitions passées\net envoie un e-mail de synthèse si des résultats sont découverts.\nConçu pour être appelé par Google Cloud Scheduler (ex: tous les jours à 07h00) ou manuellement.",
+        "operationId": "api_cron_fetch_competition_results_api_competitions_cron_fetch_results_post",
+        "parameters": [
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Force"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{comp_id}/fetch-results": {
+      "post": {
+        "summary": "Api Fetch Competition Results",
+        "description": "Récupère les résultats officiels depuis MyCompet FFME pour une compétition donnée,\nextrait les compétiteurs de l'Amicale Laïque de Jonage et met à jour leurs classements.\n404 `needs_url`: the results page was not found automatically, the coach gives its address or number.",
+        "operationId": "api_fetch_competition_results_api_competitions__comp_id__fetch_results_post",
+        "parameters": [
+          {
+            "name": "comp_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comp Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "default": {},
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultsFetched"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/competitions-results": {
+      "get": {
+        "summary": "Get Competitions Results Settings Api",
+        "description": "Retourne la configuration et l'état du batch quotidien de résultats.",
+        "operationId": "get_competitions_results_settings_api_api_settings_competitions_results_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultsSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Update Competitions Results Settings Api",
+        "description": "Met à jour l'adresse e-mail de notification des résultats.",
+        "operationId": "update_competitions_results_settings_api_api_settings_competitions_results_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultsSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultsSettingsSaved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{comp_id}/check-all-paid": {
+      "post": {
+        "summary": "Check Competition All Paid Api",
+        "description": "Vérifie si tous les compétiteurs ont payé et envoie l'e-mail récapitulatif si applicable.",
+        "operationId": "check_competition_all_paid_api_api_competitions__comp_id__check_all_paid_post",
+        "parameters": [
+          {
+            "name": "comp_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Comp Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members": {
+      "get": {
+        "summary": "List Members",
+        "operationId": "list_members_api_members_get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberList"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members/competitors": {
+      "get": {
+        "summary": "List Competitors",
+        "operationId": "list_competitors_api_members_competitors_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CompetitorContact"
+                  },
+                  "type": "array",
+                  "title": "Response List Competitors Api Members Competitors Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members/update": {
+      "post": {
+        "summary": "Update Member Api",
+        "description": "Changes a member record: badges, licence, contacts and address (member), tariff, status and comment (purchase).",
+        "operationId": "update_member_api_api_members_update_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberUpdated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members/create": {
+      "post": {
+        "summary": "Add Member Api",
+        "description": "Adds a member by hand to a season (the active one by default).",
+        "operationId": "add_member_api_api_members_create_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seasons": {
+      "get": {
+        "summary": "List Seasons",
+        "operationId": "list_seasons_api_seasons_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Seasons"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/season-tarifs": {
+      "get": {
+        "summary": "Get Season Tarifs Api",
+        "description": "Retourne la liste des tarifs HelloAsso (groupes disponibles) d'une saison pour l'édition de créneau.",
+        "operationId": "get_season_tarifs_api_api_season_tarifs_get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonTarifs"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard": {
+      "get": {
+        "summary": "Get Dashboard Data",
+        "description": "Route principale renvoyant toutes les données formatées pour le frontend.",
+        "operationId": "get_dashboard_data_api_dashboard_get",
+        "parameters": [
+          {
+            "name": "force_refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Force Refresh"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/email-templates": {
+      "get": {
+        "summary": "Get Email Templates",
+        "description": "Retourne la liste des modèles d'e-mails configurés.",
+        "operationId": "get_email_templates_api_email_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTemplates"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Save Email Template Api",
+        "description": "Crée ou met à jour un modèle d'e-mail dans la BDD SQLite (synchronisé avec Firestore).",
+        "operationId": "save_email_template_api_api_email_templates_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailTemplateUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTemplateSaved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/email-templates/{template_name}": {
+      "delete": {
+        "summary": "Delete Email Template Api",
+        "description": "Supprime un modèle d'e-mail par son nom.",
+        "operationId": "delete_email_template_api_api_email_templates__template_name__delete",
+        "parameters": [
+          {
+            "name": "template_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTemplateDeleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preview-email": {
+      "post": {
+        "summary": "Preview Email",
+        "description": "Génère un aperçu fidèle d'un e-mail personnalisé pour un destinataire et une compétition.",
+        "operationId": "preview_email_api_preview_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Data"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/email-status": {
+      "get": {
+        "summary": "Get Email Status",
+        "description": "Vérifie l'état de la configuration d'envoi d'e-mails (sans exposer de secrets).",
+        "operationId": "get_email_status_api_email_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/send-email": {
+      "post": {
+        "summary": "Send Email Api",
+        "description": "Déclenche l'envoi d'e-mails sécurisé via Gmail API ou SMTP avec injection de variables.",
+        "operationId": "send_email_api_api_send_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Data"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailDispatch"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp-template": {
+      "get": {
+        "summary": "Get Whatsapp Template Api",
+        "description": "Retourne le texte d'invitation WhatsApp mémorisé.",
+        "operationId": "get_whatsapp_template_api_api_whatsapp_template_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatsappTemplate"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Save Whatsapp Template Api",
+        "description": "Enregistre le texte d'invitation WhatsApp.",
+        "operationId": "save_whatsapp_template_api_api_whatsapp_template_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatsappTemplateUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatsappTemplateSaved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/attestations/preview": {
+      "post": {
+        "summary": "Preview Attestation Api",
+        "description": "Génère l'aperçu PDF d'une attestation de paiement (retourne application/pdf).",
+        "operationId": "preview_attestation_api_api_attestations_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttestationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The certificate (PDF)",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/attestations/send": {
+      "post": {
+        "summary": "Send Attestation Api",
+        "description": "Génère une attestation PDF en mémoire, l'envoie par e-mail et met à jour la date d'envoi.",
+        "operationId": "send_attestation_api_api_attestations_send_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttestationSend"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttestationSent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planning": {
+      "get": {
+        "summary": "Get Planning",
+        "description": "Récupère le planning depuis la BDD SQLite.",
+        "operationId": "get_planning_api_planning_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlanningSlot"
+                  },
+                  "type": "array",
+                  "title": "Response Get Planning Api Planning Get"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Update Planning",
+        "description": "Met à jour le planning dans la BDD SQLite.",
+        "operationId": "update_planning_api_planning_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array",
+                "title": "Planning Data"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planning/item": {
+      "post": {
+        "summary": "Save Planning Item Api",
+        "description": "Crée ou met à jour un créneau unique dans la table planning.",
+        "operationId": "save_planning_item_api_api_planning_item_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanningSlotUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningSlotSaved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planning/item/{item_id}": {
+      "delete": {
+        "summary": "Delete Planning Item Api",
+        "description": "Supprime un créneau de planning par son ID.",
+        "operationId": "delete_planning_item_api_api_planning_item__item_id__delete",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningSlotDeleted"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planning/export": {
+      "get": {
+        "summary": "Export Planning Api",
+        "description": "Exporte le planning au format Excel (grille visuelle hebdomadaire ou liste tabulaire).",
+        "operationId": "export_planning_api_api_planning_export_get",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "grid",
+                "list"
+              ],
+              "type": "string",
+              "default": "grid",
+              "title": "Mode"
+            }
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Classeur Excel",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/presence/config": {
+      "get": {
+        "summary": "Get Presence Config",
+        "description": "Renvoie les groupes disponibles (autonomes et cours) et leurs statistiques pour l'IHM.",
+        "operationId": "get_presence_config_api_presence_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresenceConfig"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/presence/export": {
+      "post": {
+        "summary": "Export Presence Api",
+        "description": "Génère les fiches de présence au format Excel et les renvoie directement en téléchargement.",
+        "operationId": "export_presence_api_api_presence_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresenceExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Classeur Excel, ou archive ZIP d'un classeur par cours",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {},
+              "application/zip": {}
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/map": {
+      "get": {
+        "summary": "Get Map",
+        "description": "Renvoie la page de cartographie Leaflet interactive branchée sur SQLite.",
+        "operationId": "get_map_map_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pivot": {
+      "get": {
+        "summary": "Get Pivot Table",
+        "description": "Renvoie la page du Tableau Croisé Dynamique interactif via PivotTable.js.",
+        "operationId": "get_pivot_table_pivot_get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2026-2027",
+              "title": "Season"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ffme/stats": {
+      "get": {
+        "summary": "Get Ffme Stats Api",
+        "description": "Calcule et renvoie les statistiques de l'export fédéral FFME.",
+        "operationId": "get_ffme_stats_api_api_ffme_stats_get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FfmeStats"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ffme/export": {
+      "get": {
+        "summary": "Export Ffme Api",
+        "description": "Génère le fichier CSV d'import FFME et le renvoie directement en téléchargement.",
+        "operationId": "export_ffme_api_api_ffme_export_get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
+            }
+          },
+          {
+            "name": "include_termine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Termine"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fichier CSV FFME",
+            "content": {
+              "text/csv": {}
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ffme/preview": {
+      "post": {
+        "summary": "Preview Ffme Import Api",
+        "description": "Analyse un fichier Excel FFME et prépare le rapprochement sans modifier la base.",
+        "operationId": "preview_ffme_import_api_api_ffme_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FfmeFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FfmePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ffme/import": {
+      "post": {
+        "summary": "Apply Ffme Import Api",
+        "description": "Applique l'importation FFME en BDD : rapprochements automatiques du fichier (recalculés ici, comme\ndans l'aperçu) et associations manuelles choisies par le bureau.",
+        "operationId": "apply_ffme_import_api_api_ffme_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FfmeImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FfmeImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/helloasso": {
+      "get": {
+        "summary": "Webhook Helloasso Ping",
+        "description": "Répond aux vérifications de connectivité HelloAsso (ping HTTP 200).",
+        "operationId": "webhook_helloasso_ping_webhooks_helloasso_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Webhook Helloasso",
+        "description": "Point de terminaison Webhook pour les notifications HelloAsso (Payment & Order).\nRéconcilie en temps réel le paiement avec les participants de la compétition.\n\nAuthenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles\nauprès de l'API HelloAsso (voir HelloAssoWebhookService.handle_notification).",
+        "operationId": "webhook_helloasso_webhooks_helloasso_post",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/sync": {
+      "post": {
+        "summary": "Sync Helloasso Api",
+        "description": "Synchronise la campagne annuelle HelloAsso vers Firestore.",
+        "operationId": "sync_helloasso_api_api_helloasso_sync_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HelloAssoSync"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/google/status": {
+      "get": {
+        "summary": "Get Google Auth Status",
+        "description": "Vérifie l'état de la connexion Google OAuth2 et la validité du jeton d'accès pour la BDD et Gmail.",
+        "operationId": "get_google_auth_status_api_auth_google_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/google/login": {
+      "get": {
+        "summary": "Google Auth Login",
+        "description": "Initie le flux d'autorisation OAuth2 Google pour renouveler le refresh token.",
+        "operationId": "google_auth_login_api_auth_google_login_get",
+        "parameters": [
+          {
+            "name": "return_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "/bureau/parametres",
+              "title": "Return To"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Redirect Uri"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/google/callback": {
+      "get": {
+        "summary": "Google Auth Callback",
+        "description": "Réceptionne le code d'autorisation OAuth2 de Google, échange contre le refresh_token et enregistre les identifiants.",
+        "operationId": "google_auth_callback_api_auth_google_callback_get",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/google/test": {
+      "post": {
+        "summary": "Test Google Auth",
+        "description": "Diagnostique en direct la connexion Google OAuth2, l'accès BDD et l'API Gmail.",
+        "operationId": "test_google_auth_api_auth_google_test_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleTest"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/google/update-token": {
+      "post": {
+        "summary": "Update Google Token",
+        "description": "Permet à un administrateur de renseigner ou forcer un refresh token manuellement.",
+        "operationId": "update_google_token_api_auth_google_update_token_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleTokenUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleTokenUpdated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cloud-db/status": {
+      "get": {
+        "summary": "Get Cloud Db Status Api",
+        "description": "Retourne l'état détaillé du cache local SQLite et de sa synchronisation Firestore.",
+        "operationId": "get_cloud_db_status_api_api_cloud_db_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloudDbStatus"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cloud-db/sync": {
+      "post": {
+        "summary": "Sync Cloud Db Api",
+        "description": "Force la synchronisation bilatérale entre Firestore et la base SQLite locale.",
+        "operationId": "sync_cloud_db_api_api_cloud_db_sync_post",
+        "parameters": [
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Force"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloudDbSync"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "summary": "Get Me",
+        "operationId": "get_me_api_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        }
+      }
+    },
+    "/index": {
+      "get": {
+        "summary": "Get Annuaire Page",
+        "description": "Directory of the members (read only, readable offline): Vue application, on phones as on desktop.",
+        "operationId": "get_annuaire_page_index_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root Route",
+        "description": "Point d'entrée racine : les compétitions (application Vue).",
+        "operationId": "root_route__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/competitions": {
+      "get": {
+        "summary": "Get Competitions Page",
+        "description": "Competitions (readable offline, changed offline through the outbox) and the Google sign-in callback (the OAuth\nredirect URI registered for the club): Vue application, on phones as on desktop. Also the PWA's start page.",
+        "operationId": "get_competitions_page_competitions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manifest.webmanifest": {
+      "get": {
+        "summary": "Get Manifest",
+        "description": "Manifeste PWA pour installation sur smartphone.",
+        "operationId": "get_manifest_manifest_webmanifest_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sw.js": {
+      "get": {
+        "summary": "Get Sw",
+        "description": "Service worker of the Vue application (frontend/src/sw.ts, hashed precache), built into frontend/dist. Served\nfrom / for its scope to cover every page; same address as the former hand-written worker, which it replaces in\nthe browsers that have it. Checked again on every visit (no-cache).",
+        "operationId": "get_sw_sw_js_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/web-version": {
+      "get": {
+        "summary": "Get Web Version",
+        "description": "Version deployed (code_source/VERSION, APP_VERSION): the app compares it with its own to offer an update. Never\ncached by the service worker.",
+        "operationId": "get_web_version_api_web_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppVersion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Vérification de santé (Cloud Run probes, uptime, monitoring).",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiErrorBody": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "error",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "ApiErrorBody",
+        "description": "Body of error(): what the frontend's API client turns into an ApiError."
+      },
+      "AppVersion": {
+        "properties": {
+          "app_version": {
+            "type": "string",
+            "title": "App Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "app_version"
+        ],
+        "title": "AppVersion"
+      },
+      "AttestationRequest": {
+        "properties": {
+          "purchase_id": {
+            "type": "integer",
+            "title": "Purchase Id"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "purchase_id"
+        ],
+        "title": "AttestationRequest",
+        "description": "The membership (purchase) the certificate is about; the server reads its amount, payer and status itself.\nseason: the active season when empty."
+      },
+      "AttestationSend": {
+        "properties": {
+          "purchase_id": {
+            "type": "integer",
+            "title": "Purchase Id"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          },
+          "to_email": {
+            "type": "string",
+            "title": "To Email"
+          },
+          "template_name": {
+            "type": "string",
+            "title": "Template Name",
+            "default": ""
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "default": ""
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": ""
+          },
+          "add_signature": {
+            "type": "boolean",
+            "title": "Add Signature",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "purchase_id",
+          "to_email"
+        ],
+        "title": "AttestationSend",
+        "description": "The e-mail sent with the certificate; an empty subject or body falls back to the template."
+      },
+      "AttestationSent": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "email_sent_date": {
+            "type": "string",
+            "title": "Email Sent Date"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "email_sent_date",
+          "filename"
+        ],
+        "title": "AttestationSent"
+      },
+      "BatchCompetition": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "default": ""
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          },
+          "date": {
+            "type": "string",
+            "title": "Date",
+            "default": ""
+          },
+          "lieu": {
+            "type": "string",
+            "title": "Lieu",
+            "default": ""
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": ""
+          },
+          "athletes": {
+            "items": {},
+            "type": "array",
+            "title": "Athletes",
+            "default": []
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "found",
+              "pending"
+            ],
+            "title": "Status",
+            "default": "pending"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nom",
+          "date",
+          "lieu",
+          "url",
+          "athletes",
+          "status"
+        ],
+        "title": "BatchCompetition"
+      },
+      "BatchReport": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "executed_at": {
+            "type": "string",
+            "title": "Executed At"
+          },
+          "competitions_checked": {
+            "type": "integer",
+            "title": "Competitions Checked"
+          },
+          "competitions_updated": {
+            "type": "integer",
+            "title": "Competitions Updated"
+          },
+          "email_sent": {
+            "type": "boolean",
+            "title": "Email Sent"
+          },
+          "notification_email": {
+            "type": "string",
+            "title": "Notification Email"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/BatchCompetition"
+            },
+            "type": "array",
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "executed_at",
+          "competitions_checked",
+          "competitions_updated",
+          "email_sent",
+          "notification_email",
+          "details"
+        ],
+        "title": "BatchReport"
+      },
+      "CloudDbStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "db_exists": {
+            "type": "boolean",
+            "title": "Db Exists"
+          },
+          "db_filename": {
+            "type": "string",
+            "title": "Db Filename"
+          },
+          "db_size_kb": {
+            "type": "number",
+            "title": "Db Size Kb"
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "last_error": {
+            "type": "string",
+            "title": "Last Error"
+          },
+          "last_sync": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "enabled",
+          "db_exists",
+          "db_filename",
+          "db_size_kb",
+          "member_count",
+          "pending",
+          "last_error",
+          "last_sync"
+        ],
+        "title": "CloudDbStatus"
+      },
+      "CloudDbSync": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "skipped"
+            ],
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncCounters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "CloudDbSync",
+        "description": "skipped: the server does not run on Firestore (no cache to sync)."
+      },
+      "Coach": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "Coach"
+      },
+      "CoachIn": {
+        "properties": {
+          "nom": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Nom"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nom"
+        ],
+        "title": "CoachIn"
+      },
+      "Competition": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          },
+          "id_ffme": {
+            "type": "string",
+            "title": "Id Ffme",
+            "default": ""
+          },
+          "date_competition": {
+            "type": "string",
+            "title": "Date Competition",
+            "description": "YYYY-MM-DD, empty when not dated",
+            "default": ""
+          },
+          "date_fin": {
+            "type": "string",
+            "title": "Date Fin",
+            "default": ""
+          },
+          "prix": {
+            "type": "number",
+            "title": "Prix",
+            "default": 0.0
+          },
+          "statut": {
+            "type": "string",
+            "title": "Statut",
+            "description": "en_preparation, en_cours or close (archived)",
+            "default": "en_preparation"
+          },
+          "whatsapp_link": {
+            "type": "string",
+            "title": "Whatsapp Link",
+            "default": ""
+          },
+          "url_resultats": {
+            "type": "string",
+            "title": "Url Resultats",
+            "default": ""
+          },
+          "resultats_synced_at": {
+            "type": "string",
+            "title": "Resultats Synced At",
+            "default": ""
+          },
+          "lieu": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lieu"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "coach_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Coach Ids"
+          },
+          "coaches": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Coaches",
+            "description": "Names of coach_ids, from the coaches collection"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/CompetitionParticipant"
+            },
+            "type": "array",
+            "title": "Participants"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "Competition",
+        "description": "A competition with its participants, most recent first in the list."
+      },
+      "CompetitionCreate": {
+        "properties": {
+          "nom": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Nom"
+          },
+          "id_ffme": {
+            "type": "string",
+            "title": "Id Ffme",
+            "default": ""
+          },
+          "date_competition": {
+            "type": "string",
+            "title": "Date Competition",
+            "default": ""
+          },
+          "date_fin": {
+            "type": "string",
+            "title": "Date Fin",
+            "default": ""
+          },
+          "prix": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Prix",
+            "default": 0.0
+          },
+          "statut": {
+            "type": "string",
+            "title": "Statut",
+            "default": "en_preparation"
+          },
+          "coach_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Coach Ids"
+          },
+          "helloasso_ref": {
+            "type": "string",
+            "title": "Helloasso Ref",
+            "default": ""
+          },
+          "url_resultats": {
+            "type": "string",
+            "title": "Url Resultats",
+            "default": ""
+          },
+          "whatsapp_link": {
+            "type": "string",
+            "title": "Whatsapp Link",
+            "default": ""
+          },
+          "lieu": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lieu"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nom"
+        ],
+        "title": "CompetitionCreate"
+      },
+      "CompetitionMember": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          },
+          "prenom": {
+            "type": "string",
+            "title": "Prenom",
+            "default": ""
+          },
+          "num_licence": {
+            "type": "string",
+            "title": "Num Licence",
+            "default": ""
+          },
+          "licence_ffme": {
+            "type": "string",
+            "title": "Licence Ffme",
+            "default": ""
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "default": ""
+          },
+          "email_secondaire": {
+            "type": "string",
+            "title": "Email Secondaire",
+            "default": ""
+          },
+          "tarif": {
+            "type": "string",
+            "title": "Tarif",
+            "default": ""
+          },
+          "saison": {
+            "type": "string",
+            "title": "Saison",
+            "default": ""
+          },
+          "creneau_groupe": {
+            "type": "string",
+            "title": "Creneau Groupe",
+            "default": ""
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "CompetitionMember",
+        "description": "A member of the `adherents` directory as the competition pages see it (current tariff and slot group)."
+      },
+      "CompetitionParticipant": {
+        "properties": {
+          "adherent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adherent Id"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          },
+          "prenom": {
+            "type": "string",
+            "title": "Prenom",
+            "default": ""
+          },
+          "num_licence": {
+            "type": "string",
+            "title": "Num Licence",
+            "default": ""
+          },
+          "tarif": {
+            "type": "string",
+            "title": "Tarif",
+            "default": ""
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone",
+            "default": ""
+          },
+          "selectionne": {
+            "type": "boolean",
+            "title": "Selectionne",
+            "default": false
+          },
+          "statut_paiement": {
+            "type": "string",
+            "title": "Statut Paiement",
+            "description": "non_invite, en_attente, paye, annule_perdu or annule_reporte",
+            "default": ""
+          },
+          "montant_paye": {
+            "type": "number",
+            "title": "Montant Paye",
+            "default": 0.0
+          },
+          "commande_helloasso": {
+            "type": "string",
+            "title": "Commande Helloasso",
+            "default": ""
+          },
+          "note_paiement": {
+            "type": "string",
+            "title": "Note Paiement",
+            "default": ""
+          },
+          "urgence_nom": {
+            "type": "string",
+            "title": "Urgence Nom",
+            "description": "Emergency contact copied when the member was added",
+            "default": ""
+          },
+          "urgence_tel": {
+            "type": "string",
+            "title": "Urgence Tel",
+            "default": ""
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "description": "Copied when the member was added",
+            "default": ""
+          },
+          "present": {
+            "type": "boolean",
+            "title": "Present",
+            "description": "Checked in on the day of the competition",
+            "default": false
+          },
+          "classement": {
+            "type": "string",
+            "title": "Classement",
+            "default": ""
+          },
+          "total_categorie": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Total Categorie",
+            "default": 0
+          },
+          "categorie_ffme": {
+            "type": "string",
+            "title": "Categorie Ffme",
+            "default": ""
+          },
+          "resultat_ffme": {
+            "type": "string",
+            "title": "Resultat Ffme",
+            "default": ""
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "Sent back as unchanged_since by a change queued offline",
+            "default": ""
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "CompetitionParticipant",
+        "description": "A member registered for a competition (row of its `participants`, infrastructure/firestore/competitions)."
+      },
+      "CompetitionUpdate": {
+        "properties": {
+          "nom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nom"
+          },
+          "id_ffme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Ffme"
+          },
+          "date_competition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Competition"
+          },
+          "date_fin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Fin"
+          },
+          "prix": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prix"
+          },
+          "statut": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statut"
+          },
+          "coach_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coach Ids"
+          },
+          "helloasso_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Helloasso Ref"
+          },
+          "url_resultats": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Resultats"
+          },
+          "whatsapp_link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Link"
+          },
+          "lieu": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lieu"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CompetitionUpdate",
+        "description": "Partial update: only the fields sent are changed."
+      },
+      "CompetitorContact": {
+        "properties": {
+          "adherent_id": {
+            "type": "integer",
+            "title": "Adherent Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "creneau_groupe": {
+            "type": "string",
+            "title": "Creneau Groupe"
+          },
+          "emergency1_name": {
+            "type": "string",
+            "title": "Emergency1 Name"
+          },
+          "emergency1_phone": {
+            "type": "string",
+            "title": "Emergency1 Phone"
+          },
+          "emergency2_name": {
+            "type": "string",
+            "title": "Emergency2 Name"
+          },
+          "emergency2_phone": {
+            "type": "string",
+            "title": "Emergency2 Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "adherent_id",
+          "last_name",
+          "first_name",
+          "phone",
+          "creneau_groupe",
+          "emergency1_name",
+          "emergency1_phone",
+          "emergency2_name",
+          "emergency2_phone"
+        ],
+        "title": "CompetitorContact",
+        "description": "Contacts of a participant of an open competition (domain/members/view.py competitor_contacts): the only\nmember data kept offline on a coach's phone."
+      },
+      "Creneau": {
+        "properties": {
+          "groupe": {
+            "type": "string",
+            "title": "Groupe"
+          },
+          "tarifs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tarifs"
+          },
+          "categorie_age": {
+            "type": "string",
+            "title": "Categorie Age"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "groupe",
+          "tarifs",
+          "categorie_age",
+          "type"
+        ],
+        "title": "Creneau",
+        "description": "A slot group of the planning and the HelloAsso tariffs it covers."
+      },
+      "Done": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "Done",
+        "description": "A write with nothing else to return."
+      },
+      "EmailDispatch": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "partial",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
+          "sent_count": {
+            "type": "integer",
+            "title": "Sent Count",
+            "default": 0
+          },
+          "errors_count": {
+            "type": "integer",
+            "title": "Errors Count",
+            "default": 0
+          },
+          "total_recipients": {
+            "type": "integer",
+            "title": "Total Recipients",
+            "default": 0
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/EmailSendDetail"
+            },
+            "type": "array",
+            "title": "Details",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "EmailDispatch",
+        "description": "Outcome of /api/send-email. A refused request (empty subject, no valid recipient) or a failed sending is\nanswered with HTTP 200 and status \"error\": the caller checks `status`, not the HTTP code."
+      },
+      "EmailSendDetail": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "EmailSendDetail",
+        "description": "Outcome for one recipient."
+      },
+      "EmailStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "gmail_oauth2",
+              "smtp",
+              "none"
+            ],
+            "title": "Mode"
+          },
+          "sender": {
+            "type": "string",
+            "title": "Sender"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "configured",
+          "mode",
+          "sender"
+        ],
+        "title": "EmailStatus",
+        "description": "Sending configuration of /api/email-status (no secret: the sender address only).\nmode: Gmail API (OAuth2) first, else SMTP, else \"none\" (configured is then false)."
+      },
+      "EmailTemplate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "sender_email": {
+            "type": "string",
+            "title": "Sender Email"
+          },
+          "sender_name": {
+            "type": "string",
+            "title": "Sender Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "subject",
+          "body",
+          "sender_email",
+          "sender_name"
+        ],
+        "title": "EmailTemplate"
+      },
+      "EmailTemplateDeleted": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "EmailTemplateDeleted"
+      },
+      "EmailTemplateSaved": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "template": {
+            "$ref": "#/components/schemas/EmailTemplate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "template"
+        ],
+        "title": "EmailTemplateSaved"
+      },
+      "EmailTemplateUpdate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "old_name": {
+            "type": "string",
+            "title": "Old Name",
+            "default": ""
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "default": ""
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": ""
+          },
+          "sender_email": {
+            "type": "string",
+            "title": "Sender Email",
+            "default": ""
+          },
+          "sender_name": {
+            "type": "string",
+            "title": "Sender Name",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EmailTemplateUpdate",
+        "description": "old_name: the template's current name, to rename it; empty for a new template.\nAn empty sender falls back to the club's default address and name."
+      },
+      "EmailTemplates": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/EmailTemplate"
+            },
+            "type": "array",
+            "title": "Templates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "templates"
+        ],
+        "title": "EmailTemplates"
+      },
+      "FfmeFile": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "default": "licencies_ffme.xlsx"
+          },
+          "content_base64": {
+            "type": "string",
+            "title": "Content Base64",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FfmeFile",
+        "description": "The licensee list exported from MyFFME (.xlsx), base64 encoded."
+      },
+      "FfmeImportRequest": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "default": "licencies_ffme.xlsx"
+          },
+          "content_base64": {
+            "type": "string",
+            "title": "Content Base64",
+            "default": ""
+          },
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          },
+          "manual_matches": {
+            "items": {
+              "$ref": "#/components/schemas/FfmeManualMatch"
+            },
+            "type": "array",
+            "title": "Manual Matches",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FfmeImportRequest",
+        "description": "The file is matched again by the server; manual_matches are added. season: the active one when empty."
+      },
+      "FfmeImportResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "updated_count": {
+            "type": "integer",
+            "title": "Updated Count"
+          },
+          "matched_manually": {
+            "type": "integer",
+            "title": "Matched Manually"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/FfmeMatchStats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "updated_count",
+          "matched_manually",
+          "season",
+          "stats"
+        ],
+        "title": "FfmeImportResult"
+      },
+      "FfmeLicensee": {
+        "properties": {
+          "nom": {
+            "type": "string",
+            "title": "Nom"
+          },
+          "prenom": {
+            "type": "string",
+            "title": "Prenom"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "passeports": {
+            "type": "string",
+            "title": "Passeports"
+          },
+          "diplomes": {
+            "type": "string",
+            "title": "Diplomes"
+          },
+          "document_sante": {
+            "type": "string",
+            "title": "Document Sante"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nom",
+          "prenom",
+          "licence",
+          "birth_date",
+          "passeports",
+          "diplomes",
+          "document_sante"
+        ],
+        "title": "FfmeLicensee",
+        "description": "A row of the file matched with no member: shown so that the office can pick one."
+      },
+      "FfmeManualMatch": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom",
+            "default": ""
+          },
+          "prenom": {
+            "type": "string",
+            "title": "Prenom",
+            "default": ""
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence",
+            "default": ""
+          },
+          "passeports": {
+            "type": "string",
+            "title": "Passeports",
+            "default": ""
+          },
+          "diplomes": {
+            "type": "string",
+            "title": "Diplomes",
+            "default": ""
+          },
+          "document_sante": {
+            "type": "string",
+            "title": "Document Sante",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "FfmeManualMatch",
+        "description": "A row left unmatched by the preview, linked by the office to member user_id."
+      },
+      "FfmeMatchStats": {
+        "properties": {
+          "total_processed": {
+            "type": "integer",
+            "title": "Total Processed",
+            "default": 0
+          },
+          "matched_by_licence": {
+            "type": "integer",
+            "title": "Matched By Licence",
+            "default": 0
+          },
+          "matched_by_name": {
+            "type": "integer",
+            "title": "Matched By Name",
+            "default": 0
+          },
+          "matched_manually": {
+            "type": "integer",
+            "title": "Matched Manually",
+            "default": 0
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "FfmeMatchStats"
+      },
+      "FfmeMember": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "last_name",
+          "first_name",
+          "birth_date"
+        ],
+        "title": "FfmeMember",
+        "description": "A member of the club, candidate for a manual match."
+      },
+      "FfmePreview": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/FfmeMatchStats"
+          },
+          "matched_count": {
+            "type": "integer",
+            "title": "Matched Count"
+          },
+          "unmatched_count": {
+            "type": "integer",
+            "title": "Unmatched Count"
+          },
+          "unmatched": {
+            "items": {
+              "$ref": "#/components/schemas/FfmeLicensee"
+            },
+            "type": "array",
+            "title": "Unmatched"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/FfmeMember"
+            },
+            "type": "array",
+            "title": "Users"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "filename",
+          "stats",
+          "matched_count",
+          "unmatched_count",
+          "unmatched",
+          "users"
+        ],
+        "title": "FfmePreview",
+        "description": "Matching of the file, nothing written. matched_count: rows matched by license number or name."
+      },
+      "FfmeStats": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "produced_count": {
+            "type": "integer",
+            "title": "Produced Count"
+          },
+          "termine_count": {
+            "type": "integer",
+            "title": "Termine Count"
+          },
+          "ignored_count": {
+            "type": "integer",
+            "title": "Ignored Count"
+          },
+          "estimated_total": {
+            "type": "integer",
+            "title": "Estimated Total"
+          },
+          "renewals_count": {
+            "type": "integer",
+            "title": "Renewals Count"
+          },
+          "new_licences_count": {
+            "type": "integer",
+            "title": "New Licences Count"
+          },
+          "ignored_details": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ignored Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "season",
+          "produced_count",
+          "termine_count",
+          "ignored_count",
+          "estimated_total",
+          "renewals_count",
+          "new_licences_count",
+          "ignored_details"
+        ],
+        "title": "FfmeStats",
+        "description": "Members of the season in the federal CSV export. ignored_details: the first 20 rows left out, with the reason."
+      },
+      "GoogleChecks": {
+        "properties": {
+          "oauth_token": {
+            "$ref": "#/components/schemas/ServiceCheck"
+          },
+          "database": {
+            "$ref": "#/components/schemas/ServiceCheck"
+          },
+          "gmail": {
+            "$ref": "#/components/schemas/ServiceCheck"
+          }
+        },
+        "type": "object",
+        "required": [
+          "oauth_token",
+          "database",
+          "gmail"
+        ],
+        "title": "GoogleChecks"
+      },
+      "GoogleStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "expired",
+              "disconnected"
+            ],
+            "title": "Status"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "client_id_configured": {
+            "type": "boolean",
+            "title": "Client Id Configured"
+          },
+          "refresh_token_present": {
+            "type": "boolean",
+            "title": "Refresh Token Present"
+          },
+          "user_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Email"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend"
+          },
+          "db_accessible": {
+            "type": "boolean",
+            "title": "Db Accessible"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "valid",
+          "configured",
+          "client_id_configured",
+          "refresh_token_present",
+          "user_email",
+          "backend",
+          "db_accessible",
+          "error"
+        ],
+        "title": "GoogleStatus",
+        "description": "connected: the token works; expired: a token is stored but Google refuses it; disconnected: no token."
+      },
+      "GoogleTest": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "warning",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "all_ok": {
+            "type": "boolean",
+            "title": "All Ok"
+          },
+          "results": {
+            "$ref": "#/components/schemas/GoogleChecks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "all_ok",
+          "results"
+        ],
+        "title": "GoogleTest",
+        "description": "error: no access token (the other checks are skipped); warning: some check failed."
+      },
+      "GoogleTokenUpdate": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token",
+            "default": ""
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id",
+            "default": ""
+          },
+          "client_secret": {
+            "type": "string",
+            "title": "Client Secret",
+            "default": ""
+          },
+          "user_email": {
+            "type": "string",
+            "title": "User Email",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GoogleTokenUpdate"
+      },
+      "GoogleTokenUpdated": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "user_email": {
+            "type": "string",
+            "title": "User Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "user_email"
+        ],
+        "title": "GoogleTokenUpdated"
+      },
+      "GroupLoaded": {
+        "properties": {
+          "added": {
+            "type": "integer",
+            "title": "Added"
+          },
+          "competition": {
+            "$ref": "#/components/schemas/Competition"
+          }
+        },
+        "type": "object",
+        "required": [
+          "added",
+          "competition"
+        ],
+        "title": "GroupLoaded",
+        "description": "Members of the competition group added to a competition (load-group)."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HelloAssoItem": {
+        "properties": {
+          "id_item": {
+            "type": "integer",
+            "title": "Id Item"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "payer_nom": {
+            "type": "string",
+            "title": "Payer Nom",
+            "default": ""
+          },
+          "payer_prenom": {
+            "type": "string",
+            "title": "Payer Prenom",
+            "default": ""
+          },
+          "montant": {
+            "type": "number",
+            "title": "Montant",
+            "default": 0.0
+          },
+          "etat": {
+            "type": "string",
+            "title": "Etat",
+            "default": ""
+          },
+          "date_item": {
+            "type": "string",
+            "title": "Date Item",
+            "default": ""
+          },
+          "licence_saisie": {
+            "type": "string",
+            "title": "Licence Saisie",
+            "default": ""
+          },
+          "competition_saisie": {
+            "type": "string",
+            "title": "Competition Saisie",
+            "default": ""
+          },
+          "campagne_slug": {
+            "type": "string",
+            "title": "Campagne Slug",
+            "default": ""
+          },
+          "raw_json": {
+            "type": "string",
+            "title": "Raw Json",
+            "description": "HelloAsso's item as received (JSON text)",
+            "default": ""
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "competition_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Id"
+          },
+          "adherent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adherent Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "auto or manuel once linked"
+          },
+          "commentaire": {
+            "type": "string",
+            "title": "Commentaire",
+            "default": ""
+          },
+          "ignore": {
+            "type": "boolean",
+            "title": "Ignore",
+            "default": false
+          },
+          "ignore_motif": {
+            "type": "string",
+            "title": "Ignore Motif",
+            "default": ""
+          },
+          "ignored_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignored By"
+          },
+          "ignored_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignored At"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id_item"
+        ],
+        "title": "HelloAssoItem",
+        "description": "An item of the HelloAsso mirror (`helloasso_items`) with the coach's link or ignore decision."
+      },
+      "HelloAssoSync": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
+          "stats": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HelloAssoSyncStats"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "HelloAssoSync",
+        "description": "error: no campaign configured or HelloAsso unreachable (HTTP 200, as the former pages expect)."
+      },
+      "HelloAssoSyncStats": {
+        "properties": {
+          "nb_items": {
+            "type": "integer",
+            "title": "Nb Items"
+          },
+          "nb_auto": {
+            "type": "integer",
+            "title": "Nb Auto"
+          },
+          "nb_manual": {
+            "type": "integer",
+            "title": "Nb Manual"
+          },
+          "nb_applied": {
+            "type": "integer",
+            "title": "Nb Applied"
+          },
+          "nb_unlinked": {
+            "type": "integer",
+            "title": "Nb Unlinked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nb_items",
+          "nb_auto",
+          "nb_manual",
+          "nb_applied",
+          "nb_unlinked"
+        ],
+        "title": "HelloAssoSyncStats"
+      },
+      "ItemIgnore": {
+        "properties": {
+          "ignore": {
+            "type": "boolean",
+            "title": "Ignore"
+          },
+          "motif": {
+            "type": "string",
+            "title": "Motif",
+            "default": ""
+          },
+          "commentaire": {
+            "type": "string",
+            "title": "Commentaire",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ignore"
+        ],
+        "title": "ItemIgnore"
+      },
+      "ItemLink": {
+        "properties": {
+          "competition_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Id"
+          },
+          "adherent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adherent Id"
+          },
+          "commentaire": {
+            "type": "string",
+            "title": "Commentaire",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ItemLink"
+      },
+      "ItemLinked": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "linked": {
+            "type": "boolean",
+            "title": "Linked",
+            "description": "The item now pays for a participant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "linked"
+        ],
+        "title": "ItemLinked"
+      },
+      "ManualPayment": {
+        "properties": {
+          "montant": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Montant"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "montant"
+        ],
+        "title": "ManualPayment",
+        "description": "Payment received outside HelloAsso (cheque, cash)."
+      },
+      "Me": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "admin",
+                  "coach",
+                  "readonly"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "role"
+        ],
+        "title": "Me"
+      },
+      "Member": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "purchase_id": {
+            "type": "integer",
+            "title": "Purchase Id"
+          },
+          "season_name": {
+            "type": "string",
+            "title": "Season Name"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "gender": {
+            "type": "string",
+            "title": "Gender"
+          },
+          "address": {
+            "type": "string",
+            "title": "Address"
+          },
+          "zip_code": {
+            "type": "string",
+            "title": "Zip Code"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "email_primary": {
+            "type": "string",
+            "title": "Email Primary"
+          },
+          "email_secondary": {
+            "type": "string",
+            "title": "Email Secondary"
+          },
+          "licence_ffme": {
+            "type": "string",
+            "title": "Licence Ffme"
+          },
+          "emergency1_name": {
+            "type": "string",
+            "title": "Emergency1 Name"
+          },
+          "emergency1_phone": {
+            "type": "string",
+            "title": "Emergency1 Phone"
+          },
+          "emergency2_name": {
+            "type": "string",
+            "title": "Emergency2 Name"
+          },
+          "emergency2_phone": {
+            "type": "string",
+            "title": "Emergency2 Phone"
+          },
+          "health_commitment": {
+            "type": "string",
+            "title": "Health Commitment"
+          },
+          "document_sante": {
+            "type": "string",
+            "title": "Document Sante"
+          },
+          "photo_auth": {
+            "type": "string",
+            "title": "Photo Auth"
+          },
+          "badge_rouge": {
+            "type": "string",
+            "title": "Badge Rouge"
+          },
+          "autonomie_bloc": {
+            "type": "string",
+            "title": "Autonomie Bloc"
+          },
+          "passeport_orange": {
+            "type": "string",
+            "title": "Passeport Orange"
+          },
+          "raw_passports": {
+            "type": "string",
+            "title": "Raw Passports"
+          },
+          "raw_diplomas": {
+            "type": "string",
+            "title": "Raw Diplomas"
+          },
+          "payer": {
+            "type": "string",
+            "title": "Payer"
+          },
+          "payer_email": {
+            "type": "string",
+            "title": "Payer Email"
+          },
+          "order_ref": {
+            "type": "string",
+            "title": "Order Ref"
+          },
+          "order_date": {
+            "type": "string",
+            "title": "Order Date"
+          },
+          "tarif_name": {
+            "type": "string",
+            "title": "Tarif Name"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "status_norm": {
+            "type": "string",
+            "title": "Status Norm"
+          },
+          "email_sent_date": {
+            "type": "string",
+            "title": "Email Sent Date"
+          },
+          "commentaires_correctif": {
+            "type": "string",
+            "title": "Commentaires Correctif"
+          },
+          "creneau_groupe": {
+            "type": "string",
+            "title": "Creneau Groupe"
+          },
+          "categorie": {
+            "type": "string",
+            "title": "Categorie"
+          },
+          "creneau_details": {
+            "type": "string",
+            "title": "Creneau Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "purchase_id",
+          "season_name",
+          "last_name",
+          "first_name",
+          "birth_date",
+          "age",
+          "gender",
+          "address",
+          "zip_code",
+          "city",
+          "phone",
+          "email_primary",
+          "email_secondary",
+          "licence_ffme",
+          "emergency1_name",
+          "emergency1_phone",
+          "emergency2_name",
+          "emergency2_phone",
+          "health_commitment",
+          "document_sante",
+          "photo_auth",
+          "badge_rouge",
+          "autonomie_bloc",
+          "passeport_orange",
+          "raw_passports",
+          "raw_diplomas",
+          "payer",
+          "payer_email",
+          "order_ref",
+          "order_date",
+          "tarif_name",
+          "amount",
+          "status",
+          "status_norm",
+          "email_sent_date",
+          "commentaires_correctif",
+          "creneau_groupe",
+          "categorie",
+          "creneau_details"
+        ],
+        "title": "Member",
+        "description": "One member of a season (one purchase), as domain/members/view.py member_row() builds it.\nNames, city and phones are already formatted; status_norm is the French status label."
+      },
+      "MemberChanges": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Validé",
+                  "Traité",
+                  "En cours",
+                  "Terminé",
+                  "Annulé"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "licence_ffme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence Ffme"
+          },
+          "badge_rouge": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Oui",
+                  "Non"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Badge Rouge"
+          },
+          "autonomie_bloc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Oui",
+                  "Non"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autonomie Bloc"
+          },
+          "email_primary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Primary"
+          },
+          "email_secondary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Secondary"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "zip_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "tarif_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarif Name"
+          },
+          "commentaires_correctif": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commentaires Correctif"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MemberChanges",
+        "description": "Fields of a member record to change; a field left out is kept (only the given ones are written)."
+      },
+      "MemberCreate": {
+        "properties": {
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          },
+          "fields": {
+            "$ref": "#/components/schemas/NewMember"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "title": "MemberCreate",
+        "description": "season: the active season when empty."
+      },
+      "MemberCreated": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "order_ref": {
+            "type": "string",
+            "title": "Order Ref"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "order_ref",
+          "season"
+        ],
+        "title": "MemberCreated"
+      },
+      "MemberList": {
+        "properties": {
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "creneaux": {
+            "items": {
+              "$ref": "#/components/schemas/Creneau"
+            },
+            "type": "array",
+            "title": "Creneaux"
+          }
+        },
+        "type": "object",
+        "required": [
+          "season",
+          "members",
+          "creneaux"
+        ],
+        "title": "MemberList",
+        "description": "The members of one season, sorted by name, with the planning's slot groups (filters of the list)."
+      },
+      "MemberUpdate": {
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "purchase_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Id"
+          },
+          "order_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Ref"
+          },
+          "fields": {
+            "$ref": "#/components/schemas/MemberChanges"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "title": "MemberUpdate",
+        "description": "The purchase (one membership of a season) and its member; purchase_id is enough, the others are fallbacks."
+      },
+      "MemberUpdated": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "MemberUpdated"
+      },
+      "NewMember": {
+        "properties": {
+          "last_name": {
+            "type": "string",
+            "title": "Last Name",
+            "default": ""
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name",
+            "default": ""
+          },
+          "birth_date": {
+            "type": "string",
+            "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$",
+            "title": "Birth Date",
+            "default": ""
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "Homme",
+              "Femme",
+              ""
+            ],
+            "title": "Gender",
+            "default": ""
+          },
+          "tarif_name": {
+            "type": "string",
+            "title": "Tarif Name",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Validé",
+              "Traité",
+              "En cours",
+              "Terminé",
+              "Annulé"
+            ],
+            "title": "Status",
+            "default": "Validé"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Amount",
+            "default": 0.0
+          },
+          "licence_ffme": {
+            "type": "string",
+            "title": "Licence Ffme",
+            "default": ""
+          },
+          "badge_rouge": {
+            "type": "string",
+            "enum": [
+              "Oui",
+              "Non"
+            ],
+            "title": "Badge Rouge",
+            "default": "Non"
+          },
+          "autonomie_bloc": {
+            "type": "string",
+            "enum": [
+              "Oui",
+              "Non"
+            ],
+            "title": "Autonomie Bloc",
+            "default": "Non"
+          },
+          "email_primary": {
+            "type": "string",
+            "title": "Email Primary",
+            "default": ""
+          },
+          "email_secondary": {
+            "type": "string",
+            "title": "Email Secondary",
+            "default": ""
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone",
+            "default": ""
+          },
+          "address": {
+            "type": "string",
+            "title": "Address",
+            "default": ""
+          },
+          "zip_code": {
+            "type": "string",
+            "title": "Zip Code",
+            "default": ""
+          },
+          "city": {
+            "type": "string",
+            "title": "City",
+            "default": ""
+          },
+          "emergency1_name": {
+            "type": "string",
+            "title": "Emergency1 Name",
+            "default": ""
+          },
+          "emergency1_phone": {
+            "type": "string",
+            "title": "Emergency1 Phone",
+            "default": ""
+          },
+          "commentaires_correctif": {
+            "type": "string",
+            "title": "Commentaires Correctif",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NewMember",
+        "description": "A member added by hand. Name, birth date and tariff are required (checked by the route, with its messages)."
+      },
+      "ParticipantAdd": {
+        "properties": {
+          "adherent_id": {
+            "type": "integer",
+            "title": "Adherent Id"
+          },
+          "selectionne": {
+            "type": "boolean",
+            "title": "Selectionne",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "adherent_id"
+        ],
+        "title": "ParticipantAdd"
+      },
+      "ParticipantCancel": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mode",
+          "note"
+        ],
+        "title": "ParticipantCancel"
+      },
+      "ParticipantUpdate": {
+        "properties": {
+          "selectionne": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selectionne"
+          },
+          "present": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Present"
+          },
+          "unchanged_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unchanged Since"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ParticipantUpdate"
+      },
+      "PastArchived": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "archived": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Archived",
+            "description": "Ids of the competitions archived"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "archived"
+        ],
+        "title": "PastArchived"
+      },
+      "PlanningSlot": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "groupe": {
+            "type": "string",
+            "title": "Groupe"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "categorie_age": {
+            "type": "string",
+            "title": "Categorie Age"
+          },
+          "jour": {
+            "type": "string",
+            "title": "Jour"
+          },
+          "horaires": {
+            "type": "string",
+            "title": "Horaires"
+          },
+          "encadrants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Encadrants"
+          },
+          "helloasso_tarifs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Helloasso Tarifs"
+          },
+          "whatsapp_link": {
+            "type": "string",
+            "title": "Whatsapp Link"
+          },
+          "naissance_min": {
+            "type": "string",
+            "title": "Naissance Min"
+          },
+          "naissance_max": {
+            "type": "string",
+            "title": "Naissance Max"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "groupe",
+          "type",
+          "categorie_age",
+          "jour",
+          "horaires",
+          "encadrants",
+          "helloasso_tarifs",
+          "whatsapp_link",
+          "naissance_min",
+          "naissance_max"
+        ],
+        "title": "PlanningSlot",
+        "description": "A weekly slot. jour: a day (\"Lundi\"…), or several (\"Lundi / Jeudi\"); horaires: \"18:00 - 20:00\".\nhelloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds."
+      },
+      "PlanningSlotDeleted": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "PlanningSlotDeleted"
+      },
+      "PlanningSlotSaved": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "item": {
+            "$ref": "#/components/schemas/PlanningSlot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "item"
+        ],
+        "title": "PlanningSlotSaved"
+      },
+      "PlanningSlotUpdate": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "default": 0
+          },
+          "groupe": {
+            "type": "string",
+            "title": "Groupe",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": ""
+          },
+          "categorie_age": {
+            "type": "string",
+            "title": "Categorie Age",
+            "default": ""
+          },
+          "jour": {
+            "type": "string",
+            "title": "Jour",
+            "default": ""
+          },
+          "horaires": {
+            "type": "string",
+            "title": "Horaires",
+            "default": ""
+          },
+          "encadrants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Encadrants",
+            "default": []
+          },
+          "helloasso_tarifs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Helloasso Tarifs",
+            "default": []
+          },
+          "whatsapp_link": {
+            "type": "string",
+            "title": "Whatsapp Link",
+            "default": ""
+          },
+          "naissance_min": {
+            "type": "string",
+            "title": "Naissance Min",
+            "default": ""
+          },
+          "naissance_max": {
+            "type": "string",
+            "title": "Naissance Max",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PlanningSlotUpdate",
+        "description": "id: 0 for a new slot."
+      },
+      "PresenceAutonomous": {
+        "properties": {
+          "adultes": {
+            "type": "integer",
+            "title": "Adultes"
+          },
+          "mineurs": {
+            "type": "integer",
+            "title": "Mineurs"
+          },
+          "mineurs_autorises": {
+            "type": "integer",
+            "title": "Mineurs Autorises"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "adultes",
+          "mineurs",
+          "mineurs_autorises",
+          "total",
+          "groups"
+        ],
+        "title": "PresenceAutonomous",
+        "description": "Members of the autonomous slots, plus the minors of other groups allowed to climb on their own."
+      },
+      "PresenceConfig": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "default_dates": {
+            "$ref": "#/components/schemas/PresenceDates"
+          },
+          "autonome": {
+            "$ref": "#/components/schemas/PresenceAutonomous"
+          },
+          "cours": {
+            "items": {
+              "$ref": "#/components/schemas/PresenceCourse"
+            },
+            "type": "array",
+            "title": "Cours"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "season",
+          "default_dates",
+          "autonome",
+          "cours"
+        ],
+        "title": "PresenceConfig"
+      },
+      "PresenceCourse": {
+        "properties": {
+          "groupe": {
+            "type": "string",
+            "title": "Groupe"
+          },
+          "slots": {
+            "type": "string",
+            "title": "Slots"
+          },
+          "tarifs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tarifs"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "groupe",
+          "slots",
+          "tarifs",
+          "count"
+        ],
+        "title": "PresenceCourse",
+        "description": "A supervised course. slots: \"Lundi 18:00 - 20:00 · Jeudi …\"; count: its members."
+      },
+      "PresenceDates": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "title": "End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "PresenceDates",
+        "description": "Default period of the sheets (dd/mm/yyyy)."
+      },
+      "PresenceExportRequest": {
+        "properties": {
+          "variant": {
+            "type": "string",
+            "enum": [
+              "autonome",
+              "cours"
+            ],
+            "title": "Variant",
+            "default": "cours"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": ""
+          },
+          "end_date": {
+            "type": "string",
+            "title": "End Date",
+            "default": ""
+          },
+          "show_health_col": {
+            "type": "boolean",
+            "title": "Show Health Col",
+            "default": false
+          },
+          "selected_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Selected Groups",
+            "default": []
+          },
+          "same_sheet": {
+            "type": "boolean",
+            "title": "Same Sheet",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PresenceExportRequest",
+        "description": "Attendance sheets to generate. season: the active one when empty; dates: dd/mm/yyyy, the season's when empty.\ncours only: selected_groups (all the courses when empty) and same_sheet (one workbook, else a ZIP of one file per course)."
+      },
+      "ResultsFetched": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "total_scraped": {
+            "type": "integer",
+            "title": "Total Scraped"
+          },
+          "matched_count": {
+            "type": "integer",
+            "title": "Matched Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "url",
+          "total_scraped",
+          "matched_count"
+        ],
+        "title": "ResultsFetched",
+        "description": "MyCompet results matched to the participants (the competition is updated: reload it)."
+      },
+      "ResultsSettings": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "notification_email": {
+            "type": "string",
+            "title": "Notification Email"
+          },
+          "last_run": {
+            "type": "string",
+            "title": "Last Run"
+          },
+          "last_status": {
+            "type": "string",
+            "title": "Last Status"
+          },
+          "cron_schedule": {
+            "type": "string",
+            "title": "Cron Schedule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "notification_email",
+          "last_run",
+          "last_status",
+          "cron_schedule"
+        ],
+        "title": "ResultsSettings"
+      },
+      "ResultsSettingsSaved": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "notification_email": {
+            "type": "string",
+            "title": "Notification Email"
+          },
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "notification_email",
+          "saved"
+        ],
+        "title": "ResultsSettingsSaved"
+      },
+      "ResultsSettingsUpdate": {
+        "properties": {
+          "notification_email": {
+            "type": "string",
+            "title": "Notification Email",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ResultsSettingsUpdate"
+      },
+      "SeasonTarifs": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "tarifs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tarifs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "season",
+          "tarifs"
+        ],
+        "title": "SeasonTarifs",
+        "description": "The season's HelloAsso tariffs, to link them to a planning slot."
+      },
+      "Seasons": {
+        "properties": {
+          "seasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Seasons"
+          },
+          "active": {
+            "type": "string",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seasons",
+          "active"
+        ],
+        "title": "Seasons",
+        "description": "Season names, most recent first, and the active season."
+      },
+      "ServiceCheck": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "ServiceCheck"
+      },
+      "SyncCounters": {
+        "properties": {
+          "pulled": {
+            "type": "integer",
+            "title": "Pulled"
+          },
+          "pushed": {
+            "type": "integer",
+            "title": "Pushed"
+          },
+          "full": {
+            "type": "boolean",
+            "title": "Full"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pulled",
+          "pushed",
+          "full"
+        ],
+        "title": "SyncCounters"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WhatsappTemplate": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "template": {
+            "type": "string",
+            "title": "Template"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "template"
+        ],
+        "title": "WhatsappTemplate"
+      },
+      "WhatsappTemplateSaved": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "template": {
+            "type": "string",
+            "title": "Template"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "template"
+        ],
+        "title": "WhatsappTemplateSaved"
+      },
+      "WhatsappTemplateUpdate": {
+        "properties": {
+          "template": {
+            "type": "string",
+            "title": "Template",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "WhatsappTemplateUpdate"
+      }
+    }
+  }
+}

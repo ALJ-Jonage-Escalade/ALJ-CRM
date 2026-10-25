@@ -1,5 +1,5 @@
 # Ignorés lors de l'envoi du code source vers Cloud Build (gcloud run deploy --source .)
-# Envoyer uniquement le nécessaire : Dockerfile + pyproject.toml + uv.lock + src/ + web/ + doc/ + VERSION
+# Envoyer uniquement le nécessaire : Dockerfile + pyproject.toml + uv.lock + src/ + web/ + frontend/ + doc/ + VERSION
 
 # Environnements virtuels et caches Python
 venv/
@@ -50,3 +50,6 @@ installer/
 *.bat
 *.vbs
 *.png.bak
+
+# Application Vue : dépendances installées et compilée par Cloud Build (Dockerfile)
+node_modules/

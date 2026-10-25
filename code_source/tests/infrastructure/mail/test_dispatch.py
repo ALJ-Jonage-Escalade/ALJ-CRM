@@ -89,9 +89,8 @@ class TestEmailDispatchService(unittest.TestCase):
         """Teste les route handlers FastAPI /api/email-templates et /api/preview-email."""
         # 1. Templates
         res_t = get_email_templates()
-        self.assertEqual(res_t["status"], "success")
-        self.assertIsInstance(res_t["templates"], list)
-        template_names = [t.get("name") for t in res_t["templates"]]
+        self.assertEqual(res_t.status, "success")
+        template_names = [t.name for t in res_t.templates]
         self.assertIn("Compétition - 1er Inscription", template_names)
         self.assertIn("Compétition - relance", template_names)
 
@@ -108,9 +107,24 @@ class TestEmailDispatchService(unittest.TestCase):
 
         # 3. Email Status
         res_st = get_email_status()
-        self.assertEqual(res_st["status"], "success")
-        self.assertIn("configured", res_st)
-        self.assertIn("mode", res_st)
+        self.assertEqual(res_st.status, "success")
+        self.assertIn(res_st.mode, ("gmail_oauth2", "smtp", "none"))
+
+    def test_email_status_modes(self):
+        """Gmail API first, then SMTP; nothing configured answers mode "none" and no sender."""
+        gmail = {"GMAIL_USER_EMAIL": "club@example.org", "GMAIL_CLIENT_ID": "id", "GMAIL_REFRESH_TOKEN": "token"}
+        smtp = {"SMTP_HOST": "smtp.example.org", "SMTP_USER": "relay@example.org", "SMTP_PASSWORD": "pw"}
+        cases = [
+            ({**gmail, **smtp}, True, "gmail_oauth2", "club@example.org"),
+            (smtp, True, "smtp", "relay@example.org"),
+            ({**smtp, "SMTP_PASSWORD": ""}, False, "none", ""),
+            ({}, False, "none", ""),
+        ]
+        for secrets, configured, mode, sender in cases:
+            with self.subTest(mode=mode, keys=sorted(secrets)), \
+                    patch("api.communications.email.SecretStore.get_secret", side_effect=lambda key, s=secrets: s.get(key, "")):
+                status = get_email_status()
+                self.assertEqual((status.configured, status.mode, status.sender), (configured, mode, sender))
 
 
 if __name__ == "__main__":

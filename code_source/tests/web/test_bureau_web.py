@@ -1,14 +1,13 @@
 """
-Tests du portail « bureau » (ordinateur) et de son socle web/shared/ :
-- routes publiques (pages) sans données, ressources communes servies ;
-- numéro de version identique (pages, service worker, pages PWA) ;
-- redirection ordinateur -> /bureau/ (script alj-vue.js) ;
-- rôles du socle identiques à l'API et à firestore.rules.
+Tests du portail « bureau » :
+- routes publiques (pages de l'application Vue, anciennes adresses) sans données ;
+- endpoints de l'API appelés par les pages.
 """
 
 import os
-import re
+import shutil
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -22,135 +21,59 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
-from api.web.pages import get_annuaire_page, get_bureau_home, get_bureau_page, get_competitions_page
-from api.web.pwa import get_sw, get_web_version
+from api.web.pages import get_bureau_home, get_bureau_page
 from server import app
 
 WEB = os.path.join(_code_root, "web")
-BUREAU = os.path.join(WEB, "bureau")
-SHARED = os.path.join(WEB, "shared")
-
-
-def _read(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def _current_version():
-    return get_web_version()["web_version"]
 
 
 class TestBureauFiles(unittest.TestCase):
 
-    def test_pages_exist(self):
-        for name in ("index.html", "adherents.html", "outils.html"):
-            self.assertTrue(os.path.exists(os.path.join(BUREAU, name)), name)
-        for name in ("alj.css", "alj-core.js", "alj-shell.js", "alj-vue.js",
-                      "alj-members.js", "alj-filters.js", "alj-sync.js"):
-            self.assertTrue(os.path.exists(os.path.join(SHARED, name)), name)
+    def test_no_former_page_left(self):
+        """Every page is the Vue application's: no HTML page nor script left in web/ (plan phase 12)."""
+        self.assertEqual([n for _, _, files in os.walk(WEB) for n in files if n.endswith((".html", ".js", ".css"))], [])
 
     def test_routes_serve_only_known_pages(self):
-        self.assertEqual(get_bureau_home().status_code, 200)
-        self.assertEqual(get_bureau_page("adherents").status_code, 200)
-        self.assertEqual(get_bureau_page("outils").status_code, 200)
         self.assertEqual(get_bureau_page("index.html").status_code, 404)
         self.assertEqual(get_bureau_page("..%2Fserver.py").status_code, 404)
         self.assertEqual(get_bureau_page("inconnue").status_code, 404)
-
-    def test_pages_are_static_shells_without_member_data(self):
-        """Les pages n'embarquent aucune donnée : elles chargent le socle et lisent l'API après connexion."""
-        for name in ("index.html", "adherents.html", "outils.html"):
-            html = _read(os.path.join(BUREAU, name))
-            self.assertIn('href="/static-web/alj.css"', html, name)
-            self.assertIn('import { startBureau } from "/static-web/alj-shell.js"', html, name)
-            self.assertNotIn("firebase-firestore-compat.js", html, name)
-            self.assertNotIn("crm_users", html, name)
-            self.assertNotIn("crm_orders", html, name)
-
-    def test_bureau_pages_share_web_version(self):
-        version = _current_version()
-        self.assertRegex(version, r"^\d+$")
-        for name in ("index.html", "adherents.html", "communications.html", "competitions.html", "planning.html", "outils.html", "parametres.html"):
-            html = _read(os.path.join(BUREAU, name))
-            self.assertIn(f'<meta name="alj-web-version" content="{version}">', html, name)
-            self.assertRegex(html, rf"<title>[^<]*\(v{version}\)</title>", name)
-
-    def test_service_worker_precaches_portal(self):
-        sw = _read(get_sw().path)
-        version = _current_version()
-        self.assertIn(f'CACHE_NAME = "alj-escalade-v{version}"', sw)
-        for asset in ("/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres",
-                      "/static-web/alj.css", "/static-web/alj-core.js",
-                      "/static-web/alj-shell.js", "/static-web/alj-vue.js",
-                      "/static-web/alj-members.js", "/static-web/alj-filters.js",
-                      "/static-web/alj-sync.js"):
-            self.assertIn(f'"{asset}"', sw)
-
-    def test_planning_file_structure(self):
-        """La nouvelle page planning.html doit contenir la grille visuelle, le tableau, la modale et les exports."""
-        html = _read(os.path.join(BUREAU, "planning.html"))
-        self.assertIn("alj-shell.js", html)
-        self.assertIn("pane-visual", html)
-        self.assertIn("pane-table", html)
-        self.assertIn("btn-create-slot", html)
-        self.assertIn("btn-print-grid", html)
-        self.assertIn("btn-export-excel-grid", html)
-        self.assertIn("slot-modal", html)
-
-    def test_parametres_file_structure(self):
-        """La nouvelle page parametres.html doit contenir l'outil de connexion Google, la gestion SQLite et le batch résultats."""
-        html = _read(os.path.join(BUREAU, "parametres.html"))
-        self.assertIn("alj-shell.js", html)
-        self.assertIn("alj-firebase.js", html)
-        self.assertIn("google-status-badge", html)
-        self.assertIn("btn-google-reconnect", html)
-        self.assertIn("btn-google-test", html)
-        self.assertIn("btn-force-update-sqlite", html)
-        self.assertIn("btn-full-rebuild-sqlite", html)
-        self.assertIn("sqlite-status-badge", html)
-        self.assertIn("sqlite-file-info", html)
-        # Nouveaux éléments du batch de résultats MyCompet
-        self.assertIn("results-notif-email", html)
-        self.assertIn("btn-save-notif-email", html)
-        self.assertIn("btn-run-results-batch", html)
-        self.assertIn("results-batch-last-run", html)
-        self.assertIn("results-batch-report", html)
-        self.assertIn("Suivi Automatique des Résultats MyCompet", html)
 
     def test_competitions_results_cron_and_settings_endpoints(self):
         """Vérifie les endpoints de configuration et de cron du batch des résultats MyCompet."""
         from support.fake_firestore import use_fake_firestore
         use_fake_firestore(self)
-        from api.competitions.results import (
-            get_competitions_results_settings_api,
-            update_competitions_results_settings_api
-        )
         from server import app
+        client = TestClient(app)
 
         # 1. GET /api/settings/competitions-results
-        res = get_competitions_results_settings_api()
+        res = client.get("/api/settings/competitions-results").json()
         self.assertEqual(res.get("status"), "success")
-        self.assertIn("notification_email", res)
         self.assertIn("@", res["notification_email"])
         self.assertIn("cron_schedule", res)
 
         # 2. POST /api/settings/competitions-results
-        up_res = update_competitions_results_settings_api({"notification_email": "test.notif@alj-jonage.fr"})
+        up_res = client.post("/api/settings/competitions-results", json={"notification_email": "test.notif@alj-jonage.fr"}).json()
         self.assertEqual(up_res.get("status"), "success")
         self.assertEqual(up_res.get("notification_email"), "test.notif@alj-jonage.fr")
+        bad = client.post("/api/settings/competitions-results", json={"notification_email": "pas-une-adresse"})
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(bad.json(), {"status": "error", "message": "Adresse e-mail de notification invalide."})
 
         # Rétablir l'adresse par défaut
-        update_competitions_results_settings_api({"notification_email": "david.lopez@alj-jonage.fr"})
+        client.post("/api/settings/competitions-results", json={"notification_email": "david.lopez@alj-jonage.fr"})
 
         # 3. POST /api/competitions/cron/fetch-results
         with patch("services.competitions.results_batch.CompetitionResultsBatchService.run_daily_batch") as mock_batch:
             mock_batch.return_value = {
                 "status": "success",
-                "competitions_checked": 0,
+                "executed_at": "2026-10-22T07:00:00",
+                "competitions_checked": 1,
                 "competitions_updated": 0,
-                "email_sent": False
+                "email_sent": False,
+                "notification_email": "david.lopez@alj-jonage.fr",
+                "details": [{"id": "c1", "nom": "Open", "date": "2026-10-01", "lieu": "Lyon", "url": "", "athletes": [],
+                             "status": "pending"}],
             }
-            client = TestClient(app)
             cron_resp = client.post("/api/competitions/cron/fetch-results?force=true")
             self.assertEqual(cron_resp.status_code, 200)
             self.assertEqual(cron_resp.json().get("status"), "success")
@@ -158,70 +81,11 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_cloud_db_status_endpoint(self):
         """Vérifie l'endpoint GET /api/cloud-db/status."""
-        from api.integrations.cloud_db import get_cloud_db_status_api
-        res = get_cloud_db_status_api()
+        from server import app
+        res = TestClient(app).get("/api/cloud-db/status").json()
         self.assertEqual(res.get("status"), "success")
         self.assertIn("db_exists", res)
         self.assertIn("pending", res)
-
-    def test_outils_no_longer_has_google_reconnect(self):
-        """L'onglet Google a été déplacé vers parametres.html : outils contient map, pivot, fiches de présence et FFME."""
-        html = _read(os.path.join(BUREAU, "outils.html"))
-        self.assertNotIn("btn-google-reconnect", html)
-        self.assertIn("pane-map", html)
-        self.assertIn("pane-pivot", html)
-        self.assertIn("pane-presence", html)
-        self.assertIn("pane-ffme", html)
-        self.assertIn("btn-download-autonome", html)
-        self.assertIn("btn-download-cours", html)
-        self.assertIn("btn-download-ffme", html)
-
-    def test_ffme_api_stats_and_export(self):
-        """Vérifie le calcul des statistiques et le téléchargement du fichier CSV FFME."""
-        import shutil
-        import tempfile
-        from infrastructure.sqlite.connection import SqliteDatabase
-        from infrastructure.sqlite.members import MemberRepository
-        from api.ffme.ffme import get_ffme_stats_api, export_ffme_api
-
-        # Seeded temporary database: never read data/database.db (absent in CI, personal data locally).
-        original_db_path = SqliteDatabase.get_db_path()
-        tmpdir = tempfile.mkdtemp(prefix="alj_ffme_test_")
-        self.addCleanup(shutil.rmtree, tmpdir, ignore_errors=True)
-        self.addCleanup(SqliteDatabase.set_db_path, original_db_path)
-        SqliteDatabase.set_db_path(os.path.join(tmpdir, "database.db"))
-        SqliteDatabase.setup_database()
-        MemberRepository.upsert_members([{
-            "order_ref": "ORD-1",
-            "order_date": "2026-08-20T10:00:00",
-            "status": "Validated",
-            "tarif_name": "Adultes autonomes",
-            "amount": 150.0,
-            "user_lastName": "MARTIN",
-            "user_firstName": "Leo",
-            "payer_email": "leo.martin@test.fr",
-            "champ_Date de naissance de l'adhérent": "1990-05-15",
-            "champ_Sexe": "M",
-            "champ_Adresse : numéro et nom de rue": "10 Rue des Fleurs",
-            "champ_Code postal": "69000",
-            "champ_Ville": "Lyon",
-            "champ_Téléphone ": "0612345678",
-        }], "2026-2027")
-
-        # 1. Statistiques
-        stats = get_ffme_stats_api("2026-2027")
-        self.assertEqual(stats.get("status"), "success")
-        self.assertIn("estimated_total", stats)
-        self.assertIn("renewals_count", stats)
-        self.assertIn("new_licences_count", stats)
-
-        # 2. Export CSV avec include_termine=True
-        resp = export_ffme_api(season="2026-2027", include_termine=True)
-        self.assertEqual(resp.headers.get("content-type"), "text/csv; charset=utf-8")
-        self.assertIn("attachment", resp.headers.get("content-disposition", ""))
-        csv_text = resp.body.decode("utf-8")
-        self.assertIn("numero de licence;nom;prenom", csv_text)
-        self.assertIn("MARTIN", csv_text)
 
     def test_pivot_table_configuration_and_fields(self):
         """Vérifie la présence du filtre Âge, des colonnes Statut & Sexe, et de l'exclusion par défaut d'Annulé."""
@@ -247,111 +111,6 @@ class TestBureauFiles(unittest.TestCase):
         self.assertIn('"Tranche d\'Âge": "25 à 29 ans"', html)
         self.assertIn('"Sexe"', html)
         self.assertIn('"Statut"', html)
-
-    def test_adherents_page_imports_exist_in_modules(self):
-        """Chaque symbole importé par adherents.html doit être exporté par alj-members.js et alj-filters.js."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        members_js = _read(os.path.join(SHARED, "alj-members.js"))
-        filters_js = _read(os.path.join(SHARED, "alj-filters.js"))
-
-        m_block = re.search(r"import\s*\{([^}]+)\}\s*from\s*\"/static-web/alj-members\.js\"", html, re.S).group(1)
-        for sym in [s.strip() for s in m_block.split(",") if s.strip()]:
-            self.assertRegex(members_js, rf"export (function|const|async function) {sym}\b", sym)
-
-        f_block = re.search(r"import\s*\{([^}]+)\}\s*from\s*\"/static-web/alj-filters\.js\"", html, re.S).group(1)
-        for sym in [s.strip() for s in f_block.split(",") if s.strip()]:
-            self.assertRegex(filters_js, rf"export (function|const|async function) {sym}\b", sym)
-
-    def test_adherents_formatters_names_city_phone(self):
-        """Vérifie l'harmonisation d'affichage pour les noms, prénoms, villes et téléphones."""
-        members_js = _read(os.path.join(SHARED, "alj-members.js"))
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-
-        # Vérification des exports et imports
-        for fn in ("fmtLastName", "fmtFirstName", "fmtCity", "fmtPhone"):
-            self.assertIn(f"export function {fn}", members_js)
-            self.assertIn(fn, html)
-
-        # Vérification du regex / logique de téléphone
-        self.assertIn("replace(/(\\d{2})(?=\\d)/g, \"$1 \")", members_js)
-
-    def test_adherents_page_elements(self):
-        """La page adherents.html contient le tableau, les filtres et le panneau de détail."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        filters_js = _read(os.path.join(SHARED, "alj-filters.js"))
-        for elem in ("members-table", "members-tbody", "detail-pane", "search-input",
-                      "season-select", "export-csv-btn", "status-chips", "filter-box"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn("Attestation envoyée", html)
-        self.assertIn("email_sent_date", html)
-        self.assertIn('data-sort="order_date"', html)
-        self.assertIn("Date d'inscription", html)
-        self.assertIn("order_date", filters_js)
-
-    def test_adherents_columns_diplome_and_city(self):
-        """Vérifie le masquage des colonnes Tarif/Catégorie et l'ajout des colonnes Diplôme et Ville."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        members_js = _read(os.path.join(SHARED, "alj-members.js"))
-        filters_js = _read(os.path.join(SHARED, "alj-filters.js"))
-
-        # 1. Vérification des colonnes du tableau
-        thead_match = re.search(r"<table[^>]*id=\"members-table\"[^>]*>.*?<thead>(.*?)</thead>", html, re.S)
-        self.assertIsNotNone(thead_match)
-        thead = thead_match.group(1)
-
-        # Les colonnes Tarif et Catégorie doivent être masquées (absentes du thead)
-        self.assertNotIn('data-sort="tarif_name"', thead)
-        self.assertNotIn('data-sort="categorie"', thead)
-
-        # Les nouvelles colonnes Diplôme et Ville doivent être présentes
-        self.assertIn('data-sort="diplome"', thead)
-        self.assertIn('data-sort="city"', thead)
-        self.assertIn("Diplôme", thead)
-        self.assertIn("Ville", thead)
-
-        # 2. Pictogrammes / badges attendus
-        self.assertIn("🔴", html)  # Badge rouge (rond rouge)
-        self.assertIn("🧗", html)  # Autonomie bloc (picto du grimpeur)
-        self.assertIn("🟠", html)  # Passeport Orange (rond orange)
-
-        # 3. Helpers et propagation des champs
-        self.assertIn("raw_passports", members_js)
-        self.assertIn("getMemberDiplomes", members_js)
-        self.assertIn("export function getMemberDiplomes", members_js)
-        self.assertIn("diplome", filters_js)
-        self.assertIn("ville", filters_js)
-
-    def test_member_pages_use_members_api(self):
-        """Members and seasons come from the API, never Firestore directly (plan phase 2)."""
-        adherents = _read(os.path.join(BUREAU, "adherents.html"))
-        outils = _read(os.path.join(BUREAU, "outils.html"))
-        members_js = _read(os.path.join(SHARED, "alj-members.js"))
-        for name, text in (("adherents", adherents), ("outils", outils), ("alj-members.js", members_js)):
-            for firestore_call in (".collection(", "onSnapshot", "crm_"):
-                self.assertNotIn(firestore_call, text, f"{name}: {firestore_call}")
-        self.assertIn('<script src="/static-web/alj-members-sync.js"></script>', adherents)
-        self.assertIn("ALJMembersSync.start(", adherents)
-        self.assertIn('apiFetch("/api/seasons")', outils)
-
-    def test_adherents_email_modal_and_api_wiring(self):
-        """L'Étape 2 intègre la modale d'e-mail et le câblage aux endpoints d'e-mail."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        for elem in ("email-modal", "em-template-select", "em-subject", "em-body",
-                      "em-signature", "em-preview-box", "em-submit-btn", "em-cancel-btn"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/api/email-templates")', html)
-        self.assertIn('apiFetch("/api/send-email"', html)
-
-    def test_adherents_attestation_modal_and_api_wiring(self):
-        """L'Étape 3 intègre la modale d'attestation, le choix du template d'e-mail et le câblage aux endpoints PDF."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        for elem in ("attestation-modal", "att-download-btn", "att-send-btn", "att-pdf-frame",
-                      "att-preview-loading", "att-ineligible-warn", "att-template-select",
-                      "att-to-email", "att-email-subject", "att-email-body", "att-email-signature"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/api/attestations/preview"', html)
-        self.assertIn('apiFetch("/api/attestations/send"', html)
-        self.assertIn("Attestation échéance", html)
 
     def test_build_attestation_pure_function_rules(self):
         """build_attestation respecte les règles de montant, d'annulation, de signature et de payeur."""
@@ -400,6 +159,7 @@ class TestBureauFiles(unittest.TestCase):
         import shutil
         from infrastructure.sqlite.connection import SqliteDatabase
         from api.communications.attestations import send_attestation_api
+        from api.communications.schemas import AttestationSend
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_attestation.db")
@@ -425,25 +185,14 @@ class TestBureauFiles(unittest.TestCase):
             conn.commit()
             conn.close()
 
-            payload = {
-                "member": {
-                    "user_id": 10,
-                    "purchase_id": 30,
-                    "first_name": "Jean",
-                    "last_name": "DUPONT",
-                    "email_primary": "jean.dupont@example.com",
-                    "order_ref": "CMD-TEST-ATT",
-                    "amount": 180.0,
-                    "status": "Payé"
-                },
-                "season": "2026-2027"
-            }
+            # The member, its amount and payer are read from the database: only the purchase is sent
+            payload = AttestationSend(purchase_id=30, season="2026-2027", to_email="jean.dupont@example.com")
 
             with patch("infrastructure.mail.repository.EmailRepository.send_email", return_value=True) as mock_send:
                 res = send_attestation_api(payload)
 
-            self.assertEqual(res.get("status"), "success")
-            self.assertTrue(res.get("email_sent_date"))
+            self.assertEqual(res.status, "success")
+            self.assertTrue(res.email_sent_date)
 
             # Vérifier les paramètres de l'envoi d'e-mail (conforme desktop)
             mock_send.assert_called_once()
@@ -459,36 +208,10 @@ class TestBureauFiles(unittest.TestCase):
             row = conn.execute("SELECT email_sent_date FROM purchases WHERE id = 30").fetchone()
             conn.close()
             self.assertIsNotNone(row["email_sent_date"])
-            self.assertEqual(row["email_sent_date"], res["email_sent_date"])
+            self.assertEqual(row["email_sent_date"], res.email_sent_date)
         finally:
             SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)
-
-    def test_member_edit_ui_elements(self):
-        """La page adherents.html contient le bouton Modifier et la modale d'édition complète."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        for elem in ("btn-action-edit", "member-edit-modal", "edit-modal-close", "edit-cancel-btn",
-                      "edit-save-btn", "edit-licence", "edit-badge-rouge", "edit-autonomie-bloc",
-                      "edit-tarifs-container", "edit-email-primary", "edit-email-secondary", "edit-phone",
-                      "edit-address", "edit-zip", "edit-city",
-                      "edit-commentaire", "btn-insert-comment-date"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/api/members/update"', html)
-
-    def test_member_add_ui_elements(self):
-        """La page adherents.html contient le bouton d'ajout et la modale complète d'ajout manuel."""
-        html = _read(os.path.join(BUREAU, "adherents.html"))
-        for elem in (
-            "btn-add-member", "member-add-modal", "add-modal-close", "add-cancel-btn",
-            "add-save-btn", "add-last-name", "add-first-name", "add-birth-date",
-            "add-gender", "add-tarifs-container", "add-status", "add-amount",
-            "add-licence", "add-badge-rouge", "add-autonomie-bloc",
-            "add-email-primary", "add-email-secondary", "add-phone",
-            "add-address", "add-zip", "add-city", "add-emergency-name",
-            "add-emergency-phone", "add-commentaire", "btn-insert-add-comment-date"
-        ):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/api/members/create"', html)
 
     def test_member_add_requires_admin_role(self):
         """Les endpoints de création manuelle d'adhérents exigent le rôle admin."""
@@ -502,6 +225,7 @@ class TestBureauFiles(unittest.TestCase):
         import shutil
         from infrastructure.sqlite.connection import SqliteDatabase
         from api.members.members import add_member_api
+        from api.members.schemas import MemberCreate
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_member_add.db")
@@ -540,9 +264,9 @@ class TestBureauFiles(unittest.TestCase):
                 }
             }
 
-            res = add_member_api(payload)
-            self.assertEqual(res.get("status"), "success")
-            self.assertTrue(res.get("order_ref", "").startswith("MANUEL-"))
+            res = add_member_api(MemberCreate.model_validate(payload))
+            self.assertEqual(res.status, "success")
+            self.assertTrue(res.order_ref.startswith("MANUEL-"))
 
             # Vérification dans SQLite
             conn = SqliteDatabase.get_connection()
@@ -572,7 +296,7 @@ class TestBureauFiles(unittest.TestCase):
 
             o = conn.execute("SELECT * FROM orders WHERE id = ?", (p["order_id"],)).fetchone()
             self.assertIsNotNone(o)
-            self.assertEqual(o["order_ref"], res["order_ref"])
+            self.assertEqual(o["order_ref"], res.order_ref)
             self.assertEqual(o["payer_email"], "claire.valentin@example.com")
             conn.close()
         finally:
@@ -582,17 +306,18 @@ class TestBureauFiles(unittest.TestCase):
     def test_member_add_validation(self):
         """add_member_api rejette les requêtes avec champs obligatoires manquants."""
         from api.members.members import add_member_api
+        from api.members.schemas import MemberCreate
 
         # Nom manquant
-        res = add_member_api({"fields": {"first_name": "Jean", "birth_date": "2000-01-01", "tarif_name": "Licence"}})
+        res = add_member_api(MemberCreate.model_validate({"fields": {"first_name": "Jean", "birth_date": "2000-01-01", "tarif_name": "Licence"}}))
         self.assertEqual(res.status_code, 400)
 
         # Date de naissance manquante
-        res = add_member_api({"fields": {"last_name": "DUPONT", "first_name": "Jean", "tarif_name": "Licence"}})
+        res = add_member_api(MemberCreate.model_validate({"fields": {"last_name": "DUPONT", "first_name": "Jean", "tarif_name": "Licence"}}))
         self.assertEqual(res.status_code, 400)
 
         # Tarif manquant
-        res = add_member_api({"fields": {"last_name": "DUPONT", "first_name": "Jean", "birth_date": "2000-01-01"}})
+        res = add_member_api(MemberCreate.model_validate({"fields": {"last_name": "DUPONT", "first_name": "Jean", "birth_date": "2000-01-01"}}))
         self.assertEqual(res.status_code, 400)
 
     def test_member_update_requires_admin_role(self):
@@ -606,6 +331,7 @@ class TestBureauFiles(unittest.TestCase):
         import shutil
         from infrastructure.sqlite.connection import SqliteDatabase
         from api.members.members import update_member_api
+        from api.members.schemas import MemberUpdate
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_member_edit.db")
@@ -651,8 +377,8 @@ class TestBureauFiles(unittest.TestCase):
                 }
             }
 
-            res = update_member_api(payload)
-            self.assertEqual(res.get("status"), "success")
+            res = update_member_api(MemberUpdate.model_validate(payload))
+            self.assertEqual(res.status, "success")
 
             # Vérification dans la table users
             conn = SqliteDatabase.get_connection()
@@ -690,22 +416,21 @@ class TestBureauFiles(unittest.TestCase):
         with patch("infrastructure.firestore.cloud_database.CloudDatabase.is_enabled", return_value=True):
             with patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"status": "ok", "errors": []}):
                 res = sync_cloud_db_api(force=True)
-                self.assertEqual(res.get("status"), "success")
+                self.assertEqual(res.status, "success")
+                self.assertEqual(res.result.model_dump(), {"pulled": 0, "pushed": 0, "full": False})
 
     def test_season_tarifs_endpoint(self):
         """GET /api/season-tarifs retourne les tarifs disponibles de la saison active."""
-        from api.members.seasons import get_season_tarifs_api
-        res = get_season_tarifs_api("2026-2027")
-        self.assertEqual(res.get("status"), "success")
-        self.assertIn("tarifs", res)
-        self.assertIsInstance(res["tarifs"], list)
+        res = TestClient(app).get("/api/season-tarifs", params={"season": "2026-2027"}).json()
+        self.assertEqual((res["status"], res["season"]), ("success", "2026-2027"))
         self.assertIn("Licence sèche", res["tarifs"])
 
     def test_planning_item_crud_and_export(self):
         """Vérifie la création, modification, suppression et export Excel des créneaux de planning."""
-        from api.activities.planning import save_planning_item_api, delete_planning_item_api, export_planning_api, get_planning
-        
-        # 1. Création d'un nouveau créneau
+        self._temp_database("test_planning.db")
+        client = TestClient(app)
+
+        # 1. Création d'un nouveau créneau (champs absents : vides)
         new_slot = {
             "id": 0,
             "groupe": "Test Nouveau Créneau Web",
@@ -713,257 +438,54 @@ class TestBureauFiles(unittest.TestCase):
             "horaires": "19:00 - 20:30",
             "type": "cours",
             "categorie_age": "Adultes",
-            "encadrants": ["Test Coach"],
+            "encadrants": ["Test Coach", " "],
             "helloasso_tarifs": ["Licence sèche"]
         }
-        res_create = save_planning_item_api(new_slot)
-        self.assertEqual(res_create.get("status"), "success")
+        res_create = client.post("/api/planning/item", json=new_slot).json()
+        self.assertEqual(res_create["status"], "success")
         saved_id = res_create["item"]["id"]
         self.assertGreater(saved_id, 0)
+        expected = {**new_slot, "id": saved_id, "encadrants": ["Test Coach"], "whatsapp_link": "", "naissance_min": "", "naissance_max": ""}
+        self.assertEqual(res_create["item"], expected)
 
         # 2. Modification du créneau
-        new_slot["id"] = saved_id
-        new_slot["groupe"] = "Test Créneau Modifié Web"
-        res_update = save_planning_item_api(new_slot)
-        self.assertEqual(res_update.get("status"), "success")
-
-        # Vérification dans la liste
-        planning = get_planning()
-        found = next((x for x in planning if x.get("id") == saved_id), None)
-        self.assertIsNotNone(found)
-        self.assertEqual(found["groupe"], "Test Créneau Modifié Web")
+        res_update = client.post("/api/planning/item", json={**expected, "groupe": "Test Créneau Modifié Web"})
+        self.assertEqual(res_update.status_code, 200)
+        self.assertEqual(client.get("/api/planning").json(), [{**expected, "groupe": "Test Créneau Modifié Web"}])
 
         # 3. Export Excel (grille et liste)
-        resp_export_grid = export_planning_api(mode="grid", season="2026-2027")
-        self.assertEqual(resp_export_grid.headers.get("content-type"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        self.assertIn("attachment", resp_export_grid.headers.get("content-disposition", ""))
-        self.assertGreater(len(resp_export_grid.body), 1000)
-
-        resp_export_list = export_planning_api(mode="list", season="2026-2027")
-        self.assertEqual(resp_export_list.headers.get("content-type"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        self.assertGreater(len(resp_export_list.body), 1000)
+        for mode in ("grid", "list"):
+            resp = client.get("/api/planning/export", params={"mode": mode, "season": "2026-2027"})
+            self.assertEqual(resp.headers.get("content-type"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            self.assertIn("attachment", resp.headers.get("content-disposition", ""))
+            self.assertGreater(len(resp.content), 1000)
+        self.assertEqual(client.get("/api/planning/export", params={"mode": "autre"}).status_code, 422)
 
         # 4. Suppression
-        res_del = delete_planning_item_api(saved_id)
-        self.assertEqual(res_del.get("status"), "success")
+        self.assertEqual(client.delete(f"/api/planning/item/{saved_id}").json()["status"], "success")
+        self.assertEqual(client.get("/api/planning").json(), [])
+        r = client.delete(f"/api/planning/item/{saved_id}")
+        self.assertEqual((r.status_code, r.json()["message"]), (404, f"Créneau #{saved_id} introuvable."))
 
-    def test_outils_page_tabs(self):
-        """La page outils.html contient les onglets Carte et TCD."""
-        html = _read(os.path.join(BUREAU, "outils.html"))
-        for elem in ("tab-btn-map", "tab-btn-pivot", "pane-map", "pane-pivot",
-                      "iframe-map", "iframe-pivot", "pivot-season-select", "tools-refresh-btn"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/map")', html)
-        self.assertIn('apiFetch(url)', html)
-        self.assertIn('frame.srcdoc = html;', html)
-
-    def test_ffme_import_ui_elements(self):
-        """La page outils.html contient l'onglet et les éléments d'importation Excel FFME."""
-        html = _read(os.path.join(BUREAU, "outils.html"))
-        for elem in (
-            "tab-btn-ffme-import", "pane-ffme-import", "ffme-drop-zone", "ffme-file-input",
-            "ffme-browse-btn", "btn-ffme-analyze", "btn-ffme-quick-import",
-            "btn-ffme-apply", "ffme-results-section", "ffme-unmatched-box", "ffme-unmatched-tbody"
+    def test_planning_refusals(self):
+        """Un créneau sans nom ou sans horaires est refusé ; une grille sans créneau placable aussi."""
+        self._temp_database("test_planning_refusals.db")
+        client = TestClient(app)
+        for body, message in (
+            ({"groupe": " ", "horaires": "18:00 - 20:00"}, "Le nom du groupe est obligatoire."),
+            ({"groupe": "Loisir", "horaires": ""}, "Les horaires sont obligatoires."),
         ):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn('apiFetch("/api/ffme/preview"', html)
-        self.assertIn('apiFetch("/api/ffme/import"', html)
+            with self.subTest(body=body):
+                r = client.post("/api/planning/item", json=body)
+                self.assertEqual((r.status_code, r.json()["message"]), (400, message))
+        self.assertEqual(client.post("/api/planning/item", json={"groupe": "X", "horaires": "1", "inconnu": 1}).status_code, 422)
+        self.assertEqual(client.get("/api/planning").json(), [])
 
-        # Vérification du lien direct depuis adherents.html
-        adh_html = _read(os.path.join(BUREAU, "adherents.html"))
-        self.assertIn('/bureau/outils?tab=ffme-import', adh_html)
-
-    def test_ffme_auth_roles(self):
-        """Les routes de modification/import FFME exigent le rôle admin."""
-        from infrastructure.security.api_auth import required_role
-        self.assertEqual(required_role("POST", "/api/ffme/preview"), Role.ADMIN)
-        self.assertEqual(required_role("POST", "/api/ffme/import"), Role.ADMIN)
-        self.assertEqual(required_role("GET", "/api/ffme/export"), Role.COACH)
-
-    def test_ffme_preview_and_apply_api(self):
-        """preview_ffme_import_api et apply_ffme_import_api fonctionnent de bout en bout avec un fichier Excel FFME."""
-        import base64
-        import tempfile
-        import shutil
-        import pandas as pd
-        from infrastructure.sqlite.connection import SqliteDatabase
-        from api.ffme.ffme import preview_ffme_import_api, apply_ffme_import_api
-
-        temp_dir = tempfile.mkdtemp()
-        db_path = os.path.join(temp_dir, "test_ffme_import.db")
-        orig_db_path = SqliteDatabase.get_db_path()
-
-        try:
-            SqliteDatabase.set_db_path(db_path)
-            SqliteDatabase.setup_database()
-            conn = SqliteDatabase.get_connection()
-            c = conn.cursor()
-            c.execute("INSERT OR REPLACE INTO seasons (id, name, is_active) VALUES (1, '2026-2027', 1)")
-            # Insérer un utilisateur connu
-            c.execute("""
-                INSERT INTO users (id, last_name, first_name, last_name_key, first_name_key, licence_ffme, birth_date)
-                VALUES (101, 'GARCIA', 'Elena', 'garcia', 'elena', '112233', '2008-03-15')
-            """)
-            c.execute("""
-                INSERT INTO orders (id, order_ref, season_id, order_date, status, status_normalized)
-                VALUES (201, 'CMD-GARCIA', 1, '2026-09-01', 'Validé', 'Validé')
-            """)
-            c.execute("""
-                INSERT INTO purchases (id, order_id, user_id, tarif_name, amount, status, status_normalized)
-                VALUES (301, 201, 101, 'Cours Ados', 190.0, 'Validé', 'Validé')
-            """)
-            # Insérer un second utilisateur qui sera associé manuellement
-            c.execute("""
-                INSERT INTO users (id, last_name, first_name, last_name_key, first_name_key, licence_ffme, birth_date)
-                VALUES (102, 'MOREL', 'Thomas', 'morel', 'thomas', '', '2009-07-22')
-            """)
-            c.execute("""
-                INSERT INTO orders (id, order_ref, season_id, order_date, status, status_normalized)
-                VALUES (202, 'CMD-MOREL', 1, '2026-09-01', 'Validé', 'Validé')
-            """)
-            c.execute("""
-                INSERT INTO purchases (id, order_id, user_id, tarif_name, amount, status, status_normalized)
-                VALUES (302, 202, 102, 'Cours Ados', 190.0, 'Validé', 'Validé')
-            """)
-            conn.commit()
-            conn.close()
-
-            # Création du fichier Excel FFME de test (header=1)
-            excel_path = os.path.join(temp_dir, "test_ffme.xlsx")
-            df = pd.DataFrame([
-                {
-                    "Nom": "GARCIA",
-                    "Prénom": "Elena",
-                    "N° de licence": "112233",
-                    "Date de naissance": "15/03/2008",
-                    "Passeports": "Grimpeur Vert",
-                    "Diplômes": "Initiateur SAE",
-                    "Document de santé": "Questionnaire de santé"
-                },
-                {
-                    "Nom": "MOREL-DUPONT",
-                    "Prénom": "Tom",
-                    "N° de licence": "998877",
-                    "Date de naissance": "22/07/2009",
-                    "Passeports": "Grimpeur Bleu",
-                    "Diplômes": "",
-                    "Document de santé": "Certificat médical"
-                }
-            ])
-            with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-                df.to_excel(writer, index=False, startrow=1)
-
-            with open(excel_path, "rb") as f:
-                b64_content = base64.b64encode(f.read()).decode("utf-8")
-
-            # 1. Test Prévisualisation
-            prev_res = preview_ffme_import_api({
-                "filename": "test_ffme.xlsx",
-                "content_base64": b64_content
-            })
-            self.assertEqual(prev_res.get("status"), "success")
-            self.assertEqual(prev_res.get("matched_count"), 1)
-            self.assertEqual(prev_res.get("unmatched_count"), 1)
-
-            # 2. Test Application avec 1 correspondance automatique et 1 association manuelle
-            apply_res = apply_ffme_import_api({
-                "season": "2026-2027",
-                "filename": "test_ffme.xlsx",
-                "content_base64": b64_content,
-                "updates": prev_res.get("updates"),
-                "manual_matches": [
-                    {
-                        "user_id": 102,
-                        "nom": "MOREL-DUPONT",
-                        "prenom": "Tom",
-                        "licence": "998877",
-                        "passeports": "Grimpeur Bleu",
-                        "diplomes": "",
-                        "document_sante": "Certificat médical"
-                    }
-                ]
-            })
-            self.assertEqual(apply_res.get("status"), "success")
-            self.assertEqual(apply_res.get("updated_count"), 2)
-
-            # Vérification dans SQLite
-            conn = SqliteDatabase.get_connection()
-            u1 = conn.execute("SELECT * FROM users WHERE id = 101").fetchone()
-            self.assertEqual(u1["licence_ffme"], "112233")
-            self.assertEqual(u1["raw_passports"], "Grimpeur Vert")
-            self.assertEqual(u1["raw_diplomas"], "Initiateur SAE")
-
-            p1 = conn.execute("SELECT * FROM purchases WHERE id = 301").fetchone()
-            self.assertEqual(p1["status_normalized"], "Terminé")
-            self.assertEqual(p1["document_sante"], "Questionnaire de santé")
-
-            u2 = conn.execute("SELECT * FROM users WHERE id = 102").fetchone()
-            self.assertEqual(u2["licence_ffme"], "998877")
-            self.assertEqual(u2["raw_passports"], "Grimpeur Bleu")
-
-            p2 = conn.execute("SELECT * FROM purchases WHERE id = 302").fetchone()
-            self.assertEqual(p2["status_normalized"], "Terminé")
-            self.assertEqual(p2["document_sante"], "Certificat médical")
-            conn.close()
-        finally:
-            SqliteDatabase.set_db_path(orig_db_path)
-            shutil.rmtree(temp_dir, ignore_errors=True)
-
-    def test_communications_page_ui_and_wiring(self):
-        """La page communications.html reprend le design desktop et contient tous les contrôles."""
-        html = _read(os.path.join(BUREAU, "communications.html"))
-        shell = _read(os.path.join(SHARED, "alj-shell.js"))
-        index = _read(os.path.join(BUREAU, "index.html"))
-
-        # Vérification du menu et du lien
-        self.assertIn('/bureau/communications', shell)
-        self.assertIn('/bureau/communications', index)
-
-        # Contrôles de la page
-        for elem in ("template-select", "template-name-input", "btn-save-tpl", "btn-new-tpl", "btn-del-tpl",
-                      "sender-email", "sender-name", "subject-input", "body-input",
-                      "signature-checkbox", "whatsapp-input", "pv-from", "pv-subject", "pv-body"):
-            self.assertIn(f'id="{elem}"', html)
-
-        self.assertIn('apiFetch("/api/email-templates"', html)
-        self.assertIn('apiFetch("/api/whatsapp-template"', html)
-
-    def test_competitions_desktop_page_ui_and_wiring(self):
-        """La page bureau/competitions.html est adaptée aux grands écrans d'ordinateur tout en préservant le mobile."""
-        html = _read(os.path.join(BUREAU, "competitions.html"))
-        shell = _read(os.path.join(SHARED, "alj-shell.js"))
-        index = _read(os.path.join(BUREAU, "index.html"))
-
-        # Vérification des liens du menu et de l'accueil
-        self.assertIn('/bureau/competitions', shell)
-        self.assertIn('/bureau/competitions', index)
-
-        # La vue mobile existe toujours séparément et n'est pas altérée
-        mobile_html = _read(get_competitions_page().path)
-        self.assertIn('id="page-comps"', mobile_html)
-        self.assertIn('id="page-participants"', mobile_html)
-
-        # Éléments grand écran de la page bureau
-        for elem in ("comps-list-container", "comp-workspace", "comp-search-input",
-                      "comp-form-modal", "comp-email-modal", "btn-add-comp", "btn-fetch-results",
-                      "btn-nav-comps", "btn-nav-helloasso", "btn-nav-bilan", "btn-nav-coachs",
-                      "section-competitions", "section-helloasso", "section-bilan", "section-coachs"):
-            self.assertIn(f'id="{elem}"', html)
-        self.assertIn("comp-layout", html)
-        self.assertIn("part-chip-all", html)
-        self.assertIn("part-chip-selected", html)
-        self.assertIn("part-chip-unpaid", html)
-        self.assertIn("part-chip-non-invite", html)
-        self.assertIn("btn-remove-all-non-invites", html)
-        self.assertIn("Retirer tous les compétiteurs non invités", html)
-        self.assertIn("part-status-select", html)
-        self.assertIn("⚠️ Absent", html)
-        self.assertIn("🔄 Report", html)
-        self.assertIn('apiFetch("/api/helloasso/sync"', html)
-        self.assertIn('apiFetch("/api/send-email"', html)
-        self.assertIn("/fetch-results", html)
-        self.assertIn("hasResults", html)
-        self.assertIn("🏆 Résultats", html)
+        client.post("/api/planning/item", json={"groupe": "Autonome", "jour": "Lundi / Jeudi", "horaires": "20:00 - 22:00"})
+        r = client.get("/api/planning/export", params={"mode": "grid", "season": "2026-2027"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Aucun créneau à placer sur la grille", r.json()["message"])
+        self.assertEqual(client.get("/api/planning/export", params={"mode": "list", "season": "2026-2027"}).status_code, 200)
 
     @patch("infrastructure.mycompet.scraper.fetch_and_parse_mycompet_results")
     @patch("infrastructure.firestore.client.FirestoreClient.get_document")
@@ -993,79 +515,88 @@ class TestBureauFiles(unittest.TestCase):
         self.assertEqual(data["total_scraped"], 1)
         mock_update.assert_called_once()
 
-    def test_email_template_crud_endpoints_and_sqlite(self):
-        """Les endpoints POST et DELETE /api/email-templates modifient correctement SQLite."""
-        import tempfile
-        import shutil
+    def _temp_database(self, name):
+        """SqliteDatabase on an empty database for the test."""
         from infrastructure.sqlite.connection import SqliteDatabase
-        from api.communications.email import save_email_template_api, delete_email_template_api, get_email_templates
-
         temp_dir = tempfile.mkdtemp()
-        db_path = os.path.join(temp_dir, "test_tpl.db")
         orig_db_path = SqliteDatabase.get_db_path()
-        try:
-            SqliteDatabase.set_db_path(db_path)
-            SqliteDatabase.setup_database()
+        SqliteDatabase.set_db_path(os.path.join(temp_dir, name))
+        SqliteDatabase.setup_database()
+        self.addCleanup(shutil.rmtree, temp_dir, ignore_errors=True)
+        self.addCleanup(SqliteDatabase.set_db_path, orig_db_path)
 
-            # 1. Création d'un nouveau modèle
-            payload = {
-                "name": "Test Nouveau Modèle",
-                "subject": "Sujet de test personnalisé",
-                "body": "Bonjour {first_name}, corps de test.",
-                "sender_email": "test@alj-escalade.fr",
-                "sender_name": "ALJ Test"
-            }
-            res_save = save_email_template_api(payload)
-            self.assertEqual(res_save.get("status"), "success")
+    def test_email_template_crud_endpoints_and_sqlite(self):
+        """POST, GET et DELETE /api/email-templates modifient correctement SQLite."""
+        self._temp_database("test_tpl.db")
+        client = TestClient(app)
 
-            # 2. Vérification dans la liste
-            res_list = get_email_templates()
-            self.assertEqual(res_list.get("status"), "success")
-            names = [t["name"] for t in res_list.get("templates", [])]
-            self.assertIn("Test Nouveau Modèle", names)
+        def names():
+            return [t["name"] for t in client.get("/api/email-templates").json()["templates"]]
 
-            # 3. Renommage du modèle (old_name -> name)
-            rename_payload = {
-                "name": "Test Modèle Renommé",
-                "old_name": "Test Nouveau Modèle",
-                "subject": "Sujet mis à jour",
-                "body": "Bonjour {first_name}, corps mis à jour.",
-                "sender_email": "test@alj-escalade.fr",
-                "sender_name": "ALJ Test"
-            }
-            res_rename = save_email_template_api(rename_payload)
-            self.assertEqual(res_rename.get("status"), "success")
+        # 1. Création d'un nouveau modèle
+        payload = {
+            "name": "Test Nouveau Modèle",
+            "subject": "Sujet de test personnalisé",
+            "body": "Bonjour {first_name}, corps de test.",
+            "sender_email": "test@alj-escalade.fr",
+            "sender_name": "ALJ Test"
+        }
+        res_save = client.post("/api/email-templates", json=payload).json()
+        self.assertEqual(res_save["status"], "success")
+        self.assertEqual(res_save["template"], payload)
+        self.assertIn("Test Nouveau Modèle", names())
 
-            res_list_renamed = get_email_templates()
-            names_renamed = [t["name"] for t in res_list_renamed.get("templates", [])]
-            self.assertIn("Test Modèle Renommé", names_renamed)
-            self.assertNotIn("Test Nouveau Modèle", names_renamed)
+        # 2. Renommage du modèle (old_name -> name)
+        rename_payload = {**payload, "name": "Test Modèle Renommé", "old_name": "Test Nouveau Modèle", "subject": "Sujet mis à jour"}
+        self.assertEqual(client.post("/api/email-templates", json=rename_payload).json()["status"], "success")
+        self.assertIn("Test Modèle Renommé", names())
+        self.assertNotIn("Test Nouveau Modèle", names())
 
-            # 4. Suppression du modèle
-            res_del = delete_email_template_api("Test Modèle Renommé")
-            self.assertEqual(res_del.get("status"), "success")
+        # 3. Suppression du modèle
+        res_del = client.delete("/api/email-templates/Test Modèle Renommé")
+        self.assertEqual(res_del.json()["status"], "success")
+        self.assertNotIn("Test Modèle Renommé", names())
+        self.assertEqual(client.delete("/api/email-templates/Test Modèle Renommé").status_code, 404)
 
-            # 5. Vérification que le modèle a disparu
-            res_list2 = get_email_templates()
-            names2 = [t["name"] for t in res_list2.get("templates", [])]
-            self.assertNotIn("Test Modèle Renommé", names2)
-        finally:
-            SqliteDatabase.set_db_path(orig_db_path)
-            shutil.rmtree(temp_dir, ignore_errors=True)
+    def test_email_template_save_refusals(self):
+        """Nom, sujet, adresse d'expédition et doublons sont vérifiés par le serveur."""
+        self._temp_database("test_tpl_refusals.db")
+        client = TestClient(app)
+        base = {"name": "Relance", "subject": "Sujet", "body": "Corps"}
+        self.assertEqual(client.post("/api/email-templates", json=base).status_code, 200)
+        client.post("/api/email-templates", json={**base, "name": "Autre"})
+
+        for body, status, message in (
+            ({**base, "name": " "}, 400, "Le nom du modèle est obligatoire."),
+            ({**base, "subject": ""}, 400, "Le sujet du modèle est obligatoire."),
+            ({**base, "sender_email": "pas-une-adresse"}, 400, "L'adresse d'expédition doit être une adresse e-mail valide."),
+            # A new template, or a rename, onto an existing name (case ignored)
+            ({**base, "name": "RELANCE"}, 409, "Un modèle nommé « RELANCE » existe déjà."),
+            ({**base, "name": "autre", "old_name": "Relance"}, 409, "Un modèle nommé « autre » existe déjà."),
+        ):
+            with self.subTest(body=body):
+                r = client.post("/api/email-templates", json=body)
+                self.assertEqual(r.status_code, status)
+                self.assertEqual(r.json()["message"], message)
+        # Saving a template under its own name, or changing the case of it, is fine
+        self.assertEqual(client.post("/api/email-templates", json={**base, "old_name": "Relance"}).status_code, 200)
+        self.assertEqual(client.post("/api/email-templates", json={**base, "name": "RELANCE", "old_name": "Relance"}).status_code, 200)
+        # An empty sender falls back to the club's address
+        saved = client.post("/api/email-templates", json={**base, "name": "Défaut"}).json()["template"]
+        self.assertEqual(saved["sender_email"], "inscription@alj-escalade.fr")
+        self.assertEqual(client.get("/api/email-templates").json()["templates"][0]["sender_email"], "inscription@alj-escalade.fr")
 
     def test_whatsapp_template_endpoints(self):
         """GET et POST /api/whatsapp-template enregistrent et lisent le texte WhatsApp."""
         from support.fake_firestore import use_fake_firestore
-        from api.communications.whatsapp import get_whatsapp_template_api, save_whatsapp_template_api
         use_fake_firestore(self)
+        client = TestClient(app)
+        self.assertEqual(client.get("/api/whatsapp-template").json(), {"status": "success", "template": ""})
 
-        self.assertEqual(get_whatsapp_template_api().get("template"), "")
-        res_save = save_whatsapp_template_api({"template": "Rejoignez le groupe WhatsApp du club : https://chat.whatsapp.com/xxx"})
-        self.assertEqual(res_save.get("status"), "success")
-
-        res_get = get_whatsapp_template_api()
-        self.assertEqual(res_get.get("status"), "success")
-        self.assertIn("chat.whatsapp.com", res_get.get("template", ""))
+        res_save = client.post("/api/whatsapp-template", json={"template": "Rejoignez le groupe WhatsApp du club : https://chat.whatsapp.com/xxx"})
+        self.assertEqual(res_save.json()["status"], "success")
+        self.assertIn("chat.whatsapp.com", client.get("/api/whatsapp-template").json()["template"])
+        self.assertEqual(client.post("/api/whatsapp-template", json={"template": "  "}).status_code, 400)
 
     def test_email_template_write_requires_admin_role(self):
         """Les modifications de templates d'emails exigent le rôle admin."""
@@ -1092,69 +623,6 @@ class TestBureauFiles(unittest.TestCase):
             "Bonjour Camille DURAND, votre inscription au groupe Jeunes 2010 pour la saison 2026-2027 (licence 654321) est validée."
         )
 
-    def test_pwa_entry_pages_check_device_before_rendering(self):
-        """competitions.html et index.html chargent alj-vue.js avant Firebase (redirection ordinateur)."""
-        for page in (get_competitions_page().path, get_annuaire_page().path):
-            html = _read(page)
-            self.assertIn('<script src="/static-web/alj-vue.js"></script>', html, page)
-            self.assertLess(html.index("alj-vue.js"), html.index("firebase-app-compat.js"), page)
-        self.assertIn('href="/index?vue=pwa"', _read(get_competitions_page().path))
-        self.assertIn('COMPETITIONS_URL + "?vue=pwa"', _read(get_annuaire_page().path))
-
-    def test_device_redirect_rules(self):
-        js = _read(os.path.join(SHARED, "alj-vue.js"))
-        # Ordinateur : écran large et pointeur fin (souris), pas tactile
-        self.assertIn("(min-width: 1024px) and (any-pointer: fine)", js)
-        self.assertIn('var BUREAU = "/bureau/";', js)
-        # Choix explicites : ?vue=mobile (mémorisé), ?vue=pwa (une fois), connexion Google
-        self.assertIn('vue === "mobile"', js)
-        self.assertIn('pwaDemandee = vue === "mobile" || vue === "pwa"', js)
-        self.assertIn('params.get("login") === "1"', js)
-        self.assertIn("access_token=", js)
-
-    def test_shell_imports_exist_in_core(self):
-        """Chaque nom importé par alj-shell.js doit être exporté par alj-core.js."""
-        shell = _read(os.path.join(SHARED, "alj-shell.js"))
-        core = _read(os.path.join(SHARED, "alj-core.js"))
-        block = re.search(r"import\s*\{(.*?)\}\s*from\s*\"/static-web/alj-core.js\"", shell, re.S).group(1)
-        names = [n.strip() for n in block.split(",") if n.strip()]
-        self.assertTrue(names)
-        for name in names:
-            self.assertRegex(core, rf"export (function|const|async function) {name}\b", name)
-
-    def test_competitions_bureau_uses_api_only(self):
-        """The bureau competitions page reads and writes through the API, never Firestore directly."""
-        html = _read(os.path.join(BUREAU, "competitions.html"))
-        for firestore_call in (".collection(", "onSnapshot", "initFirebase"):
-            self.assertNotIn(firestore_call, html, firestore_call)
-        self.assertIn('<script src="/static-web/alj-sync.js"></script>', html)
-        for url in ("/api/competitions", "/api/coaches", "/api/competition-members",
-                    "/api/helloasso/items"):
-            self.assertIn(f'"{url}"', html, url)
-
-    def test_bureau_imports_exist_in_core(self):
-        """Every name imported from alj-core.js by the bureau pages and shared modules is exported."""
-        core = _read(os.path.join(SHARED, "alj-core.js"))
-        for path in (os.path.join(BUREAU, "competitions.html"),
-                     os.path.join(BUREAU, "adherents.html"),
-                     os.path.join(SHARED, "alj-filters.js")):
-            block = re.search(r"import\s*\{([^}]+)\}\s*from\s*\"/static-web/alj-core\.js\"", _read(path)).group(1)
-            names = [n.strip() for n in block.split(",") if n.strip()]
-            self.assertTrue(names, path)
-            for name in names:
-                self.assertRegex(core, rf"export (function|const|async function) {name}\b", f"{path}: {name}")
-
-    def test_core_roles_match_api_and_rules(self):
-        core = _read(os.path.join(SHARED, "alj-core.js"))
-
-        def js_list(name):
-            body = re.search(r"export const %s = \[(.*?)\];" % name, core, re.S).group(1)
-            return set(re.findall(r'"([^"]+)"', body))
-
-        self.assertEqual(js_list("ADMIN_EMAILS"), set(api_auth.ADMIN_EMAILS))
-        self.assertEqual(js_list("COACH_EMAILS"), set(api_auth.ADMIN_EMAILS) | set(api_auth.COACH_EMAILS))
-        self.assertEqual(js_list("READONLY_EMAILS"), set(api_auth.READONLY_EMAILS))
-
 
 class TestBureauAccess(unittest.TestCase):
     """Le portail reste public (pages) tandis que l'API reste protégée."""
@@ -1168,8 +636,8 @@ class TestBureauAccess(unittest.TestCase):
         self.env.stop()
 
     def test_portal_public_api_protected(self):
-        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres",
-                     "/static-web/alj.css", "/static-web/alj-shell.js"):
+        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions",
+                     "/bureau/planning", "/bureau/outils", "/bureau/parametres"):
             self.assertEqual(self.client.get(path).status_code, 200, path)
         self.assertEqual(self.client.get("/bureau/inconnue").status_code, 404)
         self.assertEqual(self.client.get("/api/email-status").status_code, 401)
@@ -1178,87 +646,96 @@ class TestBureauAccess(unittest.TestCase):
     def test_portal_content_types(self):
         self.assertIn("text/html", self.client.get("/bureau/").headers["content-type"])
         self.assertIn("text/html", self.client.get("/bureau/planning").headers["content-type"])
-        self.assertIn("javascript", self.client.get("/static-web/alj-shell.js").headers["content-type"])
-        self.assertIn("text/css", self.client.get("/static-web/alj.css").headers["content-type"])
+        # Former shared scripts: gone, and the address is no longer public (401 before the 404)
+        self.assertEqual(self.client.get("/static-web/alj-core.js").status_code, 401)
 
     def test_required_role_for_portal(self):
         r = api_auth.required_role
-        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres", "/static-web/alj-core.js"):
+        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres"):
             self.assertIsNone(r("GET", path), path)
         self.assertEqual(r("GET", "/api/email-status"), Role.COACH)
 
 
-class TestSingleFirebaseInit(unittest.TestCase):
-    """Centralised Firebase initialisation (alj-firebase.js) and runtime configuration
-    served by the server (/runtime-config.js): the basis of the emulator dev mode."""
+class TestVueApp(unittest.TestCase):
+    """Pages migrated to the Vue application (frontend/): its entry page and assets (api/web/pages.py)."""
 
-    PAGES = [os.path.join(WEB, "competitions.html"), os.path.join(WEB, "index.html")] + [
-        os.path.join(BUREAU, n) for n in sorted(os.listdir(BUREAU)) if n.endswith(".html")]
+    def setUp(self):
+        self.dist = tempfile.mkdtemp(prefix="alj-dist-")
+        self.env = patch.dict(os.environ, {"ALJ_FRONTEND_DIST": self.dist})
+        self.env.start()
 
-    def test_pages_load_config_then_init(self):
-        sdk = '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>'
-        for path in self.PAGES:
-            html = _read(path)
-            i_sdk = html.index(sdk)
-            i_cfg = html.index('<script src="/runtime-config.js"></script>')
-            i_init = html.index('<script src="/static-web/alj-firebase.js"></script>')
-            self.assertLess(i_sdk, i_cfg, path)
-            self.assertLess(i_cfg, i_init, path)
+    def tearDown(self):
+        self.env.stop()
+        shutil.rmtree(self.dist, ignore_errors=True)
 
-    def test_no_client_firestore_access(self):
-        """Firebase signs in only: no Firestore SDK, query or offline cache left (plan phase 3)."""
-        files = self.PAGES + [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
-        files.append(get_sw().path)
-        for path in files:
-            text = _read(path)
-            for needle in ("firestore-compat", "firebase.firestore(", ".collection(", "onSnapshot",
-                           "enablePersistence", "runTransaction"):
-                self.assertNotIn(needle, text, f"{os.path.basename(path)}: {needle}")
+    def test_accueil_without_build_explains_how_to_build(self):
+        r = get_bureau_home()
+        self.assertEqual(r.status_code, 503)
+        self.assertIn(b"npm run build", r.body)
 
-    def test_old_firestore_cache_is_wiped(self):
-        """alj-firebase.js deletes the IndexedDB copy kept by the pages up to v22."""
-        js = _read(os.path.join(SHARED, "alj-firebase.js"))
-        self.assertIn('FIRESTORE_DB_PREFIX = "firestore/"', js)
-        self.assertIn("indexedDB.deleteDatabase(name)", js)
-        self.assertIn('"firestore/[DEFAULT]/" + FIREBASE_CONFIG.projectId + "/main"', js)
-        self.assertRegex(js, r"wipeFirestoreCache\(\);\s*services = \{ auth \};")
+    def test_accueil_serves_the_entry_page_uncached(self):
+        with open(os.path.join(self.dist, "index.html"), "w", encoding="utf-8") as f:
+            f.write("<div id=\"app\"></div>")
+        r = TestClient(app).get("/bureau/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.text, '<div id="app"></div>')
+        self.assertEqual(r.headers["cache-control"], "no-cache")
+        self.assertEqual(TestClient(app).get("/bureau").status_code, 200)
 
-    def test_firebase_config_defined_once(self):
-        files = self.PAGES + [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
-        owners = [os.path.basename(p) for p in files if "apiKey:" in _read(p)]
-        self.assertEqual(owners, ["alj-firebase.js"])
-        for path in files:
-            self.assertNotIn("firebase.initializeApp(", _read(path).replace(
-                "firebase.initializeApp(config)", ""), path)
+    def test_assets_served_under_spa(self):
+        """The mount reads the folder of the build at startup: the app's own one (frontend/dist), maybe not built."""
+        r = TestClient(app).get("/spa/assets/does-not-exist.js")
+        self.assertEqual(r.status_code, 404)  # not a server error when the frontend is not built
 
-    def test_service_worker_does_not_cache_config(self):
-        sw = _read(get_sw().path)
-        self.assertIn('"/static-web/alj-firebase.js"', sw)
-        self.assertNotIn('"/runtime-config.js",', sw)
-        self.assertIn('url.pathname === "/runtime-config.js"', sw)
+    def test_migrated_pages_serve_the_entry_page(self):
+        with open(os.path.join(self.dist, "index.html"), "w", encoding="utf-8") as f:
+            f.write("<div id=\"app\"></div>")
+        for page in ("adherents", "communications", "competitions", "outils", "parametres", "planning"):
+            r = TestClient(app).get(f"/bureau/{page}")
+            self.assertEqual(r.status_code, 200, page)
+            self.assertEqual(r.text, '<div id="app"></div>', page)
+        # The competitions and the Google sign-in callback, on phones as on desktop (?vue=: former links)
+        for path in ("/competitions", "/competitions?vue=mobile", "/competitions?login=1"):
+            self.assertEqual(TestClient(app).get(path).text, '<div id="app"></div>', path)
+        r = TestClient(app).get("/", follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (302, "/competitions"))
+        # The directory, on phones as on desktop (?vue=pwa: link of the competitions page)
+        for path in ("/index", "/index?vue=pwa"):
+            self.assertEqual(TestClient(app).get(path).text, '<div id="app"></div>', path)
+        self.assertFalse(os.path.exists(os.path.join(WEB, "index.html")))
+
+    def test_former_page_files_redirect(self):
+        """The former pages of web/ (served by the /annuaire mount): their screen, query kept (?vue=… included)."""
+        for path, target in (("/annuaire/", "/index"), ("/annuaire/index.html?vue=pwa", "/index?vue=pwa"),
+                             ("/annuaire/competitions.html", "/competitions"),
+                             ("/annuaire/competitions.html?vue=mobile", "/competitions?vue=mobile"),
+                             ("/annuaire/bureau/", "/bureau/"), ("/annuaire/bureau/index.html", "/bureau/"),
+                             ("/annuaire/bureau/adherents.html?id=3", "/bureau/adherents?id=3"),
+                             ("/annuaire/bureau/competitions.html", "/bureau/competitions")):
+            r = TestClient(app).get(path, follow_redirects=False)
+            self.assertEqual((r.status_code, r.headers.get("location")), (302, target), path)
+        self.assertEqual(TestClient(app).get("/annuaire/bureau/inconnue.html").status_code, 404)
+        self.assertEqual(TestClient(app).get("/annuaire/assets/logo.png").status_code, 200)  # the mount still serves the logo
+
+    def test_former_management_pages_redirect(self):
+        """The former competitions management pages (phone and office): the competitions screen, query kept."""
+        for path, target in (("/competitions/gestion", "/competitions"), ("/bureau/competitions-gestion?id=12", "/bureau/competitions?id=12")):
+            r = TestClient(app).get(path, follow_redirects=False)
+            self.assertEqual((r.status_code, r.headers["location"]), (302, target), path)
+        self.assertEqual(get_bureau_page("competitions-gestion").status_code, 404)  # not a page of its own any more
+
+    def test_former_record_url_goes_to_the_list(self):
+        """/bureau/adherents-fiche (member record of the former page, 2.14) opens the record in the Vue app."""
+        r = TestClient(app).get("/bureau/adherents-fiche?id=12&saison=2026-2027", follow_redirects=False)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.headers["location"], "/bureau/adherents?id=12&saison=2026-2027")
+
+
+class TestRuntimeConfig(unittest.TestCase):
+    """Runtime configuration served by the server (/runtime-config.js): the basis of the emulator dev mode."""
 
     def test_runtime_config_is_public(self):
         self.assertIsNone(api_auth.required_role("GET", "/runtime-config.js"))
-
-
-class TestSharedModuleImports(unittest.TestCase):
-    """Every name imported from /static-web/*.js is exported by that module
-    (otherwise a SyntaxError on page load, invisible on the server side)."""
-
-    IMPORT_RE = re.compile(r'import\s*\{([^}]*)\}\s*from\s*"/static-web/([\w.-]+\.js)"')
-    EXPORT_RE = re.compile(r'^export\s+(?:async\s+)?(?:function\*?|const|let|class)\s+(\w+)', re.M)
-
-    def test_imported_names_are_exported(self):
-        files = [os.path.join(WEB, n) for n in os.listdir(WEB) if n.endswith(".html")]
-        files += [os.path.join(BUREAU, n) for n in os.listdir(BUREAU) if n.endswith(".html")]
-        files += [os.path.join(SHARED, n) for n in os.listdir(SHARED) if n.endswith(".js")]
-        for path in files:
-            for names, module in self.IMPORT_RE.findall(_read(path)):
-                exported = set(self.EXPORT_RE.findall(_read(os.path.join(SHARED, module))))
-                for name in filter(None, (n.split(" as ")[0].strip() for n in names.split(","))):
-                    with self.subTest(page=os.path.basename(path), module=module, name=name):
-                        self.assertIn(name, exported)
-
 
 if __name__ == "__main__":
     unittest.main()

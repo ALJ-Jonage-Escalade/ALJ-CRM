@@ -6,7 +6,6 @@ Tests de sécurité de l'API Cloud Run :
 
 import datetime
 import os
-import re
 import sys
 import time
 import unittest
@@ -77,9 +76,9 @@ class TestRoles(unittest.TestCase):
 
     def test_required_role(self):
         r = api_auth.required_role
-        for path in ("/", "/health", "/competitions", "/index", "/sw.js", "/manifest.webmanifest",
+        for path in ("/", "/health", "/competitions", "/competitions/gestion", "/index", "/sw.js", "/manifest.webmanifest",
                      "/api/web-version", "/webhooks/helloasso", "/annuaire/", "/annuaire/index.html",
-                     "/bureau", "/bureau/", "/bureau/adherents", "/static-web/alj-core.js"):
+                     "/bureau", "/bureau/", "/bureau/adherents", "/spa/assets/index-abc.js", "/annuaire/assets/logo.png"):
             self.assertIsNone(r("GET", path), path)
         self.assertIsNone(r("POST", "/webhooks/helloasso"))
         self.assertIsNone(r("OPTIONS", "/api/send-email"))
@@ -87,6 +86,9 @@ class TestRoles(unittest.TestCase):
                      "/map", "/pivot", "/docs", "/openapi.json", "/api/une-route-future"):
             self.assertEqual(r("GET", path), Role.COACH, path)
         self.assertEqual(r("POST", "/api/planning"), Role.ADMIN)
+        self.assertEqual(r("POST", "/api/planning/item"), Role.COACH)
+        self.assertEqual(r("DELETE", "/api/planning/item/3"), Role.COACH)
+        self.assertEqual(r("GET", "/api/planning/export"), Role.COACH)
         self.assertEqual(r("GET", "/api/planning"), Role.COACH)
         self.assertEqual(r("GET", "/annuaire-pirate"), Role.COACH)
 
@@ -140,19 +142,20 @@ class TestRoles(unittest.TestCase):
         self.assertNotIn("@", rules)
         self.assertNotIn("request.auth", rules)
 
-    def test_display_lists_match_api(self):
-        """The pages' role lists (display only) stay identical to the API's."""
-        for page in ("competitions.html", "index.html", os.path.join("shared", "alj-core.js")):
-            with open(os.path.join(_code_root, "web", page), encoding="utf-8") as f:
-                html = f.read()
-
-            def js_list(name):
-                body = re.search(r"const %s = \[(.*?)\];" % name, html, re.S).group(1)
-                return set(re.findall(r'"([^"]+)"', body))
-
-            self.assertEqual(js_list("COACH_EMAILS"), set(api_auth.ADMIN_EMAILS) | set(api_auth.COACH_EMAILS), page)
-            self.assertEqual(js_list("READONLY_EMAILS"), set(api_auth.READONLY_EMAILS), page)
-
+    def test_role_lists_not_copied_to_the_web_app(self):
+        """The web app reads the role on /api/me: no copy of the role lists in any frontend file (plan phase 12)."""
+        listed = set(api_auth.ADMIN_EMAILS) | set(api_auth.COACH_EMAILS) | set(api_auth.READONLY_EMAILS)
+        self.assertTrue(listed)
+        texts = [os.path.join(_code_root, "frontend", "index.html")]
+        for root in (os.path.join(_code_root, "web"), os.path.join(_code_root, "frontend", "src")):
+            texts += [os.path.join(d, n) for d, _, names in os.walk(root) for n in names
+                      if n.endswith((".ts", ".vue", ".js", ".html", ".json", ".css"))]
+        self.assertGreater(len(texts), 10)
+        for path in texts:
+            with open(path, encoding="utf-8") as f:
+                content = f.read().lower()
+            for email in listed:
+                self.assertNotIn(email.lower(), content, path)
 
 class TestTokenVerification(_CertsMixin, unittest.TestCase):
 
@@ -182,6 +185,69 @@ class TestTokenVerification(_CertsMixin, unittest.TestCase):
             fetch.assert_called_once()
 
 
+class TestMeRoute(_CertsMixin, unittest.TestCase):
+    """GET /api/me: any signed-in account gets its own role (the pages no longer hold role lists)."""
+
+    def setUp(self):
+        super().setUp()
+        self.client = TestClient(app)
+
+    def me(self, token=None, **env):
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        with patch.dict(os.environ, {"ALJ_API_AUTH": "required", **env}):
+            return self.client.get("/api/me", headers=headers)
+
+    def test_requires_a_valid_token(self):
+        r = self.me()
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(r.headers.get("www-authenticate"), "Bearer")
+        self.assertEqual(self.me("abc").status_code, 401)
+        self.assertEqual(self.me(make_token(exp_delta=-3600)).status_code, 401)
+
+    def test_role_of_each_account(self):
+        cases = [
+            (make_token(email="albus@alj-escalade.fr"), "admin"),
+            (make_token(email="stephane.loridant@orange.fr"), "coach"),
+            (make_token(email="pirate@gmail.com", coach=True), "coach"),
+            (make_token(email="muah.did@gmail.com"), "readonly"),
+            (make_token(email="pirate@gmail.com"), None),                      # signed in, no access: 200, not 403
+            (make_token(email="albus@alj-escalade.fr", verified=False), None),  # address rules need a verified e-mail
+        ]
+        for token, role in cases:
+            r = self.me(token)
+            self.assertEqual(r.status_code, 200, role)
+            self.assertEqual(r.json()["role"], role)
+        self.assertEqual(self.me(make_token(email="albus@alj-escalade.fr")).json()["email"], "albus@alj-escalade.fr")
+
+    def test_emulator_token_in_dev_mode_only(self):
+        """Dev mode (emulator, token checks off): the unsigned emulator token is read as is."""
+        emulator_token = jwt.encode({"sub": "dev-snape", "email": "severus@hogwarts.example", "email_verified": True,
+                                     "coach": True}, key=None, algorithm="none")
+        r = self.me(emulator_token, ALJ_API_AUTH="off", ALJ_ENV="dev")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"email": "severus@hogwarts.example", "role": "coach"})
+        # Token checks off outside dev mode (local server): no unverified token is trusted
+        self.assertEqual(self.me(emulator_token, ALJ_API_AUTH="off", ALJ_ENV="prod").status_code, 401)
+        # Token checks on: the unsigned token is refused, even in dev mode
+        self.assertEqual(self.me(emulator_token, ALJ_ENV="dev").status_code, 401)
+
+    def test_local_server_verifies_the_token(self):
+        """Token checks off outside dev mode (lancer_site_web.bat): /api/me still verifies the token and answers the role."""
+        local = {"ALJ_API_AUTH": "off", "ALJ_ENV": "prod"}
+        r = self.me(make_token(email="albus@alj-escalade.fr"), **local)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"email": "albus@alj-escalade.fr", "role": "admin"})
+        self.assertEqual(self.me(make_token(email="stephane.loridant@orange.fr"), **local).json()["role"], "coach")
+        self.assertEqual(self.me(**local).status_code, 401)
+        self.assertEqual(self.me("abc", **local).status_code, 401)
+        self.assertEqual(self.me(make_token(exp_delta=-3600), **local).status_code, 401)
+        self.assertEqual(self.me(make_token(key=OTHER_KEY), **local).status_code, 401)
+        # The other routes still need no token there (local server: local_guard_middleware protects them)
+        with patch.dict(os.environ, local):
+            self.assertIsNone(api_auth.authorize_request("GET", "/api/members", None))
+            self.assertIsNone(api_auth.authorize_request("POST", "/api/members/update", "Bearer abc"))
+
+
 class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
 
     def setUp(self):
@@ -200,7 +266,7 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
 
     def test_public_routes(self):
         for path in ("/health", "/api/web-version", "/webhooks/helloasso",
-                     "/bureau/", "/bureau/adherents", "/static-web/alj-core.js"):
+                     "/bureau/", "/bureau/adherents", "/annuaire/assets/logo.png"):
             self.assertEqual(self.get(path).status_code, 200, path)
 
     def test_protected_routes(self):
@@ -234,6 +300,11 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
             r = self.client.post("/api/planning", json=[], headers={"Authorization": f"Bearer {make_token()}"})
             self.assertEqual(r.status_code, 200)
             save.assert_called_once()
+        # Single slots: coaches change them too (Planning page)
+        with patch("api.activities.planning.PlanningRepository.delete_planning_item", return_value=True) as delete:
+            r = self.client.delete("/api/planning/item/1", headers={"Authorization": f"Bearer {coach}"})
+            self.assertEqual(r.status_code, 200)
+            delete.assert_called_once_with(1)
 
     def test_cross_origin_preflight_not_approved(self):
         """No CORS: a foreign site's preflight is never approved, and OPTIONS needs no token."""

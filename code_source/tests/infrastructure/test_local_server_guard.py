@@ -97,8 +97,9 @@ class TestResponseHardening(unittest.TestCase):
 
     def test_validation_errors_keep_their_message(self):
         with patch.dict(os.environ, {"ALJ_API_AUTH": "off"}):
-            resp = self.client.post("/api/attestations/preview",
-                                    json={"member": {"first_name": "Harry", "last_name": "Potter", "amount": 0}})
+            with patch("services.members.members.MemberService.find_member",
+                       return_value={"first_name": "Harry", "last_name": "Potter", "amount": 0}):
+                resp = self.client.post("/api/attestations/preview", json={"purchase_id": 1})
         self.assertEqual(resp.status_code, 400)
         self.assertIn("supérieur à zéro", resp.json()["message"])
 

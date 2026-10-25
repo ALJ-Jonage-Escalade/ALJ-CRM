@@ -9,9 +9,13 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+
+from api.competitions.schemas.results import BatchReport, ResultsSettings, ResultsSettingsSaved, ResultsSettingsUpdate
+from api.competitions.schemas.views import ResultsFetched
+from api.responses import error, error_responses
 
 # Full paths: /api/competitions/... and /api/settings/...
 router = APIRouter()
@@ -21,11 +25,11 @@ router = APIRouter()
 # Batch quotidien de récupération des résultats MyCompet FFME & Notifications.
 # Stays registered before /{comp_id}/fetch-results, which would capture "cron": Cloud Scheduler
 # (job batch-resultats-competitions) calls POST /api/competitions/cron/fetch-results every day.
-@router.post("/api/competitions/cron/fetch-results")
+@router.post("/api/competitions/cron/fetch-results", response_model=BatchReport)
 async def api_cron_fetch_competition_results(
     force: bool = False,
     email: Optional[str] = None
-):
+) -> BatchReport:
     """
     Exécute le batch de récupération des résultats MyCompet FFME pour les compétitions passées
     et envoie un e-mail de synthèse si des résultats sont découverts.
@@ -34,16 +38,18 @@ async def api_cron_fetch_competition_results(
     from services.competitions.results_batch import CompetitionResultsBatchService
     from services.competitions.store import invalidate_cache
     try:
-        return await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
+        report = await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
+        return BatchReport.model_validate(report)
     finally:
         invalidate_cache()  # the batch writes competition documents directly
 
 
-@router.post("/api/competitions/{comp_id}/fetch-results")
-async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = Body(default={})):
+@router.post("/api/competitions/{comp_id}/fetch-results", response_model=ResultsFetched, responses=error_responses(404, 502))
+async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = Body(default={})) -> ResultsFetched | JSONResponse:  # Any: {url, club}
     """
     Récupère les résultats officiels depuis MyCompet FFME pour une compétition donnée,
     extrait les compétiteurs de l'Amicale Laïque de Jonage et met à jour leurs classements.
+    404 `needs_url`: the results page was not found automatically, the coach gives its address or number.
     """
     from infrastructure.mycompet.scraper import fetch_and_parse_mycompet_results, normalize_result_url, find_mycompet_result_url
     from infrastructure.firestore.client import FirestoreClient
@@ -70,20 +76,15 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
             url = auto_url
 
     if not url:
-        return JSONResponse({
-            "status": "needs_url",
-            "message": "Résultats introuvables automatiquement sur MyCompet. Veuillez renseigner l'URL ou le numéro de résultat (ex: https://mycompet.ffme.fr/resultat/resultat_13660 ou 13660)."
-        }, status_code=404)
+        return error(404, "Résultats introuvables automatiquement sur MyCompet. Veuillez renseigner l'URL ou le numéro de "
+                          "résultat (ex: https://mycompet.ffme.fr/resultat/resultat_13660 ou 13660).", "needs_url")
 
     try:
         club_kw = payload.get("club") or "JONAGE"
         scraped_results = await run_in_threadpool(fetch_and_parse_mycompet_results, url, club_kw)
     except Exception as e:
         print(f"❌ [MYCOMPET] Erreur scraping MyCompet ({url}) : {type(e).__name__}: {e}")
-        return JSONResponse({
-            "status": "error",
-            "message": "Erreur lors de la récupération des résultats MyCompet (détails dans les journaux)."
-        }, status_code=502)
+        return error(502, "Erreur lors de la récupération des résultats MyCompet (détails dans les journaux).")
 
     matched_count = 0
     participants = list((comp_doc.get("participants") if comp_doc else None) or [])
@@ -131,37 +132,23 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
             from services.competitions.store import invalidate_cache
             invalidate_cache()  # results visible on the next poll of the competition pages
 
-    return {
-        "status": "success",
-        "url": canonical_url,
-        "total_scraped": len(scraped_results),
-        "matched_count": matched_count,
-        "results": scraped_results,
-        "participants": participants
-    }
+    return ResultsFetched(status="success", url=canonical_url, total_scraped=len(scraped_results), matched_count=matched_count)
 
 
-@router.get("/api/settings/competitions-results")
-def get_competitions_results_settings_api():
+@router.get("/api/settings/competitions-results", response_model=ResultsSettings)
+def get_competitions_results_settings_api() -> ResultsSettings:
     """Retourne la configuration et l'état du batch quotidien de résultats."""
     from services.competitions.results_batch import CompetitionResultsBatchService
-    return {
-        "status": "success",
-        **CompetitionResultsBatchService.get_batch_status()
-    }
+    return ResultsSettings(status="success", **CompetitionResultsBatchService.get_batch_status())
 
 
-@router.post("/api/settings/competitions-results")
-def update_competitions_results_settings_api(data: Dict[str, Any] = Body(...)):
+@router.post("/api/settings/competitions-results", response_model=ResultsSettingsSaved, responses=error_responses(400))
+def update_competitions_results_settings_api(data: ResultsSettingsUpdate) -> ResultsSettingsSaved | JSONResponse:
     """Met à jour l'adresse e-mail de notification des résultats."""
     from services.competitions.results_batch import CompetitionResultsBatchService
-    email = str(data.get("notification_email") or "").strip()
+    email = data.notification_email
     if not email or "@" not in email or "." not in email:
-        raise HTTPException(status_code=400, detail="Adresse e-mail de notification invalide.")
+        return error(400, "Adresse e-mail de notification invalide.")
 
     ok = CompetitionResultsBatchService.set_notification_email(email)
-    return {
-        "status": "success",
-        "notification_email": CompetitionResultsBatchService.get_notification_email(),
-        "saved": ok
-    }
+    return ResultsSettingsSaved(status="success", notification_email=CompetitionResultsBatchService.get_notification_email(), saved=ok)

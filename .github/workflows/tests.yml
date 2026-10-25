@@ -47,6 +47,10 @@ jobs:
         uv lock --check
         python dev/export_requirements.py --check
 
+    - name: Check the API contract (frontend/openapi.json) is up to date
+      working-directory: code_source
+      run: uv run --no-sync python dev/export_openapi.py --check
+
     - name: Lint (ruff)
       working-directory: code_source
       run: uv run --no-sync ruff check src tests
@@ -58,6 +62,44 @@ jobs:
     - name: Run Unit Tests (pytest)
       working-directory: code_source
       run: uv run --no-sync pytest tests
+
+  frontend:
+    # Vue app (code_source/frontend/): same commands as locally, Node version from .nvmrc
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: code_source/frontend
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v7
+
+    - name: Set up Node
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: 'code_source/frontend/.nvmrc'
+        cache: 'npm'
+        cache-dependency-path: code_source/frontend/package-lock.json
+
+    - name: Install Dependencies (package-lock.json)
+      run: npm ci --no-fund
+
+    - name: Check the API types match the contract (src/lib/api-schema.ts)
+      run: npm run check:api
+
+    - name: Lint (ESLint)
+      run: npm run lint
+
+    - name: Format check (Prettier)
+      run: npm run format:check
+
+    - name: Type check (vue-tsc)
+      run: npm run typecheck
+
+    - name: Unit Tests (Vitest)
+      run: npm test
+
+    - name: Build
+      run: npm run build
 
   e2e:
     # Browser tests (Playwright) against a throwaway stack started by the tests: Firebase emulator +
@@ -98,27 +140,47 @@ jobs:
     - name: Install Chromium
       run: python -m playwright install --with-deps chromium
 
+    - name: Set up Node
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: 'code_source/frontend/.nvmrc'
+        cache: 'npm'
+        cache-dependency-path: code_source/frontend/package-lock.json
+
+    - name: Build the Vue app (served by the server under test)
+      working-directory: code_source/frontend
+      run: npm ci --no-fund && npm run build
+
     - name: Lint (ruff)
       run: python -m ruff check e2e
 
     - name: Run e2e tests (pytest + Playwright)
+      # Below the job's 30 min: a hung run fails here, so the logs and artifacts below are still uploaded
+      timeout-minutes: 20
       env:
         E2E_KEEP_STACK: '1' # kept for the logs below, removed by the last step
       # No --video: "retain-on-failure" still records every test, which overloads the 4-vCPU runner
       # shared by 4 workers (timeouts). The trace has a screenshot and DOM snapshot of every step.
       # -n 2 (instead of 4 locally): the 4-vCPU runner also hosts the server, the emulator and the PDF
       # rendering; 4 browsers on top of them slowed responses past the test timeouts.
+      # -vv (addopts has -q): names each test as it ends ([gw0] PASSED ...), so a worker that dies points to the test it was running.
+      # --max-worker-restart=0: a dead worker stops the run with "worker gwN crashed while running <test>"; restarting
+      # it left xdist waiting until the step timeout (worker "node down: Not properly terminated").
       run: >
-        python -m pytest -c e2e/pytest.ini e2e -n 2
+        python -m pytest -c e2e/pytest.ini e2e -n 2 -vv --max-worker-restart=0
         --output e2e-results --tracing retain-on-failure
         --screenshot only-on-failure
 
     - name: e2e stack logs
-      if: failure()
+      if: failure() || cancelled()
       run: mkdir -p e2e-results && docker compose -f e2e/docker-compose.yml logs --no-color > e2e-results/docker-compose.log 2>&1
 
+    - name: Kernel log (out-of-memory kills)
+      if: failure() || cancelled()
+      run: sudo dmesg -T | grep -iE "out of memory|killed process|oom" || echo "No out-of-memory kill"
+
     - name: Upload e2e artifacts
-      if: failure()
+      if: failure() || cancelled()
       uses: actions/upload-artifact@v7
       with:
         name: e2e-results

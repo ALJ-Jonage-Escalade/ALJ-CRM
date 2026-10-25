@@ -265,26 +265,145 @@ def seed_competitions(coach_ids):
 
     snape, mcgonagall, flitwick = coach_ids[0], coach_ids[1], coach_ids[2]
     today = datetime.date.today()
+    # id_ffme: the competition number members type on the HelloAsso form (automatic links)
     specs = [
-        ("Diagon Alley Bouldering Cup", today - datetime.timedelta(days=35), 12.0, STATUT_CLOSE, "", snape, None),
-        ("Hogwarts Lead Open", today + datetime.timedelta(days=12), 15.0, STATUT_EN_COURS,
+        ("Diagon Alley Bouldering Cup", "1203", today - datetime.timedelta(days=35), 12.0, STATUT_CLOSE, "",
+         snape, None),
+        ("Hogwarts Lead Open", "1457", today + datetime.timedelta(days=12), 15.0, STATUT_EN_COURS,
          "hogwarts-lead-open-dev", snape, mcgonagall),
-        ("Regional Championship U15-U19", today + datetime.timedelta(days=40), 20.0, STATUT_EN_PREPARATION,
+        ("Regional Championship U15-U19", "1622", today + datetime.timedelta(days=40), 20.0, STATUT_EN_PREPARATION,
          "", snape, flitwick),
-        ("Hogsmeade Friendly Contest", today + datetime.timedelta(days=75), 8.0, STATUT_EN_PREPARATION,
+        ("Hogsmeade Friendly Contest", "", today + datetime.timedelta(days=75), 8.0, STATUT_EN_PREPARATION,
          "", mcgonagall, None),
     ]
     competitors = [a["id"] for a in Repo.list_adherents(competition_only=True)]
     rng = random.Random(SEED)
     base_id = int(datetime.datetime(today.year, today.month, today.day).timestamp() * 1000)
-    for i, (name, date, price, status, ha_ref, coach1, coach2) in enumerate(specs):
-        comp = Competition(id=base_id + i, nom=name, date_competition=date.isoformat(), prix=price,
+    competitions = []
+    for i, (name, number, date, price, status, ha_ref, coach1, coach2) in enumerate(specs):
+        comp = Competition(id=base_id + i, id_ffme=number, nom=name, date_competition=date.isoformat(), prix=price,
                            statut=status, helloasso_ref=ha_ref,
                            coach_ids=[c for c in (coach1, coach2) if c is not None])
-        comp_id = Repo.save_competition(comp)
+        comp.id = Repo.save_competition(comp)
+        competitions.append(comp)
         for member_id in rng.sample(competitors, k=min(len(competitors), rng.randint(4, 9))):
-            Repo.add_participant(comp_id, member_id, selectionne=rng.random() < 0.8)
-    return len(specs), len(competitors)
+            Repo.add_participant(comp.id, member_id, selectionne=rng.random() < 0.8)
+    return competitions, len(competitors)
+
+
+HELLOASSO_FORM = "competitions-2026-2027-dev"
+
+
+def helloasso_item(item_id, order_id, user, payer, amount, date, state="Processed", fields=(), payments=None,
+                   options=()):
+    """HelloAsso v5 item as `get_items(..., withDetails=true)` returns it (amounts in cents).
+
+    `fields`: (name, answer) pairs; a pair (name, answer, "value") stores the answer under `value`,
+    as some HelloAsso forms do."""
+    first, last = user
+    payer_first, payer_last = payer
+    when = f"{date.isoformat()}T{10 + item_id % 9:02d}:{item_id * 7 % 60:02d}:00+02:00"
+    cents = int(round(amount * 100))
+    return {
+        "id": item_id,
+        "name": "Competition entry",
+        "type": "Registration",
+        "state": state,
+        "amount": cents,
+        "initialAmount": cents,
+        "priceCategory": "Fixed",
+        "user": {"firstName": first, "lastName": last},
+        "payer": {"firstName": payer_first, "lastName": payer_last,
+                  "email": f"{ascii_slug(payer_first)}.{ascii_slug(payer_last)}@{EMAIL_DOMAIN}",
+                  "city": "Hogsmeade", "zipCode": "HG1 7AA", "country": "GBR"},
+        "order": {"id": order_id, "date": when, "formSlug": HELLOASSO_FORM, "formType": "Event",
+                  "formName": "Competitions 2026-2027 (dev)", "organizationName": "ALJ Escalade (dev)"},
+        "payments": payments if payments is not None else [
+            {"id": order_id * 10, "amount": cents, "state": "Authorized", "date": when, "paymentMeans": "Card"}],
+        "customFields": [{"name": f[0], "type": "TextInput", f[2] if len(f) > 2 else "answer": f[1]}
+                         for f in fields],
+        "options": [{"name": name, "amount": int(round(price * 100)), "customFields": []} for name, price in options],
+    }
+
+
+def seed_helloasso_items(competitions):
+    """HelloAsso payments of the competition campaign (« HelloAsso » pane), one case each: linked
+    automatically (licence or name + competition number), linked by a coach, waiting for a coach
+    (unknown competition, unknown payer, no field filled, cheque not cashed yet) and ignored
+    (test payment, refunded duplicate). Goes through the same steps as POST /api/helloasso/sync."""
+    from domain.competitions import matching
+    from hp_names import PARENTS
+    from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+
+    cup, lead_open, regional = competitions[0], competitions[1], competitions[2]
+    members = [a for a in Repo.list_adherents(competition_only=True) if a.get("num_licence")]
+    if len(members) < 8:
+        print(f"⚠️  HelloAsso items skipped: {len(members)} competitors with a licence (8 needed)")
+        return 0
+    today = datetime.date.today()
+
+    def name(member):
+        return member["prenom"], member["nom"].title()
+
+    def licence(member):
+        return ("Numéro de licence FFME", member["num_licence"])
+
+    def number(comp):
+        return ("Numéro de la compétition", comp.id_ffme)
+
+    def days_ago(days):
+        return today - datetime.timedelta(days=days)
+
+    item_id, order_id = 41001, 82001
+    items = []
+
+    def add(member_or_name, comp_price, date, payer=None, **kwargs):
+        nonlocal item_id, order_id
+        user = name(member_or_name) if isinstance(member_or_name, dict) else member_or_name
+        items.append(helloasso_item(item_id, order_id, user, payer or user, comp_price, date, **kwargs))
+        item_id, order_id = item_id + 1, order_id + 1
+        return items[-1]["id"]
+
+    # Linked automatically: licence + competition number (a parent pays for some)
+    add(members[0], cup.prix, days_ago(60), fields=[licence(members[0]), number(cup)])
+    parent = (PARENTS.get(name(members[1])[1]) or "Dorothy", name(members[1])[1])
+    add(members[1], cup.prix, days_ago(58), payer=parent, fields=[licence(members[1]), number(cup)])
+    add(members[2], lead_open.prix, days_ago(9), fields=[licence(members[2]), number(lead_open)])
+    add(members[3], lead_open.prix, days_ago(8), fields=[licence(members[3]), number(lead_open)],
+        options=[("Bus to the venue", 5.0)])
+    # Linked automatically by name (no licence typed), answer under `value`, paid in two instalments
+    half = regional.prix / 2
+    add(members[4], regional.prix, days_ago(5), fields=[("Numéro de la compétition", regional.id_ffme, "value")],
+        payments=[{"id": 1, "amount": int(half * 100), "state": "Authorized", "date": f"{days_ago(5)}T18:00:00+02:00",
+                   "paymentMeans": "Card"},
+                  {"id": 2, "amount": int(half * 100), "state": "Pending", "date": f"{today + datetime.timedelta(days=25)}"
+                   "T18:00:00+02:00", "paymentMeans": "Card"}])
+    # Linked by a coach: the competition number was mistyped
+    manual = add(members[5], lead_open.prix, days_ago(7),
+                 fields=[licence(members[5]), ("Numéro de la compétition", "Hogwart lead"),
+                         ("Compétition concernée", "Lead open at Hogwarts")])
+    # Waiting for a coach
+    add(members[6], 18.0, days_ago(4), fields=[licence(members[6]), ("Compétition concernée", "Gringotts Boulder Jam")])
+    add(("Mundungus", "Fletcher"), lead_open.prix, days_ago(3), fields=[number(lead_open)])
+    add(("Gilderoy", "Lockhart"), 7.5, days_ago(2))
+    add(members[7], regional.prix, days_ago(1), state="Waiting", fields=[licence(members[7]), number(regional)],
+        payments=[{"id": 3, "amount": int(regional.prix * 100), "state": "Waiting", "date": f"{days_ago(1)}T09:30:00+02:00",
+                   "paymentMeans": "Check"}])
+    # Ignored by a coach
+    test_payment = add(("Albus", "Dumbledore"), 1.0, days_ago(70), fields=[("Compétition concernée", "Test")])
+    duplicate = add(members[0], cup.prix, days_ago(59), state="Refunded", fields=[licence(members[0]), number(cup)],
+                    payments=[{"id": 4, "amount": int(cup.prix * 100), "state": "Refunded",
+                               "date": f"{days_ago(59)}T11:00:00+02:00", "paymentMeans": "Card"}])
+
+    summarized = matching.summarize_items(items)
+    Repo.sync_helloasso_mirror(summarized, items, HELLOASSO_FORM)
+    comps = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom} for c in competitions]
+    Repo.replace_auto_links(matching.auto_link_items(summarized, comps, Repo.list_adherents(), {}))
+    Repo.save_manual_link(manual, lead_open.id, members[5]["id"], "Mistyped competition number on the form")
+    Repo.set_item_ignored(test_payment, True, "Test payment", by=DEV_ACCOUNTS[0][1])
+    Repo.set_item_ignored(duplicate, True, "Duplicate payment, refunded", by=DEV_ACCOUNTS[1][1])
+    Repo.apply_links_to_participants()
+    return len(items)
 
 
 def main() -> int:
@@ -323,8 +442,9 @@ def main() -> int:
     if report.get("errors"):
         print(f"⚠️  adherents projection: {report['errors']}")
 
-    n_comp, n_competitors = seed_competitions(coach_ids)
-    print(f"🏆 {n_comp} competitions ({n_competitors} eligible competitors)")
+    competitions, n_competitors = seed_competitions(coach_ids)
+    print(f"🏆 {len(competitions)} competitions ({n_competitors} eligible competitors)")
+    print(f"🧾 {seed_helloasso_items(competitions)} HelloAsso payments")
 
     seed_auth_accounts(os.environ["FIREBASE_AUTH_EMULATOR_HOST"], project)
     print("🔑 Login accounts: " + ", ".join(email for _, email, _, _ in DEV_ACCOUNTS))

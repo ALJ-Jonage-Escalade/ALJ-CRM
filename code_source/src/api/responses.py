@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional, Union
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel
 
 from services.errors import Conflict, InvalidRequest, NotFound, ServiceError, StorageUnavailable
 
@@ -34,6 +35,25 @@ def json_with_etag(request: Request, payload: Any) -> Response:  # Any: any JSON
 
 # Body of a write that has nothing else to return
 SUCCESS: Dict[str, str] = {"status": "success"}
+
+
+class ApiErrorBody(BaseModel):
+    """Body of error(): what the frontend's API client turns into an ApiError."""
+    status: Literal["error"]
+    message: str
+    code: Optional[str] = None
+
+
+def error_responses(*statuses: int) -> Dict[Union[int, str], Dict[str, Any]]:  # Any: FastAPI's `responses` format
+    """`responses=` of a route answering error() with these statuses (documented in the OpenAPI contract)."""
+    return {status: {"model": ApiErrorBody} for status in statuses}
+
+
+def document_responses(model: type[BaseModel], *errors: int, status: int = 200) -> Dict[Union[int, str], Dict[str, Any]]:  # Any: as above
+    """`responses=` of a route answering a stored document as it is, documented as `model`, plus the statuses of its
+    error() answers. The route sets response_model=None: a response model would add the defaults and reorder the
+    fields (the writes answer the same body as the reads)."""
+    return {status: {"model": model}, **error_responses(*errors)}
 
 
 def error(status: int, message: str, code: Optional[str] = None) -> JSONResponse:

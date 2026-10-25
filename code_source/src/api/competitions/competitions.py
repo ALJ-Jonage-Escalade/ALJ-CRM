@@ -8,38 +8,41 @@ readonly, writes need coach.
 
 from __future__ import annotations
 
+from typing import List
+
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from api.responses import SUCCESS, json_with_etag
+from api.responses import SUCCESS, document_responses, error_responses, json_with_etag
 from api.competitions.schemas.competitions import CompetitionCreate, CompetitionUpdate
+from api.competitions.schemas.views import Competition, Done, PastArchived
 from services.competitions.competitions import CompetitionService as Service
 from services.documents import Doc
 
 router = APIRouter(prefix="/api/competitions")
 
 
-@router.get("")
+@router.get("", response_model=List[Competition])
 def list_competitions(request: Request) -> Response:
     return json_with_etag(request, Service.list_competitions())
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=None, responses=document_responses(Competition, status=201))
 def create_competition(body: CompetitionCreate) -> Doc:
     return Service.create_competition(body.model_dump(exclude_none=True))
 
 
-@router.patch("/{competition_id}")
+@router.patch("/{competition_id}", response_model=None, responses=document_responses(Competition, 404))
 def update_competition(competition_id: int, body: CompetitionUpdate) -> Doc:
     return Service.update_competition(competition_id, body.model_dump(exclude_unset=True))
 
 
-@router.delete("/{competition_id}")
+@router.delete("/{competition_id}", response_model=Done, responses=error_responses(404))
 def delete_competition(competition_id: int) -> Doc:
     Service.delete_competition(competition_id)
     return SUCCESS
 
 
-@router.post("/archive-past")
+@router.post("/archive-past", response_model=PastArchived)
 def archive_past_competitions() -> Doc:
     return {**SUCCESS, "archived": Service.archive_past_competitions()}

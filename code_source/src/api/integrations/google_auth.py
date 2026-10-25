@@ -11,10 +11,11 @@ import json
 import time
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body, Query, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from api.responses import internal_error
+from api.integrations.schemas import GoogleChecks, GoogleStatus, GoogleTest, GoogleTokenUpdate, GoogleTokenUpdated, ServiceCheck
+from api.responses import error, error_responses, internal_error
 from infrastructure.security.secret_store import SecretStore
 
 router = APIRouter()
@@ -31,8 +32,8 @@ def _safe_return_to(value: Optional[str]) -> str:
     return DEFAULT_RETURN_TO
 
 
-@router.get("/api/auth/google/status")
-def get_google_auth_status():
+@router.get("/api/auth/google/status", response_model=GoogleStatus)
+def get_google_auth_status() -> GoogleStatus:
     """Vérifie l'état de la connexion Google OAuth2 et la validité du jeton d'accès pour la BDD et Gmail."""
     from infrastructure.google.drive import GoogleDriveClient
     from infrastructure.firestore.cloud_database import CloudDatabase
@@ -59,17 +60,17 @@ def get_google_auth_status():
 
     status = "connected" if valid else ("expired" if refresh_token else "disconnected")
 
-    return {
-        "status": status,
-        "valid": valid,
-        "configured": configured,
-        "client_id_configured": bool(client_id),
-        "refresh_token_present": bool(refresh_token),
-        "user_email": user_email,
-        "backend": backend,
-        "db_accessible": db_ready or valid,
-        "error": error_msg,
-    }
+    return GoogleStatus(
+        status=status,
+        valid=valid,
+        configured=configured,
+        client_id_configured=bool(client_id),
+        refresh_token_present=bool(refresh_token),
+        user_email=user_email,
+        backend=backend,
+        db_accessible=db_ready or valid,
+        error=error_msg,
+    )
 
 
 @router.get("/api/auth/google/login")
@@ -333,8 +334,8 @@ def google_auth_callback(
     )
 
 
-@router.post("/api/auth/google/test")
-def test_google_auth():
+@router.post("/api/auth/google/test", response_model=GoogleTest)
+def test_google_auth() -> GoogleTest:
     """Diagnostique en direct la connexion Google OAuth2, l'accès BDD et l'API Gmail."""
     import requests
     from infrastructure.google.drive import GoogleDriveClient
@@ -359,7 +360,7 @@ def test_google_auth():
         results["oauth_token"]["message"] = "Échec de renouvellement OAuth2 : jeton refusé ou expiré (détails dans les journaux)."
         results["database"]["message"] = "Test BDD ignoré en raison de l'échec OAuth2."
         results["gmail"]["message"] = "Test Gmail ignoré en raison de l'échec OAuth2."
-        return {"status": "error", "all_ok": False, "results": results}
+        return GoogleTest(status="error", all_ok=False, results=_checks(results))
 
     # 2. Test Accès BDD (Firestore ou Drive)
     backend = (SecretStore.get_secret("MEMBER_BACKEND") or "firestore").strip().lower()
@@ -405,34 +406,34 @@ def test_google_auth():
         results["gmail"]["message"] = "Erreur lors du test Gmail (détails dans les journaux)."
 
     all_ok = all(r["ok"] for r in results.values())
-    return {
-        "status": "success" if all_ok else "warning",
-        "all_ok": all_ok,
-        "results": results
-    }
+    return GoogleTest(status="success" if all_ok else "warning", all_ok=all_ok, results=_checks(results))
 
 
-@router.post("/api/auth/google/update-token")
-def update_google_token(data: Dict[str, Any] = Body(...)):
+def _checks(results: Dict[str, Dict[str, Any]]) -> GoogleChecks:  # Any: {"ok": bool, "message": str}
+    return GoogleChecks(**{name: ServiceCheck(**check) for name, check in results.items()})
+
+
+@router.post("/api/auth/google/update-token", response_model=GoogleTokenUpdated, responses=error_responses(400, 502))
+def update_google_token(data: GoogleTokenUpdate) -> GoogleTokenUpdated | JSONResponse:
     """Permet à un administrateur de renseigner ou forcer un refresh token manuellement."""
     import requests
     from infrastructure.google.drive import GoogleDriveClient
     from infrastructure.firestore.cloud_database import CloudDatabase
     
-    refresh_token = str(data.get("refresh_token") or "").strip()
-    client_id = str(data.get("client_id") or "").strip()
-    client_secret = str(data.get("client_secret") or "").strip()
-    user_email = str(data.get("user_email") or "").strip()
+    refresh_token = data.refresh_token
+    client_id = data.client_id
+    client_secret = data.client_secret
+    user_email = data.user_email
 
     if not refresh_token:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Le refresh token est requis."})
+        return error(400, "Le refresh token est requis.")
 
     cid_exist, sec_exist = GoogleDriveClient.get_client_credentials()
     final_cid = client_id or cid_exist
     final_sec = client_secret or sec_exist
 
     if not final_cid or not final_sec:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Client ID ou Client Secret manquant."})
+        return error(400, "Client ID ou Client Secret manquant.")
 
     test_data = {
         "client_id": final_cid,
@@ -443,16 +444,10 @@ def update_google_token(data: Dict[str, Any] = Body(...)):
     try:
         r = requests.post("https://oauth2.googleapis.com/token", data=test_data, timeout=15)
         if r.status_code != 200:
-            return JSONResponse(
-                status_code=400,
-                content={"status": "error", "message": f"Google a rejeté ce jeton : {r.text}"}
-            )
+            return error(400, f"Google a rejeté ce jeton : {r.text}")
         access_tok = r.json().get("access_token")
     except Exception as e:
-        return JSONResponse(
-            status_code=502,
-            content={"status": "error", "message": f"Impossible de joindre Google : {internal_error(e, 'update_google_token')}"}
-        )
+        return error(502, f"Impossible de joindre Google : {internal_error(e, 'update_google_token')}")
 
     if not user_email and access_tok:
         try:
@@ -462,7 +457,7 @@ def update_google_token(data: Dict[str, Any] = Body(...)):
                 timeout=10
             )
             if u_resp.status_code == 200:
-                user_email = u_resp.json().get("email", "")
+                user_email = u_resp.json().get("email") or ""
         except Exception:
             pass
 
@@ -478,8 +473,4 @@ def update_google_token(data: Dict[str, Any] = Body(...)):
         except Exception:
             pass
 
-    return {
-        "status": "success",
-        "message": "Jeton Google mis à jour et validé avec succès.",
-        "user_email": user_email
-    }
+    return GoogleTokenUpdated(status="success", message="Jeton Google mis à jour et validé avec succès.", user_email=user_email)

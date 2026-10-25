@@ -37,6 +37,15 @@ class MemberService:
         }
 
     @staticmethod
+    def find_member(season: Optional[str], purchase_id: int) -> Doc:
+        """One member of `season` (the active season when not given), by purchase, as list_members lists it."""
+        listed = MemberService.list_members(season)
+        found = next((m for m in listed["members"] if m.get("purchase_id") == purchase_id), None)
+        if found is None:
+            raise NotFound(f"Adhérent introuvable dans la saison {listed['season']}.")
+        return found
+
+    @staticmethod
     def list_competitors() -> List[Doc]:
         """Contacts of the participants of the competitions that are not archived, the only
         member data a coach's phone keeps offline (plan phase 5). Taken from the active season,

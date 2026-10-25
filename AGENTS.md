@@ -5,16 +5,16 @@ Google Cloud Run, with data in Firestore. (The former Windows desktop client was
 `documentations/desktop_features_missing_in_web.md`.)
 User docs: `README.md` · Architecture: `documentations/ARCHITECTURE.md` · Local dev stack: `code_source/dev/README.md`.
 Python conventions (lint, typing, tests): `code_source/AGENTS.md`.
-
-## Setup
-See @./README.md
+Frontend: a Vue 3 app in `code_source/frontend/` (plan: `plans/vue-responsive-frontend.md`,
+decisions: `documentations/plan_frontend_vue.md`); every screen is in it. `code_source/web/` only keeps the PWA manifest and logo.
 
 ## Local dev (emulator only, no production access)
 ```bash
 docker compose -f dev/docker-compose.yml up -d    # Firebase emulator (:4000) + Mailpit (:8025)
 set -a && source dev/dev.env && set +a
 uv run python dev/seed/seed_emulator.py           # (re)seed fake data
-uv run dev/run_server.sh                          # FastAPI with reload → http://localhost:8080/bureau/
+uv run dev/run_server.sh                          # FastAPI with reload (API, /map, /pivot, PWA files)
+cd frontend && npm ci && npm run dev              # Vue app, hot reload → http://localhost:5173/bureau/ (proxies the rest to :8080)
 docker compose -f dev/docker-compose.yml down     # stop (emulator data kept in dev/.emulator-data/)
 ```
 - Health: http://localhost:8080/health · API docs: http://localhost:8080/docs
@@ -22,9 +22,7 @@ docker compose -f dev/docker-compose.yml down     # stop (emulator data kept in 
 - HelloAsso endpoints call the real API and fail without credentials — expected in dev
 
 ## Checks (same as CI)
-- all: `uv lock --check && uv run python dev/export_requirements.py --check && uv run ruff check src tests && uv run mypy && uv run pytest tests`
-- unit tests: `uv sync --group web && uv run pytest tests` (the `web` group brings WeasyPrint/pydyf, needed by the attestation tests; WeasyPrint needs Pango, see `README.md`)
-- e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker; see `dev/README.md`)
+Install, test, lint, typecheck, e2e and frontend commands: `code_source/AGENTS.md` § Commands.
 
 ## Deployment — production, ask before running
 Run from `code_source/` (the script always uploads `code_source/`); Windows scripts live in `scripts/` and `code_source/scripts/`
@@ -36,10 +34,18 @@ Run from `code_source/` (the script always uploads `code_source/`); Windows scri
 - The test revision uses **production data and secrets**: actions there (e-mails, member edits) are real
 
 ## Rules
+- Clarity first: names say what a value holds (`competition`, `archivedCount`), without going overlong. One-letter or
+  abbreviated names only in one-line callbacks and short loops (`(c) => c.id`); never for a local read on later lines
+  (`const a = archived.length` → `archivedCount`), a parameter of a named function, or an export
 - Never commit or print secrets: `code_source/.env` holds HelloAsso, Google OAuth and SMTP credentials
 - Never commit personal data (databases, exports, `tests/fixtures/`): members' health, emergency contacts, minors (GDPR)
 - Never point dev tools at production: dev mode only works against the `demo-alj` emulator project
 - Put throwaway diagnostic scripts (`check_*`, `query_*`, ad-hoc queries) in `scripts_temporaires/` at the repo root (git-ignored), never in `code_source/`
+- API contract: routes called by the Vue app declare a Pydantic `response_model` (errors: `api.responses.error()` +
+  `error_responses()`); after changing one, run `uv run python dev/export_openapi.py` then `npm run gen:api` in
+  `frontend/`, and commit `frontend/openapi.json` and `frontend/src/lib/api-schema.ts` (both generated, checked by CI)
+- Frontend dependencies: `npm install --save-exact <pkg>` in `code_source/frontend/` (lockfile committed); MIT or equivalent
+  licenses only (decision D5); never commit `frontend/dist/` or `node_modules/`
 - Versioning: bump `APP_VERSION` in `src/domain/constants.py` and `code_source/VERSION` together on every functional change (`tests/test_cloud_run_lot4.py` checks `VERSION` == `APP_VERSION`; the `pyproject.toml` version is not used)
 
 ## Data & domain rules
@@ -50,5 +56,5 @@ Run from `code_source/` (the script always uploads `code_source/`); Windows scri
 - Name matching: use `normalize_string` / `normalize_name` from `domain/utils.py`; never rebuild paths by hand, import `CODE_ROOT` / `ROOT_DIR` / `DATA_ROOT` from `src/paths.py`
 - SQLite backups: use the SQLite backup API (`SqliteDatabase.create_db_backup`), never a raw file copy (WAL)
 - New API routes go in a router `src/api/<theme>/<domain>.py`, never in `server.py` (app assembly only); add them to `tests/test_route_inventory.py`. A route that touches the SQLite cache must not join the Firestore-only routers listed in `server.py`
-- New API routes declare an explicit role (`admin` for any write or e-mail send); Cloud Run is ephemeral → generate files in memory and return them, never persist locally
+- New API routes declare an explicit role (`admin` for any write or e-mail send; exceptions: coaches create, edit and delete single planning slots, `/api/planning/item`, while replacing the whole planning stays admin; coaches send e-mails to known members through `/api/send-email`, from a competition or a member record); Cloud Run is ephemeral → generate files in memory and return them, never persist locally
 - Generated Excel sheets (attendance, emergency contacts) follow the club style: Segoe UI, dark blue `1E3A8A` headers, orange `EA580C` for emergency, zebra rows, print gridlines on

@@ -15,6 +15,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 import server
+from api.auth import me
 from api.competitions import coaches, competitions, helloasso_items, participants
 from api.competitions import members as competition_members
 from api.members import members, seasons
@@ -62,7 +63,7 @@ class TestSqliteCacheScope(unittest.TestCase):
 
     def test_every_firestore_router_route_skips_cache(self):
         routes = api_routes(competitions.router, participants.router, coaches.router,
-                            competition_members.router, helloasso_items.router)
+                            competition_members.router, helloasso_items.router, me.router)
         self.assertGreater(len(routes), 15)
         for r in routes:
             self.assertFalse(server.uses_sqlite_cache(concrete(r.path)), r.path)
@@ -74,7 +75,7 @@ class TestSqliteCacheScope(unittest.TestCase):
         settings, members…), whatever its prefix: the results batch and check-all-paid live
         under /api/competitions in routers that must not join the Firestore-only list."""
         firestore_only = set(map(id, api_routes(competitions.router, participants.router, coaches.router,
-                                                competition_members.router, helloasso_items.router)))
+                                                competition_members.router, helloasso_items.router, me.router)))
         routes = [r for r in app_routes(server.app.routes)
                   if id(r) not in firestore_only and r.path.startswith("/api/")]
         self.assertIn("/api/competitions/cron/fetch-results", [r.path for r in routes])
@@ -119,11 +120,13 @@ class TestSqliteCacheScope(unittest.TestCase):
 
     def test_results_cron_runs_on_refreshed_cache(self):
         """The cron reads the notification address and writes last_run/status in the SQLite cache."""
+        report = {"status": "success", "executed_at": "2026-10-22T07:00:00", "competitions_checked": 0,
+                  "competitions_updated": 0, "email_sent": False, "notification_email": "n@example.org", "details": []}
         r = self._assert_cache_around(
             "POST", "/api/competitions/cron/fetch-results",
             "services.competitions.results_batch.CompetitionResultsBatchService.run_daily_batch",
-            {"status": "success"})
-        self.assertEqual(r.json(), {"status": "success"})
+            report)
+        self.assertEqual(r.json(), report)
 
     def test_check_all_paid_runs_on_refreshed_cache(self):
         r = self._assert_cache_around(

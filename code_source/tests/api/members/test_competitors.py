@@ -4,6 +4,7 @@
 from support.api_case import ApiTestCase
 from support.member_db import MemberDbTestCase
 
+from api.members.schemas import CompetitorContact
 from domain.members.view import COMPETITOR_FIELDS
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from infrastructure.sqlite.members import MemberRepository
@@ -56,6 +57,8 @@ class TestCompetitors(MemberDbTestCase, ApiTestCase):
         Repo.add_participant(self.create()["id"], self.leo)
         (contact,) = self.client.get("/api/members/competitors").json()
         self.assertEqual(set(contact), {"adherent_id", *COMPETITOR_FIELDS})
+        # The body is built by hand (json_with_etag): it must match the declared contract, field for field
+        self.assertEqual(CompetitorContact.model_validate(contact).model_dump(), contact)
         for field in ("health_commitment", "document_sante", "address", "email_primary", "birth_date"):
             self.assertNotIn(field, contact)
 

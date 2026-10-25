@@ -14,8 +14,7 @@ MOBILE_PAGES = ["/competitions", "/index"]
 def test_health_and_versions(page):
     health = page.request.get("/health")
     assert health.ok and health.json()["status"] == "healthy"
-    web_version = page.request.get("/api/web-version").json()["web_version"]
-    assert web_version
+    assert page.request.get("/api/web-version").json()["app_version"]
 
 
 def test_runtime_config_is_dev(page):

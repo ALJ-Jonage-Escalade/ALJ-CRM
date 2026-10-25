@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
+from api.competitions.schemas.views import HelloAssoSync
 from api.responses import internal_error
 from infrastructure.helloasso.webhook import HelloAssoWebhookService
 
@@ -57,7 +58,7 @@ async def webhook_helloasso(payload: Dict[str, Any] = Body(...),
         invalidate_cache()  # payments recorded on competition documents directly
 
 
-@router.post("/api/helloasso/sync")
+@router.post("/api/helloasso/sync", response_model=HelloAssoSync)
 def sync_helloasso_api():
     """Synchronise la campagne annuelle HelloAsso vers Firestore."""
     from services.competitions.store import invalidate_cache

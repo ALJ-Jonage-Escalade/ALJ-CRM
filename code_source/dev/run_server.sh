@@ -21,6 +21,6 @@ fi
 python dev/check_env.py
 
 PORT="${PORT:-8080}"
-echo "🧪 DEV mode (emulator) → http://localhost:${PORT}/bureau/"
+echo "🧪 DEV mode (emulator) → http://localhost:${PORT}/bureau/ (Vue app with hot reload: cd frontend && npm run dev → :5173)"
 exec uvicorn server:app --app-dir src --host 127.0.0.1 --port "${PORT}" \
   --reload --reload-dir src "$@"

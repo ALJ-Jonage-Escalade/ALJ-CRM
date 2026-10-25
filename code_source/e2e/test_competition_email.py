@@ -4,9 +4,9 @@ import re
 import pytest
 from playwright.sync_api import expect
 
-from helpers.bureau import open_competitions, select_competition
+from helpers.competitions import open_competition, open_screen, toast
 from helpers.data import unique_name
-from helpers.mobile import accept_dialogs, open_app, open_participants
+from helpers.dialogs import accept_dialogs
 
 
 @pytest.fixture
@@ -29,26 +29,30 @@ def _assert_sent_to_selected(mailpit, competition):
 
 
 def test_mobile_campaign(mobile_page, mailpit, competition):
-    page = open_app(mobile_page)
-    open_participants(page, competition["nom"])
-    page.locator("#p-email-btn").click()
-    expect(page.locator("#email-modal")).to_be_visible()
-    expect(page.locator("#em-count-selected")).to_have_text("2")
-    # Pre-filled from the seeded « Competition call-up » template
-    expect(page.locator("#em-subject")).to_have_value(re.compile(r"\{name_competition\}"))
-    page.locator("#em-submit-btn").click()
-    expect(page.locator("#toast")).to_contain_text("2 e-mail(s) envoyé(s)")
-    expect(page.locator("#email-modal")).to_be_hidden()
+    page = open_screen(mobile_page)
+    accept_dialogs(page)
+    open_competition(page, competition["nom"])
+    page.get_by_test_id("email-comp").click()
+    expect(page.get_by_test_id("email-dialog")).to_be_visible()
+    expect(page.get_by_test_id("email-count")).to_have_text("2 destinataires avec une adresse e-mail")
+    # Pre-filled from the seeded « Competition call-up » template, previewed for the first recipient
+    expect(page.get_by_test_id("email-subject")).to_have_value(re.compile(r"\{name_competition\}"))
+    expect(page.get_by_test_id("email-preview")).to_contain_text(competition["nom"])
+    page.get_by_test_id("email-send").click()
+    expect(toast(page)).to_contain_text("2 e-mail(s) envoyé(s)")
+    expect(page.get_by_test_id("email-dialog")).to_be_hidden()
     _assert_sent_to_selected(mailpit, competition)
 
 
-def test_office_campaign(page, mailpit, competition):
-    open_competitions(page)
+def test_desktop_campaign(page, mailpit, competition):
+    open_screen(page, "admin", "/bureau/competitions")
     accept_dialogs(page)
-    select_competition(page, competition["nom"])
-    page.locator("#btn-email-comp").click()
-    expect(page.locator("#comp-email-recipients-count")).to_have_text("2")
-    page.locator("#comp-email-subject").fill("Convocation {name_competition}")
-    page.locator("#comp-email-send").click()
-    expect(page.locator("#toast")).to_contain_text("envoyé(s) avec succès")
+    open_competition(page, competition["nom"])
+    page.get_by_test_id("email-comp").click()
+    page.get_by_test_id("email-audience-all").check()
+    expect(page.get_by_test_id("email-count")).to_have_text("3 destinataires avec une adresse e-mail")
+    page.get_by_test_id("email-audience-selected").check()
+    page.get_by_test_id("email-subject").fill("Convocation {name_competition}")
+    page.get_by_test_id("email-send").click()
+    expect(toast(page)).to_contain_text("envoyé(s) avec succès")
     _assert_sent_to_selected(mailpit, competition)

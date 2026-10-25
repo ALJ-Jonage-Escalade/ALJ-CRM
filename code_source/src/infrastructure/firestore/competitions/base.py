@@ -40,6 +40,13 @@ class CompetitionStoreBase:
         return datetime.datetime.now().isoformat(timespec="seconds")
 
     @classmethod
+    def _row_stamp(cls) -> str:
+        """`updated_at` of a participant row: to the microsecond, since a change queued offline is refused only when
+        the row's stamp differs from the one the phone saw (unchanged_since_guard). To the second, a change made
+        elsewhere in that same second went unnoticed. Still ISO: compares as a string with the older stamps."""
+        return datetime.datetime.now().isoformat(timespec="microseconds")
+
+    @classmethod
     def _now_display(cls) -> str:
         """Timestamp format of the HelloAsso mirror and payment dates."""
         return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
