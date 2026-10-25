@@ -69,7 +69,7 @@ pyphen==0.18.1
     # via weasyprint
 python-dateutil==2.9.0.post0
     # via pandas
-python-dotenv==1.2.2
+python-dotenv==1.2.4
     # via alj-escalade-manager
 requests==2.34.2
     # via alj-escalade-manager
