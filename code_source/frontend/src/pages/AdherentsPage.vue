@@ -22,7 +22,6 @@ import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText, type Schemas } from "../lib/client";
 import { createCommunicationsApi } from "../services/communications";
-import { createIntegrationsApi } from "../services/integrations";
 import { createMembersApi } from "../services/members";
 import { csvBlob } from "../lib/csv";
 import { saveFile } from "../lib/download";
@@ -66,7 +65,6 @@ import { dialogs } from "../composables/dialogs";
 const client = inject(CLIENT_KEY)!;
 const membersApi = createMembersApi(client);
 const communicationsApi = createCommunicationsApi(client);
-const integrationsApi = createIntegrationsApi(client);
 const toast = useToast();
 const route = useRoute();
 const router = useRouter();
@@ -175,21 +173,6 @@ function exportCsv(): void {
     return;
   }
   saveFile(csvBlob(csvRows(tableRef.value?.sortedRows() ?? shown.value)), csvName(season.value));
-}
-
-// Database sync (Firestore → server cache), then reload of the list
-const syncing = ref(false);
-async function syncNow(): Promise<void> {
-  syncing.value = true;
-  try {
-    await integrationsApi.syncCache(true);
-    toast.show("✅ Base de données locale synchronisée depuis Firestore !");
-    await members.refresh();
-  } catch (e) {
-    toast.show(`❌ Échec : ${errorText(e)}`, 8000);
-  } finally {
-    syncing.value = false;
-  }
 }
 
 // ---------------------------------------------------------------- Member record (side panel)
@@ -451,16 +434,6 @@ const linkButton =
           @click="panelOpen = true"
         >
           ⇤ Fiche
-        </UiButton>
-        <UiButton
-          variant="muted"
-          small
-          data-testid="sync-now"
-          :busy="syncing && 'Synchro…'"
-          title="Synchroniser maintenant la base du serveur avec Firestore"
-          @click="syncNow"
-        >
-          🔄 Synchroniser BDD
         </UiButton>
         <RouterLink
           v-if="role === 'admin'"

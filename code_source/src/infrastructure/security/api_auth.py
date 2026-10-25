@@ -158,6 +158,8 @@ def required_role(method: str, path: str) -> Optional[Role]:
         return Role.ADMIN  # imports et modifications FFME réservés aux administrateurs
     if path == "/api/auth/google/update-token" and method not in ("GET", "HEAD"):
         return Role.ADMIN  # mise à jour manuelle des identifiants Google réservée aux administrateurs
+    if path == "/api/cloud-db/sync" and method not in ("GET", "HEAD"):
+        return Role.ADMIN  # reconstruction du cache SQLite (coûteuse) réservée aux administrateurs
     return Role.COACH
 
 

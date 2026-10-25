@@ -70,7 +70,6 @@ const ANSWERS: Record<string, Answer> = {
     }
     return json(ACTIVE, 200, '"m1"');
   },
-  "POST /api/cloud-db/sync": () => json({ status: "success", message: "ok", result: { pulled: 1, pushed: 0, full: true } }),
 };
 
 async function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS, path = "/bureau/adherents") {
@@ -218,16 +217,6 @@ describe("AdherentsPage", () => {
     expect(lines[1]).toMatch(/^"MARTIN";"Max"/);
     // A phone number starting with + is kept as is (lib/csv.ts)
     expect(lines[2]).toContain('"+33 6 12 34 56 78"');
-  });
-
-  it("synchronises the database, then reloads the list", async () => {
-    const { byId, calls, wrapper } = await render("coach");
-    await flushPromises();
-    await byId("sync-now").trigger("click");
-    await flushPromises();
-    expect(calls).toContainEqual(expect.objectContaining({ method: "POST", path: "/api/cloud-db/sync?force=true" }));
-    expect(calls.filter((c) => c.path === "/api/members")).toHaveLength(2);
-    expect(wrapper.find("#toast").text()).toContain("synchronisée");
   });
 
   it("shows a coach no admin action", async () => {
