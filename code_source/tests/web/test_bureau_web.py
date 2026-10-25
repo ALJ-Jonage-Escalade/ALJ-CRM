@@ -419,6 +419,12 @@ class TestBureauFiles(unittest.TestCase):
                 self.assertEqual(res.status, "success")
                 self.assertEqual(res.result.model_dump(), {"pulled": 0, "pushed": 0, "full": False})
 
+    def test_sync_cloud_db_requires_admin_role(self):
+        """POST /api/cloud-db/sync exige le rôle admin ; l'état du cache reste lisible par les coachs."""
+        from infrastructure.security.api_auth import required_role
+        self.assertEqual(required_role("POST", "/api/cloud-db/sync"), Role.ADMIN)
+        self.assertEqual(required_role("GET", "/api/cloud-db/status"), Role.COACH)
+
     def test_season_tarifs_endpoint(self):
         """GET /api/season-tarifs retourne les tarifs disponibles de la saison active."""
         res = TestClient(app).get("/api/season-tarifs", params={"season": "2026-2027"}).json()
