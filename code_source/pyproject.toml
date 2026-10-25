@@ -107,6 +107,8 @@ files = [
     "src/api/ffme/schemas.py",
     "src/api/ffme/ffme.py",
     "src/api/activities/presence.py",
+    "src/api/reports/schemas.py",
+    "src/api/reports/map.py",
     "src/domain/members/view.py",
     "src/services/__init__.py",
     "src/services/competitions/__init__.py",

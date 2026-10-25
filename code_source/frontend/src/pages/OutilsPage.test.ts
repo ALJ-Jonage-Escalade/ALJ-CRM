@@ -17,6 +17,18 @@ function file(name: string): Response {
   return new Response(new Blob(["x"]), { headers: { "Content-Disposition": `attachment; filename="${name}"` } });
 }
 
+const POINTS = [
+  {
+    address: "1 rue des Lilas, 69330 JONAGE",
+    lat: 45.795,
+    lon: 5.045,
+    members: [
+      { name: "Ginny WEASLEY", group: "Compet" },
+      { name: "Ron WEASLEY", group: "Loisir" },
+    ],
+  },
+  { address: "MEYZIEU", lat: 45.77, lon: 5.0, members: [{ name: "Luna LOVEGOOD", group: "Loisir" }] },
+];
 const CONFIG = {
   status: "success",
   season: "2026-2027",
@@ -64,7 +76,7 @@ const PREVIEW = {
 type Answer = (body: unknown, url: URL) => Response;
 const ANSWERS: Record<string, Answer> = {
   "GET /api/seasons": () => json({ seasons: ["2026-2027", "2025-2026"], active: "2026-2027" }),
-  "GET /map": () => new Response("<p>carte</p>"),
+  "GET /api/reports/map-points": (_, url) => json({ season: url.searchParams.get("season"), points: POINTS }),
   "GET /pivot": (_, url) => new Response(`<p>tcd ${url.searchParams.get("season")}</p>`),
   "GET /api/presence/config": () => json(CONFIG),
   "POST /api/presence/export": () => file("Feuilles.xlsx"),
@@ -133,54 +145,81 @@ afterEach(() => {
 });
 
 describe("OutilsPage", () => {
-  it("shows the map in a frame without same-origin, then the pivot table of the active season", async () => {
+  it("shows the members map of the active season, filtered by group", async () => {
+    const { byId, all, sent } = await render();
+    expect(sent("GET", "/api/reports/map-points").map((c) => c.path)).toEqual(["/api/reports/map-points?season=2026-2027"]);
+    await vi.waitFor(() => expect(byId("map-stats")!.textContent.trim()).toBe("3 adhérents répartis sur 2 adresses"));
+    expect(byId("map-groups")!.textContent.trim()).toBe("🧗 Tous les groupes ▾");
+
+    byId("map-groups")!.click();
+    await flushPromises();
+    expect(all("map-group").map((c) => (c as HTMLInputElement).value)).toEqual(["Compet", "Loisir"]);
+    all("map-group")[1]!.click(); // Loisir hidden
+    await flushPromises();
+    expect(byId("map-stats")!.textContent.trim()).toBe("1 adhérents répartis sur 1 adresses (filtre : 1 groupe(s))");
+    expect(byId("map-groups")!.textContent.trim()).toBe("🧗 1 groupe(s) filtré(s) ▾");
+    expect(byId<HTMLInputElement>("map-group-all")!.indeterminate).toBe(true);
+
+    byId("map-group-all")!.click(); // every group shown
+    await flushPromises();
+    expect(byId("map-stats")!.textContent.trim()).toBe("3 adhérents répartis sur 2 adresses");
+    byId("map-group-all")!.click(); // none
+    await flushPromises();
+    expect(byId("map-stats")!.textContent.trim()).toBe("0 adhérents répartis sur 0 adresses (filtre : 0 groupe(s))");
+    expect(byId("map-groups")!.textContent.trim()).toBe("⚠️ Aucun groupe sélectionné ▾");
+  });
+
+  it("reloads the map for another season, then keeps it while showing the pivot table", async () => {
     const { byId, open, router, sent } = await render();
-    const map = byId<HTMLIFrameElement>("map-frame")!;
-    expect(map.getAttribute("srcdoc")).toBe("<p>carte</p>");
-    expect(map.getAttribute("sandbox")).toBe("allow-scripts allow-popups");
+    const season = byId<HTMLSelectElement>("map-season")!;
+    expect([...season.options].map((o) => o.value)).toEqual(["2026-2027", "2025-2026", "Toutes les saisons"]);
+    season.value = "Toutes les saisons";
+    season.dispatchEvent(new Event("change"));
+    await flushPromises();
+    expect(sent("GET", "/api/reports/map-points").at(-1)!.path).toBe("/api/reports/map-points?season=Toutes%20les%20saisons");
 
     await open("pivot");
     expect(router.currentRoute.value.fullPath).toBe("/bureau/outils?tab=pivot");
     const pivot = byId<HTMLIFrameElement>("pivot-frame")!;
     expect(pivot.getAttribute("sandbox")).toBe("allow-scripts allow-popups allow-modals");
     expect(pivot.getAttribute("srcdoc")).toBe("<p>tcd 2026-2027</p>");
-    expect([...byId<HTMLSelectElement>("pivot-season")!.options].map((o) => o.value)).toEqual([
-      "2026-2027",
-      "2025-2026",
-      "Toutes les saisons",
-    ]);
-
-    const select = byId<HTMLSelectElement>("pivot-season")!;
-    select.value = "Toutes les saisons";
-    select.dispatchEvent(new Event("change"));
+    const pivotSeason = byId<HTMLSelectElement>("pivot-season")!;
+    pivotSeason.value = "Toutes les saisons";
+    pivotSeason.dispatchEvent(new Event("change"));
     await flushPromises();
     expect(pivot.getAttribute("srcdoc")).toBe("<p>tcd Toutes les saisons</p>");
 
     // The map stays loaded: back to it, no new request
     await open("map");
     expect(router.currentRoute.value.fullPath).toBe("/bureau/outils");
-    expect(sent("GET", "/map")).toHaveLength(1);
+    expect(sent("GET", "/api/reports/map-points")).toHaveLength(2);
     byId("tools-refresh")!.click();
     await flushPromises();
-    expect(sent("GET", "/map")).toHaveLength(2);
+    expect(sent("GET", "/api/reports/map-points")).toHaveLength(3);
     expect(byId("toast")!.textContent).toBe("🔄 Carte réactualisée.");
   });
 
-  it("says when a tool page fails", async () => {
-    const original = ANSWERS["GET /map"]!;
-    ANSWERS["GET /map"] = () => new Response("", { status: 500 });
+  it("says when the map or a tool page fails", async () => {
+    const mapPoints = ANSWERS["GET /api/reports/map-points"]!;
+    const pivot = ANSWERS["GET /pivot"]!;
+    ANSWERS["GET /api/reports/map-points"] = () => json({ status: "error", message: "Erreur interne" }, 500);
+    ANSWERS["GET /pivot"] = () => new Response("", { status: 500 });
     try {
-      const { byId } = await render();
-      expect(byId("map-frame-status")!.textContent).toBe("❌ Erreur lors du chargement (HTTP 500).");
+      const { byId, open } = await render();
+      await vi.waitFor(() => expect(byId("map-status")!.textContent).toContain("❌ Impossible de charger la carte"));
+      expect(byId("map-stats")).toBeNull();
+      await open("pivot");
+      expect(byId("pivot-frame-status")!.textContent).toBe("❌ Erreur lors du chargement (HTTP 500).");
     } finally {
-      ANSWERS["GET /map"] = original;
+      ANSWERS["GET /api/reports/map-points"] = mapPoints;
+      ANSWERS["GET /pivot"] = pivot;
     }
   });
 
   it("opens the tab named in the URL; the import is for admins only", async () => {
     const admin = await render("admin", "/bureau/outils?tab=ffme-import");
     expect(admin.byId("pane-ffme-import")).not.toBeNull();
-    expect(admin.sent("GET", "/map")).toHaveLength(0);
+    expect(admin.sent("GET", "/api/reports/map-points")).toHaveLength(0);
     admin.wrapper.unmount();
     document.body.innerHTML = "";
 

@@ -125,7 +125,7 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
 | `competitions/` | `competitions`, `participants`, `coaches`, `members`, `helloasso_items`, `results`, `payments` | `/api/competitions/*`, `/api/coaches`, `/api/competition-members`, `/api/helloasso/items` · résultats MyCompet (`/api/competitions/cron/fetch-results`, `/{id}/fetch-results`, `/api/settings/competitions-results`) · `/{id}/check-all-paid` |
 | `communications/` | `email`, `whatsapp`, `attestations` | `/api/email-templates` (GET/POST/DELETE), `/api/preview-email`, `/api/email-status`, `/api/send-email` · `/api/whatsapp-template` · `/api/attestations/preview`, `/send` (PDF en mémoire, admin) |
 | `activities/` | `planning`, `presence` | `/api/planning` (GET/POST, `/item`, `/export`) · `/api/presence/config`, `/export` |
-| `reports/` | `map`, `pivot` | `/map`, `/pivot` (pages HTML générées côté serveur, chargées en `iframe srcdoc`) |
+| `reports/` | `map`, `pivot` | `/api/reports/map-points` (points de la carte des adhérents, affichée par l'application Vue avec Leaflet) · `/pivot` (page HTML générée côté serveur, chargée en `iframe srcdoc`) |
 | `ffme/` | `ffme` | `/api/ffme/stats`, `/export` (CSV), `/preview`, `/import` |
 | `integrations/` | `helloasso`, `google_auth`, `cloud_db` | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync` · `/api/auth/google/*` · `/api/cloud-db/status`, `/sync` |
 

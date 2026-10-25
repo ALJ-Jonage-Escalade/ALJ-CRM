@@ -134,7 +134,7 @@ class TestData:
         never calls Nominatim. The addresses come from the server's own map code; the cache is
         pushed to Firestore (crm_geocache). Run before the server starts: it uses its SQLite file."""
         return self._run("""
-from api.reports.map import get_sqlite_map_data
+from api.reports.map import map_points
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.sqlite.geocache import GeocacheRepository
 
@@ -145,7 +145,7 @@ class Collect:
 
 CloudDatabase.sync(full=True)
 collect = Collect()
-get_sqlite_map_data(collect)
+map_points("Toutes les saisons", collect)  # every season: the map can show any of them
 for i, address in enumerate(sorted(set(collect.addresses))):
     GeocacheRepository.save_geocode(address, 45.79 + (i % 10) * 0.004, 5.04 + (i // 10) * 0.004)
 CloudDatabase.flush_only()

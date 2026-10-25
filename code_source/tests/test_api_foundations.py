@@ -55,7 +55,7 @@ class TestSqliteCacheScope(unittest.TestCase):
                      "/api/helloasso/items/9/link", "/health", "/bureau/"):
             self.assertFalse(f(path), path)
         for path in ("/api/members", "/api/email-templates", "/api/helloasso/sync",
-                     "/api/competitions-x", "/map", "/pivot",
+                     "/api/competitions-x", "/api/reports/map-points", "/pivot",
                      # cache-backed routes under the Firestore prefixes (results batch, check-all-paid)
                      "/api/competitions/cron/fetch-results", "/api/competitions/12/check-all-paid",
                      "/api/competitions/12/fetch-results"):

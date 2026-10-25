@@ -763,7 +763,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/map": {
+    "/api/reports/map-points": {
         parameters: {
             query?: never;
             header?: never;
@@ -771,10 +771,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Map
-         * @description Renvoie la page de cartographie Leaflet interactive branchée sur SQLite.
+         * Get Map Points
+         * @description Members of a season grouped by address, for the map of the Outils page ("Toutes les saisons": every season).
          */
-        get: operations["get_map_map_get"];
+        get: operations["get_map_points_api_reports_map_points_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2428,6 +2428,41 @@ export interface components {
         ManualPayment: {
             /** Montant */
             montant: number;
+        };
+        /**
+         * MapMember
+         * @description A member living at a map point. name: "First LAST"; group: the HelloAsso tariff ("Aucun" without one).
+         */
+        MapMember: {
+            /** Name */
+            name: string;
+            /** Group */
+            group: string;
+        };
+        /**
+         * MapPoint
+         * @description Geocoded address shared by one or more members. address: as shown in the popup.
+         */
+        MapPoint: {
+            /** Address */
+            address: string;
+            /** Lat */
+            lat: number;
+            /** Lon */
+            lon: number;
+            /** Members */
+            members: components["schemas"]["MapMember"][];
+        };
+        /**
+         * MapPoints
+         * @description Members of a season placed on the map. season: the season actually read (the active one for "active").
+         *     Addresses not geocoded yet are left out (geocoded in the background, on the map at the next load).
+         */
+        MapPoints: {
+            /** Season */
+            season: string;
+            /** Points */
+            points: components["schemas"]["MapPoint"][];
         };
         /** Me */
         Me: {
@@ -4995,9 +5030,11 @@ export interface operations {
             };
         };
     };
-    get_map_map_get: {
+    get_map_points_api_reports_map_points_get: {
         parameters: {
-            query?: never;
+            query?: {
+                season?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5010,7 +5047,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "text/html": string;
+                    "application/json": components["schemas"]["MapPoints"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

@@ -43,7 +43,7 @@ def uses_sqlite_cache(path: str) -> bool:
     """True for the data routes served from the SQLite cache of the crm_* collections."""
     if any(p.match(path) for p in FIRESTORE_ONLY_PATHS):
         return False
-    return path.startswith("/api/") or path in ("/map", "/pivot")
+    return path.startswith("/api/") or path == "/pivot"
 
 
 async def cloud_db_middleware(request, call_next):

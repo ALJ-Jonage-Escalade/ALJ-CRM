@@ -53,7 +53,7 @@ cd frontend && npm run dev                         # application Vue (autre term
 ```
 
 L'application Vue répond sur http://localhost:5173/bureau/ et renvoie au serveur FastAPI (port 8080) l'API,
-`/map`, `/pivot` et les fichiers de la PWA. Sans `npm run dev`, http://localhost:8080/bureau/ sert la dernière compilation
+`/pivot` et les fichiers de la PWA. Sans `npm run dev`, http://localhost:8080/bureau/ sert la dernière compilation
 (`npm run build`), ou explique comment la lancer.
 
 Arrêt : `Ctrl+C` pour le serveur, `docker compose -f dev/docker-compose.yml down` pour les conteneurs

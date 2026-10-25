@@ -124,7 +124,7 @@ def mobile_context(new_context, playwright) -> BrowserContext:
 
 
 # Raised by Playwright itself, not by the pages: service_workers="block" patches navigator.serviceWorker
-# in every frame, which throws in the sandboxed iframes of the Outils page (map, pivot table)
+# in every frame, which throws in the sandboxed iframe of the Outils page (pivot table)
 _HARNESS_ERRORS = ("Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled "
                    "because the context is sandboxed",)
 
