@@ -52,6 +52,8 @@ def map_points(season: str, background_tasks: Optional[BackgroundTasks] = None) 
             missing_addresses.add(full_address)
             continue
         lat, lon = coords[0], coords[1]
+        if lat is None or lon is None:  # geocoding found nothing: cached as such, not retried
+            continue
 
         key = f"{lat:.6f},{lon:.6f}"
         point = points.get(key)

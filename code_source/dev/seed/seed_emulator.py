@@ -7,7 +7,8 @@ Fills the local Firestore emulator with FAKE data (Harry Potter universe).
 
 Fully resets the emulator database, then follows the production path:
 1. temporary SQLite database with the current schema, filled by the same functions as
-   the HelloAsso import (`MemberRepository.upsert_members`, `save_planning_data`, …);
+   the HelloAsso import (`MemberRepository.upsert_members`, `save_planning_data`, …),
+   plus fake coordinates in the geocache (members map, never geocoded through Nominatim);
 2. push to Firestore with `cloud_database.import_database` (real `crm_*` format);
 3. PWA `adherents` / `planning` projection, coaches and competitions through
    `CompetitionFirestoreRepository`.
@@ -223,6 +224,37 @@ def member_record(fake, rng, person, season, order_no):
     }
 
 
+# Members map: the fake towns placed on real towns around the club, each address a few hundred metres apart
+TOWN_COORDINATES = {
+    "HOGSMEADE": (45.795, 5.045),              # Jonage
+    "GODRIC'S HOLLOW": (45.768, 5.003),        # Meyzieu
+    "LITTLE WHINGING": (45.755, 5.068),        # Pusignan
+    "OTTERY ST CATCHPOLE": (45.803, 5.083),    # Jons
+}
+
+
+def fill_geocache(rng):
+    """Fake coordinates for every address the map geocodes (the server's own map code lists them), so that the
+    dev map has markers without calling Nominatim on made-up addresses."""
+    from api.reports.map import map_points
+    from infrastructure.sqlite.geocache import GeocacheRepository
+
+    class Collect:
+        def __init__(self):
+            self.addresses = []
+
+        def add_task(self, func, addresses):
+            self.addresses.extend(addresses)
+
+    collect = Collect()
+    map_points("Toutes les saisons", collect)
+    for address in sorted(set(collect.addresses)):
+        town = next((t for t in TOWN_COORDINATES if f", {t}, France" in address), "HOGSMEADE")
+        lat, lon = TOWN_COORDINATES[town]
+        GeocacheRepository.save_geocode(address, lat + rng.uniform(-0.008, 0.008), lon + rng.uniform(-0.012, 0.012))
+    return len(collect.addresses)
+
+
 EMAIL_TEMPLATES = [
     ("Welcome", "Welcome to the club, {first_name}!",
      "Hello {first_name},\n\nYour climbing membership is confirmed. "
@@ -253,6 +285,8 @@ def build_sqlite(path, fake, rng, coach_names):
     previous = [member_record(fake, rng, p, PREVIOUS_SEASON, i) for i, p in enumerate(returning, start=1)]
     MemberRepository.upsert_members(previous, PREVIOUS_SEASON)
     MemberRepository.upsert_members(current, SEASON)
+    # Own random stream: the rest of the seed data stays the same
+    fill_geocache(random.Random(SEED))  # noqa: S311 - reproducible fake coordinates, not security
 
     for name, subject, body in EMAIL_TEMPLATES:
         EmailTemplateRepository.save_email_template(name, subject, body, "", "ALJ Escalade (dev)")

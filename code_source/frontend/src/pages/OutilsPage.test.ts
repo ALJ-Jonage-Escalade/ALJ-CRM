@@ -169,6 +169,29 @@ describe("OutilsPage", () => {
     expect(byId("map-groups")!.textContent.trim()).toBe("⚠️ Aucun groupe sélectionné ▾");
   });
 
+  it("shows the groups of the filter as text", async () => {
+    const hostile = `<img src=x onerror="window.hacked=1"><b>`;
+    const mapPoints = ANSWERS["GET /api/reports/map-points"]!;
+    ANSWERS["GET /api/reports/map-points"] = () =>
+      json({ season: "2026-2027", points: [{ address: "", lat: 45.8, lon: 5.05, members: [{ name: hostile, group: hostile }] }] });
+    try {
+      const { byId, all } = await render();
+      await vi.waitFor(() => expect(byId("map-stats")).not.toBeNull());
+      byId("map-groups")!.click();
+      await flushPromises();
+      const option = all("map-group")[0]!;
+      expect((option as HTMLInputElement).value).toBe(hostile);
+      expect(option.parentElement!.textContent.trim()).toBe(hostile);
+      const popover = option.closest('[role="dialog"]');
+      expect(popover).not.toBeNull();
+      expect(popover!.querySelectorAll("img, b")).toHaveLength(0);
+      expect(byId("map-groups")!.querySelectorAll("img, b")).toHaveLength(0);
+      expect("hacked" in window).toBe(false);
+    } finally {
+      ANSWERS["GET /api/reports/map-points"] = mapPoints;
+    }
+  });
+
   it("reloads the map for another season, then keeps it while showing the pivot table", async () => {
     const { byId, open, router, sent } = await render();
     const season = byId<HTMLSelectElement>("map-season")!;

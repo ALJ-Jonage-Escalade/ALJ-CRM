@@ -12,7 +12,8 @@ from infrastructure.security.api_auth import Role, required_role
 import server
 
 HOME = "1 rue des Lilas, 69330, JONAGE, France"
-GEOCACHE = {HOME: [45.795, 5.045], "MEYZIEU, 69330, France": [45.77, 5.0]}
+UNKNOWN = "9 impasse Inconnue, 69330, JONAGE, France"
+GEOCACHE = {HOME: [45.795, 5.045], "MEYZIEU, 69330, France": [45.77, 5.0], UNKNOWN: [None, None]}
 
 
 def _row(first_name, last_name, tarif="Loisir", address="1 rue des Lilas", city="Jonage", status="Validé"):
@@ -54,7 +55,8 @@ def test_map_points_grouped_by_address(client):
 
 def test_map_points_skip_cancelled_and_unplaced_members(client):
     rows = [_row("Ron", "Weasley", status="Annulé"), _row("Neville", "Londubat", city=""),
-            _row("Harry", "Potter", address="4 Privet Drive")]
+            _row("Harry", "Potter", address="4 Privet Drive"),
+            _row("Drago", "Malefoy", address="9 impasse Inconnue")]  # not found by the geocoding: not retried
     response, _, geocode = _get(client, rows)
 
     assert response.json()["points"] == []
