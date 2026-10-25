@@ -36,7 +36,7 @@ def test_members_map(page):
     """Map of the members' addresses (Leaflet). The e2e setup pre-fills the geocache, so the
     server never calls Nominatim."""
     _open(page)
-    expect(page.get_by_test_id("map-stats")).to_contain_text("adhérents répartis sur", timeout=30_000)
+    expect(page.get_by_test_id("map-stats")).to_contain_text("réparti", timeout=30_000)
     expect(page.get_by_test_id("map-view").locator(".leaflet-tile-pane")).to_be_attached()
     # Members are shown as markers grouped in clusters; a cluster zooms in down to the markers, a marker opens its popup
     clusters = page.get_by_test_id("map-view").locator(".marker-cluster, .leaflet-marker-icon")
@@ -52,7 +52,7 @@ def test_members_map(page):
     # Group filter: hiding every group empties the map
     page.get_by_test_id("map-groups").click()
     page.get_by_test_id("map-group-all").uncheck()
-    expect(page.get_by_test_id("map-stats")).to_contain_text("0 adhérents répartis sur 0 adresses")
+    expect(page.get_by_test_id("map-stats")).to_contain_text("0 adhérent réparti sur 0 adresse")
     expect(page.get_by_test_id("map-groups")).to_contain_text("Aucun groupe sélectionné")
     page.keyboard.press("Escape")
 

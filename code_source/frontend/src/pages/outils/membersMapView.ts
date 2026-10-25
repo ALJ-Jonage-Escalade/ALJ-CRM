@@ -9,6 +9,7 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
+import { plural } from "../../lib/text";
 import type { MapPoint } from "./membersMap";
 
 export interface MembersMapView {
@@ -45,7 +46,7 @@ function popup(point: MapPoint): HTMLElement {
   const list = element("ul", "m-0 list-disc pl-4 text-xs text-slate-800");
   list.append(...point.members.map((m) => element("li", "mb-0.5", `${m.name} (${m.group})`)));
   content.append(
-    element("div", "mb-1 border-b border-slate-200 pb-0.5 text-sm font-bold text-club-blue", `${count} Adhérent${count > 1 ? "s" : ""}`),
+    element("div", "mb-1 border-b border-slate-200 pb-0.5 text-sm font-bold text-club-blue", `${count} Adhérent${plural(count)}`),
     element("div", "mb-2 text-[11px] text-slate-500", `📍 ${point.address}`),
     list,
   );

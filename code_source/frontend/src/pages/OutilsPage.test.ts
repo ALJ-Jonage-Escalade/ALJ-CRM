@@ -156,8 +156,8 @@ describe("OutilsPage", () => {
     expect(all("map-group").map((c) => (c as HTMLInputElement).value)).toEqual(["Compet", "Loisir"]);
     all("map-group")[1]!.click(); // Loisir hidden
     await flushPromises();
-    expect(byId("map-stats")!.textContent.trim()).toBe("1 adhérents répartis sur 1 adresses (filtre : 1 groupe(s))");
-    expect(byId("map-groups")!.textContent.trim()).toBe("🧗 1 groupe(s) filtré(s) ▾");
+    expect(byId("map-stats")!.textContent.trim()).toBe("1 adhérent réparti sur 1 adresse (filtre : 1 groupe)");
+    expect(byId("map-groups")!.textContent.trim()).toBe("🧗 1 groupe filtré ▾");
     expect(byId<HTMLInputElement>("map-group-all")!.indeterminate).toBe(true);
 
     byId("map-group-all")!.click(); // every group shown
@@ -165,7 +165,7 @@ describe("OutilsPage", () => {
     expect(byId("map-stats")!.textContent.trim()).toBe("3 adhérents répartis sur 2 adresses");
     byId("map-group-all")!.click(); // none
     await flushPromises();
-    expect(byId("map-stats")!.textContent.trim()).toBe("0 adhérents répartis sur 0 adresses (filtre : 0 groupe(s))");
+    expect(byId("map-stats")!.textContent.trim()).toBe("0 adhérent réparti sur 0 adresse (filtre : 0 groupe)");
     expect(byId("map-groups")!.textContent.trim()).toBe("⚠️ Aucun groupe sélectionné ▾");
   });
 
