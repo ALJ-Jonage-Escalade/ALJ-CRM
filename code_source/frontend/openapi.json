@@ -2304,18 +2304,50 @@
         }
       }
     },
-    "/map": {
+    "/api/reports/map-points": {
       "get": {
-        "summary": "Get Map",
-        "description": "Renvoie la page de cartographie Leaflet interactive branchée sur SQLite.",
-        "operationId": "get_map_map_get",
+        "summary": "Get Map Points",
+        "description": "Members of a season grouped by address, for the map of the Outils page (\"Toutes les saisons\": every season).",
+        "operationId": "get_map_points_api_reports_map_points_get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "active",
+              "title": "Season"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
-              "text/html": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/MapPoints"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -5309,6 +5341,79 @@
         ],
         "title": "ManualPayment",
         "description": "Payment received outside HelloAsso (cheque, cash)."
+      },
+      "MapMember": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "group"
+        ],
+        "title": "MapMember",
+        "description": "A member living at a map point. name: \"First LAST\"; group: the HelloAsso tariff (\"Aucun\" without one)."
+      },
+      "MapPoint": {
+        "properties": {
+          "address": {
+            "type": "string",
+            "title": "Address"
+          },
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MapMember"
+            },
+            "type": "array",
+            "title": "Members"
+          }
+        },
+        "type": "object",
+        "required": [
+          "address",
+          "lat",
+          "lon",
+          "members"
+        ],
+        "title": "MapPoint",
+        "description": "Geocoded address shared by one or more members. address: as shown in the popup."
+      },
+      "MapPoints": {
+        "properties": {
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/MapPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "season",
+          "points"
+        ],
+        "title": "MapPoints",
+        "description": "Members of a season placed on the map. season: the season actually read (the active one for \"active\").\nAddresses not geocoded yet are left out (geocoded in the background, on the map at the next load)."
       },
       "Me": {
         "properties": {

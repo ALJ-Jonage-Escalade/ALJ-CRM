@@ -36,13 +36,25 @@ def test_members_map(page):
     """Map of the members' addresses (Leaflet). The e2e setup pre-fills the geocache, so the
     server never calls Nominatim."""
     _open(page)
-    expect(page.get_by_test_id("map-frame")).to_be_visible(timeout=30_000)
-    frame = page.frame_locator("[data-testid=map-frame]")
-    expect(frame.locator(".leaflet-container")).to_be_visible()
-    # Members are shown as markers grouped in clusters
-    clusters = frame.locator(".marker-cluster, .leaflet-marker-icon")
+    expect(page.get_by_test_id("map-stats")).to_contain_text("réparti", timeout=30_000)
+    expect(page.get_by_test_id("map-view").locator(".leaflet-tile-pane")).to_be_attached()
+    # Members are shown as markers grouped in clusters; a cluster zooms in down to the markers, a marker opens its popup
+    clusters = page.get_by_test_id("map-view").locator(".marker-cluster, .leaflet-marker-icon")
     expect(clusters.first).to_be_visible(timeout=15_000)
-    assert "nominatim" not in page.request.get("/map").text().lower()
+    for _ in range(10):
+        if page.get_by_test_id("map-popup").count():
+            break
+        markers = page.get_by_test_id("map-view").locator(".leaflet-marker-icon:not(.marker-cluster)")
+        (markers if markers.count() else clusters).first.click()
+        page.wait_for_timeout(500)
+    expect(page.get_by_test_id("map-popup")).to_contain_text("Adhérent")
+
+    # Group filter: hiding every group empties the map
+    page.get_by_test_id("map-groups").click()
+    page.get_by_test_id("map-group-all").uncheck()
+    expect(page.get_by_test_id("map-stats")).to_contain_text("0 adhérent réparti sur 0 adresse")
+    expect(page.get_by_test_id("map-groups")).to_contain_text("Aucun groupe sélectionné")
+    page.keyboard.press("Escape")
 
     page.get_by_test_id("tools-refresh").click()
     expect(page.get_by_test_id("toast")).to_contain_text("Carte réactualisée")

@@ -8,7 +8,7 @@ All commands run from `code_source/frontend/`, Node version from `.nvmrc`.
 
 - install: `npm ci` (add a dependency: `npm install --save-exact <pkg>`, MIT or equivalent license only, decision D5)
 - dev: `npm run dev` → http://localhost:5173/bureau/, next to `uv run dev/run_server.sh` in `code_source/` (Vite proxies
-  the API, `/map`, `/pivot` and the PWA files to :8080)
+  the API, `/pivot` and the PWA files to :8080)
 - all checks (as CI): `npm run check:api && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`
 - typecheck: `npm run typecheck` (vue-tsc, also checks `.vue` files; not `npx tsc`)
 - format: `npm run format` before committing (Prettier, width 140, enforced in CI)

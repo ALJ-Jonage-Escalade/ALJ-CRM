@@ -1,7 +1,8 @@
 """
 Member data comes from the public HelloAsso form and must be treated as hostile:
-server-built HTML pages (/map, /pivot) must never let it end a <script> block or
-inject markup, and the portal must render those pages in an isolated iframe.
+the server-built HTML page (/pivot) must never let it end a <script> block or
+inject markup, the portal must render it in an isolated iframe, and the members map
+(Vue app) must show it as text.
 """
 
 import json
@@ -49,16 +50,6 @@ class TestServerPagesEscapeMemberData(unittest.TestCase):
         self.assertNotIn("<img", html.lower())
         self.assertNotIn("</script><", html.lower())
 
-    def test_map_data_and_popups(self):
-        point = {"address": PAYLOAD, "lat": 45.8, "lon": 5.05,
-                 "members": [f"{PAYLOAD} ({PAYLOAD})"], "groups": [PAYLOAD]}
-        with patch("api.reports.map.get_sqlite_map_data", return_value=[point]):
-            html = self.client.get("/map").text
-        self._assert_payload_contained(html)
-        self.assertIn("escHtml(point.address)", html)
-        self.assertIn("escHtml(name)", html)
-        self.assertNotIn("${group}", html)
-
     def test_pivot_data(self):
         row = {"status": PAYLOAD, "city": PAYLOAD, "already_member": 0,
                "season_name": "2026-2027", "tarif_name": PAYLOAD}
@@ -71,13 +62,27 @@ class TestServerPagesEscapeMemberData(unittest.TestCase):
 class TestToolsIframesIsolated(unittest.TestCase):
 
     def test_no_same_origin_sandbox(self):
-        """The map and the pivot table (Vue app, Outils page) run in frames that cannot reach the session or the API."""
+        """The pivot table (Vue app, Outils page) runs in a frame that cannot reach the session or the API."""
         with open(os.path.join(_code_root, "frontend", "src", "pages", "OutilsPage.vue"), encoding="utf-8") as f:
             html = f.read()
         sandboxes = re.findall(r'sandbox="([^"]*)"', html)
-        self.assertEqual(len(sandboxes), 2)
+        self.assertEqual(len(sandboxes), 1)
         for value in sandboxes:
             self.assertNotIn("allow-same-origin", value)
+
+
+class TestMembersMapShowsText(unittest.TestCase):
+
+    def test_no_html_from_member_data(self):
+        """The map's popups and filter are built as text: no HTML string reaches Leaflet or the DOM."""
+        outils = os.path.join(_code_root, "frontend", "src", "pages", "outils")
+        for name in ("MembersMap.vue", "membersMapView.ts"):
+            with open(os.path.join(outils, name), encoding="utf-8") as f:
+                source = f.read()
+            for sink in ("innerHTML", "v-html", "insertAdjacentHTML", "setContent("):
+                self.assertNotIn(sink, source, name)
+        with open(os.path.join(outils, "membersMapView.ts"), encoding="utf-8") as f:
+            self.assertIn("bindPopup(() => popup(p))", f.read())
 
 
 if __name__ == "__main__":

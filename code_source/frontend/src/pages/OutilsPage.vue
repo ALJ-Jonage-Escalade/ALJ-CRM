@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* Outils (coaches and admins): members map and pivot table (pages of the server in sandboxed frames), attendance
+/* Outils (coaches and admins): members map, pivot table (a page of the server in a sandboxed frame), attendance
    sheets, FFME CSV export and, for admins, import of the MyFFME licensee list. The open tab is in the URL (?tab=ffme,
    linked from Adhérents). A tab is loaded when first opened and kept while switching. Online only. */
 import { computed, inject, onMounted, reactive, ref } from "vue";
@@ -14,7 +14,9 @@ import { CLIENT_KEY } from "../lib/client";
 import { createMembersApi } from "../services/members";
 import FfmeExportPane from "./outils/FfmeExportPane.vue";
 import FfmeImportPane from "./outils/FfmeImportPane.vue";
+import MembersMap from "./outils/MembersMap.vue";
 import PresencePane from "./outils/PresencePane.vue";
+import SeasonSelect from "./outils/SeasonSelect.vue";
 import ToolFrame from "./outils/ToolFrame.vue";
 
 const membersApi = createMembersApi(inject(CLIENT_KEY)!);
@@ -44,21 +46,23 @@ function show(id: TabId): void {
   void router.replace({ query: { ...route.query, tab: id === "map" ? undefined : id } });
 }
 
-// Pivot table: the active season, or every season
-const ALL_SEASONS = "Toutes les saisons";
+// Map and pivot table: the active season at first, or every season
 const seasons = ref<string[]>([]);
-const season = ref(""); // empty until the seasons are known
-const pivotUrl = computed(() => `/pivot?season=${encodeURIComponent(season.value)}`);
+const mapSeason = ref(""); // empty until the seasons are known
+const pivotSeason = ref("");
+const pivotUrl = computed(() => `/pivot?season=${encodeURIComponent(pivotSeason.value)}`);
 
 onMounted(async () => {
+  let initial = "active"; // the server's active season
   try {
     const data = await membersApi.seasons();
     seasons.value = data.seasons;
-    season.value = data.seasons.includes(data.active) ? data.active : (data.seasons[0] ?? "active");
+    initial = data.seasons.includes(data.active) ? data.active : (data.seasons[0] ?? initial);
   } catch (e) {
     console.warn("Saisons des outils :", e);
-    season.value = "active"; // the server's active season
   }
+  mapSeason.value = initial;
+  pivotSeason.value = initial;
 });
 
 // Reload of the open tab
@@ -112,30 +116,14 @@ const chip = (active: boolean) => [
     </UiCard>
 
     <section v-if="isOpen('map')" v-show="tab === 'map'" data-testid="pane-map">
-      <ToolFrame
-        :ref="keep('map')"
-        url="/map"
-        sandbox="allow-scripts allow-popups"
-        title="Carte Leaflet des adhérents"
-        loading="Chargement de la carte géographique des adhérents…"
-        testid="map-frame"
-      />
+      <SeasonSelect v-model="mapSeason" :seasons="seasons" label="Saison à afficher :" testid="map-season" class="mb-2" />
+      <MembersMap v-if="mapSeason" :ref="keep('map')" :season="mapSeason" />
     </section>
 
     <section v-if="isOpen('pivot')" v-show="tab === 'pivot'" data-testid="pane-pivot">
-      <label class="mb-2 flex items-center gap-2 text-[12.5px] font-semibold text-slate-500">
-        Saison à analyser :
-        <select
-          v-model="season"
-          data-testid="pivot-season"
-          class="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12.5px] text-slate-800"
-        >
-          <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
-          <option :value="ALL_SEASONS">{{ ALL_SEASONS }}</option>
-        </select>
-      </label>
+      <SeasonSelect v-model="pivotSeason" :seasons="seasons" label="Saison à analyser :" testid="pivot-season" class="mb-2" />
       <ToolFrame
-        v-if="season"
+        v-if="pivotSeason"
         :ref="keep('pivot')"
         :url="pivotUrl"
         sandbox="allow-scripts allow-popups allow-modals"
