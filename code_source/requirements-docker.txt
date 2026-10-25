@@ -51,7 +51,7 @@ openpyxl==3.1.5
     # via alj-escalade-manager
 pandas==3.0.6
     # via alj-escalade-manager
-pillow==12.3.0
+pillow==13.0.0
     # via
     #   alj-escalade-manager
     #   weasyprint
