@@ -52,8 +52,8 @@ uv run dev/run_server.sh                           # serveur FastAPI avec rechar
 cd frontend && npm run dev                         # application Vue (autre terminal), rechargement à chaud
 ```
 
-L'application Vue répond sur http://localhost:5173/bureau/ et renvoie au serveur FastAPI (port 8080) l'API,
-`/pivot` et les fichiers de la PWA. Sans `npm run dev`, http://localhost:8080/bureau/ sert la dernière compilation
+L'application Vue répond sur http://localhost:5173/bureau/ et renvoie au serveur FastAPI (port 8080) l'API
+et les fichiers de la PWA. Sans `npm run dev`, http://localhost:8080/bureau/ sert la dernière compilation
 (`npm run build`), ou explique comment la lancer.
 
 Arrêt : `Ctrl+C` pour le serveur, `docker compose -f dev/docker-compose.yml down` pour les conteneurs

@@ -13,7 +13,7 @@ decisions: `documentations/plan_frontend_vue.md`); every screen is in it. `code_
 docker compose -f dev/docker-compose.yml up -d    # Firebase emulator (:4000) + Mailpit (:8025)
 set -a && source dev/dev.env && set +a
 uv run python dev/seed/seed_emulator.py           # (re)seed fake data
-uv run dev/run_server.sh                          # FastAPI with reload (API, /pivot, PWA files)
+uv run dev/run_server.sh                          # FastAPI with reload (API, PWA files)
 cd frontend && npm ci && npm run dev              # Vue app, hot reload → http://localhost:5173/bureau/ (proxies the rest to :8080)
 docker compose -f dev/docker-compose.yml down     # stop (emulator data kept in dev/.emulator-data/)
 ```

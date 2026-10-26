@@ -13,6 +13,7 @@ from api.reports.schemas import PivotRecord, PivotRecords
 from api.responses import error, error_responses, internal_error
 from domain.members.age_rules import age_at, get_season_start_date, parse_birth_date
 from domain.members.models import normalize_gender
+from domain.members.view import fmt_first_name, fmt_last_name
 from domain.utils import clean_city_name
 from infrastructure.sqlite.members import MemberRepository
 
@@ -68,8 +69,8 @@ def pivot_record(row: Dict[str, Any], season: str) -> PivotRecord:  # Any: a row
     age = age_at(birth_date, get_season_start_date(season_name or season))
     order_date = iso_date(row.get("order_date"))
     return PivotRecord(
-        last_name=str(row.get("last_name") or "").strip().upper(),
-        first_name=str(row.get("first_name") or "").strip().title(),
+        last_name=fmt_last_name(row.get("last_name")),
+        first_name=fmt_first_name(row.get("first_name")),
         gender=normalize_gender(row.get("gender")) or "Inconnu",
         age=age,
         age_band=age_band(age),

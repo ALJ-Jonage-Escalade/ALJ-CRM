@@ -129,14 +129,17 @@ migrated, so two service workers never compete for `/`.
 Done 2026-10-23 (plan phase 12): `frontend/src/sw.ts` in `injectManifest` mode, built into `dist/sw.js`, served at
 `/sw.js` so that it replaces the former worker in place.
 
-### D10 — Outils: map and pivot stay as iframes, map rebuilt right after the migration
+### D10 — Outils: map and pivot stay as iframes, then rebuilt as Vue components
 - During the migration, the Vue Outils page embeds `/map` (`src/api/reports/map.py`, Leaflet + markercluster from
   unpkg) and `/pivot` (`src/api/reports/pivot.py`, jQuery 3.6 + jQuery UI 1.12.1 + pivottable 2.23 from cdnjs) in
   sandboxed iframes, as today. They work, are isolated, and are not a priority on phones.
 - **First follow-up after step 5**: rebuild the map as a Vue component with `leaflet` from npm and a JSON endpoint
   (`/api/reports/map-points`). Done (#25): `pages/outils/MembersMap.vue`, Leaflet + markercluster from npm loaded on
   first display, popups built as text (no HTML), a season selector; `/map` is removed.
-- The pivot stays an iframe. To do: upgrade or remove jQuery UI 1.12.1 (known CVEs; the sandbox limits the impact).
+- Pivot rebuilt as a Vue component too (plan `plans/vue-pivot-table.md`): `pages/outils/PivotPane.vue` with
+  `vue-pivottable` from npm (MIT, no jQuery), loaded with its tab, on `/api/reports/pivot-records` (the rows shaped in
+  Python, French field names as keys); French aggregators and renderers, the layout kept in `localStorage` (never the
+  value filters). `/pivot`, jQuery / jQuery UI 1.12.1 / the cdnjs scripts and the sandboxed iframe are removed.
 
 ### D11 — One version number
 Vite reads `code_source/VERSION` at build time and injects it into the app (shown in the UI). The separate web version

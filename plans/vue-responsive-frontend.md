@@ -18,7 +18,8 @@ Durable decisions that apply across all phases:
 - **Coexistence**: FastAPI serves the SPA entry page for migrated routes, the old HTML for the others; navigation
   between them is a full page load; the Firebase session is shared.
 - **Served by FastAPI, outside the build**: `/runtime-config.js` (emulator / production switch), `/map`, `/pivot`,
-  `/manifest.webmanifest`, `/sw.js` (current network-first worker until phase 12).
+  `/manifest.webmanifest`, `/sw.js` (current network-first worker until phase 12). `/map` and `/pivot` were later
+  rebuilt as Vue components and removed (#25, `plans/vue-pivot-table.md`).
 - **Auth**: unchanged Google implicit OAuth + Firebase `signInWithCredential`, callback on `/competitions`, emulator
   login in dev. The server is the only judge of roles.
 - **New endpoint**: `GET /api/me` → `Me { email: string, role: "admin" | "coach" | "readonly" | null }`, computed by
@@ -165,7 +166,8 @@ grid and export it to Excel (server-generated file, club style), on typed routes
 
 ### What to build
 
-The Outils screen in the SPA: tabs embedding `/map` and `/pivot` in sandboxed iframes as today, FFME stats, import
+The Outils screen in the SPA: tabs embedding `/map` and `/pivot` in sandboxed iframes as today (both later rebuilt
+as Vue components, see D10), FFME stats, import
 (preview and apply) and export. The CSV export module (formula-injection rule) is introduced here and used by every
 table export from now on.
 
