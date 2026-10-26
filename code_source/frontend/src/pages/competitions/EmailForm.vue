@@ -40,8 +40,11 @@ function useTemplate(): void {
 void (async () => {
   try {
     templates.value = (await communicationsApi.emailTemplates()).templates;
-    templateName.value = defaultTemplate(templates.value)?.name ?? "";
-    useTemplate();
+    // On a slow network the user may have started writing: the default template must not replace their text
+    if (!subject.value.trim() && !body.value.trim()) {
+      templateName.value = defaultTemplate(templates.value)?.name ?? "";
+      useTemplate();
+    }
   } catch {
     problem.value = "⚠️ Modèles d'e-mails indisponibles : saisissez le message.";
   }
