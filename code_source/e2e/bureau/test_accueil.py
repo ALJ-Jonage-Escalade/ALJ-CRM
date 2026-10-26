@@ -72,9 +72,10 @@ def test_non_staff_sees_no_office_menu(page, role, pages):
     page.goto("/bureau/")
     login_as(page, role)
     expect(page.locator("#gate")).to_contain_text("Accès réservé")
-    expect(page.locator(f"{NAV} a")).to_have_count(len(pages))
+    expect(page.locator("nav")).to_have_count(0)  # full-screen gate: the pages it may open are listed in it
+    expect(page.locator("#gate a")).to_have_count(len(pages))
     for name in pages:
-        expect(page.locator(f"{NAV} a[data-page='{name}']")).to_be_visible()
+        expect(page.locator(f"#gate a[data-page='{name}']")).to_be_visible()
 
 
 @pytest.mark.parametrize("name, label", [("parametres", "Paramètres"), ("communications", "Communications")])

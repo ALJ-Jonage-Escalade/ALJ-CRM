@@ -9,7 +9,6 @@ import UiButton from "../components/ui/UiButton.vue";
 import UiDialog from "../components/ui/UiDialog.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { AUTH_KEY } from "../composables/auth";
-import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
 import { pageAccess, verdict } from "../lib/access";
@@ -51,7 +50,6 @@ import { dialogs } from "../composables/dialogs";
 const auth = inject(AUTH_KEY)!;
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const store = inject(STORE_KEY, null) ?? offlineStore();
-const signInError = inject(SIGN_IN_ERROR_KEY, ref(null));
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
@@ -275,15 +273,6 @@ const tab = (active: boolean) => [
 
 <template>
   <AppShell page="competitions" title="Compétitions" :sync="syncInfo" offline-read>
-    <p
-      v-if="signInError"
-      data-testid="sign-in-error"
-      role="alert"
-      class="mb-3 rounded-lg border border-red-300 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800"
-    >
-      ❌ {{ signInError }}
-    </p>
-
     <nav v-if="canWrite" aria-label="Sections des compétitions" class="mb-3 flex gap-1.5 overflow-x-auto" data-testid="sections">
       <RouterLink
         v-for="s in SECTIONS"

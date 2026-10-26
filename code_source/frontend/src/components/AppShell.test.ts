@@ -5,18 +5,29 @@ import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
 import type { PageId } from "../lib/access";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { STORE_KEY, type OfflineStore } from "../lib/store";
+import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
 import AppShell from "./AppShell.vue";
 import { dialogs } from "../composables/dialogs";
 
 const USER = { uid: "u1", email: "albus@alj-escalade.fr" };
 
-function render(state: AuthState, googleStatus = "ok", page: PageId = "accueil", offlineRead = false, queued = 0) {
+function render(
+  state: AuthState,
+  googleStatus = "ok",
+  page: PageId = "accueil",
+  offlineRead = false,
+  queued = 0,
+  signInError: string | null = null,
+) {
   const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
   const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: googleStatus })));
   const wrapper = mount(AppShell, {
     props: { page, title: "Titre", offlineRead },
     slots: { default: '<p id="page-body">contenu</p>' },
-    global: { provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: storeWith(queued) }, stubs: { VersionBadge: true } },
+    global: {
+      provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: storeWith(queued), [SIGN_IN_ERROR_KEY]: ref(signInError) },
+      stubs: { VersionBadge: true },
+    },
   });
   return { wrapper, auth, api };
 }
@@ -53,20 +64,30 @@ describe("AppShell", () => {
     expect(auth.logout).toHaveBeenCalledOnce();
   });
 
-  it("shows neither the gate nor the content while the session loads", () => {
+  it("shows only a full-screen splash while the session loads", () => {
     const { wrapper } = render({ status: "loading" });
-    expect(wrapper.find("#who").text()).toBe("Vérification de la connexion…");
+    expect(wrapper.find("#session-check").text()).toBe("Vérification de la connexion…");
+    expect(wrapper.find("nav").exists()).toBe(false);
     expect(wrapper.find("#gate").exists()).toBe(false);
     expect(wrapper.find("#content").exists()).toBe(false);
   });
 
-  it("asks a signed-out visitor to sign in", async () => {
+  it("asks a signed-out visitor to sign in, full screen", async () => {
     const { wrapper, auth } = render({ status: "signedOut" });
-    expect(wrapper.find("#who").text()).toBe("Non connecté");
+    expect(wrapper.find("#login-screen").exists()).toBe(true);
+    expect(wrapper.find("nav").exists()).toBe(false);
+    expect(wrapper.find("header").exists()).toBe(false);
+    expect(wrapper.find("#who").exists()).toBe(false);
     expect(wrapper.find("#logout-btn").exists()).toBe(false);
     expect(wrapper.find("#content").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="sign-in-error"]').exists()).toBe(false);
     await wrapper.find("#gate-login").trigger("click");
     expect(auth.login).toHaveBeenCalledOnce();
+  });
+
+  it("explains a failed Google sign-in on the gate", () => {
+    const { wrapper } = render({ status: "signedOut" }, "ok", "competitions", true, 0, "Connexion Google annulée.");
+    expect(wrapper.find('[data-testid="sign-in-error"]').text()).toContain("Connexion Google annulée.");
   });
 
   it.each(["admin", "coach"] as const)("renders the page for %s", async (role) => {
@@ -78,22 +99,43 @@ describe("AppShell", () => {
     expect(wrapper.find("#google-auth-warning").isVisible()).toBe(false);
   });
 
-  it.each(["readonly", null] as const)("refuses the office to %s", async (role) => {
+  it.each(["readonly", null] as const)("refuses the office to %s, full screen", async (role) => {
     const { wrapper, auth, api } = render({ status: "signedIn", user: USER, role });
     expect(wrapper.find("#gate").text()).toContain("Accès réservé");
+    expect(wrapper.find('[data-testid="gate-account"]').text()).toBe(USER.email);
+    // Read-only accounts may still open the competitions: the gate links to them
+    expect(wrapper.findAll('[data-testid="gate-pages"] a').map((link) => link.attributes("data-page"))).toEqual(
+      role === "readonly" ? ["competitions"] : [],
+    );
+    expect(wrapper.find("nav").exists()).toBe(false);
     expect(wrapper.find("#content").exists()).toBe(false);
     await wrapper.find("#gate-logout").trigger("click");
+    await flushPromises();
     expect(auth.logout).toHaveBeenCalledOnce();
     expect(api).not.toHaveBeenCalled(); // no club data asked for a non-staff account
   });
 
-  it("offers a retry when the role could not be checked", async () => {
+  it("keeps the menu offline, towards the pages readable offline", async () => {
     const { wrapper, auth } = render({ status: "error", user: USER, message: "Serveur injoignable", offline: true });
     expect(wrapper.find("#gate").text()).toContain("Serveur injoignable");
+    expect(wrapper.find('[data-testid="offline-pages"]').exists()).toBe(true);
+    expect(wrapper.findAll("nav a")).toHaveLength(8);
     expect(wrapper.find("#content").exists()).toBe(false);
     expect(wrapper.find("#logout-btn").exists()).toBe(true);
     await wrapper.find("#gate-retry").trigger("click");
     expect(auth.retry).toHaveBeenCalledOnce();
+  });
+
+  it("offers a retry and a logout, full screen, when the server refused the role", async () => {
+    const { wrapper, auth } = render({ status: "error", user: USER, message: "Session refusée par le serveur", offline: false });
+    expect(wrapper.find("#gate").text()).toContain("Session refusée par le serveur");
+    expect(wrapper.find("nav").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="offline-pages"]').exists()).toBe(false);
+    await wrapper.find("#gate-retry").trigger("click");
+    expect(auth.retry).toHaveBeenCalledOnce();
+    await wrapper.find("#gate-logout").trigger("click");
+    await flushPromises();
+    expect(auth.logout).toHaveBeenCalledOnce();
   });
 
   it("shows a page readable offline when only the network is missing", async () => {
@@ -118,7 +160,7 @@ describe("AppShell", () => {
   });
 
   it("marks the current page in the navigation", () => {
-    const { wrapper } = render({ status: "signedOut" });
+    const { wrapper } = render({ status: "error", user: USER, message: "Serveur injoignable", offline: true });
     expect(wrapper.find('nav a[data-page="accueil"]').attributes("aria-current")).toBe("page");
     expect(wrapper.find('nav a[data-page="adherents"]').attributes("aria-current")).toBeUndefined();
     expect(wrapper.findAll("nav a")).toHaveLength(8);
@@ -137,7 +179,8 @@ describe("AppShell", () => {
     ["readonly", 1],
     [null, 0],
   ] as const)("lists the pages %s may open", (role, count) => {
-    const { wrapper } = render({ status: "signedIn", user: USER, role });
+    // On Compétitions, the page every role but none may open (elsewhere a read-only account gets the full-screen gate)
+    const { wrapper } = render({ status: "signedIn", user: USER, role }, "ok", "competitions", true);
     expect(wrapper.findAll("nav a")).toHaveLength(count);
   });
 

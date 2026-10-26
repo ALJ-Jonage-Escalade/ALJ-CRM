@@ -67,8 +67,9 @@ def test_pages_open_offline(page, context):
     context.set_offline(True)
     try:
         page.reload()
-        # Shell rendered from the precache: menu and login gate, no browser error page
-        expect(page.locator("nav a[data-page='adherents']")).to_be_visible()
+        # App rendered from the precache: the full-screen login gate (no menu signed out), no browser error page
+        expect(page.locator("#login-screen")).to_be_visible()
+        expect(page.locator("nav")).to_have_count(0)
         expect(page.locator("#gate")).to_be_visible()
         for path in ("/bureau/competitions", "/competitions", "/index", "/bureau/planning"):
             page.goto(path)
