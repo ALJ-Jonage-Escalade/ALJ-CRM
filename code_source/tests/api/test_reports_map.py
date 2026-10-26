@@ -31,7 +31,7 @@ def _get(client, rows, season="active"):
     with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", return_value=rows) as load, \
          patch("infrastructure.sqlite.geocache.GeocacheRepository.get_geocache", return_value=GEOCACHE), \
          patch("api.reports.map.geocode_missing_addresses") as geocode, \
-         patch("api.reports.map.get_active_season", return_value="2026-2027"):
+         patch("api.reports.get_active_season", return_value="2026-2027"):
         response = client.get("/api/reports/map-points", params={"season": season})
     return response, load, geocode
 

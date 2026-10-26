@@ -2355,11 +2355,11 @@
         }
       }
     },
-    "/pivot": {
+    "/api/reports/pivot-records": {
       "get": {
-        "summary": "Get Pivot Table",
-        "description": "Renvoie la page du Tableau Croisé Dynamique interactif via PivotTable.js.",
-        "operationId": "get_pivot_table_pivot_get",
+        "summary": "Get Pivot Records",
+        "description": "Members of a season for the pivot table of the Outils page (\"Toutes les saisons\": every season).",
+        "operationId": "get_pivot_records_api_reports_pivot_records_get",
         "parameters": [
           {
             "name": "season",
@@ -2367,7 +2367,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "2026-2027",
+              "default": "active",
               "title": "Season"
             }
           }
@@ -2376,12 +2376,22 @@
           "200": {
             "description": "Successful Response",
             "content": {
-              "text/html": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/PivotRecords"
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -6195,6 +6205,104 @@
           "archived"
         ],
         "title": "PastArchived"
+      },
+      "PivotRecord": {
+        "properties": {
+          "Nom": {
+            "type": "string",
+            "title": "Nom"
+          },
+          "Prénom": {
+            "type": "string",
+            "title": "Prénom"
+          },
+          "Sexe": {
+            "type": "string",
+            "title": "Sexe"
+          },
+          "Âge": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Âge"
+          },
+          "Tranche d'Âge": {
+            "type": "string",
+            "title": "Tranche D'Âge"
+          },
+          "Ville": {
+            "type": "string",
+            "title": "Ville"
+          },
+          "Groupe / Tarif": {
+            "type": "string",
+            "title": "Groupe / Tarif"
+          },
+          "Statut": {
+            "type": "string",
+            "title": "Statut"
+          },
+          "Saison": {
+            "type": "string",
+            "title": "Saison"
+          },
+          "Type d'Adhésion": {
+            "type": "string",
+            "title": "Type D'Adhésion"
+          },
+          "Date d'Inscription": {
+            "type": "string",
+            "title": "Date D'Inscription"
+          },
+          "Mois d'Inscription": {
+            "type": "string",
+            "title": "Mois D'Inscription"
+          }
+        },
+        "type": "object",
+        "required": [
+          "Nom",
+          "Prénom",
+          "Sexe",
+          "Âge",
+          "Tranche d'Âge",
+          "Ville",
+          "Groupe / Tarif",
+          "Statut",
+          "Saison",
+          "Type d'Adhésion",
+          "Date d'Inscription",
+          "Mois d'Inscription"
+        ],
+        "title": "PivotRecord",
+        "description": "A member (one purchase) as a row of the pivot table. The JSON keys are the French field names shown by the\ntable (aliases); age: at the start of the row's season, None when the birth date is unknown."
+      },
+      "PivotRecords": {
+        "properties": {
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/PivotRecord"
+            },
+            "type": "array",
+            "title": "Records"
+          }
+        },
+        "type": "object",
+        "required": [
+          "season",
+          "records"
+        ],
+        "title": "PivotRecords",
+        "description": "Members of a season for the pivot table. season: the season actually read (the active one for \"active\")."
       },
       "PlanningSlot": {
         "properties": {

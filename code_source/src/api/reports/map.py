@@ -7,21 +7,15 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 
+from api.reports import resolve_season
 from api.reports.schemas import MapMember, MapPoint, MapPoints
 from api.responses import error, error_responses, internal_error
-from domain.constants import get_active_season
 from domain.utils import clean_city_name
 from infrastructure.geocoding import geocode_missing_addresses
 from infrastructure.sqlite.geocache import GeocacheRepository
 from infrastructure.sqlite.members import MemberRepository
 
 router = APIRouter()
-
-
-def resolve_season(season: str) -> str:
-    """The season to read: "", "active" and "default" mean the active season."""
-    season = (season or "").strip()
-    return get_active_season() if season.lower() in ("", "active", "default") else season
 
 
 def map_points(season: str, background_tasks: Optional[BackgroundTasks] = None) -> List[MapPoint]:

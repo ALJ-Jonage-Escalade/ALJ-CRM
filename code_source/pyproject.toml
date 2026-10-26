@@ -109,6 +109,8 @@ files = [
     "src/api/activities/presence.py",
     "src/api/reports/schemas.py",
     "src/api/reports/map.py",
+    "src/api/reports/pivot.py",
+    "src/api/reports/__init__.py",
     "src/domain/members/view.py",
     "src/services/__init__.py",
     "src/services/competitions/__init__.py",

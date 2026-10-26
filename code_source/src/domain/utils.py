@@ -1,5 +1,4 @@
 import html as _html
-import json
 import re
 import unicodedata
 from typing import Any
@@ -21,19 +20,6 @@ def is_helloasso_url(value: str) -> bool:
     host = (urlparse(raw).hostname or "").lower()
     return host == "helloasso.com" or host.endswith(".helloasso.com")
 
-
-def json_for_script(obj: Any) -> str:
-    """JSON safe to embed inside an inline <script> block.
-
-    json.dumps does not escape `</script>` or `<!--`: a member value containing them
-    would end the script and inject markup. `<`, `>`, `&` and the JS line separators
-    are emitted as \\u escapes, which JSON.parse / JS literals decode back unchanged.
-    """
-    out = json.dumps(obj, ensure_ascii=False)
-    for char, escape in (("<", "\\u003c"), (">", "\\u003e"), ("&", "\\u0026"),
-                         (" ", "\\u2028"), (" ", "\\u2029")):
-        out = out.replace(char, escape)
-    return out
 
 def normalize_string(s) -> str:
     """

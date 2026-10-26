@@ -783,7 +783,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/pivot": {
+    "/api/reports/pivot-records": {
         parameters: {
             query?: never;
             header?: never;
@@ -791,10 +791,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Pivot Table
-         * @description Renvoie la page du Tableau Croisé Dynamique interactif via PivotTable.js.
+         * Get Pivot Records
+         * @description Members of a season for the pivot table of the Outils page ("Toutes les saisons": every season).
          */
-        get: operations["get_pivot_table_pivot_get"];
+        get: operations["get_pivot_records_api_reports_pivot_records_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2792,6 +2792,47 @@ export interface components {
              * @description Ids of the competitions archived
              */
             archived: number[];
+        };
+        /**
+         * PivotRecord
+         * @description A member (one purchase) as a row of the pivot table. The JSON keys are the French field names shown by the
+         *     table (aliases); age: at the start of the row's season, None when the birth date is unknown.
+         */
+        PivotRecord: {
+            /** Nom */
+            Nom: string;
+            /** Prénom */
+            "Pr\u00E9nom": string;
+            /** Sexe */
+            Sexe: string;
+            /** Âge */
+            "\u00C2ge": number | null;
+            /** Tranche D'Âge */
+            "Tranche d'\u00C2ge": string;
+            /** Ville */
+            Ville: string;
+            /** Groupe / Tarif */
+            "Groupe / Tarif": string;
+            /** Statut */
+            Statut: string;
+            /** Saison */
+            Saison: string;
+            /** Type D'Adhésion */
+            "Type d'Adh\u00E9sion": string;
+            /** Date D'Inscription */
+            "Date d'Inscription": string;
+            /** Mois D'Inscription */
+            "Mois d'Inscription": string;
+        };
+        /**
+         * PivotRecords
+         * @description Members of a season for the pivot table. season: the season actually read (the active one for "active").
+         */
+        PivotRecords: {
+            /** Season */
+            season: string;
+            /** Records */
+            records: components["schemas"]["PivotRecord"][];
         };
         /**
          * PlanningSlot
@@ -5070,7 +5111,7 @@ export interface operations {
             };
         };
     };
-    get_pivot_table_pivot_get: {
+    get_pivot_records_api_reports_pivot_records_get: {
         parameters: {
             query?: {
                 season?: string;
@@ -5087,7 +5128,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "text/html": string;
+                    "application/json": components["schemas"]["PivotRecords"];
                 };
             };
             /** @description Validation Error */
@@ -5097,6 +5138,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

@@ -60,22 +60,46 @@ def test_members_map(page):
     expect(page.get_by_test_id("toast")).to_contain_text("Carte réactualisée")
 
 
+def _shown_on_top(locator) -> bool:
+    """True when the element is the one drawn at its centre (not clipped nor covered)."""
+    return locator.evaluate("""el => {
+        const box = el.getBoundingClientRect();
+        return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+    }""")
+
+
 def test_pivot_table_by_season(page):
     _open(page)
     page.get_by_test_id("tab-pivot").click()
     page.wait_for_url("**/bureau/outils?tab=pivot")
-    expect(page.get_by_test_id("pivot-frame")).to_be_visible(timeout=30_000)
+    table = page.get_by_test_id("pivot-table")
+    expect(table.locator("table.pvtTable")).to_be_visible(timeout=30_000)
+    expect(table.locator("table.pvtTable")).to_contain_text("Totaux")
     seasons = page.get_by_test_id("pivot-season").locator("option")
     expect(seasons).to_have_count(3)  # the two seeded seasons + all seasons
-    frame = page.frame_locator("[data-testid=pivot-frame]")
-    expect(frame.locator(".pvtTable, .pvtUi").first).to_be_visible(timeout=15_000)
 
-    with page.expect_response(lambda r: "/pivot?season=2025-2026" in r.url and r.ok):
+    # The value filter of a field opens over the table, not clipped by it
+    triangle = table.locator(".pvtAttr", has_text="Statut").locator(".pvtTriangle")
+    triangle.click()
+    filter_box = table.locator(".pvtFilterBox")
+    expect(filter_box).to_be_visible()
+    assert _shown_on_top(filter_box)
+    triangle.click()
+    expect(filter_box).to_be_hidden()
+
+    # The renderer chosen is kept across season changes and visits
+    table.locator(".pvtRenderers select").select_option("Carte de chaleur")
+    with page.expect_response(lambda r: "/api/reports/pivot-records?season=2025-2026" in r.url and r.ok):
         page.get_by_test_id("pivot-season").select_option("2025-2026")
-    expect(frame.locator(".pvtTable, .pvtUi").first).to_be_visible()
-    with page.expect_response(lambda r: "/pivot?season=Toutes%20les%20saisons" in r.url and r.ok):
+    expect(table.locator(".pvtRenderers select")).to_have_value("Carte de chaleur")
+    with page.expect_response(lambda r: "/api/reports/pivot-records?season=Toutes%20les%20saisons" in r.url and r.ok):
         page.get_by_test_id("pivot-season").select_option("Toutes les saisons")
-    expect(frame.locator(".pvtTable, .pvtUi").first).to_be_visible()
+    expect(table.locator("table.pvtTable")).to_be_visible()
+
+    page.reload()
+    expect(page.get_by_test_id("pivot-table").locator(".pvtRenderers select")).to_have_value("Carte de chaleur", timeout=30_000)
+    page.get_by_test_id("pivot-reset").click()
+    expect(page.get_by_test_id("pivot-table").locator(".pvtRenderers select")).to_have_value("Tableau")
 
 
 def test_expired_google_token_warning(page):
