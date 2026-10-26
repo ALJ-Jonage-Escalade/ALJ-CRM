@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, List, Literal
+from typing import Annotated, Any, List, Literal, Optional
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict
 
@@ -15,15 +15,18 @@ class ResultsSettings(BaseModel):
     last_run: str
     last_status: str
     cron_schedule: str
+    window_days: int  # only competitions ended in the last N days are searched (unless forced)
 
 
 class ResultsSettingsUpdate(RequestBody):
     notification_email: str = ""
+    window_days: Optional[int] = None  # None: unchanged
 
 
 class ResultsSettingsSaved(BaseModel):
     status: Literal["success"]
     notification_email: str
+    window_days: int
     saved: bool
 
 
@@ -52,14 +55,20 @@ class BatchCompetition(BaseModel):
     url: Text = ""
     # Club athletes' results as scraped from MyCompet (Any: scraper rows, the page only counts them)
     athletes: Annotated[List[Any], BeforeValidator(_rows)] = []
-    status: Literal["found", "pending"] = "pending"
+    # needs_url: a page matches the name but not the date, nothing written (the e-mail asks for the URL once)
+    status: Literal["found", "pending", "needs_url", "error"] = "pending"
 
 
 class BatchReport(BaseModel):
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
     status: Literal["success"]
     executed_at: str
     competitions_checked: int
     competitions_updated: int
+    competitions_remaining: int = 0  # left for the next run: the time budget ran out
+    partial: bool = False
+    window_days: int = 0
     email_sent: bool
     notification_email: str
     details: List[BatchCompetition]

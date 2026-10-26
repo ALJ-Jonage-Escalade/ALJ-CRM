@@ -1133,7 +1133,7 @@
     "/api/competitions/cron/fetch-results": {
       "post": {
         "summary": "Api Cron Fetch Competition Results",
-        "description": "Exécute le batch de récupération des résultats MyCompet FFME pour les compétitions passées\net envoie un e-mail de synthèse si des résultats sont découverts.\nConçu pour être appelé par Google Cloud Scheduler (ex: tous les jours à 07h00) ou manuellement.",
+        "description": "Exécute le batch de récupération des résultats MyCompet FFME pour les compétitions passées\net envoie un e-mail de synthèse si des résultats sont découverts.\nCalled by Cloud Scheduler every day at 07:00 (its OIDC token, see api_auth.SCHEDULER_PATHS) or by an admin.\n`force` (every ended competition, results or not) and `email` (another recipient): admin only.\n503: the competitions could not be read, nothing was done (Cloud Scheduler shows the run as failed).",
         "operationId": "api_cron_fetch_competition_results_api_competitions_cron_fetch_results_post",
         "parameters": [
           {
@@ -1173,6 +1173,26 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -1279,7 +1299,7 @@
       },
       "post": {
         "summary": "Update Competitions Results Settings Api",
-        "description": "Met à jour les adresses e-mail de notification des résultats.",
+        "description": "Met à jour les adresses e-mail de notification des résultats (et la fenêtre de recherche, si fournie).",
         "operationId": "update_competitions_results_settings_api_api_settings_competitions_results_post",
         "requestBody": {
           "content": {
@@ -4504,7 +4524,9 @@
             "type": "string",
             "enum": [
               "found",
-              "pending"
+              "pending",
+              "needs_url",
+              "error"
             ],
             "title": "Status",
             "default": "pending"
@@ -4541,6 +4563,21 @@
             "type": "integer",
             "title": "Competitions Updated"
           },
+          "competitions_remaining": {
+            "type": "integer",
+            "title": "Competitions Remaining",
+            "default": 0
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial",
+            "default": false
+          },
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days",
+            "default": 0
+          },
           "email_sent": {
             "type": "boolean",
             "title": "Email Sent"
@@ -4563,6 +4600,9 @@
           "executed_at",
           "competitions_checked",
           "competitions_updated",
+          "competitions_remaining",
+          "partial",
+          "window_days",
           "email_sent",
           "notification_email",
           "details"
@@ -8986,6 +9026,10 @@
           "cron_schedule": {
             "type": "string",
             "title": "Cron Schedule"
+          },
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days"
           }
         },
         "type": "object",
@@ -8994,7 +9038,8 @@
           "notification_email",
           "last_run",
           "last_status",
-          "cron_schedule"
+          "cron_schedule",
+          "window_days"
         ],
         "title": "ResultsSettings"
       },
@@ -9009,6 +9054,10 @@
             "type": "string",
             "title": "Notification Email"
           },
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days"
+          },
           "saved": {
             "type": "boolean",
             "title": "Saved"
@@ -9018,6 +9067,7 @@
         "required": [
           "status",
           "notification_email",
+          "window_days",
           "saved"
         ],
         "title": "ResultsSettingsSaved"
@@ -9028,6 +9078,17 @@
             "type": "string",
             "title": "Notification Email",
             "default": ""
+          },
+          "window_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Days"
           }
         },
         "additionalProperties": false,

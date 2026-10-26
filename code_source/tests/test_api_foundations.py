@@ -123,9 +123,10 @@ class TestSqliteCacheScope(unittest.TestCase):
         return r
 
     def test_results_cron_runs_on_refreshed_cache(self):
-        """The cron reads the notification address and writes last_run/status in the SQLite cache."""
+        """The cron's router is not in the Firestore-only list: the SQLite cache is refreshed around it."""
         report = {"status": "success", "executed_at": "2026-10-22T07:00:00", "competitions_checked": 0,
-                  "competitions_updated": 0, "email_sent": False, "notification_email": "n@example.org", "details": []}
+                  "competitions_updated": 0, "competitions_remaining": 0, "partial": False, "window_days": 30,
+                  "email_sent": False, "notification_email": "n@example.org", "details": []}
         r = self._assert_cache_around(
             "POST", "/api/competitions/cron/fetch-results",
             "services.competitions.results_batch.CompetitionResultsBatchService.run_daily_batch",

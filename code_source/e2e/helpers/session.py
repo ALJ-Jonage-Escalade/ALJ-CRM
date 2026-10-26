@@ -1,5 +1,5 @@
 """
-The e2e session: throwaway stack, seed, fake HelloAsso and server, started once per run.
+The e2e session: throwaway stack, seed, fake HelloAsso and MyCompet, and server, started once per run.
 
 With pytest-xdist, the controller process owns it (e2e/conftest.py) and hands the server's URL and
 environment to the workers: the emulator is seeded once, and the ports are bound once.
@@ -9,7 +9,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from helpers import helloasso, stack
+from helpers import helloasso, mycompet, stack
 from helpers.data import TestData
 from helpers.mailpit import Mailpit
 
@@ -39,8 +39,11 @@ class E2ESession:
         self._spawn(stack.ServerProcess(fake_env, helloasso.FAKE_PORT, self.logs_dir / "fake-helloasso.log",
                                         app="helloasso_fake:app", app_dir="e2e/fakes", health_path="/docs",
                                         check_env=False))
+        self._spawn(stack.ServerProcess(fake_env, mycompet.FAKE_PORT, self.logs_dir / "fake-mycompet.log",
+                                        app="mycompet_fake:app", app_dir="e2e/fakes", health_path="/docs",
+                                        check_env=False))
 
-        env = stack.dev_environment(self._temp_dir("alj-e2e-data-"), **helloasso.SERVER_ENV)
+        env = stack.dev_environment(self._temp_dir("alj-e2e-data-"), **helloasso.SERVER_ENV, **mycompet.SERVER_ENV)
         stack.seed(env, self.server_log)
         data = TestData(env)
         try:

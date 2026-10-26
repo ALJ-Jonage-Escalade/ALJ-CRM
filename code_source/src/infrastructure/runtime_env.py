@@ -12,6 +12,8 @@ involved: in dev, the application's SMTP settings point to Mailpit (dev/dev.env)
   misconfigured, no call can reach the real data. See ``code_source/dev/``.
   The HelloAsso API can also be replaced by a local fake (``HELLOASSO_API_BASE_URL`` /
   ``HELLOASSO_OAUTH_URL``, used by the e2e tests): these variables are ignored in production.
+  So can MyCompet and the FFME results archive (``MYCOMPET_BASE_URL`` / ``FFME_ARCHIVES_URL``,
+  fake in ``e2e/fakes/mycompet_fake.py``).
 
 Environment variables are read again on every call (tests, reload).
 """
@@ -21,6 +23,8 @@ from typing import Any, Dict, Optional
 PROD_FIRESTORE_BASE_URL = "https://firestore.googleapis.com/v1"
 PROD_HELLOASSO_API_URL = "https://api.helloasso.com/v5"
 PROD_HELLOASSO_OAUTH_URL = "https://api.helloasso.com/oauth2/token"
+PROD_MYCOMPET_BASE_URL = "https://mycompet.ffme.fr"
+PROD_FFME_ARCHIVES_URL = "https://www.ffme.fr/escalade/competition/archives-resultats-escalade/"
 DEV_PROJECT_ID = "demo-alj"
 EMULATOR_ADMIN_TOKEN = "owner"  # noqa: S105 - public emulator admin token (bypasses the security rules), only sent to the emulator
 
@@ -71,6 +75,16 @@ def helloasso_api_url() -> str:
 
 def helloasso_oauth_url() -> str:
     return _dev_override("HELLOASSO_OAUTH_URL", PROD_HELLOASSO_OAUTH_URL)
+
+
+def mycompet_base_url() -> str:
+    """Where MyCompet results pages are fetched from; a dev-only override points it to a local fake."""
+    return _dev_override("MYCOMPET_BASE_URL", PROD_MYCOMPET_BASE_URL).rstrip("/")
+
+
+def ffme_archives_url() -> str:
+    """FFME page listing the MyCompet results pages; a dev-only override points it to a local fake."""
+    return _dev_override("FFME_ARCHIVES_URL", PROD_FFME_ARCHIVES_URL)
 
 
 def emulator_token() -> Optional[str]:

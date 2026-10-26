@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import datetime
 import html
 import logging
 import os
 import re
+import unicodedata
+from typing import List, Optional, TypedDict
+
 import requests
 import lxml.html
 import pandas as pd
+from infrastructure import runtime_env
 from paths import ROOT_DIR
 
 logger = logging.getLogger("alj")
@@ -47,7 +52,7 @@ def scrape_mycompet(progress_callback=None) -> str:
     }
     
     all_rows = []
-    header_cols = []
+    header_cols: list[str] = []
     
     for num_page in range(1, 4):
         disc = disciplines[num_page - 1]
@@ -176,9 +181,15 @@ def normalize_result_url(url_or_id: str) -> str:
     return clean
 
 
+def _fetch_url(url: str) -> str:
+    """Address actually requested: stored URLs keep the MyCompet address, the dev fake (MYCOMPET_BASE_URL) serves them."""
+    base = runtime_env.mycompet_base_url()
+    prod = runtime_env.PROD_MYCOMPET_BASE_URL
+    return base + url[len(prod):] if base != prod and url.startswith(prod) else url
+
+
 def parse_mycompet_results_html(html_text: str, club_keyword: str = "JONAGE") -> list[dict]:
     """Parse le HTML d'une page de résultats MyCompet et extrait les résultats du club."""
-    import re
 
     if not html_text:
         return []
@@ -190,7 +201,7 @@ def parse_mycompet_results_html(html_text: str, club_keyword: str = "JONAGE") ->
     elements = regroupements if regroupements else doc.xpath("//table")
     club_kw = club_keyword.upper().strip()
 
-    seen = {}
+    seen: dict[str, dict] = {}
     for elem in elements:
         # Trouver la catégorie si présent
         cat_name = ""
@@ -267,82 +278,122 @@ def fetch_and_parse_mycompet_results(url_or_id: str, club_keyword: str = "JONAGE
         "Accept-Language": "fr,fr-FR;q=0.9,en;q=0.8"
     }
 
-    resp = requests.get(url, headers=headers, timeout=15)
+    resp = requests.get(_fetch_url(url), headers=headers, timeout=15)
     if resp.status_code != 200:
         raise RuntimeError(f"Impossible de récupérer les résultats MyCompet depuis {url} (code HTTP {resp.status_code})")
 
     return parse_mycompet_results_html(resp.text, club_keyword=club_keyword)
 
 
-def find_mycompet_result_url(comp_nom: str, comp_date: str = "", comp_lieu: str = "", id_ffme: str = "") -> str:
-    """Tente de trouver automatiquement l'URL de résultat MyCompet sans saisie manuelle."""
-    import unicodedata
-    import re
+class ArchiveEntry(TypedDict):
+    """One line of the FFME results archive: « <title> – dd/mm/yyyy – <venue> » linking to a MyCompet page."""
+    url: str
+    title: str
+    date: Optional[datetime.date]
+    venue: str
+    text: str  # whole line, for the name and venue matching
 
-    def _clean(t: str) -> str:
-        t = unicodedata.normalize('NFKD', t or "")
-        t = "".join(c for c in t if not unicodedata.combining(c))
-        return re.sub(r'[^a-zA-Z0-9]+', ' ', t).lower().strip()
 
-    clean_nom = _clean(comp_nom)
-    clean_lieu = _clean(comp_lieu)
+# MyCompet results pages show no date (only the season in their title): the archive line is the only dated source
+_ARCHIVE_DATE = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{4})")
+_STOP_WORDS = {'coupe', 'regional', 'regionale', 'departemental', 'departementale', 'bloc', 'difficulte', 'etape', 'open',
+               'france', 'championnat'}
+# An archive date may be the first or the last day of a multi-day event, or be off by one
+DATE_TOLERANCE = datetime.timedelta(days=1)
 
-    stop_words = {'coupe', 'regional', 'regionale', 'departemental', 'departementale', 'bloc', 'difficulte', 'etape', 'open', 'france', 'championnat'}
 
-    # 1. Vérification dans la page d'archives officielles FFME
-    try:
-        url_archives = "https://www.ffme.fr/escalade/competition/archives-resultats-escalade/"
-        resp = requests.get(url_archives, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, timeout=10)
-        if resp.status_code == 200:
-            doc = lxml.html.fromstring(resp.text)
-            links = doc.xpath("//a[contains(@href, 'mycompet.ffme.fr/resultat/resultat_')]")
+def _clean(text: str) -> str:
+    text = unicodedata.normalize('NFKD', text or "")
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return re.sub(r'[^a-zA-Z0-9]+', ' ', text).lower().strip()
 
-            best_match = None
-            for a in links:
-                href = a.attrib.get('href', '')
-                parent = a.getparent()
-                full_text = " ".join(parent.text_content().split())
-                clean_full = _clean(full_text)
 
-                words = [w for w in clean_nom.split() if len(w) > 3 and w not in stop_words]
-                if words:
-                    matches = sum(1 for w in words if w in clean_full)
-                    if matches >= max(1, len(words) - 1):
-                        return href
-
-                if clean_nom and (clean_nom in clean_full or clean_full in clean_nom):
-                    return href
-
-                if clean_lieu and clean_lieu in clean_full:
-                    best_match = href
-
-            if best_match:
-                return best_match
-    except Exception as e:
-        print(f"⚠️ [MYCOMPET] Erreur recherche automatique archives FFME : {e}")
-
-    # 2. Si non trouvé dans les archives, sonder les pages MyCompet récentes
-    try:
-        for offset in range(13710, 13640, -1):
-            url_test = f"https://mycompet.ffme.fr/resultat/resultat_{offset}"
+def parse_ffme_archive_entries(html_text: str) -> List[ArchiveEntry]:
+    """Lines of the FFME archive page that link to a MyCompet results page."""
+    if not html_text:
+        return []
+    doc = lxml.html.fromstring(html_text)
+    entries: List[ArchiveEntry] = []
+    for link in doc.xpath("//a[contains(@href, 'mycompet.ffme.fr/resultat/resultat_')]"):
+        parent = link.getparent()
+        text = " ".join((parent if parent is not None else link).text_content().split())
+        found = _ARCHIVE_DATE.search(text)
+        entry_date = None
+        if found:
+            day, month, year = (int(g) for g in found.groups())
             try:
-                r_probe = requests.get(url_test, headers={"User-Agent": "Mozilla/5.0"}, timeout=3)
-                if r_probe.status_code == 200:
-                    probe_doc = lxml.html.fromstring(r_probe.text)
-                    divs = probe_doc.xpath("//div[contains(@class, 'cr-Titre') or contains(@class, 'title')]")
-                    probe_title = _clean(divs[0].text_content() if divs else "")
-                    if clean_nom and (clean_nom in probe_title or probe_title in clean_nom):
-                        return url_test
-                    words = [w for w in clean_nom.split() if len(w) > 3 and w not in stop_words]
-                    if words and sum(1 for w in words if w in probe_title) >= max(1, len(words) - 1):
-                        return url_test
-            except Exception:
-                logger.debug("Sondage de l'URL MyCompet échoué : %s", url_test, exc_info=True)
-                continue
-    except Exception as e:
-        print(f"⚠️ [MYCOMPET] Erreur sonde récente MyCompet : {e}")
+                entry_date = datetime.date(year, month, day)
+            except ValueError:
+                entry_date = None
+        title = text[:found.start()] if found else text
+        entries.append(ArchiveEntry(url=link.attrib.get('href', '').strip(), title=title.strip(" –-"), date=entry_date,
+                                    venue=" ".join(link.text_content().split()), text=text))
+    return entries
 
-    return ""
+
+def fetch_ffme_archive_entries() -> List[ArchiveEntry]:
+    """Downloads the FFME results archive (one request; RuntimeError / requests errors on failure)."""
+    url = runtime_env.ffme_archives_url()
+    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, timeout=10)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Archives FFME indisponibles ({url}, code HTTP {resp.status_code})")
+    return parse_ffme_archive_entries(resp.text)
+
+
+def _parse_iso_date(value: str) -> Optional[datetime.date]:
+    try:
+        return datetime.date.fromisoformat(str(value or "").strip()[:10])
+    except ValueError:
+        return None
+
+
+def _match_score(entry: ArchiveEntry, clean_nom: str, clean_lieu: str) -> int:
+    """2: the competition name matches the line, 1: only the venue, 0: no match."""
+    clean_full = _clean(entry["text"])
+    words = [w for w in clean_nom.split() if len(w) > 3 and w not in _STOP_WORDS]
+    if words and sum(1 for w in words if w in clean_full) >= max(1, len(words) - 1):
+        return 2
+    if clean_nom and (clean_nom in clean_full or clean_full in clean_nom):
+        return 2
+    if clean_lieu and clean_lieu in clean_full:
+        return 1
+    return 0
+
+
+def find_result_url_in_archives(entries: List[ArchiveEntry], comp_nom: str, comp_lieu: str = "", comp_date: str = "",
+                                comp_date_fin: str = "", require_date: bool = False) -> str:
+    """URL of the archive line matching a competition ("" when none).
+
+    The name and venue matching is loose (one shared word, or the venue alone), so a line dated within
+    `comp_date`..`comp_date_fin` (± DATE_TOLERANCE) wins. `require_date`: only such a line is accepted (the
+    unattended batch: a wrong page of the same venue, an earlier season, would write wrong rankings)."""
+    clean_nom, clean_lieu = _clean(comp_nom), _clean(comp_lieu)
+    scored = [(score, entry) for entry in entries if (score := _match_score(entry, clean_nom, clean_lieu))]
+    start = _parse_iso_date(comp_date)
+    end = _parse_iso_date(comp_date_fin) or start
+    if start and end:
+        dated = [(score, entry) for score, entry in scored
+                 if entry["date"] is not None and start - DATE_TOLERANCE <= entry["date"] <= end + DATE_TOLERANCE]
+        if dated:
+            return max(dated, key=lambda candidate: candidate[0])[1]["url"]
+    if require_date:
+        return ""
+    # Without a dated match (manual fetch, a coach checks the page): first name match, else the last venue match
+    by_name = [entry for score, entry in scored if score == 2]
+    if by_name:
+        return by_name[0]["url"]
+    return scored[-1][1]["url"] if scored else ""
+
+
+def find_mycompet_result_url(comp_nom: str, comp_date: str = "", comp_lieu: str = "", id_ffme: str = "",
+                             comp_date_fin: str = "") -> str:
+    """Tente de trouver automatiquement l'URL de résultat MyCompet sans saisie manuelle (archives FFME)."""
+    try:
+        entries = fetch_ffme_archive_entries()
+    except (requests.RequestException, RuntimeError) as e:
+        logger.warning("[MYCOMPET] Recherche automatique dans les archives FFME impossible : %s", e)
+        return ""
+    return find_result_url_in_archives(entries, comp_nom, comp_lieu, comp_date, comp_date_fin)
 
 
 def _parse_dates_to_iso(date_str: str) -> tuple[str | None, str | None]:
@@ -542,4 +593,3 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
             logger.debug("Échec de la récupération des détails de la compétition %s", comp_id_str, exc_info=True)
 
     return info
-

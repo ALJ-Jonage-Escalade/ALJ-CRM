@@ -180,7 +180,64 @@ Dès que votre URL Cloud Run est active, configurez les notifications HelloAsso 
       --update-secrets HELLOASSO_CLIENT_ID=helloasso-client-id:latest,HELLOASSO_CLIENT_SECRET=helloasso-client-secret:latest,HELLOASSO_ORG_SLUG=helloasso-org-slug:latest
   ```
 - **Fail-closed** : en production, une notification qui ne peut être vérifiée ni par le jeton ni par l'API est refusée (`503`).
-- **API `/api/*`, `/docs`** : réservées aux comptes connectés à la PWA. La PWA envoie le jeton Firebase (`Authorization: Bearer …`) ; le serveur vérifie sa signature, puis lit le rôle de l'adresse vérifiée dans la liste des accès (Administration › Accès, collection `access_roles` ; coach requis, admin pour les écritures sensibles et `/api/admin/*`). Liste illisible : `503`. Restent publics : `/`, `/competitions`, `/annuaire`, `/health`, `/api/web-version`, `/sw.js`, `/manifest.webmanifest` et le webhook. Contrôle actif dans l'image Docker (`ALJ_API_AUTH=required`), désactivé pour le serveur local de l'application de bureau.
+- **API `/api/*`, `/docs`** : réservées aux comptes connectés à la PWA. La PWA envoie le jeton Firebase (`Authorization: Bearer …`) ; le serveur vérifie sa signature, puis lit le rôle de l'adresse vérifiée dans la liste des accès (Administration › Accès, collection `access_roles` ; coach requis, admin pour les écritures sensibles et `/api/admin/*`). Liste illisible : `503`. Restent publics : `/`, `/competitions`, `/annuaire`, `/health`, `/api/web-version`, `/sw.js`, `/manifest.webmanifest` et le webhook. Le batch des résultats accepte aussi le jeton OIDC de Cloud Scheduler (ci-dessous). Contrôle actif dans l'image Docker (`ALJ_API_AUTH=required`), désactivé pour le serveur local de l'application de bureau.
+
+### ⏰ Tâche planifiée Cloud Scheduler (résultats MyCompet)
+
+Chaque matin, Cloud Scheduler lance le batch des résultats MyCompet (`CompetitionResultsBatchService.run_daily_batch`) :
+compétitions terminées depuis 30 jours au plus (réglage « Compétitions terminées depuis » de la page Paramètres) et sans
+résultats, URL trouvée dans les archives FFME **à la bonne date** (sinon l'e-mail demande l'URL), classements écrits,
+e-mail récapitulatif. Le batch s'arrête entre deux compétitions après 150 s (`partial` dans la réponse) : le passage
+suivant continue.
+
+| Champ | Valeur |
+|---|---|
+| Nom | `batch-resultats-competitions` (région `europe-west1`) |
+| Planification | `0 7 * * *`, fuseau `Europe/Paris` |
+| Cible | `POST https://alj-escalade-api-bdxfydatoa-ew.a.run.app/api/competitions/cron/fetch-results` (sans paramètre) |
+| Délai de la tentative | 180 s |
+| Nouvelles tentatives | aucune |
+| Authentification | jeton OIDC du compte de service `alj-results-scheduler@smart-amplifier-510811-n6.iam.gserviceaccount.com`, audience = URL du service |
+
+La route n'est plus publique (audit A29) : elle exige un compte admin (bouton de la page Paramètres) ou ce jeton OIDC
+(`api_auth.SCHEDULER_PATHS`). Le jeton du Scheduler ne peut ni forcer (`force`) ni changer le destinataire (`email`).
+Compte et audience attendus : constantes de `api_auth.py`, ou variables `ALJ_SCHEDULER_SERVICE_ACCOUNT` /
+`ALJ_SCHEDULER_AUDIENCES` (plusieurs audiences séparées par des virgules).
+
+**Créer ou mettre à jour le job** : `code_source/scripts/setup_cloud_scheduler.sh` (depuis `code_source/`, ou dans
+Google Cloud Shell). Il crée le compte de service s'il manque (sans aucun rôle : l'API vérifie elle-même le jeton, pas
+de `roles/run.invoker`, le service reste `--allow-unauthenticated`), puis crée le job ou le remet aux réglages du tableau.
+Le relancer ne fait que rétablir ces réglages ; il sert aussi à recréer le job (projet neuf, suppression accidentelle).
+
+```bash
+./scripts/setup_cloud_scheduler.sh --dry-run   # job actuel et commandes prévues, rien n'est modifié
+./scripts/setup_cloud_scheduler.sh             # création / mise à jour (confirmation demandée)
+./scripts/setup_cloud_scheduler.sh --status    # dernier passage et journaux du batch (lecture seule)
+```
+
+Les réglages sont en tête du script ; compte et audience doivent rester ceux de `api_auth.py`
+(`tests/test_setup_cloud_scheduler.py` le vérifie).
+
+**Première mise en place, dans cet ordre** — sinon le passage de 07h00 suivant le déploiement reçoit `401` :
+1. `./scripts/setup_cloud_scheduler.sh` : le job envoie désormais un jeton OIDC (sans effet tant que la route est publique) ;
+2. déployer l'application (`./scripts/deploy_cloud_run.sh`).
+
+L'agent de service Cloud Scheduler doit pouvoir créer des jetons pour ce compte : c'est le cas par défaut pour les
+projets récents ; sinon, lui donner `roles/iam.serviceAccountTokenCreator` sur le compte (commande affichée par le script).
+
+**Vérifier** (lecture seule, aussi fait par `--status`) :
+
+```bash
+PROJECT=smart-amplifier-510811-n6
+URL=https://alj-escalade-api-bdxfydatoa-ew.a.run.app
+gcloud scheduler jobs describe batch-resultats-competitions --location europe-west1 --project $PROJECT   # status vide = succès
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="alj-escalade-api" AND textPayload:"BATCH_RESULTATS"' \
+    --project $PROJECT --freshness=1d
+curl -i -X POST $URL/api/competitions/cron/fetch-results   # doit répondre 401
+```
+
+`gcloud scheduler jobs run batch-resultats-competitions …` lance un vrai passage sur les données de production (e-mail
+réel) : seulement avec l'accord de l'équipe.
 
 ---
 

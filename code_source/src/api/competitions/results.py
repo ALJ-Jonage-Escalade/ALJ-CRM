@@ -1,7 +1,8 @@
 """MyCompet FFME results: daily batch (Cloud Scheduler), fetch for one competition, batch settings.
 
-These routes read and write the SQLite cache (notification address, batch status): they must not
-join the Firestore-only routers of server.py.
+The batch settings and status now live in Firestore (app_settings): these routes no longer read the
+SQLite cache. Moving this router to the Firestore-only list of server.py (no cache refresh before the
+batch) is a separate change.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -25,21 +26,31 @@ router = APIRouter()
 # Batch quotidien de récupération des résultats MyCompet FFME & Notifications.
 # Stays registered before /{comp_id}/fetch-results, which would capture "cron": Cloud Scheduler
 # (job batch-resultats-competitions) calls POST /api/competitions/cron/fetch-results every day.
-@router.post("/api/competitions/cron/fetch-results", response_model=BatchReport)
+@router.post("/api/competitions/cron/fetch-results", response_model=BatchReport, responses=error_responses(403, 503))
 async def api_cron_fetch_competition_results(
+    request: Request,
     force: bool = False,
     email: Optional[str] = None
-) -> BatchReport:
+) -> BatchReport | JSONResponse:
     """
     Exécute le batch de récupération des résultats MyCompet FFME pour les compétitions passées
     et envoie un e-mail de synthèse si des résultats sont découverts.
-    Conçu pour être appelé par Google Cloud Scheduler (ex: tous les jours à 07h00) ou manuellement.
+    Called by Cloud Scheduler every day at 07:00 (its OIDC token, see api_auth.SCHEDULER_PATHS) or by an admin.
+    `force` (every ended competition, results or not) and `email` (another recipient): admin only.
+    503: the competitions could not be read, nothing was done (Cloud Scheduler shows the run as failed).
     """
-    from services.competitions.results_batch import CompetitionResultsBatchService
+    from infrastructure.security.api_auth import Role, has_role, is_scheduler
+    from services.competitions.results_batch import CompetitionResultsBatchService, ResultsBatchError
     from services.competitions.store import invalidate_cache
+    claims = getattr(request.state, "user", None)  # None: token check off (local server)
+    is_admin = claims is None or (not is_scheduler(claims) and has_role(claims, Role.ADMIN))
+    if (force or email) and not is_admin:
+        return error(403, "Les options force et email sont réservées aux administrateurs.")
     try:
         report = await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
         return BatchReport.model_validate(report)
+    except ResultsBatchError:
+        return error(503, "Lecture des compétitions impossible : le batch n'a rien fait (détails dans les journaux).")
     finally:
         invalidate_cache()  # the batch writes competition documents directly
 
@@ -52,7 +63,7 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
     404 `needs_url`: the results page was not found automatically, the coach gives its address or number.
     """
     from infrastructure.mycompet.scraper import fetch_and_parse_mycompet_results, normalize_result_url, find_mycompet_result_url
-    from infrastructure.firestore.client import FirestoreClient
+    from infrastructure.firestore.client import FirestoreClient, FirestoreError
 
     url = (payload.get("url") or payload.get("result_id") or "").strip()
 
@@ -71,7 +82,8 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
         date = comp_doc.get("date_competition") or ""
         lieu = comp_doc.get("lieu") or ""
         id_ffme = comp_doc.get("id_ffme") or ""
-        auto_url = await run_in_threadpool(find_mycompet_result_url, nom, date, lieu, str(id_ffme))
+        date_fin = comp_doc.get("date_fin") or ""
+        auto_url = await run_in_threadpool(find_mycompet_result_url, nom, date, lieu, str(id_ffme), date_fin)
         if auto_url:
             url = auto_url
 
@@ -86,47 +98,21 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
         print(f"❌ [MYCOMPET] Erreur scraping MyCompet ({url}) : {type(e).__name__}: {e}")
         return error(502, "Erreur lors de la récupération des résultats MyCompet (détails dans les journaux).")
 
-    matched_count = 0
-    participants = list((comp_doc.get("participants") if comp_doc else None) or [])
-
     now_iso = datetime.datetime.now().isoformat()
     canonical_url = normalize_result_url(url)
-
-    by_licence = {}
-    by_name = {}
-    for r in scraped_results:
-        lic = str(r.get("licence") or "").strip()
-        if lic:
-            by_licence[lic] = r
-        full = f"{r.get('nom', '')} {r.get('prenom', '')}".strip().lower()
-        if full:
-            by_name[full] = r
-
-    for p in participants:
-        p_lic = str(p.get("num_licence") or "").strip()
-        p_name = f"{p.get('nom', '')} {p.get('prenom', '')}".strip().lower()
-
-        match = by_licence.get(p_lic) or by_name.get(p_name)
-        if match:
-            matched_count += 1
-            cl = str(match.get("classement") or "").strip()
-            tot = int(match.get("total_categorie") or 0)
-            p["classement"] = cl
-            p["total_categorie"] = tot
-            suffix = f" / {tot}" if tot > 0 else "e"
-            p["resultat_ffme"] = f"{cl}{suffix}" if cl else ""
-            p["categorie_ffme"] = match.get("categorie") or ""
-            p["performance_ffme"] = match.get("performance") or ""
-            p["resultat_synced_at"] = now_iso
-
+    matched_count = 0
     if comp_doc:
+        from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
+        from services.competitions.results_batch import apply_rankings
+        fields = {"url_resultats": canonical_url, "resultats_synced_at": now_iso}
         try:
-            FirestoreClient.update_fields("competitions", comp_id, {
-                "participants": participants,
-                "url_resultats": canonical_url,
-                "resultats_synced_at": now_iso
-            })
-        except Exception as e:
+            # Re-read and written under the optimistic lock: an edit made meanwhile on the web is kept
+            matched_count = await run_in_threadpool(
+                CompetitionFirestoreRepository.record_results, comp_doc.get("id") or comp_id,
+                lambda parts: len(apply_rankings(parts, scraped_results, now_iso)), fields)
+            if not matched_count:  # keep the URL the coach gave, for the next try
+                FirestoreClient.update_fields("competitions", comp_doc.get("_doc_id") or comp_id, fields)
+        except FirestoreError as e:
             print(f"⚠️ [MYCOMPET] Erreur mise à jour Firestore : {e}")
         finally:
             from services.competitions.store import invalidate_cache
@@ -144,12 +130,16 @@ def get_competitions_results_settings_api() -> ResultsSettings:
 
 @router.post("/api/settings/competitions-results", response_model=ResultsSettingsSaved, responses=error_responses(400))
 def update_competitions_results_settings_api(data: ResultsSettingsUpdate) -> ResultsSettingsSaved | JSONResponse:
-    """Met à jour les adresses e-mail de notification des résultats."""
+    """Met à jour les adresses e-mail de notification des résultats (et la fenêtre de recherche, si fournie)."""
     from services.competitions.results_batch import CompetitionResultsBatchService
-    email = data.notification_email
+    if data.window_days is not None and not 1 <= data.window_days <= 365:
+        return error(400, "Fenêtre de recherche invalide : entre 1 et 365 jours.")
     try:
-        ok = CompetitionResultsBatchService.set_notification_email(email)
+        ok = CompetitionResultsBatchService.set_notification_email(data.notification_email)
     except ValueError as e:
         return error(400, str(e))
 
-    return ResultsSettingsSaved(status="success", notification_email=CompetitionResultsBatchService.get_notification_email(), saved=ok)
+    if data.window_days is not None:
+        ok = CompetitionResultsBatchService.set_window_days(data.window_days) and ok
+    return ResultsSettingsSaved(status="success", notification_email=CompetitionResultsBatchService.get_notification_email(),
+                                window_days=CompetitionResultsBatchService.get_window_days(), saved=ok)

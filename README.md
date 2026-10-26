@@ -105,6 +105,7 @@ dans le bon répertoire de travail.
 | `scripts/backup_projet.ps1` | Sauvegarde ZIP du projet (`.\scripts\backup_projet.ps1 [-Destination E:\]`) |
 | `code_source/scripts/lancer_site_web.bat` | Environnement dev local |
 | `code_source/scripts/deploy_cloud_run.sh` / `.bat` | Déploiement Cloud Run (voir plus bas) |
+| `code_source/scripts/setup_cloud_scheduler.sh` | Tâche Cloud Scheduler du batch des résultats MyCompet (voir plus bas) |
 
 ## Tests
 
@@ -179,6 +180,10 @@ affichée. Le prochain déploiement en production renvoie le trafic sur la nouve
 
   La prise en compte par Google peut prendre quelques minutes.
 - Les webhooks HelloAsso arrivent toujours sur l'URL principale, donc sur la révision de production.
+- La tâche Cloud Scheduler `batch-resultats-competitions` (résultats MyCompet, 07h00) n'est **pas** gérée par ce
+  script : `./scripts/setup_cloud_scheduler.sh` la crée ou la met à jour (`--dry-run` pour voir, `--status` pour le
+  dernier passage). Elle appelle l'URL principale avec un jeton OIDC ; détails et ordre de mise en place :
+  `documentations/guide_deploiement_cloud_run_helloasso.md`, « Tâche planifiée Cloud Scheduler ».
 - `code_source/firestore/firestore.rules` n'est **pas** déployé par ce script
   (`cd code_source/firestore && firebase deploy --only firestore:rules`, à côté de `firebase.json`) :
   les règles s'appliquent immédiatement à toute la production. Historique et retour arrière dans la
