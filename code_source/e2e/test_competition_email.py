@@ -52,6 +52,8 @@ def test_desktop_campaign(page, mailpit, competition):
     page.get_by_test_id("email-audience-all").check()
     expect(page.get_by_test_id("email-count")).to_have_text("3 destinataires avec une adresse e-mail")
     page.get_by_test_id("email-audience-selected").check()
+    # The default template fills the body once loaded; sending before that is refused (empty message)
+    expect(page.get_by_test_id("email-body")).not_to_have_value("")
     page.get_by_test_id("email-subject").fill("Convocation {name_competition}")
     page.get_by_test_id("email-send").click()
     expect(toast(page)).to_contain_text("envoyé(s) avec succès")
