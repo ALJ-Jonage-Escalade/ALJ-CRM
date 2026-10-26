@@ -20,7 +20,7 @@ Compétitions page slot, which is not rendered while signed out: a failed sign-i
 - Implemented in `AppShell` (no `/login` route): the address stays the requested page, so the return after sign-in,
   the server's `_SPA_PAGES` and the service worker are unchanged.
 - The `#gate*` ids are kept (e2e); `#who` only exists in the shell.
-- Full-screen background `bg-side` (the menu's), white card `max-w-sm`, version below; bottom padding keeps the
+- Full-screen background `bg-side` (the menu's), white card `max-w-sm`, `AppBrand` (name, version) above; bottom padding keeps the
   dev banner clear.
 - Logout from the full-screen card goes through the shell's `logout()` (asks before losing offline changes).
 

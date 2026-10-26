@@ -11,7 +11,7 @@ import UiToast from "../components/ui/UiToast.vue";
 import { AUTH_KEY } from "../composables/auth";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
-import { pageAccess, verdict } from "../lib/access";
+import { pageVerdict } from "../lib/access";
 import { formatDateTime } from "../lib/format";
 import { CLIENT_KEY, type Schemas } from "../lib/client";
 import { createCompetitionsApi } from "../services/competitions";
@@ -54,7 +54,7 @@ const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 
-const access = computed(() => verdict(auth.state.value, pageAccess("competitions"), true));
+const access = computed(() => pageVerdict(auth.state.value, "competitions"));
 const open = computed(() => access.value === "allow" || access.value === "offline");
 const uid = computed(() => {
   const authState = auth.state.value;
@@ -272,7 +272,7 @@ const tab = (active: boolean) => [
 </script>
 
 <template>
-  <AppShell page="competitions" title="Compétitions" :sync="syncInfo" offline-read>
+  <AppShell page="competitions" title="Compétitions" :sync="syncInfo">
     <nav v-if="canWrite" aria-label="Sections des compétitions" class="mb-3 flex gap-1.5 overflow-x-auto" data-testid="sections">
       <RouterLink
         v-for="s in SECTIONS"

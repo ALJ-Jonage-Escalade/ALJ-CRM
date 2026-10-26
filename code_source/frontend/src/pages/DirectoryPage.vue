@@ -12,7 +12,7 @@ import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
 import { AUTH_KEY } from "../composables/auth";
 import { useSyncedResource } from "../composables/syncedResource";
-import { pageAccess, verdict } from "../lib/access";
+import { pageVerdict } from "../lib/access";
 import { formatDateTime } from "../lib/format";
 import type { Schemas } from "../lib/client";
 import {
@@ -51,7 +51,7 @@ const filters = ref(loadFilters(globalThis.localStorage, DIRECTORY_FILTER_KEY));
 watch(filters, (f) => saveFilters(f, globalThis.localStorage, DIRECTORY_FILTER_KEY), { deep: true });
 
 // Nothing is asked (nor read from the device) for an account the page does not open to
-const open = computed(() => ["allow", "offline"].includes(verdict(auth.state.value, pageAccess("annuaire"), true)));
+const open = computed(() => ["allow", "offline"].includes(pageVerdict(auth.state.value, "annuaire")));
 const uid = computed(() => {
   const s = auth.state.value;
   return open.value && (s.status === "signedIn" || s.status === "error") ? s.user.uid : null;
@@ -163,7 +163,7 @@ const searchInput = "w-full rounded-lg border border-slate-300 bg-white px-3 py-
 </script>
 
 <template>
-  <AppShell page="annuaire" title="Annuaire" :sync="syncInfo" offline-read>
+  <AppShell page="annuaire" title="Annuaire" :sync="syncInfo">
     <div class="mb-3 flex gap-1.5" role="tablist" aria-label="Vues de l'annuaire">
       <button
         v-for="t in TABS"

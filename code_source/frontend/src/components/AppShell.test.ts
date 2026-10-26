@@ -11,18 +11,11 @@ import { dialogs } from "../composables/dialogs";
 
 const USER = { uid: "u1", email: "albus@alj-escalade.fr" };
 
-function render(
-  state: AuthState,
-  googleStatus = "ok",
-  page: PageId = "accueil",
-  offlineRead = false,
-  queued = 0,
-  signInError: string | null = null,
-) {
+function render(state: AuthState, googleStatus = "ok", page: PageId = "accueil", queued = 0, signInError: string | null = null) {
   const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
   const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: googleStatus })));
   const wrapper = mount(AppShell, {
-    props: { page, title: "Titre", offlineRead },
+    props: { page, title: "Titre" },
     slots: { default: '<p id="page-body">contenu</p>' },
     global: {
       provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: storeWith(queued), [SIGN_IN_ERROR_KEY]: ref(signInError) },
@@ -41,7 +34,7 @@ function storeWith(n: number): OfflineStore {
 describe("AppShell", () => {
   it("asks before a logout that would lose changes made offline", async () => {
     const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(false);
-    const { wrapper, auth } = render({ status: "signedIn", user: USER, role: "coach" }, "ok", "accueil", false, 2);
+    const { wrapper, auth } = render({ status: "signedIn", user: USER, role: "coach" }, "ok", "accueil", 2);
     await wrapper.find("#logout-btn").trigger("click");
     await flushPromises();
     expect(confirm).toHaveBeenCalledWith(
@@ -86,7 +79,7 @@ describe("AppShell", () => {
   });
 
   it("explains a failed Google sign-in on the gate", () => {
-    const { wrapper } = render({ status: "signedOut" }, "ok", "competitions", true, 0, "Connexion Google annulée.");
+    const { wrapper } = render({ status: "signedOut" }, "ok", "competitions", 0, "Connexion Google annulée.");
     expect(wrapper.find('[data-testid="sign-in-error"]').text()).toContain("Connexion Google annulée.");
   });
 
@@ -140,14 +133,14 @@ describe("AppShell", () => {
 
   it("shows a page readable offline when only the network is missing", async () => {
     const offline: AuthState = { status: "error", user: USER, message: "Serveur injoignable", offline: true };
-    const { wrapper, api } = render(offline, "ok", "annuaire", true);
+    const { wrapper, api } = render(offline, "ok", "annuaire");
     expect(wrapper.find("#page-body").exists()).toBe(true);
     expect(wrapper.find("#offline-notice").exists()).toBe(true);
     expect(wrapper.find("#gate").exists()).toBe(false);
     await flushPromises();
     expect(api).not.toHaveBeenCalled();
 
-    const refused = render({ ...offline, offline: false }, "ok", "annuaire", true);
+    const refused = render({ ...offline, offline: false }, "ok", "annuaire");
     expect(refused.wrapper.find("#gate").exists()).toBe(true);
     expect(refused.wrapper.find("#page-body").exists()).toBe(false);
   });
@@ -179,8 +172,8 @@ describe("AppShell", () => {
     ["readonly", 1],
     [null, 0],
   ] as const)("lists the pages %s may open", (role, count) => {
-    // On Compétitions, the page every role but none may open (elsewhere a read-only account gets the full-screen gate)
-    const { wrapper } = render({ status: "signedIn", user: USER, role }, "ok", "competitions", true);
+    // On Compétitions, open to every role (elsewhere a read-only account gets the full-screen gate, without the menu)
+    const { wrapper } = render({ status: "signedIn", user: USER, role }, "ok", "competitions");
     expect(wrapper.findAll("nav a")).toHaveLength(count);
   });
 
