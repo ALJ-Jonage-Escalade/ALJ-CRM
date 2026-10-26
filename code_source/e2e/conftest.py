@@ -123,21 +123,11 @@ def mobile_context(new_context, playwright) -> BrowserContext:
     return new_context(**device)
 
 
-# Raised by Playwright itself, not by the pages: service_workers="block" patches navigator.serviceWorker
-# in every frame, which throws in the sandboxed iframe of the Outils page (pivot table)
-_HARNESS_ERRORS = ("Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled "
-                   "because the context is sandboxed",)
-
-
 def _checked_page(context: BrowserContext):
     """New page whose uncaught JavaScript exceptions fail the test (reported at teardown)."""
     page = context.new_page()
     errors = []
-
-    def record(error):
-        if not str(error).startswith(_HARNESS_ERRORS):
-            errors.append(str(error))
-    page.on("pageerror", record)
+    page.on("pageerror", lambda error: errors.append(str(error)))
     yield page
     assert not errors, f"uncaught JavaScript error(s): {errors}"
 

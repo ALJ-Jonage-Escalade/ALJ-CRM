@@ -1,8 +1,8 @@
 <script setup lang="ts">
-/* Outils (coaches and admins): members map, pivot table (a page of the server in a sandboxed frame), attendance
-   sheets, FFME CSV export and, for admins, import of the MyFFME licensee list. The open tab is in the URL (?tab=ffme,
-   linked from Adhérents). A tab is loaded when first opened and kept while switching. Online only. */
-import { computed, inject, onMounted, reactive, ref } from "vue";
+/* Outils (coaches and admins): members map, pivot table (vue-pivottable, loaded with its tab), attendance sheets,
+   FFME CSV export and, for admins, import of the MyFFME licensee list. The open tab is in the URL (?tab=ffme, linked
+   from Adhérents). A tab is loaded when first opened and kept while switching. Online only. */
+import { computed, defineAsyncComponent, inject, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import UiButton from "../components/ui/UiButton.vue";
@@ -17,7 +17,9 @@ import FfmeImportPane from "./outils/FfmeImportPane.vue";
 import MembersMap from "./outils/MembersMap.vue";
 import PresencePane from "./outils/PresencePane.vue";
 import SeasonSelect from "./outils/SeasonSelect.vue";
-import ToolFrame from "./outils/ToolFrame.vue";
+
+// The pivot table library is downloaded on the first opening of its tab
+const PivotPane = defineAsyncComponent(() => import("./outils/PivotPane.vue"));
 
 const membersApi = createMembersApi(inject(CLIENT_KEY)!);
 const auth = inject(AUTH_KEY)!;
@@ -50,7 +52,6 @@ function show(id: TabId): void {
 const seasons = ref<string[]>([]);
 const mapSeason = ref(""); // empty until the seasons are known
 const pivotSeason = ref("");
-const pivotUrl = computed(() => `/pivot?season=${encodeURIComponent(pivotSeason.value)}`);
 
 onMounted(async () => {
   let initial = "active"; // the server's active season
@@ -122,15 +123,7 @@ const chip = (active: boolean) => [
 
     <section v-if="isOpen('pivot')" v-show="tab === 'pivot'" data-testid="pane-pivot">
       <SeasonSelect v-model="pivotSeason" :seasons="seasons" label="Saison à analyser :" testid="pivot-season" class="mb-2" />
-      <ToolFrame
-        v-if="pivotSeason"
-        :ref="keep('pivot')"
-        :url="pivotUrl"
-        sandbox="allow-scripts allow-popups allow-modals"
-        title="Tableau Croisé Dynamique"
-        loading="Chargement du tableau croisé dynamique…"
-        testid="pivot-frame"
-      />
+      <PivotPane v-if="pivotSeason" :ref="keep('pivot')" :season="pivotSeason" />
     </section>
 
     <section v-if="isOpen('presence')" v-show="tab === 'presence'" data-testid="pane-presence">

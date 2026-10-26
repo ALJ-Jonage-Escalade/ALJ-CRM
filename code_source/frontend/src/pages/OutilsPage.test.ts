@@ -77,7 +77,7 @@ type Answer = (body: unknown, url: URL) => Response;
 const ANSWERS: Record<string, Answer> = {
   "GET /api/seasons": () => json({ seasons: ["2026-2027", "2025-2026"], active: "2026-2027" }),
   "GET /api/reports/map-points": (_, url) => json({ season: url.searchParams.get("season"), points: POINTS }),
-  "GET /pivot": (_, url) => new Response(`<p>tcd ${url.searchParams.get("season")}</p>`),
+  "GET /api/reports/pivot-records": (_, url) => json({ season: url.searchParams.get("season"), records: [] }),
   "GET /api/presence/config": () => json(CONFIG),
   "POST /api/presence/export": () => file("Feuilles.xlsx"),
   "GET /api/ffme/stats": () => json(STATS),
@@ -203,14 +203,17 @@ describe("OutilsPage", () => {
 
     await open("pivot");
     expect(router.currentRoute.value.fullPath).toBe("/bureau/outils?tab=pivot");
-    const pivot = byId<HTMLIFrameElement>("pivot-frame")!;
-    expect(pivot.getAttribute("sandbox")).toBe("allow-scripts allow-popups allow-modals");
-    expect(pivot.getAttribute("srcdoc")).toBe("<p>tcd 2026-2027</p>");
+    await vi.waitFor(() => expect(byId("pivot-table")).not.toBeNull());
+    expect(sent("GET", "/api/reports/pivot-records").map((c) => c.path)).toEqual(["/api/reports/pivot-records?season=2026-2027"]);
     const pivotSeason = byId<HTMLSelectElement>("pivot-season")!;
     pivotSeason.value = "Toutes les saisons";
     pivotSeason.dispatchEvent(new Event("change"));
     await flushPromises();
-    expect(pivot.getAttribute("srcdoc")).toBe("<p>tcd Toutes les saisons</p>");
+    expect(sent("GET", "/api/reports/pivot-records").at(-1)!.path).toBe("/api/reports/pivot-records?season=Toutes%20les%20saisons");
+    byId("tools-refresh")!.click();
+    await flushPromises();
+    expect(sent("GET", "/api/reports/pivot-records")).toHaveLength(3);
+    expect(byId("toast")!.textContent).toBe("🔄 Tableau croisé dynamique réactualisé.");
 
     // The map stays loaded: back to it, no new request
     await open("map");
@@ -222,20 +225,22 @@ describe("OutilsPage", () => {
     expect(byId("toast")!.textContent).toBe("🔄 Carte réactualisée.");
   });
 
-  it("says when the map or a tool page fails", async () => {
+  it("says when the map or the pivot table fails", async () => {
     const mapPoints = ANSWERS["GET /api/reports/map-points"]!;
-    const pivot = ANSWERS["GET /pivot"]!;
+    const pivot = ANSWERS["GET /api/reports/pivot-records"]!;
     ANSWERS["GET /api/reports/map-points"] = () => json({ status: "error", message: "Erreur interne" }, 500);
-    ANSWERS["GET /pivot"] = () => new Response("", { status: 500 });
+    ANSWERS["GET /api/reports/pivot-records"] = () => json({ status: "error", message: "Erreur interne" }, 500);
     try {
       const { byId, open } = await render();
       await vi.waitFor(() => expect(byId("map-status")!.textContent).toContain("❌ Impossible de charger la carte"));
       expect(byId("map-stats")).toBeNull();
       await open("pivot");
-      expect(byId("pivot-frame-status")!.textContent).toBe("❌ Erreur lors du chargement (HTTP 500).");
+      await vi.waitFor(() =>
+        expect(byId("pivot-status")!.textContent.trim()).toBe("❌ Impossible de charger le tableau croisé dynamique : Erreur interne"),
+      );
     } finally {
       ANSWERS["GET /api/reports/map-points"] = mapPoints;
-      ANSWERS["GET /pivot"] = pivot;
+      ANSWERS["GET /api/reports/pivot-records"] = pivot;
     }
   });
 
