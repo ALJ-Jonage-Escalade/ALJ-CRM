@@ -563,9 +563,9 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       :class="['rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm', wide ? 'order-2 mb-3' : 'mt-4']"
       data-testid="add-members"
     >
-      <div class="flex items-center gap-2 justify-between">
+      <div class="flex flex-wrap items-center justify-between gap-2">
         <b class="text-[13.5px]">Gérer les inscriptions</b>
-        <div class="flex flex-raw gap-2">
+        <div class="flex flex-wrap gap-2">
           <UiButton variant="muted" small data-testid="toggle-add" :aria-expanded="adding" @click="adding = !adding">
             {{ adding ? "Fermer" : "🔍 Rechercher un adhérent" }}
           </UiButton>
