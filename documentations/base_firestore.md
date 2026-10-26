@@ -70,10 +70,51 @@ Migration du 08/10/2026 : 1 991 documents, vérification identique pour 2025-202
 
 ## Sauvegardes
 
-- Restauration à un instant donné (PITR, 7 jours) activée sur Firestore.
-- Sauvegarde Firestore quotidienne, conservée 14 jours.
-- Copie de la base source avant migration :
-  `gs://smart-amplifier-510811-n6-sauvegardes-alj/database/`.
+Deux niveaux, décrits et vérifiés par `code_source/scripts/setup_firestore_backups.sh`
+(`--check` : rapport en lecture seule, code de sortie 1 s'il manque quelque chose ;
+`--apply` : crée ce qui manque, après confirmation, sans rien modifier ni supprimer) :
+
+1. Restauration à un instant donné (PITR, 7 jours, à la minute) et protection contre la
+   suppression de la base.
+2. Sauvegardes Firestore gérées : quotidienne conservée 14 jours, hebdomadaire (dimanche)
+   conservée 14 semaines.
+
+Coût : ~2 000 documents (quelques Mo), donc ≈ 0 €/mois. Limite assumée : ces sauvegardes
+restent dans le projet Google Cloud et disparaîtraient avec lui.
+
+Copie de la base source avant migration :
+`gs://smart-amplifier-510811-n6-sauvegardes-alj/database/`.
+
+### Restaurer
+
+Une restauration crée une **nouvelle** base ; l'application lit toujours `(default)`
+(`infrastructure/firestore/client.py`). On restaure donc dans une base temporaire, on la
+contrôle, puis on la recopie dans `(default)` par export/import.
+
+```
+P=smart-amplifier-510811-n6
+
+# a) Depuis une sauvegarde (liste : gcloud firestore backups list)
+gcloud firestore databases restore --project=$P --destination-database=restore-test \
+  --source-backup=projects/$P/locations/europe-west1/backups/<ID>
+
+# b) Ou depuis PITR (instant des 7 derniers jours, en UTC)
+gcloud firestore databases clone --project=$P --destination-database=restore-test \
+  --source-database="projects/$P/databases/(default)" --snapshot-time=2026-10-25T08:00:00Z
+
+# Recopier restore-test dans (default), puis supprimer la base temporaire
+gcloud firestore export gs://smart-amplifier-510811-n6-sauvegardes-alj/restauration \
+  --project=$P --database=restore-test
+gcloud firestore import gs://smart-amplifier-510811-n6-sauvegardes-alj/restauration/<DOSSIER> \
+  --project=$P --database="(default)"
+gcloud firestore databases delete --project=$P --database=restore-test
+```
+
+- L'import écrase les documents de même identifiant mais **ne supprime pas** ceux créés
+  depuis la sauvegarde : pour un retour exact, vider d'abord les collections `crm_*` concernées.
+- Après l'import, déployer une nouvelle révision Cloud Run pour reconstruire le cache SQLite
+  `database.db` depuis Firestore.
+- Ne jamais importer un export de production dans l'émulateur local (données personnelles).
 
 ## Retour arrière
 
