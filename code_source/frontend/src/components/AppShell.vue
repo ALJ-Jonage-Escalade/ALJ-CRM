@@ -107,26 +107,28 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
     <p v-if="access === 'pending'" id="session-check" role="status" class="text-sm text-slate-300">Vérification de la connexion…</p>
     <section v-else id="gate" class="w-full max-w-sm rounded-xl bg-white px-4.5 py-4 text-slate-900 shadow-lg">
       <template v-if="access === 'signIn'">
-        <h2 class="mb-2 text-[17px] font-bold">🔐 Connexion</h2>
-        <p class="my-1.5 leading-normal">
-          Le bureau est réservé aux coachs et administrateurs du club. Connectez-vous avec votre compte Google.
-        </p>
-        <p
-          v-if="signInError"
-          data-testid="sign-in-error"
-          role="alert"
-          class="my-2 rounded-lg border border-red-300 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800"
-        >
-          ❌ {{ signInError }}
-        </p>
-        <button
-          id="gate-login"
-          type="button"
-          class="mt-2 cursor-pointer rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:bg-accent-dark"
-          @click="auth.login()"
-        >
-          🔑 Se connecter avec Google
-        </button>
+        <div class="flex flex-col">
+          <h2 class="mb-2 text-[17px] font-bold">🔐 Connexion</h2>
+          <p class="my-1.5 leading-normal">
+            Le bureau est réservé aux coachs et administrateurs du club. Connectez-vous avec votre compte Google.
+          </p>
+          <p
+            v-if="signInError"
+            data-testid="sign-in-error"
+            role="alert"
+            class="my-2 rounded-lg border border-red-300 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800"
+          >
+            ❌ {{ signInError }}
+          </p>
+          <button
+            id="gate-login"
+            type="button"
+            class="mt-2 cursor-pointer rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:bg-accent-dark"
+            @click="auth.login()"
+          >
+            🔑 Se connecter avec Google
+          </button>
+        </div>
       </template>
       <template v-else-if="access === 'unverified' && state.status === 'error'">
         <h2 class="mb-2 text-[17px] font-bold">⚠️ Droits non vérifiés</h2>
