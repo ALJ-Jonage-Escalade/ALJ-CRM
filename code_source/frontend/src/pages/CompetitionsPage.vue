@@ -428,248 +428,259 @@ const tab = (active: boolean) => [
     <BalancePane v-else-if="section === 'bilan'" :competitions="all" />
     <CoachesPane v-else-if="section === 'coachs'" :coaches="coaches.data.value" :competitions="all" @changed="competitions.refresh()" />
 
-    <div
-      v-else
-      class="flex flex-col md:grid md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-start md:gap-4 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]"
-    >
-      <!-- The competitions: always on desktop (a panel scrolling on its own), on phones until one is opened -->
-      <section
-        :class="[
-          selected ? 'hidden md:block' : '',
-          viewMode !== 'cards' ? 'md:col-span-2' : '',
-          'order-2 md:order-1 md:col-start-1 md:row-start-1 md:sticky md:top-3 md:max-h-[calc(100dvh-1.5rem)] md:overflow-y-auto md:rounded-xl md:border md:border-slate-200 md:bg-white md:p-3 md:shadow-sm',
-        ]"
-        aria-label="Liste des compétitions"
-      >
-        <div v-if="canWrite && pastCompetitions.length" class="mb-2 flex flex-wrap gap-1.5">
-          <UiButton variant="muted" small data-testid="archive-past" @click="archivePastCompetitions">
-            📦 Archiver les passées ({{ pastCompetitions.length }})
-          </UiButton>
-        </div>
-
-        <!-- Filtre saison et sélecteur de mode de vue -->
-        <div class="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
-          <div class="flex items-center gap-1.5 text-xs">
-            <span class="font-semibold text-slate-500">Saison :</span>
-            <select
-              v-model="selectedSeason"
-              data-testid="comp-season-filter"
-              class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
-            >
-              <option value="all">Toutes les saisons</option>
-              <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
-            </select>
-          </div>
-          <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium" data-testid="view-switcher">
-            <button
-              type="button"
-              :class="[
-                'px-2 py-1 rounded-md cursor-pointer transition-colors',
-                viewMode === 'cards' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
-              ]"
-              data-testid="view-cards"
-              @click="viewMode = 'cards'"
-            >
-              🗂️ Cartes
-            </button>
-            <button
-              type="button"
-              :class="[
-                'px-2 py-1 rounded-md cursor-pointer transition-colors',
-                viewMode === 'table' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
-              ]"
-              data-testid="view-table"
-              @click="viewMode = 'table'"
-            >
-              📋 Tableau
-            </button>
-            <button
-              type="button"
-              :class="[
-                'px-2 py-1 rounded-md cursor-pointer transition-colors',
-                viewMode === 'calendar' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
-              ]"
-              data-testid="view-calendar"
-              @click="viewMode = 'calendar'"
-            >
-              📅 Calendrier
-            </button>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-1.5 mb-2">
-          <input
-            v-model="search"
-            type="search"
-            data-testid="comp-search"
-            placeholder="Rechercher (nom, lieu, discipline)…"
-            class="min-w-32 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px] md:basis-full"
-          />
-          <button
-            v-for="w in WHEN"
-            :key="w.id"
-            type="button"
-            :data-testid="`when-${w.id}`"
-            :aria-pressed="when === w.id"
-            :class="chip(when === w.id)"
-            @click="when = w.id"
-          >
-            {{ w.label }}
-          </button>
-        </div>
-        <p class="mb-2 text-xs text-slate-500" data-testid="comp-count">{{ listLine }}</p>
-
-        <!-- Vue Tableau -->
-        <div v-if="viewMode === 'table'" class="mb-3">
-          <CompetitionTable :competitions="current" :can-write="canWrite" @edit="editFromTable" @remove="removeFromTable" />
-        </div>
-
-        <!-- Vue Calendrier -->
-        <div v-else-if="viewMode === 'calendar'" class="mb-3">
-          <CompetitionCalendar :competitions="current" />
-        </div>
-
-        <!-- Vue Cartes (par défaut) -->
-        <ul v-else class="flex flex-col gap-2">
-          <li
-            v-if="competitions.data.value && !current.length"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500"
-          >
-            {{
-              search || when !== "all" || selectedSeason !== "all"
-                ? "Aucune compétition correspondante."
-                : archivedCompetitions.length
-                  ? "Aucune compétition en cours : toutes sont archivées."
-                  : "Aucune compétition enregistrée."
-            }}
-          </li>
-          <li v-for="competition in current" :key="competition.id">
-            <RouterLink
-              :to="{ query: { id: String(competition.id) } }"
-              data-testid="comp-card"
-              :aria-current="selected?.id === competition.id ? 'true' : undefined"
-              :class="[
-                'block rounded-xl border bg-white px-3.5 py-3 text-slate-800 no-underline shadow-sm hover:border-accent',
-                selected?.id === competition.id ? 'border-accent' : 'border-slate-200',
-              ]"
-            >
-              <div class="flex items-start justify-between gap-2 pb-1">
-                <b class="block text-[15px]" data-testid="comp-name">
-                  <span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆</span>
-                  {{ competition.nom }}
-                </b>
-                <UiBadge
-                  v-if="discipline(competition)"
-                  :color="disciplineColor(discipline(competition))"
-                  variant="soft"
-                  class="ml-1 shrink-0"
-                  data-testid="discipline"
-                >
-                  {{ discipline(competition) }}
-                </UiBadge>
-              </div>
-              <span class="block text-xs font-semibold text-slate-600 pb-1.5" data-testid="comp-period">
-                📅 {{ formatCompetitionPeriod(competition) }}
-              </span>
-              <span class="block text-xs text-slate-500">
-                🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}
-              </span>
-              <span class="mt-0.5 block text-xs font-semibold text-blue-900">
-                ({{ counts(competition.participants ?? []).selected }} participant{{
-                  plural(counts(competition.participants ?? []).selected)
-                }}
-                · {{ counts(competition.participants ?? []).unpaid }} en attente · {{ counts(competition.participants ?? []).paid }} payé{{
-                  plural(counts(competition.participants ?? []).paid)
-                }})
-              </span>
-            </RouterLink>
-          </li>
-        </ul>
-        <button
-          v-if="archivedCompetitions.length && viewMode === 'cards'"
-          type="button"
-          data-testid="toggle-archives"
-          :aria-expanded="showArchived"
-          class="mt-2.5 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300"
-          @click="showArchived = !showArchived"
-        >
-          {{ showArchived ? "🙈 Masquer les archives" : `🗂 Afficher les archives (${archivedCompetitions.length})` }}
-        </button>
-        <ul v-if="showArchived && viewMode === 'cards'" class="mt-2 flex flex-col gap-2" data-testid="archived-list">
-          <li v-for="c in archivedCompetitions" :key="c.id">
-            <RouterLink
-              :to="{ query: { id: String(c.id) } }"
-              data-testid="comp-card"
-              class="block rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-slate-700 no-underline hover:border-accent"
-            >
-              <b class="block text-[14px]" data-testid="comp-name">{{ c.nom }}</b>
-              <span class="block text-xs text-slate-500">📅 {{ formatCompetitionPeriod(c) }} · 📦 Archivée</span>
-            </RouterLink>
-          </li>
-        </ul>
-      </section>
-
-      <CompetitionDetail
-        v-if="selected && viewMode === 'cards'"
-        :key="selected.id"
-        :competition="selected"
-        :rows="rows"
-        :members="members.data.value ?? []"
-        :coaches="coaches.data.value ?? []"
-        :can-write="canWrite"
-        :staff="staff"
-        :contacts-shown="contactsShown"
-        :outbox="outbox"
-        :uid="uid"
-        class="order-1 min-w-0 md:order-2 md:col-start-2 md:row-start-1"
-      />
+    <!-- Mode de vue, sous les onglets (la vue Compétitions seulement ; masqué sur téléphone quand une fiche est ouverte) -->
+    <template v-else>
       <div
-        v-else-if="viewMode === 'cards'"
-        class="order-1 flex min-w-0 flex-col gap-3 md:order-2 md:col-start-2 md:row-start-1"
-        data-testid="stats-no-selection"
+        :class="[
+          selected ? 'hidden md:inline-flex' : 'inline-flex',
+          'mb-3 rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium',
+        ]"
+        data-testid="view-switcher"
       >
-        <!-- Tuiles de statistiques -->
-        <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-3" data-testid="competitions-stats-tiles">
-          <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-competitions">
-            <div class="text-2xl font-black text-blue-700" data-testid="stats-total-competitions">
-              {{ statsTotalCompetitions }}
-            </div>
-            <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Compétitions au total</div>
-            <div class="mt-1 text-[11px] text-slate-400">
-              {{ statsUpcomingCompetitions }} à venir · {{ statsPastCompetitions }} passée{{ plural(statsPastCompetitions) }}
-            </div>
+        <button
+          type="button"
+          :class="[
+            'px-2 py-1 rounded-md cursor-pointer transition-colors',
+            viewMode === 'cards' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
+          ]"
+          data-testid="view-cards"
+          @click="viewMode = 'cards'"
+        >
+          🗂️ Cartes
+        </button>
+        <button
+          type="button"
+          :class="[
+            'px-2 py-1 rounded-md cursor-pointer transition-colors',
+            viewMode === 'table' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
+          ]"
+          data-testid="view-table"
+          @click="viewMode = 'table'"
+        >
+          📋 Tableau
+        </button>
+        <button
+          type="button"
+          :class="[
+            'px-2 py-1 rounded-md cursor-pointer transition-colors',
+            viewMode === 'calendar' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
+          ]"
+          data-testid="view-calendar"
+          @click="viewMode = 'calendar'"
+        >
+          📅 Calendrier
+        </button>
+      </div>
+      <div
+        class="flex flex-col md:grid md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-start md:gap-4 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]"
+      >
+        <!-- The competitions: always on desktop (a panel scrolling on its own), on phones until one is opened -->
+        <section
+          :class="[
+            selected ? 'hidden md:block' : '',
+            viewMode !== 'cards' ? 'md:col-span-2' : '',
+            'order-2 md:order-1 md:col-start-1 md:row-start-1 md:sticky md:top-3 md:max-h-[calc(100dvh-1.5rem)] md:overflow-y-auto md:rounded-xl md:border md:border-slate-200 md:bg-white md:p-3 md:shadow-sm',
+          ]"
+          aria-label="Liste des compétitions"
+        >
+          <div v-if="canWrite && pastCompetitions.length" class="mb-2 flex flex-wrap gap-1.5">
+            <UiButton variant="muted" small data-testid="archive-past" @click="archivePastCompetitions">
+              📦 Archiver les passées ({{ pastCompetitions.length }})
+            </UiButton>
           </div>
-          <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-competitors">
-            <div class="text-2xl font-black text-emerald-700" data-testid="stats-total-competitors">
-              {{ statsTotalCompetitors }}
-            </div>
-            <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Compétiteurs</div>
-            <div class="mt-1 text-[11px] text-slate-400">
-              {{ statsTotalParticipations }} inscription{{ plural(statsTotalParticipations) }} cumulée{{ plural(statsTotalParticipations) }}
-            </div>
-          </div>
-          <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-budget">
-            <div class="text-2xl font-black text-indigo-700" data-testid="stats-total-budget">
-              {{ formatEuros(statsTotalBudget) }}
-            </div>
-            <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Budget total</div>
-            <div class="mt-1 text-[11px] text-slate-400">
-              {{ formatEuros(statsTotalPaid) }} déjà réglé{{ plural(Math.round(statsTotalPaid)) }}
-            </div>
-          </div>
-        </div>
 
-        <div class="hidden rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-slate-500 md:block">
-          <p class="m-0 text-sm font-medium">
-            {{
-              selectedId && competitions.data.value
-                ? "Compétition introuvable."
-                : "Sélectionnez une compétition dans la liste pour afficher ses détails et gérer ses compétiteurs."
-            }}
-          </p>
+          <!-- Filtre saison -->
+          <div class="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+            <div class="flex items-center gap-1.5 text-xs">
+              <span class="font-semibold text-slate-500">Saison :</span>
+              <select
+                v-model="selectedSeason"
+                data-testid="comp-season-filter"
+                class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
+              >
+                <option value="all">Toutes les saisons</option>
+                <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5 mb-2">
+            <input
+              v-model="search"
+              type="search"
+              data-testid="comp-search"
+              placeholder="Rechercher (nom, lieu, discipline)…"
+              class="min-w-32 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px] md:basis-full"
+            />
+            <div class="flex pt-1 gap-2">
+              <button
+                v-for="w in WHEN"
+                :key="w.id"
+                type="button"
+                :data-testid="`when-${w.id}`"
+                :aria-pressed="when === w.id"
+                :class="chip(when === w.id)"
+                @click="when = w.id"
+              >
+                {{ w.label }}
+              </button>
+            </div>
+          </div>
+          <p class="pt-1 pb-1 mb-2 text-xs text-slate-500" data-testid="comp-count">{{ listLine }}</p>
+
+          <!-- Vue Tableau -->
+          <div v-if="viewMode === 'table'" class="mb-3">
+            <CompetitionTable :competitions="current" :can-write="canWrite" @edit="editFromTable" @remove="removeFromTable" />
+          </div>
+
+          <!-- Vue Calendrier -->
+          <div v-else-if="viewMode === 'calendar'" class="mb-3">
+            <CompetitionCalendar :competitions="current" />
+          </div>
+
+          <!-- Vue Cartes (par défaut) -->
+          <ul v-else class="flex flex-col gap-2">
+            <li
+              v-if="competitions.data.value && !current.length"
+              class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500"
+            >
+              {{
+                search || when !== "all" || selectedSeason !== "all"
+                  ? "Aucune compétition correspondante."
+                  : archivedCompetitions.length
+                    ? "Aucune compétition en cours : toutes sont archivées."
+                    : "Aucune compétition enregistrée."
+              }}
+            </li>
+            <li v-for="competition in current" :key="competition.id">
+              <RouterLink
+                :to="{ query: { id: String(competition.id) } }"
+                data-testid="comp-card"
+                :aria-current="selected?.id === competition.id ? 'true' : undefined"
+                :class="[
+                  'block rounded-xl border bg-white px-3.5 py-3 text-slate-800 no-underline shadow-sm hover:border-accent',
+                  selected?.id === competition.id ? 'border-accent' : 'border-slate-200',
+                ]"
+              >
+                <div class="flex items-start justify-between gap-2 pb-1">
+                  <b class="block text-[15px]" data-testid="comp-name">
+                    <span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆</span>
+                    {{ competition.nom }}
+                  </b>
+                  <UiBadge
+                    v-if="discipline(competition)"
+                    :color="disciplineColor(discipline(competition))"
+                    variant="soft"
+                    class="ml-1 shrink-0"
+                    data-testid="discipline"
+                  >
+                    {{ discipline(competition) }}
+                  </UiBadge>
+                </div>
+                <span class="block text-xs font-semibold text-slate-600 pb-1.5" data-testid="comp-period">
+                  📅 {{ formatCompetitionPeriod(competition) }}
+                </span>
+                <span class="block text-xs text-slate-500">
+                  🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}
+                </span>
+                <span class="mt-0.5 block text-xs font-semibold text-blue-900">
+                  ({{ counts(competition.participants ?? []).selected }} participant{{
+                    plural(counts(competition.participants ?? []).selected)
+                  }}
+                  · {{ counts(competition.participants ?? []).unpaid }} en attente ·
+                  {{ counts(competition.participants ?? []).paid }} payé{{ plural(counts(competition.participants ?? []).paid) }})
+                </span>
+              </RouterLink>
+            </li>
+          </ul>
+          <button
+            v-if="archivedCompetitions.length && viewMode === 'cards'"
+            type="button"
+            data-testid="toggle-archives"
+            :aria-expanded="showArchived"
+            class="mt-2.5 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300"
+            @click="showArchived = !showArchived"
+          >
+            {{ showArchived ? "🙈 Masquer les archives" : `🗂 Afficher les archives (${archivedCompetitions.length})` }}
+          </button>
+          <ul v-if="showArchived && viewMode === 'cards'" class="mt-2 flex flex-col gap-2" data-testid="archived-list">
+            <li v-for="c in archivedCompetitions" :key="c.id">
+              <RouterLink
+                :to="{ query: { id: String(c.id) } }"
+                data-testid="comp-card"
+                class="block rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-slate-700 no-underline hover:border-accent"
+              >
+                <b class="block text-[14px]" data-testid="comp-name">{{ c.nom }}</b>
+                <span class="block text-xs text-slate-500">📅 {{ formatCompetitionPeriod(c) }} · 📦 Archivée</span>
+              </RouterLink>
+            </li>
+          </ul>
+        </section>
+
+        <CompetitionDetail
+          v-if="selected && viewMode === 'cards'"
+          :key="selected.id"
+          :competition="selected"
+          :rows="rows"
+          :members="members.data.value ?? []"
+          :coaches="coaches.data.value ?? []"
+          :can-write="canWrite"
+          :staff="staff"
+          :contacts-shown="contactsShown"
+          :outbox="outbox"
+          :uid="uid"
+          class="order-1 min-w-0 md:order-2 md:col-start-2 md:row-start-1"
+        />
+        <div
+          v-else-if="viewMode === 'cards'"
+          class="order-1 flex min-w-0 flex-col gap-3 md:order-2 md:col-start-2 md:row-start-1"
+          data-testid="stats-no-selection"
+        >
+          <!-- Tuiles de statistiques -->
+          <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-3" data-testid="competitions-stats-tiles">
+            <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-competitions">
+              <div class="text-2xl font-black text-blue-700" data-testid="stats-total-competitions">
+                {{ statsTotalCompetitions }}
+              </div>
+              <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Compétitions au total</div>
+              <div class="mt-1 text-[11px] text-slate-400">
+                {{ statsUpcomingCompetitions }} à venir · {{ statsPastCompetitions }} passée{{ plural(statsPastCompetitions) }}
+              </div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-competitors">
+              <div class="text-2xl font-black text-emerald-700" data-testid="stats-total-competitors">
+                {{ statsTotalCompetitors }}
+              </div>
+              <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Compétiteurs</div>
+              <div class="mt-1 text-[11px] text-slate-400">
+                {{ statsTotalParticipations }} inscription{{ plural(statsTotalParticipations) }} cumulée{{
+                  plural(statsTotalParticipations)
+                }}
+              </div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-budget">
+              <div class="text-2xl font-black text-indigo-700" data-testid="stats-total-budget">
+                {{ formatEuros(statsTotalBudget) }}
+              </div>
+              <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Budget total</div>
+              <div class="mt-1 text-[11px] text-slate-400">
+                {{ formatEuros(statsTotalPaid) }} déjà réglé{{ plural(Math.round(statsTotalPaid)) }}
+              </div>
+            </div>
+          </div>
+
+          <div class="hidden rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-slate-500 md:block">
+            <p class="m-0 text-sm font-medium">
+              {{
+                selectedId && competitions.data.value
+                  ? "Compétition introuvable."
+                  : "Sélectionnez une compétition dans la liste pour afficher ses détails et gérer ses compétiteurs."
+              }}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </template>
 
     <UiDialog v-model:open="creating" title="➕ Nouvelle compétition" wide data-testid="create-dialog">
       <CompetitionForm
