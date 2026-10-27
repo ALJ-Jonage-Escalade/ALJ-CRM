@@ -4,7 +4,8 @@
    former office page; phones: cards opening in place. Computed from the competitions only: readable offline. */
 import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
-import UiBadge, { type BadgeColor } from "../../components/ui/UiBadge.vue";
+import UiBadge from "../../components/ui/UiBadge.vue";
+import type { BadgeColor } from "../../components/ui/palette";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
 import UiTile from "../../components/ui/UiTile.vue";

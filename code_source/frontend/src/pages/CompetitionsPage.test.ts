@@ -331,6 +331,39 @@ describe("CompetitionsPage", () => {
     expect(byId("comp-detail").exists()).toBe(true);
   });
 
+  it("shows the selected competition's month on the calendar and opens a competition from it", async () => {
+    const { byId, all, router } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
+    await settle();
+    await byId("view-calendar").trigger("click");
+    expect(byId("calendar-title").text()).toBe("Mars 2027");
+    expect(byId("when-upcoming").exists()).toBe(false);
+    expect(byId("comp-season-filter").exists()).toBe(false);
+    expect(all("calendar-comp-chip").map((c) => c.text())).toEqual(["Coupe du Rhône"]);
+    expect(all("calendar-agenda-item").map((c) => c.text())).toEqual([expect.stringContaining("Coupe du Rhône")]);
+    await router.push("/competitions");
+    await all("calendar-comp-chip")[0]!.trigger("click");
+    await settle();
+    expect(router.currentRoute.value.query.id).toBe("10");
+    expect(byId("view-cards").classes()).toContain("text-accent");
+    expect(byId("comp-detail").exists()).toBe(true);
+  });
+
+  it("keeps the archived competitions on the calendar, and applies the search", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2025, 0, 5));
+    try {
+      const { byId, all } = await render(signedIn("coach"), fakeApi().api, store);
+      await settle();
+      await byId("view-calendar").trigger("click");
+      expect(byId("calendar-title").text()).toBe("Janvier 2025");
+      expect(all("calendar-comp-chip").map((c) => c.text())).toEqual(["Open passé"]);
+      await byId("comp-search").setValue("Rhône");
+      expect(all("calendar-comp-chip")).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("displays statistics tiles when no competition is selected", async () => {
     const server = fakeApi();
     const { byId } = await render(signedIn("coach"), server.api, store, "/competitions");

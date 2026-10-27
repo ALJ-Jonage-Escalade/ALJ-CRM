@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* Table view of the slots: columns on a wide screen, one card per slot on a phone, with edit and delete buttons. */
-import UiBadge, { type BadgeColor } from "../../components/ui/UiBadge.vue";
+import UiBadge from "../../components/ui/UiBadge.vue";
+import type { BadgeColor } from "../../components/ui/palette";
 import { slotKind, type Kind, type Slot } from "./slots";
 
 defineProps<{ slots: readonly Slot[] }>();

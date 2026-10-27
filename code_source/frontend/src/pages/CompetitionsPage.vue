@@ -197,6 +197,8 @@ const current = computed(() => {
   }
   return filterCompetitions(list, search.value, when.value, today);
 });
+// The calendar: the search only, archived ones included (greyed); its months replace the season and date filters
+const calendarCompetitions = computed(() => filterCompetitions(all.value, search.value, "all", today));
 const archivedCompetitions = computed(() => filterCompetitions(all.value.filter(isArchived), search.value, when.value, today));
 const pastCompetitions = computed(() => all.value.filter((c) => !isArchived(c) && isPast(c, today)));
 const showArchived = ref(false);
@@ -291,6 +293,11 @@ const editDialogOpen = computed({
     }
   },
 });
+
+function openFromCalendar(c: Competition): void {
+  viewMode.value = "cards";
+  void router.push({ query: { id: String(c.id) } });
+}
 
 function editFromTable(c: Competition): void {
   editingCompetition.value = c;
@@ -491,7 +498,10 @@ const tab = (active: boolean) => [
           </div>
 
           <!-- Filtre saison -->
-          <div class="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          <div
+            v-if="viewMode !== 'calendar'"
+            class="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2"
+          >
             <div class="flex items-center gap-1.5 text-xs">
               <span class="font-semibold text-slate-500">Saison :</span>
               <select
@@ -513,7 +523,7 @@ const tab = (active: boolean) => [
               placeholder="Rechercher (nom, lieu, discipline)…"
               class="min-w-32 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px] md:basis-full"
             />
-            <div class="flex pt-1 gap-2">
+            <div v-if="viewMode !== 'calendar'" class="flex pt-1 gap-2">
               <button
                 v-for="w in WHEN"
                 :key="w.id"
@@ -542,7 +552,7 @@ const tab = (active: boolean) => [
 
           <!-- Vue Calendrier -->
           <div v-else-if="viewMode === 'calendar'" class="mb-3">
-            <CompetitionCalendar :competitions="current" @open="viewMode = 'cards'" />
+            <CompetitionCalendar :competitions="calendarCompetitions" :selected-id="selectedId" @open="openFromCalendar" />
           </div>
 
           <!-- Vue Cartes (par défaut) -->

@@ -1,6 +1,6 @@
 /* Competitions screen: the competitions, their participants and payment status, and what coaches change on them (the
    former pages web/competitions.html and web/bureau/competitions.html, merged). The server checks every change. */
-import type { BadgeColor } from "../../components/ui/UiBadge.vue";
+import type { BadgeColor } from "../../components/ui/palette";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
@@ -123,7 +123,7 @@ export function discipline(c: Competition): string {
   return t && t.toLowerCase() !== "escalade" ? t : "";
 }
 
-const DISCIPLINE_COLOR: Record<string, BadgeColor> = { bloc: "violet", difficulté: "blue", vitesse: "amber", combiné: "teal" };
+export const DISCIPLINE_COLOR: Record<string, BadgeColor> = { bloc: "violet", difficulté: "blue", vitesse: "amber", combiné: "teal" };
 
 /** Badge colour of a discipline (former office page colours), blue for any other. */
 export const disciplineColor = (name: string): BadgeColor => DISCIPLINE_COLOR[name.toLowerCase()] ?? "blue";

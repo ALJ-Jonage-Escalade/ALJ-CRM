@@ -1,7 +1,7 @@
 /* Member list of Adhérents: slot / tariff filters, search, status, sorting and CSV export (port of the former
    web/shared/alj-filters.js and alj-members.js).
    The members come formatted by the server (GET /api/members, domain/members/view.py). */
-import type { BadgeColor } from "../../components/ui/UiBadge.vue";
+import type { BadgeColor } from "../../components/ui/palette";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";

@@ -1,235 +1,159 @@
 <script setup lang="ts">
+/* The competitions on a month: a grid of weeks with one bar per competition (across its days) from md up, the month's
+   list on phones. Drawing only: the layout is in calendar.ts, opening a competition is the page's. */
 import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
+import { SOFT, SOLID } from "../../components/ui/palette";
 import UiButton from "../../components/ui/UiButton.vue";
-import { discipline, todayIso, type Competition } from "./competitions";
+import {
+  agendaDays,
+  calendarColor,
+  competitionDays,
+  initialMonth,
+  layoutWeek,
+  LEGEND,
+  monthAgenda,
+  monthTitle,
+  monthWeeks,
+  shiftMonth,
+  WEEKDAYS,
+  type CalendarBar,
+} from "./calendar";
+import { isArchived, period, todayIso, type Competition } from "./competitions";
 
 const props = defineProps<{
   competitions: readonly Competition[];
+  selectedId?: string;
 }>();
-// A competition opened (also when it is already the selected one: the URL does not change then)
+// Also when it is the selected one already (the page then goes back to the cards without a URL change)
 const emit = defineEmits<{ open: [competition: Competition] }>();
 
-const router = useRouter();
+const today = todayIso();
+const selected = computed(() => props.competitions.find((c) => String(c.id) === props.selectedId));
+const shown = ref(initialMonth(selected.value, today));
 
-const currentYear = ref(new Date().getFullYear());
-const currentMonth = ref(new Date().getMonth()); // 0-indexed
+const weeks = computed(() => monthWeeks(shown.value, today).map((days) => ({ days, ...layoutWeek(props.competitions, days[0]!.dateIso) })));
+const agenda = computed(() => monthAgenda(props.competitions, shown.value));
 
-const MONTH_NAMES = [
-  "Janvier",
-  "Février",
-  "Mars",
-  "Avril",
-  "Mai",
-  "Juin",
-  "Juillet",
-  "Août",
-  "Septembre",
-  "Octobre",
-  "Novembre",
-  "Décembre",
-];
-const DAY_NAMES = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-
-const monthTitle = computed(() => `${MONTH_NAMES[currentMonth.value]} ${currentYear.value}`);
-
-function prevMonth(): void {
-  if (currentMonth.value === 0) {
-    currentMonth.value = 11;
-    currentYear.value -= 1;
-  } else {
-    currentMonth.value -= 1;
-  }
+function barText(c: Competition): string {
+  return [c.nom, c.lieu || "lieu non précisé", period(c)].join(" · ");
 }
 
-function nextMonth(): void {
-  if (currentMonth.value === 11) {
-    currentMonth.value = 0;
-    currentYear.value += 1;
-  } else {
-    currentMonth.value += 1;
-  }
+function barClass(bar: CalendarBar): string[] {
+  return [
+    "relative z-10 mx-1 my-px flex min-w-0 cursor-pointer items-center gap-0.5 rounded-md border px-1.5 text-left text-[11px] font-semibold",
+    "transition hover:brightness-95",
+    SOFT[calendarColor(bar.competition)],
+    bar.continuesBefore ? "-ml-px rounded-l-none border-l-0" : "",
+    bar.continuesAfter ? "-mr-px rounded-r-none border-r-0" : "",
+    isArchived(bar.competition) ? "opacity-60" : "",
+    String(bar.competition.id) === props.selectedId ? "ring-2 ring-accent" : "",
+  ];
 }
 
-function goToToday(): void {
-  const now = new Date();
-  currentYear.value = now.getFullYear();
-  currentMonth.value = now.getMonth();
-}
-
-interface CalendarDay {
-  dateIso: string;
-  dayNumber: number;
-  inCurrentMonth: boolean;
-  isToday: boolean;
-  competitions: Competition[];
-}
-
-const calendarDays = computed<CalendarDay[]>(() => {
-  const year = currentYear.value;
-  const month = currentMonth.value;
-  const firstDayOfMonth = new Date(year, month, 1);
-  const lastDayOfMonth = new Date(year, month + 1, 0);
-
-  // Day of week: 0 = Sunday, 1 = Monday, ... Convert to Monday = 0
-  let startOffset = firstDayOfMonth.getDay() - 1;
-  if (startOffset < 0) {
-    startOffset = 6;
-  }
-
-  const totalDays = lastDayOfMonth.getDate();
-  const prevMonthLastDate = new Date(year, month, 0).getDate();
-
-  const nowIso = todayIso();
-  const days: CalendarDay[] = [];
-
-  // Previous month padding
-  for (let i = startOffset - 1; i >= 0; i--) {
-    const d = prevMonthLastDate - i;
-    const m = month === 0 ? 12 : month;
-    const y = month === 0 ? year - 1 : year;
-    const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    days.push({
-      dateIso: iso,
-      dayNumber: d,
-      inCurrentMonth: false,
-      isToday: iso === nowIso,
-      competitions: getCompetitionsForDate(iso),
-    });
-  }
-
-  // Current month days
-  for (let d = 1; d <= totalDays; d++) {
-    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    days.push({
-      dateIso: iso,
-      dayNumber: d,
-      inCurrentMonth: true,
-      isToday: iso === nowIso,
-      competitions: getCompetitionsForDate(iso),
-    });
-  }
-
-  // Next month padding to complete 35 or 42 cells
-  const remaining = (7 - (days.length % 7)) % 7;
-  for (let d = 1; d <= remaining; d++) {
-    const m = month === 11 ? 1 : month + 2;
-    const y = month === 11 ? year + 1 : year;
-    const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    days.push({
-      dateIso: iso,
-      dayNumber: d,
-      inCurrentMonth: false,
-      isToday: iso === nowIso,
-      competitions: getCompetitionsForDate(iso),
-    });
-  }
-
-  return days;
-});
-
-function getCompetitionsForDate(dateIso: string): Competition[] {
-  return props.competitions.filter((c) => {
-    const start = c.date_competition?.slice(0, 10) ?? "";
-    const end = c.date_fin?.slice(0, 10) || start;
-    if (!start) {
-      return false;
-    }
-    return dateIso >= start && dateIso <= end;
-  });
-}
-
-function openComp(c: Competition): void {
-  emit("open", c);
-  void router.push({ query: { id: String(c.id) } });
-}
-
-const DISCIPLINE_BG: Record<string, string> = {
-  bloc: "bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200",
-  difficulté: "bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200",
-  vitesse: "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
-  combiné: "bg-teal-100 text-teal-800 border-teal-300 hover:bg-teal-200",
+const isOnToday = (c: Competition): boolean => {
+  const days = competitionDays(c);
+  return !!days && days[0] <= today && today <= days[1];
 };
-
-function getDisciplineClass(c: Competition): string {
-  const d = discipline(c).toLowerCase();
-  return DISCIPLINE_BG[d] || "bg-sky-100 text-sky-800 border-sky-300 hover:bg-sky-200";
-}
 </script>
 
 <template>
-  <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="comp-calendar">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:p-4" data-testid="comp-calendar">
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2">
-        <h2 class="text-base font-bold text-slate-900" data-testid="calendar-title">{{ monthTitle }}</h2>
-        <UiButton variant="muted" small @click="goToToday">Aujourd'hui</UiButton>
+        <h2 class="text-base font-bold text-slate-900" data-testid="calendar-title">{{ monthTitle(shown) }}</h2>
+        <UiButton variant="muted" small data-testid="calendar-today" @click="shown = initialMonth(undefined, today)">Aujourd'hui</UiButton>
       </div>
       <div class="flex items-center gap-1.5">
-        <UiButton variant="muted" small data-testid="prev-month" @click="prevMonth">‹ Précédent</UiButton>
-        <UiButton variant="muted" small data-testid="next-month" @click="nextMonth">Suivant ›</UiButton>
+        <UiButton variant="muted" small data-testid="prev-month" aria-label="Mois précédent" @click="shown = shiftMonth(shown, -1)">
+          ‹ Précédent
+        </UiButton>
+        <UiButton variant="muted" small data-testid="next-month" aria-label="Mois suivant" @click="shown = shiftMonth(shown, 1)">
+          Suivant ›
+        </UiButton>
       </div>
     </div>
 
-    <!-- Légende des disciplines -->
-    <div class="mb-3 flex flex-wrap items-center gap-2 text-xs">
-      <span class="text-slate-500 font-semibold">Disciplines :</span>
-      <span
-        class="inline-flex items-center gap-1 rounded px-2 py-0.5 border text-[11px] font-bold bg-purple-100 text-purple-800 border-purple-300"
-      >
-        ● Bloc
-      </span>
-      <span
-        class="inline-flex items-center gap-1 rounded px-2 py-0.5 border text-[11px] font-bold bg-blue-100 text-blue-800 border-blue-300"
-      >
-        ● Difficulté
-      </span>
-      <span
-        class="inline-flex items-center gap-1 rounded px-2 py-0.5 border text-[11px] font-bold bg-amber-100 text-amber-800 border-amber-300"
-      >
-        ● Vitesse
-      </span>
-    </div>
+    <ul
+      class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600"
+      aria-label="Disciplines"
+      data-testid="calendar-legend"
+    >
+      <li v-for="entry in LEGEND" :key="entry.label" class="flex items-center gap-1">
+        <span :class="['inline-block size-2.5 rounded-full', SOLID[entry.color]]" aria-hidden="true" />
+        {{ entry.label }}
+      </li>
+    </ul>
 
-    <!-- Grille des jours de la semaine -->
-    <div class="grid grid-cols-7 gap-px border border-slate-200 bg-slate-200 rounded-lg overflow-hidden">
-      <div v-for="name in DAY_NAMES" :key="name" class="bg-slate-50 py-1.5 text-center text-xs font-bold text-slate-600">
-        {{ name }}
+    <!-- Desktop: the month's weeks, a CSS grid per week (row 1 the day numbers, then one row per lane) -->
+    <div class="hidden overflow-hidden rounded-lg border border-slate-200 md:block" data-testid="calendar-grid">
+      <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50" aria-hidden="true">
+        <div v-for="name in WEEKDAYS" :key="name" class="py-1.5 text-center text-xs font-bold text-slate-600 capitalize">{{ name }}</div>
       </div>
-
-      <!-- Cellules du calendrier -->
       <div
-        v-for="day in calendarDays"
-        :key="day.dateIso"
-        :class="[
-          'min-h-24 bg-white p-1.5 transition-colors flex flex-col',
-          !day.inCurrentMonth ? 'bg-slate-50/50 text-slate-400' : 'text-slate-700',
-          day.isToday ? 'ring-2 ring-accent ring-inset' : '',
-        ]"
-        data-testid="calendar-day"
+        v-for="week in weeks"
+        :key="week.days[0]!.dateIso"
+        class="grid min-h-24 grid-cols-7 border-b border-slate-200 pb-1 last:border-b-0"
+        :style="{ gridTemplateRows: `1.75rem repeat(${week.lanes}, 1.5rem) 1fr` }"
+        data-testid="calendar-week"
       >
-        <div class="flex items-center justify-between mb-1">
-          <span :class="['text-xs font-bold inline-block px-1 rounded', day.isToday ? 'bg-accent text-white' : '']">
+        <div
+          v-for="(day, column) in week.days"
+          :key="day.dateIso"
+          :class="[
+            'border-l border-slate-200 px-1.5 pt-1 first:border-l-0',
+            day.inMonth ? 'bg-white text-slate-700' : 'bg-slate-50 text-slate-400',
+          ]"
+          :style="{ gridColumn: column + 1, gridRow: '1 / -1' }"
+          :aria-current="day.isToday ? 'date' : undefined"
+          data-testid="calendar-day"
+        >
+          <span :class="['inline-block rounded px-1 text-xs font-bold', day.isToday ? 'bg-accent text-white' : '']">
             {{ day.dayNumber }}
           </span>
         </div>
-
-        <div class="flex flex-col gap-1 overflow-y-auto max-h-28">
-          <button
-            v-for="c in day.competitions"
-            :key="c.id"
-            type="button"
-            :class="[
-              'text-left text-[11px] font-semibold px-1.5 py-0.5 rounded border truncate cursor-pointer transition-colors',
-              getDisciplineClass(c),
-            ]"
-            :title="`${c.nom} (${c.lieu || 'lieu non précisé'})`"
-            data-testid="calendar-comp-chip"
-            @click="openComp(c)"
-          >
-            {{ c.nom }}
-          </button>
-        </div>
+        <button
+          v-for="bar in week.bars"
+          :key="bar.competition.id"
+          type="button"
+          :class="barClass(bar)"
+          :style="{ gridColumn: `${bar.startCol + 1} / span ${bar.span}`, gridRow: bar.lane + 2 }"
+          :title="barText(bar.competition)"
+          :aria-label="barText(bar.competition)"
+          data-testid="calendar-comp-chip"
+          @click="emit('open', bar.competition)"
+        >
+          <span v-if="bar.continuesBefore" aria-hidden="true">‹</span>
+          <span class="min-w-0 flex-1 truncate">{{ bar.competition.nom }}</span>
+          <span v-if="bar.continuesAfter" aria-hidden="true">›</span>
+        </button>
       </div>
     </div>
+
+    <!-- Phones: the month's competitions as a list -->
+    <ul class="flex flex-col gap-1.5 md:hidden" data-testid="calendar-agenda">
+      <li v-if="!agenda.length" class="py-4 text-center text-sm text-slate-500">Aucune compétition ce mois-ci.</li>
+      <li v-for="c in agenda" :key="c.id">
+        <button
+          type="button"
+          :class="[
+            'flex w-full cursor-pointer items-start gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-left hover:bg-slate-50',
+            isArchived(c) ? 'opacity-60' : '',
+            String(c.id) === selectedId ? 'ring-2 ring-accent' : '',
+          ]"
+          data-testid="calendar-agenda-item"
+          @click="emit('open', c)"
+        >
+          <span :class="['mt-1.5 inline-block size-2.5 shrink-0 rounded-full', SOLID[calendarColor(c)]]" aria-hidden="true" />
+          <span class="min-w-0 flex-1">
+            <span class="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+              {{ agendaDays(c) }}
+              <span v-if="isOnToday(c)" class="rounded bg-accent px-1 text-[10px] font-bold text-white">Aujourd'hui</span>
+            </span>
+            <span class="block truncate text-sm font-bold text-slate-900">{{ c.nom }}</span>
+            <span v-if="c.lieu" class="block truncate text-xs text-slate-500">{{ c.lieu }}</span>
+          </span>
+        </button>
+      </li>
+    </ul>
   </div>
 </template>

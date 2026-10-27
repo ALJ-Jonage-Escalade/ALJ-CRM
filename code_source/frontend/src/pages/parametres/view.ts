@@ -1,5 +1,5 @@
 /* What the Paramètres page shows for each server answer (texts of the former web/bureau/parametres.html). */
-import type { BadgeColor } from "../../components/ui/UiBadge.vue";
+import type { BadgeColor } from "../../components/ui/palette";
 import type { Schemas } from "../../lib/client";
 import { formatDateTime, formatDateTimeSeconds, formatTime, parseDate } from "../../lib/format";
 
