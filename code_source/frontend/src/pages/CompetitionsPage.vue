@@ -207,7 +207,8 @@ const WHEN: { id: When; label: string }[] = [
 ];
 
 const selectedId = computed(() => (typeof route.query.id === "string" ? route.query.id : ""));
-// The detail is shown next to the cards: a competition opened from the table or the calendar goes back to them
+// The detail is shown next to the cards: a competition opened from the table or the calendar goes back to them (their
+// open event covers the competition already selected, which leaves the URL unchanged)
 watch(selectedId, (id) => {
   if (id) {
     viewMode.value = "cards";
@@ -530,12 +531,18 @@ const tab = (active: boolean) => [
 
           <!-- Vue Tableau -->
           <div v-if="viewMode === 'table'" class="mb-3">
-            <CompetitionTable :competitions="current" :can-write="canWrite" @edit="editFromTable" @remove="removeFromTable" />
+            <CompetitionTable
+              :competitions="current"
+              :can-write="canWrite"
+              @open="viewMode = 'cards'"
+              @edit="editFromTable"
+              @remove="removeFromTable"
+            />
           </div>
 
           <!-- Vue Calendrier -->
           <div v-else-if="viewMode === 'calendar'" class="mb-3">
-            <CompetitionCalendar :competitions="current" />
+            <CompetitionCalendar :competitions="current" @open="viewMode = 'cards'" />
           </div>
 
           <!-- Vue Cartes (par défaut) -->

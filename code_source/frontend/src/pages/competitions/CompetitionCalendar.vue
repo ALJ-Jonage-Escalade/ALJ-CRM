@@ -7,6 +7,8 @@ import { discipline, todayIso, type Competition } from "./competitions";
 const props = defineProps<{
   competitions: readonly Competition[];
 }>();
+// A competition opened (also when it is already the selected one: the URL does not change then)
+const emit = defineEmits<{ open: [competition: Competition] }>();
 
 const router = useRouter();
 
@@ -138,6 +140,7 @@ function getCompetitionsForDate(dateIso: string): Competition[] {
 }
 
 function openComp(c: Competition): void {
+  emit("open", c);
   void router.push({ query: { id: String(c.id) } });
 }
 

@@ -319,6 +319,18 @@ describe("CompetitionsPage", () => {
     expect(server.writes()).toEqual([]);
   });
 
+  it("goes back to the cards when the competition already selected is opened from the table", async () => {
+    const { byId, router } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
+    await settle();
+    await byId("view-table").trigger("click");
+    expect(byId("comp-detail").exists()).toBe(false);
+    await byId("comp-table-open").trigger("click");
+    await settle();
+    expect(router.currentRoute.value.query.id).toBe("10");
+    expect(byId("view-cards").classes()).toContain("text-accent");
+    expect(byId("comp-detail").exists()).toBe(true);
+  });
+
   it("displays statistics tiles when no competition is selected", async () => {
     const server = fakeApi();
     const { byId } = await render(signedIn("coach"), server.api, store, "/competitions");
