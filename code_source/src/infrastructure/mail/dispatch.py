@@ -98,13 +98,18 @@ class EmailDispatchService:
         wa_link = str(getattr(comp, "whatsapp_link", "") or "").strip()
         bloc_wa = f"Voici le lien du groupe WhatApp dédié à cette compétition : {wa_link}" if wa_link else ""
 
+        lieu = str(getattr(comp, "lieu", "") or "").strip()
         return {
             "competition_id": str(comp.id),
             "nom": comp.nom,
+            "competition_nom": comp.nom,
             "no_competition": str(comp.id_ffme or ""),
             "name_competition": comp.nom,
             "montant_competition": format_montant(comp.prix),
             "date_competition": date_formatted,
+            "competition_date": date_formatted,
+            "lieu": lieu,
+            "competition_lieu": lieu,
             "whatapp_Id": wa_link,
             "whatsapp_link": wa_link,
             "bloc_whatsapp": bloc_wa,

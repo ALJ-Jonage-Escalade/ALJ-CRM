@@ -13,7 +13,7 @@ import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText } from "../lib/client";
 import { createActivitiesApi } from "../services/activities";
 import { createMembersApi } from "../services/members";
-import { saveExport } from "../lib/download";
+import { saveExport, saveFile } from "../lib/download";
 import SlotForm from "./planning/SlotForm.vue";
 import SlotList from "./planning/SlotList.vue";
 import { countLabel, draftOf, filterSlots, KINDS, updateOf, type KindFilter, type Slot, type SlotDraft } from "./planning/slots";
@@ -121,6 +121,46 @@ async function download(mode: "grid" | "list"): Promise<void> {
   }
 }
 
+function syncGoogleCalendar(): void {
+  const icsLines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//ALJ Escalade//Planning//FR",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "X-WR-CALNAME:ALJ Escalade — Planning",
+    "X-WR-TIMEZONE:Europe/Paris",
+  ];
+  const DAY_MAP: Record<string, string> = {
+    lundi: "MO",
+    mardi: "TU",
+    mercredi: "WE",
+    jeudi: "TH",
+    vendredi: "FR",
+    samedi: "SA",
+    dimanche: "SU",
+  };
+  slots.value.forEach((s, idx) => {
+    const d = s.jour?.toLowerCase().trim() || "";
+    const byDay = DAY_MAP[d] || "MO";
+    icsLines.push(
+      "BEGIN:VEVENT",
+      `UID:alj-slot-${s.id || idx}@alj-escalade.fr`,
+      `SUMMARY:ALJ Escalade — ${s.groupe}`,
+      `DESCRIPTION:${s.type || "Cours"} · ${s.encadrants?.join(", ") || "Coachs ALJ"}`,
+      "LOCATION:Gymnase de Jonage",
+      `RRULE:FREQ=WEEKLY;BYDAY=${byDay}`,
+      "DTSTART:20260901T180000Z",
+      "DTEND:20260901T200000Z",
+      "END:VEVENT",
+    );
+  });
+  icsLines.push("END:VCALENDAR");
+  const blob = new Blob([icsLines.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+  saveFile(blob, "planning_alj_escalade.ics");
+  toast.show("📅 Fichier iCalendar (.ics) généré pour synchronisation avec Google Calendar !");
+}
+
 onMounted(() => {
   void loadPlanning();
   void loadTarifs();
@@ -144,6 +184,9 @@ const chip = (active: boolean) => [
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <UiButton data-testid="slot-new" @click="open()">➕ Nouveau créneau</UiButton>
+          <UiButton variant="muted" data-testid="sync-google-calendar" @click="syncGoogleCalendar">
+            📅 Synchroniser Google Calendar
+          </UiButton>
           <UiButton variant="muted" data-testid="planning-print" @click="print">🖨️ Imprimer la grille</UiButton>
           <UiMenu label="📥 Exporter Excel" data-testid="export-menu">
             <UiMenuItem data-testid="export-grid" @select="download('grid')">📊 Grille hebdomadaire (.xlsx)</UiMenuItem>

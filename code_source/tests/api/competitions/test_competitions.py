@@ -136,3 +136,49 @@ class TestCompetitions(ApiTestCase):
             r = self.client.get("/api/competitions")
         self.assertEqual(r.status_code, 503)
         self.assertEqual(r.json()["code"], "unavailable")
+
+    def test_lookup_ffme(self):
+        with patch("services.competitions.competitions.CompetitionService.lookup_ffme") as mock_lookup:
+            mock_lookup.return_value = {
+                "id_ffme": "18896",
+                "nom": "Coupe régionale de bloc Cusset Vichy",
+                "date_competition": "2026-11-07",
+                "date_fin": "2026-11-07",
+                "lieu": "CUSSET",
+                "type": "Bloc",
+            }
+            r = self.client.get("/api/competitions/lookup-ffme/18896")
+            self.assertEqual(r.status_code, 200)
+            data = r.json()
+            self.assertEqual(data["nom"], "Coupe régionale de bloc Cusset Vichy")
+            self.assertEqual(data["id_ffme"], "18896")
+            self.assertEqual(data["lieu"], "CUSSET")
+            self.assertEqual(data["type"], "Bloc")
+            self.assertEqual(data["date_competition"], "2026-11-07")
+            self.assertEqual(data["date_fin"], "2026-11-07")
+
+        from services.errors import NotFound
+        with patch("services.competitions.competitions.CompetitionService.lookup_ffme", side_effect=NotFound("Introuvable")):
+            r = self.client.get("/api/competitions/lookup-ffme/99999")
+            self.assertEqual(r.status_code, 404)
+            self.assertEqual(r.json()["code"], "not_found")
+
+    def test_export_competition_excel_and_pdf(self):
+        doc = self.create()
+        self.seed_adherent(1)
+        Repo.add_participant(doc["id"], 1)
+
+        r_excel = self.client.get(f"/api/competitions/{doc['id']}/export-excel")
+        self.assertEqual(r_excel.status_code, 200)
+        self.assertEqual(r_excel.headers["content-type"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        self.assertTrue(r_excel.content.startswith(b"PK\x03\x04"))
+
+        r_pdf = self.client.get(f"/api/competitions/{doc['id']}/export-pdf")
+        self.assertEqual(r_pdf.status_code, 200)
+        self.assertTrue(len(r_pdf.content) > 0)
+
+        # 404 on nonexistent competition
+        self.assertEqual(self.client.get("/api/competitions/999999/export-excel").status_code, 404)
+        self.assertEqual(self.client.get("/api/competitions/999999/export-pdf").status_code, 404)
+
+

@@ -38,13 +38,29 @@ def _safe_return_to(value: Optional[str]) -> str:
 @router.get("/api/auth/google/status", response_model=GoogleStatus)
 def get_google_auth_status() -> GoogleStatus:
     """Vérifie l'état de la connexion Google OAuth2 et la validité du jeton d'accès pour la BDD et Gmail."""
+    from infrastructure import runtime_env
     from infrastructure.google.drive import GoogleDriveClient
     from infrastructure.firestore.cloud_database import CloudDatabase
-    
+
+    backend = (SecretStore.get_secret("MEMBER_BACKEND") or "firestore").strip().lower()
+
+    if runtime_env.is_dev():
+        db_ready = CloudDatabase.cache_ready() if CloudDatabase.is_enabled() else True
+        return GoogleStatus(
+            status="connected",
+            valid=True,
+            configured=True,
+            client_id_configured=True,
+            refresh_token_present=True,
+            user_email="dev-emulator@alj-escalade.fr",
+            backend=backend,
+            db_accessible=db_ready,
+            error="",
+        )
+
     client_id, client_secret = GoogleDriveClient.get_client_credentials()
     refresh_token = SecretStore.get_secret("GMAIL_REFRESH_TOKEN")
     user_email = SecretStore.get_secret("GMAIL_USER_EMAIL")
-    backend = (SecretStore.get_secret("MEMBER_BACKEND") or "firestore").strip().lower()
 
     configured = bool(client_id and refresh_token)
     valid = False

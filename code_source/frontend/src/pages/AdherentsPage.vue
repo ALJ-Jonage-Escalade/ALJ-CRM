@@ -43,6 +43,7 @@ import {
   diplomeWeight,
   filterMembers,
   groupChecked,
+  isCompetitor,
   loadFilters,
   loadPanelOpen,
   OTHER_PREFIX,
@@ -91,7 +92,12 @@ const all = computed<readonly Member[]>(() => membersList.value?.members ?? []);
 const items = computed(() => creneauItems(membersList.value?.creneaux ?? []));
 const counts = computed(() => tarifCounts(all.value, items.value));
 const otherTarifs = computed(() => Object.keys(counts.value.others).sort((a, b) => a.localeCompare(b, "fr")));
-const shown = computed(() => filterMembers(all.value, filters.value, allowedTarifs(items.value, counts.value, filters.value)));
+const competitorsOnly = ref(false);
+const competitorCount = computed(() => all.value.filter(isCompetitor).length);
+const shown = computed(() => {
+  const filtered = filterMembers(all.value, filters.value, allowedTarifs(items.value, counts.value, filters.value));
+  return competitorsOnly.value ? filtered.filter(isCompetitor) : filtered;
+});
 const chips = computed(() => statusChips(all.value));
 const summary = computed(() =>
   membersList.value ? countSummary(shown.value.length, all.value.length, season.value) : "Chargement des données…",
@@ -135,10 +141,22 @@ function toggleStatus(value: string): void {
 }
 
 // The table goes back to its first page when the filters or the season change
-const resetKey = computed(() => [season.value, filters.value.status, filters.value.search, filters.value.groups, filters.value.others]);
+const resetKey = computed(() => [
+  season.value,
+  filters.value.status,
+  filters.value.search,
+  filters.value.groups,
+  filters.value.others,
+  competitorsOnly.value,
+]);
 
 const COLUMNS: DataColumn<Member>[] = [
-  { id: "last_name", label: "Nom", value: (m) => m.last_name, class: "font-bold" },
+  {
+    id: "last_name",
+    label: "Nom",
+    value: (m) => (isCompetitor(m) ? `🏆 ${m.last_name}` : m.last_name),
+    class: "font-bold",
+  },
   { id: "first_name", label: "Prénom", value: (m) => m.first_name },
   {
     id: "order_date",
@@ -414,7 +432,25 @@ const linkButton =
         <UiButton variant="muted" small data-testid="export-csv" title="Télécharger la liste affichée en fichier CSV" @click="exportCsv">
           📥 Export CSV
         </UiButton>
-        <a href="/bureau/outils?tab=ffme" :class="linkButton" title="Ouvrir l'export officiel FFME">🇫🇷 Export FFME</a>
+        <a
+          v-if="role === 'admin'"
+          href="/bureau/outils?tab=ffme"
+          :class="linkButton"
+          data-testid="export-ffme"
+          title="Ouvrir l'export officiel FFME"
+        >
+          🇫🇷 Export FFME
+        </a>
+        <button
+          v-else
+          type="button"
+          disabled
+          :class="[linkButton, 'cursor-not-allowed opacity-50']"
+          data-testid="export-ffme"
+          title="Réservé aux administrateurs"
+        >
+          🇫🇷 Export FFME
+        </button>
         <a
           v-if="role === 'admin'"
           href="/bureau/outils?tab=ffme-import"
@@ -511,6 +547,17 @@ const linkButton =
             @click="toggleStatus(c.value)"
           >
             {{ c.label }} ({{ c.count }})
+          </button>
+          <button
+            type="button"
+            :class="[
+              'cursor-pointer rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors',
+              competitorsOnly ? 'border-purple-600 bg-purple-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+            ]"
+            data-testid="filter-competitors"
+            @click="competitorsOnly = !competitorsOnly"
+          >
+            🏆 Compétiteurs ({{ competitorCount }})
           </button>
         </div>
         <span data-testid="member-count" class="text-xs text-slate-500">{{ summary }}</span>

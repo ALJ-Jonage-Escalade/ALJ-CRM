@@ -117,10 +117,10 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
             type="button"
             data-testid="remove"
             :class="[action, 'border-red-200 text-red-600 hover:bg-red-50']"
-            title="Retirer de l'épreuve (aucun paiement reçu)"
+            title="Supprimer ce compétiteur de la compétition"
             @click="emit('remove')"
           >
-            ✕ Retirer
+            🗑️ Supprimer
           </button>
           <button
             type="button"

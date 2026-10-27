@@ -96,10 +96,10 @@ dans le bon répertoire de travail.
 
 | Script | Rôle |
 |---|---|
-| `scripts/lancer_site_web.bat` | Serveur web local → http://127.0.0.1:8000/bureau/ ; compile d'abord l'interface (`npm run build`, nécessite [Node.js](https://nodejs.org/)) |
+| `scripts/lancer_site_web.bat` | Environnement dev local (Docker emulator + Mailpit, backend :8080, frontend Vite :5173 → http://localhost:5173/bureau/) |
 | `scripts/deploy_cloud_run.bat` | Déploiement en production (appelle `code_source/scripts/deploy_cloud_run.bat`) |
 | `scripts/backup_projet.ps1` | Sauvegarde ZIP du projet (`.\scripts\backup_projet.ps1 [-Destination E:\]`) |
-| `code_source/scripts/lancer_site_web.bat` | Serveur web local |
+| `code_source/scripts/lancer_site_web.bat` | Environnement dev local |
 | `code_source/scripts/deploy_cloud_run.sh` / `.bat` | Déploiement Cloud Run (voir plus bas) |
 
 ## Tests

@@ -27,6 +27,9 @@ export function createCompetitionsApi(client: ApiClient) {
       ),
     remove: (competitionId: number) => unwrap(client.DELETE("/api/competitions/{competition_id}", competition(competitionId))),
     archivePast: () => unwrap(client.POST("/api/competitions/archive-past")),
+    /** Scrapes MyCompet FFME for competition title and metadata from its ID number. */
+    lookupFfme: (idFfme: string) =>
+      unwrap(client.GET("/api/competitions/lookup-ffme/{id_ffme}", { params: { path: { id_ffme: idFfme } } })),
     /** url "": the server looks for the competition's page on MyCompet itself. */
     fetchResults: (competitionId: number, url: string) =>
       unwrap(

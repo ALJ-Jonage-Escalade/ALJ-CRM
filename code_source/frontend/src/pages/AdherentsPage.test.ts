@@ -224,7 +224,11 @@ describe("AdherentsPage", () => {
     await flushPromises();
     expect(byId("member-add").exists()).toBe(false);
     expect(wrapper.find('a[href="/bureau/outils?tab=ffme-import"]').exists()).toBe(false);
-    expect(wrapper.find('a[href="/bureau/outils?tab=ffme"]').exists()).toBe(true);
+    expect(wrapper.find('a[href="/bureau/outils?tab=ffme"]').exists()).toBe(false);
+    const ffmeBtn = wrapper.find('button[data-testid="export-ffme"]');
+    expect(ffmeBtn.exists()).toBe(true);
+    expect(ffmeBtn.attributes("disabled")).toBeDefined();
+    expect(ffmeBtn.attributes("title")).toBe("Réservé aux administrateurs");
   });
 
   it("opens the record of a member from the list: a coach can e-mail but not edit", async () => {

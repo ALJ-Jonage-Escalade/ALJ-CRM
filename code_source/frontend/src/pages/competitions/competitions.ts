@@ -76,6 +76,46 @@ export function period(c: Competition): string {
   return end && end > start ? `${formatDayText(start)} → ${formatDayText(end)}` : formatDayText(start);
 }
 
+/** « 31/10/2026 » ou « 31/10 au 01/11/2026 » si sur deux jours. */
+export function formatCompetitionPeriod(c: Competition): string {
+  const start = c.date_competition ?? "";
+  if (!start) {
+    return "sans date";
+  }
+  const end = c.date_fin ?? "";
+  const startText = formatDayText(start);
+  if (!end || end <= start) {
+    return startText;
+  }
+  const endText = formatDayText(end);
+  if (startText.length === 10 && endText.length === 10 && startText.slice(6) === endText.slice(6)) {
+    return `${startText.slice(0, 5)} au ${endText}`;
+  }
+  return `${startText} au ${endText}`;
+}
+
+/** Calcule la saison sportive (ex. 2026-2027) à partir d'une date ISO. */
+export function competitionSeason(dateStr?: string): string {
+  if (!dateStr) {
+    return "";
+  }
+  const parts = dateStr.slice(0, 10).split("-");
+  if (parts.length < 3) {
+    return "";
+  }
+  const yearStr = parts[0];
+  const monthStr = parts[1];
+  if (!yearStr || !monthStr) {
+    return "";
+  }
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  if (isNaN(year) || isNaN(month)) {
+    return "";
+  }
+  return month >= 9 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+}
+
 /** The discipline, when it says more than « escalade » (pass-through field of the office page). */
 export function discipline(c: Competition): string {
   const t = (c.type ?? "").trim();

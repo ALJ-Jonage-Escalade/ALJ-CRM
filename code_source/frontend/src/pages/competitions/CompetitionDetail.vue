@@ -18,6 +18,10 @@ import { csvBlob } from "../../lib/csv";
 import { saveFile } from "../../lib/download";
 import { formatEuros } from "../../lib/format";
 import CompetitionForm from "./CompetitionForm.vue";
+import CompetitionCharts from "./CompetitionCharts.vue";
+import CovoiturageSection from "./CovoiturageSection.vue";
+import ProgrammeSection from "./ProgrammeSection.vue";
+import ResultsSection from "./ResultsSection.vue";
 import {
   countLine,
   counts,
@@ -107,8 +111,8 @@ async function remove(): Promise<void> {
   if (
     !(await dialogs.confirm({
       title: "Supprimer la compétition",
-      message: `Supprimer définitivement « ${c.value.nom} » et sa liste de compétiteurs ?`,
-      confirmLabel: "Supprimer",
+      message: "Êtes-vous sûr de vouloir supprimer cette compétition ?",
+      confirmLabel: "Confirmer",
       variant: "danger",
     }))
   ) {
@@ -133,8 +137,18 @@ async function archive(archived: boolean): Promise<void> {
   });
 }
 
+const addMemberDialogOpen = ref(false);
+
 function exportCsv(): void {
   saveFile(csvBlob(participantCsv(props.rows)), csvName(c.value));
+}
+
+function exportExcel(): void {
+  window.open(`/api/competitions/${c.value.id}/export-excel`, "_blank");
+}
+
+function exportPdf(): void {
+  window.open(`/api/competitions/${c.value.id}/export-pdf`, "_blank");
 }
 
 // ---------------------------------------------------------------- MyCompet results
@@ -280,16 +294,16 @@ async function pay(amount: number): Promise<void> {
 async function removeOne(r: Row): Promise<void> {
   if (
     !(await dialogs.confirm({
-      title: "Retirer le compétiteur",
-      message: `Retirer ${named(r)} de cette compétition ?\n(L'adhérent reste dans la base du club.)`,
-      confirmLabel: "Retirer",
+      title: "Supprimer le compétiteur",
+      message: "Êtes-vous sûr de vouloir supprimer ce compétiteur de la compétition ?",
+      confirmLabel: "Confirmer",
       variant: "danger",
     }))
   ) {
     return;
   }
   await writer.run(() => competitionsApi.removeParticipant(c.value.id, r.adherent_id!), {
-    done: `🗑 ${named(r)} retiré(e) de l'épreuve.`,
+    done: `🗑 ${named(r)} supprimé(e) de l'épreuve.`,
   });
 }
 
@@ -388,15 +402,18 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         data-testid="detail-actions"
       >
         <UiButton variant="muted" small data-testid="edit-comp" @click="editing = true">✏️ Modifier</UiButton>
-        <UiButton variant="muted" small data-testid="email-comp" @click="emailing = true">✉️ E-mail aux compétiteurs</UiButton>
-        <!-- The actions rarely needed (the results are also fetched every night) -->
+        <UiButton variant="muted" small danger data-testid="delete-comp" :disabled="writer.busy.value" @click="remove">
+          🗑️ Supprimer
+        </UiButton>
+        <!-- Actions secondaires -->
         <UiMenu label="⋯ Plus" small :busy="fetching && 'Recherche MyCompet…'" aria-label="Plus d'actions" data-testid="detail-more">
           <UiMenuItem data-testid="fetch-results" @select="fetchResults()">🏆 Trouver les résultats</UiMenuItem>
           <UiMenuItem data-testid="export-csv" :disabled="!rows.length" @select="exportCsv">📥 Export CSV</UiMenuItem>
+          <UiMenuItem data-testid="export-excel-menu" :disabled="!rows.length" @select="exportExcel">📊 Export Excel</UiMenuItem>
+          <UiMenuItem data-testid="export-pdf-menu" :disabled="!rows.length" @select="exportPdf">📄 Export PDF</UiMenuItem>
           <UiMenuItem :data-testid="isArchived(c) ? 'unarchive-comp' : 'archive-comp'" @select="archive(!isArchived(c))">
             {{ isArchived(c) ? "♻️ Désarchiver" : "📦 Archiver" }}
           </UiMenuItem>
-          <UiMenuItem danger data-testid="delete-comp" :disabled="writer.busy.value" @select="remove">🗑️ Supprimer</UiMenuItem>
         </UiMenu>
       </div>
     </div>
@@ -408,7 +425,33 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       </div>
     </div>
 
+    <!-- Graphiques de répartition (catégorie et discipline) -->
+    <CompetitionCharts :competition="c" :rows="rows" />
+
+    <!-- Programme et horaires -->
+    <ProgrammeSection :competition-id="c.id" :can-write="canWrite" />
+
+    <!-- Covoiturage -->
+    <CovoiturageSection :competition-id="c.id" />
+
+    <!-- Résultats officiels MyCompet -->
+    <ResultsSection :competition="c" :rows="rows" :can-write="canWrite" :fetching="fetching" @fetch-results="fetchResults()" />
+
     <div :class="wide ? 'order-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm' : ''">
+      <!-- En-tête avec boutons d'actions compétiteurs -->
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+        <h3 class="text-sm font-bold text-slate-800">Compétiteurs ({{ rows.length }})</h3>
+        <div v-if="canWrite" class="flex flex-wrap items-center gap-1.5" data-testid="table-header-actions">
+          <UiButton small data-testid="add-competitor-btn" @click="addMemberDialogOpen = true">➕ Ajouter un compétiteur</UiButton>
+          <UiButton variant="muted" small data-testid="email-comp" @click="emailing = true">✉️ Envoyer un email aux compétiteurs</UiButton>
+          <UiButton variant="muted" small data-testid="export-excel-btn" :disabled="!rows.length" @click="exportExcel">
+            📊 Exporter la liste des compétiteurs (Excel)
+          </UiButton>
+          <UiButton variant="muted" small data-testid="export-pdf-btn" :disabled="!rows.length" @click="exportPdf">
+            📄 Exporter la liste des compétiteurs (PDF)
+          </UiButton>
+        </div>
+      </div>
       <div class="mb-2 flex flex-wrap items-center gap-1.5">
         <input
           v-if="wide"
@@ -665,6 +708,47 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         "
         @cancel="emailing = false"
       />
+    </UiDialog>
+
+    <!-- Modal Ajouter un compétiteur -->
+    <UiDialog v-model:open="addMemberDialogOpen" title="➕ Ajouter un compétiteur" data-testid="add-competitor-dialog">
+      <div class="flex flex-col gap-3">
+        <p class="text-xs text-slate-600">
+          Recherchez un adhérent du club par son nom, prénom ou numéro de licence pour l'inscrire à cette compétition.
+        </p>
+        <input
+          v-model="memberSearch"
+          type="search"
+          data-testid="member-search-modal"
+          placeholder="Nom, prénom ou licence (2 lettres au moins)…"
+          :class="field"
+        />
+        <ul class="max-h-60 overflow-y-auto flex flex-col divide-y divide-slate-100">
+          <li v-for="m in matches" :key="m.id!" data-testid="member-result-modal" class="flex items-center justify-between gap-2 py-2">
+            <span class="min-w-0">
+              <b class="text-[13px] text-slate-800">{{ m.nom }} {{ m.prenom }}</b>
+              <span class="block text-xs text-slate-500">🪪 {{ m.licence_ffme || "sans licence" }} · {{ m.tarif || "—" }}</span>
+            </span>
+            <UiButton
+              small
+              data-testid="member-add-modal"
+              :disabled="writer.busy.value"
+              @click="
+                add(m);
+                addMemberDialogOpen = false;
+              "
+            >
+              ➕ Inscrire
+            </UiButton>
+          </li>
+          <li v-if="memberSearch.trim().length >= 2 && !matches.length" class="text-xs text-slate-500 py-4 text-center">
+            {{ members.length ? "Aucun adhérent trouvé (ou déjà inscrit)." : "Annuaire des adhérents indisponible." }}
+          </li>
+        </ul>
+        <UiDialogActions>
+          <UiButton variant="muted" @click="addMemberDialogOpen = false">Fermer</UiButton>
+        </UiDialogActions>
+      </div>
     </UiDialog>
   </section>
 </template>

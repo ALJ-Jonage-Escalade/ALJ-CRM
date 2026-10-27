@@ -49,15 +49,23 @@ export function variables(c: Competition, r: Row | undefined): Record<string, st
   const start = formatDayText(c.date_competition ?? "");
   const end = formatDayText(c.date_fin ?? "");
   const wa = (c.whatsapp_link ?? "").trim();
+  const dateFormatted = !end || end === start || !start ? start : `${start} au ${end}`;
+  const lieu = (c.lieu ?? "").trim();
   return {
     first_name: (r?.prenom ?? "").trim(),
     last_name: (r?.nom ?? "").trim().toUpperCase(),
+    prenom: (r?.prenom ?? "").trim(),
+    nom: (r?.nom ?? "").trim().toUpperCase(),
     num_licence: r?.num_licence ?? "",
-    nom: c.nom ?? "",
+    nom_competition: c.nom ?? "",
     name_competition: c.nom ?? "",
+    competition_nom: c.nom ?? "",
     no_competition: c.id_ffme ?? "",
     montant_competition: amountText(c.prix),
-    date_competition: !end || end === start || !start ? start : `${start} au ${end}`,
+    date_competition: dateFormatted,
+    competition_date: dateFormatted,
+    lieu,
+    competition_lieu: lieu,
     whatapp_id: wa,
     whatsapp_link: wa,
     bloc_whatsapp: wa ? `Voici le lien du groupe WhatApp dédié à cette compétition : ${wa}` : "",

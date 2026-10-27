@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 import os
+import re
 import requests
 import lxml.html
 import pandas as pd
@@ -339,3 +342,199 @@ def find_mycompet_result_url(comp_nom: str, comp_date: str = "", comp_lieu: str 
         print(f"⚠️ [MYCOMPET] Erreur sonde récente MyCompet : {e}")
 
     return ""
+
+
+def _parse_dates_to_iso(date_str: str) -> tuple[str | None, str | None]:
+    """Extrait les dates de début et de fin au format ISO AAAA-MM-JJ.
+
+    Prend en charge une date unique (JJ/MM/AAAA) ou un intervalle (ex. JJ/MM/AAAA-JJ/MM/AAAA,
+    JJ/MM/AAAA au JJ/MM/AAAA, JJ/MM/AAAA JJ/MM/AAAA, etc.).
+    Retourne (date_debut, date_fin). Si une seule date est présente, date_fin == date_debut.
+    """
+    if not date_str:
+        return None, None
+    matches = re.findall(r"(\d{2})/(\d{2})/(\d{4})", date_str)
+    if not matches:
+        return None, None
+    start = f"{matches[0][2]}-{matches[0][1]}-{matches[0][0]}"
+    if len(matches) >= 2:
+        end = f"{matches[1][2]}-{matches[1][1]}-{matches[1][0]}"
+    else:
+        end = start
+    return start, end
+
+
+def _parse_date_to_iso(date_str: str) -> str | None:
+    """Convertit une date au format JJ/MM/AAAA en AAAA-MM-JJ pour les formulaires HTML."""
+    start, _ = _parse_dates_to_iso(date_str)
+    return start
+
+
+def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | None]:
+    """Récupère les informations d'une compétition FFME sur MyCompet à partir de son numéro.
+
+    Interroge le serveur MyCompet (protocole Echo.Sync) pour filtrer par numéro d'épreuve et
+    extraire le titre officiel, la discipline, les dates et le lieu.
+    """
+    import re
+    import secrets
+    import time
+    from services.errors import InvalidRequest, NotFound, StorageUnavailable
+
+    comp_id_str = str(competition_id).strip()
+    if not comp_id_str.isdigit():
+        raise InvalidRequest(f"Numéro de compétition FFME invalide : '{competition_id}' (chiffres uniquement).")
+
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Language": "fr-FR,fr;q=0.9",
+    })
+
+    try:
+        resp_entry = session.get("https://mycompet.ffme.fr/action/competitions", timeout=10)
+    except requests.RequestException as err:
+        logger.warning("Échec de connexion initiale à MyCompet : %s", err)
+        raise StorageUnavailable("Impossible de joindre le serveur MyCompet FFME.") from err
+
+    if resp_entry.status_code != 200:
+        raise StorageUnavailable(f"MyCompet a répondu avec le statut HTTP {resp_entry.status_code}.")
+
+    match_init = re.search(r"Echo\.Boot\.boot\('(/app)',\s*'(\d+)'", resp_entry.text)
+    init_id = match_init.group(2) if match_init else "0"
+    window_id = f"{int(time.time() * 1000):x}.{secrets.token_hex(4)}"
+
+    sync_headers = {
+        "Content-Type": "text/xml;charset=utf-8",
+        "Referer": "https://mycompet.ffme.fr/app",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+
+    # 1. Message d'initialisation Echo.Sync
+    init_xml = (
+        f'<cmsg xmlns="http://www.nextapp.com/products/echo/svrmsg/clientmessage.3.0" t="init" w="{window_id}" ii="{init_id}" i="0">'
+        '<dir xmlns="" proc="ClientProperties">'
+        '<p n="screenWidth">1920</p><p n="screenHeight">1080</p><p n="screenColorDepth">24</p><p n="utcOffset">60</p>'
+        '<p n="navigatorAppName">Netscape</p><p n="navigatorCookieEnabled">true</p>'
+        '<p n="navigatorLanguage">fr</p><p n="navigatorPlatform">Win32</p>'
+        '<p n="browserChrome">true</p><p n="browserVersionMajor">120</p><p n="engineWebKit">true</p>'
+        '</dir><dir xmlns="" proc="CSync"/></cmsg>'
+    )
+    try:
+        session.post("https://mycompet.ffme.fr/app?sid=Echo.Sync", data=init_xml.encode("utf-8"), headers=sync_headers, timeout=10)
+    except requests.RequestException as err:
+        logger.warning("Échec de l'initialisation Echo.Sync MyCompet : %s", err)
+        raise StorageUnavailable("Erreur lors de l'initialisation de session sur MyCompet.") from err
+
+    # 2. Ouverture de la vue Calendrier des compétitions (composant C.34)
+    cal_xml = (
+        '<cmsg xmlns="http://www.nextapp.com/products/echo/svrmsg/clientmessage.3.0" i="1">'
+        '<dir xmlns="" proc="CFocus"><focus i="C.34"/></dir>'
+        '<dir xmlns="" proc="CSync"><e t="action" i="C.34"/></dir></cmsg>'
+    )
+    try:
+        resp_cal = session.post(
+            "https://mycompet.ffme.fr/app?sid=Echo.Sync",
+            data=cal_xml.encode("utf-8"),
+            headers=sync_headers,
+            timeout=10,
+        )
+    except requests.RequestException as err:
+        logger.warning("Échec de l'ouverture du calendrier MyCompet : %s", err)
+        raise StorageUnavailable("Erreur lors du chargement du calendrier MyCompet.") from err
+
+    # 3. Filtrage par numéro de compétition
+    match_id_field = re.search(r'<c i="([^"]+)" t="RTF"><s>Grid</s><p n="toolTipText">CompetitionAdm\.c\.id\.tt</p>', resp_cal.text)
+    seq = 1
+    xml_table = resp_cal.text
+    if match_id_field:
+        field_id = match_id_field.group(1)
+        seq += 1
+        filter_xml = (
+            f'<cmsg xmlns="http://www.nextapp.com/products/echo/svrmsg/clientmessage.3.0" i="{seq}">'
+            f'<dir xmlns="" proc="CFocus"><focus i="{field_id}"/></dir>'
+            f'<dir xmlns="" proc="CSync"><p i="{field_id}" n="text">{comp_id_str}</p><e t="action" i="{field_id}"/></dir></cmsg>'
+        )
+        try:
+            resp_filter = session.post(
+                "https://mycompet.ffme.fr/app?sid=Echo.Sync",
+                data=filter_xml.encode("utf-8"),
+                headers=sync_headers,
+                timeout=10,
+            )
+            xml_table = resp_filter.text
+        except requests.RequestException as err:
+            logger.warning("Échec du filtre MyCompet : %s", err)
+            raise StorageUnavailable("Erreur lors du filtrage sur MyCompet.") from err
+
+    # 4. Détection de la ligne de résultat
+    match_row = re.search(rf'<p n="text">{re.escape(comp_id_str)}</p>(.*?)(?:<p n="text">\d{{5}}</p>|$)', xml_table, re.DOTALL)
+    if not match_row:
+        raise NotFound(f"Compétition n°{comp_id_str} introuvable sur MyCompet FFME.")
+
+    row_snippet = match_row.group(1)
+    match_title = re.search(r'<p n="text">([^<]+)</p>', row_snippet)
+    title = match_title.group(1).strip() if match_title else ""
+
+    info: dict[str, str | None] = {
+        "id_ffme": comp_id_str,
+        "nom": title,
+        "date_competition": None,
+        "date_fin": None,
+        "lieu": None,
+        "type": None,
+    }
+
+    # 5. Clic sur le bouton DÉTAILS pour extraire toutes les caractéristiques
+    match_btn = re.search(r'<c i="([^"]+)" t="B"[^>]*>.*?<p n="text">DÉTAILS</p>', row_snippet, re.DOTALL)
+    if match_btn:
+        btn_id = match_btn.group(1)
+        seq += 1
+        detail_xml = (
+            f'<cmsg xmlns="http://www.nextapp.com/products/echo/svrmsg/clientmessage.3.0" i="{seq}">'
+            f'<dir xmlns="" proc="CFocus"><focus i="{btn_id}"/></dir>'
+            f'<dir xmlns="" proc="CSync"><e t="action" i="{btn_id}"/></dir></cmsg>'
+        )
+        try:
+            resp_det = session.post(
+                "https://mycompet.ffme.fr/app?sid=Echo.Sync",
+                data=detail_xml.encode("utf-8"),
+                headers=sync_headers,
+                timeout=10,
+            )
+            det_text = resp_det.text
+            pairs = dict(
+                re.findall(r'<p n=.text.>([^<]+?)\s*</p></c><c[^>]*><s>publicItemValue[^<]*</s><p n=.text.>([^<]+)</p>', det_text)
+            )
+
+            if "Nom" in pairs and pairs["Nom"].strip():
+                info["nom"] = pairs["Nom"].strip()
+
+            if "Date de la compétition" in pairs:
+                start_iso, end_iso = _parse_dates_to_iso(pairs["Date de la compétition"])
+                if start_iso:
+                    info["date_competition"] = start_iso
+                    info["date_fin"] = end_iso
+
+            if "ville" in pairs and pairs["ville"].strip():
+                info["lieu"] = pairs["ville"].strip()
+            elif "Adresse" in pairs and pairs["Adresse"].strip():
+                info["lieu"] = pairs["Adresse"].strip()
+
+            if "Discipline" in pairs:
+                disc = pairs["Discipline"].strip()
+                disc_lower = disc.lower()
+                if "bloc" in disc_lower:
+                    info["type"] = "Bloc"
+                elif "diff" in disc_lower:
+                    info["type"] = "Difficulté"
+                elif "vitesse" in disc_lower:
+                    info["type"] = "Vitesse"
+                else:
+                    info["type"] = disc
+        except requests.RequestException:
+            logger.debug("Échec de la récupération des détails de la compétition %s", comp_id_str, exc_info=True)
+
+    return info
+

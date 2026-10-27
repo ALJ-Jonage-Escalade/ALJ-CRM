@@ -21,11 +21,15 @@ import BalancePane from "./competitions/BalancePane.vue";
 import CoachesPane from "./competitions/CoachesPane.vue";
 import CompetitionDetail from "./competitions/CompetitionDetail.vue";
 import CompetitionForm from "./competitions/CompetitionForm.vue";
+import CompetitionTable from "./competitions/CompetitionTable.vue";
+import CompetitionCalendar from "./competitions/CompetitionCalendar.vue";
 import {
+  competitionSeason,
   counts,
   discipline,
   disciplineColor,
   filterCompetitions,
+  formatCompetitionPeriod,
   hasResults,
   isArchived,
   isPast,
@@ -170,14 +174,29 @@ const today = todayIso();
 const all = computed(() => sortCompetitions(competitions.data.value ?? []));
 const search = ref("");
 const when = ref<When>("all");
-const current = computed(() =>
-  filterCompetitions(
-    all.value.filter((c) => !isArchived(c)),
-    search.value,
-    when.value,
-    today,
-  ),
-);
+const selectedSeason = ref("2026-2027");
+const seasons = computed(() => {
+  const set = new Set<string>();
+  set.add("2026-2027");
+  all.value.forEach((c) => {
+    const s = competitionSeason(c.date_competition);
+    if (s) {
+      set.add(s);
+    }
+  });
+  return Array.from(set).sort().reverse();
+});
+
+type ViewMode = "cards" | "table" | "calendar";
+const viewMode = ref<ViewMode>("cards");
+
+const current = computed(() => {
+  let list = all.value.filter((c) => !isArchived(c));
+  if (selectedSeason.value && selectedSeason.value !== "all") {
+    list = list.filter((c) => competitionSeason(c.date_competition) === selectedSeason.value);
+  }
+  return filterCompetitions(list, search.value, when.value, today);
+});
 const archivedCompetitions = computed(() => filterCompetitions(all.value.filter(isArchived), search.value, when.value, today));
 const pastCompetitions = computed(() => all.value.filter((c) => !isArchived(c) && isPast(c, today)));
 const showArchived = ref(false);
@@ -201,6 +220,47 @@ const rows = computed(() =>
 );
 
 const creating = ref(false);
+const editingCompetition = ref<Competition | null>(null);
+const editDialogOpen = computed({
+  get: () => Boolean(editingCompetition.value),
+  set: (val: boolean) => {
+    if (!val) {
+      editingCompetition.value = null;
+    }
+  },
+});
+
+function editFromTable(c: Competition): void {
+  editingCompetition.value = c;
+}
+
+async function saveFromTable(body: Schemas["CompetitionCreate"]): Promise<void> {
+  if (!editingCompetition.value) {
+    return;
+  }
+  const id = editingCompetition.value.id;
+  const ok = await writer.run(() => competitionsApi.update(id, body), {
+    done: "✅ Compétition mise à jour.",
+  });
+  if (ok) {
+    editingCompetition.value = null;
+  }
+}
+
+async function removeFromTable(c: Competition): Promise<void> {
+  const ok = await dialogs.confirm({
+    title: "Supprimer la compétition",
+    message: "Êtes-vous sûr de vouloir supprimer cette compétition ?",
+    confirmLabel: "Confirmer",
+    variant: "danger",
+  });
+  if (!ok) {
+    return;
+  }
+  await writer.run(() => competitionsApi.remove(c.id), {
+    done: "🗑 Compétition supprimée.",
+  });
+}
 
 async function create(body: Schemas["CompetitionCreate"]): Promise<void> {
   const created = await writer.run(() => competitionsApi.create(body), { done: "✅ Compétition créée." });
@@ -273,17 +333,31 @@ const tab = (active: boolean) => [
 
 <template>
   <AppShell page="competitions" title="Compétitions" :sync="syncInfo">
-    <nav v-if="canWrite" aria-label="Sections des compétitions" class="mb-3 flex gap-1.5 overflow-x-auto" data-testid="sections">
-      <RouterLink
-        v-for="s in SECTIONS"
-        :key="s.id"
-        :to="{ query: s.id === 'competitions' ? {} : { section: s.id } }"
-        :data-testid="`section-${s.id}`"
-        :aria-current="section === s.id ? 'page' : undefined"
-        :class="tab(section === s.id)"
+    <nav
+      v-if="canWrite"
+      aria-label="Sections des compétitions"
+      class="mb-3 flex flex-wrap items-center justify-between gap-2"
+      data-testid="sections"
+    >
+      <div class="flex gap-1.5 overflow-x-auto">
+        <RouterLink
+          v-for="s in SECTIONS"
+          :key="s.id"
+          :to="{ query: s.id === 'competitions' ? {} : { section: s.id } }"
+          :data-testid="`section-${s.id}`"
+          :aria-current="section === s.id ? 'page' : undefined"
+          :class="tab(section === s.id)"
+        >
+          {{ s.label }}
+        </RouterLink>
+      </div>
+      <UiButton
+        small
+        data-testid="top-create-comp"
+        @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')"
       >
-        {{ s.label }}
-      </RouterLink>
+        ➕ Ajouter une compétition
+      </UiButton>
     </nav>
 
     <HelloAssoPane
@@ -305,6 +379,7 @@ const tab = (active: boolean) => [
       <section
         :class="[
           selected ? 'hidden md:block' : '',
+          viewMode !== 'cards' ? 'md:col-span-2' : '',
           'md:sticky md:top-3 md:max-h-[calc(100dvh-1.5rem)] md:overflow-y-auto md:rounded-xl md:border md:border-slate-200 md:bg-white md:p-3 md:shadow-sm',
         ]"
         aria-label="Liste des compétitions"
@@ -321,6 +396,57 @@ const tab = (active: boolean) => [
             📦 Archiver les passées ({{ pastCompetitions.length }})
           </UiButton>
         </div>
+
+        <!-- Filtre saison et sélecteur de mode de vue -->
+        <div class="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          <div class="flex items-center gap-1.5 text-xs">
+            <span class="font-semibold text-slate-500">Saison :</span>
+            <select
+              v-model="selectedSeason"
+              data-testid="comp-season-filter"
+              class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
+            >
+              <option value="all">Toutes les saisons</option>
+              <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
+            </select>
+          </div>
+          <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium" data-testid="view-switcher">
+            <button
+              type="button"
+              :class="[
+                'px-2 py-1 rounded-md cursor-pointer transition-colors',
+                viewMode === 'cards' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
+              ]"
+              data-testid="view-cards"
+              @click="viewMode = 'cards'"
+            >
+              🗂️ Cartes
+            </button>
+            <button
+              type="button"
+              :class="[
+                'px-2 py-1 rounded-md cursor-pointer transition-colors',
+                viewMode === 'table' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
+              ]"
+              data-testid="view-table"
+              @click="viewMode = 'table'"
+            >
+              📋 Tableau
+            </button>
+            <button
+              type="button"
+              :class="[
+                'px-2 py-1 rounded-md cursor-pointer transition-colors',
+                viewMode === 'calendar' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
+              ]"
+              data-testid="view-calendar"
+              @click="viewMode = 'calendar'"
+            >
+              📅 Calendrier
+            </button>
+          </div>
+        </div>
+
         <div class="flex flex-wrap items-center gap-1.5 mb-2">
           <input
             v-model="search"
@@ -342,7 +468,19 @@ const tab = (active: boolean) => [
           </button>
         </div>
         <p class="mb-2 text-xs text-slate-500" data-testid="comp-count">{{ listLine }}</p>
-        <ul class="flex flex-col gap-2">
+
+        <!-- Vue Tableau -->
+        <div v-if="viewMode === 'table'" class="mb-3">
+          <CompetitionTable :competitions="current" :can-write="canWrite" @edit="editFromTable" @remove="removeFromTable" />
+        </div>
+
+        <!-- Vue Calendrier -->
+        <div v-else-if="viewMode === 'calendar'" class="mb-3">
+          <CompetitionCalendar :competitions="current" />
+        </div>
+
+        <!-- Vue Cartes (par défaut) -->
+        <ul v-else class="flex flex-col gap-2">
           <li
             v-if="competitions.data.value && !current.length"
             class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500"
@@ -365,7 +503,7 @@ const tab = (active: boolean) => [
                 selected?.id === competition.id ? 'border-accent' : 'border-slate-200',
               ]"
             >
-              <span class="flex flex-row justify-between pb-2">
+              <div class="flex items-start justify-between gap-2 pb-1">
                 <b class="block text-[15px]" data-testid="comp-name">
                   <span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆</span>
                   {{ competition.nom }}
@@ -374,13 +512,15 @@ const tab = (active: boolean) => [
                   v-if="discipline(competition)"
                   :color="disciplineColor(discipline(competition))"
                   variant="soft"
-                  class="ml-1"
+                  class="ml-1 shrink-0"
                   data-testid="discipline"
                 >
                   {{ discipline(competition) }}
                 </UiBadge>
+              </div>
+              <span class="block text-xs font-semibold text-slate-600 pb-1.5" data-testid="comp-period">
+                📅 {{ formatCompetitionPeriod(competition) }}
               </span>
-              <span class="block text-xs text-slate-500 pb-2">📅 {{ period(competition) }}</span>
               <span class="block text-xs text-slate-500">
                 🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}
               </span>
@@ -396,7 +536,7 @@ const tab = (active: boolean) => [
           </li>
         </ul>
         <button
-          v-if="archivedCompetitions.length"
+          v-if="archivedCompetitions.length && viewMode === 'cards'"
           type="button"
           data-testid="toggle-archives"
           :aria-expanded="showArchived"
@@ -405,7 +545,7 @@ const tab = (active: boolean) => [
         >
           {{ showArchived ? "🙈 Masquer les archives" : `🗂 Afficher les archives (${archivedCompetitions.length})` }}
         </button>
-        <ul v-if="showArchived" class="mt-2 flex flex-col gap-2" data-testid="archived-list">
+        <ul v-if="showArchived && viewMode === 'cards'" class="mt-2 flex flex-col gap-2" data-testid="archived-list">
           <li v-for="c in archivedCompetitions" :key="c.id">
             <RouterLink
               :to="{ query: { id: String(c.id) } }"
@@ -413,14 +553,14 @@ const tab = (active: boolean) => [
               class="block rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-slate-700 no-underline hover:border-accent"
             >
               <b class="block text-[14px]" data-testid="comp-name">{{ c.nom }}</b>
-              <span class="block text-xs text-slate-500">📅 {{ period(c) }} · 📦 Archivée</span>
+              <span class="block text-xs text-slate-500">📅 {{ formatCompetitionPeriod(c) }} · 📦 Archivée</span>
             </RouterLink>
           </li>
         </ul>
       </section>
 
       <CompetitionDetail
-        v-if="selected"
+        v-if="selected && viewMode === 'cards'"
         :key="selected.id"
         :competition="selected"
         :rows="rows"
@@ -432,7 +572,10 @@ const tab = (active: boolean) => [
         :outbox="outbox"
         :uid="uid"
       />
-      <p v-else class="hidden rounded-xl border border-dashed bg-white border-slate-300 px-4 py-10 text-center text-slate-500 md:block">
+      <p
+        v-else-if="viewMode === 'cards'"
+        class="hidden rounded-xl border border-dashed bg-white border-slate-300 px-4 py-10 text-center text-slate-500 md:block"
+      >
         {{
           selectedId && competitions.data.value ? "Compétition introuvable." : "Sélectionnez une compétition pour voir ses compétiteurs."
         }}
@@ -448,6 +591,18 @@ const tab = (active: boolean) => [
         @cancel="creating = false"
       />
     </UiDialog>
+
+    <UiDialog v-model:open="editDialogOpen" :title="`✏️ Modifier : ${editingCompetition?.nom}`" wide data-testid="edit-dialog">
+      <CompetitionForm
+        v-if="editingCompetition"
+        :competition="editingCompetition"
+        :coaches="coaches.data.value ?? []"
+        :busy="writer.busy.value"
+        @save="saveFromTable"
+        @cancel="editingCompetition = null"
+      />
+    </UiDialog>
+
     <UiToast :message="toast.message.value" />
   </AppShell>
 </template>

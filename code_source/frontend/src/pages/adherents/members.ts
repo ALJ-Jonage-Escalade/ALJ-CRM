@@ -20,6 +20,13 @@ export function normKey(s: string | null | undefined): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+/** Indique si un adhérent appartient à un groupe ou tarif compétition. */
+export function isCompetitor(m: Member): boolean {
+  const g = normKey(m.creneau_groupe);
+  const t = normKey(m.tarif_name);
+  return g.includes("competition") || t.includes("competition");
+}
+
 // ---------------------------------------------------------------- Slot groups and tariffs
 
 /** A line of the slot filter: a section title, a sub-section (birth years) or a slot group with its tariffs. */
