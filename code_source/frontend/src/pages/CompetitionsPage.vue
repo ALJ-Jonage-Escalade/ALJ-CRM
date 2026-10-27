@@ -12,7 +12,7 @@ import { AUTH_KEY } from "../composables/auth";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
 import { pageVerdict } from "../lib/access";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, formatEuros } from "../lib/format";
 import { CLIENT_KEY, type Schemas } from "../lib/client";
 import { createCompetitionsApi } from "../services/competitions";
 import { isStaff } from "../lib/roles";
@@ -219,6 +219,61 @@ const rows = computed(() =>
     : [],
 );
 
+// ---------------------------------------------------------------- Global statistics (when no competition is selected)
+
+const statsCompetitions = computed(() => {
+  let list = all.value.filter((c) => !isArchived(c));
+  if (selectedSeason.value && selectedSeason.value !== "all") {
+    list = list.filter((c) => competitionSeason(c.date_competition) === selectedSeason.value);
+  }
+  return list;
+});
+
+const statsTotalCompetitions = computed(() => statsCompetitions.value.length);
+const statsUpcomingCompetitions = computed(() => statsCompetitions.value.filter((c) => !isPast(c, today)).length);
+const statsPastCompetitions = computed(() => statsCompetitions.value.filter((c) => isPast(c, today)).length);
+
+const statsTotalCompetitors = computed(() => {
+  const set = new Set<string>();
+  for (const c of statsCompetitions.value) {
+    for (const p of c.participants ?? []) {
+      const key =
+        p.adherent_id != null ? String(p.adherent_id) : `${(p.nom ?? "").trim().toLowerCase()}_${(p.prenom ?? "").trim().toLowerCase()}`;
+      if (key && key !== "_") {
+        set.add(key);
+      }
+    }
+  }
+  return set.size;
+});
+
+const statsTotalParticipations = computed(() => statsCompetitions.value.reduce((acc, c) => acc + (c.participants?.length ?? 0), 0));
+
+const statsTotalBudget = computed(() => {
+  let total = 0;
+  for (const c of statsCompetitions.value) {
+    const price = Number(c.prix ?? 0);
+    if (!price) {
+      continue;
+    }
+    const parts = c.participants ?? [];
+    const selectedCount = parts.filter((p) => p.selectionne).length;
+    const count = selectedCount > 0 ? selectedCount : parts.length;
+    total += price * count;
+  }
+  return total;
+});
+
+const statsTotalPaid = computed(() => {
+  let total = 0;
+  for (const c of statsCompetitions.value) {
+    for (const p of c.participants ?? []) {
+      total += Number(p.montant_paye ?? 0);
+    }
+  }
+  return total;
+});
+
 const creating = ref(false);
 const editingCompetition = ref<Competition | null>(null);
 const editDialogOpen = computed({
@@ -373,14 +428,14 @@ const tab = (active: boolean) => [
 
     <div
       v-else
-      class="md:grid md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-start md:gap-4 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]"
+      class="flex flex-col md:grid md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-start md:gap-4 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]"
     >
       <!-- The competitions: always on desktop (a panel scrolling on its own), on phones until one is opened -->
       <section
         :class="[
           selected ? 'hidden md:block' : '',
           viewMode !== 'cards' ? 'md:col-span-2' : '',
-          'md:sticky md:top-3 md:max-h-[calc(100dvh-1.5rem)] md:overflow-y-auto md:rounded-xl md:border md:border-slate-200 md:bg-white md:p-3 md:shadow-sm',
+          'order-2 md:order-1 md:col-start-1 md:row-start-1 md:sticky md:top-3 md:max-h-[calc(100dvh-1.5rem)] md:overflow-y-auto md:rounded-xl md:border md:border-slate-200 md:bg-white md:p-3 md:shadow-sm',
         ]"
         aria-label="Liste des compétitions"
       >
@@ -571,15 +626,54 @@ const tab = (active: boolean) => [
         :contacts-shown="contactsShown"
         :outbox="outbox"
         :uid="uid"
+        class="order-1 min-w-0 md:order-2 md:col-start-2 md:row-start-1"
       />
-      <p
+      <div
         v-else-if="viewMode === 'cards'"
-        class="hidden rounded-xl border border-dashed bg-white border-slate-300 px-4 py-10 text-center text-slate-500 md:block"
+        class="order-1 flex min-w-0 flex-col gap-3 md:order-2 md:col-start-2 md:row-start-1"
+        data-testid="stats-no-selection"
       >
-        {{
-          selectedId && competitions.data.value ? "Compétition introuvable." : "Sélectionnez une compétition pour voir ses compétiteurs."
-        }}
-      </p>
+        <!-- Tuiles de statistiques -->
+        <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-3" data-testid="competitions-stats-tiles">
+          <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-competitions">
+            <div class="text-2xl font-black text-blue-700" data-testid="stats-total-competitions">
+              {{ statsTotalCompetitions }}
+            </div>
+            <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Compétitions au total</div>
+            <div class="mt-1 text-[11px] text-slate-400">
+              {{ statsUpcomingCompetitions }} à venir · {{ statsPastCompetitions }} passée{{ plural(statsPastCompetitions) }}
+            </div>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-competitors">
+            <div class="text-2xl font-black text-emerald-700" data-testid="stats-total-competitors">
+              {{ statsTotalCompetitors }}
+            </div>
+            <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Compétiteurs</div>
+            <div class="mt-1 text-[11px] text-slate-400">
+              {{ statsTotalParticipations }} inscription{{ plural(statsTotalParticipations) }} cumulée{{ plural(statsTotalParticipations) }}
+            </div>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-budget">
+            <div class="text-2xl font-black text-indigo-700" data-testid="stats-total-budget">
+              {{ formatEuros(statsTotalBudget) }}
+            </div>
+            <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Budget total</div>
+            <div class="mt-1 text-[11px] text-slate-400">
+              {{ formatEuros(statsTotalPaid) }} déjà réglé{{ plural(Math.round(statsTotalPaid)) }}
+            </div>
+          </div>
+        </div>
+
+        <div class="hidden rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-slate-500 md:block">
+          <p class="m-0 text-sm font-medium">
+            {{
+              selectedId && competitions.data.value
+                ? "Compétition introuvable."
+                : "Sélectionnez une compétition dans la liste pour afficher ses détails et gérer ses compétiteurs."
+            }}
+          </p>
+        </div>
+      </div>
     </div>
 
     <UiDialog v-model:open="creating" title="➕ Nouvelle compétition" wide data-testid="create-dialog">

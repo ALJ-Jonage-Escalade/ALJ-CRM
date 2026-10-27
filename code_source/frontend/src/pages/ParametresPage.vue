@@ -155,14 +155,34 @@ async function loadResults(): Promise<void> {
 
 async function saveEmail(): Promise<void> {
   const value = email.value.trim();
-  if (!looksLikeEmail(value)) {
+  if (!value) {
     toast.show("❌ Veuillez saisir une adresse e-mail valide.");
     return;
   }
+  const parts = value
+    .split(/[,;\s]+/)
+    .map((e) => e.trim())
+    .filter(Boolean);
+  if (!parts.length) {
+    toast.show("❌ Veuillez saisir une adresse e-mail valide.");
+    return;
+  }
+  for (const part of parts) {
+    if (!looksLikeEmail(part)) {
+      toast.show("❌ Veuillez saisir une adresse e-mail valide.");
+      return;
+    }
+  }
+  const normalized = parts.join(", ");
   savingEmail.value = true;
   try {
-    await competitionsApi.saveResultsSettings(value);
-    toast.show(`✅ Adresse de notification enregistrée : ${value}`);
+    await competitionsApi.saveResultsSettings(normalized);
+    const msg =
+      parts.length > 1
+        ? `✅ Adresses de notification enregistrées : ${normalized}`
+        : `✅ Adresse de notification enregistrée : ${normalized}`;
+    toast.show(msg);
+    email.value = normalized;
     editingEmail = false;
     await loadResults();
   } catch (e) {
@@ -344,18 +364,21 @@ onMounted(() => {
         <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
           <form class="rounded-lg border border-slate-200 bg-slate-50 p-3" novalidate @submit.prevent="saveEmail">
             <label for="results-email" class="mb-1.5 block text-[11.5px] font-semibold text-slate-500 uppercase">
-              E-mail de notification des résultats
+              E-mails de notification des résultats
             </label>
-            <div class="flex items-center gap-2">
-              <input
-                id="results-email"
-                v-model="email"
-                type="email"
-                data-testid="results-email"
-                placeholder="adresse@exemple.fr"
-                class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[13px]"
-                @focus="editingEmail = true"
-              />
+            <div class="flex items-start gap-2">
+              <div class="min-w-0 flex-1">
+                <input
+                  id="results-email"
+                  v-model="email"
+                  type="text"
+                  data-testid="results-email"
+                  placeholder="contact@exemple.fr, coach@exemple.fr"
+                  class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[13px]"
+                  @focus="editingEmail = true"
+                />
+                <span class="mt-1 block text-[11px] text-slate-500">Séparez plusieurs adresses par des virgules ou points-virgules</span>
+              </div>
               <UiButton type="submit" variant="muted" small :busy="savingEmail && 'Enregistrement…'" data-testid="results-email-save">
                 Enregistrer
               </UiButton>

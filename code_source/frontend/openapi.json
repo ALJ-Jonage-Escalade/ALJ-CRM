@@ -1214,7 +1214,7 @@
       },
       "post": {
         "summary": "Update Competitions Results Settings Api",
-        "description": "Met à jour l'adresse e-mail de notification des résultats.",
+        "description": "Met à jour les adresses e-mail de notification des résultats.",
         "operationId": "update_competitions_results_settings_api_api_settings_competitions_results_post",
         "requestBody": {
           "content": {
@@ -4063,6 +4063,11 @@
             "type": "string",
             "title": "Creneau Groupe",
             "default": ""
+          },
+          "gender": {
+            "type": "string",
+            "title": "Gender",
+            "default": ""
           }
         },
         "additionalProperties": true,
@@ -4182,6 +4187,11 @@
           "resultat_ffme": {
             "type": "string",
             "title": "Resultat Ffme",
+            "default": ""
+          },
+          "gender": {
+            "type": "string",
+            "title": "Gender",
             "default": ""
           },
           "updated_at": {

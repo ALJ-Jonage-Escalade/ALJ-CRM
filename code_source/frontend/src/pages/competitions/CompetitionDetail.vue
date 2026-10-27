@@ -19,9 +19,6 @@ import { saveFile } from "../../lib/download";
 import { formatEuros } from "../../lib/format";
 import CompetitionForm from "./CompetitionForm.vue";
 import CompetitionCharts from "./CompetitionCharts.vue";
-import CovoiturageSection from "./CovoiturageSection.vue";
-import ProgrammeSection from "./ProgrammeSection.vue";
-import ResultsSection from "./ResultsSection.vue";
 import {
   countLine,
   counts,
@@ -427,15 +424,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
 
     <!-- Graphiques de répartition (catégorie et discipline) -->
     <CompetitionCharts :competition="c" :rows="rows" />
-
-    <!-- Programme et horaires -->
-    <ProgrammeSection :competition-id="c.id" :can-write="canWrite" />
-
-    <!-- Covoiturage -->
-    <CovoiturageSection :competition-id="c.id" />
-
-    <!-- Résultats officiels MyCompet -->
-    <ResultsSection :competition="c" :rows="rows" :can-write="canWrite" :fetching="fetching" @fetch-results="fetchResults()" />
 
     <div :class="wide ? 'order-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm' : ''">
       <!-- En-tête avec boutons d'actions compétiteurs -->

@@ -45,6 +45,20 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
         # Nettoyage
         CompetitionResultsBatchService.set_notification_email(DEFAULT_NOTIFICATION_EMAIL)
 
+    def test_set_and_get_multiple_notification_emails(self):
+        """Plusieurs adresses de notification peuvent être enregistrées et normalisées."""
+        emails_input = "coach1@alj-jonage.fr, coach2@alj-jonage.fr; admin@alj-jonage.fr"
+        ok = CompetitionResultsBatchService.set_notification_email(emails_input)
+        self.assertTrue(ok)
+        expected = "coach1@alj-jonage.fr, coach2@alj-jonage.fr, admin@alj-jonage.fr"
+        self.assertEqual(CompetitionResultsBatchService.get_notification_email(), expected)
+
+        parsed = CompetitionResultsBatchService.parse_notification_emails(emails_input)
+        self.assertEqual(parsed, ["coach1@alj-jonage.fr", "coach2@alj-jonage.fr", "admin@alj-jonage.fr"])
+
+        # Nettoyage
+        CompetitionResultsBatchService.set_notification_email(DEFAULT_NOTIFICATION_EMAIL)
+
     def test_set_invalid_email_raises_error(self):
         """Une adresse sans @ ou invalide lève une ValueError."""
         with self.assertRaises(ValueError):

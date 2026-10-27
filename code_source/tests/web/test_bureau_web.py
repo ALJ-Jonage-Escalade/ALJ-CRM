@@ -59,6 +59,11 @@ class TestBureauFiles(unittest.TestCase):
         self.assertEqual(bad.status_code, 400)
         self.assertEqual(bad.json(), {"status": "error", "message": "Adresse e-mail de notification invalide."})
 
+        # 2b. POST avec plusieurs e-mails
+        multi_res = client.post("/api/settings/competitions-results", json={"notification_email": "coach1@alj-jonage.fr, coach2@alj-jonage.fr"}).json()
+        self.assertEqual(multi_res.get("status"), "success")
+        self.assertEqual(multi_res.get("notification_email"), "coach1@alj-jonage.fr, coach2@alj-jonage.fr")
+
         # Rétablir l'adresse par défaut
         client.post("/api/settings/competitions-results", json={"notification_email": "david.lopez@alj-jonage.fr"})
 

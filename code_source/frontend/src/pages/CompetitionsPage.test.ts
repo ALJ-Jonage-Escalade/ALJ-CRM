@@ -318,4 +318,14 @@ describe("CompetitionsPage", () => {
     expect(document.querySelector("#toast")!.textContent).toContain("Hors ligne : seules les cases « Participe » et « Présent »");
     expect(server.writes()).toEqual([]);
   });
+
+  it("displays statistics tiles when no competition is selected", async () => {
+    const server = fakeApi();
+    const { byId } = await render(signedIn("coach"), server.api, store, "/competitions");
+    await settle();
+    expect(byId("stats-no-selection").exists()).toBe(true);
+    expect(byId("stats-total-competitions").text()).toBe("1");
+    expect(byId("stats-total-competitors").text()).toBe("3");
+    expect(byId("stats-total-budget").text()).toMatch(/24,00\s*€/);
+  });
 });

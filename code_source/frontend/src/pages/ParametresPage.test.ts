@@ -132,4 +132,20 @@ describe("ParametresPage", () => {
     expect(JSON.parse(post!.body!)).toEqual({ notification_email: "nouvelle@alj.example" });
     expect(byId("toast").text()).toBe("✅ Adresse de notification enregistrée : nouvelle@alj.example");
   });
+
+  it("saves multiple notification addresses separated by commas or semicolons", async () => {
+    const { byId, calls } = render();
+    await flushPromises();
+    await byId("results-email").setValue("admin@alj.example, coach@alj.example; assistant@alj.example");
+    byId("results-email-save").element.closest("form")!.dispatchEvent(new Event("submit"));
+    await flushPromises();
+    const post = calls.find((c) => c.method === "POST");
+    expect(post?.path).toBe("/api/settings/competitions-results");
+    expect(JSON.parse(post!.body!)).toEqual({
+      notification_email: "admin@alj.example, coach@alj.example, assistant@alj.example",
+    });
+    expect(byId("toast").text()).toBe(
+      "✅ Adresses de notification enregistrées : admin@alj.example, coach@alj.example, assistant@alj.example",
+    );
+  });
 });

@@ -101,6 +101,7 @@ class ParticipantsMixin(AdherentsMixin):
             "note_paiement": "",
             "urgence_nom": str(adherent_doc.get("emergency_name") or ""),
             "urgence_tel": str(adherent_doc.get("emergency_phone") or ""),
+            "gender": str(adherent_doc.get("gender") or ""),
             "updated_at": cls._row_stamp(),
         }
 

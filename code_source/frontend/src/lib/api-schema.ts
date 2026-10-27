@@ -362,7 +362,7 @@ export interface paths {
         put?: never;
         /**
          * Update Competitions Results Settings Api
-         * @description Met à jour l'adresse e-mail de notification des résultats.
+         * @description Met à jour les adresses e-mail de notification des résultats.
          */
         post: operations["update_competitions_results_settings_api_api_settings_competitions_results_post"];
         delete?: never;
@@ -1674,6 +1674,11 @@ export interface components {
              * @default
              */
             creneau_groupe?: string;
+            /**
+             * Gender
+             * @default
+             */
+            gender?: string;
         } & {
             [key: string]: unknown;
         };
@@ -1778,6 +1783,11 @@ export interface components {
              * @default
              */
             resultat_ffme?: string;
+            /**
+             * Gender
+             * @default
+             */
+            gender?: string;
             /**
              * Updated At
              * @description Sent back as unchanged_since by a change queued offline

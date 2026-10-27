@@ -15,7 +15,7 @@ export type Coach = Schemas["Coach"];
     slot group to group the participants, the names, licence and e-mail to add one or write to them. */
 export type MemberSlot = Pick<
   Schemas["CompetitionMember"],
-  "id" | "nom" | "prenom" | "licence_ffme" | "email" | "email_secondaire" | "tarif" | "creneau_groupe"
+  "id" | "nom" | "prenom" | "licence_ffme" | "email" | "email_secondaire" | "tarif" | "creneau_groupe" | "gender"
 >;
 
 export const ARCHIVED = "close";
@@ -32,6 +32,7 @@ export function toMemberSlots(answer: unknown): MemberSlot[] {
     email_secondaire: m.email_secondaire ?? "",
     tarif: m.tarif ?? "",
     creneau_groupe: m.creneau_groupe ?? "",
+    gender: m.gender ?? "",
   }));
 }
 
@@ -187,6 +188,7 @@ export interface Row extends Participant {
   emergency: { name: string; phone: string }[];
   /** Flags changed offline, not sent yet */
   queued: { selectionne: boolean; present: boolean };
+  gender?: string;
 }
 
 export const UNIDENTIFIED = "Non identifiés";
@@ -226,6 +228,7 @@ export function participantRows(
       email: member?.email || member?.email_secondaire || p.email || "",
       group: member?.creneau_groupe || contact?.creneau_groupe || tarif || UNIDENTIFIED,
       emergency: emergency.filter((e) => e.phone),
+      gender: member?.gender || p.gender || "",
     };
   });
 }

@@ -7,15 +7,45 @@ const props = defineProps<{
   rows: readonly Row[];
 }>();
 
-// 1. Répartition par catégorie d'âge
-const categoryCounts = computed(() => {
+// Détection du sexe : priorité au champ gender, sinon catégorie FFME
+function detectGender(r: Row): "Femmes" | "Hommes" | "Non renseigné" {
+  const g = String(r.gender ?? "")
+    .trim()
+    .toLowerCase();
+  if (g.startsWith("f") || g === "femme" || g === "féminin") {
+    return "Femmes";
+  }
+  if (g.startsWith("h") || g.startsWith("m") || g === "homme" || g === "masculin") {
+    return "Hommes";
+  }
+
+  const cat = String(r.categorie_ffme ?? "").toLowerCase();
+  if (cat.includes("femme") || cat.includes("dame") || cat.includes("féminin") || cat.includes("feminin") || /\bf\b/.test(cat)) {
+    return "Femmes";
+  }
+  if (cat.includes("homme") || cat.includes("masculin") || /\b[hm]\b/.test(cat)) {
+    return "Hommes";
+  }
+
+  return "Non renseigné";
+}
+
+// 1. Répartition par sexe
+const genderCounts = computed(() => {
   const counts: Record<string, number> = {};
   for (const r of props.rows) {
-    const cat = r.categorie_ffme?.trim() || "Non renseignée";
-    counts[cat] = (counts[cat] || 0) + 1;
+    const g = detectGender(r);
+    counts[g] = (counts[g] || 0) + 1;
   }
   return Object.entries(counts).sort((a, b) => b[1] - a[1]);
 });
+
+// Couleurs dédiées par sexe
+const GENDER_COLORS: Record<string, string> = {
+  Femmes: "#EC4899", // Rose
+  Hommes: "#3B82F6", // Bleu
+  "Non renseigné": "#94A3B8", // Gris ardoise
+};
 
 // 2. Répartition par discipline
 const disciplineCounts = computed(() => {
@@ -31,19 +61,19 @@ const disciplineCounts = computed(() => {
 const PALETTE = ["#3B82F6", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#6366F1", "#14B8A6", "#F97316"];
 
 // Calcul des parts du camembert (SVG Pie)
-const totalCategories = computed(() => categoryCounts.value.reduce((sum, [, n]) => sum + n, 0));
+const totalGenders = computed(() => genderCounts.value.reduce((sum, [, n]) => sum + n, 0));
 
 const pieSlices = computed(() => {
-  const total = totalCategories.value;
+  const total = totalGenders.value;
   if (!total) {
     return [];
   }
   let cumulative = 0;
-  return categoryCounts.value.map(([label, count], i) => {
+  return genderCounts.value.map(([label, count]) => {
     const startAngle = (cumulative / total) * 360;
     cumulative += count;
     const endAngle = (cumulative / total) * 360;
-    const color = PALETTE[i % PALETTE.length];
+    const color = GENDER_COLORS[label] || PALETTE[0];
 
     // Calcul arc SVG (r = 40, center = 50, 50)
     const x1 = 50 + 40 * Math.cos((Math.PI * (startAngle - 90)) / 180);
@@ -53,9 +83,7 @@ const pieSlices = computed(() => {
     const largeArc = endAngle - startAngle > 180 ? 1 : 0;
 
     const path =
-      categoryCounts.value.length === 1
-        ? "M 50 10 A 40 40 0 1 1 49.99 10 Z"
-        : `M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArc} 1 ${x2} ${y2} Z`;
+      genderCounts.value.length === 1 ? "M 50 10 A 40 40 0 1 1 49.99 10 Z" : `M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArc} 1 ${x2} ${y2} Z`;
 
     const percent = Math.round((count / total) * 100);
     return { label, count, percent, color, path };
@@ -67,9 +95,9 @@ const maxDisciplineCount = computed(() => Math.max(...disciplineCounts.value.map
 
 <template>
   <div v-if="rows.length" class="mb-4 grid gap-4 md:grid-cols-2" data-testid="competition-charts">
-    <!-- Graphique 1 : Camembert catégories d'âge -->
+    <!-- Graphique 1 : Camembert répartition par sexe -->
     <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between">
-      <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">🥧 Répartition par catégorie d'âge</h3>
+      <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">🥧 Répartition par sexe</h3>
       <div class="flex items-center gap-4 flex-wrap sm:flex-nowrap">
         <svg viewBox="0 0 100 100" class="size-32 shrink-0 drop-shadow-xs">
           <path

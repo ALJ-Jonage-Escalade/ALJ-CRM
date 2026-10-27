@@ -52,7 +52,17 @@ describe("competitions", () => {
     expect(
       toMemberSlots([{ id: 1, nom: "X", prenom: "Y", num_licence: "123", email: "x@y.fr", tarif: "T", creneau_groupe: "G", phone: "06" }]),
     ).toEqual([
-      { id: 1, nom: "X", prenom: "Y", licence_ffme: "123", email: "x@y.fr", email_secondaire: "", tarif: "T", creneau_groupe: "G" },
+      {
+        id: 1,
+        nom: "X",
+        prenom: "Y",
+        licence_ffme: "123",
+        email: "x@y.fr",
+        email_secondaire: "",
+        tarif: "T",
+        creneau_groupe: "G",
+        gender: "",
+      },
     ]);
   });
 
