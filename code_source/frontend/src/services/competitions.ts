@@ -30,6 +30,12 @@ export function createCompetitionsApi(client: ApiClient) {
     /** Scrapes MyCompet FFME for competition title and metadata from its ID number. */
     lookupFfme: (idFfme: string) =>
       unwrap(client.GET("/api/competitions/lookup-ffme/{id_ffme}", { params: { path: { id_ffme: idFfme } } })),
+    /** List of the competitors (Excel), for saveExport(). */
+    competitorsExcel: (competitionId: number) =>
+      client.GET("/api/competitions/{competition_id}/export-excel", { ...competition(competitionId), parseAs: "blob" }),
+    /** List of the competitors (PDF; the printable HTML page when the server has no WeasyPrint), for saveExport(). */
+    competitorsPdf: (competitionId: number) =>
+      client.GET("/api/competitions/{competition_id}/export-pdf", { ...competition(competitionId), parseAs: "blob" }),
     /** url "": the server looks for the competition's page on MyCompet itself. */
     fetchResults: (competitionId: number, url: string) =>
       unwrap(

@@ -1,5 +1,5 @@
 import unittest
-from exports.competitors_excel import export_competitors_excel
+from exports.competitors_excel import export_competitors_excel, payment_label
 from exports.competitors_pdf import export_competitors_pdf, generate_competitors_html
 
 
@@ -62,6 +62,19 @@ class TestCompetitorsExport(unittest.TestCase):
 
         pdf_bytes = export_competitors_pdf(self.comp)
         self.assertTrue(len(pdf_bytes) > 0)
+
+    def test_payment_label_uses_domain_labels(self):
+        cases = [
+            ({"statut_paiement": "paye", "montant_paye": 15.5}, "Payé (15,50 €)"),
+            ({"statut_paiement": "paye", "montant_paye": 15.0}, "Payé (15 €)"),
+            ({"statut_paiement": "en_attente"}, "En attente"),
+            ({"statut_paiement": "annule_perdu", "montant_paye": 0}, "Annulé — perdu"),
+            ({"statut_paiement": "annule_reporte"}, "Annulé — report"),
+            ({}, "Non invité"),
+        ]
+        for participant, expected in cases:
+            with self.subTest(participant=participant):
+                self.assertEqual(payment_label(participant), expected)
 
 
 if __name__ == "__main__":

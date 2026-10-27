@@ -174,10 +174,10 @@ const today = todayIso();
 const all = computed(() => sortCompetitions(competitions.data.value ?? []));
 const search = ref("");
 const when = ref<When>("all");
-const selectedSeason = ref("2026-2027");
+// Every season by default: a competition without a date (allowed) or of another season is never hidden unasked
+const selectedSeason = ref("all");
 const seasons = computed(() => {
-  const set = new Set<string>();
-  set.add("2026-2027");
+  const set = new Set<string>([competitionSeason(today)]);
   all.value.forEach((c) => {
     const s = competitionSeason(c.date_competition);
     if (s) {
@@ -207,6 +207,12 @@ const WHEN: { id: When; label: string }[] = [
 ];
 
 const selectedId = computed(() => (typeof route.query.id === "string" ? route.query.id : ""));
+// The detail is shown next to the cards: a competition opened from the table or the calendar goes back to them
+watch(selectedId, (id) => {
+  if (id) {
+    viewMode.value = "cards";
+  }
+});
 const selected = computed(() => all.value.find((c) => String(c.id) === selectedId.value));
 const rows = computed(() =>
   selected.value
@@ -305,8 +311,8 @@ async function saveFromTable(body: Schemas["CompetitionCreate"]): Promise<void> 
 async function removeFromTable(c: Competition): Promise<void> {
   const ok = await dialogs.confirm({
     title: "Supprimer la compétition",
-    message: "Êtes-vous sûr de vouloir supprimer cette compétition ?",
-    confirmLabel: "Confirmer",
+    message: `Supprimer définitivement « ${c.nom} » et sa liste de compétiteurs ?`,
+    confirmLabel: "Supprimer",
     variant: "danger",
   });
   if (!ok) {
@@ -541,7 +547,7 @@ const tab = (active: boolean) => [
             class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500"
           >
             {{
-              search || when !== "all"
+              search || when !== "all" || selectedSeason !== "all"
                 ? "Aucune compétition correspondante."
                 : archivedCompetitions.length
                   ? "Aucune compétition en cours : toutes sont archivées."

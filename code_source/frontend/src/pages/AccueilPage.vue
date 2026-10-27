@@ -4,11 +4,10 @@ import { RouterLink, useRoute } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import PageLink from "../components/PageLink.vue";
 import UiBadge from "../components/ui/UiBadge.vue";
-import UiButton from "../components/ui/UiButton.vue";
 import { canOpen, pageAccess, pageScreen, PAGES, REFUSED_QUERY, shownOn, type Access, type Screen } from "../lib/access";
 import { API_KEY } from "../lib/api";
 import { formatDayText } from "../lib/format";
-import type { Competition, Participant } from "./competitions/competitions";
+import { isPast, todayIso, type Competition, type Participant } from "./competitions/competitions";
 import type { Role } from "../lib/roles";
 
 const api = inject(API_KEY, null);
@@ -28,21 +27,23 @@ onMounted(async () => {
   }
 });
 
-const todayIsoStr = new Date().toISOString().slice(0, 10);
+// Local date; a competition is upcoming until its last day, an undated one is never past
+const today = todayIso();
 const upcomingComps = computed(() =>
   comps.value
-    .filter((c) => (c.date_competition || c.date_fin || "") >= todayIsoStr && c.statut !== "close")
-    .sort((a, b) => (a.date_competition || "").localeCompare(b.date_competition || ""))
+    .filter((c) => !isPast(c, today) && c.statut !== "close")
+    // Soonest first, the undated ones (« Date à venir ») last
+    .sort(
+      (a, b) =>
+        Number(!a.date_competition) - Number(!b.date_competition) || (a.date_competition ?? "").localeCompare(b.date_competition ?? ""),
+    )
     .slice(0, 3),
 );
 
 const pastResultsComps = computed(() =>
   comps.value
     .filter(
-      (c) =>
-        (c.date_competition || "") < todayIsoStr ||
-        c.statut === "close" ||
-        (c.participants || []).some((p: Participant) => p.classement || p.resultat_ffme),
+      (c) => isPast(c, today) || c.statut === "close" || (c.participants || []).some((p: Participant) => p.classement || p.resultat_ffme),
     )
     .sort((a, b) => (b.date_competition || "").localeCompare(a.date_competition || ""))
     .slice(0, 3),
@@ -105,7 +106,13 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
     <template #default="{ role }">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p class="m-0 text-sm text-slate-600">Bienvenue sur le nouvel espace de gestion de l'ALJ Escalade</p>
-        <UiButton href="/bureau/competitions" variant="primary" data-testid="goto-competitions">🏆 Compétitions</UiButton>
+        <RouterLink
+          to="/bureau/competitions"
+          data-testid="goto-competitions"
+          class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white no-underline hover:bg-accent-dark"
+        >
+          🏆 Compétitions
+        </RouterLink>
       </div>
       <p
         v-if="refused"

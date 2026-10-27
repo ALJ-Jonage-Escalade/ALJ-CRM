@@ -109,7 +109,7 @@
             },
             "description": "Not Found"
           },
-          "502": {
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -117,7 +117,7 @@
                 }
               }
             },
-            "description": "Bad Gateway"
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -273,11 +273,9 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Classeur Excel",
             "content": {
-              "application/json": {
-                "schema": {}
-              }
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
             }
           },
           "404": {
@@ -320,11 +318,10 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Liste PDF (HTML sans WeasyPrint)",
             "content": {
-              "application/json": {
-                "schema": {}
-              }
+              "application/pdf": {},
+              "text/html": {}
             }
           },
           "404": {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import logging
 import os
 import re
@@ -376,7 +377,6 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
     Interroge le serveur MyCompet (protocole Echo.Sync) pour filtrer par numéro d'épreuve et
     extraire le titre officiel, la discipline, les dates et le lieu.
     """
-    import re
     import secrets
     import time
     from services.errors import InvalidRequest, NotFound, StorageUnavailable
@@ -475,7 +475,9 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
 
     row_snippet = match_row.group(1)
     match_title = re.search(r'<p n="text">([^<]+)</p>', row_snippet)
-    title = match_title.group(1).strip() if match_title else ""
+    title = html.unescape(match_title.group(1)).strip() if match_title else ""
+    if not title:
+        raise NotFound(f"Compétition n°{comp_id_str} introuvable sur MyCompet FFME.")
 
     info: dict[str, str | None] = {
         "id_ffme": comp_id_str,
@@ -504,9 +506,12 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
                 timeout=10,
             )
             det_text = resp_det.text
-            pairs = dict(
-                re.findall(r'<p n=.text.>([^<]+?)\s*</p></c><c[^>]*><s>publicItemValue[^<]*</s><p n=.text.>([^<]+)</p>', det_text)
-            )
+            pairs = {
+                html.unescape(key): html.unescape(value)
+                for key, value in re.findall(
+                    r'<p n=.text.>([^<]+?)\s*</p></c><c[^>]*><s>publicItemValue[^<]*</s><p n=.text.>([^<]+)</p>', det_text
+                )
+            }
 
             if "Nom" in pairs and pairs["Nom"].strip():
                 info["nom"] = pairs["Nom"].strip()

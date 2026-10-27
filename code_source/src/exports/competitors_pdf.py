@@ -10,7 +10,12 @@ Respecte la charte graphique ALJ Escalade :
 from __future__ import annotations
 
 import html
+import logging
 from typing import Any, Dict, List
+
+from exports.competitors_excel import payment_label
+
+logger = logging.getLogger("alj")
 
 
 def generate_competitors_html(comp: Dict[str, Any], participants: List[Dict[str, Any]] | None = None) -> str:
@@ -40,9 +45,7 @@ def generate_competitors_html(comp: Dict[str, Any], participants: List[Dict[str,
         surclass = "Oui" if p.get("surclassement") else "Non"
         discipline_val = html.escape(str(p.get("discipline") or p.get("creneau_groupe") or disc or "").strip())
         statut = "Sélectionné" if p.get("selectionne") else "Non invité"
-        paiement = html.escape(str(p.get("statut_paiement") or "en_attente").replace("paye", "Payé").replace("en_attente", "En attente"))
-        if p.get("montant_paye"):
-            paiement += f" ({p.get('montant_paye')} €)"
+        paiement = html.escape(payment_label(p))
         dob = html.escape(str(p.get("date_naissance") or p.get("birth_date") or "").strip())
         licence = html.escape(str(p.get("num_licence") or p.get("licence_ffme") or "").strip())
         email = html.escape(str(p.get("email") or "").strip())
@@ -171,7 +174,8 @@ def export_competitors_pdf(comp: Dict[str, Any], participants: List[Dict[str, An
     html_content = generate_competitors_html(comp, participants)
     try:
         from weasyprint import HTML
-        return HTML(string=html_content).write_pdf()
-    except Exception:
-        # Repli si WeasyPrint (Pango) non configuré sur l'environnement
+    except (ImportError, OSError):
+        # Repli si WeasyPrint (Pango) non configuré sur l'environnement : la page HTML, imprimable depuis le navigateur
+        logger.warning("WeasyPrint indisponible : liste des compétiteurs servie en HTML")
         return html_content.encode("utf-8")
+    return HTML(string=html_content).write_pdf()

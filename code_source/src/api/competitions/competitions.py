@@ -21,13 +21,15 @@ from services.documents import Doc
 
 router = APIRouter(prefix="/api/competitions")
 
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
 
 @router.get("", response_model=List[Competition])
 def list_competitions(request: Request) -> Response:
     return json_with_etag(request, Service.list_competitions())
 
 
-@router.get("/lookup-ffme/{id_ffme}", response_model=CompetitionFfmeLookup, responses=error_responses(400, 404, 502))
+@router.get("/lookup-ffme/{id_ffme}", response_model=CompetitionFfmeLookup, responses=error_responses(400, 404, 503))
 def lookup_ffme_competition(id_ffme: str) -> Doc:
     return Service.lookup_ffme(id_ffme)
 
@@ -53,22 +55,28 @@ def archive_past_competitions() -> Doc:
     return {**SUCCESS, "archived": Service.archive_past_competitions()}
 
 
-@router.get("/{competition_id}/export-excel", responses=error_responses(404))
+@router.get("/{competition_id}/export-excel", response_class=Response,
+            responses={200: {"content": {XLSX: {}}, "description": "Classeur Excel"}, **error_responses(404)})
 def export_competition_excel(competition_id: int) -> Response:
     content = Service.export_excel(competition_id)
     return Response(
         content=content,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        media_type=XLSX,
         headers={"Content-Disposition": f'attachment; filename="competiteurs_{competition_id}.xlsx"'},
     )
 
 
-@router.get("/{competition_id}/export-pdf", responses=error_responses(404))
+@router.get("/{competition_id}/export-pdf", response_class=Response,
+            responses={200: {"content": {"application/pdf": {}, "text/html": {}}, "description": "Liste PDF (HTML sans WeasyPrint)"},
+                       **error_responses(404)})
 def export_competition_pdf(competition_id: int) -> Response:
     content = Service.export_pdf(competition_id)
-    media_type = "application/pdf" if content.startswith(b"%PDF") else "text/html; charset=utf-8"
+    # Without WeasyPrint the service answers the printable HTML page: named as such
+    is_pdf = content.startswith(b"%PDF")
+    media_type = "application/pdf" if is_pdf else "text/html; charset=utf-8"
+    extension = "pdf" if is_pdf else "html"
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": f'inline; filename="competiteurs_{competition_id}.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="competiteurs_{competition_id}.{extension}"'},
     )

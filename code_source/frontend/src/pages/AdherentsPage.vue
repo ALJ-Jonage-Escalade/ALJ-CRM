@@ -155,6 +155,8 @@ const COLUMNS: DataColumn<Member>[] = [
     id: "last_name",
     label: "Nom",
     value: (m) => (isCompetitor(m) ? `🏆 ${m.last_name}` : m.last_name),
+    // The trophy is only shown: the column still sorts by name
+    compare: (a, b) => collator.compare(a.last_name, b.last_name),
     class: "font-bold",
   },
   { id: "first_name", label: "Prénom", value: (m) => m.first_name },

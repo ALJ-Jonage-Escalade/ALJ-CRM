@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import UiButton from "../../components/ui/UiButton.vue";
-import { discipline, type Competition } from "./competitions";
+import { discipline, todayIso, type Competition } from "./competitions";
 
 const props = defineProps<{
   competitions: readonly Competition[];
@@ -78,7 +78,7 @@ const calendarDays = computed<CalendarDay[]>(() => {
   const totalDays = lastDayOfMonth.getDate();
   const prevMonthLastDate = new Date(year, month, 0).getDate();
 
-  const nowIso = new Date().toISOString().slice(0, 10);
+  const nowIso = todayIso();
   const days: CalendarDay[] = [];
 
   // Previous month padding

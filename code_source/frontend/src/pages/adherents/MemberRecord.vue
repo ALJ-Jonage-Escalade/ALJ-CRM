@@ -9,7 +9,7 @@ import UiButton from "../../components/ui/UiButton.vue";
 import { API_KEY } from "../../lib/api";
 import { formatDayText } from "../../lib/format";
 import { isCompetitor, normKey, telHref, type Member } from "./members";
-import type { Competition, Participant } from "../competitions/competitions";
+import { payment, type Competition, type Participant } from "../competitions/competitions";
 import { recordRows } from "./record";
 
 const props = defineProps<{ member: Member; admin: boolean; compact?: boolean }>();
@@ -197,14 +197,9 @@ const rows = computed(() => recordRows(props.member));
           >
             {{ c.participant.selectionne ? "✓ Sélectionné" : "🔘 Non invité" }}
           </span>
-          <span
-            :class="[
-              'rounded px-1.5 py-0.5 font-semibold',
-              c.participant.statut_paiement === 'paye' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700',
-            ]"
-          >
-            {{ c.participant.statut_paiement === "paye" ? "💶 Payé" : "⏳ Paiement en attente" }}
-          </span>
+          <UiBadge variant="soft" :color="payment(c.participant.statut_paiement).color" class="text-[11px]">
+            {{ payment(c.participant.statut_paiement).label }}
+          </UiBadge>
           <span v-if="c.participant.classement" class="rounded bg-violet-50 px-1.5 py-0.5 font-bold text-violet-700">
             🏅 Rang : {{ c.participant.classement }}
           </span>

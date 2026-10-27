@@ -16,6 +16,8 @@ import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
+from domain.competitions.models import LIBELLES_STATUT_PAIEMENT, PAIEMENT_NON_INVITE
+from domain.utils import format_montant
 from exports.spreadsheet_safety import neutralize_formulas
 
 HEADER_BG = "1E3A8A"
@@ -49,6 +51,14 @@ COLUMNS = [
     "Email",
     "Téléphone",
 ]
+
+
+def payment_label(participant: Dict[str, Any]) -> str:
+    """« Payé (15,50 €) », « En attente », « Annulé — perdu »… (labels of the domain model)."""
+    status = str(participant.get("statut_paiement") or PAIEMENT_NON_INVITE)
+    label = LIBELLES_STATUT_PAIEMENT.get(status, status)
+    amount = format_montant(participant.get("montant_paye")) if participant.get("montant_paye") else ""
+    return f"{label} ({amount} €)" if amount else label
 
 
 def export_competitors_excel(comp: Dict[str, Any], participants: List[Dict[str, Any]] | None = None) -> bytes:
@@ -104,9 +114,7 @@ def export_competitors_excel(comp: Dict[str, Any], participants: List[Dict[str, 
         surclass = "Oui" if p.get("surclassement") else "Non"
         discipline_val = str(p.get("discipline") or p.get("creneau_groupe") or disc or "").strip()
         statut = "Sélectionné" if p.get("selectionne") else "Non invité"
-        paiement = str(p.get("statut_paiement") or "en_attente").replace("paye", "Payé").replace("en_attente", "En attente")
-        if p.get("montant_paye"):
-            paiement += f" ({p.get('montant_paye')} €)"
+        paiement = payment_label(p)
         dob = str(p.get("date_naissance") or p.get("birth_date") or "").strip()
         licence = str(p.get("num_licence") or p.get("licence_ffme") or "").strip()
         email = str(p.get("email") or "").strip()

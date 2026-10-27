@@ -46,7 +46,7 @@ def test_desktop_layout(page):
     expect(page.locator("#content a[href='/index']")).to_be_hidden()
     expect(page.get_by_text(f"v{VERSION}", exact=True).filter(visible=True)).to_be_visible()
 
-    page.locator("#content a[href='/bureau/competitions']").click()
+    page.locator("#content a[href='/bureau/competitions']").first.click()  # the button, the card and the widgets
     page.wait_for_url("**/bureau/competitions")
     expect(page.locator("#who")).to_contain_text("albus.dumbledore@alj-escalade.fr")  # same session on the page
 

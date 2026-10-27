@@ -194,7 +194,7 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
             type="button"
             class="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100 font-bold"
             title="Gras"
-            @click="insertTag('**', '**')"
+            @click="insertTag('<b>', '</b>')"
           >
             B
           </button>
@@ -202,7 +202,7 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
             type="button"
             class="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100 italic"
             title="Italique"
-            @click="insertTag('*', '*')"
+            @click="insertTag('<i>', '</i>')"
           >
             I
           </button>

@@ -16,7 +16,17 @@ import { createMembersApi } from "../services/members";
 import { saveExport, saveFile } from "../lib/download";
 import SlotForm from "./planning/SlotForm.vue";
 import SlotList from "./planning/SlotList.vue";
-import { countLabel, draftOf, filterSlots, KINDS, updateOf, type KindFilter, type Slot, type SlotDraft } from "./planning/slots";
+import {
+  countLabel,
+  draftOf,
+  filterSlots,
+  KINDS,
+  planningIcs,
+  updateOf,
+  type KindFilter,
+  type Slot,
+  type SlotDraft,
+} from "./planning/slots";
 import WeekGrid from "./planning/WeekGrid.vue";
 import { dialogs } from "../composables/dialogs";
 
@@ -121,44 +131,13 @@ async function download(mode: "grid" | "list"): Promise<void> {
   }
 }
 
-function syncGoogleCalendar(): void {
-  const icsLines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//ALJ Escalade//Planning//FR",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
-    "X-WR-CALNAME:ALJ Escalade — Planning",
-    "X-WR-TIMEZONE:Europe/Paris",
-  ];
-  const DAY_MAP: Record<string, string> = {
-    lundi: "MO",
-    mardi: "TU",
-    mercredi: "WE",
-    jeudi: "TH",
-    vendredi: "FR",
-    samedi: "SA",
-    dimanche: "SU",
-  };
-  slots.value.forEach((s, idx) => {
-    const d = s.jour?.toLowerCase().trim() || "";
-    const byDay = DAY_MAP[d] || "MO";
-    icsLines.push(
-      "BEGIN:VEVENT",
-      `UID:alj-slot-${s.id || idx}@alj-escalade.fr`,
-      `SUMMARY:ALJ Escalade — ${s.groupe}`,
-      `DESCRIPTION:${s.type || "Cours"} · ${s.encadrants?.join(", ") || "Coachs ALJ"}`,
-      "LOCATION:Gymnase de Jonage",
-      `RRULE:FREQ=WEEKLY;BYDAY=${byDay}`,
-      "DTSTART:20260901T180000Z",
-      "DTEND:20260901T200000Z",
-      "END:VEVENT",
-    );
-  });
-  icsLines.push("END:VCALENDAR");
-  const blob = new Blob([icsLines.join("\r\n")], { type: "text/calendar;charset=utf-8" });
-  saveFile(blob, "planning_alj_escalade.ics");
-  toast.show("📅 Fichier iCalendar (.ics) généré pour synchronisation avec Google Calendar !");
+function exportCalendar(): void {
+  const { ics, skipped } = planningIcs(slots.value, new Date());
+  saveFile(new Blob([ics], { type: "text/calendar;charset=utf-8" }), "planning_alj_escalade.ics");
+  const left = skipped
+    ? ` (${skipped} créneau${skipped > 1 ? "x" : ""} sans jour ou horaires lisibles ignoré${skipped > 1 ? "s" : ""})`
+    : "";
+  toast.show(`📅 Fichier agenda (.ics) téléchargé, à importer dans Google Agenda${left}.`, skipped ? 8000 : 4000);
 }
 
 onMounted(() => {
@@ -184,8 +163,13 @@ const chip = (active: boolean) => [
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <UiButton data-testid="slot-new" @click="open()">➕ Nouveau créneau</UiButton>
-          <UiButton variant="muted" data-testid="sync-google-calendar" @click="syncGoogleCalendar">
-            📅 Synchroniser Google Calendar
+          <UiButton
+            variant="muted"
+            data-testid="sync-google-calendar"
+            title="Fichier à importer dans Google Agenda"
+            @click="exportCalendar"
+          >
+            📅 Exporter l'agenda (.ics)
           </UiButton>
           <UiButton variant="muted" data-testid="planning-print" @click="print">🖨️ Imprimer la grille</UiButton>
           <UiMenu label="📥 Exporter Excel" data-testid="export-menu">
