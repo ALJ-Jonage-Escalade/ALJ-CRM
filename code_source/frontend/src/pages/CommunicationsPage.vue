@@ -137,25 +137,6 @@ async function remove(): Promise<void> {
 const whatsapp = ref("");
 const savingWhatsapp = ref(false);
 
-// Envoi SMS (Twilio / OVH)
-const smsProvider = ref<"twilio" | "ovh">("twilio");
-const smsRecipient = ref("");
-const smsText = ref("");
-const sendingSms = ref(false);
-
-function sendSms(): void {
-  if (!smsRecipient.value.trim() || !smsText.value.trim()) {
-    toast.show("❌ Veuillez renseigner le destinataire et le message du SMS.");
-    return;
-  }
-  sendingSms.value = true;
-  setTimeout(() => {
-    sendingSms.value = false;
-    toast.show(`📱 SMS envoyé avec succès via ${smsProvider.value === "twilio" ? "Twilio" : "OVH Telecom"} à ${smsRecipient.value} !`);
-    smsText.value = "";
-  }, 600);
-}
-
 async function loadWhatsapp(): Promise<void> {
   try {
     whatsapp.value = (await communicationsApi.whatsappTemplate()).template;
@@ -249,51 +230,6 @@ onMounted(() => {
               placeholder="Saisissez le texte WhatsApp…"
               class="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-xs"
             />
-          </form>
-        </UiCard>
-
-        <!-- Passerelle SMS (Twilio / OVH) -->
-        <UiCard data-testid="sms-card">
-          <form class="flex flex-col gap-2.5" @submit.prevent="sendSms">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <h2 class="text-[15px] font-bold flex items-center gap-1.5">💬 Envoi de SMS (Passerelle Twilio / OVH)</h2>
-              <UiButton type="submit" small :busy="sendingSms && 'Envoi en cours…'" data-testid="sms-send-btn">🚀 Envoyer le SMS</UiButton>
-            </div>
-            <p class="text-[11.5px] text-slate-500">
-              Diffusez des alertes ou rappels urgents par SMS aux compétiteurs ou adhérents via l'API Twilio ou OVH Télécom.
-            </p>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <label class="font-semibold block mb-1">Opérateur / Passerelle</label>
-                <select v-model="smsProvider" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white">
-                  <option value="twilio">Twilio SMS (API Internationale)</option>
-                  <option value="ovh">OVH Télécom SMS (France / Europe)</option>
-                </select>
-              </div>
-              <div>
-                <label class="font-semibold block mb-1">Destinataire(s)</label>
-                <input
-                  v-model="smsRecipient"
-                  type="text"
-                  placeholder="ex. 0612345678 ou 'Compétiteurs'"
-                  class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs"
-                />
-              </div>
-            </div>
-            <div>
-              <div class="flex justify-between items-center text-xs mb-1">
-                <label class="font-semibold">Message SMS</label>
-                <span class="text-slate-400 text-[11px]">
-                  {{ smsText.length }}/160 car. ({{ Math.ceil(smsText.length / 160) || 1 }} SMS)
-                </span>
-              </div>
-              <textarea
-                v-model="smsText"
-                rows="3"
-                placeholder="Rédigez votre SMS…"
-                class="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-xs"
-              />
-            </div>
           </form>
         </UiCard>
       </div>
