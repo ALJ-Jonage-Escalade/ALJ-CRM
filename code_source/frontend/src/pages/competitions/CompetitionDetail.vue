@@ -410,7 +410,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         data-testid="detail-actions"
       >
         <UiButton variant="muted" small data-testid="edit-comp" @click="editing = true">✏️ Modifier</UiButton>
-        <UiButton variant="danger" small data-testid="delete-comp" :disabled="writer.busy.value" @click="remove">🗑️ Supprimer</UiButton>
+        <UiButton variant="muted" small data-testid="email-comp" @click="emailing = true">✉️ Envoyer un email aux compétiteurs</UiButton>
         <!-- Actions secondaires -->
         <UiMenu label="⋯ Plus" small :busy="fetching && 'Recherche MyCompet…'" aria-label="Plus d'actions" data-testid="detail-more">
           <UiMenuItem data-testid="fetch-results" @select="fetchResults()">🏆 Trouver les résultats</UiMenuItem>
@@ -420,19 +420,10 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           <UiMenuItem :data-testid="isArchived(c) ? 'unarchive-comp' : 'archive-comp'" @select="archive(!isArchived(c))">
             {{ isArchived(c) ? "♻️ Désarchiver" : "📦 Archiver" }}
           </UiMenuItem>
+          <UiMenuItem danger data-testid="delete-comp" :disabled="writer.busy.value" @select="remove">🗑️ Supprimer</UiMenuItem>
         </UiMenu>
       </div>
     </div>
-
-    <div class="order-1 mb-3 grid grid-cols-4 gap-2 text-center lg:gap-2.5">
-      <div v-for="k in KPIS" :key="k.id" class="rounded-xl border border-slate-200 bg-white px-1 py-2 shadow-sm lg:px-3 lg:py-2.5">
-        <div :class="['text-xl font-extrabold', k.color]" :data-testid="`kpi-${k.id}`">{{ k.value }}</div>
-        <div class="text-[11px] font-semibold text-slate-500 lg:uppercase">{{ k.label }}</div>
-      </div>
-    </div>
-
-    <!-- Graphiques de répartition (catégorie et discipline) -->
-    <CompetitionCharts :competition="c" :rows="rows" />
 
     <div :class="wide ? 'order-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm' : ''">
       <!-- En-tête avec boutons d'actions compétiteurs -->
@@ -440,13 +431,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         <h3 class="text-sm font-bold text-slate-800">Compétiteurs ({{ rows.length }})</h3>
         <div v-if="canWrite" class="flex flex-wrap items-center gap-1.5" data-testid="table-header-actions">
           <UiButton small data-testid="add-competitor-btn" @click="addMemberDialogOpen = true">➕ Ajouter un compétiteur</UiButton>
-          <UiButton variant="muted" small data-testid="email-comp" @click="emailing = true">✉️ Envoyer un email aux compétiteurs</UiButton>
-          <UiButton variant="muted" small data-testid="export-excel-btn" :disabled="!rows.length" @click="exportFile('excel')">
-            📊 Exporter la liste des compétiteurs (Excel)
-          </UiButton>
-          <UiButton variant="muted" small data-testid="export-pdf-btn" :disabled="!rows.length" @click="exportFile('pdf')">
-            📄 Exporter la liste des compétiteurs (PDF)
-          </UiButton>
         </div>
       </div>
       <div class="mb-2 flex flex-wrap items-center gap-1.5">
@@ -596,6 +580,19 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           </ul>
         </div>
       </template>
+    </div>
+
+    <!-- Statistiques, juste avant la gestion des inscriptions (même rang flex : l'ordre du DOM les départage) -->
+    <div :class="wide ? 'order-2' : 'mt-4'">
+      <div class="mb-3 grid grid-cols-4 gap-2 text-center lg:gap-2.5">
+        <div v-for="k in KPIS" :key="k.id" class="rounded-xl border border-slate-200 bg-white px-1 py-2 shadow-sm lg:px-3 lg:py-2.5">
+          <div :class="['text-xl font-extrabold', k.color]" :data-testid="`kpi-${k.id}`">{{ k.value }}</div>
+          <div class="text-[11px] font-semibold text-slate-500 lg:uppercase">{{ k.label }}</div>
+        </div>
+      </div>
+
+      <!-- Graphiques de répartition (catégorie et discipline) -->
+      <CompetitionCharts :competition="c" :rows="rows" />
     </div>
 
     <div

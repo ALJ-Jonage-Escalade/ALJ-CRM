@@ -88,6 +88,7 @@ def test_edit_and_delete_competition(page, test_data):
     expect(card).to_contain_text("Coachs : Filius Flitwick")
     expect(competition_card(page, nom)).to_have_count(0)
 
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("delete-comp").click()
     expect(toast(page)).to_contain_text("Compétition supprimée")
     expect(competition_card(page, renamed)).to_have_count(0)

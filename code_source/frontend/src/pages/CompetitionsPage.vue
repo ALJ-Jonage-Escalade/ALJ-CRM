@@ -412,11 +412,7 @@ const tab = (active: boolean) => [
           {{ s.label }}
         </RouterLink>
       </div>
-      <UiButton
-        small
-        data-testid="top-create-comp"
-        @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')"
-      >
+      <UiButton small data-testid="create-comp" @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')">
         ➕ Ajouter une compétition
       </UiButton>
     </nav>
@@ -445,15 +441,8 @@ const tab = (active: boolean) => [
         ]"
         aria-label="Liste des compétitions"
       >
-        <div v-if="canWrite" class="mb-2 flex flex-wrap gap-1.5">
-          <UiButton
-            small
-            data-testid="create-comp"
-            @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')"
-          >
-            ➕ Nouvelle compétition
-          </UiButton>
-          <UiButton v-if="pastCompetitions.length" variant="muted" small data-testid="archive-past" @click="archivePastCompetitions">
+        <div v-if="canWrite && pastCompetitions.length" class="mb-2 flex flex-wrap gap-1.5">
+          <UiButton variant="muted" small data-testid="archive-past" @click="archivePastCompetitions">
             📦 Archiver les passées ({{ pastCompetitions.length }})
           </UiButton>
         </div>
