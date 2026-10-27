@@ -241,10 +241,6 @@ class ParticipantsMixin(AdherentsMixin):
                                        guard=unchanged_since_guard("present", present, unchanged_since))
 
     @classmethod
-    def set_present(cls, competition_id: int, adherent_id: int, present: bool) -> bool:
-        return cls.set_present_doc(competition_id, adherent_id, present) is not None
-
-    @classmethod
     def set_payment_status(cls, competition_id: int, adherent_id: int, statut_paiement: str) -> bool:
         return cls._update_participant(competition_id, adherent_id,
                                        lambda p: p.update(statut_paiement=statut_paiement)) is not None

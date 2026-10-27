@@ -8,7 +8,7 @@ import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import { API_KEY } from "../../lib/api";
 import { formatDayText } from "../../lib/format";
-import { isCompetitor, normKey, telHref, type Member } from "./members";
+import { isCompetitor, telHref, type Member } from "./members";
 import { payment, type Competition, type Participant } from "../competitions/competitions";
 import { recordRows } from "./record";
 
@@ -24,9 +24,9 @@ onMounted(async () => {
     return;
   }
   try {
-    const res = await api("/api/competitions");
-    if (res.ok) {
-      competitions.value = (await res.json()) as Competition[];
+    const response = await api("/api/competitions");
+    if (response.ok) {
+      competitions.value = (await response.json()) as Competition[];
     }
   } catch {
     // Offline
@@ -34,25 +34,13 @@ onMounted(async () => {
 });
 
 const memberCompetitions = computed(() => {
-  const m = props.member;
-  const mId = m.user_id;
-  const mNom = normKey(m.last_name);
-  const mPrenom = normKey(m.first_name);
-
+  const memberId = props.member.user_id;
   return competitions.value
-    .filter((c) => {
-      const parts = c.participants || [];
-      return parts.some((p: Participant) => (mId && p.adherent_id === mId) || (normKey(p.nom) === mNom && normKey(p.prenom) === mPrenom));
-    })
-    .map((c) => {
-      const part = (c.participants || []).find(
-        (p: Participant) => (mId && p.adherent_id === mId) || (normKey(p.nom) === mNom && normKey(p.prenom) === mPrenom),
-      );
-      return {
-        ...c,
-        participant: part,
-      };
-    })
+    .map((competition) => ({
+      ...competition,
+      participant: (competition.participants || []).find((participant: Participant) => participant.adherent_id === memberId),
+    }))
+    .filter((competition) => competition.participant)
     .sort((a, b) => (b.date_competition || "").localeCompare(a.date_competition || ""));
 });
 
@@ -107,13 +95,6 @@ const rows = computed(() => recordRows(props.member));
       >
         📞 Appeler
       </a>
-      <a
-        v-if="member.email_primary"
-        :href="`mailto:${member.email_primary}`"
-        class="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 no-underline"
-      >
-        ✉️ Écrire
-      </a>
     </div>
 
     <!-- Onglets de la fiche adhérent -->
@@ -146,11 +127,7 @@ const rows = computed(() => recordRows(props.member));
     </div>
 
     <!-- Onglet 1 : Fiche générale -->
-    <dl
-      v-if="tab === 'general'"
-      data-testid="record-fields"
-      class="divide-y divide-slate-100 rounded-lg border border-slate-200 text-[12.5px]"
-    >
+    <dl v-if="tab === 'general'" data-testid="record-fields" class="divide-y divide-slate-100 rounded-lg text-[12.5px]">
       <div
         v-for="row in rows"
         :key="row.label"
@@ -158,7 +135,7 @@ const rows = computed(() => recordRows(props.member));
         :class="compact ? 'px-3 py-1.5' : 'grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)] gap-3 px-3 py-1.5'"
       >
         <dt :class="['font-semibold text-slate-500', compact && 'text-[11.5px]']">{{ row.icon }} {{ row.label }}</dt>
-        <dd class="break-words whitespace-pre-line text-slate-800">{{ row.value }}</dd>
+        <dd class="wrap-break-word whitespace-pre-line text-slate-800">{{ row.value }}</dd>
       </div>
     </dl>
 

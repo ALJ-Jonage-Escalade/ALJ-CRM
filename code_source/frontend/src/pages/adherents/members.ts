@@ -21,10 +21,10 @@ export function normKey(s: string | null | undefined): string {
 }
 
 /** Indique si un adhérent appartient à un groupe ou tarif compétition. */
-export function isCompetitor(m: Member): boolean {
-  const g = normKey(m.creneau_groupe);
-  const t = normKey(m.tarif_name);
-  return g.includes("competition") || t.includes("competition");
+export function isCompetitor(member: Member): boolean {
+  const group = normKey(member.creneau_groupe);
+  const tarif = normKey(member.tarif_name);
+  return group.includes("competition") || tarif.includes("competition");
 }
 
 // ---------------------------------------------------------------- Slot groups and tariffs
