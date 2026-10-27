@@ -317,7 +317,7 @@ export interface paths {
          * @description Exécute le batch de récupération des résultats MyCompet FFME pour les compétitions passées
          *     et envoie un e-mail de synthèse si des résultats sont découverts.
          *     Called by Cloud Scheduler every day at 07:00 (its OIDC token, see api_auth.SCHEDULER_PATHS) or by an admin.
-         *     `force` (every ended competition, results or not) and `email` (another recipient): admin only.
+         *     `force` (every competition ended in the last year, results or not) and `email` (another recipient): admin only.
          *     503: the competitions could not be read, nothing was done (Cloud Scheduler shows the run as failed).
          */
         post: operations["api_cron_fetch_competition_results_api_competitions_cron_fetch_results_post"];

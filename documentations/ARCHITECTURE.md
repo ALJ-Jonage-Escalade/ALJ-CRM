@@ -136,9 +136,10 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
 | `ffme/` | `ffme` | `/api/ffme/stats`, `/export` (CSV), `/preview`, `/import` |
 | `integrations/` | `helloasso`, `google_auth`, `cloud_db` | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync` · `/api/auth/google/*` · `/api/cloud-db/status`, `/sync` |
 
-- **Cache SQLite** : les routeurs `competitions`, `participants`, `coaches`, `members` (compétitions) et `helloasso_items`
-  ne lisent que Firestore et sautent le rafraîchissement du cache (`FIRESTORE_ONLY_PATHS`). Une route qui lit ou écrit le
-  cache va dans un autre routeur, même sous `/api/competitions` (`results`, `payments`).
+- **Cache SQLite** : les routeurs `competitions`, `participants`, `coaches`, `members` (compétitions), `helloasso_items`
+  et `results` (résultats MyCompet : l'appel de Cloud Scheduler n'attend pas une reconstruction du cache) ne lisent que
+  Firestore et sautent le rafraîchissement du cache (`FIRESTORE_ONLY_PATHS`). Une route qui lit ou écrit le cache va
+  dans un autre routeur, même sous `/api/competitions` (`payments`).
 - **URL appelées de l'extérieur, à ne pas changer** : Cloud Scheduler (job `batch-resultats-competitions`,
   `POST /api/competitions/cron/fetch-results` chaque jour à 07h00, jeton OIDC — à déclarer avant `/{id}/fetch-results`), webhook
   HelloAsso, retours OAuth Google (console Google Cloud), `/health` (déploiement). `tests/test_route_inventory.py`

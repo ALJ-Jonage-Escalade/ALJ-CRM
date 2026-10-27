@@ -274,7 +274,7 @@ def scheduler_service_account() -> str:
     return (os.environ.get("ALJ_SCHEDULER_SERVICE_ACCOUNT") or DEFAULT_SCHEDULER_SERVICE_ACCOUNT).strip().lower()
 
 
-def scheduler_audiences() -> list:
+def scheduler_audiences() -> list[str]:
     raw = os.environ.get("ALJ_SCHEDULER_AUDIENCES") or DEFAULT_SCHEDULER_AUDIENCE
     return [a.strip().rstrip("/") for a in raw.split(",") if a.strip()]
 
@@ -370,7 +370,7 @@ def authorize_request(method: str, path: str, authorization: Optional[str]) -> O
     token = bearer_token(authorization)
     if not token:
         raise AuthError(401, "Authentification requise : connectez-vous avec votre compte Google")
-    if path.rstrip("/") in SCHEDULER_PATHS and _is_google_oidc_token(token):
+    if path in SCHEDULER_PATHS and _is_google_oidc_token(token):
         return verify_scheduler_token(token)
     claims = verify_firebase_token(token)
     try:

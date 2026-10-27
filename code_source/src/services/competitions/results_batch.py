@@ -29,6 +29,7 @@ if _src_dir not in sys.path:
 
 import requests
 
+from domain.utils import normalize_name
 from infrastructure.mail.repository import EmailRepository
 from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL
 from infrastructure.firestore.app_settings import AppSettingsRepository
@@ -49,6 +50,8 @@ SETTING_BATCH_LAST_STATUS = "RESULTATS_BATCH_LAST_STATUS"
 # Only competitions ended in the last N days are searched (unless forced): the others are left to a manual fetch
 SETTING_BATCH_WINDOW_DAYS = "RESULTATS_BATCH_WINDOW_DAYS"
 DEFAULT_WINDOW_DAYS = 30
+# A forced run (admin) searches back this far at least, results or not: older competitions need a manual fetch
+FORCED_WINDOW_DAYS = 365
 # Stops between two competitions after this long: Cloud Scheduler gives up after 180 s (attempt deadline)
 DEFAULT_TIME_BUDGET_SECONDS = 150.0
 # Set on a competition once the summary e-mail asked for its results URL (asked only once)
@@ -97,15 +100,15 @@ def apply_rankings(participants: List[Dict[str, Any]], scraped: List[Dict[str, A
         licence = str(row.get("licence") or "").strip()
         if licence:
             by_licence[licence] = row
-        full_name = f"{row.get('nom', '')} {row.get('prenom', '')}".strip().lower()
+        full_name = normalize_name(f"{row.get('nom') or ''} {row.get('prenom') or ''}")
         if full_name:
             by_name[full_name] = row
 
     athletes: List[ClubAthlete] = []
     for participant in participants:
         licence = str(participant.get("num_licence") or "").strip()
-        full_name = f"{participant.get('nom', '')} {participant.get('prenom', '')}".strip().lower()
-        match = (by_licence.get(licence) if licence else None) or by_name.get(full_name)
+        full_name = normalize_name(f"{participant.get('nom') or ''} {participant.get('prenom') or ''}")
+        match = (by_licence.get(licence) if licence else None) or (by_name.get(full_name) if full_name else None)
         if not match:
             continue
         rank = str(match.get("classement") or "").strip()
@@ -243,9 +246,11 @@ class CompetitionResultsBatchService:
     def list_pending_competitions(cls, force: bool = False, window_days: Optional[int] = None,
                                   today: Optional[datetime.date] = None) -> List[Dict[str, Any]]:
         """Competitions ended in the last `window_days` days (None: the setting) without results, most recent first.
-        `force`: every ended competition, results or not. ResultsBatchError when Firestore cannot be read."""
+        `force`: every competition ended in the last FORCED_WINDOW_DAYS days (or the window, if longer), results or not.
+        ResultsBatchError when Firestore cannot be read."""
         today = today or datetime.date.today()
-        oldest = today - datetime.timedelta(days=window_days if window_days is not None else cls.get_window_days())
+        window = window_days if window_days is not None else cls.get_window_days()
+        oldest = today - datetime.timedelta(days=max(window, FORCED_WINDOW_DAYS) if force else window)
         try:
             docs = CompetitionFirestoreRepository.list_competition_docs()
         except FirestoreError as e:
@@ -256,7 +261,7 @@ class CompetitionResultsBatchService:
             ended = cls.end_date(doc)
             if doc.get("id") is None or ended is None or ended > today:
                 continue
-            if force or (ended >= oldest and not cls.has_results(doc)):
+            if ended >= oldest and (force or not cls.has_results(doc)):
                 pending.append(doc)
         pending.sort(key=lambda d: cls.end_date(d) or datetime.date.min, reverse=True)
         return pending
@@ -543,8 +548,8 @@ class CompetitionResultsBatchService:
     @classmethod
     def _mark_url_requested(cls, comp: Dict[str, Any], at: str) -> None:
         try:
-            FirestoreClient.update_fields(CompetitionFirestoreRepository.COLLECTION_COMPETITIONS, str(comp["id"]),
-                                          {FIELD_NEEDS_URL_NOTIFIED: at})
+            FirestoreClient.update_fields(CompetitionFirestoreRepository.COLLECTION_COMPETITIONS,
+                                          comp.get("_doc_id") or str(comp["id"]), {FIELD_NEEDS_URL_NOTIFIED: at})
         except FirestoreError:
             logger.warning("[BATCH_RESULTATS] Mémorisation de la demande d'URL impossible (#%s)", comp.get("id"), exc_info=True)
 
@@ -579,6 +584,7 @@ class CompetitionResultsBatchService:
         archive = cls._load_archive(pending)
         results_found_list: List[Dict[str, Any]] = []
         needs_url: List[Dict[str, Any]] = []
+        needs_url_comps: List[Dict[str, Any]] = []  # their documents, marked once the e-mail is sent
         details: List[Dict[str, Any]] = []
         checked = 0
 
@@ -607,6 +613,7 @@ class CompetitionResultsBatchService:
             elif outcome["status"] == "needs_url":
                 if not comp.get(FIELD_NEEDS_URL_NOTIFIED):  # asked once, not every morning
                     needs_url.append(item)
+                    needs_url_comps.append(comp)
             else:
                 print(f"ℹ️ [BATCH_RESULTATS] Aucun résultat officiel disponible pour le moment pour « {nom} ».")
 
@@ -621,8 +628,8 @@ class CompetitionResultsBatchService:
             print(f"📧 [BATCH_RESULTATS] Envoi de l'e-mail récapitulatif pour {len(results_found_list)} compétition(s)...")
             email_sent = cls.send_notification_email(results_found_list, to_email=notification_email, needs_url=needs_url)
             if email_sent:
-                for item in needs_url:
-                    cls._mark_url_requested(item, now_iso)
+                for comp in needs_url_comps:
+                    cls._mark_url_requested(comp, now_iso)
         else:
             print("ℹ️ [BATCH_RESULTATS] Aucun nouveau résultat à notifier aujourd'hui.")
 

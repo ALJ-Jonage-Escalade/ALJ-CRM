@@ -1,8 +1,8 @@
 """MyCompet FFME results: daily batch (Cloud Scheduler), fetch for one competition, batch settings.
 
-The batch settings and status now live in Firestore (app_settings): these routes no longer read the
-SQLite cache. Moving this router to the Firestore-only list of server.py (no cache refresh before the
-batch) is a separate change.
+Firestore only (competitions, app_settings): this router is in the Firestore-only list of server.py, so
+Cloud Scheduler's call does not wait for a SQLite cache rebuild. A route that reads the cache must go
+in another router.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ async def api_cron_fetch_competition_results(
     Exécute le batch de récupération des résultats MyCompet FFME pour les compétitions passées
     et envoie un e-mail de synthèse si des résultats sont découverts.
     Called by Cloud Scheduler every day at 07:00 (its OIDC token, see api_auth.SCHEDULER_PATHS) or by an admin.
-    `force` (every ended competition, results or not) and `email` (another recipient): admin only.
+    `force` (every competition ended in the last year, results or not) and `email` (another recipient): admin only.
     503: the competitions could not be read, nothing was done (Cloud Scheduler shows the run as failed).
     """
     from infrastructure.security.api_auth import Role, has_role, is_scheduler
@@ -111,7 +111,8 @@ async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = 
                 CompetitionFirestoreRepository.record_results, comp_doc.get("id") or comp_id,
                 lambda parts: len(apply_rankings(parts, scraped_results, now_iso)), fields)
             if not matched_count:  # keep the URL the coach gave, for the next try
-                FirestoreClient.update_fields("competitions", comp_doc.get("_doc_id") or comp_id, fields)
+                await run_in_threadpool(FirestoreClient.update_fields, CompetitionFirestoreRepository.COLLECTION_COMPETITIONS,
+                                        comp_doc.get("_doc_id") or comp_id, fields)
         except FirestoreError as e:
             print(f"⚠️ [MYCOMPET] Erreur mise à jour Firestore : {e}")
         finally:

@@ -18,7 +18,8 @@ if _src_dir not in sys.path:
 
 from services.competitions.results_batch import (
     CompetitionResultsBatchService,
-    DEFAULT_NOTIFICATION_EMAIL
+    DEFAULT_NOTIFICATION_EMAIL,
+    apply_rankings,
 )
 from support.fake_firestore import use_fake_firestore
 
@@ -141,6 +142,16 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
         self.assertIn("🥈", html)  # Médaille d'argent 2e
         self.assertIn("https://mycompet.ffme.fr/resultat/resultat_13660", html)
         self.assertTrue("batch quotidien ALJ Escalade" in html)
+
+
+def test_apply_rankings_matches_name_without_accents_or_hyphens():
+    participants = [{"nom": "Lefèvre", "prenom": "Zoé-Anne", "num_licence": ""}, {"nom": "Autre", "prenom": "Grimpeur"}]
+    scraped = [{"nom": "LEFEVRE", "prenom": "Zoe Anne", "licence": "", "classement": "3", "total_categorie": 12,
+                "categorie": "U13 Femme"}]
+    athletes = apply_rankings(participants, scraped, "2026-10-26T07:00:00")
+    assert [a["classement"] for a in athletes] == ["3"]
+    assert participants[0]["resultat_ffme"] == "3 / 12"
+    assert "classement" not in participants[1]
 
 
 if __name__ == "__main__":

@@ -5,12 +5,12 @@ import html
 import logging
 import os
 import re
-import unicodedata
 from typing import List, Optional, TypedDict
 
 import requests
 import lxml.html
 import pandas as pd
+from domain.utils import normalize_string
 from infrastructure import runtime_env
 from paths import ROOT_DIR
 
@@ -303,9 +303,8 @@ DATE_TOLERANCE = datetime.timedelta(days=1)
 
 
 def _clean(text: str) -> str:
-    text = unicodedata.normalize('NFKD', text or "")
-    text = "".join(c for c in text if not unicodedata.combining(c))
-    return re.sub(r'[^a-zA-Z0-9]+', ' ', text).lower().strip()
+    """Lower case, no accents, words of letters and digits only (archive and competition names)."""
+    return re.sub(r'[^a-z0-9]+', ' ', normalize_string(text)).strip()
 
 
 def parse_ffme_archive_entries(html_text: str) -> List[ArchiveEntry]:

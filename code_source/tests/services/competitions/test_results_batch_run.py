@@ -95,13 +95,15 @@ class TestDailyBatch(BatchTestCase):
         self.competition(201, "Open de bloc de Valbrume", ended_days_ago=5)
         self.competition(202, "Coupe de difficulté Brumevent", ended_days_ago=35)
         self.competition(203, "Futur contest", ended_days_ago=-10)
+        self.competition(204, "Coupe d'il y a deux saisons", ended_days_ago=400)
 
         def checked(**kwargs) -> list:
             return [c["id"] for c in Batch.list_pending_competitions(today=TODAY, **kwargs)]
 
         self.assertEqual(checked(window_days=30), [201])
         self.assertEqual(checked(window_days=60), [201, 202])  # most recent first
-        self.assertEqual(checked(window_days=1, force=True), [201, 202])
+        self.assertEqual(checked(window_days=365), [201, 202])
+        self.assertEqual(checked(window_days=1, force=True), [201, 202])  # forced: one year back, not 204
         self.assertEqual(checked(), [201])  # default: 30 days
         self.fake.upsert_document("app_settings", SETTING_BATCH_WINDOW_DAYS, {"key": SETTING_BATCH_WINDOW_DAYS, "value": "45"})
         self.assertEqual(checked(), [201, 202])

@@ -47,7 +47,7 @@ from infrastructure.firestore.cloud_database import CloudDatabase
 # projections, HelloAsso mirror) through CompetitionFirestoreRepository: they never touch the
 # SQLite cache, so they must not wait for its refresh (a full rebuild after a cold start).
 # Filled from their routers once included (below). Exact routes, not path prefixes: other routes
-# under /api/competitions (results batch, check-all-paid) use the cache.
+# under /api/competitions (check-all-paid) use the cache.
 FIRESTORE_ONLY_PATHS: List[re.Pattern[str]] = []
 
 
@@ -116,11 +116,13 @@ for _api in (competitions, participants, coaches, competition_members, helloasso
     app.include_router(_api.router)
 pages.mount_static(app)
 # Every route of these routers skips the SQLite cache refresh: a route that reads or writes the
-# cache (members, app settings, HelloAsso payments…) must live in another router, even under
-# /api/competitions (results batch, check-all-paid). /api/me and /api/admin/access only use the access list,
-# /api/helloasso/campaigns the app_settings collection and HelloAsso.
-FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items, me, access,
-                                                       helloasso_campaigns)
+# cache (members, email templates, HelloAsso payments…) must live in another router, even under
+# /api/competitions (check-all-paid). /api/me and /api/admin/access only use the access list,
+# /api/helloasso/campaigns the app_settings collection and HelloAsso. The MyCompet results batch
+# (results) reads its settings from Firestore: Cloud Scheduler's 07:00 call must not wait for a
+# full cache rebuild on a cold start (180 s deadline).
+FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items,
+                                                      results, me, access, helloasso_campaigns)
                             for r in _api.router.routes if isinstance(r, APIRoute))
 app.add_exception_handler(ServiceError, service_error_handler)
 

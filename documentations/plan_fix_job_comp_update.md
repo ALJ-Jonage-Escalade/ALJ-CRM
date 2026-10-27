@@ -111,7 +111,7 @@ Only the manual "Trouver les résultats" action per competition works (`POST /ap
   Firestore error → the endpoint returns an error, not 200 with 0 competitions.
 
 ### b. Bound the run (must ship with **a**, otherwise the first run times out)
-- Only competitions that ended in the last N days, unless `force=true` (admin only). N is the `app_settings` key
+- Only competitions that ended in the last N days, unless `force=true` (admin only: one year back, results or not). N is the `app_settings` key
   `RESULTATS_BATCH_WINDOW_DAYS` (default 30, read through `AppSettingsRepository`, invalid value → default + warning),
   so the club can change it without a deploy. `run_daily_batch` / `list_pending_competitions` also take
   `window_days: int | None = None` and `today: datetime.date | None = None` (`None` = setting / real date), so tests
