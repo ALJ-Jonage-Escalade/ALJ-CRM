@@ -1,23 +1,26 @@
 <script setup lang="ts">
 /* Layout of every page: navigation (side menu on desktop, bottom bar on phones) with the signed-in account, header,
    and the sign-in / access gate. The page content is only rendered for a role allowed on the page (lib/access.ts),
-   and the menu only lists those pages.
+   and the menu only lists those pages. Without any page to offer, the gate is shown alone, full screen.
    Element ids are the ones of the former web/shared/alj-shell.js: the e2e tests rely on them.
    Printed, only the page content remains (Planning prints its grid). */
 import { computed, inject, ref, watch } from "vue";
 import { AUTH_KEY } from "../composables/auth";
-import { canOpen, pageAccess, PAGES, shownOn, verdict, type PageId } from "../lib/access";
+import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
+import { canOpen, OFFLINE_PAGES, PAGES, pageVerdict, shownOn, type PageId } from "../lib/access";
 import { API_KEY } from "../lib/api";
 import { isStaff, roleLabel } from "../lib/roles";
 import { offlineStore, STORE_KEY } from "../lib/store";
 import { logoutWarning } from "../pages/competitions/outbox";
+import AppBrand from "./AppBrand.vue";
 import PageLink from "./PageLink.vue";
+import UiButton from "./ui/UiButton.vue";
 import VersionBadge from "./VersionBadge.vue";
 import { dialogs } from "../composables/dialogs";
 
-/** sync: freshness of the page's data, next to the title (Adhérents). offlineRead: the page shows the copy kept on the
-    device when the role cannot be checked for lack of network (the directory); its slot then gets no role. */
-const props = defineProps<{ page: PageId; title: string; sync?: string; offlineRead?: boolean }>();
+/** sync: freshness of the page's data, next to the title (Adhérents). A page readable offline (PAGES offlineRead) gets
+    no role in its slot when it shows the copy kept on the device. */
+const props = defineProps<{ page: PageId; title: string; sync?: string }>();
 
 const auth = inject(AUTH_KEY)!;
 const api = inject(API_KEY)!;
@@ -42,19 +45,24 @@ async function logout(): Promise<void> {
   await auth.logout();
 }
 
-const who = computed(() => {
-  const s = state.value;
-  if (s.status === "loading") {
-    return "Vérification de la connexion…";
-  }
-  if (s.status === "signedOut") {
-    return "Non connecté";
-  }
-  return `${s.user.email || "(compte sans e-mail)"} · ${s.status === "signedIn" ? roleLabel(s.role) : "⚠️ rôle inconnu"}`;
-});
+const email = computed(() =>
+  state.value.status === "signedIn" || state.value.status === "error" ? state.value.user.email || "(compte sans e-mail)" : "",
+);
+// The shell (outside the full-screen gate) is only shown with a user: signed in, or role unchecked offline
+const who = computed(() => `${email.value} · ${state.value.status === "signedIn" ? roleLabel(state.value.role) : "⚠️ rôle inconnu"}`);
 const staff = computed(() => state.value.status === "signedIn" && isStaff(state.value.role));
 const role = computed(() => (state.value.status === "signedIn" ? state.value.role : null));
-const access = computed(() => verdict(state.value, pageAccess(props.page), props.offlineRead));
+const access = computed(() => pageVerdict(state.value, props.page));
+const offline = computed(() => state.value.status === "error" && state.value.offline);
+/* No page to offer (signed out, account refused, role unchecked with the network up): the gate alone, full screen,
+   without the menu. Offline, the menu stays: it leads to the pages readable offline. */
+const fullscreen = computed(() => {
+  const pageVerdict = access.value;
+  return (
+    pageVerdict === "pending" || pageVerdict === "signIn" || pageVerdict === "noAccess" || (pageVerdict === "unverified" && !offline.value)
+  );
+});
+const signInError = inject(SIGN_IN_ERROR_KEY, ref(null));
 // Every page until the role is known, then only those the role may open (none outside the staff)
 const nav = computed(() => (state.value.status === "signedIn" ? PAGES.filter((p) => canOpen(role.value, p.access)) : PAGES));
 
@@ -83,15 +91,62 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
 </script>
 
 <template>
-  <div class="min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)] print:block">
+  <!-- Full screen: the gate alone on the menu's background; bottom padding keeps it clear of the dev banner -->
+  <div
+    v-if="fullscreen"
+    id="login-screen"
+    class="flex min-h-dvh flex-col items-center justify-center gap-5 bg-side px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(5rem,env(safe-area-inset-bottom))] text-side-text"
+  >
+    <AppBrand large class="text-center" />
+    <p v-if="access === 'pending'" id="session-check" role="status" class="text-sm text-slate-300">Vérification de la connexion…</p>
+    <section v-else id="gate" class="w-full max-w-sm rounded-xl bg-white px-4.5 py-4 text-slate-900 shadow-lg">
+      <template v-if="access === 'signIn'">
+        <div class="flex flex-col">
+          <h2 class="mb-2 text-[17px] font-bold">🔐 Connexion</h2>
+          <p class="my-1.5 leading-normal">
+            Le bureau est réservé aux coachs et administrateurs du club. Connectez-vous avec votre compte Google.
+          </p>
+          <p
+            v-if="signInError"
+            data-testid="sign-in-error"
+            role="alert"
+            class="my-2 rounded-lg border border-red-300 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800"
+          >
+            ❌ {{ signInError }}
+          </p>
+          <UiButton id="gate-login" class="mt-2" @click="auth.login()">🔑 Se connecter avec Google</UiButton>
+        </div>
+      </template>
+      <template v-else-if="access === 'unverified' && state.status === 'error'">
+        <h2 class="mb-2 text-[17px] font-bold">⚠️ Droits non vérifiés</h2>
+        <p class="my-1.5 leading-normal">{{ state.message }}</p>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <UiButton id="gate-retry" @click="auth.retry()">🔄 Réessayer</UiButton>
+          <UiButton id="gate-logout" variant="muted" @click="logout">🚪 Se déconnecter</UiButton>
+        </div>
+      </template>
+      <template v-else-if="state.status === 'signedIn'">
+        <h2 class="mb-2 text-[17px] font-bold">⛔ Accès réservé</h2>
+        <p class="my-1.5 leading-normal">
+          Connecté en tant que
+          <b data-testid="gate-account">{{ email }}</b>
+          : ce compte n'est pas autorisé à consulter le bureau. Déconnectez-vous et utilisez un compte coach ou administrateur.
+        </p>
+        <!-- No menu here: the pages the role may still open (the competitions for a read-only account) -->
+        <p v-if="nav.length" data-testid="gate-pages" class="my-1.5 leading-normal">
+          Accessible avec ce compte :
+          <PageLink v-for="item in nav" :key="item.id" :href="item.href" :data-page="item.id" class="font-semibold text-accent">
+            {{ item.icon }} {{ item.label }}
+          </PageLink>
+        </p>
+        <UiButton id="gate-logout" variant="muted" class="mt-2" @click="logout">🚪 Se déconnecter</UiButton>
+      </template>
+    </section>
+  </div>
+
+  <div v-else class="min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)] print:block">
     <aside class="print:hidden md:sticky md:top-0 md:flex md:h-dvh md:flex-col md:gap-5 md:bg-side md:px-3 md:py-5 md:text-side-text">
-      <div class="hidden px-2 md:block">
-        <b class="block text-base text-slate-50">🧗 ALJ Escalade</b>
-        <span class="mt-0.5 block text-xs text-slate-400">
-          Bureau ·
-          <VersionBadge />
-        </span>
-      </div>
+      <AppBrand class="hidden px-2 md:block" />
       <nav
         v-if="nav.length"
         aria-label="Navigation principale"
@@ -117,18 +172,11 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
       </nav>
       <!-- Signed-in account: foot of the side menu on desktop, top of the page on phones (the menu is a bottom bar) -->
       <div
+        v-if="email"
         class="flex items-center gap-2 px-4 pt-3 md:mt-auto md:flex-col md:items-start md:gap-2 md:border-t md:border-side-hover md:px-2 md:pt-4"
       >
         <span id="who" class="min-w-0 text-xs break-words text-slate-500 md:text-slate-400">{{ who }}</span>
-        <button
-          v-if="state.status === 'signedIn' || state.status === 'error'"
-          id="logout-btn"
-          type="button"
-          class="ml-auto shrink-0 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-300 md:ml-0"
-          @click="logout"
-        >
-          🚪 Se déconnecter
-        </button>
+        <UiButton id="logout-btn" variant="muted" small class="ml-auto shrink-0 md:ml-0" @click="logout">🚪 Se déconnecter</UiButton>
       </div>
     </aside>
 
@@ -160,38 +208,25 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         📴 Hors ligne : consultation des dernières données reçues sur cet appareil.
       </p>
 
+      <!-- Gate kept in the layout: offline (the menu leads to the pages readable offline) and a coach on an admin page -->
       <section
-        v-if="access !== 'allow' && access !== 'pending' && access !== 'offline'"
+        v-if="access === 'unverified' || access === 'adminOnly'"
         id="gate"
         class="max-w-xl rounded-xl border border-slate-200 bg-white px-4.5 py-4 shadow-sm"
       >
-        <template v-if="access === 'signIn'">
-          <h2 class="mb-2 text-[17px] font-bold">🔐 Connexion</h2>
-          <p class="my-1.5 leading-normal">
-            Le bureau est réservé aux coachs et administrateurs du club. Connectez-vous avec votre compte Google.
-          </p>
-          <button
-            id="gate-login"
-            type="button"
-            class="mt-2 cursor-pointer rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:bg-accent-dark"
-            @click="auth.login()"
-          >
-            🔑 Se connecter avec Google
-          </button>
-        </template>
-        <template v-else-if="access === 'unverified' && state.status === 'error'">
+        <template v-if="access === 'unverified' && state.status === 'error'">
           <h2 class="mb-2 text-[17px] font-bold">⚠️ Droits non vérifiés</h2>
           <p class="my-1.5 leading-normal">{{ state.message }}</p>
-          <button
-            id="gate-retry"
-            type="button"
-            class="mt-2 cursor-pointer rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:bg-accent-dark"
-            @click="auth.retry()"
-          >
-            🔄 Réessayer
-          </button>
+          <p data-testid="offline-pages" class="my-1.5 leading-normal">
+            Hors ligne, restent consultables :
+            <template v-for="(item, index) in OFFLINE_PAGES" :key="item.id">
+              <template v-if="index">·</template>
+              <PageLink :href="item.href" class="font-semibold text-accent">{{ item.icon }} {{ item.label }}</PageLink>
+            </template>
+          </p>
+          <UiButton id="gate-retry" class="mt-2" @click="auth.retry()">🔄 Réessayer</UiButton>
         </template>
-        <template v-else-if="access === 'adminOnly'">
+        <template v-else>
           <h2 class="mb-2 text-[17px] font-bold">⛔ Réservé aux administrateurs</h2>
           <p class="my-1.5 leading-normal">Cette page est réservée aux administrateurs du club.</p>
           <a
@@ -200,20 +235,6 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
           >
             🏠 Retour à l'accueil
           </a>
-        </template>
-        <template v-else>
-          <h2 class="mb-2 text-[17px] font-bold">⛔ Accès réservé</h2>
-          <p class="my-1.5 leading-normal">
-            Ce compte n'est pas autorisé à consulter le bureau. Déconnectez-vous et utilisez un compte coach ou administrateur.
-          </p>
-          <button
-            id="gate-logout"
-            type="button"
-            class="mt-2 cursor-pointer rounded-lg bg-slate-200 px-3.5 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-300"
-            @click="auth.logout()"
-          >
-            🚪 Se déconnecter
-          </button>
         </template>
       </section>
 

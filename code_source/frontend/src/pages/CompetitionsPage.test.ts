@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, ref } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
-import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import type { Role } from "../lib/roles";
@@ -127,7 +126,6 @@ async function render(state: AuthState, api: ApiFetch, store: OfflineStore, path
         [API_KEY]: api,
         [CLIENT_KEY]: createApiClient(api, "http://alj.test"),
         [STORE_KEY]: store,
-        [SIGN_IN_ERROR_KEY]: ref(null),
       },
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
     },

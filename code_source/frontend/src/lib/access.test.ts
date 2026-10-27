@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AuthState } from "../composables/auth";
-import { canOpen, shownOn, verdict, type Access, type Verdict } from "./access";
+import { canOpen, OFFLINE_PAGES, pageVerdict, shownOn, verdict, type Access, type Verdict } from "./access";
 import type { Role } from "./roles";
 
 const USER = { uid: "u1", email: "u@example.org" };
@@ -46,6 +46,16 @@ describe("verdict of a page readable offline", () => {
     [signedIn("coach"), "allow"],
   ])("otherwise as any page", (state, expected) => {
     expect(verdict(state, "staff", true)).toBe(expected);
+  });
+});
+
+describe("pageVerdict", () => {
+  const offline: AuthState = { status: "error", user: USER, message: "x", offline: true };
+  it("reads offline only the pages PAGES marks so", () => {
+    expect(OFFLINE_PAGES.map((p) => p.id)).toEqual(["annuaire", "competitions"]);
+    expect(pageVerdict(offline, "annuaire")).toBe("offline");
+    expect(pageVerdict(offline, "competitions")).toBe("offline");
+    expect(pageVerdict(offline, "planning")).toBe("unverified");
   });
 });
 

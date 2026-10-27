@@ -88,5 +88,5 @@ export async function handleSignIn(deps: SignInDeps): Promise<string | null> {
   return null;
 }
 
-/** The message of a failed sign-in, shown by the competitions page (provided by main.ts). */
+/** The message of a failed sign-in, shown on the sign-in gate of AppShell (provided by main.ts). */
 export const SIGN_IN_ERROR_KEY: InjectionKey<Readonly<Ref<string | null>>> = Symbol("sign-in-error");

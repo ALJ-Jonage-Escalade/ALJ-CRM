@@ -15,11 +15,21 @@ export const REFUSED_QUERY = "reserve";
     same breakpoint as the menu (`md`). Hidden by CSS only: both addresses still open on any screen. */
 export type Screen = "any" | "phone" | "desktop";
 
-/** Office pages, in menu order. */
+/** Office pages, in menu order. offlineRead: the page shows the copy kept on the device when the role cannot be checked
+    for lack of network (verdict "offline"). */
 export const PAGES = [
-  { id: "accueil", icon: "🏠", label: "Accueil", short: "Accueil", href: "/bureau/", access: "staff", screen: "any" },
-  { id: "adherents", icon: "👥", label: "Adhérents", short: "Adhérents", href: "/bureau/adherents", access: "staff", screen: "desktop" },
-  { id: "annuaire", icon: "📇", label: "Annuaire", short: "Annuaire", href: "/index", access: "staff", screen: "phone" },
+  { id: "accueil", icon: "🏠", label: "Accueil", short: "Accueil", href: "/bureau/", access: "staff", screen: "any", offlineRead: false },
+  {
+    id: "adherents",
+    icon: "👥",
+    label: "Adhérents",
+    short: "Adhérents",
+    href: "/bureau/adherents",
+    access: "staff",
+    screen: "desktop",
+    offlineRead: false,
+  },
+  { id: "annuaire", icon: "📇", label: "Annuaire", short: "Annuaire", href: "/index", access: "staff", screen: "phone", offlineRead: true },
   {
     id: "communications",
     icon: "✉️",
@@ -28,6 +38,7 @@ export const PAGES = [
     href: "/bureau/communications",
     access: "admin",
     screen: "any",
+    offlineRead: false,
   },
   {
     id: "competitions",
@@ -37,11 +48,48 @@ export const PAGES = [
     href: "/bureau/competitions",
     access: "viewer",
     screen: "any",
+    offlineRead: true,
   },
-  { id: "planning", icon: "📅", label: "Planning", short: "Planning", href: "/bureau/planning", access: "staff", screen: "any" },
-  { id: "outils", icon: "🛠️", label: "Outils", short: "Outils", href: "/bureau/outils", access: "staff", screen: "any" },
-  { id: "parametres", icon: "⚙️", label: "Paramètres", short: "Réglages", href: "/bureau/parametres", access: "admin", screen: "any" },
-] as const satisfies readonly { id: string; icon: string; label: string; short: string; href: string; access: Access; screen: Screen }[];
+  {
+    id: "planning",
+    icon: "📅",
+    label: "Planning",
+    short: "Planning",
+    href: "/bureau/planning",
+    access: "staff",
+    screen: "any",
+    offlineRead: false,
+  },
+  {
+    id: "outils",
+    icon: "🛠️",
+    label: "Outils",
+    short: "Outils",
+    href: "/bureau/outils",
+    access: "staff",
+    screen: "any",
+    offlineRead: false,
+  },
+  {
+    id: "parametres",
+    icon: "⚙️",
+    label: "Paramètres",
+    short: "Réglages",
+    href: "/bureau/parametres",
+    access: "admin",
+    screen: "any",
+    offlineRead: false,
+  },
+] as const satisfies readonly {
+  id: string;
+  icon: string;
+  label: string;
+  short: string;
+  href: string;
+  access: Access;
+  screen: Screen;
+  offlineRead: boolean;
+}[];
 
 export type PageId = (typeof PAGES)[number]["id"];
 
@@ -52,6 +100,9 @@ export function pageAccess(id: PageId): Access {
 export function pageScreen(id: PageId): Screen {
   return PAGES.find((p) => p.id === id)!.screen;
 }
+
+/** The pages readable offline (the gate links to them when the role cannot be checked for lack of network). */
+export const OFFLINE_PAGES = PAGES.filter((p) => p.offlineRead);
 
 // Whole class names, for Tailwind to find them in this file
 const SHOWN: Record<"flex" | "block", Record<Screen, string>> = {
@@ -105,4 +156,10 @@ export function verdict(state: AuthState, access: Access, offlineRead = false): 
     return "allow";
   }
   return isStaff(state.role) ? "adminOnly" : "noAccess";
+}
+
+/** The verdict of an office page, readable offline or not as PAGES says. */
+export function pageVerdict(state: AuthState, id: PageId): Verdict {
+  const page = PAGES.find((p) => p.id === id)!;
+  return verdict(state, page.access, page.offlineRead);
 }

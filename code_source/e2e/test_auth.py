@@ -46,7 +46,7 @@ def test_logout(page, login_as):
     expect(page.locator("#content")).to_be_visible()
     page.locator("#logout-btn").click()
     expect(page.locator("#gate-login")).to_be_visible()
-    expect(page.locator("#who")).to_have_text("Non connecté")
+    expect(page.locator("#login-screen")).to_be_visible()  # full screen, without the menu
     expect(page.locator("#content")).to_be_hidden()
 
 
