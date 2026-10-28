@@ -11,6 +11,8 @@ from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from domain.members.sex import Sex
+
 
 class CompetitionParticipant(BaseModel):
     """A member registered for a competition (row of its `participants`, infrastructure/firestore/competitions)."""
@@ -35,7 +37,7 @@ class CompetitionParticipant(BaseModel):
     total_categorie: Union[int, str] = 0
     categorie_ffme: str = ""
     resultat_ffme: str = ""
-    gender: str = ""
+    sex: Optional[Sex] = Field(None, description="Read from the member (adherents directory), None when not given")
     updated_at: str = Field("", description="Sent back as unchanged_since by a change queued offline")
 
 
@@ -75,7 +77,7 @@ class CompetitionMember(BaseModel):
     tarif: str = ""
     saison: str = ""
     creneau_groupe: str = ""
-    gender: str = ""
+    sex: Optional[Sex] = None
 
 
 class GroupLoaded(BaseModel):

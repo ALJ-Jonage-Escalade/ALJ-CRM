@@ -225,7 +225,7 @@ class TestBureauFiles(unittest.TestCase):
                     "last_name": "VALENTIN",
                     "first_name": "Claire",
                     "birth_date": "2010-05-14",
-                    "gender": "Femme",
+                    "sex": "F",
                     "tarif_name": "Cours Ados 1 (Lundi)",
                     "status": "Validé",
                     "amount": 195.0,
@@ -254,7 +254,7 @@ class TestBureauFiles(unittest.TestCase):
             self.assertIsNotNone(u)
             self.assertEqual(u["first_name"], "Claire")
             self.assertEqual(u["birth_date"], "2010-05-14")
-            self.assertEqual(u["gender"], "Femme")
+            self.assertEqual(u["sex"], "F")
             self.assertEqual(u["licence_ffme"], "654321")
             self.assertEqual(u["badge_rouge"], "Oui")
             self.assertEqual(u["autonomie_bloc"], "Oui")

@@ -4061,10 +4061,15 @@
             "title": "Creneau Groupe",
             "default": ""
           },
-          "gender": {
-            "type": "string",
-            "title": "Gender",
-            "default": ""
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": true,
@@ -4186,10 +4191,16 @@
             "title": "Resultat Ffme",
             "default": ""
           },
-          "gender": {
-            "type": "string",
-            "title": "Gender",
-            "default": ""
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Read from the member (adherents directory), None when not given"
           },
           "updated_at": {
             "type": "string",
@@ -5725,9 +5736,16 @@
             ],
             "title": "Age"
           },
-          "gender": {
-            "type": "string",
-            "title": "Gender"
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "FFME sex, None when not given"
           },
           "address": {
             "type": "string",
@@ -5874,7 +5892,7 @@
           "first_name",
           "birth_date",
           "age",
-          "gender",
+          "sex",
           "address",
           "zip_code",
           "city",
@@ -5941,6 +5959,17 @@
               }
             ],
             "title": "Licence Ffme"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sent as null to clear it"
           },
           "badge_rouge": {
             "anyOf": [
@@ -6229,15 +6258,15 @@
             "title": "Birth Date",
             "default": ""
           },
-          "gender": {
-            "type": "string",
-            "enum": [
-              "Homme",
-              "Femme",
-              ""
-            ],
-            "title": "Gender",
-            "default": ""
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "tarif_name": {
             "type": "string",
@@ -6450,8 +6479,15 @@
             "title": "Prénom"
           },
           "Sexe": {
-            "type": "string",
-            "title": "Sexe"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None when not given (the page labels it)"
           },
           "Âge": {
             "anyOf": [
@@ -7058,6 +7094,15 @@
           "message"
         ],
         "title": "ServiceCheck"
+      },
+      "Sex": {
+        "type": "string",
+        "enum": [
+          "F",
+          "H"
+        ],
+        "title": "Sex",
+        "description": "FFME codes (column \"sexe\" of the FFME CSV)."
       },
       "SyncCounters": {
         "properties": {

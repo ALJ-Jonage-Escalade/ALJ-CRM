@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { sexPluralLabel, type Sex } from "../../../lib/sex";
 import type { Competition, Row } from "../competitions";
 
 const props = defineProps<{
@@ -7,45 +8,22 @@ const props = defineProps<{
   rows: readonly Row[];
 }>();
 
-// Détection du sexe : priorité au champ gender, sinon catégorie FFME
-function detectGender(r: Row): "Femmes" | "Hommes" | "Non renseigné" {
-  const g = String(r.gender ?? "")
-    .trim()
-    .toLowerCase();
-  if (g.startsWith("f") || g === "femme" || g === "féminin") {
-    return "Femmes";
-  }
-  if (g.startsWith("h") || g.startsWith("m") || g === "homme" || g === "masculin") {
-    return "Hommes";
-  }
-
-  const cat = String(r.categorie_ffme ?? "").toLowerCase();
-  if (cat.includes("femme") || cat.includes("dame") || cat.includes("féminin") || cat.includes("feminin") || /\bf\b/.test(cat)) {
-    return "Femmes";
-  }
-  if (cat.includes("homme") || cat.includes("masculin") || /\b[hm]\b/.test(cat)) {
-    return "Hommes";
-  }
-
-  return "Non renseigné";
-}
-
-// 1. Répartition par sexe
-const genderCounts = computed(() => {
-  const counts: Record<string, number> = {};
-  for (const r of props.rows) {
-    const g = detectGender(r);
-    counts[g] = (counts[g] || 0) + 1;
-  }
-  return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-});
-
-// Couleurs dédiées par sexe
-const GENDER_COLORS: Record<string, string> = {
-  Femmes: "#EC4899", // Rose
-  Hommes: "#3B82F6", // Bleu
-  "Non renseigné": "#94A3B8", // Gris ardoise
+// 1. Répartition par sexe (celui de l'adhérent, renvoyé par le serveur)
+type SexKey = Sex | "none";
+const SEX_COLORS: Record<SexKey, string> = {
+  F: "#EC4899", // Rose
+  H: "#3B82F6", // Bleu
+  none: "#94A3B8", // Gris ardoise
 };
+
+const sexCounts = computed(() => {
+  const counts = new Map<SexKey, number>();
+  for (const r of props.rows) {
+    const key = r.sex ?? "none";
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1]);
+});
 
 // 2. Répartition par discipline
 const disciplineCounts = computed(() => {
@@ -61,19 +39,20 @@ const disciplineCounts = computed(() => {
 const PALETTE = ["#3B82F6", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#6366F1", "#14B8A6", "#F97316"];
 
 // Calcul des parts du camembert (SVG Pie)
-const totalGenders = computed(() => genderCounts.value.reduce((sum, [, n]) => sum + n, 0));
+const totalSexes = computed(() => sexCounts.value.reduce((sum, [, n]) => sum + n, 0));
 
 const pieSlices = computed(() => {
-  const total = totalGenders.value;
+  const total = totalSexes.value;
   if (!total) {
     return [];
   }
   let cumulative = 0;
-  return genderCounts.value.map(([label, count]) => {
+  return sexCounts.value.map(([key, count]) => {
+    const label = sexPluralLabel(key === "none" ? null : key);
     const startAngle = (cumulative / total) * 360;
     cumulative += count;
     const endAngle = (cumulative / total) * 360;
-    const color = GENDER_COLORS[label] || PALETTE[0];
+    const color = SEX_COLORS[key];
 
     // Calcul arc SVG (r = 40, center = 50, 50)
     const x1 = 50 + 40 * Math.cos((Math.PI * (startAngle - 90)) / 180);
@@ -83,7 +62,7 @@ const pieSlices = computed(() => {
     const largeArc = endAngle - startAngle > 180 ? 1 : 0;
 
     const path =
-      genderCounts.value.length === 1 ? "M 50 10 A 40 40 0 1 1 49.99 10 Z" : `M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArc} 1 ${x2} ${y2} Z`;
+      sexCounts.value.length === 1 ? "M 50 10 A 40 40 0 1 1 49.99 10 Z" : `M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArc} 1 ${x2} ${y2} Z`;
 
     const percent = Math.round((count / total) * 100);
     return { label, count, percent, color, path };

@@ -9,6 +9,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import pandas as pd
 
 from domain.constants import CORRECTIVE_MAP
+from domain.members.sex import parse_sex
 from infrastructure.sqlite import schema_v2
 from infrastructure.sqlite.connection import DB_WRITE_ERROR, SqliteDatabase
 
@@ -84,7 +85,7 @@ class MemberRepository:
     # One row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), the fields of the web member pages
     _MEMBER_ROWS_SQL = """
         SELECT u.id AS user_id, p.id AS purchase_id,
-               u.last_name, u.first_name, u.birth_date, u.gender,
+               u.last_name, u.first_name, u.birth_date, u.sex,
                u.address, u.zip_code, u.city, u.phone, u.email_primary, u.email_secondary,
                u.emergency1_name, u.emergency1_phone, u.emergency2_name, u.emergency2_phone,
                u.licence_ffme, u.health_commitment, u.photo_auth, u.badge_rouge, u.autonomie_bloc,
@@ -228,7 +229,7 @@ class MemberRepository:
         """
         Ajoute manuellement un adhérent dans le schéma v2 (users + orders + purchases),
         en synthétisant une commande « MANUEL-... » équivalente à une inscription HelloAsso.
-        Champs attendus : last_name, first_name, birth_date ('JJ/MM/AAAA' ou ISO), gender,
+        Champs attendus : last_name, first_name, birth_date ('JJ/MM/AAAA' ou ISO), sex,
         phone, email_primary, address, zip_code, city, tarif_name, status, amount.
         Retourne (True, order_ref) ou (False, message d'erreur).
         """
@@ -251,7 +252,7 @@ class MemberRepository:
                 "user_lastName": str(fields.get("last_name") or "").strip(),
                 "user_firstName": str(fields.get("first_name") or "").strip(),
                 DOB_COLUMN: str(fields.get("birth_date") or "").strip(),
-                "champ_Sexe": str(fields.get("gender") or "").strip(),
+                "champ_Sexe": str(fields.get("sex") or "").strip(),
                 "champ_Téléphone ": str(fields.get("phone") or "").strip(),
                 "champ_Adresse mail pour la réception des informations du club": payer_email,
                 "champ_Adresse : numéro et nom de rue": str(fields.get("address") or "").strip(),
@@ -418,7 +419,7 @@ class MemberRepository:
     ) -> Tuple[bool, str]:
         """
         Met à jour de manière ciblée les informations d'un adhérent :
-        - Table users : badge_rouge, autonomie_bloc, email_primary, email_secondary, phone.
+        - Table users : badge_rouge, autonomie_bloc, email_primary, email_secondary, phone, sex…
         - Table purchases : tarif_name.
         Retourne (succès: bool, message: str).
         """
@@ -462,6 +463,9 @@ class MemberRepository:
                 user_updates["phone"] = str(fields["phone"] or "").strip()
             if "licence_ffme" in fields:
                 user_updates["licence_ffme"] = str(fields["licence_ffme"] or "").strip()
+            if "sex" in fields:
+                sex = parse_sex(fields["sex"])
+                user_updates["sex"] = sex.value if sex else None
             if "address" in fields:
                 user_updates["address"] = str(fields["address"] or "").strip()
             if "zip_code" in fields:

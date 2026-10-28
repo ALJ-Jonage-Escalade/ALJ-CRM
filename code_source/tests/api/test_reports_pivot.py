@@ -14,7 +14,7 @@ import server
 
 
 def _row(**fields):
-    row = {"last_name": "weasley ", "first_name": "ron", "gender": "M", "birth_date": "2000-01-15", "city": "Jonage",
+    row = {"last_name": "weasley ", "first_name": "ron", "sex": "H", "birth_date": "2000-01-15", "city": "Jonage",
            "tarif_name": "Adulte", "status": "Processed", "season_name": "2026-2027", "already_member": 1,
            "order_date": "2026-06-03 10:12:00"}
     row.update(fields)
@@ -40,19 +40,19 @@ def test_pivot_records_fields(client):
     assert response.status_code == 200
     load.assert_called_once_with("2026-2027")
     assert response.json() == {"season": "2026-2027", "records": [{
-        "Nom": "WEASLEY", "Prénom": "Ron", "Sexe": "Homme", "Âge": 26, "Tranche d'Âge": "25 à 29 ans",
+        "Nom": "WEASLEY", "Prénom": "Ron", "Sexe": "H", "Âge": 26, "Tranche d'Âge": "25 à 29 ans",
         "Ville": "Jonage", "Groupe / Tarif": "Adulte", "Statut": "Validé", "Saison": "2026-2027",
         "Type d'Adhésion": "Déjà Membre", "Date d'Inscription": "2026-06-03", "Mois d'Inscription": "2026-06",
     }]}
 
 
 def test_pivot_records_unknown_values(client):
-    row = _row(last_name=None, first_name=None, gender=None, birth_date=None, city=None, tarif_name="", status="Cancelled",
+    row = _row(last_name=None, first_name=None, sex=None, birth_date=None, city=None, tarif_name="", status="Cancelled",
                season_name=None, already_member=None, order_date="03/06/2026")
     record = _get(client, [row])[0].json()["records"][0]
 
     assert record == {
-        "Nom": "", "Prénom": "", "Sexe": "Inconnu", "Âge": None, "Tranche d'Âge": "Inconnue", "Ville": "Inconnue",
+        "Nom": "", "Prénom": "", "Sexe": None, "Âge": None, "Tranche d'Âge": "Inconnue", "Ville": "Inconnue",
         "Groupe / Tarif": "Aucun", "Statut": "Annulé", "Saison": "Inconnue", "Type d'Adhésion": "Nouvelle Inscription",
         "Date d'Inscription": "Inconnue", "Mois d'Inscription": "Inconnue",
     }

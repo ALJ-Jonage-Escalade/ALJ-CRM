@@ -6,6 +6,7 @@
 import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
+import { SEX_LABELS, SEX_NOT_GIVEN, type Sex } from "../../lib/sex";
 import { draftErrors, STATUS_CHOICES, withDateTag, type DraftErrors, type DraftField, type MemberDraft, type TarifChoice } from "./record";
 
 const draft = defineModel<MemberDraft>({ required: true });
@@ -38,6 +39,7 @@ const statuses = computed(() =>
     ? STATUS_CHOICES
     : [[draft.value.status, draft.value.status] as const, ...STATUS_CHOICES],
 );
+const sexes = Object.entries(SEX_LABELS) as [Sex, string][];
 
 const root = ref<HTMLFormElement | null>(null);
 async function submit(): Promise<void> {
@@ -115,13 +117,6 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
           <input v-model="draft.birth_date" v-bind="attrs('birth_date')" type="date" :class="fieldClass('birth_date')" />
           <p v-if="errors.birth_date" id="member-birth_date-error" class="mt-1 text-xs text-red-600">{{ errors.birth_date }}</p>
         </div>
-        <div>
-          <label for="member-gender" :class="label">Sexe</label>
-          <select v-model="draft.gender" v-bind="attrs('gender')" :class="fieldClass('gender')">
-            <option value="Homme">Homme</option>
-            <option value="Femme">Femme</option>
-          </select>
-        </div>
       </div>
     </template>
 
@@ -176,7 +171,7 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
     </fieldset>
 
     <div :class="section">🧗 Badges & licence FFME</div>
-    <div class="grid gap-3 sm:grid-cols-3">
+    <div class="grid gap-3 sm:grid-cols-2">
       <div>
         <label for="member-licence_ffme" :class="label">N° licence FFME</label>
         <input
@@ -186,6 +181,13 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
           placeholder="123456"
           :class="fieldClass('licence_ffme')"
         />
+      </div>
+      <div>
+        <label for="member-sex" :class="label">Sexe (FFME)</label>
+        <select v-model="draft.sex" v-bind="attrs('sex')" :class="fieldClass('sex')">
+          <option value="">{{ SEX_NOT_GIVEN }}</option>
+          <option v-for="[value, text] in sexes" :key="value" :value="value">{{ text }}</option>
+        </select>
       </div>
       <div>
         <label for="member-badge_rouge" :class="label">🔴 Badge rouge diff</label>

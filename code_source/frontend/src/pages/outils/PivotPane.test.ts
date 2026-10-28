@@ -12,7 +12,7 @@ function record(fields: Partial<Schemas["PivotRecord"]>): Schemas["PivotRecord"]
   return {
     Nom: "WEASLEY",
     Prénom: "Ron",
-    Sexe: "Homme",
+    Sexe: "H",
     Âge: 16,
     "Tranche d'Âge": "10 à 17 ans",
     Ville: "Jonage",
@@ -28,7 +28,7 @@ function record(fields: Partial<Schemas["PivotRecord"]>): Schemas["PivotRecord"]
 
 const RECORDS = [
   record({}),
-  record({ Nom: "GRANGER", Sexe: "Femme" }),
+  record({ Nom: "GRANGER", Sexe: "F" }),
   record({ "Groupe / Tarif": HOSTILE, Âge: null }),
   record({ Statut: "Annulé" }), // hidden by default
   record({ "Groupe / Tarif": "Liste d'attente cours" }), // hidden by default
@@ -63,7 +63,7 @@ afterEach(() => {
 });
 
 describe("PivotPane", () => {
-  it("counts the members of the season by group, status and gender, without the hidden values", async () => {
+  it("counts the members of the season by group, status and sex, without the hidden values", async () => {
     const { seasons, table, text } = await render();
     expect(seasons).toEqual(["2026-2027"]);
     expect(table().props("pivotModel")).toMatchObject({

@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse, Response
 
 from api.ffme.schemas import FfmeFile, FfmeImportRequest, FfmeImportResult, FfmeLicensee, FfmeMatchStats, FfmeMember, FfmePreview, FfmeStats
 from api.responses import error, error_responses, internal_error
+from domain.members.sex import parse_sex
 
 router = APIRouter()
 
@@ -93,17 +94,22 @@ def get_ffme_stats_api(season: Optional[str] = None) -> Union[FfmeStats, JSONRes
                 if isinstance(parsed_dt, (datetime.datetime, datetime.date)):
                     dob_date = parsed_dt
 
+            nom = str(p.get("last_name") or "Inconnu").strip().upper()
+            prenom = str(p.get("first_name") or "Inconnu").strip()
             if not dob_date or dob_date >= now:
                 ignored_count += 1
-                nom = str(p.get("last_name") or "Inconnu").strip().upper()
-                prenom = str(p.get("first_name") or "Inconnu").strip()
                 ignored_details.append(f"{nom} {prenom} (date de naissance manquante/invalide)")
                 continue
 
-            # 3. Terminé ou à produire
+            # 3. Sexe : obligatoire pour une première licence (même règle que generate_ffme_csv)
             lic = clean_digits_only(p.get("licence_ffme") or "")
             is_renewal = 5 <= len(lic) <= 10
+            if not is_renewal and parse_sex(p.get("sex")) is None:
+                ignored_count += 1
+                ignored_details.append(f"{nom} {prenom} (sexe non renseigné)")
+                continue
 
+            # 4. Terminé ou à produire
             if "termin" in status:
                 termine_count += 1
             else:

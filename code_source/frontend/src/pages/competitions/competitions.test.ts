@@ -61,7 +61,6 @@ describe("competitions", () => {
         email_secondaire: "",
         tarif: "T",
         creneau_groupe: "G",
-        gender: "",
       },
     ]);
   });

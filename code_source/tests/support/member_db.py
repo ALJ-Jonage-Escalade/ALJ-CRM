@@ -14,6 +14,7 @@ BASE_MEMBER = {
     "payer_lastName": "MARTIN",
     "payer_firstName": "Claire",
     "champ_Date de naissance de l'adhérent": "2017-03-10",
+    "champ_Sexe": "Homme",
     "is_modified": "Non",
     "commentaires_correctif": "",
 }

@@ -12,9 +12,13 @@ Importé par infrastructure.sqlite.members (écritures miroir phase 3) et migrat
 Aucune dépendance à infrastructure.sqlite.connection pour éviter toute importation circulaire.
 """
 import datetime
+import logging
 import sqlite3
 
+from domain.members.sex import parse_sex
 from domain.utils import normalize_name
+
+logger = logging.getLogger("alj")
 
 SCHEMA_TARGET_VERSION = 2
 SEASON_ACTIVE = "2026-2027"
@@ -59,7 +63,7 @@ CREATE TABLE IF NOT EXISTS users (
     first_name_key TEXT NOT NULL,
     birth_date TEXT,
     birth_date_raw TEXT,
-    gender TEXT, nationality TEXT,
+    sex TEXT, nationality TEXT,
     address TEXT, zip_code TEXT, city TEXT, country TEXT,
     phone TEXT,
     email_primary TEXT, email_secondary TEXT,
@@ -126,7 +130,7 @@ CREATE TABLE IF NOT EXISTS purchase_options (
 USER_FIELD_MAP = {
     "user_lastName": "last_name",
     "user_firstName": "first_name",
-    "champ_Sexe": "gender",
+    "champ_Sexe": "sex",
     "champ_Nationalité": "nationality",
     "champ_Adresse : numéro et nom de rue": "address",
     "champ_Code postal": "zip_code",
@@ -209,14 +213,14 @@ def clean_legacy_text(val):
     return str(val).strip()
 
 
-def normalize_gender(val):
-    """Harmonise le genre en 'Femme' ou 'Homme'."""
-    s = str(val or "").strip().lower()
-    if s in ("f", "femme", "féminin", "feminin"):
-        return "Femme"
-    if s in ("h", "m", "homme", "masculin"):
-        return "Homme"
-    return str(val or "").strip()
+def sex_code(raw: object, order_ref: object) -> str | None:
+    """Value of the users.sex column (FFME code "F" / "H") for an imported value (HelloAsso, Excel, legacy).
+
+    A value not understood is stored as NULL and logged with its order (never the member's name)."""
+    sex = parse_sex(raw)
+    if sex is None and str(raw or "").strip():
+        logger.warning("Sexe non reconnu pour la commande %s : enregistré comme non renseigné", order_ref)
+    return sex.value if sex else None
 
 
 def parse_iso_date(val):
@@ -291,6 +295,23 @@ def _dynamic_field_values(rec):
 def ensure_v2_schema(cur):
     """Crée les tables v2 si absentes (idempotent)."""
     cur.executescript(V2_DDL)
+    rename_gender_column(cur)
+
+
+def rename_gender_column(cur: sqlite3.Cursor) -> None:
+    """Existing databases: users.gender (free text) becomes users.sex (FFME code, plans/sex-enum.md).
+
+    A Firestore cache is only renamed (its older CACHE_FORMAT has it rebuilt from Firestore; converting the
+    values here would fire the tracking triggers and push them); a plain database gets its values converted."""
+    columns = {row[1] for row in cur.execute("PRAGMA table_info(users)").fetchall()}
+    if "gender" not in columns or "sex" in columns:
+        return
+    cur.execute("ALTER TABLE users RENAME COLUMN gender TO sex")
+    if cur.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '_fs_changes'").fetchone():
+        return
+    for user_id, raw in cur.execute("SELECT id, sex FROM users WHERE sex IS NOT NULL").fetchall():
+        sex = parse_sex(raw)
+        cur.execute("UPDATE users SET sex = ? WHERE id = ?", (sex.value if sex else None, user_id))
 
 
 def resolve_season_id(cur, season_name):
@@ -328,8 +349,10 @@ def upsert_user_v2(cur, rec, now_iso, field_map):
         for src_col, dst_col in field_map.items():
             new_val = clean_legacy_text(_get(rec, src_col))
             if new_val:
-                if dst_col == "gender":
-                    new_val = normalize_gender(new_val)
+                if dst_col == "sex":
+                    new_val = sex_code(new_val, _get(rec, "order_ref"))
+                    if new_val is None:
+                        continue
                 cur.execute(
                     f'UPDATE users SET "{dst_col}" = ?, updated_at = ? '  # noqa: S608 - dst_col issu de USER_FIELD_MAP
                     f'WHERE id = ? AND (("{dst_col}" IS NULL) OR (TRIM("{dst_col}") = ""))',
@@ -344,7 +367,9 @@ def upsert_user_v2(cur, rec, now_iso, field_map):
                 )
         return user_id, False
 
-    values = {dst: (normalize_gender(clean_legacy_text(_get(rec, src))) if dst == "gender" else clean_legacy_text(_get(rec, src))) for src, dst in field_map.items()}
+    values = {dst: clean_legacy_text(_get(rec, src)) for src, dst in field_map.items()}
+    if "sex" in values:
+        values["sex"] = sex_code(values["sex"], _get(rec, "order_ref"))
     values["last_name"] = last
     values["first_name"] = first
     values["last_name_key"] = k_last
@@ -659,11 +684,7 @@ SELECT
     u.first_name AS "first_name",
     u.birth_date AS "birth_date",
     u.birth_date_raw AS "birth_date_raw",
-    CASE 
-      WHEN LOWER(TRIM(u.gender)) IN ('f', 'femme', 'féminin', 'feminin') THEN 'Femme'
-      WHEN LOWER(TRIM(u.gender)) IN ('h', 'm', 'homme', 'masculin') THEN 'Homme'
-      ELSE u.gender 
-    END AS "gender",
+    u.sex AS "sex",
     u.nationality AS "nationality",
     u.address AS "address",
     u.zip_code AS "zip_code",

@@ -1674,11 +1674,7 @@ export interface components {
              * @default
              */
             creneau_groupe?: string;
-            /**
-             * Gender
-             * @default
-             */
-            gender?: string;
+            sex?: components["schemas"]["Sex"] | null;
         } & {
             [key: string]: unknown;
         };
@@ -1783,11 +1779,8 @@ export interface components {
              * @default
              */
             resultat_ffme?: string;
-            /**
-             * Gender
-             * @default
-             */
-            gender?: string;
+            /** @description Read from the member (adherents directory), None when not given */
+            sex?: components["schemas"]["Sex"] | null;
             /**
              * Updated At
              * @description Sent back as unchanged_since by a change queued offline
@@ -2570,8 +2563,8 @@ export interface components {
             birth_date: string;
             /** Age */
             age: number | null;
-            /** Gender */
-            gender: string;
+            /** @description FFME sex, None when not given */
+            sex: components["schemas"]["Sex"] | null;
             /** Address */
             address: string;
             /** Zip Code */
@@ -2646,6 +2639,8 @@ export interface components {
             status?: ("Validé" | "Traité" | "En cours" | "Terminé" | "Annulé") | null;
             /** Licence Ffme */
             licence_ffme?: string | null;
+            /** @description Sent as null to clear it */
+            sex?: components["schemas"]["Sex"] | null;
             /** Badge Rouge */
             badge_rouge?: ("Oui" | "Non") | null;
             /** Autonomie Bloc */
@@ -2748,12 +2743,7 @@ export interface components {
              * @default
              */
             birth_date?: string;
-            /**
-             * Gender
-             * @default
-             * @enum {string}
-             */
-            gender?: "Homme" | "Femme" | "";
+            sex?: components["schemas"]["Sex"] | null;
             /**
              * Tarif Name
              * @default
@@ -2882,8 +2872,8 @@ export interface components {
             Nom: string;
             /** Prénom */
             "Pr\u00E9nom": string;
-            /** Sexe */
-            Sexe: string;
+            /** @description None when not given (the page labels it) */
+            Sexe: components["schemas"]["Sex"] | null;
             /** Âge */
             "\u00C2ge": number | null;
             /** Tranche D'Âge */
@@ -3206,6 +3196,12 @@ export interface components {
             /** Message */
             message: string;
         };
+        /**
+         * Sex
+         * @description FFME codes (column "sexe" of the FFME CSV).
+         * @enum {string}
+         */
+        Sex: "F" | "H";
         /** SyncCounters */
         SyncCounters: {
             /** Pulled */

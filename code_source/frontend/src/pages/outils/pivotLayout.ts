@@ -4,11 +4,13 @@
 import { PivotUtilities, Renderer } from "vue-pivottable";
 import { h, useAttrs, type Component, type VNode } from "vue";
 import type { Schemas } from "../../lib/client";
+import { sexLabel } from "../../lib/sex";
 
 type PivotRecord = Schemas["PivotRecord"];
 export type PivotField = keyof PivotRecord;
-/** A row of the table: the unknown age is a value of its own (filterable, skipped by the age aggregators). */
-export type PivotRow = { [F in PivotField]: F extends "Âge" ? number | "Inconnu" : PivotRecord[F] };
+/** A row of the table: the unknown age is a value of its own (filterable, skipped by the age aggregators); the sex
+    is shown by its label, « Non renseigné » included. */
+export type PivotRow = { [F in PivotField]: F extends "Âge" ? number | "Inconnu" : F extends "Sexe" ? string : PivotRecord[F] };
 
 export const FIELDS = [
   "Nom",
@@ -27,7 +29,7 @@ export const FIELDS = [
 
 /** The row of the table for a record of the API. */
 export function pivotRow(record: PivotRecord): PivotRow {
-  return { ...record, Âge: record.Âge ?? "Inconnu" };
+  return { ...record, Âge: record.Âge ?? "Inconnu", Sexe: sexLabel(record.Sexe) };
 }
 
 const { aggregatorTemplates: templates, numberFormat } = PivotUtilities;
