@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from domain.constants import get_active_season
 from domain.members.age_rules import parse_birth_date, age_at, get_season_start_date
 from domain.members import view as member_view
+from domain.members.sex import parse_sex
 from domain.utils import normalize_string
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions.base import CompetitionStoreBase
@@ -110,7 +111,7 @@ class AdherentsMixin(CompetitionStoreBase):
                     "num_licence": licence,
                     "birth_date": bdate,
                     "age": age_val,
-                    "gender": d.get("gender") or "",
+                    "sex": d.get("sex"),
                     "email": str(d.get("email_primary") or "").strip(),
                     "email_secondaire": str(d.get("email_secondary") or "").strip(),
                     "phone": str(d.get("phone") or "").strip(),
@@ -212,10 +213,17 @@ class AdherentsMixin(CompetitionStoreBase):
             "emergency_phone": str(doc.get("emergency_phone") or ""),
             "birth_date": str(doc.get("birth_date") or ""),
             "age": doc.get("age"),
-            "gender": str(doc.get("gender") or ""),
+            "sex": cls._sex_code(doc),
             "badge_rouge": str(doc.get("badge_rouge") or ""),
             "autonomie_bloc": str(doc.get("autonomie_bloc") or ""),
         }
+
+    @staticmethod
+    def _sex_code(doc: Dict[str, Any]) -> Optional[str]:
+        """FFME code of a directory document; `gender`: documents written before the rename (plans/sex-enum.md),
+        until the directory is next rewritten."""
+        sex = parse_sex(doc.get("sex") if "sex" in doc else doc.get("gender"))
+        return sex.value if sex else None
 
     @classmethod
     def list_adherents(cls, search: str = "", competition_only: bool = False) -> list:

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Schemas } from "../../lib/client";
 import {
   AGGREGATORS,
   clearLayout,
@@ -87,11 +88,11 @@ describe("table options", () => {
     expect(DEFAULT_LAYOUT.rendererName in RENDERERS).toBe(true);
   });
 
-  it("makes the unknown age a value of its own", () => {
-    const record = {
+  it("makes the unknown age a value of its own and labels the sex", () => {
+    const record: Schemas["PivotRecord"] = {
       Nom: "WEASLEY",
       Prénom: "Ron",
-      Sexe: "Homme",
+      Sexe: "H",
       Âge: null,
       "Tranche d'Âge": "Inconnue",
       Ville: "Jonage",
@@ -104,5 +105,7 @@ describe("table options", () => {
     };
     expect(pivotRow(record).Âge).toBe("Inconnu");
     expect(pivotRow({ ...record, Âge: 12 }).Âge).toBe(12);
+    expect(pivotRow(record).Sexe).toBe("Homme");
+    expect(pivotRow({ ...record, Sexe: null }).Sexe).toBe("Non renseigné");
   });
 });

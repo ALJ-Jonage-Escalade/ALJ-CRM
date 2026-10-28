@@ -9,6 +9,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from domain.members.models import Member
+from domain.members.sex import Sex
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.members import MemberRepository
 
@@ -69,6 +70,29 @@ class TestMemberBilingualAdapter(unittest.TestCase):
         # Nom v2 vide -> repli legacy
         m = Member.from_dict({"last_name": "", "user_lastName": "LEGACYNOM"})
         self.assertEqual(m.user_last_name, "LEGACYNOM")
+
+    def test_from_dict_sex_column(self):
+        self.assertEqual(Member.from_dict({"sex": "F"}).sex, Sex.FEMALE)
+        self.assertEqual(Member.from_dict({"sex": "F"}).to_dict()["champ_Sexe"], "F")
+
+    def test_from_dict_sex_from_legacy_gender(self):
+        # Rows and documents written before the rename hold `gender` (free text)
+        self.assertEqual(Member.from_dict({"gender": "Homme"}).sex, Sex.MALE)
+
+    def test_from_dict_sex_from_helloasso_label(self):
+        self.assertEqual(Member.from_dict({"champ_Sexe": "Féminin"}).sex, Sex.FEMALE)
+
+    def test_from_dict_sex_missing(self):
+        m = Member.from_dict({"order_ref": "C3"})
+        self.assertIsNone(m.sex)
+        self.assertEqual(m.to_dict()["champ_Sexe"], "")
+
+    def test_from_dict_sex_unparseable_logged(self):
+        with self.assertLogs("alj", level="WARNING") as logs:
+            m = Member.from_dict({"order_ref": "C4", "last_name": "SECRET", "champ_Sexe": "X"})
+        self.assertIsNone(m.sex)
+        self.assertIn("C4", logs.output[0])
+        self.assertNotIn("SECRET", logs.output[0])  # no personal data in the logs
 
 
 class TestGetMembersLoader(unittest.TestCase):

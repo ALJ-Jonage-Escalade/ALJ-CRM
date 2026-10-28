@@ -4,6 +4,7 @@
 import type { Schemas } from "../../lib/client";
 import { looksLikeEmail } from "../../lib/email";
 import { formatDate, formatDayText } from "../../lib/format";
+import { sexLabel, type Sex } from "../../lib/sex";
 import { diplomes, normKey, type Creneau, type Member } from "./members";
 
 export type MemberChanges = Schemas["MemberChanges"];
@@ -28,7 +29,7 @@ export function recordRows(m: Member): RecordRow[] {
   };
   const join = (sep: string, ...parts: string[]) => parts.filter(Boolean).join(sep);
   add("🎂", "Date de naissance", m.birth_date ? `${formatDayText(m.birth_date)}${m.age != null ? ` (${m.age} ans)` : ""}` : "");
-  add("⚧", "Sexe", m.gender);
+  add("⚧", "Sexe", m.sex ? sexLabel(m.sex) : "");
   add("📍", "Adresse", join(", ", m.address, join(" ", m.zip_code, m.city)));
   add("📞", "Téléphone", m.phone);
   add("✉️", "E-mail principal", m.email_primary);
@@ -104,7 +105,8 @@ export interface MemberDraft {
   last_name: string;
   first_name: string;
   birth_date: string;
-  gender: "Homme" | "Femme";
+  /** Empty: not given (never guessed, the FFME export leaves a new member without it out) */
+  sex: Sex | "";
   /** One of STATUS_CHOICES, or the member's own status when it is none of them (kept unless changed). */
   status: string;
   amount: string;
@@ -134,7 +136,7 @@ export function draftOf(m?: Member, firstTarif = ""): MemberDraft {
     last_name: m?.last_name ?? "",
     first_name: m?.first_name ?? "",
     birth_date: "",
-    gender: m?.gender === "Femme" ? "Femme" : "Homme",
+    sex: m?.sex ?? "",
     status: m?.status_norm || "Validé",
     amount: "0.00",
     tarif_name: m ? m.tarif_name : firstTarif,
@@ -212,7 +214,7 @@ export function newMemberOf(d: MemberDraft): NewMember {
     last_name: d.last_name.trim().toUpperCase(),
     first_name: d.first_name.trim(),
     birth_date: d.birth_date,
-    gender: d.gender,
+    sex: d.sex || null,
     tarif_name: d.tarif_name.trim(),
     status: d.status as NewMember["status"], // the add form offers STATUS_CHOICES only
     amount: Number(d.amount.replace(",", ".")) || 0,
@@ -254,7 +256,7 @@ const EDITED: [keyof MemberChanges & DraftField, string][] = [
 /** What the edit form changes on the member (only those fields are sent). */
 export function changesOf(m: Member, d: MemberDraft): Changes {
   const before = draftOf(m);
-  const fields: Record<string, string> = {};
+  const fields: Record<string, string | null> = {};
   const lines: string[] = [];
   for (const [field, label] of EDITED) {
     const was = before[field].trim();
@@ -264,6 +266,12 @@ export function changesOf(m: Member, d: MemberDraft): Changes {
     }
     fields[field] = now;
     lines.push(`${label} : ${was || "vide"} ➔ ${now || "vide"}`);
+  }
+  const sexWas = m.sex ?? null;
+  const sexNow = d.sex || null;
+  if (sexNow !== sexWas) {
+    fields.sex = sexNow;
+    lines.push(`Sexe : ${sexLabel(sexWas)} ➔ ${sexLabel(sexNow)}`);
   }
   const was = m.commentaires_correctif.trim();
   const now = d.commentaires_correctif.trim();

@@ -5,6 +5,7 @@ import type { BadgeColor } from "../../components/ui/palette";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
+import { SEX_LABELS } from "../../lib/sex";
 import { plural } from "../../lib/text";
 
 export type Member = Schemas["Member"];
@@ -394,7 +395,7 @@ export function csvRows(members: readonly Member[]): Cell[][] {
       m.first_name,
       formatDayText(m.birth_date),
       m.age,
-      m.gender,
+      m.sex ? SEX_LABELS[m.sex] : "",
       m.categorie,
       m.creneau_groupe,
       m.tarif_name,

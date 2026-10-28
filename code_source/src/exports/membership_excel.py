@@ -12,6 +12,7 @@ from domain.constants import (
 )
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.google.drive import GoogleDriveClient
+from domain.members.sex import parse_sex
 from domain.utils import normalize_name
 
 logger = logging.getLogger("alj")
@@ -452,14 +453,12 @@ def generate_ffme_csv(participants_data, output_path=None, include_termine=False
             
         dob = dob_date.strftime("%d/%m/%Y")
             
-        # 3. Sexe
-        sexe_raw = str(p.get("gender", "")).strip().upper()
-        if sexe_raw.startswith(("M", "H", "G")):
-            sexe = "H"
-        elif sexe_raw.startswith(("F", "D")):
-            sexe = "F"
-        else:
-            sexe = "" if lic_num else "H"
+        # 3. Sexe : obligatoire pour une première licence (jamais deviné), vide accepté pour un renouvellement
+        sex = parse_sex(p.get("sex"))
+        if sex is None and not lic_num:
+            ignored_members.append(f"⚠️ [IGNORÉ] {nom} {prenom} (Commande {p.get('order_ref')}) : sexe non renseigné")
+            continue
+        sexe = sex.value if sex else ""
             
         # 4. Pays
         pays_raw = str(p.get("country", "France")).strip().upper()

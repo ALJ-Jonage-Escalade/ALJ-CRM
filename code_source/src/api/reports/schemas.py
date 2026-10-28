@@ -9,6 +9,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from domain.members.sex import Sex
+
 
 class MapMember(BaseModel):
     """A member living at a map point. name: "First LAST"; group: the HelloAsso tariff ("Aucun" without one)."""
@@ -37,7 +39,7 @@ class PivotRecord(BaseModel):
 
     last_name: str = Field(serialization_alias="Nom")
     first_name: str = Field(serialization_alias="Prénom")
-    gender: str = Field(serialization_alias="Sexe")
+    sex: Optional[Sex] = Field(serialization_alias="Sexe", description="None when not given (the page labels it)")
     age: Optional[int] = Field(serialization_alias="Âge")
     age_band: str = Field(serialization_alias="Tranche d'Âge")
     city: str = Field(serialization_alias="Ville")

@@ -4,6 +4,8 @@ from unittest.mock import patch
 
 from support.api_case import ApiTestCase
 
+from services.competitions import store as competition_store
+
 from domain.competitions.models import PAIEMENT_PAYE
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from infrastructure.firestore.client import FirestoreClient
@@ -33,6 +35,36 @@ class TestParticipants(ApiTestCase):
         self.assertEqual(self.participant(self.comp, 1)["statut_paiement"], "non_invite")
         self.assertEqual(self.client.post("/api/competitions/999/participants",
                                           json={"adherent_id": 1}).status_code, 404)
+
+    def listed_participant(self, adherent_id):
+        comp = next(c for c in self.client.get("/api/competitions").json() if c["id"] == self.comp)
+        return next(p for p in comp["participants"] if p["adherent_id"] == adherent_id)
+
+    def test_sex_is_read_from_the_member(self):
+        """The participant row holds no sex: the view reads the member's, so a correction shows at once."""
+        self.seed_adherent(3, nom="WEASLEY", prenom="Ginny", sex="F")
+        r = self.client.post(self.url(), json={"adherent_id": 3})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertNotIn("sex", Repo._load_comp_doc(self.comp)["participants"][0])  # not copied
+        self.assertEqual(next(p for p in r.json()["participants"] if p["adherent_id"] == 3)["sex"], "F")
+        self.assertEqual(self.listed_participant(3)["sex"], "F")
+
+        self.seed_adherent(3, nom="WEASLEY", prenom="Ginny", sex=None)  # sex cleared on the member record
+        competition_store.invalidate_cache()
+        self.assertIsNone(self.listed_participant(3)["sex"])
+
+    def test_sex_of_older_rows_and_directory(self):
+        """Rows written before plans/sex-enum.md hold a copied `gender` (dropped); directory documents not
+        rewritten since hold `gender` (read as a code)."""
+        self.seed_adherent(3, gender="Femme")
+        Repo.add_participant(self.comp, 3)
+        doc = Repo._load_comp_doc(self.comp)
+        doc["participants"][0]["gender"] = "Homme"
+        self.fake.upsert_document("competitions", doc["_doc_id"], {k: v for k, v in doc.items() if k != "_doc_id"})
+        competition_store.invalidate_cache()
+        p = self.listed_participant(3)
+        self.assertEqual(p["sex"], "F")
+        self.assertNotIn("gender", p)
 
     def reads_during(self, method, url, body=None):
         """(response, competition documents read, coaches collection reads) of one request."""

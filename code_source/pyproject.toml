@@ -112,6 +112,7 @@ files = [
     "src/api/reports/pivot.py",
     "src/api/reports/__init__.py",
     "src/domain/members/view.py",
+    "src/domain/members/sex.py",
     "src/services/__init__.py",
     "src/services/competitions/__init__.py",
     "src/services/members/__init__.py",

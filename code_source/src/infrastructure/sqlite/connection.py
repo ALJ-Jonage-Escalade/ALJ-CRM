@@ -251,21 +251,6 @@ class SqliteDatabase:
         schema_v2.recreate_compat_view(cursor)
         print("🔗 [SQLITE] Vue de compatibilité v_adherents_legacy vérifiée.")
 
-        # Harmonisation du genre (Femme / Homme) dans la table users
-        try:
-            cursor.execute("""
-                UPDATE users
-                SET gender = 'Femme'
-                WHERE LOWER(TRIM(gender)) IN ('f', 'femme', 'féminin', 'feminin')
-            """)
-            cursor.execute("""
-                UPDATE users
-                SET gender = 'Homme'
-                WHERE LOWER(TRIM(gender)) IN ('h', 'm', 'homme', 'masculin')
-            """)
-        except sqlite3.Error as e:
-            print(f"⚠️ [SQLITE] Harmonisation du genre impossible : {e}")
-
         conn.commit()
         conn.close()
         print("✅ [SQLITE] Initialisation et vérification du schéma d'adhérents accomplies.")

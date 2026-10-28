@@ -78,6 +78,25 @@ class TestFfmeRoutes(MemberDbTestCase):
         self.assertIn("MARTIN", text)
         self.assertNotIn("PETIT", text)
 
+    def test_csv_export_member_without_sex(self):
+        # A first licence needs the sex (never guessed): left out and reported; a renewal is sent with it empty
+        self.seed("1", "Léo", "MARTIN", "Adultes autonomes", champ_Sexe="")
+        self.seed("2", "Max", "PETIT", "Adultes autonomes", champ_Sexe="", **{"champ_Numéro de Licence FFME (6 chiffres)": "123456"})
+        stats = self.client.get("/api/ffme/stats", params={"season": "2026-2027"}).json()
+        self.assertEqual((stats["estimated_total"], stats["renewals_count"], stats["new_licences_count"]), (1, 1, 0))
+        self.assertEqual(stats["ignored_details"], ["MARTIN Léo (sexe non renseigné)"])
+
+        text = self.client.get("/api/ffme/export", params={"season": "2026-2027"}).content.decode("utf-8-sig")
+        self.assertNotIn("MARTIN", text)
+        petit = next(line for line in text.splitlines() if "PETIT" in line)
+        self.assertEqual(petit.split(";")[:5], ["123456", "PETIT", "Max", "10/03/2017", ""])
+
+    def test_csv_export_sex_code(self):
+        self.seed("1", "Léa", "MARTIN", "Adultes autonomes", champ_Sexe="Féminin")
+        text = self.client.get("/api/ffme/export", params={"season": "2026-2027"}).content.decode("utf-8-sig")
+        martin = next(line for line in text.splitlines() if "MARTIN" in line)
+        self.assertEqual(martin.split(";")[4], "F")
+
     def test_bad_season_refused(self):
         for path in ("/api/ffme/stats", "/api/ffme/export"):
             with self.subTest(path=path):

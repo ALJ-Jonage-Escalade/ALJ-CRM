@@ -8,6 +8,7 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from api.request_body import RequestBody
+from domain.members.sex import Sex
 
 
 class SeasonTarifs(BaseModel):
@@ -41,7 +42,7 @@ class Member(BaseModel):
     first_name: str
     birth_date: str
     age: Optional[int]
-    gender: str
+    sex: Optional[Sex] = Field(description="FFME sex, None when not given")
     address: str
     zip_code: str
     city: str
@@ -115,6 +116,7 @@ class MemberChanges(RequestBody):
     """Fields of a member record to change; a field left out is kept (only the given ones are written)."""
     status: Optional[MemberStatus] = None
     licence_ffme: Optional[str] = None
+    sex: Optional[Sex] = Field(default=None, description="Sent as null to clear it")
     badge_rouge: Optional[YesNo] = None
     autonomie_bloc: Optional[YesNo] = None
     email_primary: Optional[str] = None
@@ -147,7 +149,7 @@ class NewMember(RequestBody):
     last_name: str = ""
     first_name: str = ""
     birth_date: str = Field(default="", pattern=r"^(\d{4}-\d{2}-\d{2})?$")
-    gender: Literal["Homme", "Femme", ""] = ""
+    sex: Optional[Sex] = None
     tarif_name: str = ""
     status: MemberStatus = "Validé"
     amount: float = Field(default=0.0, ge=0)

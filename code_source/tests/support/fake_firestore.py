@@ -103,14 +103,14 @@ class FirestoreRepoTestCase(unittest.TestCase):
         self.addCleanup(Repo._invalidate_adherents_cache)
 
     def seed_adherent(self, aid, nom="MARTIN", prenom="Lucas", licence="654321",
-                      tarif="Compétition U18", email="lucas.martin@test.fr"):
+                      tarif="Compétition U18", email="lucas.martin@test.fr", **extra):
         Repo.COLLECTION_ADHERENTS and self.fake.upsert_document(
             Repo.COLLECTION_ADHERENTS, str(aid),
             {
                 "id": aid, "nom": nom, "prenom": prenom, "licence_ffme": licence,
                 "num_licence": licence, "email": email, "phone": "0600000000",
                 "tarif": tarif, "creneau_groupe": tarif, "emergency_name": "Mère",
-                "emergency_phone": "0611111111",
+                "emergency_phone": "0611111111", **extra,
             },
         )
         Repo._invalidate_adherents_cache()

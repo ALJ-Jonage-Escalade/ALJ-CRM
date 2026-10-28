@@ -1,14 +1,10 @@
+import logging
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-def normalize_gender(val: Any) -> str:
-    """Harmonise le genre en 'Femme' ou 'Homme'."""
-    s = str(val or "").strip().lower()
-    if s in ("f", "femme", "féminin", "feminin"):
-        return "Femme"
-    if s in ("h", "m", "homme", "masculin"):
-        return "Homme"
-    return str(val or "").strip()
+from domain.members.sex import Sex, parse_sex
+
+logger = logging.getLogger("alj")
 
 @dataclass
 class InsuranceOptions:
@@ -38,7 +34,7 @@ class Member:
     payer_last_name: str
     payer_email: str
     birth_date: str = ""
-    gender: str = ""
+    sex: Optional[Sex] = None
     nationality: str = ""
     address: str = ""
     zip_code: str = ""
@@ -132,6 +128,11 @@ class Member:
                 amount_trail=float(data.get("opt_Montant Assurance Option Trail", 0.0) or 0.0),
             )
 
+        # "gender": rows and documents written before the column was renamed (plans/sex-enum.md)
+        raw_sex = pick("sex", "gender", "champ_Sexe")
+        if parse_sex(raw_sex) is None and str(raw_sex).strip():
+            logger.warning("Sexe non reconnu pour la commande %s : lu comme non renseigné", data.get("order_ref"))
+
         return cls(
             order_ref=str(data.get("order_ref") or ""),
             order_date=str(data.get("order_date") or ""),
@@ -144,7 +145,7 @@ class Member:
             payer_last_name=str(pick("payer_last_name", "payer_lastName")).strip(),
             payer_email=str(pick("payer_email", "payer_email_order")).strip(),
             birth_date=str(pick("champ_Date de naissance de l'adhérent", "birth_date", "birth_date_raw")).strip(),
-            gender=normalize_gender(pick("champ_Sexe", "gender")),
+            sex=parse_sex(raw_sex),
             nationality=str(pick("champ_Nationalité", "nationality")).strip(),
             address=str(pick("champ_Adresse : numéro et nom de rue", "address")).strip(),
             zip_code=clean_float_str(pick("champ_Code postal", "zip_code")),
@@ -189,7 +190,7 @@ class Member:
             "payer_lastName": self.payer_last_name,
             "payer_email": self.payer_email,
             "champ_Date de naissance de l'adhérent": self.birth_date,
-            "champ_Sexe": self.gender,
+            "champ_Sexe": self.sex.value if self.sex else "",
             "champ_Nationalité": self.nationality,
             "champ_Adresse : numéro et nom de rue": self.address,
             "champ_Code postal": self.zip_code,

@@ -1,4 +1,5 @@
 """Competitions CRUD and the end-of-season report."""
+import logging
 from typing import Dict, Any, List, Optional
 
 from domain.competitions.models import (
@@ -8,8 +9,10 @@ from domain.competitions.models import (
     PAIEMENT_ANNULE_REPORTE,
     STATUT_CLOSE,
 )
-from infrastructure.firestore.client import FirestoreClient
+from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions.adherents import AdherentsMixin
+
+logger = logging.getLogger("alj")
 
 
 class CompetitionsMixin(AdherentsMixin):
@@ -35,7 +38,8 @@ class CompetitionsMixin(AdherentsMixin):
         """Competition documents as stored (participants and counters included), most
         recent first: the shape the web pages use."""
         coaches = cls._coaches_map()
-        docs = [cls._api_doc(d, coaches) for d in cls._list_comp_docs()]
+        sexes = cls._member_sexes()
+        docs = [cls._with_member_sex(cls._api_doc(d, coaches), sexes) for d in cls._list_comp_docs()]
         docs.sort(key=lambda d: cls._comp_sort_key(d.get("date_competition"), d.get("id")), reverse=True)
         return docs
 
@@ -48,7 +52,28 @@ class CompetitionsMixin(AdherentsMixin):
     def competition_api_doc(cls, doc: Dict[str, Any]) -> Dict[str, Any]:
         """Shape of get_competition_doc for a document already read or just written (the
         participant writes below return it): saves reading it again."""
-        return cls._api_doc(doc, cls._coaches_map())
+        return cls._with_member_sex(cls._api_doc(doc, cls._coaches_map()), cls._member_sexes())
+
+    @classmethod
+    def _member_sexes(cls) -> Dict[int, Optional[str]]:
+        """{adherent id -> sex code} from the `adherents` directory: the single source of the participants'
+        sex (plans/sex-enum.md D7). Empty when the directory cannot be read: the sexes show as not given."""
+        try:
+            return {a["id"]: a["sex"] for a in map(cls._adherent_as_legacy_dict, cls._adherents_raw()) if a["id"] is not None}
+        except FirestoreError as e:
+            logger.warning("Annuaire adhérents illisible, sexe des participants non renseigné : %s", e)
+            return {}
+
+    @staticmethod
+    def _with_member_sex(doc: Dict[str, Any], sexes: Dict[int, Optional[str]]) -> Dict[str, Any]:
+        """The API document with each participant's `sex` read from its member (the copy older rows hold,
+        `gender`, is dropped). Participant maps are copied: `doc` may share them with a cached document."""
+        participants = []
+        for p in doc.get("participants") or []:
+            row = {k: v for k, v in p.items() if k != "gender"}
+            row["sex"] = sexes.get(p.get("adherent_id"))
+            participants.append(row)
+        return {**doc, "participants": participants}
 
     @classmethod
     def archive_past_competitions(cls, today_iso: str) -> List[int]:

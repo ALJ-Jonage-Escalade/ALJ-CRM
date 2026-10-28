@@ -4,6 +4,7 @@ import datetime
 import unittest
 
 from domain.members import view as member_view
+from domain.members.sex import Sex
 
 PLANNING = [
     {"id": 2, "groupe": "Enfants 2015-2016", "categorie_age": "U11", "type": "Cours",
@@ -16,7 +17,7 @@ PLANNING = [
 
 def row(**over):
     base = {"user_id": 7, "purchase_id": 70, "last_name": "Martin", "first_name": "Léo",
-            "birth_date": "2015-09-02", "gender": "m", "tarif_name": "Enfant mercredi",
+            "birth_date": "2015-09-02", "sex": "H", "tarif_name": "Enfant mercredi",
             "amount": 150.0, "status": "validated", "payer_first_name": "Claire",
             "payer_last_name": "MARTIN", "season_name": "2026-2027", "phone": None}
     base.update(over)
@@ -41,7 +42,7 @@ class TestMemberView(unittest.TestCase):
         m = member_view.member_row(row(), member_view.tarif_slots(PLANNING), datetime.date(2026, 9, 1))
         self.assertEqual((m["user_id"], m["purchase_id"]), (7, 70))
         self.assertEqual(m["age"], 10)                                # 11 on 2 September only
-        self.assertEqual(m["gender"], "Homme")
+        self.assertEqual(m["sex"], Sex.MALE)
         self.assertEqual(m["status_norm"], "Validé")
         self.assertEqual(m["payer"], "Claire MARTIN")
         self.assertEqual((m["creneau_groupe"], m["categorie"], m["creneau_details"]),
@@ -88,7 +89,6 @@ class TestMemberView(unittest.TestCase):
     def test_normalizers(self):
         self.assertEqual(member_view.normalize_status(" Canceled "), "Annulé")
         self.assertEqual(member_view.normalize_status("Autre"), "Autre")
-        self.assertEqual(member_view.normalize_gender("Féminin"), "Femme")
 
 
 if __name__ == "__main__":

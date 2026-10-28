@@ -67,6 +67,20 @@ describe("edit and add", () => {
     });
   });
 
+  it("sends the sex as an FFME code, null to clear it", () => {
+    const m = member({ sex: "F" });
+    expect(changesOf(m, draftOf(m))).toEqual({ fields: {}, lines: [] });
+    expect(changesOf(m, { ...draftOf(m), sex: "H" })).toEqual({ fields: { sex: "H" }, lines: ["Sexe : Femme ➔ Homme"] });
+    expect(changesOf(m, { ...draftOf(m), sex: "" })).toEqual({ fields: { sex: null }, lines: ["Sexe : Femme ➔ Non renseigné"] });
+  });
+
+  it("never guesses the sex of a new member", () => {
+    const d = draftOf(undefined, "Adulte loisir");
+    expect(d.sex).toBe("");
+    expect(newMemberOf(d).sex).toBeNull();
+    expect(newMemberOf({ ...d, sex: "F" }).sex).toBe("F");
+  });
+
   it("builds the new member: last name in capitals, French decimal amount", () => {
     const d = {
       ...draftOf(undefined, "Adulte loisir"),

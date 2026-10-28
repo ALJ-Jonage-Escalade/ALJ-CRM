@@ -12,6 +12,7 @@ import re
 from typing import Any, Dict, Iterable, List, Optional
 
 from domain.members.age_rules import age_at, get_season_start_date, parse_birth_date
+from domain.members.sex import parse_sex
 from domain.utils import normalize_string
 
 # Rows (SQLite) and members (JSON for the pages) are Dict[str, Any]: mixed column types.
@@ -26,15 +27,6 @@ STATUS_MAP = {
 def normalize_status(status: object) -> str:
     raw = str(status or "").strip()
     return STATUS_MAP.get(raw.lower(), raw)
-
-
-def normalize_gender(value: object) -> str:
-    s = str(value or "").strip().lower()
-    if s in ("f", "femme", "féminin", "feminin"):
-        return "Femme"
-    if s in ("h", "m", "homme", "masculin"):
-        return "Homme"
-    return str(value or "").strip()
 
 
 _FIRST_NAME_WORD = re.compile(r"(^|[\s\-'’])([a-zà-öø-ÿ])", re.IGNORECASE)
@@ -167,7 +159,7 @@ def member_row(row: Dict[str, Any], slots: Dict[str, Dict[str, str]],
         "purchase_id": row.get("purchase_id"),
         "birth_date": birth,
         "age": age if age is not None and age >= 0 else None,
-        "gender": normalize_gender(row.get("gender")),
+        "sex": parse_sex(row.get("sex")),
         "payer": " ".join(p for p in (row.get("payer_first_name"), row.get("payer_last_name")) if p),
         "tarif_name": tarif,
         "amount": row.get("amount"),

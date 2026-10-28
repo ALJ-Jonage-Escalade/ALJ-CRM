@@ -78,6 +78,7 @@ class TestWebhookPayments(ApiTestCase):
             if collection == Repo.COLLECTION_ADHERENTS:
                 raise FirestoreError("down")
             return real(collection, *args, **kwargs)
+        Repo._invalidate_adherents_cache()  # no copy of the list yet (the competition read in setUp keeps one)
         with patch.object(FirestoreClient, "list_documents", side_effect=adherents_down):
             r = self.client.post("/webhooks/helloasso", json={"eventType": "Payment", "data": payment_item(7777, 9999, 1500)})
         self.assertEqual(r.status_code, 503, r.text)
