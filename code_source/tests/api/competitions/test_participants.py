@@ -62,9 +62,9 @@ class TestParticipants(ApiTestCase):
         doc["participants"][0]["gender"] = "Homme"
         self.fake.upsert_document("competitions", doc["_doc_id"], {k: v for k, v in doc.items() if k != "_doc_id"})
         competition_store.invalidate_cache()
-        p = self.listed_participant(3)
-        self.assertEqual(p["sex"], "F")
-        self.assertNotIn("gender", p)
+        participant = self.listed_participant(3)
+        self.assertEqual(participant["sex"], "F")
+        self.assertNotIn("gender", participant)
 
     def reads_during(self, method, url, body=None):
         """(response, competition documents read, coaches collection reads) of one request."""

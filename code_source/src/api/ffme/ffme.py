@@ -110,7 +110,6 @@ def get_ffme_stats_api(season: Optional[str] = None) -> Union[FfmeStats, JSONRes
                 continue
 
             # 4. Terminé ou à produire
-
             if "termin" in status:
                 termine_count += 1
             else:

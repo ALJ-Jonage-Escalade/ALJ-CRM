@@ -4,7 +4,7 @@
 import type { Schemas } from "../../lib/client";
 import { looksLikeEmail } from "../../lib/email";
 import { formatDate, formatDayText } from "../../lib/format";
-import { sexLabel, type Sex } from "../../lib/sex";
+import { SEX_LABELS, sexLabel, type Sex } from "../../lib/sex";
 import { diplomes, normKey, type Creneau, type Member } from "./members";
 
 export type MemberChanges = Schemas["MemberChanges"];
@@ -29,7 +29,7 @@ export function recordRows(m: Member): RecordRow[] {
   };
   const join = (sep: string, ...parts: string[]) => parts.filter(Boolean).join(sep);
   add("🎂", "Date de naissance", m.birth_date ? `${formatDayText(m.birth_date)}${m.age != null ? ` (${m.age} ans)` : ""}` : "");
-  add("⚧", "Sexe", m.sex ? sexLabel(m.sex) : "");
+  add("⚧", "Sexe", m.sex ? SEX_LABELS[m.sex] : "");
   add("📍", "Adresse", join(", ", m.address, join(" ", m.zip_code, m.city)));
   add("📞", "Téléphone", m.phone);
   add("✉️", "E-mail principal", m.email_primary);

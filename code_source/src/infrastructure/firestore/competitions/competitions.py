@@ -59,7 +59,7 @@ class CompetitionsMixin(AdherentsMixin):
         """{adherent id -> sex code} from the `adherents` directory: the single source of the participants'
         sex (plans/sex-enum.md D7). Empty when the directory cannot be read: the sexes show as not given."""
         try:
-            return {a["id"]: a["sex"] for a in map(cls._adherent_as_legacy_dict, cls._adherents_raw()) if a["id"] is not None}
+            return {doc["id"]: cls._sex_code(doc) for doc in cls._adherents_raw() if doc.get("id") is not None}
         except FirestoreError as e:
             logger.warning("Annuaire adhérents illisible, sexe des participants non renseigné : %s", e)
             return {}

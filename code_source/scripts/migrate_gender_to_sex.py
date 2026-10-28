@@ -49,7 +49,7 @@ class UserChange:
 
 @dataclass
 class Report:
-    users_by_sex: Counter = field(default_factory=Counter)
+    users_by_sex: Counter[str] = field(default_factory=Counter)
     unparsed: Dict[Any, str] = field(default_factory=dict)  # user id -> order refs
     users_skipped: int = 0
     participants: int = 0
@@ -92,7 +92,7 @@ def order_refs_by_user(store: RestStore) -> Dict[Any, List[str]]:
 def migrate_users(store: RestStore, apply: bool, report: Report) -> None:
     docs = store.list_all(collection_for("users"))
     changes: List[UserChange] = []
-    unparsed_ids = []
+    unparsed_ids: List[Any] = []  # Any: user ids as stored in Firestore
     for doc in docs:
         change = user_change(doc)
         if change is None:
