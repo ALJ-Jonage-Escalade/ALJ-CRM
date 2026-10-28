@@ -5,10 +5,10 @@
    - cancelled, money lost (annule_perdu): kept by the club, neither due nor credit (shown, balanced);
    - neither selected nor paid: not counted.
    A season runs from August to July. */
-import type { Cell } from "../../lib/csv";
-import { formatEuros } from "../../lib/format";
-import { normKey } from "../adherents/members";
-import { isPast, ranking, todayIso, type Competition, type Participant } from "./competitions";
+import type { Cell } from "../../../lib/csv";
+import { formatEuros } from "../../../lib/format";
+import { normKey } from "../../adherents/members";
+import { isPast, ranking, todayIso, type Competition, type Participant } from "../competitions";
 
 /** « 2026-2027 » for a date from August 2026 to July 2027. */
 export function seasonOf(iso: string): string {

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import UiBadge from "../../components/ui/UiBadge.vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import { formatDayText } from "../../lib/format";
-import { plural } from "../../lib/text";
-import { counts, discipline, disciplineColor, hasResults, type Competition } from "./competitions";
+import UiBadge from "../../../components/ui/UiBadge.vue";
+import UiButton from "../../../components/ui/UiButton.vue";
+import { formatDayText } from "../../../lib/format";
+import { plural } from "../../../lib/text";
+import { counts, discipline, disciplineColor, hasResults, type Competition } from "../competitions";
 
 defineProps<{
   competitions: readonly Competition[];

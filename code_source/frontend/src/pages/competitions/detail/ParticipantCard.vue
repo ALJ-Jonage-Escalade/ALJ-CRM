@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /* A competitor of the competition. */
-import UiBadge from "../../components/ui/UiBadge.vue";
-import { telHref } from "../adherents/members";
-import { hasPaid, isCancelled, payment, ranking, type Row } from "./competitions";
+import UiBadge from "../../../components/ui/UiBadge.vue";
+import { telHref } from "../../adherents/members";
+import { hasPaid, isCancelled, payment, ranking, type Row } from "../competitions";
 
 const props = defineProps<{ row: Row; canWrite: boolean; staff: boolean; contactsShown: boolean }>();
 const emit = defineEmits<{ toggle: [flag: "selectionne" | "present", value: boolean]; remove: []; pay: []; withdraw: []; restore: [] }>();

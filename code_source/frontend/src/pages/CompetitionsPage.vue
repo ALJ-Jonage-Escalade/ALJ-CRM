@@ -4,7 +4,6 @@
 import { computed, inject, onScopeDispose, provide, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
-import UiBadge from "../components/ui/UiBadge.vue";
 import UiButton from "../components/ui/UiButton.vue";
 import UiDialog from "../components/ui/UiDialog.vue";
 import UiToast from "../components/ui/UiToast.vue";
@@ -12,27 +11,16 @@ import { AUTH_KEY } from "../composables/auth";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
 import { pageVerdict } from "../lib/access";
-import { formatDateTime, formatEuros } from "../lib/format";
+import { formatDateTime } from "../lib/format";
 import { CLIENT_KEY, type Schemas } from "../lib/client";
 import { createCompetitionsApi } from "../services/competitions";
 import { isStaff } from "../lib/roles";
 import { offlineStore, STORE_KEY } from "../lib/store";
-import BalancePane from "./competitions/BalancePane.vue";
+import BalancePane from "./competitions/balance/BalancePane.vue";
 import CoachesPane from "./competitions/CoachesPane.vue";
-import CompetitionDetail from "./competitions/CompetitionDetail.vue";
+import CompetitionDetail from "./competitions/detail/CompetitionDetail.vue";
 import CompetitionForm from "./competitions/CompetitionForm.vue";
-import CompetitionTable from "./competitions/CompetitionTable.vue";
-import CompetitionCalendar from "./competitions/CompetitionCalendar.vue";
 import {
-  competitionSeason,
-  counts,
-  discipline,
-  disciplineColor,
-  filterCompetitions,
-  formatCompetitionPeriod,
-  hasResults,
-  isArchived,
-  isPast,
   participantRows,
   period,
   sortCompetitions,
@@ -42,10 +30,16 @@ import {
   type Competition,
   type CompetitorContact,
   type MemberSlot,
-  type When,
 } from "./competitions/competitions";
-import HelloAssoPane from "./competitions/HelloAssoPane.vue";
-import type { HelloAssoItem } from "./competitions/helloasso";
+import HelloAssoPane from "./competitions/helloasso/HelloAssoPane.vue";
+import type { HelloAssoItem } from "./competitions/helloasso/helloasso";
+import CompetitionCalendar from "./competitions/list/CompetitionCalendar.vue";
+import CompetitionCards from "./competitions/list/CompetitionCards.vue";
+import CompetitionFilters from "./competitions/list/CompetitionFilters.vue";
+import CompetitionStats from "./competitions/list/CompetitionStats.vue";
+import CompetitionTable from "./competitions/list/CompetitionTable.vue";
+import { useCompetitionFilters, type ViewMode } from "./competitions/list/filters";
+import ViewSwitcher from "./competitions/list/ViewSwitcher.vue";
 import { createOutbox, pendingLine, replayMessage } from "./competitions/outbox";
 import { createWriter, WRITER_KEY } from "./competitions/writer";
 import { plural } from "../lib/text";
@@ -111,8 +105,8 @@ const items = useSyncedResource<HelloAssoItem[]>(
 
 // ---------------------------------------------------------------- Network and outbox
 
-const networkUp = ref(navigator.onLine !== false);
-const onNetwork = () => (networkUp.value = navigator.onLine !== false);
+const networkUp = ref(navigator.onLine);
+const onNetwork = () => (networkUp.value = navigator.onLine);
 window.addEventListener("online", onNetwork);
 window.addEventListener("offline", onNetwork);
 onScopeDispose(() => {
@@ -172,41 +166,19 @@ provide(WRITER_KEY, writer);
 
 const today = todayIso();
 const all = computed(() => sortCompetitions(competitions.data.value ?? []));
-const search = ref("");
-const when = ref<When>("all");
-// Every season by default: a competition without a date (allowed) or of another season is never hidden unasked
-const selectedSeason = ref("all");
-const seasons = computed(() => {
-  const set = new Set<string>([competitionSeason(today)]);
-  all.value.forEach((c) => {
-    const s = competitionSeason(c.date_competition);
-    if (s) {
-      set.add(s);
-    }
-  });
-  return Array.from(set).sort().reverse();
-});
-
-type ViewMode = "cards" | "table" | "calendar";
+const {
+  search,
+  when,
+  selectedSeason,
+  seasons,
+  seasonCompetitions,
+  current,
+  archived: archivedCompetitions,
+  calendar: calendarCompetitions,
+  past: pastCompetitions,
+  filtered,
+} = useCompetitionFilters(all, today);
 const viewMode = ref<ViewMode>("cards");
-
-const current = computed(() => {
-  let list = all.value.filter((c) => !isArchived(c));
-  if (selectedSeason.value && selectedSeason.value !== "all") {
-    list = list.filter((c) => competitionSeason(c.date_competition) === selectedSeason.value);
-  }
-  return filterCompetitions(list, search.value, when.value, today);
-});
-// The calendar: the search only, archived ones included (greyed); its months replace the season and date filters
-const calendarCompetitions = computed(() => filterCompetitions(all.value, search.value, "all", today));
-const archivedCompetitions = computed(() => filterCompetitions(all.value.filter(isArchived), search.value, when.value, today));
-const pastCompetitions = computed(() => all.value.filter((c) => !isArchived(c) && isPast(c, today)));
-const showArchived = ref(false);
-const WHEN: { id: When; label: string }[] = [
-  { id: "all", label: "Toutes" },
-  { id: "upcoming", label: "À venir" },
-  { id: "past", label: "Passées" },
-];
 
 const selectedId = computed(() => (typeof route.query.id === "string" ? route.query.id : ""));
 // The detail is shown next to the cards: a competition opened from the table or the calendar goes back to them (their
@@ -227,61 +199,6 @@ const rows = computed(() =>
       )
     : [],
 );
-
-// ---------------------------------------------------------------- Global statistics (when no competition is selected)
-
-const statsCompetitions = computed(() => {
-  let list = all.value.filter((c) => !isArchived(c));
-  if (selectedSeason.value && selectedSeason.value !== "all") {
-    list = list.filter((c) => competitionSeason(c.date_competition) === selectedSeason.value);
-  }
-  return list;
-});
-
-const statsTotalCompetitions = computed(() => statsCompetitions.value.length);
-const statsUpcomingCompetitions = computed(() => statsCompetitions.value.filter((c) => !isPast(c, today)).length);
-const statsPastCompetitions = computed(() => statsCompetitions.value.filter((c) => isPast(c, today)).length);
-
-const statsTotalCompetitors = computed(() => {
-  const set = new Set<string>();
-  for (const c of statsCompetitions.value) {
-    for (const p of c.participants ?? []) {
-      const key =
-        p.adherent_id != null ? String(p.adherent_id) : `${(p.nom ?? "").trim().toLowerCase()}_${(p.prenom ?? "").trim().toLowerCase()}`;
-      if (key && key !== "_") {
-        set.add(key);
-      }
-    }
-  }
-  return set.size;
-});
-
-const statsTotalParticipations = computed(() => statsCompetitions.value.reduce((acc, c) => acc + (c.participants?.length ?? 0), 0));
-
-const statsTotalBudget = computed(() => {
-  let total = 0;
-  for (const c of statsCompetitions.value) {
-    const price = Number(c.prix ?? 0);
-    if (!price) {
-      continue;
-    }
-    const parts = c.participants ?? [];
-    const selectedCount = parts.filter((p) => p.selectionne).length;
-    const count = selectedCount > 0 ? selectedCount : parts.length;
-    total += price * count;
-  }
-  return total;
-});
-
-const statsTotalPaid = computed(() => {
-  let total = 0;
-  for (const c of statsCompetitions.value) {
-    for (const p of c.participants ?? []) {
-      total += Number(p.montant_paye ?? 0);
-    }
-  }
-  return total;
-});
 
 const creating = ref(false);
 const editingCompetition = ref<Competition | null>(null);
@@ -390,10 +307,6 @@ const syncInfo = computed(() => {
   return waiting.slice(3);
 });
 
-const chip = (active: boolean) => [
-  "cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold",
-  active ? "border-accent bg-accent text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
-];
 const tab = (active: boolean) => [
   "shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-bold no-underline",
   active ? "bg-accent text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50",
@@ -438,46 +351,8 @@ const tab = (active: boolean) => [
 
     <!-- Mode de vue, sous les onglets (la vue Compétitions seulement ; masqué sur téléphone quand une fiche est ouverte) -->
     <template v-else>
-      <div
-        :class="[
-          selected ? 'hidden md:inline-flex' : 'inline-flex',
-          'mb-3 rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium',
-        ]"
-        data-testid="view-switcher"
-      >
-        <button
-          type="button"
-          :class="[
-            'px-2 py-1 rounded-md cursor-pointer transition-colors',
-            viewMode === 'cards' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
-          ]"
-          data-testid="view-cards"
-          @click="viewMode = 'cards'"
-        >
-          🗂️ Cartes
-        </button>
-        <button
-          type="button"
-          :class="[
-            'px-2 py-1 rounded-md cursor-pointer transition-colors',
-            viewMode === 'table' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
-          ]"
-          data-testid="view-table"
-          @click="viewMode = 'table'"
-        >
-          📋 Tableau
-        </button>
-        <button
-          type="button"
-          :class="[
-            'px-2 py-1 rounded-md cursor-pointer transition-colors',
-            viewMode === 'calendar' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
-          ]"
-          data-testid="view-calendar"
-          @click="viewMode = 'calendar'"
-        >
-          📅 Calendrier
-        </button>
+      <div :class="['mb-3', selected ? 'hidden md:block' : '']">
+        <ViewSwitcher v-model="viewMode" />
       </div>
       <div
         class="flex flex-col md:grid md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-start md:gap-4 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]"
@@ -497,46 +372,13 @@ const tab = (active: boolean) => [
             </UiButton>
           </div>
 
-          <!-- Filtre saison -->
-          <div
-            v-if="viewMode !== 'calendar'"
-            class="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2"
-          >
-            <div class="flex items-center gap-1.5 text-xs">
-              <span class="font-semibold text-slate-500">Saison :</span>
-              <select
-                v-model="selectedSeason"
-                data-testid="comp-season-filter"
-                class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
-              >
-                <option value="all">Toutes les saisons</option>
-                <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-1.5 mb-2">
-            <input
-              v-model="search"
-              type="search"
-              data-testid="comp-search"
-              placeholder="Rechercher (nom, lieu, discipline)…"
-              class="min-w-32 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px] md:basis-full"
-            />
-            <div v-if="viewMode !== 'calendar'" class="flex pt-1 gap-2">
-              <button
-                v-for="w in WHEN"
-                :key="w.id"
-                type="button"
-                :data-testid="`when-${w.id}`"
-                :aria-pressed="when === w.id"
-                :class="chip(when === w.id)"
-                @click="when = w.id"
-              >
-                {{ w.label }}
-              </button>
-            </div>
-          </div>
+          <CompetitionFilters
+            v-model:season="selectedSeason"
+            v-model:search="search"
+            v-model:when="when"
+            :seasons="seasons"
+            :calendar="viewMode === 'calendar'"
+          />
           <p class="pt-1 pb-1 mb-2 text-xs text-slate-500" data-testid="comp-count">{{ listLine }}</p>
 
           <!-- Vue Tableau -->
@@ -556,82 +398,14 @@ const tab = (active: boolean) => [
           </div>
 
           <!-- Vue Cartes (par défaut) -->
-          <ul v-else class="flex flex-col gap-2">
-            <li
-              v-if="competitions.data.value && !current.length"
-              class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500"
-            >
-              {{
-                search || when !== "all" || selectedSeason !== "all"
-                  ? "Aucune compétition correspondante."
-                  : archivedCompetitions.length
-                    ? "Aucune compétition en cours : toutes sont archivées."
-                    : "Aucune compétition enregistrée."
-              }}
-            </li>
-            <li v-for="competition in current" :key="competition.id">
-              <RouterLink
-                :to="{ query: { id: String(competition.id) } }"
-                data-testid="comp-card"
-                :aria-current="selected?.id === competition.id ? 'true' : undefined"
-                :class="[
-                  'block rounded-xl border bg-white px-3.5 py-3 text-slate-800 no-underline shadow-sm hover:border-accent',
-                  selected?.id === competition.id ? 'border-accent' : 'border-slate-200',
-                ]"
-              >
-                <div class="flex items-start justify-between gap-2 pb-1">
-                  <b class="block text-[15px]" data-testid="comp-name">
-                    <span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆</span>
-                    {{ competition.nom }}
-                  </b>
-                  <UiBadge
-                    v-if="discipline(competition)"
-                    :color="disciplineColor(discipline(competition))"
-                    variant="soft"
-                    class="ml-1 shrink-0"
-                    data-testid="discipline"
-                  >
-                    {{ discipline(competition) }}
-                  </UiBadge>
-                </div>
-                <span class="block text-xs font-semibold text-slate-600 pb-1.5" data-testid="comp-period">
-                  📅 {{ formatCompetitionPeriod(competition) }}
-                </span>
-                <span class="block text-xs text-slate-500">
-                  🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}
-                </span>
-                <span class="mt-0.5 block text-xs font-semibold text-blue-900">
-                  ({{ counts(competition.participants ?? []).selected }} participant{{
-                    plural(counts(competition.participants ?? []).selected)
-                  }}
-                  · {{ counts(competition.participants ?? []).unpaid }} en attente ·
-                  {{ counts(competition.participants ?? []).paid }} payé{{ plural(counts(competition.participants ?? []).paid) }})
-                </span>
-              </RouterLink>
-            </li>
-          </ul>
-          <button
-            v-if="archivedCompetitions.length && viewMode === 'cards'"
-            type="button"
-            data-testid="toggle-archives"
-            :aria-expanded="showArchived"
-            class="mt-2.5 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300"
-            @click="showArchived = !showArchived"
-          >
-            {{ showArchived ? "🙈 Masquer les archives" : `🗂 Afficher les archives (${archivedCompetitions.length})` }}
-          </button>
-          <ul v-if="showArchived && viewMode === 'cards'" class="mt-2 flex flex-col gap-2" data-testid="archived-list">
-            <li v-for="c in archivedCompetitions" :key="c.id">
-              <RouterLink
-                :to="{ query: { id: String(c.id) } }"
-                data-testid="comp-card"
-                class="block rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-slate-700 no-underline hover:border-accent"
-              >
-                <b class="block text-[14px]" data-testid="comp-name">{{ c.nom }}</b>
-                <span class="block text-xs text-slate-500">📅 {{ formatCompetitionPeriod(c) }} · 📦 Archivée</span>
-              </RouterLink>
-            </li>
-          </ul>
+          <CompetitionCards
+            v-else
+            :competitions="current"
+            :archived="archivedCompetitions"
+            :loaded="competitions.data.value !== null"
+            :filtered="filtered"
+            :selected-id="selected?.id"
+          />
         </section>
 
         <CompetitionDetail
@@ -653,38 +427,7 @@ const tab = (active: boolean) => [
           class="order-1 flex min-w-0 flex-col gap-3 md:order-2 md:col-start-2 md:row-start-1"
           data-testid="stats-no-selection"
         >
-          <!-- Tuiles de statistiques -->
-          <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-3" data-testid="competitions-stats-tiles">
-            <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-competitions">
-              <div class="text-2xl font-black text-blue-700" data-testid="stats-total-competitions">
-                {{ statsTotalCompetitions }}
-              </div>
-              <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Compétitions au total</div>
-              <div class="mt-1 text-[11px] text-slate-400">
-                {{ statsUpcomingCompetitions }} à venir · {{ statsPastCompetitions }} passée{{ plural(statsPastCompetitions) }}
-              </div>
-            </div>
-            <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-competitors">
-              <div class="text-2xl font-black text-emerald-700" data-testid="stats-total-competitors">
-                {{ statsTotalCompetitors }}
-              </div>
-              <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Compétiteurs</div>
-              <div class="mt-1 text-[11px] text-slate-400">
-                {{ statsTotalParticipations }} inscription{{ plural(statsTotalParticipations) }} cumulée{{
-                  plural(statsTotalParticipations)
-                }}
-              </div>
-            </div>
-            <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-budget">
-              <div class="text-2xl font-black text-indigo-700" data-testid="stats-total-budget">
-                {{ formatEuros(statsTotalBudget) }}
-              </div>
-              <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Budget total</div>
-              <div class="mt-1 text-[11px] text-slate-400">
-                {{ formatEuros(statsTotalPaid) }} déjà réglé{{ plural(Math.round(statsTotalPaid)) }}
-              </div>
-            </div>
-          </div>
+          <CompetitionStats :competitions="seasonCompetitions" :today="today" />
 
           <div class="hidden rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-slate-500 md:block">
             <p class="m-0 text-sm font-medium">

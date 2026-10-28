@@ -1,6 +1,6 @@
 """Competitions screen, coaches and admins: the competitors of a competition. Counters and filters, « Participe »,
 withdrawal of a competitor who paid (money carried over or lost), manual payment, check-in, removal, adding members
-(frontend/src/pages/competitions/CompetitionDetail.vue, plan phase 11)."""
+(frontend/src/pages/competitions/detail/CompetitionDetail.vue, plan phase 11)."""
 import datetime
 
 import pytest

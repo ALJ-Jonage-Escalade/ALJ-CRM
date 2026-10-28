@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  countLabel,
   dayOptions,
   draftOf,
   filterSlots,
@@ -32,6 +33,14 @@ function slot(change: Partial<Slot> = {}): Slot {
     ...change,
   };
 }
+
+describe("countLabel", () => {
+  it("is singular up to one slot", () => {
+    expect(countLabel(0)).toBe("0 créneau configuré");
+    expect(countLabel(1)).toBe("1 créneau configuré");
+    expect(countLabel(2)).toBe("2 créneaux configurés");
+  });
+});
 
 describe("hours", () => {
   it.each([

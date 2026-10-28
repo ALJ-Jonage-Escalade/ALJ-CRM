@@ -3,14 +3,14 @@
    template of the club or a free text, a preview for the first recipient, then POST /api/send-email: the server
    replaces the variables for each one and adds the signature. */
 import { computed, inject, ref, watch } from "vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import UiDialogActions from "../../components/ui/UiDialogActions.vue";
-import { CLIENT_KEY, errorText } from "../../lib/client";
-import { createCommunicationsApi } from "../../services/communications";
-import type { Competition, Row } from "./competitions";
+import UiButton from "../../../components/ui/UiButton.vue";
+import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
+import { CLIENT_KEY, errorText } from "../../../lib/client";
+import { createCommunicationsApi } from "../../../services/communications";
+import type { Competition, Row } from "../competitions";
 import { audience, AUDIENCES, defaultTemplate, hasEmail, render, sendBody, variables, type Audience, type Template } from "./email";
-import { plural } from "../../lib/text";
-import { dialogs } from "../../composables/dialogs";
+import { plural } from "../../../lib/text";
+import { dialogs } from "../../../composables/dialogs";
 
 const props = defineProps<{ competition: Competition; rows: readonly Row[] }>();
 const emit = defineEmits<{ sent: [message: string]; cancel: [] }>();

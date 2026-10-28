@@ -29,7 +29,7 @@ def planning(page):
 def _open(page, role="admin"):
     page.goto("/bureau/planning")
     login_as(page, role)
-    expect(page.get_by_test_id("slot-count")).to_contain_text("créneau(x) configuré(s)", timeout=20_000)
+    expect(page.get_by_test_id("slot-count")).to_contain_text("configuré", timeout=20_000)
     return page
 
 
@@ -50,7 +50,7 @@ def _xlsx_text(download, folder) -> str:
 
 def test_week_view_and_table(page, planning):
     _open(page)
-    expect(page.get_by_test_id("slot-count")).to_have_text(f"{len(planning)} créneau(x) configuré(s)")
+    expect(page.get_by_test_id("slot-count")).to_have_text(f"{len(planning)} créneaux configurés")
     # One card per slot of a single day (the « Lundi / Jeudi » slot spans two days: not on the grid)
     on_grid = [s for s in planning if s["jour"] in DAYS]
     expect(page.get_by_test_id("slot-card")).to_have_count(len(on_grid))

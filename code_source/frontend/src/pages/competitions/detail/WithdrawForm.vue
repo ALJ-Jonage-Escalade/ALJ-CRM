@@ -2,10 +2,10 @@
 /* A competitor who paid no longer takes part: never refunded, the coach chooses what happens to the money (carried
    over to a next competition, a credit in the season balance; or lost, kept by the club), with a required comment. */
 import { ref } from "vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import UiDialogActions from "../../components/ui/UiDialogActions.vue";
-import { formatEuros } from "../../lib/format";
-import { type Participant } from "./competitions";
+import UiButton from "../../../components/ui/UiButton.vue";
+import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
+import { formatEuros } from "../../../lib/format";
+import { type Participant } from "../competitions";
 
 defineProps<{ participant: Participant; busy: boolean }>();
 const emit = defineEmits<{ confirm: [mode: "reporte" | "perdu", note: string]; cancel: [] }>();

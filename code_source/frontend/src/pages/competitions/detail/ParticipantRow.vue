@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /* A competitor as a row of the wide-screen table (the former desktop page); ParticipantCard elsewhere. Same test ids,
    events and rules as the card: « Participe » and « Présent » switches, then the action allowed by the payment. */
-import UiBadge from "../../components/ui/UiBadge.vue";
-import { telHref } from "../adherents/members";
-import { hasPaid, isCancelled, payment, ranking, type Row } from "./competitions";
+import UiBadge from "../../../components/ui/UiBadge.vue";
+import { telHref } from "../../adherents/members";
+import { hasPaid, isCancelled, payment, ranking, type Row } from "../competitions";
 
 const props = defineProps<{ row: Row; canWrite: boolean; staff: boolean; contactsShown: boolean }>();
 const emit = defineEmits<{ toggle: [flag: "selectionne" | "present", value: boolean]; remove: []; pay: []; withdraw: []; restore: [] }>();

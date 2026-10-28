@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /* A payment received outside HelloAsso (cheque, cash): the competitor becomes selected and paid. */
 import { computed, ref } from "vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import UiDialogActions from "../../components/ui/UiDialogActions.vue";
-import type { Participant } from "./competitions";
+import UiButton from "../../../components/ui/UiButton.vue";
+import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
+import type { Participant } from "../competitions";
 
 const props = defineProps<{ participant: Participant; price: number; busy: boolean }>();
 const emit = defineEmits<{ confirm: [amount: number]; cancel: [] }>();

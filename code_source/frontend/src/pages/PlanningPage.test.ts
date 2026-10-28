@@ -81,7 +81,7 @@ describe("PlanningPage", () => {
   it("shows the week, then the table with its filters", async () => {
     const { byId, all } = render();
     await flushPromises();
-    expect(byId("slot-count")!.textContent).toBe("3 créneau(x) configuré(s)");
+    expect(byId("slot-count")!.textContent).toBe("3 créneaux configurés");
     // The two-day slot has no column
     expect(all("slot-card").map((c) => c.querySelector("b")!.textContent)).toEqual(["Loisir collège", "Compétition U13"]);
     expect(byId("day-Mercredi")!.textContent).toContain("Compétition U13");
