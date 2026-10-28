@@ -1,4 +1,5 @@
-"""Office portal, Paramètres page: Google connection (no Google account in dev mode), server cache, results batch.
+"""Office portal, Paramètres page: Google connection (reported connected in dev mode, the real check fails without a
+Google account), server cache, results batch.
 
 The MyCompet detection (real FFME site) and the manual token check (real Google endpoint) are not run here."""
 import pytest
@@ -7,7 +8,7 @@ from playwright.sync_api import expect
 from helpers.auth import login_as
 from helpers.dialogs import cancel_dialog, confirm_dialog
 
-# The full rebuild replaces the server's cache: a setting saved meanwhile by another test of this file would be lost
+# The cache sync rewrites the server's cache: a setting saved meanwhile by another test of this file would be lost
 pytestmark = pytest.mark.xdist_group("parametres")
 
 
@@ -18,15 +19,16 @@ def _open(page):
     return page
 
 
-def test_google_status_without_token(page):
+def test_google_status_in_dev_mode(page):
     _open(page)
-    expect(page.get_by_test_id("google-status")).to_contain_text("Non connecté")
-    expect(page.get_by_test_id("google-account")).to_have_text("Non configuré")
+    # The status is not asked of Google in dev mode (api/integrations/google_auth.py)
+    expect(page.get_by_test_id("google-status")).to_contain_text("Connecté")
+    expect(page.get_by_test_id("google-account")).to_have_text("dev-emulator@alj-escalade.fr")
     expect(page.get_by_test_id("db-mode")).to_contain_text("Firestore")
 
     page.get_by_test_id("google-test").click()
     report = page.get_by_test_id("google-test-report")
-    expect(report).to_contain_text("🔴 Jeton OAuth2")
+    expect(report).to_contain_text("🔴 Jeton Google OAuth2")
     expect(report).to_contain_text("Base de Données")
     expect(report).to_contain_text("Service Gmail API")
     expect(page.get_by_test_id("google-test")).to_be_enabled()
@@ -44,28 +46,23 @@ def test_server_cache_status(page):
     expect(page.get_by_test_id("cache-status")).to_contain_text("Cache opérationnel")
 
 
-def test_incremental_update_and_full_rebuild(page):
+def test_incremental_update(page):
     _open(page)
     page.get_by_test_id("cache-sync").click()
+    confirm_dialog(page)
     expect(page.get_by_test_id("toast")).to_contain_text("synchronisée avec succès")
     report = page.get_by_test_id("cache-report")
     expect(report).to_contain_text("Synchronisation réussie")
     expect(report).not_to_contain_text("reconstruction complète")
-
-    page.get_by_test_id("troubleshooting").click()  # collapsed <details>
-    page.get_by_test_id("cache-rebuild").click()
-    confirm_dialog(page)
-    expect(report).to_contain_text("(reconstruction complète)", timeout=30_000)
-    # The rebuilt cache still holds every member
+    # The synced cache still holds every member
     status = page.request.get("/api/cloud-db/status").json()
     expect(page.get_by_test_id("cache-file")).to_contain_text(f"{status['member_count']} adhérents")
     assert status["member_count"] > 20
 
 
-def test_full_rebuild_needs_confirmation(page):
+def test_sync_needs_confirmation(page):
     _open(page)
-    page.get_by_test_id("troubleshooting").click()  # collapsed <details>
-    page.get_by_test_id("cache-rebuild").click()
+    page.get_by_test_id("cache-sync").click()
     cancel_dialog(page)
     expect(page.get_by_test_id("cache-report")).to_be_hidden()
 

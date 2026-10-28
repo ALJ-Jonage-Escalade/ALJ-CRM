@@ -52,8 +52,8 @@ const rows = computed(() => recordRows(props.member));
     <div class="flex flex-wrap items-start justify-between gap-2">
       <div class="flex min-w-0 flex-1 flex-col gap-3">
         <div class="flex flex-row items-start justify-between gap-2 text-lg font-bold text-slate-800">
-          <div class="flex flex-wrap items-center gap-1.5" data-testid="record-name">
-            <span>{{ member.first_name }} {{ member.last_name }}</span>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span data-testid="record-name">{{ member.first_name }} {{ member.last_name }}</span>
             <UiBadge v-if="isCompetitor(member)" variant="soft" color="violet" class="text-[10.5px]">🏆 Compétiteur</UiBadge>
           </div>
           <div>
