@@ -1,8 +1,8 @@
 /* The Compétitions calendar: the month's weeks, the competitions laid out as bars over them (several days → one bar,
    overlapping ones on separate lanes) and the month's list for phones. Dates are local "YYYY-MM-DD" strings, compared
    as text; never toISOString(), which is UTC and shifts the day in the evening. */
-import type { BadgeColor } from "../../components/ui/palette";
-import { discipline, DISCIPLINE_COLOR, disciplineColor, isArchived, todayIso, type Competition } from "./competitions";
+import type { BadgeColor } from "../../../components/ui/palette";
+import { discipline, DISCIPLINE_COLOR, disciplineColor, isArchived, todayIso, type Competition } from "../competitions";
 
 /** A month; `month` from 0 (January) to 11, as in Date. */
 export interface YearMonth {

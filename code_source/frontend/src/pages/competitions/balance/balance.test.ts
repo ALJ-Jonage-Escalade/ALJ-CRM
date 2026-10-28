@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { balanceCsv, balanceLabel, balances, searchBalances, seasonOf, seasons, totals } from "./balance";
-import type { Competition } from "./competitions";
+import type { Competition } from "../competitions";
 
 const TODAY = "2026-11-15";
 const LIST: Competition[] = [

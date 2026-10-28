@@ -1,9 +1,9 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
-import type { ApiFetch } from "../../lib/api";
-import { CLIENT_KEY, createApiClient } from "../../lib/client";
+import type { ApiFetch } from "../../../lib/api";
+import { CLIENT_KEY, createApiClient } from "../../../lib/client";
 import EmailForm from "./EmailForm.vue";
-import { participantRows, type Competition } from "./competitions";
+import { participantRows, type Competition } from "../competitions";
 
 const COMP: Competition = {
   id: 10,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { Competition, Row } from "./competitions";
+import type { Competition, Row } from "../competitions";
 
 const props = defineProps<{
   competition: Competition;

@@ -1,9 +1,9 @@
 /* E-mail to the competitors of a competition: the audience, a preview with the competition's variables (the server
    fills them again when sending: infrastructure/mail/dispatch.py get_competition_context), the request body. */
-import type { Schemas } from "../../lib/client";
-import { looksLikeEmail } from "../../lib/email";
-import { formatDayText } from "../../lib/format";
-import type { Competition, Row } from "./competitions";
+import type { Schemas } from "../../../lib/client";
+import { looksLikeEmail } from "../../../lib/email";
+import { formatDayText } from "../../../lib/format";
+import type { Competition, Row } from "../competitions";
 
 export type Template = Schemas["EmailTemplate"];
 export type Audience = "selected" | "unpaid" | "all";

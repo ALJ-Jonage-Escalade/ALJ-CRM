@@ -5,19 +5,19 @@
    spreadsheet export. « Participe » and « Présent » also change offline (the outbox, sent when the network comes back). */
 import { computed, inject, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import UiBadge from "../../components/ui/UiBadge.vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import UiDialogActions from "../../components/ui/UiDialogActions.vue";
-import UiDialog from "../../components/ui/UiDialog.vue";
-import UiMenu from "../../components/ui/UiMenu.vue";
-import UiMenuItem from "../../components/ui/UiMenuItem.vue";
-import { useMediaQuery } from "../../composables/media";
-import { CLIENT_KEY, errorText, type Schemas } from "../../lib/client";
-import { createCompetitionsApi } from "../../services/competitions";
-import { csvBlob } from "../../lib/csv";
-import { saveExport, saveFile } from "../../lib/download";
-import { formatEuros } from "../../lib/format";
-import CompetitionForm from "./CompetitionForm.vue";
+import UiBadge from "../../../components/ui/UiBadge.vue";
+import UiButton from "../../../components/ui/UiButton.vue";
+import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
+import UiDialog from "../../../components/ui/UiDialog.vue";
+import UiMenu from "../../../components/ui/UiMenu.vue";
+import UiMenuItem from "../../../components/ui/UiMenuItem.vue";
+import { useMediaQuery } from "../../../composables/media";
+import { CLIENT_KEY, errorText, type Schemas } from "../../../lib/client";
+import { createCompetitionsApi } from "../../../services/competitions";
+import { csvBlob } from "../../../lib/csv";
+import { saveExport, saveFile } from "../../../lib/download";
+import { formatEuros } from "../../../lib/format";
+import CompetitionForm from "../CompetitionForm.vue";
 import CompetitionCharts from "./CompetitionCharts.vue";
 import {
   countLine,
@@ -39,16 +39,16 @@ import {
   type Participant,
   type ParticipantFilter,
   type Row,
-} from "./competitions";
+} from "../competitions";
 import EmailForm from "./EmailForm.vue";
-import type { Outbox, QueuedFlag } from "./outbox";
+import type { Outbox, QueuedFlag } from "../outbox";
 import ParticipantCard from "./ParticipantCard.vue";
 import ParticipantRow from "./ParticipantRow.vue";
 import PaymentForm from "./PaymentForm.vue";
 import WithdrawForm from "./WithdrawForm.vue";
-import { WRITER_KEY } from "./writer";
-import { plural } from "../../lib/text";
-import { dialogs } from "../../composables/dialogs";
+import { WRITER_KEY } from "../writer";
+import { plural } from "../../../lib/text";
+import { dialogs } from "../../../composables/dialogs";
 
 const props = defineProps<{
   competition: Competition;

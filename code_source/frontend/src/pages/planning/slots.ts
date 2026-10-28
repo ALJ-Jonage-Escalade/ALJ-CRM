@@ -1,6 +1,7 @@
 /* The Planning page's slots: placement on the week grid, table filters, the slot form and its checks
    (texts and rules of the former web/bureau/planning.html). */
 import type { Schemas } from "../../lib/client";
+import { plural } from "../../lib/text";
 
 export type Slot = Schemas["PlanningSlot"];
 export type SlotUpdate = Schemas["PlanningSlotUpdate"];
@@ -133,7 +134,7 @@ export function filterSlots(slots: readonly Slot[], search: string, kind: KindFi
 }
 
 export function countLabel(count: number): string {
-  return `${count} créneau(x) configuré(s)`;
+  return `${count} créneau${plural(count, "x")} configuré${plural(count)}`;
 }
 
 /** The slot form: coaches typed as one text, separated by commas. */

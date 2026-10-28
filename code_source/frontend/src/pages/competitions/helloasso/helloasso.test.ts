@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Competition, MemberSlot } from "./competitions";
+import type { Competition, MemberSlot } from "../competitions";
 import {
   displayName,
   filterItems,

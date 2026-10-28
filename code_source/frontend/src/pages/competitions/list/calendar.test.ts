@@ -13,7 +13,7 @@ import {
   shiftMonth,
   WEEKDAYS,
 } from "./calendar";
-import type { Competition } from "./competitions";
+import type { Competition } from "../competitions";
 
 const comp = (id: number, start: string, end?: string, extra: Partial<Competition> = {}): Competition => ({
   id,

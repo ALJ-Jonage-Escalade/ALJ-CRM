@@ -3,10 +3,10 @@
    that participant (the server selects the member and records the payment); a line unrelated to a competition is
    ignored, with a reason. The competition and member are suggested from what the payer typed. */
 import { computed, ref } from "vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import UiDialogActions from "../../components/ui/UiDialogActions.vue";
-import { formatDateTime, formatEuros, parseDate } from "../../lib/format";
-import { sortCompetitions, isArchived, type Competition, type MemberSlot } from "./competitions";
+import UiButton from "../../../components/ui/UiButton.vue";
+import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
+import { formatDateTime, formatEuros, parseDate } from "../../../lib/format";
+import { sortCompetitions, isArchived, type Competition, type MemberSlot } from "../competitions";
 import {
   displayName,
   isIgnored,

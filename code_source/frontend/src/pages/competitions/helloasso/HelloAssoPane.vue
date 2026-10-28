@@ -2,16 +2,16 @@
 /* HelloAsso view */
 import { computed, inject, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
-import UiBadge from "../../components/ui/UiBadge.vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import UiDialog from "../../components/ui/UiDialog.vue";
-import { useMediaQuery } from "../../composables/media";
-import { CLIENT_KEY } from "../../lib/client";
-import { createCompetitionsApi } from "../../services/competitions";
-import { createIntegrationsApi } from "../../services/integrations";
-import { formatDate, formatEuros, parseDate } from "../../lib/format";
+import UiBadge from "../../../components/ui/UiBadge.vue";
+import UiButton from "../../../components/ui/UiButton.vue";
+import UiDialog from "../../../components/ui/UiDialog.vue";
+import { useMediaQuery } from "../../../composables/media";
+import { CLIENT_KEY } from "../../../lib/client";
+import { createCompetitionsApi } from "../../../services/competitions";
+import { createIntegrationsApi } from "../../../services/integrations";
+import { formatDate, formatEuros, parseDate } from "../../../lib/format";
 import AttachForm from "./AttachForm.vue";
-import { type Competition, type MemberSlot } from "./competitions";
+import { type Competition, type MemberSlot } from "../competitions";
 import {
   displayName,
   filterItems,
@@ -29,8 +29,8 @@ import {
   type ItemInfo,
   type PassTally,
 } from "./helloasso";
-import { WRITER_KEY } from "./writer";
-import { plural } from "../../lib/text";
+import { WRITER_KEY } from "../writer";
+import { plural } from "../../../lib/text";
 
 const props = defineProps<{
   items: readonly HelloAssoItem[] | null;

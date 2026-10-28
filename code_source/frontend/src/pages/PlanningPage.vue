@@ -14,6 +14,7 @@ import { CLIENT_KEY, errorText } from "../lib/client";
 import { createActivitiesApi } from "../services/activities";
 import { createMembersApi } from "../services/members";
 import { saveExport, saveFile } from "../lib/download";
+import { plural } from "../lib/text";
 import SlotForm from "./planning/SlotForm.vue";
 import SlotList from "./planning/SlotList.vue";
 import {
@@ -134,9 +135,7 @@ async function download(mode: "grid" | "list"): Promise<void> {
 function exportCalendar(): void {
   const { ics, skipped } = planningIcs(slots.value, new Date());
   saveFile(new Blob([ics], { type: "text/calendar;charset=utf-8" }), "planning_alj_escalade.ics");
-  const left = skipped
-    ? ` (${skipped} créneau${skipped > 1 ? "x" : ""} sans jour ou horaires lisibles ignoré${skipped > 1 ? "s" : ""})`
-    : "";
+  const left = skipped ? ` (${skipped} créneau${plural(skipped, "x")} sans jour ou horaires lisibles ignoré${plural(skipped)})` : "";
   toast.show(`📅 Fichier agenda (.ics) téléchargé, à importer dans Google Agenda${left}.`, skipped ? 8000 : 4000);
 }
 

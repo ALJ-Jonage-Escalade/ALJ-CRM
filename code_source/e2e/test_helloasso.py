@@ -1,5 +1,5 @@
 """HelloAsso payments: sync from the (fake) API, automatic and manual links, ignored lines (« HelloAsso » section of
-the competitions screen, frontend/src/pages/competitions/HelloAssoPane.vue), webhook notifications and the
+the competitions screen, frontend/src/pages/competitions/helloasso/HelloAssoPane.vue), webhook notifications and the
 membership dashboard."""
 import re
 import uuid

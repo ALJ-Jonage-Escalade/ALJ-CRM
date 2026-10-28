@@ -4,18 +4,18 @@
    former office page; phones: cards opening in place. Computed from the competitions only: readable offline. */
 import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
-import UiBadge from "../../components/ui/UiBadge.vue";
-import type { BadgeColor } from "../../components/ui/palette";
-import UiButton from "../../components/ui/UiButton.vue";
-import UiCard from "../../components/ui/UiCard.vue";
-import UiTile from "../../components/ui/UiTile.vue";
-import { useMediaQuery } from "../../composables/media";
-import { csvBlob } from "../../lib/csv";
-import { saveFile } from "../../lib/download";
-import { formatEuros } from "../../lib/format";
+import UiBadge from "../../../components/ui/UiBadge.vue";
+import type { BadgeColor } from "../../../components/ui/palette";
+import UiButton from "../../../components/ui/UiButton.vue";
+import UiCard from "../../../components/ui/UiCard.vue";
+import UiTile from "../../../components/ui/UiTile.vue";
+import { useMediaQuery } from "../../../composables/media";
+import { csvBlob } from "../../../lib/csv";
+import { saveFile } from "../../../lib/download";
+import { formatEuros } from "../../../lib/format";
 import { balanceCsv, balanceLabel, balances, searchBalances, seasonOf, seasons, totals, type Balance } from "./balance";
-import { discipline, disciplineColor, payment, period, todayIso, type Competition } from "./competitions";
-import { plural } from "../../lib/text";
+import { discipline, disciplineColor, payment, period, todayIso, type Competition } from "../competitions";
+import { plural } from "../../../lib/text";
 
 const props = defineProps<{ competitions: readonly Competition[] }>();
 

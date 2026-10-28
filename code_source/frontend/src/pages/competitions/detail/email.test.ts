@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { participantRows, type Competition } from "./competitions";
+import { participantRows, type Competition } from "../competitions";
 import { amountText, audience, defaultTemplate, render, sendBody, variables } from "./email";
 
 const COMP: Competition = {

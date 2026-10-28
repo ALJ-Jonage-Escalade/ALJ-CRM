@@ -2,8 +2,8 @@
 /* The competitions on a month: a grid of weeks with one bar per competition (across its days) from md up, the month's
    list on phones. Drawing only: the layout is in calendar.ts, opening a competition is the page's. */
 import { computed, ref } from "vue";
-import { SOFT, SOLID } from "../../components/ui/palette";
-import UiButton from "../../components/ui/UiButton.vue";
+import { SOFT, SOLID } from "../../../components/ui/palette";
+import UiButton from "../../../components/ui/UiButton.vue";
 import {
   agendaDays,
   calendarColor,
@@ -18,7 +18,7 @@ import {
   WEEKDAYS,
   type CalendarBar,
 } from "./calendar";
-import { isArchived, period, todayIso, type Competition } from "./competitions";
+import { isArchived, period, todayIso, type Competition } from "../competitions";
 
 const props = defineProps<{
   competitions: readonly Competition[];
@@ -92,17 +92,14 @@ const isOnToday = (c: Competition): boolean => {
       <div
         v-for="week in weeks"
         :key="week.days[0]!.dateIso"
-        class="grid min-h-24 grid-cols-7 border-b border-slate-200 pb-1 last:border-b-0"
+        class="grid min-h-24 grid-cols-7 border-b border-slate-200 pb-1"
         :style="{ gridTemplateRows: `1.75rem repeat(${week.lanes}, 1.5rem) 1fr` }"
         data-testid="calendar-week"
       >
         <div
           v-for="(day, column) in week.days"
           :key="day.dateIso"
-          :class="[
-            'border-l border-slate-200 px-1.5 pt-1 first:border-l-0',
-            day.inMonth ? 'bg-white text-slate-700' : 'bg-slate-50 text-slate-400',
-          ]"
+          :class="['border-l border-slate-200 px-1.5 pt-1', day.inMonth ? 'bg-white text-slate-700' : 'bg-slate-50 text-slate-400']"
           :style="{ gridColumn: column + 1, gridRow: '1 / -1' }"
           :aria-current="day.isToday ? 'date' : undefined"
           data-testid="calendar-day"
