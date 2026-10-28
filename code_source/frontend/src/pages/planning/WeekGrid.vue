@@ -48,7 +48,7 @@ function tip(slot: Slot): string {
         :key="day"
         :data-testid="`day-${day}`"
         :aria-label="day"
-        class="flex flex-col border-r border-slate-200 last:border-r-0"
+        class="flex flex-col border-r border-slate-200"
       >
         <h3
           class="flex h-10 items-center justify-center border-b border-slate-200 bg-slate-100 text-[13px] font-bold tracking-wide text-slate-800 uppercase"

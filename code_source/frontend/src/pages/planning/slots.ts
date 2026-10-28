@@ -199,3 +199,78 @@ export function slotError(draft: SlotDraft): string | null {
   }
   return null;
 }
+
+// ---------------------------------------------------------------- Calendar file (.ics)
+
+const ICS_DAYS: Record<string, string> = {
+  lundi: "MO",
+  mardi: "TU",
+  mercredi: "WE",
+  jeudi: "TH",
+  vendredi: "FR",
+  samedi: "SA",
+  dimanche: "SU",
+};
+const WEEKDAYS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+
+/** Text value of an iCalendar property (RFC 5545 § 3.3.11). */
+function icsText(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+}
+
+const two = (n: number): string => String(n).padStart(2, "0");
+const icsDay = (d: Date): string => `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}`;
+const icsTime = (hours: number): string => {
+  const minutes = Math.round(hours * 60);
+  return `${two(Math.floor(minutes / 60))}${two(minutes % 60)}00`;
+};
+
+/** "Lundi / Jeudi" → ["MO", "TH"]; empty when no day is named. */
+export function icsDays(jour: string): string[] {
+  return [...new Set((jour.toLowerCase().match(/[a-z]+/g) ?? []).map((word) => ICS_DAYS[word]).filter((d): d is string => !!d))];
+}
+
+/**
+ * The slots as weekly events, from 1 September of the season of `now` to 30 June, at their Paris times (Google
+ * Calendar import). Slots without a readable day or hours are left out and counted.
+ */
+export function planningIcs(slots: readonly Slot[], now: Date): { ics: string; skipped: number } {
+  const seasonYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//ALJ Escalade//Planning//FR",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "X-WR-CALNAME:ALJ Escalade — Planning",
+    "X-WR-TIMEZONE:Europe/Paris",
+  ];
+  let skipped = 0;
+  for (const s of slots) {
+    const days = icsDays(s.jour);
+    const hours = parseHours(s.horaires);
+    if (!days.length || !hours) {
+      skipped++;
+      continue;
+    }
+    // The first event is the first of these days from 1 September (an extra one otherwise, RFC 5545 § 3.8.5.3)
+    const first = new Date(seasonYear, 8, 1);
+    while (!days.includes(WEEKDAYS[first.getDay()]!)) {
+      first.setDate(first.getDate() + 1);
+    }
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:alj-slot-${s.id}@alj-escalade.fr`,
+      `DTSTAMP:${stamp}`,
+      `SUMMARY:${icsText(`ALJ Escalade — ${s.groupe}`)}`,
+      `DESCRIPTION:${icsText([s.type, s.encadrants.join(", ")].filter(Boolean).join(" · "))}`,
+      `DTSTART;TZID=Europe/Paris:${icsDay(first)}T${icsTime(hours[0])}`,
+      `DTEND;TZID=Europe/Paris:${icsDay(first)}T${icsTime(hours[1])}`,
+      `RRULE:FREQ=WEEKLY;BYDAY=${days.join(",")};UNTIL=${seasonYear + 1}0630T215959Z`,
+      "END:VEVENT",
+    );
+  }
+  lines.push("END:VCALENDAR");
+  return { ics: lines.join("\r\n"), skipped };
+}

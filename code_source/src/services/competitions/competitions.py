@@ -67,3 +67,24 @@ class CompetitionService:
     def archive_past_competitions() -> List[int]:
         """Closes the competitions that are over; returns their ids."""
         return Repo.archive_past_competitions(datetime.date.today().isoformat())
+
+    @staticmethod
+    def lookup_ffme(id_ffme: str) -> Dict[str, Any]:
+        """Scrape MyCompet for competition metadata by its FFME ID."""
+        from infrastructure.mycompet.scraper import scrape_competition_info_by_id
+        return scrape_competition_info_by_id(id_ffme)
+
+    @staticmethod
+    @storage
+    def export_excel(competition_id: int) -> bytes:
+        comp = require_competition(competition_id)
+        from exports.competitors_excel import export_competitors_excel
+        return export_competitors_excel(comp)
+
+    @staticmethod
+    @storage
+    def export_pdf(competition_id: int) -> bytes:
+        comp = require_competition(competition_id)
+        from exports.competitors_pdf import export_competitors_pdf
+        return export_competitors_pdf(comp)
+

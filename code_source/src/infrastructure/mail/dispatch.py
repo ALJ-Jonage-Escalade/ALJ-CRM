@@ -11,6 +11,7 @@ Permet de :
 
 from typing import Dict, Any, List, Optional
 
+from domain.competitions.models import Competition
 from domain.utils import apply_template_variables, format_montant
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
@@ -89,22 +90,29 @@ class EmailDispatchService:
         """Extrait les variables de contexte d'une compétition pour injection dans les modèles."""
         if not competition_id:
             return {}
-        comp = CompetitionRepository.get_competition(competition_id)
-        if not comp:
+        # The document, not the domain model: the place is a pass-through field the model drops
+        doc = CompetitionRepository.get_competition_doc(competition_id)
+        if not doc:
             return {}
+        comp = Competition.from_row(doc)
 
         from domain.utils import format_periode
         date_formatted = format_periode(comp.date_competition, comp.date_fin)
         wa_link = str(getattr(comp, "whatsapp_link", "") or "").strip()
         bloc_wa = f"Voici le lien du groupe WhatApp dédié à cette compétition : {wa_link}" if wa_link else ""
 
+        lieu = str(doc.get("lieu") or "").strip()
         return {
             "competition_id": str(comp.id),
             "nom": comp.nom,
+            "competition_nom": comp.nom,
             "no_competition": str(comp.id_ffme or ""),
             "name_competition": comp.nom,
             "montant_competition": format_montant(comp.prix),
             "date_competition": date_formatted,
+            "competition_date": date_formatted,
+            "lieu": lieu,
+            "competition_lieu": lieu,
             "whatapp_Id": wa_link,
             "whatsapp_link": wa_link,
             "bloc_whatsapp": bloc_wa,

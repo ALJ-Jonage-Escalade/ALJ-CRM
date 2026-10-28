@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import List, Optional
 
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from api.request_body import RequestBody
 from domain.competitions.models import STATUT_EN_PREPARATION, STATUTS_COMPETITION
@@ -68,3 +68,14 @@ class CompetitionUpdate(RequestBody):
     _statut = field_validator("statut")(_check_statut)
     _dates = field_validator("date_competition", "date_fin")(_check_date)
     _coaches = field_validator("coach_ids")(_distinct)
+
+
+class CompetitionFfmeLookup(BaseModel):
+    """Informations de la compétition extraites de MyCompet FFME par son numéro."""
+    id_ffme: str
+    nom: str
+    date_competition: Optional[str] = None
+    date_fin: Optional[str] = None
+    lieu: Optional[str] = None
+    type: Optional[str] = None
+

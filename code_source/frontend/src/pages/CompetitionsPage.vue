@@ -12,7 +12,7 @@ import { AUTH_KEY } from "../composables/auth";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
 import { pageVerdict } from "../lib/access";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, formatEuros } from "../lib/format";
 import { CLIENT_KEY, type Schemas } from "../lib/client";
 import { createCompetitionsApi } from "../services/competitions";
 import { isStaff } from "../lib/roles";
@@ -21,11 +21,15 @@ import BalancePane from "./competitions/BalancePane.vue";
 import CoachesPane from "./competitions/CoachesPane.vue";
 import CompetitionDetail from "./competitions/CompetitionDetail.vue";
 import CompetitionForm from "./competitions/CompetitionForm.vue";
+import CompetitionTable from "./competitions/CompetitionTable.vue";
+import CompetitionCalendar from "./competitions/CompetitionCalendar.vue";
 import {
+  competitionSeason,
   counts,
   discipline,
   disciplineColor,
   filterCompetitions,
+  formatCompetitionPeriod,
   hasResults,
   isArchived,
   isPast,
@@ -170,14 +174,31 @@ const today = todayIso();
 const all = computed(() => sortCompetitions(competitions.data.value ?? []));
 const search = ref("");
 const when = ref<When>("all");
-const current = computed(() =>
-  filterCompetitions(
-    all.value.filter((c) => !isArchived(c)),
-    search.value,
-    when.value,
-    today,
-  ),
-);
+// Every season by default: a competition without a date (allowed) or of another season is never hidden unasked
+const selectedSeason = ref("all");
+const seasons = computed(() => {
+  const set = new Set<string>([competitionSeason(today)]);
+  all.value.forEach((c) => {
+    const s = competitionSeason(c.date_competition);
+    if (s) {
+      set.add(s);
+    }
+  });
+  return Array.from(set).sort().reverse();
+});
+
+type ViewMode = "cards" | "table" | "calendar";
+const viewMode = ref<ViewMode>("cards");
+
+const current = computed(() => {
+  let list = all.value.filter((c) => !isArchived(c));
+  if (selectedSeason.value && selectedSeason.value !== "all") {
+    list = list.filter((c) => competitionSeason(c.date_competition) === selectedSeason.value);
+  }
+  return filterCompetitions(list, search.value, when.value, today);
+});
+// The calendar: the search only, archived ones included (greyed); its months replace the season and date filters
+const calendarCompetitions = computed(() => filterCompetitions(all.value, search.value, "all", today));
 const archivedCompetitions = computed(() => filterCompetitions(all.value.filter(isArchived), search.value, when.value, today));
 const pastCompetitions = computed(() => all.value.filter((c) => !isArchived(c) && isPast(c, today)));
 const showArchived = ref(false);
@@ -188,6 +209,13 @@ const WHEN: { id: When; label: string }[] = [
 ];
 
 const selectedId = computed(() => (typeof route.query.id === "string" ? route.query.id : ""));
+// The detail is shown next to the cards: a competition opened from the table or the calendar goes back to them (their
+// open event covers the competition already selected, which leaves the URL unchanged)
+watch(selectedId, (id) => {
+  if (id) {
+    viewMode.value = "cards";
+  }
+});
 const selected = computed(() => all.value.find((c) => String(c.id) === selectedId.value));
 const rows = computed(() =>
   selected.value
@@ -200,7 +228,108 @@ const rows = computed(() =>
     : [],
 );
 
+// ---------------------------------------------------------------- Global statistics (when no competition is selected)
+
+const statsCompetitions = computed(() => {
+  let list = all.value.filter((c) => !isArchived(c));
+  if (selectedSeason.value && selectedSeason.value !== "all") {
+    list = list.filter((c) => competitionSeason(c.date_competition) === selectedSeason.value);
+  }
+  return list;
+});
+
+const statsTotalCompetitions = computed(() => statsCompetitions.value.length);
+const statsUpcomingCompetitions = computed(() => statsCompetitions.value.filter((c) => !isPast(c, today)).length);
+const statsPastCompetitions = computed(() => statsCompetitions.value.filter((c) => isPast(c, today)).length);
+
+const statsTotalCompetitors = computed(() => {
+  const set = new Set<string>();
+  for (const c of statsCompetitions.value) {
+    for (const p of c.participants ?? []) {
+      const key =
+        p.adherent_id != null ? String(p.adherent_id) : `${(p.nom ?? "").trim().toLowerCase()}_${(p.prenom ?? "").trim().toLowerCase()}`;
+      if (key && key !== "_") {
+        set.add(key);
+      }
+    }
+  }
+  return set.size;
+});
+
+const statsTotalParticipations = computed(() => statsCompetitions.value.reduce((acc, c) => acc + (c.participants?.length ?? 0), 0));
+
+const statsTotalBudget = computed(() => {
+  let total = 0;
+  for (const c of statsCompetitions.value) {
+    const price = Number(c.prix ?? 0);
+    if (!price) {
+      continue;
+    }
+    const parts = c.participants ?? [];
+    const selectedCount = parts.filter((p) => p.selectionne).length;
+    const count = selectedCount > 0 ? selectedCount : parts.length;
+    total += price * count;
+  }
+  return total;
+});
+
+const statsTotalPaid = computed(() => {
+  let total = 0;
+  for (const c of statsCompetitions.value) {
+    for (const p of c.participants ?? []) {
+      total += Number(p.montant_paye ?? 0);
+    }
+  }
+  return total;
+});
+
 const creating = ref(false);
+const editingCompetition = ref<Competition | null>(null);
+const editDialogOpen = computed({
+  get: () => Boolean(editingCompetition.value),
+  set: (val: boolean) => {
+    if (!val) {
+      editingCompetition.value = null;
+    }
+  },
+});
+
+function openFromCalendar(c: Competition): void {
+  viewMode.value = "cards";
+  void router.push({ query: { id: String(c.id) } });
+}
+
+function editFromTable(c: Competition): void {
+  editingCompetition.value = c;
+}
+
+async function saveFromTable(body: Schemas["CompetitionCreate"]): Promise<void> {
+  if (!editingCompetition.value) {
+    return;
+  }
+  const id = editingCompetition.value.id;
+  const ok = await writer.run(() => competitionsApi.update(id, body), {
+    done: "✅ Compétition mise à jour.",
+  });
+  if (ok) {
+    editingCompetition.value = null;
+  }
+}
+
+async function removeFromTable(c: Competition): Promise<void> {
+  const ok = await dialogs.confirm({
+    title: "Supprimer la compétition",
+    message: `Supprimer définitivement « ${c.nom} » et sa liste de compétiteurs ?`,
+    confirmLabel: "Supprimer",
+    variant: "danger",
+  });
+  if (!ok) {
+    return;
+  }
+  await writer.run(() => competitionsApi.remove(c.id), {
+    done: "🗑 Compétition supprimée.",
+  });
+}
 
 async function create(body: Schemas["CompetitionCreate"]): Promise<void> {
   const created = await writer.run(() => competitionsApi.create(body), { done: "✅ Compétition créée." });
@@ -273,17 +402,27 @@ const tab = (active: boolean) => [
 
 <template>
   <AppShell page="competitions" title="Compétitions" :sync="syncInfo">
-    <nav v-if="canWrite" aria-label="Sections des compétitions" class="mb-3 flex gap-1.5 overflow-x-auto" data-testid="sections">
-      <RouterLink
-        v-for="s in SECTIONS"
-        :key="s.id"
-        :to="{ query: s.id === 'competitions' ? {} : { section: s.id } }"
-        :data-testid="`section-${s.id}`"
-        :aria-current="section === s.id ? 'page' : undefined"
-        :class="tab(section === s.id)"
-      >
-        {{ s.label }}
-      </RouterLink>
+    <nav
+      v-if="canWrite"
+      aria-label="Sections des compétitions"
+      class="mb-3 flex flex-wrap items-center justify-between gap-2"
+      data-testid="sections"
+    >
+      <div class="flex gap-1.5 overflow-x-auto">
+        <RouterLink
+          v-for="s in SECTIONS"
+          :key="s.id"
+          :to="{ query: s.id === 'competitions' ? {} : { section: s.id } }"
+          :data-testid="`section-${s.id}`"
+          :aria-current="section === s.id ? 'page' : undefined"
+          :class="tab(section === s.id)"
+        >
+          {{ s.label }}
+        </RouterLink>
+      </div>
+      <UiButton small data-testid="create-comp" @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')">
+        ➕ Ajouter une compétition
+      </UiButton>
     </nav>
 
     <HelloAssoPane
@@ -297,147 +436,268 @@ const tab = (active: boolean) => [
     <BalancePane v-else-if="section === 'bilan'" :competitions="all" />
     <CoachesPane v-else-if="section === 'coachs'" :coaches="coaches.data.value" :competitions="all" @changed="competitions.refresh()" />
 
-    <div
-      v-else
-      class="md:grid md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-start md:gap-4 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]"
-    >
-      <!-- The competitions: always on desktop (a panel scrolling on its own), on phones until one is opened -->
-      <section
+    <!-- Mode de vue, sous les onglets (la vue Compétitions seulement ; masqué sur téléphone quand une fiche est ouverte) -->
+    <template v-else>
+      <div
         :class="[
-          selected ? 'hidden md:block' : '',
-          'md:sticky md:top-3 md:max-h-[calc(100dvh-1.5rem)] md:overflow-y-auto md:rounded-xl md:border md:border-slate-200 md:bg-white md:p-3 md:shadow-sm',
+          selected ? 'hidden md:inline-flex' : 'inline-flex',
+          'mb-3 rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium',
         ]"
-        aria-label="Liste des compétitions"
+        data-testid="view-switcher"
       >
-        <div v-if="canWrite" class="mb-2 flex flex-wrap gap-1.5">
-          <UiButton
-            small
-            data-testid="create-comp"
-            @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')"
-          >
-            ➕ Nouvelle compétition
-          </UiButton>
-          <UiButton v-if="pastCompetitions.length" variant="muted" small data-testid="archive-past" @click="archivePastCompetitions">
-            📦 Archiver les passées ({{ pastCompetitions.length }})
-          </UiButton>
-        </div>
-        <div class="flex flex-wrap items-center gap-1.5 mb-2">
-          <input
-            v-model="search"
-            type="search"
-            data-testid="comp-search"
-            placeholder="Rechercher (nom, lieu, discipline)…"
-            class="min-w-32 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px] md:basis-full"
-          />
-          <button
-            v-for="w in WHEN"
-            :key="w.id"
-            type="button"
-            :data-testid="`when-${w.id}`"
-            :aria-pressed="when === w.id"
-            :class="chip(when === w.id)"
-            @click="when = w.id"
-          >
-            {{ w.label }}
-          </button>
-        </div>
-        <p class="mb-2 text-xs text-slate-500" data-testid="comp-count">{{ listLine }}</p>
-        <ul class="flex flex-col gap-2">
-          <li
-            v-if="competitions.data.value && !current.length"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500"
-          >
-            {{
-              search || when !== "all"
-                ? "Aucune compétition correspondante."
-                : archivedCompetitions.length
-                  ? "Aucune compétition en cours : toutes sont archivées."
-                  : "Aucune compétition enregistrée."
-            }}
-          </li>
-          <li v-for="competition in current" :key="competition.id">
-            <RouterLink
-              :to="{ query: { id: String(competition.id) } }"
-              data-testid="comp-card"
-              :aria-current="selected?.id === competition.id ? 'true' : undefined"
-              :class="[
-                'block rounded-xl border bg-white px-3.5 py-3 text-slate-800 no-underline shadow-sm hover:border-accent',
-                selected?.id === competition.id ? 'border-accent' : 'border-slate-200',
-              ]"
-            >
-              <span class="flex flex-row justify-between pb-2">
-                <b class="block text-[15px]" data-testid="comp-name">
-                  <span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆</span>
-                  {{ competition.nom }}
-                </b>
-                <UiBadge
-                  v-if="discipline(competition)"
-                  :color="disciplineColor(discipline(competition))"
-                  variant="soft"
-                  class="ml-1"
-                  data-testid="discipline"
-                >
-                  {{ discipline(competition) }}
-                </UiBadge>
-              </span>
-              <span class="block text-xs text-slate-500 pb-2">📅 {{ period(competition) }}</span>
-              <span class="block text-xs text-slate-500">
-                🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}
-              </span>
-              <span class="mt-0.5 block text-xs font-semibold text-blue-900">
-                ({{ counts(competition.participants ?? []).selected }} participant{{
-                  plural(counts(competition.participants ?? []).selected)
-                }}
-                · {{ counts(competition.participants ?? []).unpaid }} en attente · {{ counts(competition.participants ?? []).paid }} payé{{
-                  plural(counts(competition.participants ?? []).paid)
-                }})
-              </span>
-            </RouterLink>
-          </li>
-        </ul>
         <button
-          v-if="archivedCompetitions.length"
           type="button"
-          data-testid="toggle-archives"
-          :aria-expanded="showArchived"
-          class="mt-2.5 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300"
-          @click="showArchived = !showArchived"
+          :class="[
+            'px-2 py-1 rounded-md cursor-pointer transition-colors',
+            viewMode === 'cards' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
+          ]"
+          data-testid="view-cards"
+          @click="viewMode = 'cards'"
         >
-          {{ showArchived ? "🙈 Masquer les archives" : `🗂 Afficher les archives (${archivedCompetitions.length})` }}
+          🗂️ Cartes
         </button>
-        <ul v-if="showArchived" class="mt-2 flex flex-col gap-2" data-testid="archived-list">
-          <li v-for="c in archivedCompetitions" :key="c.id">
-            <RouterLink
-              :to="{ query: { id: String(c.id) } }"
-              data-testid="comp-card"
-              class="block rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-slate-700 no-underline hover:border-accent"
-            >
-              <b class="block text-[14px]" data-testid="comp-name">{{ c.nom }}</b>
-              <span class="block text-xs text-slate-500">📅 {{ period(c) }} · 📦 Archivée</span>
-            </RouterLink>
-          </li>
-        </ul>
-      </section>
+        <button
+          type="button"
+          :class="[
+            'px-2 py-1 rounded-md cursor-pointer transition-colors',
+            viewMode === 'table' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
+          ]"
+          data-testid="view-table"
+          @click="viewMode = 'table'"
+        >
+          📋 Tableau
+        </button>
+        <button
+          type="button"
+          :class="[
+            'px-2 py-1 rounded-md cursor-pointer transition-colors',
+            viewMode === 'calendar' ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
+          ]"
+          data-testid="view-calendar"
+          @click="viewMode = 'calendar'"
+        >
+          📅 Calendrier
+        </button>
+      </div>
+      <div
+        class="flex flex-col md:grid md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-start md:gap-4 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]"
+      >
+        <!-- The competitions: always on desktop (a panel scrolling on its own), on phones until one is opened -->
+        <section
+          :class="[
+            selected ? 'hidden md:block' : '',
+            viewMode !== 'cards' ? 'md:col-span-2' : '',
+            'order-2 md:order-1 md:col-start-1 md:row-start-1 md:sticky md:top-3 md:max-h-[calc(100dvh-1.5rem)] md:overflow-y-auto md:rounded-xl md:border md:border-slate-200 md:bg-white md:p-3 md:shadow-sm',
+          ]"
+          aria-label="Liste des compétitions"
+        >
+          <div v-if="canWrite && pastCompetitions.length" class="mb-2 flex flex-wrap gap-1.5">
+            <UiButton variant="muted" small data-testid="archive-past" @click="archivePastCompetitions">
+              📦 Archiver les passées ({{ pastCompetitions.length }})
+            </UiButton>
+          </div>
 
-      <CompetitionDetail
-        v-if="selected"
-        :key="selected.id"
-        :competition="selected"
-        :rows="rows"
-        :members="members.data.value ?? []"
-        :coaches="coaches.data.value ?? []"
-        :can-write="canWrite"
-        :staff="staff"
-        :contacts-shown="contactsShown"
-        :outbox="outbox"
-        :uid="uid"
-      />
-      <p v-else class="hidden rounded-xl border border-dashed bg-white border-slate-300 px-4 py-10 text-center text-slate-500 md:block">
-        {{
-          selectedId && competitions.data.value ? "Compétition introuvable." : "Sélectionnez une compétition pour voir ses compétiteurs."
-        }}
-      </p>
-    </div>
+          <!-- Filtre saison -->
+          <div
+            v-if="viewMode !== 'calendar'"
+            class="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2"
+          >
+            <div class="flex items-center gap-1.5 text-xs">
+              <span class="font-semibold text-slate-500">Saison :</span>
+              <select
+                v-model="selectedSeason"
+                data-testid="comp-season-filter"
+                class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
+              >
+                <option value="all">Toutes les saisons</option>
+                <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5 mb-2">
+            <input
+              v-model="search"
+              type="search"
+              data-testid="comp-search"
+              placeholder="Rechercher (nom, lieu, discipline)…"
+              class="min-w-32 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px] md:basis-full"
+            />
+            <div v-if="viewMode !== 'calendar'" class="flex pt-1 gap-2">
+              <button
+                v-for="w in WHEN"
+                :key="w.id"
+                type="button"
+                :data-testid="`when-${w.id}`"
+                :aria-pressed="when === w.id"
+                :class="chip(when === w.id)"
+                @click="when = w.id"
+              >
+                {{ w.label }}
+              </button>
+            </div>
+          </div>
+          <p class="pt-1 pb-1 mb-2 text-xs text-slate-500" data-testid="comp-count">{{ listLine }}</p>
+
+          <!-- Vue Tableau -->
+          <div v-if="viewMode === 'table'" class="mb-3">
+            <CompetitionTable
+              :competitions="current"
+              :can-write="canWrite"
+              @open="viewMode = 'cards'"
+              @edit="editFromTable"
+              @remove="removeFromTable"
+            />
+          </div>
+
+          <!-- Vue Calendrier -->
+          <div v-else-if="viewMode === 'calendar'" class="mb-3">
+            <CompetitionCalendar :competitions="calendarCompetitions" :selected-id="selectedId" @open="openFromCalendar" />
+          </div>
+
+          <!-- Vue Cartes (par défaut) -->
+          <ul v-else class="flex flex-col gap-2">
+            <li
+              v-if="competitions.data.value && !current.length"
+              class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500"
+            >
+              {{
+                search || when !== "all" || selectedSeason !== "all"
+                  ? "Aucune compétition correspondante."
+                  : archivedCompetitions.length
+                    ? "Aucune compétition en cours : toutes sont archivées."
+                    : "Aucune compétition enregistrée."
+              }}
+            </li>
+            <li v-for="competition in current" :key="competition.id">
+              <RouterLink
+                :to="{ query: { id: String(competition.id) } }"
+                data-testid="comp-card"
+                :aria-current="selected?.id === competition.id ? 'true' : undefined"
+                :class="[
+                  'block rounded-xl border bg-white px-3.5 py-3 text-slate-800 no-underline shadow-sm hover:border-accent',
+                  selected?.id === competition.id ? 'border-accent' : 'border-slate-200',
+                ]"
+              >
+                <div class="flex items-start justify-between gap-2 pb-1">
+                  <b class="block text-[15px]" data-testid="comp-name">
+                    <span v-if="hasResults(competition)" title="Résultats officiels récupérés">🏆</span>
+                    {{ competition.nom }}
+                  </b>
+                  <UiBadge
+                    v-if="discipline(competition)"
+                    :color="disciplineColor(discipline(competition))"
+                    variant="soft"
+                    class="ml-1 shrink-0"
+                    data-testid="discipline"
+                  >
+                    {{ discipline(competition) }}
+                  </UiBadge>
+                </div>
+                <span class="block text-xs font-semibold text-slate-600 pb-1.5" data-testid="comp-period">
+                  📅 {{ formatCompetitionPeriod(competition) }}
+                </span>
+                <span class="block text-xs text-slate-500">
+                  🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}
+                </span>
+                <span class="mt-0.5 block text-xs font-semibold text-blue-900">
+                  ({{ counts(competition.participants ?? []).selected }} participant{{
+                    plural(counts(competition.participants ?? []).selected)
+                  }}
+                  · {{ counts(competition.participants ?? []).unpaid }} en attente ·
+                  {{ counts(competition.participants ?? []).paid }} payé{{ plural(counts(competition.participants ?? []).paid) }})
+                </span>
+              </RouterLink>
+            </li>
+          </ul>
+          <button
+            v-if="archivedCompetitions.length && viewMode === 'cards'"
+            type="button"
+            data-testid="toggle-archives"
+            :aria-expanded="showArchived"
+            class="mt-2.5 cursor-pointer rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300"
+            @click="showArchived = !showArchived"
+          >
+            {{ showArchived ? "🙈 Masquer les archives" : `🗂 Afficher les archives (${archivedCompetitions.length})` }}
+          </button>
+          <ul v-if="showArchived && viewMode === 'cards'" class="mt-2 flex flex-col gap-2" data-testid="archived-list">
+            <li v-for="c in archivedCompetitions" :key="c.id">
+              <RouterLink
+                :to="{ query: { id: String(c.id) } }"
+                data-testid="comp-card"
+                class="block rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-slate-700 no-underline hover:border-accent"
+              >
+                <b class="block text-[14px]" data-testid="comp-name">{{ c.nom }}</b>
+                <span class="block text-xs text-slate-500">📅 {{ formatCompetitionPeriod(c) }} · 📦 Archivée</span>
+              </RouterLink>
+            </li>
+          </ul>
+        </section>
+
+        <CompetitionDetail
+          v-if="selected && viewMode === 'cards'"
+          :key="selected.id"
+          :competition="selected"
+          :rows="rows"
+          :members="members.data.value ?? []"
+          :coaches="coaches.data.value ?? []"
+          :can-write="canWrite"
+          :staff="staff"
+          :contacts-shown="contactsShown"
+          :outbox="outbox"
+          :uid="uid"
+          class="order-1 min-w-0 md:order-2 md:col-start-2 md:row-start-1"
+        />
+        <div
+          v-else-if="viewMode === 'cards'"
+          class="order-1 flex min-w-0 flex-col gap-3 md:order-2 md:col-start-2 md:row-start-1"
+          data-testid="stats-no-selection"
+        >
+          <!-- Tuiles de statistiques -->
+          <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-3" data-testid="competitions-stats-tiles">
+            <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-competitions">
+              <div class="text-2xl font-black text-blue-700" data-testid="stats-total-competitions">
+                {{ statsTotalCompetitions }}
+              </div>
+              <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Compétitions au total</div>
+              <div class="mt-1 text-[11px] text-slate-400">
+                {{ statsUpcomingCompetitions }} à venir · {{ statsPastCompetitions }} passée{{ plural(statsPastCompetitions) }}
+              </div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-competitors">
+              <div class="text-2xl font-black text-emerald-700" data-testid="stats-total-competitors">
+                {{ statsTotalCompetitors }}
+              </div>
+              <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Compétiteurs</div>
+              <div class="mt-1 text-[11px] text-slate-400">
+                {{ statsTotalParticipations }} inscription{{ plural(statsTotalParticipations) }} cumulée{{
+                  plural(statsTotalParticipations)
+                }}
+              </div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm" data-testid="tile-total-budget">
+              <div class="text-2xl font-black text-indigo-700" data-testid="stats-total-budget">
+                {{ formatEuros(statsTotalBudget) }}
+              </div>
+              <div class="mt-1 text-xs font-semibold uppercase text-slate-500">Budget total</div>
+              <div class="mt-1 text-[11px] text-slate-400">
+                {{ formatEuros(statsTotalPaid) }} déjà réglé{{ plural(Math.round(statsTotalPaid)) }}
+              </div>
+            </div>
+          </div>
+
+          <div class="hidden rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-slate-500 md:block">
+            <p class="m-0 text-sm font-medium">
+              {{
+                selectedId && competitions.data.value
+                  ? "Compétition introuvable."
+                  : "Sélectionnez une compétition dans la liste pour afficher ses détails et gérer ses compétiteurs."
+              }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <UiDialog v-model:open="creating" title="➕ Nouvelle compétition" wide data-testid="create-dialog">
       <CompetitionForm
@@ -448,6 +708,18 @@ const tab = (active: boolean) => [
         @cancel="creating = false"
       />
     </UiDialog>
+
+    <UiDialog v-model:open="editDialogOpen" :title="`✏️ Modifier : ${editingCompetition?.nom}`" wide data-testid="edit-dialog">
+      <CompetitionForm
+        v-if="editingCompetition"
+        :competition="editingCompetition"
+        :coaches="coaches.data.value ?? []"
+        :busy="writer.busy.value"
+        @save="saveFromTable"
+        @cancel="editingCompetition = null"
+      />
+    </UiDialog>
+
     <UiToast :message="toast.message.value" />
   </AppShell>
 </template>

@@ -36,7 +36,7 @@ const open = defineModel<boolean>("open", { required: true });
           ⇥
         </button>
       </header>
-      <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3 [scrollbar-gutter:stable]">
         <slot />
       </div>
     </aside>

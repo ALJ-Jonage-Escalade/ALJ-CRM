@@ -17,6 +17,7 @@ import FfmeImportPane from "./outils/FfmeImportPane.vue";
 import MembersMap from "./outils/MembersMap.vue";
 import PresencePane from "./outils/PresencePane.vue";
 import SeasonSelect from "./outils/SeasonSelect.vue";
+import StatsPane from "./outils/StatsPane.vue";
 
 // The pivot table library is downloaded on the first opening of its tab
 const PivotPane = defineAsyncComponent(() => import("./outils/PivotPane.vue"));
@@ -30,6 +31,7 @@ const toast = useToast();
 const TABS = [
   { id: "map", label: "📍 Carte géographique", refreshed: "🔄 Carte réactualisée." },
   { id: "pivot", label: "📊 Analyse des effectifs (TCD)", refreshed: "🔄 Tableau croisé dynamique réactualisé." },
+  { id: "stats", label: "📈 Statistiques compétitions", refreshed: "🔄 Statistiques des compétitions réactualisées." },
   { id: "presence", label: "📋 Fiches de présence", refreshed: "🔄 Effectifs et créneaux réactualisés." },
   { id: "ffme", label: "🇫🇷 Export CSV FFME", refreshed: "🔄 Statistiques FFME réactualisées." },
   { id: "ffme-import", label: "📥 Import Excel FFME", refreshed: "🔄 Formulaire d'import FFME réinitialisé.", admin: true },
@@ -124,6 +126,10 @@ const chip = (active: boolean) => [
     <section v-if="isOpen('pivot')" v-show="tab === 'pivot'" data-testid="pane-pivot">
       <SeasonSelect v-model="pivotSeason" :seasons="seasons" label="Saison à analyser :" testid="pivot-season" class="mb-2" />
       <PivotPane v-if="pivotSeason" :ref="keep('pivot')" :season="pivotSeason" />
+    </section>
+
+    <section v-if="isOpen('stats')" v-show="tab === 'stats'" data-testid="pane-stats">
+      <StatsPane :ref="keep('stats')" />
     </section>
 
     <section v-if="isOpen('presence')" v-show="tab === 'presence'" data-testid="pane-presence">

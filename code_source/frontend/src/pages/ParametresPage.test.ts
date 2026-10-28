@@ -98,18 +98,18 @@ describe("ParametresPage", () => {
     expect(byId("cache-status").element.closest("section")!.textContent).toContain("Erreur interne");
   });
 
-  it("asks before a full rebuild, and reports a failed sync", async () => {
+  it("asks before syncing the database, and reports a failed sync", async () => {
     const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(false);
     const { byId, calls } = render();
     await flushPromises();
-    await byId("cache-rebuild").trigger("click");
+    await byId("cache-sync").trigger("click");
     expect(confirm).toHaveBeenCalledOnce();
     expect(calls.some((c) => c.method === "POST")).toBe(false);
 
     confirm.mockResolvedValue(true);
-    await byId("cache-rebuild").trigger("click");
+    await byId("cache-sync").trigger("click");
     await flushPromises();
-    expect(calls).toContainEqual(expect.objectContaining({ method: "POST", path: "/api/cloud-db/sync?force=true" }));
+    expect(calls).toContainEqual(expect.objectContaining({ method: "POST", path: "/api/cloud-db/sync?force=false" }));
     expect(byId("cache-report").text()).toContain("🔴 Échec de synchronisation : Erreur de synchronisation (1 erreur(s)");
     expect(byId("toast").text()).toContain("❌ Échec de la mise à jour");
     expect(byId("cache-sync").attributes("disabled")).toBeUndefined();
@@ -131,5 +131,21 @@ describe("ParametresPage", () => {
     expect(post?.path).toBe("/api/settings/competitions-results");
     expect(JSON.parse(post!.body!)).toEqual({ notification_email: "nouvelle@alj.example" });
     expect(byId("toast").text()).toBe("✅ Adresse de notification enregistrée : nouvelle@alj.example");
+  });
+
+  it("saves multiple notification addresses separated by commas or semicolons", async () => {
+    const { byId, calls } = render();
+    await flushPromises();
+    await byId("results-email").setValue("admin@alj.example, coach@alj.example; assistant@alj.example");
+    byId("results-email-save").element.closest("form")!.dispatchEvent(new Event("submit"));
+    await flushPromises();
+    const post = calls.find((c) => c.method === "POST");
+    expect(post?.path).toBe("/api/settings/competitions-results");
+    expect(JSON.parse(post!.body!)).toEqual({
+      notification_email: "admin@alj.example, coach@alj.example, assistant@alj.example",
+    });
+    expect(byId("toast").text()).toBe(
+      "✅ Adresses de notification enregistrées : admin@alj.example, coach@alj.example, assistant@alj.example",
+    );
   });
 });

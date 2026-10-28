@@ -3,8 +3,10 @@ import {
   dayOptions,
   draftOf,
   filterSlots,
+  icsDays,
   layoutDay,
   parseHours,
+  planningIcs,
   slotError,
   slotKind,
   tarifOptions,
@@ -135,5 +137,36 @@ describe("slot form", () => {
     [{ horaires: "le soir" }, "⚠️ Horaires illisibles : écrivez-les comme « 18:00 - 20:00 »."],
   ])("checks %j", (change, message) => {
     expect(slotError({ ...draftOf(slot()), ...change })).toBe(message);
+  });
+});
+
+describe("planningIcs", () => {
+  const now = new Date(2026, 9, 27, 10, 0);
+
+  it("names every day of a slot", () => {
+    expect(icsDays("Lundi / Jeudi")).toEqual(["MO", "TH"]);
+    expect(icsDays("Mercredi")).toEqual(["WE"]);
+    expect(icsDays("?")).toEqual([]);
+  });
+
+  it("starts each slot on its own day of the season, at its Paris times", () => {
+    const { ics, skipped } = planningIcs([slot({ jour: "Mercredi", horaires: "17:00 - 18:30" })], now);
+    expect(skipped).toBe(0);
+    // 1 September 2026 is a Tuesday: the first Wednesday is the 2nd
+    expect(ics).toContain("DTSTART;TZID=Europe/Paris:20260902T170000");
+    expect(ics).toContain("DTEND;TZID=Europe/Paris:20260902T183000");
+    expect(ics).toContain("RRULE:FREQ=WEEKLY;BYDAY=WE;UNTIL=20270630T215959Z");
+    expect(ics).toContain("DTSTAMP:");
+  });
+
+  it("repeats a slot on all its days, escapes the text and leaves out unreadable slots", () => {
+    const { ics, skipped } = planningIcs(
+      [slot({ jour: "Lundi / Jeudi", groupe: "Autonome, adultes", encadrants: [] }), slot({ id: 2, horaires: "à voir" })],
+      now,
+    );
+    expect(skipped).toBe(1);
+    expect(ics).toContain("BYDAY=MO,TH");
+    expect(ics).toContain("SUMMARY:ALJ Escalade — Autonome\\, adultes");
+    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(1);
   });
 });

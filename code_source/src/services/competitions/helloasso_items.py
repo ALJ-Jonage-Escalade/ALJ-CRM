@@ -39,7 +39,7 @@ class HelloAssoItemService:
         item = Repo.get_item(id_item)
         if item is None:
             raise _item_not_found()
-        if competition_id is not None and Repo.get_competition_doc(competition_id) is None:
+        if competition_id is not None and Repo.get_competition(competition_id) is None:
             raise competition_not_found()
         prev_comp, prev_adherent = item.get("competition_id"), item.get("adherent_id")
         Repo.save_manual_link(id_item, competition_id, adherent_id, commentaire)

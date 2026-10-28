@@ -14,17 +14,24 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from api.responses import SUCCESS, document_responses, error_responses, json_with_etag
-from api.competitions.schemas.competitions import CompetitionCreate, CompetitionUpdate
+from api.competitions.schemas.competitions import CompetitionCreate, CompetitionFfmeLookup, CompetitionUpdate
 from api.competitions.schemas.views import Competition, Done, PastArchived
 from services.competitions.competitions import CompetitionService as Service
 from services.documents import Doc
 
 router = APIRouter(prefix="/api/competitions")
 
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
 
 @router.get("", response_model=List[Competition])
 def list_competitions(request: Request) -> Response:
     return json_with_etag(request, Service.list_competitions())
+
+
+@router.get("/lookup-ffme/{id_ffme}", response_model=CompetitionFfmeLookup, responses=error_responses(400, 404, 503))
+def lookup_ffme_competition(id_ffme: str) -> Doc:
+    return Service.lookup_ffme(id_ffme)
 
 
 @router.post("", status_code=201, response_model=None, responses=document_responses(Competition, status=201))
@@ -46,3 +53,30 @@ def delete_competition(competition_id: int) -> Doc:
 @router.post("/archive-past", response_model=PastArchived)
 def archive_past_competitions() -> Doc:
     return {**SUCCESS, "archived": Service.archive_past_competitions()}
+
+
+@router.get("/{competition_id}/export-excel", response_class=Response,
+            responses={200: {"content": {XLSX: {}}, "description": "Classeur Excel"}, **error_responses(404)})
+def export_competition_excel(competition_id: int) -> Response:
+    content = Service.export_excel(competition_id)
+    return Response(
+        content=content,
+        media_type=XLSX,
+        headers={"Content-Disposition": f'attachment; filename="competiteurs_{competition_id}.xlsx"'},
+    )
+
+
+@router.get("/{competition_id}/export-pdf", response_class=Response,
+            responses={200: {"content": {"application/pdf": {}, "text/html": {}}, "description": "Liste PDF (HTML sans WeasyPrint)"},
+                       **error_responses(404)})
+def export_competition_pdf(competition_id: int) -> Response:
+    content = Service.export_pdf(competition_id)
+    # Without WeasyPrint the service answers the printable HTML page: named as such
+    is_pdf = content.startswith(b"%PDF")
+    media_type = "application/pdf" if is_pdf else "text/html; charset=utf-8"
+    extension = "pdf" if is_pdf else "html"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="competiteurs_{competition_id}.{extension}"'},
+    )

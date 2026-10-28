@@ -63,6 +63,75 @@
         }
       }
     },
+    "/api/competitions/lookup-ffme/{id_ffme}": {
+      "get": {
+        "summary": "Lookup Ffme Competition",
+        "operationId": "lookup_ffme_competition_api_competitions_lookup_ffme__id_ffme__get",
+        "parameters": [
+          {
+            "name": "id_ffme",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id Ffme"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompetitionFfmeLookup"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/competitions/{competition_id}": {
       "patch": {
         "summary": "Update Competition",
@@ -180,6 +249,97 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PastArchived"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competition_id}/export-excel": {
+      "get": {
+        "summary": "Export Competition Excel",
+        "operationId": "export_competition_excel_api_competitions__competition_id__export_excel_get",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Classeur Excel",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competition_id}/export-pdf": {
+      "get": {
+        "summary": "Export Competition Pdf",
+        "operationId": "export_competition_pdf_api_competitions__competition_id__export_pdf_get",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste PDF (HTML sans WeasyPrint)",
+            "content": {
+              "application/pdf": {},
+              "text/html": {}
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1051,7 +1211,7 @@
       },
       "post": {
         "summary": "Update Competitions Results Settings Api",
-        "description": "Met à jour l'adresse e-mail de notification des résultats.",
+        "description": "Met à jour les adresses e-mail de notification des résultats.",
         "operationId": "update_competitions_results_settings_api_api_settings_competitions_results_post",
         "requestBody": {
           "content": {
@@ -3780,6 +3940,69 @@
         ],
         "title": "CompetitionCreate"
       },
+      "CompetitionFfmeLookup": {
+        "properties": {
+          "id_ffme": {
+            "type": "string",
+            "title": "Id Ffme"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom"
+          },
+          "date_competition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Competition"
+          },
+          "date_fin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Fin"
+          },
+          "lieu": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lieu"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_ffme",
+          "nom"
+        ],
+        "title": "CompetitionFfmeLookup",
+        "description": "Informations de la compétition extraites de MyCompet FFME par son numéro."
+      },
       "CompetitionMember": {
         "properties": {
           "id": {
@@ -3836,6 +4059,11 @@
           "creneau_groupe": {
             "type": "string",
             "title": "Creneau Groupe",
+            "default": ""
+          },
+          "gender": {
+            "type": "string",
+            "title": "Gender",
             "default": ""
           }
         },
@@ -3956,6 +4184,11 @@
           "resultat_ffme": {
             "type": "string",
             "title": "Resultat Ffme",
+            "default": ""
+          },
+          "gender": {
+            "type": "string",
+            "title": "Gender",
             "default": ""
           },
           "updated_at": {

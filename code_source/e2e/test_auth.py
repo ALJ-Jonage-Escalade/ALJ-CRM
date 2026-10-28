@@ -27,7 +27,7 @@ def test_staff_sees_office(page, login_as, role, label):
     expect(page.locator("#who")).to_contain_text(label)
     expect(page.locator("#content")).to_be_visible()
     expect(page.locator("#gate")).to_be_hidden()
-    # The club's Google token is fine in dev mode: no warning (see test_expired_google_token_warning)
+    # The Google token is not checked in dev mode: no warning (the expired case: frontend AppShell.test.ts)
     expect(page.locator("#google-auth-warning")).to_be_hidden()
 
 

@@ -26,9 +26,28 @@ const templates = ref<Template[]>([]);
 const templateName = ref("");
 const subject = ref("");
 const body = ref("");
+const bodyTextarea = ref<HTMLTextAreaElement | null>(null);
 const sending = ref(false);
 const problem = ref("");
 const notConfigured = ref(false);
+
+function insertTag(tag: string, endTag = ""): void {
+  const el = bodyTextarea.value;
+  if (!el) {
+    body.value += tag + endTag;
+    return;
+  }
+  const start = el.selectionStart ?? body.value.length;
+  const end = el.selectionEnd ?? body.value.length;
+  const before = body.value.substring(0, start);
+  const selected = body.value.substring(start, end);
+  const after = body.value.substring(end);
+  body.value = before + tag + selected + (endTag || "") + after;
+}
+
+function insertVariable(varName: string): void {
+  insertTag(`{${varName}}`);
+}
 
 function useTemplate(): void {
   const t = templates.value.find((x) => x.name === templateName.value);
@@ -157,16 +176,69 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
       </select>
     </div>
     <div>
-      <label for="ce-subject" :class="label">Sujet</label>
-      <input id="ce-subject" v-model="subject" data-testid="email-subject" :class="field" />
+      <label for="ce-subject" :class="label">Objet</label>
+      <input
+        id="ce-subject"
+        v-model="subject"
+        data-testid="email-subject"
+        :class="field"
+        placeholder="ex. Convocation — Championnat de bloc"
+      />
     </div>
     <div>
-      <label for="ce-body" :class="label">Message</label>
-      <textarea id="ce-body" v-model="body" rows="7" data-testid="email-body" :class="field" />
-      <p class="mt-1 text-[11px] text-slate-500">
-        Variables : {first_name} {last_name} {num_licence} {name_competition} {no_competition} {date_competition} {montant_competition}
-        {bloc_whatsapp}
-      </p>
+      <div class="flex flex-wrap items-center justify-between gap-1 mb-1">
+        <label for="ce-body" :class="label">Message</label>
+        <!-- Barre d'outils texte enrichi -->
+        <div class="flex items-center gap-1 text-xs">
+          <button
+            type="button"
+            class="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100 font-bold"
+            title="Gras"
+            @click="insertTag('<b>', '</b>')"
+          >
+            B
+          </button>
+          <button
+            type="button"
+            class="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100 italic"
+            title="Italique"
+            @click="insertTag('<i>', '</i>')"
+          >
+            I
+          </button>
+          <button
+            type="button"
+            class="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100"
+            title="Liste à puces"
+            @click="insertTag('\n• ')"
+          >
+            • Liste
+          </button>
+        </div>
+      </div>
+      <textarea
+        id="ce-body"
+        ref="bodyTextarea"
+        v-model="body"
+        rows="7"
+        data-testid="email-body"
+        :class="field"
+        placeholder="Rédigez votre message…"
+      />
+      <!-- Insertion des variables de publipostage -->
+      <div class="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
+        <span class="font-semibold">Insérer :</span>
+        <button
+          v-for="v in ['prenom', 'nom', 'competition_nom', 'competition_date', 'competition_lieu']"
+          :key="v"
+          type="button"
+          class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10.5px] text-slate-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer border border-slate-200"
+          :data-testid="`insert-var-${v}`"
+          @click="insertVariable(v)"
+        >
+          {`{${v}}`}
+        </button>
+      </div>
     </div>
     <div v-if="preview">
       <span :class="label">Aperçu pour {{ reachable[0]!.prenom }} {{ reachable[0]!.nom }}</span>

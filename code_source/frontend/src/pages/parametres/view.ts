@@ -1,5 +1,5 @@
 /* What the Paramètres page shows for each server answer (texts of the former web/bureau/parametres.html). */
-import type { BadgeColor } from "../../components/ui/UiBadge.vue";
+import type { BadgeColor } from "../../components/ui/palette";
 import type { Schemas } from "../../lib/client";
 import { formatDateTime, formatDateTimeSeconds, formatTime, parseDate } from "../../lib/format";
 
@@ -43,7 +43,7 @@ export interface CheckLine {
 export function googleChecks(t: Schemas["GoogleTest"]): CheckLine[] {
   const { oauth_token, database, gmail } = t.results;
   return [
-    { ok: oauth_token.ok, label: "Jeton OAuth2", message: oauth_token.message },
+    { ok: oauth_token.ok, label: "Jeton Google OAuth2", message: oauth_token.message },
     { ok: database.ok, label: "Base de Données", message: database.message },
     { ok: gmail.ok, label: "Service Gmail API", message: gmail.message },
   ];

@@ -53,16 +53,23 @@ class TestEmailDispatchService(unittest.TestCase):
             self.assertIn("<div", preview["body_html"])
 
     def test_get_competition_context_includes_whatsapp_link(self):
-        from domain.competitions.models import Competition
-        fake_comp = Competition(
-            id=12, nom="Coupe Bugey", id_ffme="12345", prix=15.0,
-            date_competition="2026-10-03", whatsapp_link="https://chat.whatsapp.com/abc"
-        )
-        with patch("infrastructure.mail.dispatch.CompetitionRepository.get_competition", return_value=fake_comp):
+        fake_doc = {
+            "id": 12, "nom": "Coupe Bugey", "id_ffme": "12345", "prix": 15.0,
+            "date_competition": "2026-10-03", "whatsapp_link": "https://chat.whatsapp.com/abc",
+        }
+        with patch("infrastructure.mail.dispatch.CompetitionRepository.get_competition_doc", return_value=fake_doc):
             ctx = EmailDispatchService.get_competition_context(12)
             self.assertEqual(ctx["whatapp_Id"], "https://chat.whatsapp.com/abc")
             self.assertEqual(ctx["whatsapp_link"], "https://chat.whatsapp.com/abc")
             self.assertEqual(ctx["name_competition"], "Coupe Bugey")
+
+    def test_get_competition_context_includes_place(self):
+        """The place is a pass-through field of the document (not in the domain model)."""
+        fake_doc = {"id": 12, "nom": "Coupe Bugey", "lieu": " CUSSET "}
+        with patch("infrastructure.mail.dispatch.CompetitionRepository.get_competition_doc", return_value=fake_doc):
+            ctx = EmailDispatchService.get_competition_context(12)
+            self.assertEqual(ctx["lieu"], "CUSSET")
+            self.assertEqual(ctx["competition_lieu"], "CUSSET")
 
     @patch("infrastructure.mail.repository.EmailRepository.send_email")
     def test_dispatch_emails_success(self, mock_send):

@@ -11,10 +11,11 @@ Exécute chaque jour (par exemple à 07h00) :
 
 from __future__ import annotations
 
+import datetime
 import logging
 import os
+import re
 import sys
-import datetime
 from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger("alj")
@@ -39,22 +40,36 @@ class CompetitionResultsBatchService:
     """Orchestre la détection quotidienne des résultats et la notification par e-mail."""
 
     @classmethod
+    def parse_notification_emails(cls, raw: str) -> List[str]:
+        """Découpe et valide une liste d'adresses e-mail séparées par des virgules, points-virgules ou espaces."""
+        parts = [p.strip() for p in re.split(r"[,;\s]+", str(raw or "").strip()) if p.strip()]
+        if not parts:
+            raise ValueError("Adresse e-mail de notification invalide.")
+        valid: List[str] = []
+        for p in parts:
+            if "@" not in p or "." not in p or len(p) < 5:
+                raise ValueError("Adresse e-mail de notification invalide.")
+            valid.append(p)
+        return valid
+
+    @classmethod
     def get_notification_email(cls) -> str:
-        """Retourne l'e-mail de notification configuré, ou l'adresse par défaut."""
+        """Retourne l'e-mail ou les e-mails de notification configurés, ou l'adresse par défaut."""
         try:
             val = AppSettingsRepository.get(SETTING_NOTIFICATION_EMAIL)
-            if val and "@" in str(val).strip():
-                return str(val).strip()
+            if val:
+                emails = [e.strip() for e in re.split(r"[,;\s]+", str(val).strip()) if e.strip() and "@" in e]
+                if emails:
+                    return ", ".join(emails)
         except Exception:
             logger.warning("Lecture de l'e-mail de notification des résultats impossible", exc_info=True)
         return DEFAULT_NOTIFICATION_EMAIL
 
     @classmethod
     def set_notification_email(cls, email: str) -> bool:
-        """Enregistre l'adresse e-mail de notification."""
-        clean = str(email or "").strip()
-        if not clean or "@" not in clean or "." not in clean:
-            raise ValueError("Adresse e-mail de notification invalide.")
+        """Enregistre une ou plusieurs adresses e-mail de notification."""
+        valid = cls.parse_notification_emails(email)
+        clean = ", ".join(valid)
 
         try:
             return AppSettingsRepository.save(SETTING_NOTIFICATION_EMAIL, clean)
@@ -366,10 +381,14 @@ class CompetitionResultsBatchService:
         if not comp_results_list:
             return False
 
-        recipient = (to_email or cls.get_notification_email()).strip()
-        if not recipient or "@" not in recipient:
-            print(f"⚠️ [BATCH_RESULTATS] Adresse de notification invalide : '{recipient}'")
+        recipient_raw = (to_email or cls.get_notification_email()).strip()
+        try:
+            recipients = cls.parse_notification_emails(recipient_raw)
+        except ValueError:
+            print(f"⚠️ [BATCH_RESULTATS] Adresse de notification invalide : '{recipient_raw}'")
             return False
+
+        recipient = ", ".join(recipients)
 
         nb_comps = len(comp_results_list)
         if nb_comps == 1:

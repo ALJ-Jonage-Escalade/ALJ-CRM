@@ -1,7 +1,7 @@
 /* Member list of Adhérents: slot / tariff filters, search, status, sorting and CSV export (port of the former
    web/shared/alj-filters.js and alj-members.js).
    The members come formatted by the server (GET /api/members, domain/members/view.py). */
-import type { BadgeColor } from "../../components/ui/UiBadge.vue";
+import type { BadgeColor } from "../../components/ui/palette";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
@@ -18,6 +18,13 @@ export function normKey(s: string | null | undefined): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+/** Indique si un adhérent appartient à un groupe ou tarif compétition. */
+export function isCompetitor(member: Member): boolean {
+  const group = normKey(member.creneau_groupe);
+  const tarif = normKey(member.tarif_name);
+  return group.includes("competition") || tarif.includes("competition");
 }
 
 // ---------------------------------------------------------------- Slot groups and tariffs

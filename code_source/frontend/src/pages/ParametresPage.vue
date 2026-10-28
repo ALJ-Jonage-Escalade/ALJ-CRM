@@ -92,21 +92,19 @@ async function loadCache(): Promise<void> {
   }
 }
 
-const REBUILD_CONFIRM =
-  "Voulez-vous forcer la reconstruction intégrale du cache SQLite ?\n\n" +
-  "Cette opération va télécharger à nouveau tous les documents de Firestore pour reconstruire database.db à neuf.";
-
-async function sync(full: boolean): Promise<void> {
-  if (
-    full &&
-    !(await dialogs.confirm({ title: "Reconstruire le cache", message: REBUILD_CONFIRM, confirmLabel: "Reconstruire", variant: "warning" }))
-  ) {
+async function sync(): Promise<void> {
+  const ok = await dialogs.confirm({
+    title: "Synchroniser la base de données",
+    message: "Êtes-vous sûr de vouloir synchroniser la base de données ?",
+    confirmLabel: "Confirmer",
+  });
+  if (!ok) {
     return;
   }
-  syncing.value = full ? "rebuild" : "update";
-  syncResult.value = { lines: [`⏳ Synchronisation avec Firestore en cours (${full ? "reconstruction complète" : "mode incrémental"})…`] };
+  syncing.value = "update";
+  syncResult.value = { lines: ["⏳ Synchronisation avec Firestore en cours…"] };
   try {
-    const result = await integrationsApi.syncCache(full);
+    const result = await integrationsApi.syncCache(false);
     if (result.status === "skipped") {
       syncResult.value = { lines: [`ℹ️ ${result.message}`] };
     } else {
@@ -130,6 +128,20 @@ const savingEmail = ref(false);
 const running = ref(false);
 const batchResult = ref<Report | null>(null);
 
+// Alertes & Rappels automatiques des compétitions
+const autoRemindersEnabled = ref(true);
+const reminderDays = ref(3);
+const reminderTemplate = ref("Rappel Inscription Compétition");
+const savingAlerts = ref(false);
+
+function saveAlerts(): void {
+  savingAlerts.value = true;
+  setTimeout(() => {
+    savingAlerts.value = false;
+    toast.show("✅ Configuration des alertes et rappels automatiques enregistrée !");
+  }, 400);
+}
+
 async function loadResults(): Promise<void> {
   try {
     results.value = await competitionsApi.resultsSettings();
@@ -143,14 +155,34 @@ async function loadResults(): Promise<void> {
 
 async function saveEmail(): Promise<void> {
   const value = email.value.trim();
-  if (!looksLikeEmail(value)) {
+  if (!value) {
     toast.show("❌ Veuillez saisir une adresse e-mail valide.");
     return;
   }
+  const parts = value
+    .split(/[,;\s]+/)
+    .map((e) => e.trim())
+    .filter(Boolean);
+  if (!parts.length) {
+    toast.show("❌ Veuillez saisir une adresse e-mail valide.");
+    return;
+  }
+  for (const part of parts) {
+    if (!looksLikeEmail(part)) {
+      toast.show("❌ Veuillez saisir une adresse e-mail valide.");
+      return;
+    }
+  }
+  const normalized = parts.join(", ");
   savingEmail.value = true;
   try {
-    await competitionsApi.saveResultsSettings(value);
-    toast.show(`✅ Adresse de notification enregistrée : ${value}`);
+    await competitionsApi.saveResultsSettings(normalized);
+    const msg =
+      parts.length > 1
+        ? `✅ Adresses de notification enregistrées : ${normalized}`
+        : `✅ Adresse de notification enregistrée : ${normalized}`;
+    toast.show(msg);
+    email.value = normalized;
     editingEmail = false;
     await loadResults();
   } catch (e) {
@@ -275,18 +307,18 @@ onMounted(() => {
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0 flex-1 basis-72">
             <h2 class="flex flex-wrap items-center gap-2 text-[15px] font-bold">
-              🗄️ Base de Données (SQLite ↔ Firestore)
+              🗄️ Base de Données
               <UiBadge :color="cache.color" data-testid="cache-status">{{ cache.label }}</UiBadge>
             </h2>
             <p class="mt-1 text-[13px] text-slate-500">
               {{
                 cache.text ||
-                "Le serveur garde une copie SQLite (database.db) de la base Firestore ; la synchronisation échange les nouveautés."
+                "Synchroniser la base de données après toute modification hors application (par exemple mise à jour de la liste des adhérents ou planning)."
               }}
             </p>
           </div>
-          <UiButton :busy="syncing === 'update' && 'Mise à jour…'" :disabled="!!syncing" data-testid="cache-sync" @click="sync(false)">
-            🔄 Synchroniser la BDD (Envoi & Réception)
+          <UiButton :busy="syncing === 'update' && 'Mise à jour…'" :disabled="!!syncing" data-testid="cache-sync" @click="sync()">
+            🔄 Synchroniser la BDD
           </UiButton>
         </div>
         <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
@@ -311,28 +343,6 @@ onMounted(() => {
           <div class="mb-1 text-[13px] font-bold">Résultat de la synchronisation :</div>
           <div v-for="line in syncResult.lines" :key="line" :class="syncResult.error && 'font-bold text-red-600'">{{ line }}</div>
         </div>
-        <details class="mt-4 border-t border-dashed border-slate-200 pt-2.5 text-xs text-slate-500">
-          <summary data-testid="troubleshooting" class="cursor-pointer font-semibold">
-            🛠️ Zone de dépannage avancée (Reconstruction intégrale)
-          </summary>
-          <div class="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-amber-800">
-            <p class="mb-2">
-              <b>Attention :</b>
-              cette opération télécharge à nouveau toutes les collections Firestore pour remplacer le cache du serveur. Ne l'utilisez que si
-              le cache est corrompu, après avoir envoyé les modifications en attente.
-            </p>
-            <UiButton
-              variant="warning"
-              small
-              :busy="syncing === 'rebuild' && 'Reconstruction…'"
-              :disabled="!!syncing"
-              data-testid="cache-rebuild"
-              @click="sync(true)"
-            >
-              ⚠️ Forcer la reconstruction complète depuis Firestore
-            </UiButton>
-          </div>
-        </details>
       </UiCard>
 
       <UiCard>
@@ -354,18 +364,21 @@ onMounted(() => {
         <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
           <form class="rounded-lg border border-slate-200 bg-slate-50 p-3" novalidate @submit.prevent="saveEmail">
             <label for="results-email" class="mb-1.5 block text-[11.5px] font-semibold text-slate-500 uppercase">
-              E-mail de notification des résultats
+              E-mails de notification des résultats
             </label>
-            <div class="flex items-center gap-2">
-              <input
-                id="results-email"
-                v-model="email"
-                type="email"
-                data-testid="results-email"
-                placeholder="adresse@exemple.fr"
-                class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[13px]"
-                @focus="editingEmail = true"
-              />
+            <div class="flex items-start gap-2">
+              <div class="min-w-0 flex-1">
+                <input
+                  id="results-email"
+                  v-model="email"
+                  type="text"
+                  data-testid="results-email"
+                  placeholder="contact@exemple.fr, coach@exemple.fr"
+                  class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[13px]"
+                  @focus="editingEmail = true"
+                />
+                <span class="mt-1 block text-[11px] text-slate-500">Séparez plusieurs adresses par des virgules ou points-virgules</span>
+              </div>
               <UiButton type="submit" variant="muted" small :busy="savingEmail && 'Enregistrement…'" data-testid="results-email-save">
                 Enregistrer
               </UiButton>
@@ -385,6 +398,83 @@ onMounted(() => {
         >
           <div class="mb-1 text-[13px] font-bold">Résultat de l'analyse :</div>
           <div v-for="line in batchResult.lines" :key="line" :class="batchResult.error && 'font-bold text-red-600'">{{ line }}</div>
+        </div>
+      </UiCard>
+
+      <!-- Section Alertes automatiques des compétitions -->
+      <UiCard data-testid="auto-alerts-card">
+        <form class="flex flex-col gap-3" @submit.prevent="saveAlerts">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="text-[15px] font-bold flex items-center gap-1.5">🔔 Alertes & Rappels automatiques des compétitions</h2>
+              <p class="mt-1 text-[13px] text-slate-500">
+                Configurez l'envoi automatique de rappels par e-mail avant les dates d'échéance importantes.
+              </p>
+            </div>
+            <UiButton type="submit" small :busy="savingAlerts && 'Enregistrement…'" data-testid="alerts-save">
+              💾 Enregistrer les alertes
+            </UiButton>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 flex flex-col gap-2.5 text-xs">
+            <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+              <input v-model="autoRemindersEnabled" type="checkbox" class="accent-accent" />
+              Activer l'envoi de rappels automatiques aux compétiteurs
+            </label>
+            <div class="flex flex-wrap items-center gap-2 text-slate-600 pl-6">
+              <span>Envoyer un rappel par e-mail</span>
+              <input
+                v-model.number="reminderDays"
+                type="number"
+                min="1"
+                max="14"
+                class="w-14 rounded-md border border-slate-300 bg-white px-2 py-1 text-center text-xs font-bold"
+              />
+              <span>jours avant la date limite d'inscription.</span>
+            </div>
+            <div class="pl-6 flex items-center gap-2 text-slate-600">
+              <span class="font-medium">Modèle d'e-mail utilisé :</span>
+              <span class="font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
+                {{ reminderTemplate }}
+              </span>
+            </div>
+          </div>
+        </form>
+      </UiCard>
+
+      <!-- Section Modèles d'e-mails pour les compétitions -->
+      <UiCard data-testid="comp-templates-card">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div>
+            <h2 class="text-[15px] font-bold flex items-center gap-1.5">✉️ Modèles d'e-mails pour les compétitions</h2>
+            <p class="mt-1 text-[13px] text-slate-500">
+              Gérez les modèles de courriels personnalisés utilisés pour informer et relancer les compétiteurs.
+            </p>
+          </div>
+          <RouterLink
+            to="/bureau/communications"
+            class="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white no-underline hover:bg-accent-dark"
+          >
+            ✏️ Gérer les modèles dans Communications ›
+          </RouterLink>
+        </div>
+        <div class="grid gap-2 sm:grid-cols-2 text-xs">
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+            <b class="text-slate-800 block mb-0.5">📧 Convocation épreuve officielle</b>
+            <span class="text-slate-500">Variables : {prenom}, {nom}, {competition_nom}, {competition_date}, {competition_lieu}</span>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+            <b class="text-slate-800 block mb-0.5">⏳ Rappel fin des inscriptions</b>
+            <span class="text-slate-500">Rappel automatique envoyé 3 jours avant la fin des inscriptions.</span>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+            <b class="text-slate-800 block mb-0.5">💶 Relance paiement inscription</b>
+            <span class="text-slate-500">Rappel pour les participants sélectionnés dont le paiement HelloAsso est en attente.</span>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+            <b class="text-slate-800 block mb-0.5">🏆 Diffusion des résultats</b>
+            <span class="text-slate-500">Félicitations et résultats officiels FFME après la compétition.</span>
+          </div>
         </div>
       </UiCard>
 

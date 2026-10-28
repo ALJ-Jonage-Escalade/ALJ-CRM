@@ -35,6 +35,7 @@ class CompetitionParticipant(BaseModel):
     total_categorie: Union[int, str] = 0
     categorie_ffme: str = ""
     resultat_ffme: str = ""
+    gender: str = ""
     updated_at: str = Field("", description="Sent back as unchanged_since by a change queued offline")
 
 
@@ -74,6 +75,7 @@ class CompetitionMember(BaseModel):
     tarif: str = ""
     saison: str = ""
     creneau_groupe: str = ""
+    gender: str = ""
 
 
 class GroupLoaded(BaseModel):

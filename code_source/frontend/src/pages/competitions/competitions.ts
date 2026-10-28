@@ -1,6 +1,6 @@
 /* Competitions screen: the competitions, their participants and payment status, and what coaches change on them (the
    former pages web/competitions.html and web/bureau/competitions.html, merged). The server checks every change. */
-import type { BadgeColor } from "../../components/ui/UiBadge.vue";
+import type { BadgeColor } from "../../components/ui/palette";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
@@ -15,7 +15,7 @@ export type Coach = Schemas["Coach"];
     slot group to group the participants, the names, licence and e-mail to add one or write to them. */
 export type MemberSlot = Pick<
   Schemas["CompetitionMember"],
-  "id" | "nom" | "prenom" | "licence_ffme" | "email" | "email_secondaire" | "tarif" | "creneau_groupe"
+  "id" | "nom" | "prenom" | "licence_ffme" | "email" | "email_secondaire" | "tarif" | "creneau_groupe" | "gender"
 >;
 
 export const ARCHIVED = "close";
@@ -32,6 +32,7 @@ export function toMemberSlots(answer: unknown): MemberSlot[] {
     email_secondaire: m.email_secondaire ?? "",
     tarif: m.tarif ?? "",
     creneau_groupe: m.creneau_groupe ?? "",
+    gender: m.gender ?? "",
   }));
 }
 
@@ -76,13 +77,53 @@ export function period(c: Competition): string {
   return end && end > start ? `${formatDayText(start)} → ${formatDayText(end)}` : formatDayText(start);
 }
 
+/** « 31/10/2026 » ou « 31/10 au 01/11/2026 » si sur deux jours. */
+export function formatCompetitionPeriod(c: Competition): string {
+  const start = c.date_competition ?? "";
+  if (!start) {
+    return "sans date";
+  }
+  const end = c.date_fin ?? "";
+  const startText = formatDayText(start);
+  if (!end || end <= start) {
+    return startText;
+  }
+  const endText = formatDayText(end);
+  if (startText.length === 10 && endText.length === 10 && startText.slice(6) === endText.slice(6)) {
+    return `${startText.slice(0, 5)} au ${endText}`;
+  }
+  return `${startText} au ${endText}`;
+}
+
+/** Calcule la saison sportive (ex. 2026-2027) à partir d'une date ISO. */
+export function competitionSeason(dateStr?: string): string {
+  if (!dateStr) {
+    return "";
+  }
+  const parts = dateStr.slice(0, 10).split("-");
+  if (parts.length < 3) {
+    return "";
+  }
+  const yearStr = parts[0];
+  const monthStr = parts[1];
+  if (!yearStr || !monthStr) {
+    return "";
+  }
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  if (isNaN(year) || isNaN(month)) {
+    return "";
+  }
+  return month >= 9 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+}
+
 /** The discipline, when it says more than « escalade » (pass-through field of the office page). */
 export function discipline(c: Competition): string {
   const t = (c.type ?? "").trim();
   return t && t.toLowerCase() !== "escalade" ? t : "";
 }
 
-const DISCIPLINE_COLOR: Record<string, BadgeColor> = { bloc: "violet", difficulté: "blue", vitesse: "amber", combiné: "teal" };
+export const DISCIPLINE_COLOR: Record<string, BadgeColor> = { bloc: "violet", difficulté: "blue", vitesse: "amber", combiné: "teal" };
 
 /** Badge colour of a discipline (former office page colours), blue for any other. */
 export const disciplineColor = (name: string): BadgeColor => DISCIPLINE_COLOR[name.toLowerCase()] ?? "blue";
@@ -147,6 +188,7 @@ export interface Row extends Participant {
   emergency: { name: string; phone: string }[];
   /** Flags changed offline, not sent yet */
   queued: { selectionne: boolean; present: boolean };
+  gender?: string;
 }
 
 export const UNIDENTIFIED = "Non identifiés";
@@ -186,6 +228,7 @@ export function participantRows(
       email: member?.email || member?.email_secondaire || p.email || "",
       group: member?.creneau_groupe || contact?.creneau_groupe || tarif || UNIDENTIFIED,
       emergency: emergency.filter((e) => e.phone),
+      gender: member?.gender || p.gender || "",
     };
   });
 }

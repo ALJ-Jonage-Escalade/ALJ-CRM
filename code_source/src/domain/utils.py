@@ -125,13 +125,24 @@ def apply_template_variables(text: str, member: Any, competition_context: dict =
     out = out.replace("{Nom}", enc(last))
     out = out.replace("{first_name}", enc(first))
     out = out.replace("{last_name}", enc(last))
+    out = out.replace("{prenom}", enc(first))
+    out = out.replace("{nom}", enc(last))
     out = out.replace("{num_licence}", enc(licence))
     if tarif:
         out = out.replace("{tarif}", enc(tarif))
     if season:
         out = out.replace("{season}", enc(season))
 
-    for key in ("no_competition", "name_competition", "montant_competition", "date_competition"):
+    for key in (
+        "no_competition",
+        "name_competition",
+        "competition_nom",
+        "montant_competition",
+        "date_competition",
+        "competition_date",
+        "lieu",
+        "competition_lieu",
+    ):
         val = str(ctx.get(key) or "").strip()
         if val:
             out = out.replace("{" + key + "}", enc(val))

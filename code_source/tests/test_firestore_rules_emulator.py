@@ -10,8 +10,8 @@ import unittest
 import urllib.error
 import urllib.request
 
-AUTH = "http://localhost:9099/identitytoolkit.googleapis.com/v1"
-FIRESTORE = "http://localhost:8081/v1/projects/demo-alj/databases/(default)/documents"
+AUTH = "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1"
+FIRESTORE = "http://127.0.0.1:8081/v1/projects/demo-alj/databases/(default)/documents"
 
 COLLECTIONS = ("competitions", "coaches", "adherents", "planning", "helloasso_items",
                "email_templates", "app_settings", "crm_users", "crm_purchases")
@@ -19,8 +19,8 @@ COLLECTIONS = ("competitions", "coaches", "adherents", "planning", "helloasso_it
 
 def _emulator_running() -> bool:
     try:
-        urllib.request.urlopen("http://localhost:8081/", timeout=1)
-        urllib.request.urlopen("http://localhost:9099/", timeout=1)
+        urllib.request.urlopen("http://127.0.0.1:8081/", timeout=1)
+        urllib.request.urlopen("http://127.0.0.1:9099/", timeout=1)
         return True
     except Exception:
         return False

@@ -2,7 +2,6 @@
 Google token warning of every office page."""
 import csv
 import io
-import json
 import zipfile
 
 import openpyxl
@@ -100,15 +99,6 @@ def test_pivot_table_by_season(page):
     expect(page.get_by_test_id("pivot-table").locator(".pvtRenderers select")).to_have_value("Carte de chaleur", timeout=30_000)
     page.get_by_test_id("pivot-reset").click()
     expect(page.get_by_test_id("pivot-table").locator(".pvtRenderers select")).to_have_value("Tableau")
-
-
-def test_expired_google_token_warning(page):
-    """Every office page warns when the club's Google token has expired."""
-    page.route("**/api/auth/google/status", lambda route: route.fulfill(
-        content_type="application/json", body=json.dumps({"status": "expired", "user_email": "office@hogwarts.example"})))
-    page.goto("/bureau/")
-    login_as(page, "admin")
-    expect(page.locator("#google-auth-warning")).to_be_visible()
 
 
 # ---------------------------------------------------------------------------

@@ -10,6 +10,7 @@ import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
 import { canOpen, OFFLINE_PAGES, PAGES, pageVerdict, shownOn, type PageId } from "../lib/access";
 import { API_KEY } from "../lib/api";
 import { isStaff, roleLabel } from "../lib/roles";
+import { isEmulator } from "../lib/runtime";
 import { offlineStore, STORE_KEY } from "../lib/store";
 import { logoutWarning } from "../pages/competitions/outbox";
 import AppBrand from "./AppBrand.vue";
@@ -73,7 +74,7 @@ watch(
   () => (staff.value && state.value.status === "signedIn" ? state.value.user.uid : null),
   async (uid) => {
     googleExpired.value = false;
-    if (!uid) {
+    if (!uid || isEmulator) {
       return;
     }
     try {
@@ -104,7 +105,11 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         <div class="flex flex-col">
           <h2 class="mb-2 text-[17px] font-bold">🔐 Connexion</h2>
           <p class="my-1.5 leading-normal">
-            Le bureau est réservé aux coachs et administrateurs du club. Connectez-vous avec votre compte Google.
+            {{
+              isEmulator
+                ? "Environnement local : connectez-vous avec un compte de test de l'émulateur."
+                : "Le bureau est réservé aux coachs et administrateurs du club. Connectez-vous avec votre compte Google."
+            }}
           </p>
           <p
             v-if="signInError"
@@ -114,7 +119,9 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
           >
             ❌ {{ signInError }}
           </p>
-          <UiButton id="gate-login" class="mt-2" @click="auth.login()">🔑 Se connecter avec Google</UiButton>
+          <UiButton id="gate-login" class="mt-2" @click="auth.login()">
+            {{ isEmulator ? "🔑 Choisir un compte de test" : "🔑 Se connecter avec Google" }}
+          </UiButton>
         </div>
       </template>
       <template v-else-if="access === 'unverified' && state.status === 'error'">

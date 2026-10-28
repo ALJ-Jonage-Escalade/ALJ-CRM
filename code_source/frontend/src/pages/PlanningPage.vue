@@ -13,10 +13,20 @@ import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText } from "../lib/client";
 import { createActivitiesApi } from "../services/activities";
 import { createMembersApi } from "../services/members";
-import { saveExport } from "../lib/download";
+import { saveExport, saveFile } from "../lib/download";
 import SlotForm from "./planning/SlotForm.vue";
 import SlotList from "./planning/SlotList.vue";
-import { countLabel, draftOf, filterSlots, KINDS, updateOf, type KindFilter, type Slot, type SlotDraft } from "./planning/slots";
+import {
+  countLabel,
+  draftOf,
+  filterSlots,
+  KINDS,
+  planningIcs,
+  updateOf,
+  type KindFilter,
+  type Slot,
+  type SlotDraft,
+} from "./planning/slots";
 import WeekGrid from "./planning/WeekGrid.vue";
 import { dialogs } from "../composables/dialogs";
 
@@ -121,6 +131,15 @@ async function download(mode: "grid" | "list"): Promise<void> {
   }
 }
 
+function exportCalendar(): void {
+  const { ics, skipped } = planningIcs(slots.value, new Date());
+  saveFile(new Blob([ics], { type: "text/calendar;charset=utf-8" }), "planning_alj_escalade.ics");
+  const left = skipped
+    ? ` (${skipped} créneau${skipped > 1 ? "x" : ""} sans jour ou horaires lisibles ignoré${skipped > 1 ? "s" : ""})`
+    : "";
+  toast.show(`📅 Fichier agenda (.ics) téléchargé, à importer dans Google Agenda${left}.`, skipped ? 8000 : 4000);
+}
+
 onMounted(() => {
   void loadPlanning();
   void loadTarifs();
@@ -144,6 +163,14 @@ const chip = (active: boolean) => [
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <UiButton data-testid="slot-new" @click="open()">➕ Nouveau créneau</UiButton>
+          <UiButton
+            variant="muted"
+            data-testid="sync-google-calendar"
+            title="Fichier à importer dans Google Agenda"
+            @click="exportCalendar"
+          >
+            📅 Exporter l'agenda (.ics)
+          </UiButton>
           <UiButton variant="muted" data-testid="planning-print" @click="print">🖨️ Imprimer la grille</UiButton>
           <UiMenu label="📥 Exporter Excel" data-testid="export-menu">
             <UiMenuItem data-testid="export-grid" @select="download('grid')">📊 Grille hebdomadaire (.xlsx)</UiMenuItem>

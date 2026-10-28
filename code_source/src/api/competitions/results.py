@@ -144,11 +144,12 @@ def get_competitions_results_settings_api() -> ResultsSettings:
 
 @router.post("/api/settings/competitions-results", response_model=ResultsSettingsSaved, responses=error_responses(400))
 def update_competitions_results_settings_api(data: ResultsSettingsUpdate) -> ResultsSettingsSaved | JSONResponse:
-    """Met à jour l'adresse e-mail de notification des résultats."""
+    """Met à jour les adresses e-mail de notification des résultats."""
     from services.competitions.results_batch import CompetitionResultsBatchService
     email = data.notification_email
-    if not email or "@" not in email or "." not in email:
-        return error(400, "Adresse e-mail de notification invalide.")
+    try:
+        ok = CompetitionResultsBatchService.set_notification_email(email)
+    except ValueError as e:
+        return error(400, str(e))
 
-    ok = CompetitionResultsBatchService.set_notification_email(email)
     return ResultsSettingsSaved(status="success", notification_email=CompetitionResultsBatchService.get_notification_email(), saved=ok)

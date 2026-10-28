@@ -2,13 +2,48 @@
 /* Read view of a member record: status, slot, every known field, call / write links. Coaches and admins can send an
    e-mail; admins also get the payment certificate and the edit form, which the page opens in a dialog. compact: a narrow
    column (the page's side panel), each label above its value. */
-import { computed } from "vue";
+import { computed, inject, onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
+import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
-import { telHref, type Member } from "./members";
+import { API_KEY } from "../../lib/api";
+import { formatDayText } from "../../lib/format";
+import { isCompetitor, telHref, type Member } from "./members";
+import { payment, type Competition, type Participant } from "../competitions/competitions";
 import { recordRows } from "./record";
 
 const props = defineProps<{ member: Member; admin: boolean; compact?: boolean }>();
 const emit = defineEmits<{ email: []; attestation: []; edit: [] }>();
+
+const api = inject(API_KEY, null);
+const tab = ref<"general" | "competitions">("general");
+const competitions = ref<Competition[]>([]);
+
+onMounted(async () => {
+  if (!api) {
+    return;
+  }
+  try {
+    const response = await api("/api/competitions");
+    if (response.ok) {
+      competitions.value = (await response.json()) as Competition[];
+    }
+  } catch {
+    // Offline
+  }
+});
+
+const memberCompetitions = computed(() => {
+  const memberId = props.member.user_id;
+  return competitions.value
+    .map((competition) => ({
+      ...competition,
+      participant: (competition.participants || []).find((participant: Participant) => participant.adherent_id === memberId),
+    }))
+    .filter((competition) => competition.participant)
+    .sort((a, b) => (b.date_competition || "").localeCompare(a.date_competition || ""));
+});
+
 const rows = computed(() => recordRows(props.member));
 </script>
 
@@ -17,7 +52,10 @@ const rows = computed(() => recordRows(props.member));
     <div class="flex flex-wrap items-start justify-between gap-2">
       <div class="flex min-w-0 flex-1 flex-col gap-3">
         <div class="flex flex-row items-start justify-between gap-2 text-lg font-bold text-slate-800">
-          <div data-testid="record-name">{{ member.first_name }} {{ member.last_name }}</div>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span data-testid="record-name">{{ member.first_name }} {{ member.last_name }}</span>
+            <UiBadge v-if="isCompetitor(member)" variant="soft" color="violet" class="text-[10.5px]">🏆 Compétiteur</UiBadge>
+          </div>
           <div>
             <slot name="status" />
           </div>
@@ -57,16 +95,39 @@ const rows = computed(() => recordRows(props.member));
       >
         📞 Appeler
       </a>
-      <a
-        v-if="member.email_primary"
-        :href="`mailto:${member.email_primary}`"
-        class="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 no-underline"
-      >
-        ✉️ Écrire
-      </a>
     </div>
 
-    <dl data-testid="record-fields" class="divide-y divide-slate-100 rounded-lg border border-slate-200 text-[12.5px]">
+    <!-- Onglets de la fiche adhérent -->
+    <div class="flex border-b border-slate-200 text-xs font-semibold" data-testid="record-tabs">
+      <button
+        type="button"
+        :class="[
+          'px-3 py-1.5 border-b-2 cursor-pointer transition-colors',
+          tab === 'general' ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-slate-800',
+        ]"
+        data-testid="record-tab-general"
+        @click="tab = 'general'"
+      >
+        📋 Fiche adhérent
+      </button>
+      <button
+        type="button"
+        :class="[
+          'px-3 py-1.5 border-b-2 cursor-pointer transition-colors flex items-center gap-1',
+          tab === 'competitions' ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-slate-800',
+        ]"
+        data-testid="record-tab-competitions"
+        @click="tab = 'competitions'"
+      >
+        🏆 Compétitions
+        <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+          {{ memberCompetitions.length }}
+        </span>
+      </button>
+    </div>
+
+    <!-- Onglet 1 : Fiche générale -->
+    <dl v-if="tab === 'general'" data-testid="record-fields" class="divide-y divide-slate-100 rounded-lg text-[12.5px]">
       <div
         v-for="row in rows"
         :key="row.label"
@@ -74,8 +135,53 @@ const rows = computed(() => recordRows(props.member));
         :class="compact ? 'px-3 py-1.5' : 'grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)] gap-3 px-3 py-1.5'"
       >
         <dt :class="['font-semibold text-slate-500', compact && 'text-[11.5px]']">{{ row.icon }} {{ row.label }}</dt>
-        <dd class="break-words whitespace-pre-line text-slate-800">{{ row.value }}</dd>
+        <dd class="wrap-break-word whitespace-pre-line text-slate-800">{{ row.value }}</dd>
       </div>
     </dl>
+
+    <!-- Onglet 2 : Compétitions de l'adhérent -->
+    <div v-else class="flex flex-col gap-2 text-xs" data-testid="record-competitions-list">
+      <div v-if="!memberCompetitions.length" class="text-xs text-slate-400 italic py-4 text-center">
+        Cet adhérent n'est inscrit à aucune compétition.
+      </div>
+      <div
+        v-for="c in memberCompetitions"
+        :key="c.id"
+        class="rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 flex flex-col gap-1"
+        data-testid="member-comp-item"
+      >
+        <div class="flex items-start justify-between gap-1">
+          <RouterLink
+            :to="{ path: '/bureau/competitions', query: { id: String(c.id) } }"
+            class="font-bold text-slate-900 hover:underline hover:text-accent"
+          >
+            {{ c.nom }}
+          </RouterLink>
+          <UiBadge v-if="c.type" variant="soft" color="blue" class="text-[10px] shrink-0">
+            {{ c.type }}
+          </UiBadge>
+        </div>
+        <div class="text-[11.5px] text-slate-500">
+          📅 {{ c.date_competition ? formatDayText(c.date_competition) : "Date non précisée" }}
+          <span v-if="c.lieu">· 📍 {{ c.lieu }}</span>
+        </div>
+        <div v-if="c.participant" class="flex flex-wrap items-center gap-1.5 mt-1 text-[11px]">
+          <span
+            :class="[
+              'rounded px-1.5 py-0.5 font-semibold',
+              c.participant.selectionne ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600',
+            ]"
+          >
+            {{ c.participant.selectionne ? "✓ Sélectionné" : "🔘 Non invité" }}
+          </span>
+          <UiBadge variant="soft" :color="payment(c.participant.statut_paiement).color" class="text-[11px]">
+            {{ payment(c.participant.statut_paiement).label }}
+          </UiBadge>
+          <span v-if="c.participant.classement" class="rounded bg-violet-50 px-1.5 py-0.5 font-bold text-violet-700">
+            🏅 Rang : {{ c.participant.classement }}
+          </span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

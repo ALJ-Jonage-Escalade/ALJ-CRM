@@ -29,6 +29,7 @@ def test_create_competition(mobile_page, test_data):
     page.get_by_test_id("cf-idffme").fill("EVT-E2E-1")
     page.get_by_test_id("cf-date").fill("2027-03-14")
     page.get_by_test_id("cf-date-fin").fill("2027-03-15")
+    page.get_by_test_id("cf-details").locator("summary").click()  # collapsed <details>
     page.get_by_test_id("cf-lieu").fill("Saint-Étienne")
     page.get_by_test_id("cf-type").select_option("Difficulté")
     page.get_by_test_id("cf-prix").fill("18")
@@ -73,6 +74,7 @@ def test_edit_and_delete_competition(page, test_data):
     expect(page.get_by_test_id("cf-nom")).to_have_value(nom)
     renamed = unique_name("E2E Edited")
     page.get_by_test_id("cf-nom").fill(renamed)
+    page.get_by_test_id("cf-details").locator("summary").click()  # collapsed <details>
     page.get_by_test_id("cf-prix").fill("22,5")
     page.get_by_test_id("cf-lieu").fill("Lyon")
     tick_coach(page, "Filius Flitwick")

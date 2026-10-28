@@ -101,6 +101,7 @@ class ParticipantsMixin(AdherentsMixin):
             "note_paiement": "",
             "urgence_nom": str(adherent_doc.get("emergency_name") or ""),
             "urgence_tel": str(adherent_doc.get("emergency_phone") or ""),
+            "gender": str(adherent_doc.get("gender") or ""),
             "updated_at": cls._row_stamp(),
         }
 
@@ -238,10 +239,6 @@ class ParticipantsMixin(AdherentsMixin):
         return cls._update_participant(competition_id, adherent_id,
                                        lambda p: p.update(present=bool(present)),
                                        guard=unchanged_since_guard("present", present, unchanged_since))
-
-    @classmethod
-    def set_present(cls, competition_id: int, adherent_id: int, present: bool) -> bool:
-        return cls.set_present_doc(competition_id, adherent_id, present) is not None
 
     @classmethod
     def set_payment_status(cls, competition_id: int, adherent_id: int, statut_paiement: str) -> bool:
