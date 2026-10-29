@@ -338,6 +338,20 @@ describe("CompetitionsPage", () => {
     expect(byId("comp-detail").exists()).toBe(true);
   });
 
+  it("creates a competition from the list and edits one from the table", async () => {
+    const { byId } = await render(signedIn("coach"), fakeApi().api, store, "/bureau/competitions");
+    await settle();
+    await byId("create-comp").trigger("click");
+    await settle();
+    expect(document.querySelector('[data-testid="create-dialog"]')).not.toBeNull();
+    document.querySelector<HTMLButtonElement>('[data-testid="create-dialog"] [aria-label="Fermer"]')!.click();
+    await settle();
+    await byId("view-table").trigger("click");
+    await byId("edit-comp-row").trigger("click");
+    await settle();
+    expect(document.querySelector('[data-testid="edit-dialog"]')?.textContent).toContain("Modifier : Coupe du Rhône");
+  });
+
   it("shows the selected competition's month on the calendar and opens a competition from it", async () => {
     const { byId, all, router } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
     await settle();
