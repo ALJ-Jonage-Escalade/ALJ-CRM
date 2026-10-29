@@ -195,16 +195,24 @@ async function fetchResults(url = ""): Promise<void> {
 
 // ---------------------------------------------------------------- The list
 
-const adding = ref(false);
 const memberSearch = ref("");
 const matches = computed(() => memberMatches(props.members, c.value, memberSearch.value));
 const statusHint = `Adhérents au statut ${competitorStatusesLabel} uniquement`;
 const noMatch = `Aucun adhérent trouvé : seuls les adhérents au statut ${competitorStatusesLabel} peuvent être ajoutés (ou il est déjà inscrit).`;
 
+function openAddMember(): void {
+  memberSearch.value = "";
+  addMemberDialogOpen.value = true;
+}
+
+/** The dialog stays open, search cleared, to add several competitors in a row. */
 async function add(m: MemberSlot): Promise<void> {
-  await writer.run(() => competitionsApi.addParticipant(c.value.id, m.id!), {
+  const ok = await writer.run(() => competitionsApi.addParticipant(c.value.id, m.id!), {
     done: `➕ ${m.prenom} ${m.nom} ajouté(e) à la compétition.`,
   });
+  if (ok) {
+    memberSearch.value = "";
+  }
 }
 
 async function loadGroup(): Promise<void> {
@@ -356,7 +364,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
 </script>
 
 <template>
-  <!-- Wide screens: the block adding members comes before the competitors (flex order), on phones after them -->
+  <!-- Wide screens: the bulk registration block (load the group, remove the never invited) comes before the competitors (flex order), on phones after them -->
   <section data-testid="comp-detail" aria-label="Compétiteurs" :class="wide ? 'flex flex-col' : ''">
     <RouterLink
       :to="{ query: {} }"
@@ -434,7 +442,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
         <h3 class="text-sm font-bold text-slate-800">Compétiteurs ({{ rows.length }})</h3>
         <div v-if="canWrite" class="flex flex-wrap items-center gap-1.5" data-testid="table-header-actions">
-          <UiButton small data-testid="add-competitor-btn" @click="addMemberDialogOpen = true">➕ Ajouter un compétiteur</UiButton>
+          <UiButton small data-testid="add-competitor-btn" @click="openAddMember">➕ Ajouter un compétiteur</UiButton>
         </div>
       </div>
       <div class="mb-2 flex flex-wrap items-center gap-1.5">
@@ -607,9 +615,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       <div class="flex flex-wrap items-center justify-between gap-2">
         <b class="text-[13.5px]">Gérer les inscriptions</b>
         <div class="flex flex-wrap gap-2">
-          <UiButton variant="muted" small data-testid="toggle-add" :aria-expanded="adding" @click="adding = !adding">
-            {{ adding ? "Fermer" : "🔍 Rechercher un adhérent" }}
-          </UiButton>
           <UiButton variant="muted" small data-testid="load-group" @click="loadGroup">🧗 Charger le groupe « Compétition »</UiButton>
           <UiButton
             v-if="canWrite"
@@ -624,33 +629,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           </UiButton>
         </div>
       </div>
-      <template v-if="adding">
-        <input
-          v-model="memberSearch"
-          type="search"
-          data-testid="member-search"
-          placeholder="Nom, prénom ou licence (2 lettres au moins)"
-          :class="[field, 'mt-2 w-full']"
-        />
-        <p class="mt-1 text-xs text-slate-500" data-testid="member-status-hint">{{ statusHint }}</p>
-        <ul class="mt-2 flex flex-col">
-          <li
-            v-for="m in matches"
-            :key="m.id!"
-            data-testid="member-result"
-            class="flex items-center justify-between gap-2 border-b border-slate-100 py-1.5"
-          >
-            <span class="min-w-0">
-              <b class="text-[13px]">{{ m.nom }} {{ m.prenom }}</b>
-              <span class="block text-xs text-slate-500">🪪 {{ m.licence_ffme || "sans licence" }} · {{ m.tarif || "—" }}</span>
-            </span>
-            <UiButton small data-testid="member-add" :disabled="writer.busy.value" @click="add(m)">➕ Ajouter</UiButton>
-          </li>
-          <li v-if="memberSearch.trim().length >= 2 && !matches.length" class="text-xs text-slate-500">
-            {{ members.length ? noMatch : "Annuaire des adhérents indisponible (réseau ?)." }}
-          </li>
-        </ul>
-      </template>
     </div>
 
     <UiDialog v-model:open="editing" :title="`✏️ Modifier : ${c.nom}`" wide data-testid="edit-dialog">
@@ -710,7 +688,8 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
     </UiDialog>
 
     <!-- Modal Ajouter un compétiteur -->
-    <UiDialog v-model:open="addMemberDialogOpen" title="➕ Ajouter un compétiteur" data-testid="add-competitor-dialog">
+    <!-- Wide: long tariff names (« Compétition U15 U17 - nés en 2008, … ») stay on one line on a computer -->
+    <UiDialog v-model:open="addMemberDialogOpen" title="➕ Ajouter un compétiteur" wide data-testid="add-competitor-dialog">
       <div class="flex flex-col gap-3">
         <p class="text-xs text-slate-600">
           Recherchez un adhérent du club par son nom, prénom ou numéro de licence pour l'inscrire à cette compétition.
@@ -718,31 +697,24 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         <input
           v-model="memberSearch"
           type="search"
-          data-testid="member-search-modal"
+          data-testid="member-search"
           placeholder="Nom, prénom ou licence (2 lettres au moins)…"
           :class="field"
         />
-        <p class="-mt-2 text-xs text-slate-500">{{ statusHint }}</p>
+        <p class="-mt-2 text-xs text-slate-500" data-testid="member-status-hint">{{ statusHint }}</p>
         <ul class="max-h-60 overflow-y-auto flex flex-col divide-y divide-slate-100">
-          <li v-for="m in matches" :key="m.id!" data-testid="member-result-modal" class="flex items-center justify-between gap-2 py-2">
-            <span class="min-w-0">
+          <li v-for="m in matches" :key="m.id!" data-testid="member-result" class="flex items-center justify-between gap-2 py-2">
+            <span class="min-w-0 flex-1">
               <b class="text-[13px] text-slate-800">{{ m.nom }} {{ m.prenom }}</b>
               <span class="block text-xs text-slate-500">🪪 {{ m.licence_ffme || "sans licence" }} · {{ m.tarif || "—" }}</span>
             </span>
-            <UiButton
-              small
-              data-testid="member-add-modal"
-              :disabled="writer.busy.value"
-              @click="
-                add(m);
-                addMemberDialogOpen = false;
-              "
-            >
+            <!-- Same size on every row, however long the tariff next to it -->
+            <UiButton small class="shrink-0 whitespace-nowrap" data-testid="member-add" :disabled="writer.busy.value" @click="add(m)">
               ➕ Inscrire
             </UiButton>
           </li>
           <li v-if="memberSearch.trim().length >= 2 && !matches.length" class="text-xs text-slate-500 py-4 text-center">
-            {{ members.length ? noMatch : "Annuaire des adhérents indisponible." }}
+            {{ members.length ? noMatch : "Annuaire des adhérents indisponible (réseau ?)." }}
           </li>
         </ul>
         <UiDialogActions>

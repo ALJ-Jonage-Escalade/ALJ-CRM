@@ -86,6 +86,12 @@ function fakeApi(options: { down?: boolean; patch?: (body: Record<string, unknow
         { id: 4, nom: "NOUVEAU", prenom: "Ali" },
       ]);
     }
+    if (method === "POST" && path === "/api/competitions/10/participants") {
+      competitions = competitions.map((c) =>
+        c.id !== 10 ? c : { ...c, participants: [...c.participants!, { adherent_id: Number(body!.adherent_id), selectionne: true }] },
+      );
+      return json(competitions[0]);
+    }
     if (method === "POST" && path === "/api/competitions/10/load-group") {
       return json({ added: 0, competition: competitions[0] });
     }
@@ -151,6 +157,13 @@ async function settle(): Promise<void> {
     await flushPromises();
     await new Promise((r) => setImmediate(r));
   }
+}
+
+/** Types in an input rendered outside the wrapper (dialogs). */
+async function search(input: HTMLElement, text: string): Promise<void> {
+  (input as HTMLInputElement).value = text;
+  input.dispatchEvent(new Event("input"));
+  await flushPromises();
 }
 
 const signedIn = (role: Role): AuthState => ({ status: "signedIn", user: USER, role });
@@ -322,15 +335,16 @@ describe("CompetitionsPage", () => {
 
   it("offers and loads only the members at the competitor statuses", async () => {
     const server = fakeApi();
-    const { byId, wrapper } = await render(signedIn("coach"), server.api, store, "/competitions?id=10");
+    const { byId, inBody } = await render(signedIn("coach"), server.api, store, "/competitions?id=10");
     await settle();
     expect(server.queries.filter((q) => q.path === "/api/competition-members").map((q) => q.status)).toContainEqual(["Terminé"]);
     expect(server.queries.filter((q) => q.path === "/api/competition-members" && !q.status.length)).toEqual([]);
 
-    await byId("toggle-add").trigger("click");
-    expect(byId("member-status-hint").text()).toBe("Adhérents au statut « Terminé » uniquement");
-    await byId("member-search").setValue("zzz");
-    expect(wrapper.text()).toContain("seuls les adhérents au statut « Terminé » peuvent être ajoutés");
+    await byId("add-competitor-btn").trigger("click");
+    await settle();
+    expect(inBody("member-status-hint")!.textContent).toBe("Adhérents au statut « Terminé » uniquement");
+    await search(inBody("member-search")!, "zzz");
+    expect(inBody("add-competitor-dialog")!.textContent).toContain("seuls les adhérents au statut « Terminé » peuvent être ajoutés");
 
     await byId("load-group").trigger("click");
     await settle();
@@ -338,6 +352,26 @@ describe("CompetitionsPage", () => {
     expect(document.querySelector("#toast")!.textContent).toContain(
       "Tous les membres « Terminé » du groupe « Compétition » sont déjà présents dans la liste.",
     );
+  });
+
+  it("adds competitors one after the other from a single dialog", async () => {
+    const server = fakeApi();
+    const { byId, inBody, all } = await render(signedIn("coach"), server.api, store, "/competitions?id=10");
+    await settle();
+    expect(byId("toggle-add").exists()).toBe(false); // the dialog is the only way to add one competitor
+    await byId("add-competitor-btn").trigger("click");
+    await settle();
+    await search(inBody("member-search")!, "nouv");
+    expect(document.querySelectorAll('[data-testid="member-result"]')).toHaveLength(1);
+    inBody("member-add")!.click();
+    await settle();
+    expect(server.writes()).toEqual([
+      { method: "POST", path: "/api/competitions/10/participants", body: { adherent_id: 4, selectionne: true } },
+    ]);
+    // Still open, search cleared, for the next one
+    expect(inBody("add-competitor-dialog")).not.toBeNull();
+    expect((inBody("member-search") as HTMLInputElement).value).toBe("");
+    expect(all("participant-card")).toHaveLength(4);
   });
 
   it("refuses other changes offline", async () => {
