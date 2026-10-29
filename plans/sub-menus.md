@@ -2,7 +2,7 @@
 
 > Branch: `feat/rethink_menu`. Design settled by a grilling session (2026-10-27).
 
-The pages that grew tabs (Compétitions: 4 sections, Outils: 5 tabs) get crowded: each tab keeps gaining features.
+The pages that grew tabs (Compétitions: 4 sections, Outils: 6 tabs) get crowded: each tab keeps gaining features.
 Their tabs become sub-pages listed in the menu, through one reusable mechanism that any page can adopt.
 
 ## Decisions
@@ -54,6 +54,7 @@ Their tabs become sub-pages listed in the menu, through one reusable mechanism t
 | | Coachs (`coachs`) | staff | staffCopy |
 | Outils | Carte (index) | staff | none |
 | | TCD (`pivot`) | staff | none |
+| | Statistiques (`stats`) | staff | none |
 | | Fiches de présence (`presence`) | staff | none |
 | | Export FFME (`ffme`) | staff | none |
 | | Import FFME (`ffme-import`) | admin | none |

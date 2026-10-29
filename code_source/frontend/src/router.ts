@@ -34,6 +34,12 @@ const OutilsPage = () => import("./pages/OutilsPage.vue");
 const ParametresPage = () => import("./pages/ParametresPage.vue");
 const PlanningPage = () => import("./pages/PlanningPage.vue");
 const CompetitionsHelloAssoPage = () => import("./pages/competitions/CompetitionsHelloAssoPage.vue"); // online only
+const OutilsMapPage = () => import("./pages/outils/OutilsMapPage.vue");
+const OutilsPivotPage = () => import("./pages/outils/OutilsPivotPage.vue"); // with the pivot table library
+const OutilsStatsPage = () => import("./pages/outils/OutilsStatsPage.vue");
+const OutilsPresencePage = () => import("./pages/outils/OutilsPresencePage.vue");
+const OutilsFfmePage = () => import("./pages/outils/OutilsFfmePage.vue");
+const OutilsFfmeImportPage = () => import("./pages/outils/OutilsFfmeImportPage.vue");
 
 /** Component of each sub-page, by page then sub-page id (lib/access.ts subPages). */
 const SUB_COMPONENTS: Partial<Record<PageId, Record<string, RouteComponent>>> = {
@@ -43,6 +49,14 @@ const SUB_COMPONENTS: Partial<Record<PageId, Record<string, RouteComponent>>> = 
     bilan: CompetitionsBalancePage,
     coachs: CompetitionsCoachesPage,
   },
+  outils: {
+    map: OutilsMapPage,
+    pivot: OutilsPivotPage,
+    stats: OutilsStatsPage,
+    presence: OutilsPresencePage,
+    ffme: OutilsFfmePage,
+    "ffme-import": OutilsFfmeImportPage,
+  },
 };
 
 declare module "vue-router" {
@@ -50,16 +64,18 @@ declare module "vue-router" {
     access: Access;
     /** Id of the sub-page a child route opens. */
     sub?: string;
+    /** The page layout keeps its sub-pages mounted while switching (loaded data and typed values kept). */
+    keepAlive?: boolean;
   }
 }
 
 /** The child routes of a page's sub-pages, named `<name>` for the index route and `<name>-<sub-page id>` for the others. */
-function subRoutes(id: PageId, name: string): RouteRecordRaw[] {
+function subRoutes(id: PageId, name: string, keepAlive = false): RouteRecordRaw[] {
   return subPages(id).map((sub) => ({
     path: sub.path,
     name: sub.path ? `${name}-${sub.id}` : name,
     component: SUB_COMPONENTS[id]![sub.id]!,
-    meta: { access: pageAccess(id), sub: sub.id },
+    meta: { access: pageAccess(id), sub: sub.id, ...(keepAlive && { keepAlive }) },
   }));
 }
 
@@ -84,7 +100,12 @@ export const routes: RouteRecordRaw[] = [
   { path: "/index", name: "annuaire", component: DirectoryPage, meta: { access: pageAccess("annuaire") } },
   { path: "/bureau/communications", name: "communications", component: CommunicationsPage, meta: { access: pageAccess("communications") } },
   { path: "/bureau/planning", name: "planning", component: PlanningPage, meta: { access: pageAccess("planning") } },
-  { path: "/bureau/outils", name: "outils", component: OutilsPage, meta: { access: pageAccess("outils") } },
+  {
+    path: "/bureau/outils",
+    component: OutilsPage,
+    meta: { access: pageAccess("outils") },
+    children: subRoutes("outils", "outils", true),
+  },
   { path: "/bureau/parametres", name: "parametres", component: ParametresPage, meta: { access: pageAccess("parametres") } },
   { path: "/:unknown(.*)*", component: NotFoundPage, meta: { access: "public" } },
 ];

@@ -1,12 +1,12 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
-import { createMemoryHistory, createRouter } from "vue-router";
+import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import { AUTH_KEY, type Auth } from "../composables/auth";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import type { Role } from "../lib/roles";
-import OutilsPage from "./OutilsPage.vue";
+import { routes } from "../router";
 import { dialogs } from "../composables/dialogs";
 
 function json(body: unknown, status = 200): Response {
@@ -111,9 +111,10 @@ async function render(role: Role = "admin", path = "/bureau/outils") {
     retry: vi.fn(async () => {}),
     stop: vi.fn(),
   };
-  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/bureau/outils", component: OutilsPage }] });
+  // The app's routes: the page renders its sub-pages (router.ts)
+  const router = createRouter({ history: createMemoryHistory(), routes });
   await router.push(path);
-  const wrapper = mount(OutilsPage, {
+  const wrapper = mount(RouterView, {
     attachTo: document.body,
     global: {
       plugins: [router],
@@ -124,8 +125,9 @@ async function render(role: Role = "admin", path = "/bureau/outils") {
   await flushPromises();
   const byId = <T extends HTMLElement = HTMLElement>(id: string) => document.querySelector<T>(`[data-testid="${id}"]`);
   const all = (id: string) => [...document.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`)];
-  const open = async (tab: string) => {
-    byId(`tab-${tab}`)!.click();
+  // The sub-menu links are stubbed (PageLink): opened through the router, as PageLink does
+  const open = async (sub: string) => {
+    await router.push(sub === "map" ? "/bureau/outils" : `/bureau/outils/${sub}`);
     await flushPromises();
   };
   const sent = (method: string, path: string) => calls.filter((c) => c.method === method && c.path.startsWith(path));
@@ -193,7 +195,7 @@ describe("OutilsPage", () => {
   });
 
   it("reloads the map for another season, then keeps it while showing the pivot table", async () => {
-    const { byId, open, router, sent } = await render();
+    const { byId, open, sent } = await render();
     const season = byId<HTMLSelectElement>("map-season")!;
     expect([...season.options].map((o) => o.value)).toEqual(["2026-2027", "2025-2026", "Toutes les saisons"]);
     season.value = "Toutes les saisons";
@@ -202,7 +204,7 @@ describe("OutilsPage", () => {
     expect(sent("GET", "/api/reports/map-points").at(-1)!.path).toBe("/api/reports/map-points?season=Toutes%20les%20saisons");
 
     await open("pivot");
-    expect(router.currentRoute.value.fullPath).toBe("/bureau/outils?tab=pivot");
+    expect(byId("sub-side-pivot")!.getAttribute("aria-current")).toBe("page");
     await vi.waitFor(() => expect(byId("pivot-table")).not.toBeNull());
     expect(sent("GET", "/api/reports/pivot-records").map((c) => c.path)).toEqual(["/api/reports/pivot-records?season=2026-2027"]);
     const pivotSeason = byId<HTMLSelectElement>("pivot-season")!;
@@ -217,7 +219,7 @@ describe("OutilsPage", () => {
 
     // The map stays loaded: back to it, no new request
     await open("map");
-    expect(router.currentRoute.value.fullPath).toBe("/bureau/outils");
+    expect(byId("sub-side-map")!.getAttribute("aria-current")).toBe("page");
     expect(sent("GET", "/api/reports/map-points")).toHaveLength(2);
     byId("tools-refresh")!.click();
     await flushPromises();
@@ -244,22 +246,34 @@ describe("OutilsPage", () => {
     }
   });
 
-  it("opens the tab named in the URL; the import is for admins only", async () => {
-    const admin = await render("admin", "/bureau/outils?tab=ffme-import");
+  it("opens the sub-page of the URL, titled with it; the import is for admins only", async () => {
+    const admin = await render("admin", "/bureau/outils/ffme-import");
     expect(admin.byId("pane-ffme-import")).not.toBeNull();
     expect(admin.sent("GET", "/api/reports/map-points")).toHaveLength(0);
+    expect(document.querySelector("h1")!.textContent).toBe("Import FFME");
+    expect(document.title).toBe("Import FFME · Outils — ALJ Escalade");
+    expect(admin.all("sub-side-ffme-import")).toHaveLength(1);
     admin.wrapper.unmount();
     document.body.innerHTML = "";
 
-    const coach = await render("coach", "/bureau/outils?tab=ffme-import");
-    expect(coach.byId("tab-ffme-import")).toBeNull();
+    const coach = await render("coach", "/bureau/outils/ffme-import");
+    expect(coach.router.currentRoute.value.fullPath).toBe("/bureau/outils?reserve=ffme-import");
+    expect(coach.byId("sub-side-ffme-import")).toBeNull();
     expect(coach.byId("pane-ffme-import")).toBeNull();
-    expect(coach.byId("tab-map")!.getAttribute("aria-pressed")).toBe("true");
+    expect(document.getElementById("refused-page")!.textContent).toContain("Import FFME est réservée aux administrateurs");
+    expect(coach.byId("sub-side-map")!.getAttribute("aria-current")).toBe("page");
+    expect(document.querySelector("h1")!.textContent).toBe("Outils");
+  });
+
+  it("opens the former tab address on its sub-page", async () => {
+    const { router, byId } = await render("coach", "/bureau/outils/ffme");
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/outils/ffme");
+    expect(byId("pane-ffme")).not.toBeNull();
   });
 
   it("generates the attendance sheets", async () => {
     stubDownloads();
-    const { byId, all, open, sent } = await render("coach", "/bureau/outils?tab=presence");
+    const { byId, all, open, sent } = await render("coach", "/bureau/outils/presence");
     expect(byId("presence-autonomous-summary")!.textContent).toContain("Total adhérents : 17");
     expect(byId("course-count")!.textContent.trim()).toBe("2 créneau(x)");
     expect(all("course").map((c) => (c as HTMLInputElement).checked)).toEqual([true, true]);
@@ -303,7 +317,7 @@ describe("OutilsPage", () => {
 
   it("shows the FFME counts and downloads the CSV", async () => {
     stubDownloads();
-    const { byId, sent } = await render("coach", "/bureau/outils?tab=ffme");
+    const { byId, sent } = await render("coach", "/bureau/outils/ffme");
     expect(["ffme-total", "ffme-renewals", "ffme-new", "ffme-ignored"].map((id) => byId(id)!.textContent)).toEqual(["30", "18", "12", "2"]);
     expect(byId("ffme-ignored-details")!.textContent).toContain("PETIT Max (date de naissance manquante/invalide)");
 
@@ -316,7 +330,7 @@ describe("OutilsPage", () => {
 
   it("previews the FFME file, then applies it with a manual match", async () => {
     const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
-    const { byId, all, sent } = await render("admin", "/bureau/outils?tab=ffme-import");
+    const { byId, all, sent } = await render("admin", "/bureau/outils/ffme-import");
     expect((byId("ffme-analyze") as HTMLButtonElement).disabled).toBe(true);
 
     const input = byId<HTMLInputElement>("ffme-file")!;
@@ -361,7 +375,7 @@ describe("OutilsPage", () => {
 
   it("imports straight away once confirmed", async () => {
     const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-    const { byId, sent } = await render("admin", "/bureau/outils?tab=ffme-import");
+    const { byId, sent } = await render("admin", "/bureau/outils/ffme-import");
     const input = byId<HTMLInputElement>("ffme-file")!;
     Object.defineProperty(input, "files", { value: [new File(["PK"], "ffme.xlsx")], configurable: true });
     input.dispatchEvent(new Event("change"));

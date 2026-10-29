@@ -20,7 +20,10 @@ WEB_DIR = os.path.join(CODE_ROOT, "web")
 _SPA_PAGES = frozenset({"adherents", "communications", "competitions", "outils", "parametres", "planning"})
 # Sub-pages of the office pages (frontend/src/lib/access.ts subPages, plans/sub-menus.md): /bureau/<page>/<sub-page>,
 # and /competitions/<sub-page> for the competitions (each one public in api_auth.PUBLIC_PATHS)
-SPA_SUB_PAGES = {"competitions": frozenset({"helloasso", "bilan", "coachs"})}
+SPA_SUB_PAGES = {
+    "competitions": frozenset({"helloasso", "bilan", "coachs"}),
+    "outils": frozenset({"pivot", "stats", "presence", "ffme", "ffme-import"}),
+}
 # Former addresses of the competitions management pages (phone and office, until plan phase 11): now the competitions
 # screen itself, where coaches change everything
 FORMER_MANAGEMENT_PAGES = {"/competitions/gestion": "/competitions", "/bureau/competitions-gestion": "/bureau/competitions"}

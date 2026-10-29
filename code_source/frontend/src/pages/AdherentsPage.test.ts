@@ -223,8 +223,8 @@ describe("AdherentsPage", () => {
     const { byId, wrapper } = await render("coach");
     await flushPromises();
     expect(byId("member-add").exists()).toBe(false);
-    expect(wrapper.find('a[href="/bureau/outils?tab=ffme-import"]').exists()).toBe(false);
-    expect(wrapper.find('a[href="/bureau/outils?tab=ffme"]').exists()).toBe(false);
+    expect(wrapper.find('a[href="/bureau/outils/ffme-import"]').exists()).toBe(false);
+    expect(wrapper.find('a[href="/bureau/outils/ffme"]').exists()).toBe(false);
     const ffmeBtn = wrapper.find('button[data-testid="export-ffme"]');
     expect(ffmeBtn.exists()).toBe(true);
     expect(ffmeBtn.attributes("disabled")).toBeDefined();

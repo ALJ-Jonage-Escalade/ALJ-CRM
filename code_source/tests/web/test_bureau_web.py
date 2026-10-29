@@ -40,6 +40,7 @@ class TestBureauFiles(unittest.TestCase):
         self.assertEqual(get_bureau_sub_page("competitions", "inconnue").status_code, 404)
         self.assertEqual(get_bureau_sub_page("planning", "bilan").status_code, 404)
         self.assertEqual(get_bureau_sub_page("inconnue", "bilan").status_code, 404)
+        self.assertEqual(get_bureau_sub_page("outils", "bilan").status_code, 404)
 
     def test_competitions_results_cron_and_settings_endpoints(self):
         """Vérifie les endpoints de configuration et de cron du batch des résultats MyCompet."""
@@ -628,7 +629,8 @@ class TestBureauAccess(unittest.TestCase):
         for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions",
                      "/bureau/planning", "/bureau/outils", "/bureau/parametres", "/bureau/competitions/helloasso",
                      "/bureau/competitions/bilan", "/bureau/competitions/coachs", "/competitions/helloasso",
-                     "/competitions/bilan", "/competitions/coachs"):
+                     "/competitions/bilan", "/competitions/coachs", "/bureau/outils/pivot", "/bureau/outils/stats",
+                     "/bureau/outils/presence", "/bureau/outils/ffme", "/bureau/outils/ffme-import"):
             self.assertEqual(self.client.get(path).status_code, 200, path)
         self.assertEqual(self.client.get("/bureau/inconnue").status_code, 404)
         self.assertEqual(self.client.get("/bureau/competitions/inconnue").status_code, 404)

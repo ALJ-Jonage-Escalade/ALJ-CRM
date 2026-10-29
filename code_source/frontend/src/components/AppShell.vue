@@ -128,7 +128,8 @@ const refusedSub = computed(() => {
 });
 
 const pageLabel = computed(() => PAGES.find((p) => p.id === props.page)!.label);
-const heading = computed(() => current.value?.sub.label ?? props.title);
+// The index sub-page is the page itself: its title (plans/sub-menus.md D7)
+const heading = computed(() => (current.value?.sub.path ? current.value.sub.label : props.title));
 watchEffect(() => {
   document.title = current.value?.sub.path ? `${heading.value} · ${pageLabel.value} — ALJ Escalade` : `${heading.value} — ALJ Escalade`;
 });

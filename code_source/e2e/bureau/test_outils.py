@@ -10,6 +10,7 @@ import pytest
 from playwright.sync_api import expect
 
 from helpers.auth import login_as
+from helpers.competitions import sub_menu_entry
 from helpers.data import eventually
 from helpers.dialogs import confirm_dialog
 
@@ -17,11 +18,11 @@ from helpers.dialogs import confirm_dialog
 pytestmark = pytest.mark.xdist_group("planning")
 
 
-def _open(page, role="admin", tab=None):
-    page.goto("/bureau/outils" + (f"?tab={tab}" if tab else ""))
+def _open(page, role="admin", sub_page=None):
+    page.goto("/bureau/outils" + (f"/{sub_page}" if sub_page else ""))
     login_as(page, role)
-    if tab:
-        expect(page.get_by_test_id(f"pane-{tab}")).to_be_visible()
+    if sub_page:
+        expect(page.get_by_test_id(f"pane-{sub_page}")).to_be_visible()
     return page
 
 
@@ -69,8 +70,9 @@ def _shown_on_top(locator) -> bool:
 
 def test_pivot_table_by_season(page):
     _open(page)
-    page.get_by_test_id("tab-pivot").click()
-    page.wait_for_url("**/bureau/outils?tab=pivot")
+    sub_menu_entry(page, "pivot").click()
+    page.wait_for_url("**/bureau/outils/pivot")
+    expect(sub_menu_entry(page, "pivot")).to_have_attribute("aria-current", "page")
     table = page.get_by_test_id("pivot-table")
     expect(table.locator("table.pvtTable")).to_be_visible(timeout=30_000)
     expect(table.locator("table.pvtTable")).to_contain_text("Totaux")
@@ -166,10 +168,17 @@ def test_ffme_licences_export(page, tmp_path):
 
 def test_coach_has_no_ffme_import(page):
     _open(page, "coach")
-    page.goto("/bureau/outils?tab=ffme-import")
-    expect(page.get_by_test_id("tab-ffme")).to_be_visible()
-    expect(page.get_by_test_id("tab-ffme-import")).to_have_count(0)
+    expect(sub_menu_entry(page, "ffme")).to_be_visible()
+    expect(sub_menu_entry(page, "ffme-import")).to_have_count(0)
+    # Opened by its address: back to the index sub-page, which says why (plans/sub-menus.md D8)
+    page.goto("/bureau/outils/ffme-import")
+    page.wait_for_url("**/bureau/outils?reserve=ffme-import")
+    expect(page.locator("#refused-page")).to_contain_text("réservée aux administrateurs")
     expect(page.get_by_test_id("pane-ffme-import")).to_have_count(0)
+    # Former tab address (bookmarks): its sub-page
+    page.goto("/bureau/outils?tab=ffme")
+    page.wait_for_url("**/bureau/outils/ffme")
+    expect(page.get_by_test_id("pane-ffme")).to_be_visible()
 
 
 def _ffme_file(folder, rows):

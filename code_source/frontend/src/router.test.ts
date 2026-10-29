@@ -81,7 +81,7 @@ describe("app routes", () => {
     expect(router.currentRoute.value.fullPath).toBe(`/bureau/?reserve=${path}`);
   });
 
-  it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils?tab=ffme", "/index", "/index?vue=pwa"])(
+  it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils/ffme", "/index", "/index?vue=pwa"])(
     "open %s to a coach",
     async (path) => {
       const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
@@ -143,6 +143,18 @@ describe("app routes", () => {
   });
 
   it.each([
+    ["/bureau/outils", "outils", "map"],
+    ["/bureau/outils/pivot", "outils-pivot", "pivot"],
+    ["/bureau/outils/ffme-import", "outils-ffme-import", "ffme-import"],
+  ])("open the Outils sub-page %s, kept mounted while switching", async (path, name, sub) => {
+    const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
+    await router.push(path);
+    expect([router.currentRoute.value.name, router.currentRoute.value.meta]).toEqual([name, { access: "staff", sub, keepAlive: true }]);
+  });
+
+  it.each([
+    ["/bureau/outils?tab=ffme-import", "/bureau/outils/ffme-import"],
+    ["/bureau/outils?tab=map", "/bureau/outils?tab=map"],
     ["/bureau/competitions?section=bilan", "/bureau/competitions/bilan"],
     ["/competitions?section=helloasso&id=3", "/competitions/helloasso?id=3"],
     ["/bureau/competitions?section=inconnue", "/bureau/competitions?section=inconnue"],
