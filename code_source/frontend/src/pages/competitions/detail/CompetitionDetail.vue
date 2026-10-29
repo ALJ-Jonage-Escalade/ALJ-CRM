@@ -22,6 +22,8 @@ import CompetitionCharts from "./CompetitionCharts.vue";
 import {
   countLine,
   counts,
+  COMPETITOR_STATUSES,
+  competitorStatusesLabel,
   csvName,
   discipline,
   disciplineColor,
@@ -196,6 +198,8 @@ async function fetchResults(url = ""): Promise<void> {
 const adding = ref(false);
 const memberSearch = ref("");
 const matches = computed(() => memberMatches(props.members, c.value, memberSearch.value));
+const statusHint = `Adhérents au statut ${competitorStatusesLabel} uniquement`;
+const noMatch = `Aucun adhérent trouvé : seuls les adhérents au statut ${competitorStatusesLabel} peuvent être ajoutés (ou il est déjà inscrit).`;
 
 async function add(m: MemberSlot): Promise<void> {
   await writer.run(() => competitionsApi.addParticipant(c.value.id, m.id!), {
@@ -204,11 +208,11 @@ async function add(m: MemberSlot): Promise<void> {
 }
 
 async function loadGroup(): Promise<void> {
-  await writer.run(() => competitionsApi.loadGroup(c.value.id), {
+  await writer.run(() => competitionsApi.loadGroup(c.value.id, COMPETITOR_STATUSES), {
     done: (r) =>
       r.added
         ? `🧗 ${r.added} compétiteur(s) du groupe « Compétition » ajouté(s) à la liste.`
-        : "ℹ️ Tous les membres du groupe « Compétition » sont déjà présents dans la liste.",
+        : `ℹ️ Tous les membres ${competitorStatusesLabel} du groupe « Compétition » sont déjà présents dans la liste.`,
   });
 }
 
@@ -628,6 +632,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           placeholder="Nom, prénom ou licence (2 lettres au moins)"
           :class="[field, 'mt-2 w-full']"
         />
+        <p class="mt-1 text-xs text-slate-500" data-testid="member-status-hint">{{ statusHint }}</p>
         <ul class="mt-2 flex flex-col">
           <li
             v-for="m in matches"
@@ -642,7 +647,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
             <UiButton small data-testid="member-add" :disabled="writer.busy.value" @click="add(m)">➕ Ajouter</UiButton>
           </li>
           <li v-if="memberSearch.trim().length >= 2 && !matches.length" class="text-xs text-slate-500">
-            {{ members.length ? "Aucun adhérent trouvé (ou déjà inscrit)." : "Annuaire des adhérents indisponible (réseau ?)." }}
+            {{ members.length ? noMatch : "Annuaire des adhérents indisponible (réseau ?)." }}
           </li>
         </ul>
       </template>
@@ -717,6 +722,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           placeholder="Nom, prénom ou licence (2 lettres au moins)…"
           :class="field"
         />
+        <p class="-mt-2 text-xs text-slate-500">{{ statusHint }}</p>
         <ul class="max-h-60 overflow-y-auto flex flex-col divide-y divide-slate-100">
           <li v-for="m in matches" :key="m.id!" data-testid="member-result-modal" class="flex items-center justify-between gap-2 py-2">
             <span class="min-w-0">
@@ -736,7 +742,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
             </UiButton>
           </li>
           <li v-if="memberSearch.trim().length >= 2 && !matches.length" class="text-xs text-slate-500 py-4 text-center">
-            {{ members.length ? "Aucun adhérent trouvé (ou déjà inscrit)." : "Annuaire des adhérents indisponible." }}
+            {{ members.length ? noMatch : "Annuaire des adhérents indisponible." }}
           </li>
         </ul>
         <UiDialogActions>

@@ -1,6 +1,7 @@
 /* API of the competitions theme (server: api/competitions/): competitions, their participants, coaches, HelloAsso
    payments and MyCompet results. Conventions of every service: frontend/AGENTS.md § API services. */
 import { unwrap, type ApiClient, type Schemas } from "../lib/client";
+import type { MemberStatus } from "../pages/adherents/members";
 import { ARCHIVED, PREPARING } from "../pages/competitions/competitions";
 
 /** Club searched on the MyCompet results pages. */
@@ -61,8 +62,13 @@ export function createCompetitionsApi(client: ApiClient) {
           body: { adherent_id: adherentId, selectionne: true },
         }),
       ),
-    /** Adds the members of the « Compétition » group not on the list yet. */
-    loadGroup: (competitionId: number) => unwrap(client.POST("/api/competitions/{competition_id}/load-group", competition(competitionId))),
+    /** Adds the members of the « Compétition » group not on the list yet, only those at one of `statuses`. */
+    loadGroup: (competitionId: number, statuses: readonly MemberStatus[]) =>
+      unwrap(
+        client.POST("/api/competitions/{competition_id}/load-group", {
+          params: { path: { competition_id: competitionId }, query: { status: [...statuses] } },
+        }),
+      ),
     updateParticipant: (competitionId: number, adherentId: number, body: Schemas["ParticipantUpdate"]) =>
       unwrap(
         client.PATCH("/api/competitions/{competition_id}/participants/{adherent_id}", { ...participant(competitionId, adherentId), body }),

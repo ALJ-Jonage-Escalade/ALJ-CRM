@@ -14,6 +14,8 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from infrastructure.firestore.client import FirestoreClient
+from infrastructure.firestore.cloud_database import CloudDatabase
+from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.firestore import client as fc
 from infrastructure.firestore.competitions import base as repo_base
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
@@ -169,6 +171,11 @@ class TestParticipants(FirestoreRepoTestCase):
         self.assertEqual(p.adherent_id, 101)
         self.assertFalse(p.selectionne)
         self.assertEqual(p.statut_paiement, PAIEMENT_NON_INVITE)
+
+    def test_load_competition_group_with_statuses(self):
+        self.seed_adherent(103, nom="PETIT", tarif="Compétition U15", statut="En cours")
+        self.assertEqual(Repo.load_competition_group_into(self.comp_id, ["Terminé"]), 1)
+        self.assertEqual([p.adherent_id for p in Repo.list_participants(self.comp_id)], [101])
 
     def test_list_participants_selected_only(self):
         Repo.add_participant(self.comp_id, 101, selectionne=True)
@@ -398,9 +405,34 @@ class TestSyncAdherentsFromMain(MemberDbTestCase, FirestoreRepoTestCase):
         self.assertEqual(dupont["tarif"], "Compétition - U13/U15")
         self.assertEqual(dupont["creneau_groupe"], "Compétition - U13")
 
+        self.assertEqual(dupont["statut"], "Validé")  # "Validated" normalized
+
         # Idempotent: a second sync rewrites the same documents
         Repo.sync_adherents_from_main("2026-2027")
         self.assertEqual(Repo.count_adherents(), 3)
+
+    def test_sync_keeps_the_highest_priority_purchase(self):
+        """Two purchases of the season (two orders): the confirmed licence wins over a later cancelled one,
+        and the tariff comes from the same purchase."""
+        conn = SqliteDatabase.get_connection()
+        try:
+            # The importer refuses a lower-priority purchase: the cancelled one is written directly, after the other
+            conn.execute("UPDATE purchases SET status = 'Terminé' WHERE tarif_name = 'Compétition - U13/U15'")
+            conn.execute("INSERT INTO orders (order_ref, season_id) SELECT 'CMD4', season_id FROM orders WHERE order_ref = 'CMD1'")
+            conn.execute("INSERT INTO purchases (order_id, user_id, tarif_name, amount, status) "
+                         "SELECT (SELECT id FROM orders WHERE order_ref = 'CMD4'), user_id, 'Adultes autonomes', 150, 'Annulé' "
+                         "FROM purchases WHERE tarif_name = 'Compétition - U13/U15' AND order_id = "
+                         "(SELECT id FROM orders WHERE order_ref = 'CMD1')")
+            conn.commit()
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM v_adherents_legacy WHERE last_name = 'DUPONT'").fetchone()[0], 2)
+        finally:
+            conn.close()
+        report = Repo.sync_adherents_from_main("2026-2027")
+        self.assertEqual((report["errors"], report["imported"]), ([], 3))
+        dupont = [a for a in Repo.list_adherents() if a["nom"] == "DUPONT"][0]
+        self.assertEqual((dupont["statut"], dupont["tarif"], dupont["creneau_groupe"]),
+                         ("Terminé", "Compétition - U13/U15", "Compétition - U13"))
+        self.assertEqual([a["nom"] for a in Repo.list_adherents(statuses=["Terminé"])], ["DUPONT", "MARTIN"])
 
     def test_planning_groups(self):
         mapping = Repo.list_planning_groups()
@@ -420,6 +452,27 @@ class TestAdherents(FirestoreRepoTestCase):
         self.assertEqual(len(Repo.list_adherents(search="dupont")), 1)
         self.assertEqual(len(Repo.list_adherents(competition_only=True)), 1)
         self.assertEqual(Repo.count_adherents(), 2)
+
+    def test_status_filter(self):
+        self.seed_adherent(101)
+        self.seed_adherent(102, nom="DUPONT", statut="Validé")
+        self.seed_adherent(103, nom="PETIT", statut="termine")  # normalized
+        ids = lambda **kw: sorted(a["id"] for a in Repo.list_adherents(**kw))  # noqa: E731
+        self.assertEqual(ids(), [101, 102, 103])
+        self.assertEqual(ids(statuses=["Terminé"]), [101, 103])
+        self.assertEqual(ids(statuses=["Terminé", "Validé"]), [101, 102, 103])
+        self.assertEqual(ids(statuses=[]), [])
+
+    def test_directory_without_status_is_rewritten_next_tick(self):
+        """A directory written before `statut` existed marks the projection dirty (rewritten by the next tick)."""
+        self.seed_adherent(101)
+        with patch.object(CloudDatabase, "_projection_dirty", False):
+            Repo.list_adherents()
+            self.assertFalse(CloudDatabase._projection_dirty)
+            self.fake.upsert_document(Repo.COLLECTION_ADHERENTS, "102", {"id": 102, "nom": "ANCIEN"})
+            Repo._invalidate_adherents_cache()
+            self.assertEqual(Repo.list_adherents(statuses=["Terminé"])[0]["id"], 101)  # strict until rewritten
+            self.assertTrue(CloudDatabase._projection_dirty)
 
 
 class TestBatchUpsertCommitBody(unittest.TestCase):

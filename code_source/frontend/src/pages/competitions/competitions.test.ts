@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   coachChoices,
+  competitionMembersPath,
+  competitorStatusesLabel,
   counts,
   discipline,
   disciplineColor,
@@ -197,6 +199,11 @@ describe("participants", () => {
     expect(memberMatches(all, c, "mart").map((m) => m.id)).toEqual([4]);
     expect(memberMatches(all, c, "eva").map((m) => m.id)).toEqual([4]);
     expect(memberMatches(all, c, "1234").map((m) => m.id)).toEqual([4]);
+  });
+
+  it("asks the server for the members at the competitor statuses only", () => {
+    expect(new URL(competitionMembersPath(), "http://alj.test").searchParams.getAll("status")).toEqual(["Terminé"]);
+    expect(competitorStatusesLabel).toBe("« Terminé »");
   });
 
   it("exports the participants", () => {

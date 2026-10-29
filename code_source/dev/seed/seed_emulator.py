@@ -167,8 +167,9 @@ def build_people(fake, rng, planning):
 def member_record(fake, rng, person, season, order_no):
     """Record in the HelloAsso import format (keys read by schema_v2).
 
-    Keys, the "Validé" status and "Oui"/"Non" answers are the HelloAsso form's own
-    (French) values, matched by the app; every other value is English."""
+    Keys, the "Validé" / "Terminé" statuses and "Oui"/"Non" answers are the HelloAsso form's own
+    (French) values, matched by the app; every other value is English. Members with a licence number are
+    "Terminé" (licence confirmed: only they can be added to a competition), the incomplete ones "Validé"."""
     from hp_names import PARENTS
     from infrastructure.sqlite.schema_v2 import DOB_COLUMN
     first, last, group = person["first"], person["last"], person["group"]
@@ -192,7 +193,7 @@ def member_record(fake, rng, person, season, order_no):
     return {
         "order_ref": f"DEV-{season[:4]}-{order_no:04d}",
         "order_date": order_date.strftime("%d/%m/%Y"),
-        "status": "Validé",
+        "status": "Validé" if incomplete else "Terminé",
         "payer_lastName": last.upper(),
         "payer_firstName": payer_first,
         "payer_email": payer_email,
@@ -310,7 +311,7 @@ def seed_competitions(coach_ids):
         ("Hogsmeade Friendly Contest", "", today + datetime.timedelta(days=75), 8.0, STATUT_EN_PREPARATION,
          "", mcgonagall, None),
     ]
-    competitors = [a["id"] for a in Repo.list_adherents(competition_only=True)]
+    competitors = [a["id"] for a in Repo.list_adherents(competition_only=True, statuses=["Terminé"])]
     rng = random.Random(SEED)
     base_id = int(datetime.datetime(today.year, today.month, today.day).timestamp() * 1000)
     competitions = []

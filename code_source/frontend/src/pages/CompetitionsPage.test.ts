@@ -61,10 +61,13 @@ function json(body: unknown, status = 200): Response {
 /** The server: the competitions as they change, writes recorded; `down` makes every call fail like a lost network. */
 function fakeApi(options: { down?: boolean; patch?: (body: Record<string, unknown>) => Response | null } = {}) {
   const calls: { method: string; path: string; body?: Record<string, unknown> }[] = [];
+  // The query string of each call, by path (calls keeps the path alone)
+  const queries: { path: string; status: string[] }[] = [];
   let competitions = structuredClone(COMPETITIONS);
   const state = { down: !!options.down };
   const api: ApiFetch = vi.fn(async (url: string, init?: RequestInit) => {
-    const path = new URL(url, "http://alj.test").pathname;
+    const { pathname: path, searchParams } = new URL(url, "http://alj.test");
+    queries.push({ path, status: searchParams.getAll("status") });
     const method = init?.method ?? "GET";
     const body = typeof init?.body === "string" && init.body ? JSON.parse(init.body) : undefined;
     calls.push({ method, path, body });
@@ -82,6 +85,9 @@ function fakeApi(options: { down?: boolean; patch?: (body: Record<string, unknow
         { id: 1, nom: "MARTIN", prenom: "Léo", tarif: "Compétition U18", creneau_groupe: "Compét. U18", phone: "x" },
         { id: 4, nom: "NOUVEAU", prenom: "Ali" },
       ]);
+    }
+    if (method === "POST" && path === "/api/competitions/10/load-group") {
+      return json({ added: 0, competition: competitions[0] });
     }
     if (path === "/api/coaches") {
       return json([{ id: 1, nom: "Alice" }]);
@@ -108,7 +114,7 @@ function fakeApi(options: { down?: boolean; patch?: (body: Record<string, unknow
     }
     return json({}, 404);
   });
-  return { api, calls, writes: () => calls.filter((c) => c.method !== "GET"), state };
+  return { api, calls, queries, writes: () => calls.filter((c) => c.method !== "GET"), state };
 }
 
 async function render(state: AuthState, api: ApiFetch, store: OfflineStore, path = "/competitions") {
@@ -312,6 +318,26 @@ describe("CompetitionsPage", () => {
       "ABEL Max (Coupe du Rhône) : modifié entre-temps sur un autre appareil",
     );
     expect(await store.queued(USER.uid)).toEqual([]);
+  });
+
+  it("offers and loads only the members at the competitor statuses", async () => {
+    const server = fakeApi();
+    const { byId, wrapper } = await render(signedIn("coach"), server.api, store, "/competitions?id=10");
+    await settle();
+    expect(server.queries.filter((q) => q.path === "/api/competition-members").map((q) => q.status)).toContainEqual(["Terminé"]);
+    expect(server.queries.filter((q) => q.path === "/api/competition-members" && !q.status.length)).toEqual([]);
+
+    await byId("toggle-add").trigger("click");
+    expect(byId("member-status-hint").text()).toBe("Adhérents au statut « Terminé » uniquement");
+    await byId("member-search").setValue("zzz");
+    expect(wrapper.text()).toContain("seuls les adhérents au statut « Terminé » peuvent être ajoutés");
+
+    await byId("load-group").trigger("click");
+    await settle();
+    expect(server.queries.filter((q) => q.path === "/api/competitions/10/load-group").map((q) => q.status)).toEqual([["Terminé"]]);
+    expect(document.querySelector("#toast")!.textContent).toContain(
+      "Tous les membres « Terminé » du groupe « Compétition » sont déjà présents dans la liste.",
+    );
   });
 
   it("refuses other changes offline", async () => {

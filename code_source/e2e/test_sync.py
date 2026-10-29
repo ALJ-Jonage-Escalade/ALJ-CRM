@@ -29,7 +29,7 @@ def test_new_competition_reaches_other_phone(mobile_page, second_phone):
 
 
 def test_selection_reaches_other_phone(mobile_page, second_phone, test_data):
-    member = test_data.members(competition_only=True)[0]
+    member = test_data.competition_group()[0]
     nom = unique_name("E2E Sync")
     test_data.create_competition(nom, date="2027-10-03", participants=[member["id"]])
     first, second = open_screen(mobile_page), open_screen(second_phone)

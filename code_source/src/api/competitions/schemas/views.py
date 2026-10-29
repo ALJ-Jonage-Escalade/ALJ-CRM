@@ -75,6 +75,7 @@ class CompetitionMember(BaseModel):
     email: str = ""
     email_secondaire: str = ""
     tarif: str = ""
+    statut: str = Field("", description="Membership status of the member's season purchase (« Terminé »…)")
     saison: str = ""
     creneau_groupe: str = ""
     sex: Optional[Sex] = None

@@ -19,7 +19,7 @@ def _iso(days: int) -> str:
 def members(test_data):
     """Competition-group members by role in the fixture competition. Every counter gets a different
     value (participe 3, en attente 2, payé 1) so that mixing two of them up cannot go unnoticed."""
-    found = test_data.members(competition_only=True)
+    found = test_data.competition_group()
     assert len(found) >= 5, "the seed creates competition-group members"
     return {"paid": found[0], "unpaid": found[1], "unpaid_2": found[2], "invited": found[3], "outsider": found[4]}
 
@@ -130,7 +130,7 @@ def test_add_member_outside_the_list(mobile_page, test_data, competition, member
 def test_load_competition_group(mobile_page, test_data):
     nom = unique_name("E2E Group")
     cid = test_data.create_competition(nom, date=_iso(41))
-    group = test_data.members(competition_only=True)
+    group = test_data.competition_group()
     page = open_screen(mobile_page)
     open_competition(page, nom)
     expect(page.get_by_test_id("participant-card")).to_have_count(0)

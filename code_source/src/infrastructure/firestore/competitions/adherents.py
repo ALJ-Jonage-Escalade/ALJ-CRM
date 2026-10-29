@@ -11,6 +11,7 @@ from domain.utils import normalize_string
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions.base import CompetitionStoreBase
 from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.schema_v2 import purchase_priority_score
 
 _ADHERENTS_CACHE_TTL = 30.0
 
@@ -90,11 +91,8 @@ class AdherentsMixin(CompetitionStoreBase):
         ref_date = get_season_start_date(season or get_active_season())
         now = cls._now_iso()
         adherent_writes = []
-        for row in rows:
-            d = dict(row)
+        for d in cls._best_purchase_rows(rows):
             adherent_id = d.get("user_id") or d.get("id")
-            if adherent_id is None:
-                continue
             bdate = d.get("birth_date") or ""
             b_parsed = parse_birth_date(bdate)
             age_val = age_at(b_parsed, ref_date) if b_parsed else None
@@ -117,6 +115,7 @@ class AdherentsMixin(CompetitionStoreBase):
                     "phone": str(d.get("phone") or "").strip(),
                     "creneau_groupe": groupe,
                     "tarif": t_name,
+                    "statut": member_view.normalize_status(d.get("status")),
                     "saison": str(d.get("season_name") or "").strip(),
                     "emergency_name": d.get("emergency1_name") or "",
                     "emergency_phone": d.get("emergency1_phone") or "",
@@ -145,6 +144,22 @@ class AdherentsMixin(CompetitionStoreBase):
         cls._invalidate_adherents_cache()
         report["updated"] = len(adherent_writes)
         return report
+
+    @staticmethod
+    def _best_purchase_rows(rows: List[Any]) -> List[Dict[str, Any]]:
+        """One row per member (`v_adherents_legacy` has one per purchase): the highest-priority purchase, by the
+        import's rule (purchase_priority_score); on a tie the last row, as when every row was written in turn."""
+        best: Dict[Any, Dict[str, Any]] = {}
+        for row in rows:
+            d = dict(row)
+            adherent_id = d.get("user_id") or d.get("id")
+            if adherent_id is None:
+                continue
+            kept = best.get(adherent_id)
+            score = purchase_priority_score(d.get("status"), d.get("tarif_name"), d.get("amount"))
+            if kept is None or score >= purchase_priority_score(kept.get("status"), kept.get("tarif_name"), kept.get("amount")):
+                best[adherent_id] = d
+        return list(best.values())
 
     @staticmethod
     def _read_planning_groups(main_conn) -> Dict[str, str]:
@@ -187,8 +202,18 @@ class AdherentsMixin(CompetitionStoreBase):
                     if isinstance(e, FirestoreError):
                         raise
                     raise FirestoreError(f"Lecture de l'annuaire adhérents impossible : {e}") from e
+            else:
+                cls._heal_outdated_directory(cls._adherents_cache)
             cls._adherents_cache_at = now
         return cls._adherents_cache
+
+    @staticmethod
+    def _heal_outdated_directory(docs: List[Dict[str, Any]]) -> None:
+        """A directory written before a field was added to it (`statut`, plans/competitor-status-filter.md) is
+        rewritten by the next background tick: without it, the status filters would find nobody."""
+        if any("statut" not in doc for doc in docs):
+            from infrastructure.firestore.cloud_database import CloudDatabase
+            CloudDatabase.mark_projection_dirty()
 
     @classmethod
     def _adherent_map(cls) -> Dict[int, Dict[str, Any]]:
@@ -206,6 +231,7 @@ class AdherentsMixin(CompetitionStoreBase):
             "email_secondaire": str(doc.get("email_secondaire") or ""),
             "phone": str(doc.get("phone") or ""),
             "tarif": str(doc.get("tarif") or ""),
+            "statut": member_view.normalize_status(doc.get("statut")),
             "saison": str(doc.get("saison") or ""),
             "licence_ffme": licence,
             "creneau_groupe": str(doc.get("creneau_groupe") or ""),
@@ -226,13 +252,16 @@ class AdherentsMixin(CompetitionStoreBase):
         return sex.value if sex else None
 
     @classmethod
-    def list_adherents(cls, search: str = "", competition_only: bool = False) -> list:
-        """Liste les adhérents de l'annuaire Firestore (recherche insensible aux accents)."""
+    def list_adherents(cls, search: str = "", competition_only: bool = False, statuses: Optional[List[str]] = None) -> list:
+        """Liste les adhérents de l'annuaire Firestore (recherche insensible aux accents).
+        `statuses`: only the members at one of these membership statuses (« Terminé »…); None: every status."""
         q = normalize_string(search) if search else ""
         result = []
         for doc in cls._adherents_raw():
             d = cls._adherent_as_legacy_dict(doc)
             if competition_only and "competition" not in normalize_string(d.get("tarif") or ""):
+                continue
+            if statuses is not None and d["statut"] not in statuses:
                 continue
             if q:
                 haystack = normalize_string(

@@ -299,14 +299,16 @@ class ParticipantsMixin(AdherentsMixin):
         return cls._update_participant(competition_id, adherent_id, change) is not None
 
     @classmethod
-    def load_competition_group_into(cls, competition_id: int) -> int:
+    def load_competition_group_into(cls, competition_id: int, statuses: Optional[List[str]] = None) -> int:
         """Pré-remplit la liste des participants avec le groupe « Compétition »."""
-        return cls.load_competition_group_doc(competition_id)[0]
+        return cls.load_competition_group_doc(competition_id, statuses)[0]
 
     @classmethod
-    def load_competition_group_doc(cls, competition_id: int) -> Tuple[int, Optional[Dict[str, Any]]]:
-        """(number added, document written); the document is None when nobody was added."""
-        groupe = cls.list_adherents(competition_only=True)
+    def load_competition_group_doc(cls, competition_id: int,
+                                   statuses: Optional[List[str]] = None) -> Tuple[int, Optional[Dict[str, Any]]]:
+        """(number added, document written); the document is None when nobody was added.
+        `statuses`: only the members at one of these membership statuses; None: every status."""
+        groupe = cls.list_adherents(competition_only=True, statuses=statuses)
         added = {"count": 0}
 
         def mutate(parts):

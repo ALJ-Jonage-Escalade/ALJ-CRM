@@ -1665,6 +1665,12 @@ export interface components {
              */
             tarif?: string;
             /**
+             * Statut
+             * @description Membership status of the member's season purchase (« Terminé »…)
+             * @default
+             */
+            statut?: string;
+            /**
              * Saison
              * @default
              */
@@ -3790,7 +3796,10 @@ export interface operations {
     };
     load_competition_group_api_competitions__competition_id__load_group_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only the members at one of these statuses (repeatable) */
+                status?: ("Validé" | "Traité" | "En cours" | "Terminé" | "Annulé")[] | null;
+            };
             header?: never;
             path: {
                 competition_id: number;
@@ -3967,7 +3976,10 @@ export interface operations {
     };
     list_competition_members_api_competition_members_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only the members at one of these statuses (repeatable) */
+                status?: ("Validé" | "Traité" | "En cours" | "Terminé" | "Annulé")[] | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3981,6 +3993,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompetitionMember"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
