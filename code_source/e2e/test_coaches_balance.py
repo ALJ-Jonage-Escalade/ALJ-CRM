@@ -5,7 +5,7 @@ import io
 
 from playwright.sync_api import expect
 
-from helpers.competitions import SEEDED_COMPETITION, competition_card, go_to, open_screen, toast
+from helpers.competitions import SEEDED_COMPETITION, competition_card, go_to, open_screen, sub_menu_entry, toast
 from helpers.data import eventually, unique_name
 from helpers.dialogs import accept_dialogs
 
@@ -83,7 +83,7 @@ def test_coach_opens_a_competition_they_follow(page):
     go_to(page, "coachs")
     _coach_card(page, "Severus Snape").get_by_test_id("coach-competition").filter(has_text=SEEDED_COMPETITION).click()
     expect(page.get_by_test_id("detail-name")).to_have_text(SEEDED_COMPETITION)
-    expect(page.get_by_test_id("section-competitions")).to_have_attribute("aria-current", "page")
+    expect(sub_menu_entry(page, "competitions")).to_have_attribute("aria-current", "page")
 
 
 def test_balance_of_an_athlete(mobile_page, test_data):

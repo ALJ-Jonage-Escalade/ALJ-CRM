@@ -17,7 +17,8 @@ import { balanceCsv, balanceLabel, balances, searchBalances, seasonOf, seasons, 
 import { discipline, disciplineColor, payment, period, todayIso, type Competition } from "../competitions";
 import { plural } from "../../../lib/text";
 
-const props = defineProps<{ competitions: readonly Competition[] }>();
+/** listPath: address of the competitions list (the page's index route), where a competition opens. */
+const props = defineProps<{ competitions: readonly Competition[]; listPath: string }>();
 
 const today = todayIso();
 const seasonList = computed(() => seasons(props.competitions, today));
@@ -135,7 +136,7 @@ const TONE_COLOR = { ok: "green", due: "red", credit: "violet" } satisfies Recor
               class="flex flex-wrap items-center justify-between gap-1 border-b border-dashed border-slate-100 py-1"
             >
               <RouterLink
-                :to="{ query: { id: String(l.competition.id) } }"
+                :to="{ path: listPath, query: { id: String(l.competition.id) } }"
                 class="font-semibold text-slate-700 no-underline hover:text-accent"
               >
                 🏆 {{ l.competition.nom }}
@@ -249,7 +250,7 @@ const TONE_COLOR = { ok: "green", due: "red", credit: "violet" } satisfies Recor
                   </span>
                 </span>
                 <RouterLink
-                  :to="{ query: { id: String(l.competition.id) } }"
+                  :to="{ path: listPath, query: { id: String(l.competition.id) } }"
                   class="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 no-underline hover:border-accent hover:text-accent"
                 >
                   🔍 Voir l'épreuve

@@ -6,10 +6,12 @@ is sent too. Logging out with changes not sent asks first.
 
 Service workers are blocked in the e2e contexts, so "offline" is simulated by making every API call fail
 while the page itself still loads."""
+import re
+
 import pytest
 from playwright.sync_api import expect
 
-from helpers.competitions import open_competition, open_screen, participant_card, toast
+from helpers.competitions import go_to, open_competition, open_screen, participant_card, sub_menu_entry, toast
 from helpers.data import eventually, unique_name
 from helpers.offline import owner, put_queued, queued, stored, wait_stored
 from helpers.dialogs import cancel_dialog, confirm_dialog
@@ -68,6 +70,21 @@ def test_competitors_shown_offline_other_changes_refused(mobile_page, competitio
         expect(emergency_links(page, member)).to_have_count(1)
         page.get_by_test_id("load-group").click()  # any other change needs the network
         expect(toast(page)).to_contain_text("Hors ligne : seules les cases « Participe » et « Présent »")
+    finally:
+        mobile_page.context.set_offline(False)
+
+
+def test_coach_opens_bilan_offline_helloasso_waits_for_the_network(mobile_page, competition):
+    """Sub-pages offline (plans/sub-menus.md D6): Bilan reads the copy kept on a coach's phone, HelloAsso stays listed
+    but disabled."""
+    page = open_screen(mobile_page)
+    open_competition(page, competition["nom"])
+    go_offline(page, mobile_page.context, competition)
+    try:
+        go_to(page, "bilan")
+        expect(page.get_by_test_id("balance-pane")).to_be_visible()
+        expect(page).to_have_url(re.compile(r"/competitions/bilan$"))
+        expect(sub_menu_entry(page, "helloasso")).to_have_attribute("aria-disabled", "true")
     finally:
         mobile_page.context.set_offline(False)
 

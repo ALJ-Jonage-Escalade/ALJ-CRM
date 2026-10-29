@@ -130,4 +130,25 @@ describe("app routes", () => {
     await router.push("/bureau/inconnu");
     expect(router.currentRoute.value.meta.access).toBe("public");
   });
+  it.each([
+    ["/bureau/competitions/helloasso", "competitions-helloasso", "helloasso"],
+    ["/bureau/competitions/bilan", "competitions-bilan", "bilan"],
+    ["/competitions/coachs", "competitions-pwa-coachs", "coachs"],
+    ["/bureau/competitions", "competitions", "competitions"],
+  ])("open the sub-page %s with its page's access (AppShell checks the sub-page)", async (path, name, sub) => {
+    const router = createAppRouter(fakeAuth(signedIn("readonly")).auth, createMemoryHistory());
+    await router.push(path);
+    expect(router.currentRoute.value.fullPath).toBe(path);
+    expect([router.currentRoute.value.name, router.currentRoute.value.meta]).toEqual([name, { access: "viewer", sub }]);
+  });
+
+  it.each([
+    ["/bureau/competitions?section=bilan", "/bureau/competitions/bilan"],
+    ["/competitions?section=helloasso&id=3", "/competitions/helloasso?id=3"],
+    ["/bureau/competitions?section=inconnue", "/bureau/competitions?section=inconnue"],
+  ])("open the former tab address %s on its sub-page", async (path, expected) => {
+    const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
+    await router.push(path);
+    expect(router.currentRoute.value.fullPath).toBe(expected);
+  });
 });

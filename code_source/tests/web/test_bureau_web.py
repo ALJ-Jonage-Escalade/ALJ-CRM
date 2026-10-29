@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
-from api.web.pages import get_bureau_home, get_bureau_page
+from api.web.pages import get_bureau_home, get_bureau_page, get_bureau_sub_page
 from server import app
 
 WEB = os.path.join(_code_root, "web")
@@ -37,6 +37,9 @@ class TestBureauFiles(unittest.TestCase):
         self.assertEqual(get_bureau_page("index.html").status_code, 404)
         self.assertEqual(get_bureau_page("..%2Fserver.py").status_code, 404)
         self.assertEqual(get_bureau_page("inconnue").status_code, 404)
+        self.assertEqual(get_bureau_sub_page("competitions", "inconnue").status_code, 404)
+        self.assertEqual(get_bureau_sub_page("planning", "bilan").status_code, 404)
+        self.assertEqual(get_bureau_sub_page("inconnue", "bilan").status_code, 404)
 
     def test_competitions_results_cron_and_settings_endpoints(self):
         """Vérifie les endpoints de configuration et de cron du batch des résultats MyCompet."""
@@ -623,9 +626,12 @@ class TestBureauAccess(unittest.TestCase):
 
     def test_portal_public_api_protected(self):
         for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions",
-                     "/bureau/planning", "/bureau/outils", "/bureau/parametres"):
+                     "/bureau/planning", "/bureau/outils", "/bureau/parametres", "/bureau/competitions/helloasso",
+                     "/bureau/competitions/bilan", "/bureau/competitions/coachs", "/competitions/helloasso",
+                     "/competitions/bilan", "/competitions/coachs"):
             self.assertEqual(self.client.get(path).status_code, 200, path)
         self.assertEqual(self.client.get("/bureau/inconnue").status_code, 404)
+        self.assertEqual(self.client.get("/bureau/competitions/inconnue").status_code, 404)
         self.assertEqual(self.client.get("/api/email-status").status_code, 401)
         self.assertEqual(self.client.get("/api/dashboard").status_code, 401)
 

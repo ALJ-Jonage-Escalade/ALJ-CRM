@@ -76,6 +76,10 @@ PUBLIC_PATHS = frozenset({
     "/health",
     "/competitions",
     "/competitions/gestion",
+    # Sub-pages of the competitions (api/web/pages.py SPA_SUB_PAGES)
+    "/competitions/helloasso",
+    "/competitions/bilan",
+    "/competitions/coachs",
     "/index",
     "/sw.js",
     "/manifest.webmanifest",

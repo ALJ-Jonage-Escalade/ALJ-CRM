@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { AuthState } from "../composables/auth";
-import { canOpen, OFFLINE_PAGES, pageVerdict, shownOn, verdict, type Access, type Verdict } from "./access";
+import {
+  canOpen,
+  OFFLINE_PAGES,
+  pageVerdict,
+  shownOn,
+  subHref,
+  subPages,
+  subVerdict,
+  verdict,
+  type Access,
+  type SubOffline,
+  type SubPage,
+  type SubVerdict,
+  type Verdict,
+} from "./access";
 import type { Role } from "./roles";
 
 const USER = { uid: "u1", email: "u@example.org" };
@@ -83,5 +97,51 @@ describe("shownOn", () => {
     expect(shownOn("any", "flex")).toBe("flex");
     expect(shownOn("phone", "flex")).toBe("flex md:hidden");
     expect(shownOn("desktop", "block")).toBe("hidden md:block");
+  });
+});
+
+describe("subVerdict", () => {
+  const offline: AuthState = { status: "error", user: USER, message: "x", offline: true };
+  const sub = (access: Access, mode: SubOffline): SubPage => ({ id: "s", label: "S", path: "s", access, offline: mode });
+
+  it.each<[Role, Access, SubVerdict]>([
+    ["admin", "admin", "allow"],
+    ["coach", "admin", "hidden"],
+    ["coach", "staff", "allow"],
+    ["readonly", "staff", "hidden"],
+    ["readonly", "viewer", "allow"],
+  ])("signed in as %s, on a %s sub-page: %s", (role, access, expected) => {
+    expect(subVerdict(signedIn(role), sub(access, "none"), false)).toBe(expected);
+  });
+
+  it.each<[SubOffline, boolean | null, SubVerdict]>([
+    ["read", false, "allow"],
+    ["read", null, "allow"],
+    ["staffCopy", true, "allow"],
+    ["staffCopy", false, "hidden"],
+    ["staffCopy", null, "pending"],
+    ["none", true, "disabled"],
+    ["none", false, "hidden"],
+    ["none", null, "pending"],
+  ])("offline, %s with a staff copy %s: %s", (mode, staffCopy, expected) => {
+    expect(subVerdict(offline, sub("staff", mode), staffCopy)).toBe(expected);
+  });
+
+  it("waits while the session loads or the role is not checked online", () => {
+    expect(subVerdict({ status: "loading" }, sub("viewer", "read"), true)).toBe("pending");
+    expect(subVerdict({ status: "error", user: USER, message: "x", offline: false }, sub("viewer", "read"), true)).toBe("pending");
+  });
+});
+
+describe("sub-pages", () => {
+  it("open the competitions list on the page's own address", () => {
+    const [index, ...others] = subPages("competitions");
+    expect(index && subHref("competitions", index)).toBe("/bureau/competitions");
+    expect(others.map((s) => subHref("competitions", s))).toEqual([
+      "/bureau/competitions/helloasso",
+      "/bureau/competitions/bilan",
+      "/bureau/competitions/coachs",
+    ]);
+    expect(subPages("planning")).toEqual([]);
   });
 });
