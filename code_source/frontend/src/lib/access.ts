@@ -15,6 +15,21 @@ export const REFUSED_QUERY = "reserve";
     same breakpoint as the menu (`md`). Hidden by CSS only: both addresses still open on any screen. */
 export type Screen = "any" | "phone" | "desktop";
 
+/** What a sub-page shows offline, when the role cannot be checked: read — the copy kept on the device; staffCopy — only
+    on a device the parent page says holds a staff copy (Compétitions: the competitors' contacts, never kept for other
+    roles); none — nothing, online only (listed disabled on a staff device). */
+export type SubOffline = "read" | "staffCopy" | "none";
+
+/** A sub-page of an office page, listed under it in the menu (plans/sub-menus.md). The first one is the page's index
+    route (empty path): the page's own address opens it. */
+export interface SubPage {
+  id: string;
+  label: string;
+  path: string;
+  access: Access;
+  offline: SubOffline;
+}
+
 /** Office pages, in menu order. offlineRead: the page shows the copy kept on the device when the role cannot be checked
     for lack of network (verdict "offline"). */
 export const PAGES = [
@@ -49,6 +64,12 @@ export const PAGES = [
     access: "viewer",
     screen: "any",
     offlineRead: true,
+    children: [
+      { id: "competitions", label: "Compétitions", path: "", access: "viewer", offline: "read" },
+      { id: "helloasso", label: "HelloAsso", path: "helloasso", access: "staff", offline: "none" },
+      { id: "bilan", label: "Bilan", path: "bilan", access: "staff", offline: "staffCopy" },
+      { id: "coachs", label: "Coachs", path: "coachs", access: "staff", offline: "staffCopy" },
+    ],
   },
   {
     id: "planning",
@@ -69,6 +90,14 @@ export const PAGES = [
     access: "staff",
     screen: "any",
     offlineRead: false,
+    children: [
+      { id: "map", label: "Carte", path: "", access: "staff", offline: "none" },
+      { id: "pivot", label: "TCD", path: "pivot", access: "staff", offline: "none" },
+      { id: "stats", label: "Statistiques", path: "stats", access: "staff", offline: "none" },
+      { id: "presence", label: "Fiches de présence", path: "presence", access: "staff", offline: "none" },
+      { id: "ffme", label: "Export FFME", path: "ffme", access: "staff", offline: "none" },
+      { id: "ffme-import", label: "Import FFME", path: "ffme-import", access: "admin", offline: "none" },
+    ],
   },
   {
     id: "parametres",
@@ -89,6 +118,7 @@ export const PAGES = [
   access: Access;
   screen: Screen;
   offlineRead: boolean;
+  children?: readonly SubPage[];
 }[];
 
 export type PageId = (typeof PAGES)[number]["id"];
@@ -99,6 +129,46 @@ export function pageAccess(id: PageId): Access {
 
 export function pageScreen(id: PageId): Screen {
   return PAGES.find((p) => p.id === id)!.screen;
+}
+
+/** The sub-pages of an office page, in menu order (none for a page without sub-menu). */
+export function subPages(id: PageId): readonly SubPage[] {
+  const page = PAGES.find((p) => p.id === id)!;
+  return "children" in page ? page.children : [];
+}
+
+/** Address of a sub-page: the page's own for its index route. */
+export function subHref(id: PageId, sub: SubPage): string {
+  const href = PAGES.find((p) => p.id === id)!.href;
+  return sub.path ? `${href}/${sub.path}` : href;
+}
+
+/**
+ * What the menu does with a sub-page for the current session (the page's own verdict is checked first).
+ * - allow: listed, opens
+ * - disabled: listed, does not open (online only, offline on a staff device)
+ * - hidden: not listed; opened by its address, the page sends back to its index route
+ * - pending: not known yet (session loading, or the parent page still reading what the device holds: staffCopy null)
+ */
+export type SubVerdict = "allow" | "disabled" | "hidden" | "pending";
+
+export function subVerdict(state: AuthState, sub: SubPage, staffCopy: boolean | null): SubVerdict {
+  if (state.status === "signedIn") {
+    return canOpen(state.role, sub.access) ? "allow" : "hidden";
+  }
+  if (state.status !== "error" || !state.offline) {
+    return "pending"; // the page shows its gate
+  }
+  if (sub.offline === "read") {
+    return "allow";
+  }
+  if (staffCopy === null) {
+    return "pending";
+  }
+  if (!staffCopy) {
+    return "hidden";
+  }
+  return sub.offline === "staffCopy" ? "allow" : "disabled";
 }
 
 /** The pages readable offline (the gate links to them when the role cannot be checked for lack of network). */

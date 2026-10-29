@@ -12,7 +12,7 @@ from playwright.sync_api import Page, expect
 
 from helpers.auth import ACCOUNTS, login_as
 from helpers.data import unique_name
-from helpers.competitions import SEEDED_COMPETITION
+from helpers.competitions import SEEDED_COMPETITION, sub_menu_entry
 from helpers.offline import owner, put_record, record, wait_stored
 from helpers.stack import AUTH_HOST
 
@@ -71,7 +71,9 @@ def test_phone_list_then_competition(mobile_page, competition):
 
 def test_desktop_shows_list_and_competition_side_by_side(page, competition):
     open_view(page, "admin", "/bureau/competitions")
-    expect(page.locator("nav a[data-page='competitions']")).to_have_attribute("aria-current", "page")
+    # The page is the current section, its index sub-page the current page (plans/sub-menus.md D3)
+    expect(page.locator("nav a[data-page='competitions']")).to_have_attribute("aria-current", "true")
+    expect(sub_menu_entry(page, "competitions")).to_have_attribute("aria-current", "page")
     card(page, competition["nom"]).click()
     expect(page.get_by_test_id("detail-name")).to_have_text(competition["nom"])
     expect(card(page, SEEDED_COMPETITION)).to_be_visible()
@@ -91,7 +93,8 @@ def test_readonly_sees_no_contacts_nor_management(mobile_page, competition):
     expect(participant(page, competition["member"])).to_be_visible()
     expect(page.get_by_test_id("emergency-link")).to_have_count(0)
     expect(participant(page, competition["member"]).get_by_test_id("participe")).to_have_text("✅ Participe")
-    for testid in ("participe-switch", "participant-actions", "detail-actions", "add-members", "create-comp", "sections"):
+    for testid in ("participe-switch", "participant-actions", "detail-actions", "add-members", "create-comp", "subnav-side",
+                   "subnav-strip"):
         expect(page.get_by_test_id(testid)).to_have_count(0)
 
 

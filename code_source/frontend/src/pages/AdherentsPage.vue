@@ -436,7 +436,7 @@ const linkButton =
         </UiButton>
         <a
           v-if="role === 'admin'"
-          href="/bureau/outils?tab=ffme"
+          href="/bureau/outils/ffme"
           :class="linkButton"
           data-testid="export-ffme"
           title="Ouvrir l'export officiel FFME"
@@ -453,12 +453,7 @@ const linkButton =
         >
           🇫🇷 Export FFME
         </button>
-        <a
-          v-if="role === 'admin'"
-          href="/bureau/outils?tab=ffme-import"
-          :class="linkButton"
-          title="Importer la liste Excel des licenciés FFME"
-        >
+        <a v-if="role === 'admin'" href="/bureau/outils/ffme-import" :class="linkButton" title="Importer la liste Excel des licenciés FFME">
           📥 Import FFME
         </a>
         <UiButton

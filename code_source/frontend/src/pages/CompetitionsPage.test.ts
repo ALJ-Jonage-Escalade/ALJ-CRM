@@ -1,14 +1,14 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, ref } from "vue";
-import { createMemoryHistory, createRouter } from "vue-router";
+import { ref } from "vue";
+import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import type { Role } from "../lib/roles";
 import { createOfflineStore, STORE_KEY, type OfflineStore } from "../lib/store";
-import CompetitionsPage from "./CompetitionsPage.vue";
+import { routes } from "../router";
 import type { Competition } from "./competitions/competitions";
 
 const USER = { uid: "u1", email: "coach@example.org" };
@@ -31,6 +31,7 @@ const COMPETITIONS: Competition[] = [
     date_competition: "2027-03-15",
     prix: 12,
     coaches: ["Alice"],
+    coach_ids: [1],
     statut: "en_preparation",
     participants: [LEO, ZOE, MAX],
   },
@@ -111,13 +112,11 @@ function fakeApi(options: { down?: boolean; patch?: (body: Record<string, unknow
 }
 
 async function render(state: AuthState, api: ApiFetch, store: OfflineStore, path = "/competitions") {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [{ path: "/:any(.*)*", component: defineComponent({ render: () => null }) }],
-  });
+  // The app's routes: the page renders its sub-pages (router.ts)
+  const router = createRouter({ history: createMemoryHistory(), routes });
   await router.push(path);
   const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
-  const wrapper = mount(CompetitionsPage, {
+  const wrapper = mount(RouterView, {
     attachTo: document.body,
     global: {
       plugins: [router],
@@ -212,7 +211,15 @@ describe("CompetitionsPage", () => {
     expect(calls.map((c) => c.path)).not.toContain("/api/members/competitors");
     expect(calls.map((c) => c.path)).not.toContain("/api/coaches");
     expect(byId("emergency-link").exists()).toBe(false);
-    for (const id of ["participe-switch", "participant-actions", "detail-actions", "create-comp", "sections", "add-members"]) {
+    for (const id of [
+      "participe-switch",
+      "participant-actions",
+      "detail-actions",
+      "create-comp",
+      "subnav-side",
+      "subnav-strip",
+      "add-members",
+    ]) {
       expect(byId(id).exists(), id).toBe(false);
     }
     expect(byId("participe").text()).toBe("✅ Participe");
@@ -327,8 +334,22 @@ describe("CompetitionsPage", () => {
     await byId("comp-table-open").trigger("click");
     await settle();
     expect(router.currentRoute.value.query.id).toBe("10");
-    expect(byId("view-cards").classes()).toContain("text-accent");
+    expect(byId("view-cards").attributes("aria-pressed")).toBe("true");
     expect(byId("comp-detail").exists()).toBe(true);
+  });
+
+  it("creates a competition from the list and edits one from the table", async () => {
+    const { byId } = await render(signedIn("coach"), fakeApi().api, store, "/bureau/competitions");
+    await settle();
+    await byId("create-comp").trigger("click");
+    await settle();
+    expect(document.querySelector('[data-testid="create-dialog"]')).not.toBeNull();
+    document.querySelector<HTMLButtonElement>('[data-testid="create-dialog"] [aria-label="Fermer"]')!.click();
+    await settle();
+    await byId("view-table").trigger("click");
+    await byId("edit-comp-row").trigger("click");
+    await settle();
+    expect(document.querySelector('[data-testid="edit-dialog"]')?.textContent).toContain("Modifier : Coupe du Rhône");
   });
 
   it("shows the selected competition's month on the calendar and opens a competition from it", async () => {
@@ -344,7 +365,7 @@ describe("CompetitionsPage", () => {
     await all("calendar-comp-chip")[0]!.trigger("click");
     await settle();
     expect(router.currentRoute.value.query.id).toBe("10");
-    expect(byId("view-cards").classes()).toContain("text-accent");
+    expect(byId("view-cards").attributes("aria-pressed")).toBe("true");
     expect(byId("comp-detail").exists()).toBe(true);
   });
 
@@ -372,5 +393,48 @@ describe("CompetitionsPage", () => {
     expect(byId("stats-total-competitions").text()).toBe("1");
     expect(byId("stats-total-competitors").text()).toBe("3");
     expect(byId("stats-total-budget").text()).toMatch(/24,00\s*€/);
+  });
+
+  it("opens a sub-page under the page, the shared data loaded once", async () => {
+    const server = fakeApi();
+    const { byId, wrapper, router } = await render(signedIn("coach"), server.api, store, "/bureau/competitions/bilan");
+    await settle();
+    expect(byId("balance-pane").exists()).toBe(true);
+    expect(wrapper.find("h1").text()).toBe("Bilan");
+    expect(server.calls.map((c) => c.path)).not.toContain("/api/helloasso/items");
+    await router.push("/bureau/competitions/helloasso");
+    await settle();
+    expect(byId("helloasso-pane").exists()).toBe(true);
+    expect(server.calls.filter((c) => c.path === "/api/helloasso/items")).toHaveLength(1);
+    expect(server.calls.filter((c) => c.path === "/api/competitions")).toHaveLength(1);
+  });
+
+  it("opens Bilan offline on a coach's device", async () => {
+    await store.start(USER.uid);
+    await store.save("competitions", USER.uid, COMPETITIONS, null, "/api/competitions");
+    await store.save("competitors", USER.uid, CONTACTS, null, "/api/members/competitors");
+    const { byId, router } = await render(offline, fakeApi({ down: true }).api, store, "/bureau/competitions/bilan");
+    await settle();
+    expect(byId("balance-pane").exists()).toBe(true);
+    expect(byId("sub-side-helloasso").attributes("aria-disabled")).toBe("true");
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/competitions/bilan");
+  });
+
+  it("sends a device without the coaches' copy back to the list offline", async () => {
+    await store.start(USER.uid);
+    await store.save("competitions", USER.uid, COMPETITIONS, null, "/api/competitions");
+    const { byId, router } = await render(offline, fakeApi({ down: true }).api, store, "/bureau/competitions/bilan");
+    await settle();
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/competitions?reserve=bilan");
+    expect(byId("balance-pane").exists()).toBe(false);
+    expect(byId("comp-count").text()).toBe("1 compétition · 1 archivée");
+  });
+  it("opens a competition from Coachs on the list", async () => {
+    const { all, byId, router } = await render(signedIn("coach"), fakeApi().api, store, "/bureau/competitions/coachs");
+    await settle();
+    await all("coach-competition")[0]!.trigger("click");
+    await settle();
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/competitions?id=10");
+    expect(byId("detail-name").text()).toBe("Coupe du Rhône");
   });
 });

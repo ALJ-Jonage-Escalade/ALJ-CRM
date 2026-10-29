@@ -3,11 +3,26 @@
    and the sign-in / access gate. The page content is only rendered for a role allowed on the page (lib/access.ts),
    and the menu only lists those pages. Without any page to offer, the gate is shown alone, full screen.
    Element ids are the ones of the former web/shared/alj-shell.js: the e2e tests rely on them.
+   A page with sub-pages (lib/access.ts subPages) names the open one (`sub`): listed under the page in the side menu,
+   as a strip under the title on phones. A sub-page the session may not open sends back to the page's index route,
+   which says why (?reserve=<sub-page id>).
    Printed, only the page content remains (Planning prints its grid). */
-import { computed, inject, ref, watch } from "vue";
+import { computed, inject, ref, watch, watchEffect } from "vue";
+import { routeLocationKey, routerKey } from "vue-router";
 import { AUTH_KEY } from "../composables/auth";
 import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
-import { canOpen, OFFLINE_PAGES, PAGES, pageVerdict, shownOn, type PageId } from "../lib/access";
+import {
+  canOpen,
+  OFFLINE_PAGES,
+  PAGES,
+  pageVerdict,
+  REFUSED_QUERY,
+  shownOn,
+  subHref,
+  subPages,
+  subVerdict,
+  type PageId,
+} from "../lib/access";
 import { API_KEY } from "../lib/api";
 import { isStaff, roleLabel } from "../lib/roles";
 import { isEmulator } from "../lib/runtime";
@@ -15,13 +30,15 @@ import { offlineStore, STORE_KEY } from "../lib/store";
 import { logoutWarning } from "../pages/competitions/outbox";
 import AppBrand from "./AppBrand.vue";
 import PageLink from "./PageLink.vue";
+import SubNav, { type SubNavItem } from "./SubNav.vue";
 import UiButton from "./ui/UiButton.vue";
 import VersionBadge from "./VersionBadge.vue";
 import { dialogs } from "../composables/dialogs";
 
 /** sync: freshness of the page's data, next to the title (Adhérents). A page readable offline (PAGES offlineRead) gets
-    no role in its slot when it shows the copy kept on the device. */
-const props = defineProps<{ page: PageId; title: string; sync?: string }>();
+    no role in its slot when it shows the copy kept on the device. sub: the open sub-page (its id); staffCopy: offline,
+    whether the device holds a staff copy of the page's data (null while it is being read), see subVerdict. */
+const props = defineProps<{ page: PageId; title: string; sync?: string; sub?: string; staffCopy?: boolean | null }>();
 
 const auth = inject(AUTH_KEY)!;
 const api = inject(API_KEY)!;
@@ -66,6 +83,56 @@ const fullscreen = computed(() => {
 const signInError = inject(SIGN_IN_ERROR_KEY, ref(null));
 // Every page until the role is known, then only those the role may open (none outside the staff)
 const nav = computed(() => (state.value.status === "signedIn" ? PAGES.filter((p) => canOpen(role.value, p.access)) : PAGES));
+
+// ---------------------------------------------------------------- Sub-pages
+
+// Absent from the components' tests mounted without a router
+const router = inject(routerKey, null);
+const route = inject(routeLocationKey, null);
+const subs = computed(() =>
+  subPages(props.page).map((sub) => ({
+    sub,
+    verdict: subVerdict(state.value, sub, props.staffCopy === undefined ? false : props.staffCopy),
+  })),
+);
+const current = computed(() => subs.value.find(({ sub }) => sub.id === props.sub));
+// Listed with at least two entries: a role seeing a single one gets the page as without sub-menu
+const subMenu = computed<SubNavItem[]>(() => {
+  const listed = subs.value.filter(({ verdict }) => verdict === "allow" || verdict === "disabled");
+  return listed.length > 1
+    ? listed.map(({ sub, verdict }) => ({ id: sub.id, label: sub.label, href: subHref(props.page, sub), disabled: verdict === "disabled" }))
+    : [];
+});
+const subAllowed = computed(() => !current.value || current.value.verdict === "allow");
+watch(
+  () => current.value?.verdict,
+  (verdict) => {
+    const index = subs.value[0]?.sub;
+    const sub = current.value?.sub;
+    if (router && index && sub && sub !== index && (verdict === "hidden" || verdict === "disabled")) {
+      void router.replace({ path: subHref(props.page, index), query: { [REFUSED_QUERY]: sub.id } });
+    }
+  },
+  { immediate: true },
+);
+// Sent back from a sub-page: only a known one is named
+const refusedSub = computed(() => {
+  const sub = subPages(props.page).find((s) => s.path && s.id === route?.query[REFUSED_QUERY]);
+  if (!sub) {
+    return "";
+  }
+  if (offline.value) {
+    return `📴 La page ${sub.label} n'est consultable qu'en ligne.`;
+  }
+  return `⛔ La page ${sub.label} est réservée aux ${sub.access === "admin" ? "administrateurs" : "coachs et administrateurs"}.`;
+});
+
+const pageLabel = computed(() => PAGES.find((p) => p.id === props.page)!.label);
+// The index sub-page is the page itself: its title (plans/sub-menus.md D7)
+const heading = computed(() => (current.value?.sub.path ? current.value.sub.label : props.title));
+watchEffect(() => {
+  document.title = current.value?.sub.path ? `${heading.value} · ${pageLabel.value} — ALJ Escalade` : `${heading.value} — ALJ Escalade`;
+});
 
 // Club Google token (Gmail, Drive) expired or revoked: warned on every page, checked once per user
 const googleExpired = ref(false);
@@ -159,23 +226,36 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         aria-label="Navigation principale"
         class="fixed inset-x-0 bottom-0 z-40 flex h-16 justify-around border-t border-side-hover bg-side pb-[env(safe-area-inset-bottom)] md:static md:h-auto md:flex-col md:justify-start md:gap-0.5 md:border-0 md:pb-0"
       >
-        <PageLink
-          v-for="item in nav"
-          :key="item.id"
-          :href="item.href"
-          :data-page="item.id"
-          :aria-current="item.id === props.page ? 'page' : undefined"
-          :class="[
-            shownOn(item.screen, 'flex'),
-            'min-w-0 flex-1 flex-col items-center justify-center gap-0.5 font-semibold text-side-text no-underline',
-            'md:flex-none md:flex-row md:justify-start md:gap-2 md:rounded-lg md:px-3 md:py-2.5',
-            item.id === props.page ? 'text-white md:bg-accent' : 'hover:text-white md:hover:bg-side-hover',
-          ]"
-        >
-          <span aria-hidden="true" class="text-lg md:text-base">{{ item.icon }}</span>
-          <span class="max-w-full truncate text-[10px] md:hidden">{{ item.short }}</span>
-          <span class="hidden md:inline">{{ item.label }}</span>
-        </PageLink>
+        <template v-for="item in nav" :key="item.id">
+          <!-- With its sub-menu open, the page is "section active" (lighter, aria-current="true"), the open sub-page is the
+               current page (accent) -->
+          <PageLink
+            :href="item.href"
+            :data-page="item.id"
+            :aria-current="item.id !== props.page ? undefined : subMenu.length ? 'true' : 'page'"
+            :class="[
+              shownOn(item.screen, 'flex'),
+              'min-w-0 flex-1 flex-col items-center justify-center gap-0.5 font-semibold text-side-text no-underline',
+              'md:flex-none md:flex-row md:justify-start md:gap-2 md:rounded-lg md:px-3 md:py-2.5',
+              item.id !== props.page
+                ? 'hover:text-white md:hover:bg-side-hover'
+                : subMenu.length
+                  ? 'text-white md:bg-side-hover'
+                  : 'text-white md:bg-accent',
+            ]"
+          >
+            <span aria-hidden="true" class="text-lg md:text-base">{{ item.icon }}</span>
+            <span class="max-w-full truncate text-[10px] md:hidden">{{ item.short }}</span>
+            <span class="hidden md:inline">{{ item.label }}</span>
+          </PageLink>
+          <SubNav
+            v-if="item.id === props.page && subMenu.length"
+            :items="subMenu"
+            :current="props.sub"
+            variant="side"
+            class="hidden md:flex"
+          />
+        </template>
       </nav>
       <!-- Signed-in account: foot of the side menu on desktop, top of the page on phones (the menu is a bottom bar) -->
       <div
@@ -189,9 +269,10 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
 
     <div class="min-w-0 px-4 pt-4 pb-28 md:px-7 md:pt-6 md:pb-10 print:p-0">
       <header class="mb-4 flex print:hidden flex-wrap items-center gap-x-4 gap-y-2">
-        <h1 class="m-0 text-xl font-bold md:text-[22px]">{{ props.title }}</h1>
+        <h1 class="m-0 text-xl font-bold md:text-[22px]">{{ heading }}</h1>
         <span id="sync-info" class="text-[13px] text-slate-500">{{ props.sync }}</span>
       </header>
+      <SubNav v-if="subMenu.length" :items="subMenu" :current="props.sub" variant="strip" class="mb-3 flex print:hidden md:hidden" />
 
       <div
         v-show="googleExpired"
@@ -245,7 +326,16 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         </template>
       </section>
 
-      <div v-if="access === 'allow' || access === 'offline'" id="content">
+      <p
+        v-if="refusedSub && (access === 'allow' || access === 'offline')"
+        id="refused-page"
+        role="status"
+        class="mb-3.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-900 print:hidden"
+      >
+        {{ refusedSub }}
+      </p>
+
+      <div v-if="(access === 'allow' || access === 'offline') && subAllowed" id="content">
         <slot :role="role" />
       </div>
 

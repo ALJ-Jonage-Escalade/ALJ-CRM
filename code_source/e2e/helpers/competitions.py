@@ -32,10 +32,16 @@ def open_competition(page: Page, nom: str) -> Locator:
     return page.get_by_test_id("comp-detail")
 
 
-def go_to(page: Page, section: str) -> None:
-    """Sections of coaches and admins: competitions, helloasso, bilan, coachs."""
-    page.get_by_test_id(f"section-{section}").click()
-    expect(page.get_by_test_id(f"section-{section}")).to_have_attribute("aria-current", "page")
+def sub_menu_entry(page: Page, sub_page: str) -> Locator:
+    """Entry of a sub-page in the menu shown: nested in the side menu on desktop, the strip under the title on phones
+    (frontend/src/components/SubNav.vue)."""
+    return page.locator(f"[data-testid='sub-side-{sub_page}']:visible, [data-testid='sub-strip-{sub_page}']:visible")
+
+
+def go_to(page: Page, sub_page: str) -> None:
+    """Sub-pages of coaches and admins: competitions, helloasso, bilan, coachs."""
+    sub_menu_entry(page, sub_page).click()
+    expect(sub_menu_entry(page, sub_page)).to_have_attribute("aria-current", "page")
 
 
 def participant_card(page: Page, member: dict) -> Locator:

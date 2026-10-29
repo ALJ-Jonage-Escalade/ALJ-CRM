@@ -18,6 +18,12 @@ WEB_DIR = os.path.join(CODE_ROOT, "web")
 # Office pages of the Vue application (frontend/src/router.ts): its entry page answers them. The pages are public,
 # the data stays behind the API (ID token, roles).
 _SPA_PAGES = frozenset({"adherents", "communications", "competitions", "outils", "parametres", "planning"})
+# Sub-pages of the office pages (frontend/src/lib/access.ts subPages, plans/sub-menus.md): /bureau/<page>/<sub-page>,
+# and /competitions/<sub-page> for the competitions (each one public in api_auth.PUBLIC_PATHS)
+SPA_SUB_PAGES = {
+    "competitions": frozenset({"helloasso", "bilan", "coachs"}),
+    "outils": frozenset({"pivot", "stats", "presence", "ffme", "ffme-import"}),
+}
 # Former addresses of the competitions management pages (phone and office, until plan phase 11): now the competitions
 # screen itself, where coaches change everything
 FORMER_MANAGEMENT_PAGES = {"/competitions/gestion": "/competitions", "/bureau/competitions-gestion": "/bureau/competitions"}
@@ -85,6 +91,13 @@ def get_bureau_page(page: str) -> Response:
         return spa_entry()
     return HTMLResponse("<h1>Page bureau introuvable</h1>", status_code=404)
 
+@router.get("/bureau/{page}/{sub_page}", response_class=HTMLResponse, include_in_schema=False)
+def get_bureau_sub_page(page: str, sub_page: str) -> Response:
+    """Sub-pages of the office pages (SPA_SUB_PAGES): the Vue application, else 404."""
+    if sub_page in SPA_SUB_PAGES.get(page, ()):
+        return spa_entry()
+    return HTMLResponse("<h1>Page bureau introuvable</h1>", status_code=404)
+
 @router.get("/index", response_class=HTMLResponse)
 def get_annuaire_page() -> Response:
     """Directory of the members (read only, readable offline): Vue application, on phones as on desktop."""
@@ -129,4 +142,12 @@ def root_route() -> RedirectResponse:
 def get_competitions_page() -> Response:
     """Competitions (readable offline, changed offline through the outbox) and the Google sign-in callback (the OAuth
     redirect URI registered for the club): Vue application, on phones as on desktop. Also the PWA's start page."""
+    return spa_entry()
+
+
+@router.get("/competitions/helloasso", response_class=HTMLResponse, include_in_schema=False)
+@router.get("/competitions/bilan", response_class=HTMLResponse, include_in_schema=False)
+@router.get("/competitions/coachs", response_class=HTMLResponse, include_in_schema=False)
+def get_competitions_sub_page() -> Response:
+    """Sub-pages of the competitions on the PWA's address (SPA_SUB_PAGES): Vue application."""
     return spa_entry()

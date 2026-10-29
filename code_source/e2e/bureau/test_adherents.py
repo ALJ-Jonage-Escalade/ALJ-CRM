@@ -203,7 +203,7 @@ def test_former_record_link_opens_the_record(page, people):
 def test_coach_has_no_admin_action(page):
     open_members(page, role="coach")
     expect(page.get_by_test_id("member-add")).to_have_count(0)
-    expect(page.locator("a[href='/bureau/outils?tab=ffme-import']")).to_have_count(0)
+    expect(page.locator("a[href='/bureau/outils/ffme-import']")).to_have_count(0)
 
 
 def test_coach_record_emails_but_does_not_edit(page, mailpit, people):

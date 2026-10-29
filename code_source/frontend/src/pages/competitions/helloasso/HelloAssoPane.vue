@@ -37,6 +37,8 @@ const props = defineProps<{
   loading: boolean;
   competitions: readonly Competition[];
   members: readonly MemberSlot[];
+  /** Address of the competitions list (the page's index route), where a competition opens. */
+  listPath: string;
 }>();
 const emit = defineEmits<{ changed: [] }>();
 const client = inject(CLIENT_KEY)!;
@@ -309,7 +311,7 @@ const chip = (active: boolean) => [
               <td class="px-2.5 py-2 text-slate-600">
                 <RouterLink
                   v-if="detected != null"
-                  :to="{ query: { id: String(detected) } }"
+                  :to="{ path: listPath, query: { id: String(detected) } }"
                   :title="`Compétition détectée : ${compName.get(detected)}`"
                   data-testid="ha-detected"
                   class="text-accent no-underline hover:underline"
@@ -327,7 +329,7 @@ const chip = (active: boolean) => [
                     ✅
                     <RouterLink
                       v-if="compName.has(it.competition_id!)"
-                      :to="{ query: { id: String(it.competition_id) } }"
+                      :to="{ path: listPath, query: { id: String(it.competition_id) } }"
                       data-testid="ha-linked-competition"
                       class="text-inherit no-underline hover:underline"
                     >
@@ -477,7 +479,7 @@ const chip = (active: boolean) => [
                 <b>Épreuve :</b>
                 <RouterLink
                   v-if="compName.has(it.competition_id!)"
-                  :to="{ query: { id: String(it.competition_id) } }"
+                  :to="{ path: listPath, query: { id: String(it.competition_id) } }"
                   data-testid="ha-linked-competition"
                   class="text-accent no-underline hover:underline"
                 >

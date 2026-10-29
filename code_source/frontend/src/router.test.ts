@@ -81,7 +81,7 @@ describe("app routes", () => {
     expect(router.currentRoute.value.fullPath).toBe(`/bureau/?reserve=${path}`);
   });
 
-  it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils?tab=ffme", "/index", "/index?vue=pwa"])(
+  it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils/ffme", "/index", "/index?vue=pwa"])(
     "open %s to a coach",
     async (path) => {
       const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
@@ -129,5 +129,38 @@ describe("app routes", () => {
     const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
     await router.push("/bureau/inconnu");
     expect(router.currentRoute.value.meta.access).toBe("public");
+  });
+  it.each([
+    ["/bureau/competitions/helloasso", "competitions-helloasso", "helloasso"],
+    ["/bureau/competitions/bilan", "competitions-bilan", "bilan"],
+    ["/competitions/coachs", "competitions-pwa-coachs", "coachs"],
+    ["/bureau/competitions", "competitions", "competitions"],
+  ])("open the sub-page %s with its page's access (AppShell checks the sub-page)", async (path, name, sub) => {
+    const router = createAppRouter(fakeAuth(signedIn("readonly")).auth, createMemoryHistory());
+    await router.push(path);
+    expect(router.currentRoute.value.fullPath).toBe(path);
+    expect([router.currentRoute.value.name, router.currentRoute.value.meta]).toEqual([name, { access: "viewer", sub }]);
+  });
+
+  it.each([
+    ["/bureau/outils", "outils", "map"],
+    ["/bureau/outils/pivot", "outils-pivot", "pivot"],
+    ["/bureau/outils/ffme-import", "outils-ffme-import", "ffme-import"],
+  ])("open the Outils sub-page %s, kept mounted while switching", async (path, name, sub) => {
+    const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
+    await router.push(path);
+    expect([router.currentRoute.value.name, router.currentRoute.value.meta]).toEqual([name, { access: "staff", sub, keepAlive: true }]);
+  });
+
+  it.each([
+    ["/bureau/outils?tab=ffme-import", "/bureau/outils/ffme-import"],
+    ["/bureau/outils?tab=map", "/bureau/outils?tab=map"],
+    ["/bureau/competitions?section=bilan", "/bureau/competitions/bilan"],
+    ["/competitions?section=helloasso&id=3", "/competitions/helloasso?id=3"],
+    ["/bureau/competitions?section=inconnue", "/bureau/competitions?section=inconnue"],
+  ])("open the former tab address %s on its sub-page", async (path, expected) => {
+    const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
+    await router.push(path);
+    expect(router.currentRoute.value.fullPath).toBe(expected);
   });
 });

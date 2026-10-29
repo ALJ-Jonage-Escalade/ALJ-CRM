@@ -1,8 +1,10 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
 import type { PageId } from "../lib/access";
+import type { Role } from "../lib/roles";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { STORE_KEY, type OfflineStore } from "../lib/store";
 import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
@@ -10,6 +12,7 @@ import AppShell from "./AppShell.vue";
 import { dialogs } from "../composables/dialogs";
 
 const USER = { uid: "u1", email: "albus@alj-escalade.fr" };
+const signedIn = (role: Role): AuthState => ({ status: "signedIn", user: USER, role });
 
 function render(state: AuthState, googleStatus = "ok", page: PageId = "accueil", queued = 0, signInError: string | null = null) {
   const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
@@ -174,7 +177,7 @@ describe("AppShell", () => {
   ] as const)("lists the pages %s may open", (role, count) => {
     // On Compétitions, open to every role (elsewhere a read-only account gets the full-screen gate, without the menu)
     const { wrapper } = render({ status: "signedIn", user: USER, role }, "ok", "competitions");
-    expect(wrapper.findAll("nav a")).toHaveLength(count);
+    expect(wrapper.findAll("nav a[data-page]")).toHaveLength(count);
   });
 
   it("hides the admin pages from a coach", () => {
@@ -195,5 +198,88 @@ describe("AppShell", () => {
     const { wrapper } = render({ status: "signedIn", user: USER, role: "admin" }, "ok", "parametres");
     expect(wrapper.find("#page-body").exists()).toBe(true);
     expect(wrapper.find("#gate").exists()).toBe(false);
+  });
+});
+
+describe("AppShell sub-menu", () => {
+  const offline: AuthState = { status: "error", user: USER, message: "x", offline: true };
+
+  /** The competitions page on one of its sub-pages, with a router (sent back to the index route). */
+  async function renderSub(state: AuthState, sub: string, staffCopy: boolean | null = false, path = `/bureau/competitions/${sub}`) {
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/:any(.*)*", component: { render: () => null } }] });
+    await router.push(path);
+    const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
+    const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: "ok" })));
+    const wrapper = mount(AppShell, {
+      props: { page: "competitions", title: "Compétitions", sub, staffCopy },
+      slots: { default: '<p id="page-body">contenu</p>' },
+      global: {
+        plugins: [router],
+        provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: storeWith(0), [SIGN_IN_ERROR_KEY]: ref(null) },
+        stubs: { VersionBadge: true },
+      },
+    });
+    await flushPromises();
+    const entries = (variant: string) =>
+      wrapper
+        .findAll(`[data-testid="subnav-${variant}"] [data-testid]`)
+        .map((e) => e.attributes("data-testid")!.replace(`sub-${variant}-`, ""));
+    return { wrapper, router, entries };
+  }
+
+  it("lists the sub-pages under the open page, on the side and as a strip, the open one current", async () => {
+    const { wrapper, entries } = await renderSub(signedIn("coach"), "bilan");
+    expect(entries("side")).toEqual(["competitions", "helloasso", "bilan", "coachs"]);
+    expect(entries("strip")).toEqual(["competitions", "helloasso", "bilan", "coachs"]);
+    expect(wrapper.find('[data-testid="sub-side-bilan"]').attributes("aria-current")).toBe("page");
+    expect(wrapper.find('nav a[data-page="competitions"]').attributes("aria-current")).toBe("true");
+    expect(wrapper.find("h1").text()).toBe("Bilan");
+    expect(document.title).toBe("Bilan · Compétitions — ALJ Escalade");
+    expect(wrapper.find("#page-body").exists()).toBe(true);
+  });
+
+  it("shows no sub-menu to a role seeing a single sub-page", async () => {
+    const { wrapper } = await renderSub(signedIn("readonly"), "competitions", false, "/bureau/competitions");
+    expect(wrapper.find('[data-testid^="subnav-"]').exists()).toBe(false);
+    expect(wrapper.find('nav a[data-page="competitions"]').attributes("aria-current")).toBe("page");
+    expect(wrapper.find("h1").text()).toBe("Compétitions");
+  });
+
+  it("sends a role back to the index route from a sub-page it may not open, and says why", async () => {
+    const { wrapper, router } = await renderSub(signedIn("readonly"), "bilan");
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/competitions?reserve=bilan");
+    expect(wrapper.find("#page-body").exists()).toBe(false);
+    await wrapper.setProps({ sub: "competitions" });
+    expect(wrapper.find("#refused-page").text()).toBe("⛔ La page Bilan est réservée aux coachs et administrateurs.");
+  });
+
+  it("offline on a coach's device, keeps the online-only sub-pages listed but disabled", async () => {
+    const { wrapper, entries } = await renderSub(offline, "bilan", true);
+    expect(entries("side")).toEqual(["competitions", "helloasso", "bilan", "coachs"]);
+    const helloasso = wrapper.find('[data-testid="sub-side-helloasso"]');
+    expect(helloasso.element.tagName).toBe("SPAN");
+    expect(helloasso.attributes("aria-disabled")).toBe("true");
+    expect(wrapper.find("#page-body").exists()).toBe(true);
+  });
+
+  it("offline, sends back from an online-only sub-page", async () => {
+    const { wrapper, router } = await renderSub(offline, "helloasso", true);
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/competitions?reserve=helloasso");
+    await wrapper.setProps({ sub: "competitions" });
+    expect(wrapper.find("#refused-page").text()).toBe("📴 La page HelloAsso n'est consultable qu'en ligne.");
+  });
+
+  it("offline on another device, shows no sub-menu and keeps the coaches' sub-pages closed", async () => {
+    const { wrapper, router } = await renderSub(offline, "bilan", false);
+    expect(wrapper.find('[data-testid^="subnav-"]').exists()).toBe(false);
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/competitions?reserve=bilan");
+  });
+
+  it("waits for the device's copy before deciding offline", async () => {
+    const { wrapper, router } = await renderSub(offline, "bilan", null);
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/competitions/bilan");
+    expect(wrapper.find("#page-body").exists()).toBe(false);
+    await wrapper.setProps({ staffCopy: true });
+    expect(wrapper.find("#page-body").exists()).toBe(true);
   });
 });

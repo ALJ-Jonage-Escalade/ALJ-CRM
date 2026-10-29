@@ -10,7 +10,8 @@ import { coachedBy, period, sortCompetitions, type Coach, type Competition } fro
 import { WRITER_KEY } from "./writer";
 import { dialogs } from "../../composables/dialogs";
 
-const props = defineProps<{ coaches: readonly Coach[] | null; competitions: readonly Competition[] }>();
+/** listPath: address of the competitions list (the page's index route), where a competition opens. */
+const props = defineProps<{ coaches: readonly Coach[] | null; competitions: readonly Competition[]; listPath: string }>();
 const emit = defineEmits<{ changed: [] }>();
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const writer = inject(WRITER_KEY)!;
@@ -103,7 +104,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         <ul class="mt-1.5 text-xs" data-testid="coach-competitions">
           <li v-for="comp in sortCompetitions(coachedBy(competitions, c))" :key="comp.id">
             <RouterLink
-              :to="{ query: { id: String(comp.id) } }"
+              :to="{ path: listPath, query: { id: String(comp.id) } }"
               data-testid="coach-competition"
               class="text-slate-700 no-underline hover:text-accent"
             >

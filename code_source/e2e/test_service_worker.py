@@ -71,7 +71,7 @@ def test_pages_open_offline(page, context):
         expect(page.locator("#login-screen")).to_be_visible()
         expect(page.locator("nav")).to_have_count(0)
         expect(page.locator("#gate")).to_be_visible()
-        for path in ("/bureau/competitions", "/competitions", "/index", "/bureau/planning"):
+        for path in ("/bureau/competitions", "/bureau/competitions/bilan", "/competitions", "/index", "/bureau/planning"):
             page.goto(path)
             expect(page.locator("#gate")).to_be_visible()
         page.goto("/")  # the server's redirect, done by the app offline
