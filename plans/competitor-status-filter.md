@@ -25,7 +25,8 @@ and a confirmed one), `tarif` / `creneau_groupe` are arbitrary.
   `statut`, `tarif`, `creneau_groupe` all come from that purchase. `statut` is normalized with
   `domain.members.view.normalize_status` (`termine` → `Terminé`).
 - Rollout, self-healing: when the server reads the directory from Firestore and a document has no `statut`, the
-  projection is marked dirty; the next background tick (≤ 3 min) rewrites it. Until then such a member does not
+  projection is marked dirty (once per process: the sync never deletes, a member no longer synced keeps lacking it);
+  the next background tick (≤ 3 min) rewrites it. Until then such a member does not
   match a status filter (strict).
 - Server-side enforcement on `POST /participants`: no (offline queue: a status change between queueing and replay
   would reject a write the coach believed done; coaches are trusted).

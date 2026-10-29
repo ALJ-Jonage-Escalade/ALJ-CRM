@@ -20,4 +20,4 @@ def list_competition_members(
     request: Request,
     status: Optional[List[MemberStatus]] = Query(None, description="Only the members at one of these statuses (repeatable)"),
 ) -> Response:
-    return json_with_etag(request, Service.list_members(list(status) if status else None))
+    return json_with_etag(request, Service.list_members(status))

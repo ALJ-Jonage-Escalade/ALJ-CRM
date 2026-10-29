@@ -466,13 +466,18 @@ class TestAdherents(FirestoreRepoTestCase):
     def test_directory_without_status_is_rewritten_next_tick(self):
         """A directory written before `statut` existed marks the projection dirty (rewritten by the next tick)."""
         self.seed_adherent(101)
-        with patch.object(CloudDatabase, "_projection_dirty", False):
+        with patch.object(CloudDatabase, "_projection_dirty", False), patch.object(Repo, "_directory_heal_requested", False):
             Repo.list_adherents()
             self.assertFalse(CloudDatabase._projection_dirty)
             self.fake.upsert_document(Repo.COLLECTION_ADHERENTS, "102", {"id": 102, "nom": "ANCIEN"})
             Repo._invalidate_adherents_cache()
             self.assertEqual(Repo.list_adherents(statuses=["Terminé"])[0]["id"], 101)  # strict until rewritten
             self.assertTrue(CloudDatabase._projection_dirty)
+            # Still lacking after the rewrite (a member no longer synced): not sent for rewriting again
+            CloudDatabase._projection_dirty = False
+            Repo._invalidate_adherents_cache()
+            Repo.list_adherents()
+            self.assertFalse(CloudDatabase._projection_dirty)
 
 
 class TestBatchUpsertCommitBody(unittest.TestCase):

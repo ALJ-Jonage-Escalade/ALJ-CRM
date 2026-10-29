@@ -56,5 +56,5 @@ def load_competition_group(
     competition_id: int,
     status: Optional[List[MemberStatus]] = Query(None, description="Only the members at one of these statuses (repeatable)"),
 ) -> Doc:
-    added, competition = Service.load_competition_group(competition_id, list(status) if status else None)
+    added, competition = Service.load_competition_group(competition_id, status)
     return {"added": added, "competition": competition}

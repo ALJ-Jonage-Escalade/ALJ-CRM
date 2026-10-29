@@ -1,7 +1,7 @@
 """`adherents` directory: snapshot of the members of database.db, read through a short cache."""
 import time
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Sequence, Tuple
 
 from domain.constants import get_active_season
 from domain.members.age_rules import parse_birth_date, age_at, get_season_start_date
@@ -21,6 +21,8 @@ class AdherentsMixin(CompetitionStoreBase):
 
     _adherents_cache: Optional[List[Dict[str, Any]]] = None
     _adherents_cache_at: float = 0.0
+    # The outdated directory was already sent for rewriting by this process (_heal_outdated_directory)
+    _directory_heal_requested: bool = False
 
     # ------------------------------------------------------------------
     # Instantané des adhérents (source : database.db principale -> Firestore)
@@ -149,17 +151,18 @@ class AdherentsMixin(CompetitionStoreBase):
     def _best_purchase_rows(rows: List[Any]) -> List[Dict[str, Any]]:
         """One row per member (`v_adherents_legacy` has one per purchase): the highest-priority purchase, by the
         import's rule (purchase_priority_score); on a tie the last row, as when every row was written in turn."""
-        best: Dict[Any, Dict[str, Any]] = {}
+        # adherent id -> (score, purchase row); Any: the ids come from SQLite rows
+        best: Dict[Any, Tuple[int, Dict[str, Any]]] = {}
         for row in rows:
-            d = dict(row)
-            adherent_id = d.get("user_id") or d.get("id")
+            purchase = dict(row)
+            adherent_id = purchase.get("user_id") or purchase.get("id")
             if adherent_id is None:
                 continue
+            score = purchase_priority_score(purchase.get("status"), purchase.get("tarif_name"), purchase.get("amount"))
             kept = best.get(adherent_id)
-            score = purchase_priority_score(d.get("status"), d.get("tarif_name"), d.get("amount"))
-            if kept is None or score >= purchase_priority_score(kept.get("status"), kept.get("tarif_name"), kept.get("amount")):
-                best[adherent_id] = d
-        return list(best.values())
+            if kept is None or score >= kept[0]:
+                best[adherent_id] = (score, purchase)
+        return [purchase for _, purchase in best.values()]
 
     @staticmethod
     def _read_planning_groups(main_conn) -> Dict[str, str]:
@@ -207,13 +210,15 @@ class AdherentsMixin(CompetitionStoreBase):
             cls._adherents_cache_at = now
         return cls._adherents_cache
 
-    @staticmethod
-    def _heal_outdated_directory(docs: List[Dict[str, Any]]) -> None:
+    @classmethod
+    def _heal_outdated_directory(cls, docs: List[Dict[str, Any]]) -> None:
         """A directory written before a field was added to it (`statut`, plans/competitor-status-filter.md) is
-        rewritten by the next background tick: without it, the status filters would find nobody."""
-        if any("statut" not in doc for doc in docs):
+        rewritten by the next background tick: without it, the status filters would find nobody. Once per process:
+        the sync never deletes, so the document of a member no longer synced keeps lacking the field."""
+        if not cls._directory_heal_requested and any("statut" not in doc for doc in docs):
             from infrastructure.firestore.cloud_database import CloudDatabase
             CloudDatabase.mark_projection_dirty()
+            cls._directory_heal_requested = True
 
     @classmethod
     def _adherent_map(cls) -> Dict[int, Dict[str, Any]]:
@@ -252,7 +257,7 @@ class AdherentsMixin(CompetitionStoreBase):
         return sex.value if sex else None
 
     @classmethod
-    def list_adherents(cls, search: str = "", competition_only: bool = False, statuses: Optional[List[str]] = None) -> list:
+    def list_adherents(cls, search: str = "", competition_only: bool = False, statuses: Optional[Sequence[str]] = None) -> list:
         """Liste les adhérents de l'annuaire Firestore (recherche insensible aux accents).
         `statuses`: only the members at one of these membership statuses (« Terminé »…); None: every status."""
         q = normalize_string(search) if search else ""
