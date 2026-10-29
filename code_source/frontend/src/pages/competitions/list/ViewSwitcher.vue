@@ -12,15 +12,17 @@ const VIEWS: { id: ViewMode; label: string }[] = [
 </script>
 
 <template>
-  <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium" data-testid="view-switcher">
+  <!-- Same look as the former section tabs of the page (before the sub-menu) -->
+  <div class="flex gap-1.5 overflow-x-auto" role="group" aria-label="Affichage des compétitions" data-testid="view-switcher">
     <button
       v-for="view in VIEWS"
       :key="view.id"
       type="button"
       :class="[
-        'px-2 py-1 rounded-md cursor-pointer transition-colors',
-        viewMode === view.id ? 'bg-white font-bold text-accent shadow-xs' : 'text-slate-600 hover:text-slate-900',
+        'shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-[13px] font-bold',
+        viewMode === view.id ? 'bg-accent text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
       ]"
+      :aria-pressed="viewMode === view.id"
       :data-testid="`view-${view.id}`"
       @click="viewMode = view.id"
     >

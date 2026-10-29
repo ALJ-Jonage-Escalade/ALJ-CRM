@@ -334,7 +334,7 @@ describe("CompetitionsPage", () => {
     await byId("comp-table-open").trigger("click");
     await settle();
     expect(router.currentRoute.value.query.id).toBe("10");
-    expect(byId("view-cards").classes()).toContain("text-accent");
+    expect(byId("view-cards").attributes("aria-pressed")).toBe("true");
     expect(byId("comp-detail").exists()).toBe(true);
   });
 
@@ -365,7 +365,7 @@ describe("CompetitionsPage", () => {
     await all("calendar-comp-chip")[0]!.trigger("click");
     await settle();
     expect(router.currentRoute.value.query.id).toBe("10");
-    expect(byId("view-cards").classes()).toContain("text-accent");
+    expect(byId("view-cards").attributes("aria-pressed")).toBe("true");
     expect(byId("comp-detail").exists()).toBe(true);
   });
 
