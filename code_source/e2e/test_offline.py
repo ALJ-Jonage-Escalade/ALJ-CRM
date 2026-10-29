@@ -19,7 +19,7 @@ from helpers.dialogs import cancel_dialog, confirm_dialog
 
 @pytest.fixture
 def competition(test_data):
-    member = test_data.members(competition_only=True)[0]
+    member = test_data.competition_group()[0]
     nom = unique_name("E2E Offline")
     cid = test_data.create_competition(nom, date="2027-12-04", participants=[member["id"]], selected=[member["id"]])
     return {"id": cid, "nom": nom, "member": member}

@@ -20,7 +20,7 @@ pytestmark = pytest.mark.xdist_group("helloasso")
 def setup(test_data, fake_helloasso):
     """A competition with two invited members (with a licence) and three HelloAsso payments:
     one auto-linkable (licence + competition number), two that need a coach."""
-    members = [m for m in test_data.members(competition_only=True) if m.get("licence_ffme")][:2]
+    members = [m for m in test_data.competition_group() if m.get("licence_ffme")][:2]
     assert len(members) == 2, "the seed gives most members a licence number"
     number = "E2E-" + uuid.uuid4().hex[:6].upper()
     nom = unique_name("E2E HelloAsso")

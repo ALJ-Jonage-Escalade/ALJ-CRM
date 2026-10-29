@@ -113,9 +113,16 @@ class TestData:
                 raise RuntimeError("test data setup failed:\n" + "\n".join(output) + "\n" + json.loads(line[len(_ERROR):]))
             output.append(line)
 
-    def members(self, competition_only: bool = False) -> list:
-        """Members of the `adherents` projection (id, nom, prenom, tarif, email…)."""
-        return self._run("result = Repo.list_adherents(competition_only=args['only'])", only=competition_only)
+    def members(self, competition_only: bool = False, statuses: list | None = None) -> list:
+        """Members of the `adherents` projection (id, nom, prenom, tarif, statut, email…); `statuses`: only those
+        at one of these membership statuses."""
+        return self._run("result = Repo.list_adherents(competition_only=args['only'], statuses=args['statuses'])",
+                         only=competition_only, statuses=statuses)
+
+    def competition_group(self) -> list:
+        """Members of the « Compétition » group the competition pages list and offer (COMPETITOR_STATUSES of
+        frontend/src/pages/competitions/competitions.ts)."""
+        return self.members(competition_only=True, statuses=["Terminé"])
 
     def coaches(self) -> list:
         return self._run("result = Repo.list_coaches()")

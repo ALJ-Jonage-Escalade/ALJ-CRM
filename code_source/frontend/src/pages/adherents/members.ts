@@ -256,6 +256,7 @@ export function filterMembers<M extends FilteredMember>(members: readonly M[], f
 // ---------------------------------------------------------------- Display
 
 export const STATUSES = ["Validé", "Traité", "Terminé", "En cours", "Annulé"] as const;
+export type MemberStatus = (typeof STATUSES)[number];
 
 /** Status chips: « Tous » then the statuses some member has, with their counts. */
 export function statusChips(members: readonly Pick<Member, "status_norm">[]): { value: string; label: string; count: number }[] {

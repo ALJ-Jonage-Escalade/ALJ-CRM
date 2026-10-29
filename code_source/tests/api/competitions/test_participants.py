@@ -166,3 +166,13 @@ class TestParticipants(ApiTestCase):
         self.assertEqual(r.json()["added"], 1)  # only the « Compétition » tariff member
         self.assertEqual(self.participant(self.comp, 1)["statut_paiement"], "non_invite")
         self.assertEqual(self.client.post(f"/api/competitions/{self.comp}/load-group").json()["added"], 0)
+
+    def test_load_group_with_status_filter(self):
+        self.seed_adherent(3, nom="PETIT", prenom="Max", tarif="Compétition U15", statut="Validé")
+        r = self.client.post(f"/api/competitions/{self.comp}/load-group", params={"status": ["Terminé"]})
+        self.assertEqual((r.status_code, r.json()["added"]), (200, 1))
+        self.assertEqual([p["adherent_id"] for p in r.json()["competition"]["participants"]], [1])
+        r = self.client.post(f"/api/competitions/{self.comp}/load-group", params={"status": ["Terminé", "Validé"]})
+        self.assertEqual(r.json()["added"], 1)  # PETIT
+        r = self.client.post(f"/api/competitions/{self.comp}/load-group", params={"status": "Fini"})
+        self.assertEqual(r.status_code, 422)

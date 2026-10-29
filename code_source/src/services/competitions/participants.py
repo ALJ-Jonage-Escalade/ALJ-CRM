@@ -6,7 +6,7 @@ concurrent change). Knows nothing about HTTP: failures are raised as services.er
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 
 from domain.competitions.models import STATUT_CLOSE
 from infrastructure.firestore.competition_repository import (
@@ -110,8 +110,8 @@ class ParticipantService:
 
     @staticmethod
     @write
-    def load_competition_group(competition_id: int) -> Tuple[int, dict]:
-        """Adds every member of the « Compétition » tariff not already listed (not invited).
-        Returns (number added, competition)."""
-        added, doc = Repo.load_competition_group_doc(competition_id)
+    def load_competition_group(competition_id: int, statuses: Optional[Sequence[str]] = None) -> Tuple[int, dict]:
+        """Adds every member of the « Compétition » tariff not already listed (not invited), only those at one of
+        `statuses` when given. Returns (number added, competition)."""
+        added, doc = Repo.load_competition_group_doc(competition_id, statuses)
         return added, _written(competition_id, doc)

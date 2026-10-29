@@ -12,7 +12,7 @@ from helpers.dialogs import accept_dialogs
 @pytest.fixture
 def competition(test_data):
     """Two selected competitors with an e-mail address, one invited only."""
-    members = [m for m in test_data.members(competition_only=True) if "@" in (m.get("email") or "")][:3]
+    members = [m for m in test_data.competition_group() if "@" in (m.get("email") or "")][:3]
     assert len(members) == 3, "the seed gives most members an e-mail address"
     nom = unique_name("E2E Mail")
     test_data.create_competition(nom, date="2027-09-18", prix=9, participants=[m["id"] for m in members],

@@ -42,7 +42,7 @@ def api_back(page: Page) -> None:
 @pytest.fixture
 def competition(test_data):
     """A competition with one selected competitor (who has an emergency contact in the seed)."""
-    member = test_data.members(competition_only=True)[0]
+    member = test_data.competition_group()[0]
     nom = unique_name("E2E Vue")
     cid = test_data.create_competition(nom, date="2027-11-20", participants=[member["id"]], selected=[member["id"]])
     return {"id": cid, "nom": nom, "member": member}

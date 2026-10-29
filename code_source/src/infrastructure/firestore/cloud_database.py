@@ -217,6 +217,11 @@ class CloudDatabase:
                   f"reçus={report.get('pulled', 0)} conflits={report.get('conflicts', 0)}")
 
     @classmethod
+    def mark_projection_dirty(cls) -> None:
+        """The `adherents` directory is rewritten by the next background tick (e.g. written before a field existed)."""
+        cls._projection_dirty = True
+
+    @classmethod
     def refresh_projection(cls, force: bool = False):
         """Met à jour l'annuaire `adherents` / `planning` lu par la PWA et le webhook."""
         if not (cls._projection_dirty or force):

@@ -87,7 +87,7 @@ def test_coach_opens_a_competition_they_follow(page):
 
 
 def test_balance_of_an_athlete(mobile_page, test_data):
-    member = test_data.members(competition_only=True)[4]
+    member = test_data.competition_group()[4]
     season, june = _season()
     due, paid_comp = unique_name("E2E Due"), unique_name("E2E Paid")
     test_data.create_competition(due, date=f"{june}-06-03", prix=15, participants=[member["id"]], selected=[member["id"]])
@@ -107,7 +107,7 @@ def test_balance_of_an_athlete(mobile_page, test_data):
 
 
 def test_season_balance_export(page, test_data, tmp_path):
-    member = test_data.members(competition_only=True)[0]
+    member = test_data.competition_group()[0]
     season, june = _season()
     nom = unique_name("E2E Bilan")
     test_data.create_competition(nom, date=f"{june}-05-27", prix=14, participants=[member["id"]], selected=[member["id"]])

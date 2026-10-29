@@ -4,19 +4,32 @@ import type { BadgeColor } from "../../components/ui/palette";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
-import { normKey } from "../adherents/members";
+import { normKey, type MemberStatus } from "../adherents/members";
 import { plural } from "../../lib/text";
 
 export type Competition = Schemas["Competition"];
 export type Participant = Schemas["CompetitionParticipant"];
 export type CompetitorContact = Schemas["CompetitorContact"];
 export type Coach = Schemas["Coach"];
-/** What the screen keeps of the member directory (GET /api/competition-members, online only): the current tariff and
+/** What the screen keeps of the member directory (GET /api/competition-members limited to COMPETITOR_STATUSES, online only): the current tariff and
     slot group to group the participants, the names, licence and e-mail to add one or write to them. */
 export type MemberSlot = Pick<
   Schemas["CompetitionMember"],
   "id" | "nom" | "prenom" | "licence_ffme" | "email" | "email_secondaire" | "tarif" | "creneau_groupe"
 >;
+
+/** Membership statuses of the members offered as competitors (« Terminé »: FFME licence confirmed), sent as
+    ?status= to GET /api/competition-members and POST …/load-group. The member list fetched with it also gives the
+    participants their tariff and group: a licensed competitor never goes back to another status. */
+export const COMPETITOR_STATUSES: readonly MemberStatus[] = ["Terminé"];
+/** « Terminé » (or « Terminé » ou « Validé »…), for the coach-facing texts. */
+export const competitorStatusesLabel = COMPETITOR_STATUSES.map((status) => `« ${status} »`).join(" ou ");
+
+/** GET /api/competition-members limited to COMPETITOR_STATUSES. */
+export function competitionMembersPath(): string {
+  const query = new URLSearchParams(COMPETITOR_STATUSES.map((status) => ["status", status]));
+  return `/api/competition-members?${query.toString()}`;
+}
 
 export const ARCHIVED = "close";
 export const PREPARING = "en_preparation";

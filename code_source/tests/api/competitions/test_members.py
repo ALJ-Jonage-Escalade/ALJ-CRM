@@ -21,6 +21,17 @@ class TestCompetitionMembers(ApiTestCase):
             self.assertEqual({k: v for k, v in CompetitionMember.model_validate(m).model_dump().items() if k in declared},
                              {k: m[k] for k in declared})
 
+    def test_status_filter(self):
+        self.seed_adherent(1)
+        self.seed_adherent(2, nom="DURAND", statut="Validé")
+        self.seed_adherent(3, nom="PETIT", statut="Annulé")
+        ids = lambda params: [m["id"] for m in self.client.get("/api/competition-members", params=params).json()]  # noqa: E731
+        self.assertEqual(sorted(ids({})), [1, 2, 3])
+        self.assertEqual(ids({"status": "Terminé"}), [1])
+        self.assertEqual(sorted(ids({"status": ["Terminé", "Validé"]})), [1, 2])
+        self.assertEqual(self.client.get("/api/competition-members", params={"status": "Terminé"}).json()[0]["statut"], "Terminé")
+        self.assertEqual(self.client.get("/api/competition-members", params={"status": "Fini"}).status_code, 422)
+
     def test_firestore_failure_is_an_error_not_an_empty_directory(self):
         self.seed_adherent(1)
         with patch.object(FirestoreClient, "list_documents", side_effect=FirestoreError("down")):

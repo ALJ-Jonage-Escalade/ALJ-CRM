@@ -16,6 +16,7 @@ import { createCompetitionsApi } from "../services/competitions";
 import { isStaff } from "../lib/roles";
 import { offlineStore, STORE_KEY } from "../lib/store";
 import {
+  competitionMembersPath,
   sortCompetitions,
   toMemberSlots,
   type Coach,
@@ -59,7 +60,7 @@ const canWrite = computed(() => staff.value || (access.value === "offline" && co
 // Tariffs and slot groups to group the participants, names and e-mails to add or write to them: online only
 const members = useSyncedResource<MemberSlot[]>(
   "competition-members",
-  () => (open.value && signedIn.value ? "/api/competition-members" : null),
+  () => (open.value && signedIn.value ? competitionMembersPath() : null),
   {
     offline: false,
     select: toMemberSlots,

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from typing import List, Optional
+
+from fastapi import APIRouter, Query
 
 from api.competitions.schemas.participants import (
     CANCEL_MODES,
@@ -12,6 +14,7 @@ from api.competitions.schemas.participants import (
     ParticipantUpdate,
 )
 from api.competitions.schemas.views import Competition, GroupLoaded
+from api.members.schemas import MemberStatus
 from api.responses import document_responses
 from services.documents import Doc
 from services.competitions.participants import ParticipantService as Service
@@ -49,6 +52,9 @@ def remove_participant(competition_id: int, adherent_id: int) -> Doc:
 
 
 @router.post("/load-group", response_model=None, responses=document_responses(GroupLoaded, 404))
-def load_competition_group(competition_id: int) -> Doc:
-    added, competition = Service.load_competition_group(competition_id)
+def load_competition_group(
+    competition_id: int,
+    status: Optional[List[MemberStatus]] = Query(None, description="Only the members at one of these statuses (repeatable)"),
+) -> Doc:
+    added, competition = Service.load_competition_group(competition_id, status)
     return {"added": added, "competition": competition}

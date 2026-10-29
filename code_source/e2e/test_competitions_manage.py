@@ -169,7 +169,7 @@ def _read_csv(download, folder) -> list:
 
 
 def test_competition_csv_export(page, test_data, tmp_path):
-    members = test_data.members(competition_only=True)[:3]
+    members = test_data.competition_group()[:3]
     nom = unique_name("E2E Csv")
     test_data.create_competition(nom, date=_iso(26), participants=[m["id"] for m in members], selected=[members[0]["id"]])
     open_screen(page, "admin", "/bureau/competitions")
