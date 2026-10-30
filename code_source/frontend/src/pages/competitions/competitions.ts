@@ -228,7 +228,7 @@ export function athleteContactCards(p: Participant, member?: MemberSlot, contact
   const athletePhone = contact?.phone || member?.phone || p.phone || "";
   const athleteEmail = member?.email || p.email || "";
 
-  const c1: ContactCard = {
+  const athleteCard: ContactCard = {
     role: "athlete",
     title: "🧗 Athlète",
     name: athleteName,
@@ -242,7 +242,7 @@ export function athleteContactCards(p: Participant, member?: MemberSlot, contact
   if (!e1Email && member?.payer_email && member?.payer_name && e1Name && normKey(e1Name) === normKey(member.payer_name)) {
     e1Email = member.payer_email;
   }
-  const c2: ContactCard = {
+  const emergency1Card: ContactCard = {
     role: "emergency1",
     title: "🚨 Contact d'urgence 1",
     name: e1Name,
@@ -262,7 +262,7 @@ export function athleteContactCards(p: Participant, member?: MemberSlot, contact
   } else if (member?.payer_email && member.payer_email !== athleteEmail && member.payer_email !== e1Email) {
     e2Email = member.payer_email;
   }
-  const c3: ContactCard = {
+  const emergency2Card: ContactCard = {
     role: "emergency2",
     title: "🚨 Contact d'urgence 2",
     name: e2Name,
@@ -270,7 +270,7 @@ export function athleteContactCards(p: Participant, member?: MemberSlot, contact
     email: e2Email,
   };
 
-  return [c1, c2, c3];
+  return [athleteCard, emergency1Card, emergency2Card];
 }
 
 /** A participant as listed: the member's current tariff and slot group, phone and emergency contacts when known, and
@@ -419,9 +419,14 @@ export function defaultDeadline(start: string): string {
   if (!start || !/^\d{4}-\d{2}-\d{2}$/.test(start)) {
     return "";
   }
-  const d = new Date(start + "T00:00:00");
-  d.setDate(d.getDate() - 7);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const deadline = new Date(start + "T00:00:00");
+  deadline.setDate(deadline.getDate() - 7);
+  return `${deadline.getFullYear()}-${String(deadline.getMonth() + 1).padStart(2, "0")}-${String(deadline.getDate()).padStart(2, "0")}`;
+}
+
+/** The registration deadline of a competition, the default one when none is stored (cached before the field existed). */
+export function deadlineOf(c: Competition): string {
+  return c.deadline || defaultDeadline(c.date_competition ?? "");
 }
 
 export interface CompetitionDraft {
@@ -445,7 +450,7 @@ export function draftOf(c?: Competition): CompetitionDraft {
     id_ffme: c?.id_ffme ?? "",
     date_competition: start,
     date_fin: c?.date_fin && c.date_fin !== c.date_competition ? c.date_fin : "",
-    deadline: c?.deadline || (start ? defaultDeadline(start) : ""),
+    deadline: c?.deadline || defaultDeadline(start),
     lieu: c?.lieu ?? "",
     type: c?.type ?? "",
     prix: c ? String(c.prix ?? 0) : "",
@@ -477,7 +482,7 @@ export function draftBody(d: CompetitionDraft): Schemas["CompetitionCreate"] {
     id_ffme: d.id_ffme.trim(),
     date_competition: start,
     date_fin: start && d.date_fin > start ? d.date_fin : start,
-    deadline: d.deadline ? d.deadline : start ? defaultDeadline(start) : "",
+    deadline: d.deadline || defaultDeadline(start),
     lieu: d.lieu.trim(),
     type: d.type,
     prix: Number(d.prix.replace(",", ".")) || 0,

@@ -25,7 +25,7 @@ import {
   COMPETITOR_STATUSES,
   competitorStatusesLabel,
   csvName,
-  defaultDeadline,
+  deadlineOf,
   discipline,
   disciplineColor,
   filterRows,
@@ -385,9 +385,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         <h2 class="m-0 text-[17px] font-bold lg:text-lg lg:font-extrabold" data-testid="detail-name">{{ c.nom }}</h2>
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-1 lg:text-[12.5px]" data-testid="detail-meta">
           🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }}
-          <template v-if="c.deadline || (c.date_competition && defaultDeadline(c.date_competition))">
-            · ⏳ Date limite : {{ formatDayText(c.deadline || (c.date_competition ? defaultDeadline(c.date_competition) : "")) }}
-          </template>
+          <template v-if="deadlineOf(c)">· ⏳ Date limite : {{ formatDayText(deadlineOf(c)) }}</template>
           · 💶 {{ formatEuros(c.prix) }}
           <template v-if="c.lieu">· 📍 {{ c.lieu }}</template>
           <template v-if="isArchived(c)">· 📦 Archivée</template>

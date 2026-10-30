@@ -3,7 +3,7 @@
 import type { Schemas } from "../../../lib/client";
 import { looksLikeEmail } from "../../../lib/email";
 import { formatDayText } from "../../../lib/format";
-import { defaultDeadline, type Competition, type Row } from "../competitions";
+import { deadlineOf, type Competition, type Row } from "../competitions";
 
 export type Template = Schemas["EmailTemplate"];
 export type Audience = "selected" | "unpaid" | "all";
@@ -50,8 +50,7 @@ export function variables(c: Competition, r: Row | undefined): Record<string, st
   const end = formatDayText(c.date_fin ?? "");
   const wa = (c.whatsapp_link ?? "").trim();
   const dateFormatted = !end || end === start || !start ? start : `${start} au ${end}`;
-  const deadlineRaw = c.deadline || (c.date_competition ? defaultDeadline(c.date_competition) : "");
-  const deadlineFormatted = formatDayText(deadlineRaw);
+  const deadlineFormatted = formatDayText(deadlineOf(c));
   const lieu = (c.lieu ?? "").trim();
   return {
     first_name: (r?.prenom ?? "").trim(),

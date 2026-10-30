@@ -8,6 +8,7 @@ from domain.competitions.models import (
     LEGACY_COACH_SLOTS,
     Competition,
     coach_ids_of,
+    default_deadline,
     PAIEMENT_PAYE,
 )
 from infrastructure.firestore.client import (
@@ -137,12 +138,7 @@ class CompetitionStoreBase:
         """Document for the web pages: `coach_ids` normalized (legacy slots read too) and
         `coaches` resolved from the coaches collection, never the stored copy."""
         out = cls._clean_doc(doc)
-        start = str(doc.get("date_competition") or "")
-        deadline = str(doc.get("deadline") or "").strip()
-        if not deadline and start:
-            from domain.competitions.models import default_deadline
-            deadline = default_deadline(start)
-        out["deadline"] = deadline
+        out["deadline"] = str(doc.get("deadline") or "").strip() or default_deadline(str(doc.get("date_competition") or ""))
         out["coach_ids"] = coach_ids_of(doc)
         out["coaches"] = cls._coach_names(out["coach_ids"], coaches)
         return out
@@ -176,10 +172,7 @@ class CompetitionStoreBase:
         """Document complet prêt à être écrit (participants préservés)."""
         parts = (doc or {}).get("participants") or []
         now = cls._now_iso()
-        deadline = str(getattr(comp, "deadline", "") or (doc or {}).get("deadline") or "").strip()
-        if not deadline and comp.date_competition:
-            from domain.competitions.models import default_deadline
-            deadline = default_deadline(comp.date_competition)
+        deadline = (comp.deadline or str((doc or {}).get("deadline") or "")).strip() or default_deadline(comp.date_competition)
         new_doc = {
             "id": comp.id,
             "id_ffme": comp.id_ffme or "",

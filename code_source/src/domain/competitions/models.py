@@ -94,16 +94,11 @@ LIBELLE_VERS_STATUT_COMPETITION = {v: k for k, v in LIBELLES_STATUT_COMPETITION.
 
 def default_deadline(date_competition: str) -> str:
     """Date limite d'inscription par défaut : 7 jours avant le début de la compétition (ISO AAAA-MM-JJ)."""
-    if not date_competition:
-        return ""
     try:
-        parts = date_competition.strip()[:10].split("-")
-        if len(parts) == 3:
-            d = datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
-            return (d - datetime.timedelta(days=7)).isoformat()
-    except (ValueError, TypeError):
-        pass
-    return ""
+        start = datetime.date.fromisoformat(date_competition.strip()[:10])
+    except ValueError:
+        return ""
+    return (start - datetime.timedelta(days=7)).isoformat()
 
 
 @dataclass
@@ -150,16 +145,13 @@ class Competition:
     @classmethod
     def from_row(cls, row: dict) -> "Competition":
         date_start = str(row.get("date_competition") or "")
-        deadline_val = str(row.get("deadline") or "").strip()
-        if not deadline_val and date_start:
-            deadline_val = default_deadline(date_start)
         return cls(
             id=row.get("id"),
             id_ffme=str(row.get("id_ffme") or ""),
             nom=str(row.get("nom") or ""),
             date_competition=date_start,
             date_fin=str(row.get("date_fin") or ""),
-            deadline=deadline_val,
+            deadline=str(row.get("deadline") or "").strip() or default_deadline(date_start),
             prix=float(row.get("prix") or 0.0),
             statut=str(row.get("statut") or STATUT_EN_PREPARATION),
             helloasso_ref=str(row.get("helloasso_ref") or ""),
