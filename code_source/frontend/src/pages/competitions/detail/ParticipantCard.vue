@@ -5,7 +5,14 @@ import { telHref } from "../../adherents/members";
 import { hasPaid, isCancelled, payment, ranking, type Row } from "../competitions";
 
 const props = defineProps<{ row: Row; canWrite: boolean; staff: boolean; contactsShown: boolean }>();
-const emit = defineEmits<{ toggle: [flag: "selectionne" | "present", value: boolean]; remove: []; pay: []; withdraw: []; restore: [] }>();
+const emit = defineEmits<{
+  toggle: [flag: "selectionne" | "present", value: boolean];
+  remove: [];
+  pay: [];
+  withdraw: [];
+  restore: [];
+  showContact: [];
+}>();
 
 /* The box shows the data, not the click: it changes once the change is made (or queued), and stays put when refused. */
 function onToggle(flag: "selectionne" | "present", e: Event): void {
@@ -23,7 +30,17 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
   <li data-testid="participant-card" class="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm">
     <div class="flex items-start justify-between gap-2">
       <span class="min-w-0">
-        <b class="block text-[14.5px]" data-testid="participant-name">{{ row.nom }} {{ row.prenom }}</b>
+        <button
+          v-if="contactsShown"
+          type="button"
+          data-testid="participant-name"
+          class="block cursor-pointer text-left text-[14.5px] font-bold text-blue-950 hover:text-blue-600 hover:underline"
+          title="Voir la fiche contact"
+          @click="emit('showContact')"
+        >
+          {{ row.nom }} {{ row.prenom }}
+        </button>
+        <b v-else class="block text-[14.5px]" data-testid="participant-name">{{ row.nom }} {{ row.prenom }}</b>
         <span class="block text-xs text-slate-500">
           🪪 {{ row.num_licence || "sans licence" }} · {{ row.tarif || "—" }}
           <template v-if="staff && row.commande_helloasso">· 🧾 {{ row.commande_helloasso }}</template>

@@ -35,6 +35,7 @@ export const DEMO_MEMBER: Record<string, string> = {
   num_licence: "847291",
   nom_competition: "Championnat Régional Bloc",
   date_competition: "15/11/2026",
+  competition_deadline: "08/11/2026",
   montant_competition: "15.00 €",
 };
 export const VARIABLES = Object.keys(DEMO_MEMBER).map((name) => `{${name}}`);

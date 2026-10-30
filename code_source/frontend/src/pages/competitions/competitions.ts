@@ -193,11 +193,48 @@ export function ranking(p: Participant): string {
   return `${icon} ${r}${total > 0 ? ` / ${total}` : r === "1" ? "er" : "e"}`;
 }
 
+export interface ContactCard {
+  role: "athlete" | "emergency1" | "emergency2";
+  title: string;
+  name: string;
+  phone: string;
+  email: string;
+}
+
+/** The 3 contact cards of an athlete: the athlete (with the e-mail of the member list), emergency contacts 1 and 2
+    (name and phone only: no e-mail is kept offline about a competitor's contacts). */
+export function athleteContactCards(p: Participant, member?: MemberSlot, contact?: CompetitorContact): ContactCard[] {
+  return [
+    {
+      role: "athlete",
+      title: "🧗 Athlète",
+      name: `${p.prenom} ${p.nom}`.trim() || `${member?.prenom ?? ""} ${member?.nom ?? ""}`.trim(),
+      phone: contact?.phone || p.phone || "",
+      email: member?.email || p.email || "",
+    },
+    {
+      role: "emergency1",
+      title: "🚨 Contact d'urgence 1",
+      name: contact?.emergency1_name || p.urgence_nom || "",
+      phone: contact?.emergency1_phone || p.urgence_tel || "",
+      email: "",
+    },
+    {
+      role: "emergency2",
+      title: "🚨 Contact d'urgence 2",
+      name: contact?.emergency2_name ?? "",
+      phone: contact?.emergency2_phone ?? "",
+      email: "",
+    },
+  ];
+}
+
 /** A participant as listed: the member's current tariff and slot group, phone and emergency contacts when known, and
     the changes waiting in the outbox (shown at once, sent when the network comes back). */
 export interface Row extends Participant {
   group: string;
   emergency: { name: string; phone: string }[];
+  contacts: ContactCard[];
   /** Flags changed offline, not sent yet */
   queued: { selectionne: boolean; present: boolean };
 }
@@ -239,6 +276,7 @@ export function participantRows(
       email: member?.email || member?.email_secondaire || p.email || "",
       group: member?.creneau_groupe || contact?.creneau_groupe || tarif || UNIDENTIFIED,
       emergency: emergency.filter((e) => e.phone),
+      contacts: athleteContactCards(p, member, contact),
     };
   });
 }
@@ -331,11 +369,27 @@ export const csvName = (c: Competition): string => `competition_${String(c.nom |
 
 export const DISCIPLINES = ["Bloc", "Difficulté", "Vitesse", "Combiné", "Escalade"] as const;
 
+/** 7 days before the start date (YYYY-MM-DD), or empty string when undated. */
+export function defaultDeadline(start: string): string {
+  if (!start || !/^\d{4}-\d{2}-\d{2}$/.test(start)) {
+    return "";
+  }
+  const deadline = new Date(start + "T00:00:00");
+  deadline.setDate(deadline.getDate() - 7);
+  return `${deadline.getFullYear()}-${String(deadline.getMonth() + 1).padStart(2, "0")}-${String(deadline.getDate()).padStart(2, "0")}`;
+}
+
+/** The registration deadline of a competition, the default one when none is stored (cached before the field existed). */
+export function deadlineOf(c: Competition): string {
+  return c.deadline || defaultDeadline(c.date_competition ?? "");
+}
+
 export interface CompetitionDraft {
   nom: string;
   id_ffme: string;
   date_competition: string;
   date_fin: string;
+  deadline: string;
   lieu: string;
   type: string;
   prix: string;
@@ -345,11 +399,13 @@ export interface CompetitionDraft {
 }
 
 export function draftOf(c?: Competition): CompetitionDraft {
+  const start = c?.date_competition ?? "";
   return {
     nom: c?.nom ?? "",
     id_ffme: c?.id_ffme ?? "",
-    date_competition: c?.date_competition ?? "",
+    date_competition: start,
     date_fin: c?.date_fin && c.date_fin !== c.date_competition ? c.date_fin : "",
+    deadline: c?.deadline || defaultDeadline(start),
     lieu: c?.lieu ?? "",
     type: c?.type ?? "",
     prix: c ? String(c.prix ?? 0) : "",
@@ -381,6 +437,8 @@ export function draftBody(d: CompetitionDraft): Schemas["CompetitionCreate"] {
     id_ffme: d.id_ffme.trim(),
     date_competition: start,
     date_fin: start && d.date_fin > start ? d.date_fin : start,
+    // Only a deadline set by hand is stored: the default one follows the start date
+    deadline: d.deadline === defaultDeadline(start) ? "" : d.deadline,
     lieu: d.lieu.trim(),
     type: d.type,
     prix: Number(d.prix.replace(",", ".")) || 0,

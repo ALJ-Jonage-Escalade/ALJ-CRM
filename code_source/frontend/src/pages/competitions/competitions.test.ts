@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  athleteContactCards,
   coachChoices,
   competitionMembersPath,
   competitorStatusesLabel,
   counts,
+  defaultDeadline,
   discipline,
   disciplineColor,
   draftBody,
@@ -23,6 +25,7 @@ import {
   toMemberSlots,
   UNIDENTIFIED,
   type Competition,
+  type CompetitorContact,
   type MemberSlot,
 } from "./competitions";
 
@@ -86,17 +89,21 @@ describe("competitions", () => {
       prix: "Montant invalide.",
       date_fin: "Indiquez d'abord la date de début.",
     });
+    expect(defaultDeadline("2026-03-14")).toBe("2026-03-07");
+    expect(defaultDeadline("")).toBe("");
     const draft = { ...draftOf(), nom: " Open ", date_competition: "2026-03-14", date_fin: "2026-03-13", prix: "12,5", coach_ids: [3, 1] };
     expect(draftBody(draft)).toMatchObject({
       nom: "Open",
       date_competition: "2026-03-14",
       date_fin: "2026-03-14",
+      deadline: "",
       prix: 12.5,
       coach_ids: [3, 1],
     });
     expect(draftBody({ ...draft, date_fin: "2026-03-15" }).date_fin).toBe("2026-03-15");
+    expect(draftBody({ ...draft, deadline: "2026-03-01" }).deadline).toBe("2026-03-01");
     const edited = draftOf(comp({ nom: "X", date_competition: "2026-03-14", date_fin: "2026-03-14", prix: 9, lieu: "Lyon" }));
-    expect([edited.date_fin, edited.prix, edited.lieu]).toEqual(["", "9", "Lyon"]);
+    expect([edited.date_fin, edited.prix, edited.lieu, edited.deadline]).toEqual(["", "9", "Lyon", "2026-03-07"]);
   });
 
   it("offers the competition's coaches first, in their order, then the others by name", () => {
@@ -214,5 +221,37 @@ describe("participants", () => {
       ["MARTIN", "1er", "Oui", "Payé"],
       ["ABEL", "", "Non", "Non invité"],
     ]);
+  });
+
+  it("builds the 3 contact cards from the competitor's contacts, e-mail on the athlete's card only", () => {
+    const p = { nom: "DUPONT", prenom: "Lucas", email: "lucas@test.fr" };
+    const member: MemberSlot = { id: 10, nom: "DUPONT", prenom: "Lucas", email: "lucas@test.fr", email_secondaire: "maman@test.fr" };
+    const contact: CompetitorContact = {
+      adherent_id: 10,
+      last_name: "DUPONT",
+      first_name: "Lucas",
+      phone: "06 00 11 22 33",
+      creneau_groupe: "",
+      emergency1_name: "Dupont Marie",
+      emergency1_phone: "06 11 11 11 11",
+      emergency2_name: "Dupont Jean",
+      emergency2_phone: "06 22 22 22 22",
+    };
+    expect(athleteContactCards(p, member, contact)).toEqual([
+      { role: "athlete", title: "🧗 Athlète", name: "Lucas DUPONT", phone: "06 00 11 22 33", email: "lucas@test.fr" },
+      { role: "emergency1", title: "🚨 Contact d'urgence 1", name: "Dupont Marie", phone: "06 11 11 11 11", email: "" },
+      { role: "emergency2", title: "🚨 Contact d'urgence 2", name: "Dupont Jean", phone: "06 22 22 22 22", email: "" },
+    ]);
+  });
+
+  it("handles empty or partial contacts gracefully", () => {
+    const p = { nom: "SOLO", prenom: "Han" };
+    const cards = athleteContactCards(p);
+    expect(cards).toHaveLength(3);
+    expect(cards[0]!.name).toBe("Han SOLO");
+    expect(cards[0]!.phone).toBe("");
+    expect(cards[0]!.email).toBe("");
+    expect(cards[1]!.name).toBe("");
+    expect(cards[2]!.name).toBe("");
   });
 });

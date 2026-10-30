@@ -1512,6 +1512,12 @@ export interface components {
              */
             date_fin?: string;
             /**
+             * Deadline
+             * @description YYYY-MM-DD, registration deadline (defaults to 1 week before date_competition)
+             * @default
+             */
+            deadline?: string;
+            /**
              * Prix
              * @default 0
              */
@@ -1572,6 +1578,11 @@ export interface components {
              * @default
              */
             date_fin?: string;
+            /**
+             * Deadline
+             * @default
+             */
+            deadline?: string;
             /**
              * Prix
              * @default 0
@@ -1809,6 +1820,8 @@ export interface components {
             date_competition?: string | null;
             /** Date Fin */
             date_fin?: string | null;
+            /** Deadline */
+            deadline?: string | null;
             /** Prix */
             prix?: number | null;
             /** Statut */

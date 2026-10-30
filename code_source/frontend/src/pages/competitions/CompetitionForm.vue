@@ -6,7 +6,17 @@ import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { CLIENT_KEY, type Schemas } from "../../lib/client";
 import { createCompetitionsApi } from "../../services/competitions";
-import { type Coach, coachChoices, type Competition, DISCIPLINES, draftBody, draftErrors, draftOf, resultsUrlHint } from "./competitions";
+import {
+  type Coach,
+  coachChoices,
+  type Competition,
+  defaultDeadline,
+  DISCIPLINES,
+  draftBody,
+  draftErrors,
+  draftOf,
+  resultsUrlHint,
+} from "./competitions";
 
 const props = defineProps<{ competition?: Competition; coaches: readonly Coach[]; busy: boolean }>();
 const emit = defineEmits<{ save: [body: Schemas["CompetitionCreate"]]; cancel: [] }>();
@@ -22,9 +32,14 @@ const lookupBusy = ref(false);
 const lookupError = ref("");
 const lookupSuccess = ref("");
 let endByHand = !!draft.value.date_fin;
+let deadlineByHand = draft.value.deadline !== defaultDeadline(draft.value.date_competition);
 
 function endSetByHand(): void {
   endByHand = true;
+}
+
+function deadlineSetByHand(): void {
+  deadlineByHand = true;
 }
 
 watch(
@@ -32,6 +47,9 @@ watch(
   (start) => {
     if (!endByHand || (draft.value.date_fin && draft.value.date_fin < start)) {
       draft.value.date_fin = "";
+    }
+    if (!deadlineByHand && start) {
+      draft.value.deadline = defaultDeadline(start);
     }
   },
 );
@@ -59,6 +77,9 @@ async function lookupFfme(): Promise<void> {
     }
     if (info.date_competition) {
       draft.value.date_competition = info.date_competition;
+      if (!deadlineByHand) {
+        draft.value.deadline = defaultDeadline(info.date_competition);
+      }
     }
     if (info.date_fin) {
       draft.value.date_fin = info.date_fin;
@@ -125,7 +146,7 @@ const error = "mt-1 text-xs font-semibold text-red-600";
       <input id="cf-nom" v-model="draft.nom" data-testid="cf-nom" :class="field" autocomplete="off" />
       <p v-if="shown && errors.nom" :class="error" data-testid="cf-error">{{ errors.nom }}</p>
     </div>
-    <div class="grid grid-cols-2 gap-2 sm:col-span-2">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:col-span-2">
       <div>
         <label for="cf-date" :class="label">Date de début</label>
         <input id="cf-date" v-model="draft.date_competition" type="date" data-testid="cf-date" :class="field" />
@@ -142,6 +163,10 @@ const error = "mt-1 text-xs font-semibold text-red-600";
           @input="endSetByHand"
         />
         <p v-if="shown && errors.date_fin" :class="error">{{ errors.date_fin }}</p>
+      </div>
+      <div>
+        <label for="cf-deadline" :class="label">Date limite (deadline)</label>
+        <input id="cf-deadline" v-model="draft.deadline" type="date" data-testid="cf-deadline" :class="field" @input="deadlineSetByHand" />
       </div>
     </div>
 

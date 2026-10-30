@@ -3844,6 +3844,12 @@
             "title": "Date Fin",
             "default": ""
           },
+          "deadline": {
+            "type": "string",
+            "title": "Deadline",
+            "description": "YYYY-MM-DD, registration deadline (defaults to 1 week before date_competition)",
+            "default": ""
+          },
           "prix": {
             "type": "number",
             "title": "Prix",
@@ -3943,6 +3949,11 @@
           "date_fin": {
             "type": "string",
             "title": "Date Fin",
+            "default": ""
+          },
+          "deadline": {
+            "type": "string",
+            "title": "Deadline",
             "default": ""
           },
           "prix": {
@@ -4334,6 +4345,17 @@
               }
             ],
             "title": "Date Fin"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
           },
           "prix": {
             "anyOf": [

@@ -50,6 +50,7 @@ class Competition(BaseModel):
     id_ffme: str = ""
     date_competition: str = Field("", description="YYYY-MM-DD, empty when not dated")
     date_fin: str = ""
+    deadline: str = Field("", description="YYYY-MM-DD, registration deadline (defaults to 1 week before date_competition)")
     prix: float = 0.0
     statut: str = Field("en_preparation", description="en_preparation, en_cours or close (archived)")
     whatsapp_link: str = ""

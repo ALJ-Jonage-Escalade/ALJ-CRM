@@ -4,6 +4,7 @@ Modèles métier du module de gestion des compétitions (base partagée Firestor
 Ces modèles sont purs (aucune dépendance Qt / réseau) afin d'être réutilisables
 par l'application de bureau, le serveur web et les tests unitaires.
 """
+import datetime
 from dataclasses import dataclass, field
 from typing import Any, List, Mapping
 
@@ -91,6 +92,15 @@ LIBELLE_VERS_STATUT_PAIEMENT = {v: k for k, v in LIBELLES_STATUT_PAIEMENT.items(
 LIBELLE_VERS_STATUT_COMPETITION = {v: k for k, v in LIBELLES_STATUT_COMPETITION.items()}
 
 
+def default_deadline(date_competition: str) -> str:
+    """Date limite d'inscription par défaut : 7 jours avant le début de la compétition (ISO AAAA-MM-JJ)."""
+    try:
+        start = datetime.date.fromisoformat(date_competition.strip()[:10])
+    except ValueError:
+        return ""
+    return (start - datetime.timedelta(days=7)).isoformat()
+
+
 @dataclass
 class Competition:
     """Une épreuve de la saison (document Firestore `competitions/{id}`)."""
@@ -99,6 +109,7 @@ class Competition:
     nom: str = ""
     date_competition: str = ""       # date de début, ISO AAAA-MM-JJ
     date_fin: str = ""               # date de fin ISO ; vide = même jour que le début
+    deadline: str = ""               # date limite d'inscription ISO, saisie à la main ; vide = 7j avant le début (default_deadline)
     prix: float = 0.0                # tarif d'inscription en euros
     statut: str = STATUT_EN_PREPARATION
     helloasso_ref: str = ""          # slug ou URL de la campagne HelloAsso dédiée
@@ -119,6 +130,7 @@ class Competition:
             "nom": self.nom,
             "date_competition": self.date_competition,
             "date_fin": self.date_fin,
+            "deadline": self.deadline,
             "prix": self.prix,
             "statut": self.statut,
             "helloasso_ref": self.helloasso_ref,
@@ -138,6 +150,7 @@ class Competition:
             nom=str(row.get("nom") or ""),
             date_competition=str(row.get("date_competition") or ""),
             date_fin=str(row.get("date_fin") or ""),
+            deadline=str(row.get("deadline") or "").strip(),
             prix=float(row.get("prix") or 0.0),
             statut=str(row.get("statut") or STATUT_EN_PREPARATION),
             helloasso_ref=str(row.get("helloasso_ref") or ""),

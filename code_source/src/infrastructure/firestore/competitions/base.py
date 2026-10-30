@@ -8,6 +8,7 @@ from domain.competitions.models import (
     LEGACY_COACH_SLOTS,
     Competition,
     coach_ids_of,
+    default_deadline,
     PAIEMENT_PAYE,
 )
 from infrastructure.firestore.client import (
@@ -135,8 +136,10 @@ class CompetitionStoreBase:
     @classmethod
     def _api_doc(cls, doc: Dict[str, Any], coaches: Dict[int, str]) -> Dict[str, Any]:
         """Document for the web pages: `coach_ids` normalized (legacy slots read too) and
-        `coaches` resolved from the coaches collection, never the stored copy."""
+        `coaches` resolved from the coaches collection, never the stored copy. Only a deadline set by
+        hand is stored: the default one (1 week before the start) follows the start date."""
         out = cls._clean_doc(doc)
+        out["deadline"] = str(doc.get("deadline") or "").strip() or default_deadline(str(doc.get("date_competition") or ""))
         out["coach_ids"] = coach_ids_of(doc)
         out["coaches"] = cls._coach_names(out["coach_ids"], coaches)
         return out
@@ -149,6 +152,7 @@ class CompetitionStoreBase:
             "nom": doc.get("nom"),
             "date_competition": doc.get("date_competition"),
             "date_fin": doc.get("date_fin"),
+            "deadline": doc.get("deadline"),
             "prix": doc.get("prix"),
             "statut": doc.get("statut"),
             "helloasso_ref": doc.get("helloasso_ref"),
@@ -175,6 +179,7 @@ class CompetitionStoreBase:
             "nom": comp.nom or "",
             "date_competition": comp.date_competition or "",
             "date_fin": comp.date_fin or "",
+            "deadline": (comp.deadline or "").strip(),
             "prix": float(comp.prix or 0.0),
             "statut": comp.statut or "en_preparation",
             "helloasso_ref": comp.helloasso_ref or "",

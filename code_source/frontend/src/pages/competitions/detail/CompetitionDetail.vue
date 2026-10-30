@@ -25,6 +25,7 @@ import {
   COMPETITOR_STATUSES,
   competitorStatusesLabel,
   csvName,
+  deadlineOf,
   discipline,
   disciplineColor,
   filterRows,
@@ -44,11 +45,13 @@ import {
 } from "../competitions";
 import EmailForm from "./EmailForm.vue";
 import type { Outbox, QueuedFlag } from "../outbox";
+import AthleteContactDialog from "./AthleteContactDialog.vue";
 import ParticipantCard from "./ParticipantCard.vue";
 import ParticipantRow from "./ParticipantRow.vue";
 import PaymentForm from "./PaymentForm.vue";
 import WithdrawForm from "./WithdrawForm.vue";
 import { WRITER_KEY } from "../writer";
+import { formatDayText } from "../../../lib/format";
 import { plural } from "../../../lib/text";
 import { dialogs } from "../../../composables/dialogs";
 
@@ -343,6 +346,8 @@ async function restore(r: Row): Promise<void> {
 }
 
 const emailing = ref(false);
+const contactAthlete = ref<Row | null>(null);
+const contactDialogOpen = ref(false);
 /* A dialog open while its participant is set; closing it (Escape, outside click) forgets the participant. */
 const dialog = (r: { value: Participant | null }) =>
   computed({
@@ -379,7 +384,9 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       <div class="min-w-0">
         <h2 class="m-0 text-[17px] font-bold lg:text-lg lg:font-extrabold" data-testid="detail-name">{{ c.nom }}</h2>
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-1 lg:text-[12.5px]" data-testid="detail-meta">
-          🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }} · 💶 {{ formatEuros(c.prix) }}
+          🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }}
+          <template v-if="deadlineOf(c)">· ⏳ Date limite : {{ formatDayText(deadlineOf(c)) }}</template>
+          · 💶 {{ formatEuros(c.prix) }}
           <template v-if="c.lieu">· 📍 {{ c.lieu }}</template>
           <template v-if="isArchived(c)">· 📦 Archivée</template>
           <UiBadge v-if="discipline(c)" :color="disciplineColor(discipline(c))" variant="soft" class="ml-1" data-testid="discipline">
@@ -566,6 +573,10 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
               @pay="paying = server(r) ?? null"
               @withdraw="withdrawing = server(r) ?? null"
               @restore="restore(r)"
+              @show-contact="
+                contactAthlete = r;
+                contactDialogOpen = true;
+              "
             />
           </tbody>
         </table>
@@ -588,6 +599,10 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
               @pay="paying = server(r) ?? null"
               @withdraw="withdrawing = server(r) ?? null"
               @restore="restore(r)"
+              @show-contact="
+                contactAthlete = r;
+                contactDialogOpen = true;
+              "
             />
           </ul>
         </div>
@@ -722,5 +737,8 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         </UiDialogActions>
       </div>
     </UiDialog>
+
+    <!-- Modal Fiche contact athlète -->
+    <AthleteContactDialog v-model:open="contactDialogOpen" :athlete="contactAthlete" />
   </section>
 </template>
