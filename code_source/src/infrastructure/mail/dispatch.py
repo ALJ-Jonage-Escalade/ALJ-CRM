@@ -98,6 +98,11 @@ class EmailDispatchService:
 
         from domain.utils import format_periode
         date_formatted = format_periode(comp.date_competition, comp.date_fin)
+        deadline_raw = str(doc.get("deadline") or getattr(comp, "deadline", "") or "").strip()
+        if not deadline_raw and comp.date_competition:
+            from domain.competitions.models import default_deadline
+            deadline_raw = default_deadline(comp.date_competition)
+        deadline_formatted = format_periode(deadline_raw) if deadline_raw else ""
         wa_link = str(getattr(comp, "whatsapp_link", "") or "").strip()
         bloc_wa = f"Voici le lien du groupe WhatApp dédié à cette compétition : {wa_link}" if wa_link else ""
 
@@ -111,6 +116,8 @@ class EmailDispatchService:
             "montant_competition": format_montant(comp.prix),
             "date_competition": date_formatted,
             "competition_date": date_formatted,
+            "competition_deadline": deadline_formatted,
+            "deadline": deadline_formatted,
             "lieu": lieu,
             "competition_lieu": lieu,
             "whatapp_Id": wa_link,

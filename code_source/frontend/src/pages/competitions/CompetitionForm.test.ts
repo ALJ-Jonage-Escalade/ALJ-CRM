@@ -95,6 +95,12 @@ describe("CompetitionForm", () => {
     const dateFinInput = wrapper.get('[data-testid="cf-date-fin"]');
     expect((dateFinInput.element as HTMLInputElement).value).toBe("2026-11-07");
 
+    const deadlineInput = wrapper.get('[data-testid="cf-deadline"]');
+    expect((deadlineInput.element as HTMLInputElement).value).toBe("2026-10-31");
+
+    await deadlineInput.setValue("2026-10-25");
+    expect((deadlineInput.element as HTMLInputElement).value).toBe("2026-10-25");
+
     const lieuInput = wrapper.get('[data-testid="cf-lieu"]');
     expect((lieuInput.element as HTMLInputElement).value).toBe("CUSSET");
 

@@ -17,7 +17,7 @@ from services.documents import Doc
 
 # Fields stored as given, outside the domain model (plan appendix B)
 PASS_THROUGH_FIELDS = ("lieu", "type")
-COMPETITION_FIELDS = ("nom", "id_ffme", "date_competition", "date_fin", "prix", "statut",
+COMPETITION_FIELDS = ("nom", "id_ffme", "date_competition", "date_fin", "deadline", "prix", "statut",
                       "helloasso_ref", "url_resultats", "whatsapp_link")
 
 

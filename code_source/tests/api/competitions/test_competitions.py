@@ -59,6 +59,19 @@ class TestCompetitions(ApiTestCase):
                      {"nom": "A", "prix": -1}, {"nom": "A", "champ_inconnu": 1}):
             self.assertEqual(self.client.post("/api/competitions", json=body).status_code, 422, body)
 
+    def test_deadline_default_and_update(self):
+        # Default: 1 week before date_competition
+        doc = self.create(nom="Open", date_competition="2026-03-15")
+        self.assertEqual(doc["deadline"], "2026-03-08")
+
+        # Custom deadline on create
+        custom = self.create(nom="Open 2", date_competition="2026-03-15", deadline="2026-03-01")
+        self.assertEqual(custom["deadline"], "2026-03-01")
+
+        # Edit deadline
+        updated = self.client.patch(f"/api/competitions/{doc['id']}", json={"deadline": "2026-03-05"}).json()
+        self.assertEqual(updated["deadline"], "2026-03-05")
+
     def test_partial_update_keeps_other_fields(self):
         doc = self.create(id_ffme="18846", helloasso_ref="coupe-rhone", lieu="Lyon")
         r = self.client.patch(f"/api/competitions/{doc['id']}", json={"nom": "Coupe du Rhône"})

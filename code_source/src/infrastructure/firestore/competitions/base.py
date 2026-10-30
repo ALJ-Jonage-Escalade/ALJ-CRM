@@ -137,6 +137,12 @@ class CompetitionStoreBase:
         """Document for the web pages: `coach_ids` normalized (legacy slots read too) and
         `coaches` resolved from the coaches collection, never the stored copy."""
         out = cls._clean_doc(doc)
+        start = str(doc.get("date_competition") or "")
+        deadline = str(doc.get("deadline") or "").strip()
+        if not deadline and start:
+            from domain.competitions.models import default_deadline
+            deadline = default_deadline(start)
+        out["deadline"] = deadline
         out["coach_ids"] = coach_ids_of(doc)
         out["coaches"] = cls._coach_names(out["coach_ids"], coaches)
         return out
@@ -149,6 +155,7 @@ class CompetitionStoreBase:
             "nom": doc.get("nom"),
             "date_competition": doc.get("date_competition"),
             "date_fin": doc.get("date_fin"),
+            "deadline": doc.get("deadline"),
             "prix": doc.get("prix"),
             "statut": doc.get("statut"),
             "helloasso_ref": doc.get("helloasso_ref"),
@@ -169,12 +176,17 @@ class CompetitionStoreBase:
         """Document complet prêt à être écrit (participants préservés)."""
         parts = (doc or {}).get("participants") or []
         now = cls._now_iso()
+        deadline = str(getattr(comp, "deadline", "") or (doc or {}).get("deadline") or "").strip()
+        if not deadline and comp.date_competition:
+            from domain.competitions.models import default_deadline
+            deadline = default_deadline(comp.date_competition)
         new_doc = {
             "id": comp.id,
             "id_ffme": comp.id_ffme or "",
             "nom": comp.nom or "",
             "date_competition": comp.date_competition or "",
             "date_fin": comp.date_fin or "",
+            "deadline": deadline,
             "prix": float(comp.prix or 0.0),
             "statut": comp.statut or "en_preparation",
             "helloasso_ref": comp.helloasso_ref or "",

@@ -140,12 +140,15 @@ def apply_template_variables(text: str, member: Any, competition_context: dict =
         "montant_competition",
         "date_competition",
         "competition_date",
+        "competition_deadline",
+        "deadline",
         "lieu",
         "competition_lieu",
     ):
         val = str(ctx.get(key) or "").strip()
         if val:
             out = out.replace("{" + key + "}", enc(val))
+            out = out.replace("{" + key.title() + "}", enc(val))
 
     wa_val = str(
         ctx.get("whatapp_Id")

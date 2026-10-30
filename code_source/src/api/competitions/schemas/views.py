@@ -50,6 +50,7 @@ class Competition(BaseModel):
     id_ffme: str = ""
     date_competition: str = Field("", description="YYYY-MM-DD, empty when not dated")
     date_fin: str = ""
+    deadline: str = Field("", description="YYYY-MM-DD, registration deadline (defaults to 1 week before date_competition)")
     prix: float = 0.0
     statut: str = Field("en_preparation", description="en_preparation, en_cours or close (archived)")
     whatsapp_link: str = ""
@@ -72,6 +73,7 @@ class CompetitionMember(BaseModel):
     prenom: str = ""
     num_licence: str = ""
     licence_ffme: str = ""
+    phone: str = ""
     email: str = ""
     email_secondaire: str = ""
     tarif: str = ""
@@ -79,6 +81,12 @@ class CompetitionMember(BaseModel):
     saison: str = ""
     creneau_groupe: str = ""
     sex: Optional[Sex] = None
+    emergency1_name: str = ""
+    emergency1_phone: str = ""
+    emergency2_name: str = ""
+    emergency2_phone: str = ""
+    payer_name: str = ""
+    payer_email: str = ""
 
 
 class GroupLoaded(BaseModel):

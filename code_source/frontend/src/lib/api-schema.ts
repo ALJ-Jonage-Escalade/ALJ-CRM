@@ -1512,6 +1512,12 @@ export interface components {
              */
             date_fin?: string;
             /**
+             * Deadline
+             * @description YYYY-MM-DD, registration deadline (defaults to 1 week before date_competition)
+             * @default
+             */
+            deadline?: string;
+            /**
              * Prix
              * @default 0
              */
@@ -1572,6 +1578,11 @@ export interface components {
              * @default
              */
             date_fin?: string;
+            /**
+             * Deadline
+             * @default
+             */
+            deadline?: string;
             /**
              * Prix
              * @default 0
@@ -1650,6 +1661,11 @@ export interface components {
              */
             licence_ffme?: string;
             /**
+             * Phone
+             * @default
+             */
+            phone?: string;
+            /**
              * Email
              * @default
              */
@@ -1681,6 +1697,36 @@ export interface components {
              */
             creneau_groupe?: string;
             sex?: components["schemas"]["Sex"] | null;
+            /**
+             * Emergency1 Name
+             * @default
+             */
+            emergency1_name?: string;
+            /**
+             * Emergency1 Phone
+             * @default
+             */
+            emergency1_phone?: string;
+            /**
+             * Emergency2 Name
+             * @default
+             */
+            emergency2_name?: string;
+            /**
+             * Emergency2 Phone
+             * @default
+             */
+            emergency2_phone?: string;
+            /**
+             * Payer Name
+             * @default
+             */
+            payer_name?: string;
+            /**
+             * Payer Email
+             * @default
+             */
+            payer_email?: string;
         } & {
             [key: string]: unknown;
         };
@@ -1809,6 +1855,8 @@ export interface components {
             date_competition?: string | null;
             /** Date Fin */
             date_fin?: string | null;
+            /** Deadline */
+            deadline?: string | null;
             /** Prix */
             prix?: number | null;
             /** Statut */

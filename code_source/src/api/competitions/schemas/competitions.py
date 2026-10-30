@@ -35,6 +35,7 @@ class CompetitionCreate(RequestBody):
     id_ffme: str = ""
     date_competition: str = ""
     date_fin: str = ""
+    deadline: str = ""
     prix: float = Field(0.0, ge=0)
     statut: str = STATUT_EN_PREPARATION
     coach_ids: List[int] = Field(default_factory=list)
@@ -46,7 +47,7 @@ class CompetitionCreate(RequestBody):
     type: Optional[str] = None
 
     _statut = field_validator("statut")(_check_statut)
-    _dates = field_validator("date_competition", "date_fin")(_check_date)
+    _dates = field_validator("date_competition", "date_fin", "deadline")(_check_date)
     _coaches = field_validator("coach_ids")(_distinct)
 
 
@@ -56,6 +57,7 @@ class CompetitionUpdate(RequestBody):
     id_ffme: Optional[str] = None
     date_competition: Optional[str] = None
     date_fin: Optional[str] = None
+    deadline: Optional[str] = None
     prix: Optional[float] = Field(None, ge=0)
     statut: Optional[str] = None
     coach_ids: Optional[List[int]] = None
@@ -66,7 +68,7 @@ class CompetitionUpdate(RequestBody):
     type: Optional[str] = None
 
     _statut = field_validator("statut")(_check_statut)
-    _dates = field_validator("date_competition", "date_fin")(_check_date)
+    _dates = field_validator("date_competition", "date_fin", "deadline")(_check_date)
     _coaches = field_validator("coach_ids")(_distinct)
 
 
