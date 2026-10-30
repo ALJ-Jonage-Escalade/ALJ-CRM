@@ -574,7 +574,12 @@ class TestBureauFiles(unittest.TestCase):
         # An empty sender falls back to the club's address
         saved = client.post("/api/email-templates", json={**base, "name": "Défaut"}).json()["template"]
         self.assertEqual(saved["sender_email"], "inscription@alj-escalade.fr")
-        self.assertEqual(client.get("/api/email-templates").json()["templates"][0]["sender_email"], "inscription@alj-escalade.fr")
+        listed = client.get("/api/email-templates").json()
+        self.assertEqual(listed["templates"][0]["sender_email"], "inscription@alj-escalade.fr")
+        # The Vue app takes the club's sender settings from this answer instead of its own copy
+        self.assertEqual(listed["default_sender_email"], "inscription@alj-escalade.fr")
+        self.assertEqual(listed["default_sender_name"], "Amicale Laïque Jonage - Inscriptions")
+        self.assertIn("contact@alj-escalade.fr", listed["sender_suggestions"])
 
     def test_whatsapp_template_endpoints(self):
         """GET et POST /api/whatsapp-template enregistrent et lisent le texte WhatsApp."""

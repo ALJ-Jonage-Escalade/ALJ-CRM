@@ -14,13 +14,8 @@ import time
 from typing import Optional
 
 from paths import DATA_ROOT, ROOT_DIR
+from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.sqlite import schema_v2
-
-# Adresse d'expédition par défaut des e-mails de la Communication (choisissable/sauvegardable dans l'IHM)
-DEFAULT_SENDER_EMAIL = "inscription@alj-escalade.fr"
-
-# Nom d'affichage de l'expéditeur (visible dans la colonne « De » des messageries)
-DEFAULT_SENDER_NAME = "Amicale Laïque Jonage - Inscriptions"
 
 # Message renvoyé à l'appelant (et au navigateur) quand une écriture échoue : le détail de
 # l'exception (SQL, chemins) reste dans le journal

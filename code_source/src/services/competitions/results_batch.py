@@ -26,6 +26,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from infrastructure.mail.repository import EmailRepository
+from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreError
 from infrastructure.mycompet.scraper import fetch_and_parse_mycompet_results, normalize_result_url, find_mycompet_result_url
@@ -422,7 +423,7 @@ class CompetitionResultsBatchService:
                 subject=subject,
                 body=plain_body,
                 html_body=html_body,
-                from_email="inscription@alj-escalade.fr",
+                from_email=DEFAULT_SENDER_EMAIL,
                 from_name="ALJ Escalade - Résultats Compétitions"
             )
             if ok:

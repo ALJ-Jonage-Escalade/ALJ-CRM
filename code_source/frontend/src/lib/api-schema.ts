@@ -2040,7 +2040,10 @@ export interface components {
              */
             sender_name?: string;
         };
-        /** EmailTemplates */
+        /**
+         * EmailTemplates
+         * @description default_sender_*: used by the server when a template's sender is empty.
+         */
         EmailTemplates: {
             /**
              * Status
@@ -2049,6 +2052,12 @@ export interface components {
             status: "success";
             /** Templates */
             templates: components["schemas"]["EmailTemplate"][];
+            /** Default Sender Email */
+            default_sender_email: string;
+            /** Default Sender Name */
+            default_sender_name: string;
+            /** Sender Suggestions */
+            sender_suggestions: string[];
         };
         /**
          * FfmeFile

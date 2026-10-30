@@ -4823,14 +4823,33 @@
             },
             "type": "array",
             "title": "Templates"
+          },
+          "default_sender_email": {
+            "type": "string",
+            "title": "Default Sender Email"
+          },
+          "default_sender_name": {
+            "type": "string",
+            "title": "Default Sender Name"
+          },
+          "sender_suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sender Suggestions"
           }
         },
         "type": "object",
         "required": [
           "status",
-          "templates"
+          "templates",
+          "default_sender_email",
+          "default_sender_name",
+          "sender_suggestions"
         ],
-        "title": "EmailTemplates"
+        "title": "EmailTemplates",
+        "description": "default_sender_*: used by the server when a template's sender is empty."
       },
       "FfmeFile": {
         "properties": {

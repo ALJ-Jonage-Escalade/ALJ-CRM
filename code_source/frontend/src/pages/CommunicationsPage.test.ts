@@ -14,9 +14,20 @@ function json(body: unknown, status = 200): Response {
 const RELANCE = { name: "Relance", subject: "Rappel {first_name}", body: "Bonjour", sender_email: "a@alj.example", sender_name: "ALJ" };
 const ECHEANCE = { name: "Rappel echeance", subject: "Échéance", body: "Payez", sender_email: "b@alj.example", sender_name: "ALJ" };
 
+/** The /api/email-templates answer: the templates and the club's sender settings. */
+function templatesAnswer(templates: unknown[]): Response {
+  return json({
+    status: "success",
+    templates,
+    default_sender_email: "club@alj.example",
+    default_sender_name: "Club",
+    sender_suggestions: ["club@alj.example", "contact@alj.example"],
+  });
+}
+
 type Answer = (body: unknown) => Response;
 const ANSWERS: Record<string, Answer> = {
-  "GET /api/email-templates": () => json({ status: "success", templates: [RELANCE, ECHEANCE] }),
+  "GET /api/email-templates": () => templatesAnswer([RELANCE, ECHEANCE]),
   "GET /api/whatsapp-template": () => json({ status: "success", template: "Rejoignez le groupe" }),
   "POST /api/email-templates": (body) => json({ status: "success", message: "ok", template: body }),
 };
@@ -72,7 +83,7 @@ describe("CommunicationsPage", () => {
   it("saves a renamed template under its former name, then shows it", async () => {
     const { wrapper, writes, byId } = render({
       ...ANSWERS,
-      "GET /api/email-templates": () => json({ status: "success", templates: [{ ...RELANCE, name: "Relance 2" }, ECHEANCE] }),
+      "GET /api/email-templates": () => templatesAnswer([{ ...RELANCE, name: "Relance 2" }, ECHEANCE]),
     });
     await flushPromises();
     await wrapper.find('[data-testid="template-select"]').setValue("Relance 2");
@@ -134,6 +145,17 @@ describe("CommunicationsPage", () => {
     expect(byId("new-template-dialog")).toBeNull();
   });
 
+  it("takes the sender suggestions and the default sender from the server", async () => {
+    const { wrapper } = render();
+    await flushPromises();
+    const offered = wrapper.findAll('[data-testid="sender-suggestions"] option').map((option) => option.attributes("value"));
+    expect(offered).toEqual(["club@alj.example", "contact@alj.example"]);
+    await wrapper.find('[data-testid="sender-email"]').setValue("");
+    await wrapper.find('[data-testid="sender-name"]').setValue("");
+    expect(wrapper.find('[data-testid="sender-email"]').attributes("placeholder")).toBe("club@alj.example");
+    expect(wrapper.find('[data-testid="preview-from"]').text()).toBe("Club <club@alj.example>");
+  });
+
   it("deletes the template once confirmed", async () => {
     const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const { wrapper, writes, byId } = render();
@@ -164,7 +186,7 @@ describe("CommunicationsPage", () => {
   });
 
   it("says when there is no template yet", async () => {
-    const { wrapper, byId } = render({ ...ANSWERS, "GET /api/email-templates": () => json({ status: "success", templates: [] }) });
+    const { wrapper, byId } = render({ ...ANSWERS, "GET /api/email-templates": () => templatesAnswer([]) });
     await flushPromises();
     expect(wrapper.text()).toContain("Aucun modèle pour l'instant");
     expect(byId("template-name")).toBeNull();
