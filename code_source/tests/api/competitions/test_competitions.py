@@ -68,9 +68,17 @@ class TestCompetitions(ApiTestCase):
         custom = self.create(nom="Open 2", date_competition="2026-03-15", deadline="2026-03-01")
         self.assertEqual(custom["deadline"], "2026-03-01")
 
-        # Edit deadline
+        # The default deadline follows the start date; one set by hand stays
+        moved = self.client.patch(f"/api/competitions/{doc['id']}", json={"date_competition": "2026-03-22"}).json()
+        self.assertEqual(moved["deadline"], "2026-03-15")
+        kept = self.client.patch(f"/api/competitions/{custom['id']}", json={"date_competition": "2026-03-22"}).json()
+        self.assertEqual(kept["deadline"], "2026-03-01")
+
+        # Edit deadline, then clear it back to the default
         updated = self.client.patch(f"/api/competitions/{doc['id']}", json={"deadline": "2026-03-05"}).json()
         self.assertEqual(updated["deadline"], "2026-03-05")
+        cleared = self.client.patch(f"/api/competitions/{doc['id']}", json={"deadline": ""}).json()
+        self.assertEqual(cleared["deadline"], "2026-03-15")
 
     def test_partial_update_keeps_other_fields(self):
         doc = self.create(id_ffme="18846", helloasso_ref="coupe-rhone", lieu="Lyon")

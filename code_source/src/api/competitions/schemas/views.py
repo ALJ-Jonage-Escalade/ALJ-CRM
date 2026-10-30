@@ -73,7 +73,6 @@ class CompetitionMember(BaseModel):
     prenom: str = ""
     num_licence: str = ""
     licence_ffme: str = ""
-    phone: str = ""
     email: str = ""
     email_secondaire: str = ""
     tarif: str = ""
@@ -81,12 +80,6 @@ class CompetitionMember(BaseModel):
     saison: str = ""
     creneau_groupe: str = ""
     sex: Optional[Sex] = None
-    emergency1_name: str = ""
-    emergency1_phone: str = ""
-    emergency2_name: str = ""
-    emergency2_phone: str = ""
-    payer_name: str = ""
-    payer_email: str = ""
 
 
 class GroupLoaded(BaseModel):

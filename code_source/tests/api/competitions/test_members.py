@@ -21,28 +21,6 @@ class TestCompetitionMembers(ApiTestCase):
             self.assertEqual({k: v for k, v in CompetitionMember.model_validate(m).model_dump().items() if k in declared},
                              {k: m[k] for k in declared})
 
-    def test_contacts_fields(self):
-        self.seed_adherent(
-            10,
-            nom="DUPONT",
-            prenom="Jean",
-            phone="0612345678",
-            emergency1_name="Dupont Marie",
-            emergency1_phone="0611223344",
-            emergency2_name="Dupont Pierre",
-            emergency2_phone="0655667788",
-            payer_name="Dupont Marie",
-            payer_email="marie@test.fr",
-        )
-        (m,) = [x for x in self.client.get("/api/competition-members").json() if x["id"] == 10]
-        self.assertEqual(m["phone"], "0612345678")
-        self.assertEqual(m["emergency1_name"], "Dupont Marie")
-        self.assertEqual(m["emergency1_phone"], "0611223344")
-        self.assertEqual(m["emergency2_name"], "Dupont Pierre")
-        self.assertEqual(m["emergency2_phone"], "0655667788")
-        self.assertEqual(m["payer_name"], "Dupont Marie")
-        self.assertEqual(m["payer_email"], "marie@test.fr")
-
     def test_status_filter(self):
         self.seed_adherent(1)
         self.seed_adherent(2, nom="DURAND", statut="Validé")

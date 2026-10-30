@@ -25,6 +25,7 @@ import {
   toMemberSlots,
   UNIDENTIFIED,
   type Competition,
+  type CompetitorContact,
   type MemberSlot,
 } from "./competitions";
 
@@ -52,7 +53,7 @@ describe("competitions", () => {
     expect(disciplineColor("Paraescalade")).toBe("blue");
   });
 
-  it("keeps what the screen needs of the member directory, including contacts", () => {
+  it("keeps what the screen needs of the member directory, not the phones", () => {
     expect(
       toMemberSlots([{ id: 1, nom: "X", prenom: "Y", num_licence: "123", email: "x@y.fr", tarif: "T", creneau_groupe: "G", phone: "06" }]),
     ).toEqual([
@@ -61,17 +62,10 @@ describe("competitions", () => {
         nom: "X",
         prenom: "Y",
         licence_ffme: "123",
-        phone: "06",
         email: "x@y.fr",
         email_secondaire: "",
         tarif: "T",
         creneau_groupe: "G",
-        emergency1_name: "",
-        emergency1_phone: "",
-        emergency2_name: "",
-        emergency2_phone: "",
-        payer_name: "",
-        payer_email: "",
       },
     ]);
   });
@@ -102,7 +96,7 @@ describe("competitions", () => {
       nom: "Open",
       date_competition: "2026-03-14",
       date_fin: "2026-03-14",
-      deadline: "2026-03-07",
+      deadline: "",
       prix: 12.5,
       coach_ids: [3, 1],
     });
@@ -229,44 +223,25 @@ describe("participants", () => {
     ]);
   });
 
-  it("builds the 3 contact cards with athlete, emergency 1 and emergency 2", () => {
-    const p = { nom: "DUPONT", prenom: "Lucas", phone: "06 00 11 22 33", email: "lucas@test.fr" };
-    const member: MemberSlot = {
-      id: 10,
-      nom: "DUPONT",
-      prenom: "Lucas",
-      email: "lucas@test.fr",
-      email_secondaire: "maman@test.fr",
+  it("builds the 3 contact cards from the competitor's contacts, e-mail on the athlete's card only", () => {
+    const p = { nom: "DUPONT", prenom: "Lucas", email: "lucas@test.fr" };
+    const member: MemberSlot = { id: 10, nom: "DUPONT", prenom: "Lucas", email: "lucas@test.fr", email_secondaire: "maman@test.fr" };
+    const contact: CompetitorContact = {
+      adherent_id: 10,
+      last_name: "DUPONT",
+      first_name: "Lucas",
+      phone: "06 00 11 22 33",
+      creneau_groupe: "",
       emergency1_name: "Dupont Marie",
       emergency1_phone: "06 11 11 11 11",
       emergency2_name: "Dupont Jean",
       emergency2_phone: "06 22 22 22 22",
-      payer_name: "Dupont Jean",
-      payer_email: "jean.payeur@test.fr",
     };
-    const cards = athleteContactCards(p, member);
-    expect(cards).toHaveLength(3);
-    expect(cards[0]).toEqual({
-      role: "athlete",
-      title: "🧗 Athlète",
-      name: "Lucas DUPONT",
-      phone: "06 00 11 22 33",
-      email: "lucas@test.fr",
-    });
-    expect(cards[1]).toEqual({
-      role: "emergency1",
-      title: "🚨 Contact d'urgence 1",
-      name: "Dupont Marie",
-      phone: "06 11 11 11 11",
-      email: "maman@test.fr",
-    });
-    expect(cards[2]).toEqual({
-      role: "emergency2",
-      title: "🚨 Contact d'urgence 2",
-      name: "Dupont Jean",
-      phone: "06 22 22 22 22",
-      email: "jean.payeur@test.fr",
-    });
+    expect(athleteContactCards(p, member, contact)).toEqual([
+      { role: "athlete", title: "🧗 Athlète", name: "Lucas DUPONT", phone: "06 00 11 22 33", email: "lucas@test.fr" },
+      { role: "emergency1", title: "🚨 Contact d'urgence 1", name: "Dupont Marie", phone: "06 11 11 11 11", email: "" },
+      { role: "emergency2", title: "🚨 Contact d'urgence 2", name: "Dupont Jean", phone: "06 22 22 22 22", email: "" },
+    ]);
   });
 
   it("handles empty or partial contacts gracefully", () => {

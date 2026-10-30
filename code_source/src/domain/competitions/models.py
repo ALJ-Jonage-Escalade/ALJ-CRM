@@ -109,7 +109,7 @@ class Competition:
     nom: str = ""
     date_competition: str = ""       # date de début, ISO AAAA-MM-JJ
     date_fin: str = ""               # date de fin ISO ; vide = même jour que le début
-    deadline: str = ""               # date limite d'inscription ISO AAAA-MM-JJ (défaut : 7j avant début)
+    deadline: str = ""               # date limite d'inscription ISO, saisie à la main ; vide = 7j avant le début (default_deadline)
     prix: float = 0.0                # tarif d'inscription en euros
     statut: str = STATUT_EN_PREPARATION
     helloasso_ref: str = ""          # slug ou URL de la campagne HelloAsso dédiée
@@ -144,14 +144,13 @@ class Competition:
 
     @classmethod
     def from_row(cls, row: dict) -> "Competition":
-        date_start = str(row.get("date_competition") or "")
         return cls(
             id=row.get("id"),
             id_ffme=str(row.get("id_ffme") or ""),
             nom=str(row.get("nom") or ""),
-            date_competition=date_start,
+            date_competition=str(row.get("date_competition") or ""),
             date_fin=str(row.get("date_fin") or ""),
-            deadline=str(row.get("deadline") or "").strip() or default_deadline(date_start),
+            deadline=str(row.get("deadline") or "").strip(),
             prix=float(row.get("prix") or 0.0),
             statut=str(row.get("statut") or STATUT_EN_PREPARATION),
             helloasso_ref=str(row.get("helloasso_ref") or ""),

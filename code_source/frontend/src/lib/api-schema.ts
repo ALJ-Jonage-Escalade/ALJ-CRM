@@ -1661,11 +1661,6 @@ export interface components {
              */
             licence_ffme?: string;
             /**
-             * Phone
-             * @default
-             */
-            phone?: string;
-            /**
              * Email
              * @default
              */
@@ -1697,36 +1692,6 @@ export interface components {
              */
             creneau_groupe?: string;
             sex?: components["schemas"]["Sex"] | null;
-            /**
-             * Emergency1 Name
-             * @default
-             */
-            emergency1_name?: string;
-            /**
-             * Emergency1 Phone
-             * @default
-             */
-            emergency1_phone?: string;
-            /**
-             * Emergency2 Name
-             * @default
-             */
-            emergency2_name?: string;
-            /**
-             * Emergency2 Phone
-             * @default
-             */
-            emergency2_phone?: string;
-            /**
-             * Payer Name
-             * @default
-             */
-            payer_name?: string;
-            /**
-             * Payer Email
-             * @default
-             */
-            payer_email?: string;
         } & {
             [key: string]: unknown;
         };

@@ -4115,11 +4115,6 @@
             "title": "Licence Ffme",
             "default": ""
           },
-          "phone": {
-            "type": "string",
-            "title": "Phone",
-            "default": ""
-          },
           "email": {
             "type": "string",
             "title": "Email",
@@ -4160,36 +4155,6 @@
                 "type": "null"
               }
             ]
-          },
-          "emergency1_name": {
-            "type": "string",
-            "title": "Emergency1 Name",
-            "default": ""
-          },
-          "emergency1_phone": {
-            "type": "string",
-            "title": "Emergency1 Phone",
-            "default": ""
-          },
-          "emergency2_name": {
-            "type": "string",
-            "title": "Emergency2 Name",
-            "default": ""
-          },
-          "emergency2_phone": {
-            "type": "string",
-            "title": "Emergency2 Phone",
-            "default": ""
-          },
-          "payer_name": {
-            "type": "string",
-            "title": "Payer Name",
-            "default": ""
-          },
-          "payer_email": {
-            "type": "string",
-            "title": "Payer Email",
-            "default": ""
           }
         },
         "additionalProperties": true,

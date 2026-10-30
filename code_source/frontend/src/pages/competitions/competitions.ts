@@ -15,21 +15,7 @@ export type Coach = Schemas["Coach"];
     slot group to group the participants, the names, licence and e-mail to add one or write to them. */
 export type MemberSlot = Pick<
   Schemas["CompetitionMember"],
-  | "id"
-  | "nom"
-  | "prenom"
-  | "licence_ffme"
-  | "phone"
-  | "email"
-  | "email_secondaire"
-  | "tarif"
-  | "creneau_groupe"
-  | "emergency1_name"
-  | "emergency1_phone"
-  | "emergency2_name"
-  | "emergency2_phone"
-  | "payer_name"
-  | "payer_email"
+  "id" | "nom" | "prenom" | "licence_ffme" | "email" | "email_secondaire" | "tarif" | "creneau_groupe"
 >;
 
 /** Membership statuses of the members offered as competitors (« Terminé »: FFME licence confirmed), sent as
@@ -48,24 +34,17 @@ export function competitionMembersPath(): string {
 export const ARCHIVED = "close";
 export const PREPARING = "en_preparation";
 
-/** The answer of GET /api/competition-members reduced to the fields above. */
+/** The answer of GET /api/competition-members reduced to the fields above (phones and emergency contacts stay on the server). */
 export function toMemberSlots(answer: unknown): MemberSlot[] {
   return (answer as Schemas["CompetitionMember"][]).map((m) => ({
     id: m.id,
     nom: m.nom ?? "",
     prenom: m.prenom ?? "",
     licence_ffme: m.licence_ffme || m.num_licence || "",
-    phone: m.phone ?? "",
     email: m.email ?? "",
     email_secondaire: m.email_secondaire ?? "",
     tarif: m.tarif ?? "",
     creneau_groupe: m.creneau_groupe ?? "",
-    emergency1_name: m.emergency1_name ?? "",
-    emergency1_phone: m.emergency1_phone ?? "",
-    emergency2_name: m.emergency2_name ?? "",
-    emergency2_phone: m.emergency2_phone ?? "",
-    payer_name: m.payer_name ?? "",
-    payer_email: m.payer_email ?? "",
   }));
 }
 
@@ -222,55 +201,32 @@ export interface ContactCard {
   email: string;
 }
 
-/** Resolves the 3 contact cards of an athlete: the athlete themselves, emergency contact 1 and emergency contact 2. */
+/** The 3 contact cards of an athlete: the athlete (with the e-mail of the member list), emergency contacts 1 and 2
+    (name and phone only: no e-mail is kept offline about a competitor's contacts). */
 export function athleteContactCards(p: Participant, member?: MemberSlot, contact?: CompetitorContact): ContactCard[] {
-  const athleteName = `${p.prenom} ${p.nom}`.trim() || `${member?.prenom ?? ""} ${member?.nom ?? ""}`.trim();
-  const athletePhone = contact?.phone || member?.phone || p.phone || "";
-  const athleteEmail = member?.email || p.email || "";
-
-  const athleteCard: ContactCard = {
-    role: "athlete",
-    title: "🧗 Athlète",
-    name: athleteName,
-    phone: athletePhone,
-    email: athleteEmail,
-  };
-
-  const e1Name = contact?.emergency1_name || member?.emergency1_name || p.urgence_nom || "";
-  const e1Phone = contact?.emergency1_phone || member?.emergency1_phone || p.urgence_tel || "";
-  let e1Email = member?.email_secondaire || "";
-  if (!e1Email && member?.payer_email && member?.payer_name && e1Name && normKey(e1Name) === normKey(member.payer_name)) {
-    e1Email = member.payer_email;
-  }
-  const emergency1Card: ContactCard = {
-    role: "emergency1",
-    title: "🚨 Contact d'urgence 1",
-    name: e1Name,
-    phone: e1Phone,
-    email: e1Email,
-  };
-
-  const e2Name = contact?.emergency2_name || member?.emergency2_name || member?.payer_name || "";
-  const e2Phone = contact?.emergency2_phone || member?.emergency2_phone || "";
-  let e2Email = "";
-  if (member?.payer_email && e2Name && member?.payer_name && normKey(e2Name) === normKey(member.payer_name)) {
-    e2Email = member.payer_email;
-  } else if (member?.payer_email && !e1Email) {
-    e2Email = member.payer_email;
-  } else if (member?.email_secondaire && e1Email !== member.email_secondaire) {
-    e2Email = member.email_secondaire;
-  } else if (member?.payer_email && member.payer_email !== athleteEmail && member.payer_email !== e1Email) {
-    e2Email = member.payer_email;
-  }
-  const emergency2Card: ContactCard = {
-    role: "emergency2",
-    title: "🚨 Contact d'urgence 2",
-    name: e2Name,
-    phone: e2Phone,
-    email: e2Email,
-  };
-
-  return [athleteCard, emergency1Card, emergency2Card];
+  return [
+    {
+      role: "athlete",
+      title: "🧗 Athlète",
+      name: `${p.prenom} ${p.nom}`.trim() || `${member?.prenom ?? ""} ${member?.nom ?? ""}`.trim(),
+      phone: contact?.phone || p.phone || "",
+      email: member?.email || p.email || "",
+    },
+    {
+      role: "emergency1",
+      title: "🚨 Contact d'urgence 1",
+      name: contact?.emergency1_name || p.urgence_nom || "",
+      phone: contact?.emergency1_phone || p.urgence_tel || "",
+      email: "",
+    },
+    {
+      role: "emergency2",
+      title: "🚨 Contact d'urgence 2",
+      name: contact?.emergency2_name ?? "",
+      phone: contact?.emergency2_phone ?? "",
+      email: "",
+    },
+  ];
 }
 
 /** A participant as listed: the member's current tariff and slot group, phone and emergency contacts when known, and
@@ -310,18 +266,17 @@ export function participantRows(
       : [{ name: p.urgence_nom ?? "", phone: p.urgence_tel ?? "" }];
     const selectionne = pending(p.adherent_id, "selectionne");
     const present = pending(p.adherent_id, "present");
-    const contactCards = athleteContactCards(p, member, contact);
     return {
       ...p,
       selectionne: selectionne ?? p.selectionne,
       present: present ?? p.present,
       queued: { selectionne: selectionne !== undefined, present: present !== undefined },
       tarif,
-      phone: contact?.phone || member?.phone || p.phone || "",
+      phone: contact?.phone || p.phone || "",
       email: member?.email || member?.email_secondaire || p.email || "",
       group: member?.creneau_groupe || contact?.creneau_groupe || tarif || UNIDENTIFIED,
       emergency: emergency.filter((e) => e.phone),
-      contacts: contactCards,
+      contacts: athleteContactCards(p, member, contact),
     };
   });
 }
@@ -482,7 +437,8 @@ export function draftBody(d: CompetitionDraft): Schemas["CompetitionCreate"] {
     id_ffme: d.id_ffme.trim(),
     date_competition: start,
     date_fin: start && d.date_fin > start ? d.date_fin : start,
-    deadline: d.deadline || defaultDeadline(start),
+    // Only a deadline set by hand is stored: the default one follows the start date
+    deadline: d.deadline === defaultDeadline(start) ? "" : d.deadline,
     lieu: d.lieu.trim(),
     type: d.type,
     prix: Number(d.prix.replace(",", ".")) || 0,

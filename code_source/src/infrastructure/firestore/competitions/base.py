@@ -136,7 +136,8 @@ class CompetitionStoreBase:
     @classmethod
     def _api_doc(cls, doc: Dict[str, Any], coaches: Dict[int, str]) -> Dict[str, Any]:
         """Document for the web pages: `coach_ids` normalized (legacy slots read too) and
-        `coaches` resolved from the coaches collection, never the stored copy."""
+        `coaches` resolved from the coaches collection, never the stored copy. Only a deadline set by
+        hand is stored: the default one (1 week before the start) follows the start date."""
         out = cls._clean_doc(doc)
         out["deadline"] = str(doc.get("deadline") or "").strip() or default_deadline(str(doc.get("date_competition") or ""))
         out["coach_ids"] = coach_ids_of(doc)
@@ -172,14 +173,13 @@ class CompetitionStoreBase:
         """Document complet prêt à être écrit (participants préservés)."""
         parts = (doc or {}).get("participants") or []
         now = cls._now_iso()
-        deadline = (comp.deadline or str((doc or {}).get("deadline") or "")).strip() or default_deadline(comp.date_competition)
         new_doc = {
             "id": comp.id,
             "id_ffme": comp.id_ffme or "",
             "nom": comp.nom or "",
             "date_competition": comp.date_competition or "",
             "date_fin": comp.date_fin or "",
-            "deadline": deadline,
+            "deadline": (comp.deadline or "").strip(),
             "prix": float(comp.prix or 0.0),
             "statut": comp.statut or "en_preparation",
             "helloasso_ref": comp.helloasso_ref or "",

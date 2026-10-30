@@ -11,7 +11,7 @@ Permet de :
 
 from typing import Dict, Any, List, Optional
 
-from domain.competitions.models import Competition
+from domain.competitions.models import Competition, default_deadline
 from domain.utils import apply_template_variables, format_montant
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
@@ -98,8 +98,8 @@ class EmailDispatchService:
 
         from domain.utils import format_periode
         date_formatted = format_periode(comp.date_competition, comp.date_fin)
-        # from_row already falls back to the default deadline (1 week before the start)
-        deadline_formatted = format_periode(comp.deadline) if comp.deadline else ""
+        deadline = comp.deadline or default_deadline(comp.date_competition)
+        deadline_formatted = format_periode(deadline) if deadline else ""
         wa_link = str(getattr(comp, "whatsapp_link", "") or "").strip()
         bloc_wa = f"Voici le lien du groupe WhatApp dédié à cette compétition : {wa_link}" if wa_link else ""
 

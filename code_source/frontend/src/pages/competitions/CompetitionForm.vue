@@ -32,7 +32,7 @@ const lookupBusy = ref(false);
 const lookupError = ref("");
 const lookupSuccess = ref("");
 let endByHand = !!draft.value.date_fin;
-let deadlineByHand = !!props.competition?.deadline;
+let deadlineByHand = draft.value.deadline !== defaultDeadline(draft.value.date_competition);
 
 function endSetByHand(): void {
   endByHand = true;

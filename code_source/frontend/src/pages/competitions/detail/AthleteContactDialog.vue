@@ -74,7 +74,7 @@ const emit = defineEmits<{
                 <span v-else class="text-slate-400 italic">Non renseigné</span>
               </div>
 
-              <div class="flex items-start gap-1.5">
+              <div v-if="c.role === 'athlete'" class="flex items-start gap-1.5">
                 <span class="w-16 shrink-0 text-slate-500">Email :</span>
                 <a
                   v-if="c.email"

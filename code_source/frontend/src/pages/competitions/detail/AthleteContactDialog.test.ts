@@ -41,7 +41,7 @@ describe("AthleteContactDialog", () => {
         title: "🚨 Contact d'urgence 1",
         name: "Marie Dupont",
         phone: "06 11 11 11 11",
-        email: "marie@test.fr",
+        email: "",
       },
       {
         role: "emergency2",
@@ -79,7 +79,7 @@ describe("AthleteContactDialog", () => {
     expect(cards[1]!.querySelector("[data-testid='contact-title']")?.textContent).toBe("🚨 Contact d'urgence 1");
     expect(cards[1]!.querySelector("[data-testid='contact-name']")?.textContent).toBe("Marie Dupont");
     expect(cards[1]!.querySelector("[data-testid='contact-phone-link']")?.getAttribute("href")).toBe("tel:0611111111");
-    expect(cards[1]!.querySelector("[data-testid='contact-email-link']")?.getAttribute("href")).toBe("mailto:marie@test.fr");
+    expect(cards[1]!.querySelector("[data-testid='contact-email-link']")).toBeNull();
 
     // Card 3: Urgence 2 (no email)
     expect(cards[2]!.querySelector("[data-testid='contact-title']")?.textContent).toBe("🚨 Contact d'urgence 2");
