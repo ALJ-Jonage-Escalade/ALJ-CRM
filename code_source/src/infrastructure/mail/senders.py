@@ -5,10 +5,10 @@ from __future__ import annotations
 # Sender addresses: club domain or the configured sending account (EmailDispatchService.is_allowed_sender)
 CLUB_SENDER_DOMAIN = "alj-escalade.fr"
 
-# Adresse d'expédition par défaut des e-mails (choisissable/sauvegardable dans l'IHM)
+# Default sender address of the e-mails (can be chosen and saved per template in the UI)
 DEFAULT_SENDER_EMAIL = f"inscription@{CLUB_SENDER_DOMAIN}"
 
-# Nom d'affichage de l'expéditeur (visible dans la colonne « De » des messageries)
+# Sender display name (shown in the "From" column of mail clients)
 DEFAULT_SENDER_NAME = "Amicale Laïque Jonage - Inscriptions"
 
 # Addresses offered in the template editor's sender field

@@ -1,26 +1,26 @@
 """
-Authentification de l'API FastAPI (Cloud Run).
+Authentication of the FastAPI API (Cloud Run).
 
-Principe
---------
-- L'application Vue (frontend/, installable en PWA) est connectée à Firebase
+Principle
+---------
+- The Vue app (frontend/, installable as a PWA) signs in through Firebase
   Authentication (Google).
-  Chaque appel à l'API envoie le jeton d'identité Firebase de l'utilisateur dans
-  l'en-tête ``Authorization: Bearer <ID token>``.
-- Le serveur vérifie la signature du jeton (clés publiques Google), son audience
-  (projet Firebase), son émetteur et sa date d'expiration, puis lit le rôle de
-  l'adresse vérifiée dans la liste des accès (role_directory : admin / coach /
-  lecture seule). Liste illisible : 503, jamais 403.
-- Toute route non publique exige au minimum le rôle « coach » ; certaines
-  écritures exigent « admin » (fail-closed : une nouvelle route est protégée par
-  défaut). Exception: reads listed in READONLY_READ_PREFIXES are open to readonly.
+  Every API call sends the user's Firebase ID token in the
+  ``Authorization: Bearer <ID token>`` header.
+- The server checks the token's signature (Google public keys), audience
+  (Firebase project), issuer and expiry, then reads the role of the verified
+  address in the access list (role_directory: admin / coach / read-only).
+  Unreadable list: 503, never 403.
+- Every non-public route needs at least the "coach" role; some writes need
+  "admin" (fail-closed: a new route is protected by default). Exception: reads
+  listed in READONLY_READ_PREFIXES are open to readonly.
 
 Activation
 ----------
-- ``ALJ_API_AUTH=required`` (positionné dans le Dockerfile) ou exécution sur
-  Cloud Run (variable ``K_SERVICE`` injectée par la plateforme) : contrôle actif.
-- ``ALJ_API_AUTH=off`` : désactivé (serveur local de l'application de bureau,
-  qui n'écoute que sur 127.0.0.1).
+- ``ALJ_API_AUTH=required`` (set in the Dockerfile) or running on Cloud Run
+  (``K_SERVICE`` variable injected by the platform): checks on.
+- ``ALJ_API_AUTH=off``: checks off (local server of the desktop app, which only
+  listens on 127.0.0.1).
 """
 
 from __future__ import annotations
@@ -47,9 +47,9 @@ FIREBASE_CERTS_URL = (
 )
 
 # ---------------------------------------------------------------------------
-# Rôles : seul juge des droits (firestore.rules refuse tout client). Ils viennent de la liste des
-# accès (Administration › Accès, collection Firestore access_roles) : jamais d'adresse dans le code.
-# L'application web n'en garde aucune copie : elle lit le rôle sur /api/me.
+# Roles: the only judge of access rights (firestore.rules refuses every client). They come from the
+# access list (Administration › Accès, Firestore collection access_roles): never an address in the code.
+# The web app keeps no copy of them: it reads the role from /api/me.
 # ---------------------------------------------------------------------------
 ACCESS_UNAVAILABLE_MESSAGE = "Rôle non vérifiable : la liste des accès est momentanément illisible. Réessayez dans un instant."
 
@@ -133,7 +133,7 @@ def required_role(method: str, path: str) -> Optional[Role]:
     if path == "/api/planning" and method not in ("GET", "HEAD"):
         return Role.ADMIN  # remplacement du planning complet réservé aux admins ; les coachs modifient les créneaux
     if path == "/api/admin" or path.startswith("/api/admin/"):
-        return Role.ADMIN  # Administration (accès, demandes, historique) : lecture comprise
+        return Role.ADMIN  # Administration (access list, requests, history): reads included
     if path.startswith("/api/attestations"):
         return Role.ADMIN  # attestations réservées aux administrateurs
     if path.startswith("/api/members") and method not in ("GET", "HEAD"):

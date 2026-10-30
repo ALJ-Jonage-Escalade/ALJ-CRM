@@ -218,8 +218,8 @@ class FirestoreClient:
     def list_latest(cls, collection_name: str, field: str, limit: int,
                     project_id: Optional[str] = None,
                     access_token: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Les `limit` documents de plus grande valeur de `field`, du plus grand au plus petit (index simple
-        automatique de Firestore) ; les documents sans ce champ sont ignorés."""
+        """The `limit` documents with the highest `field` value, highest first (Firestore's automatic
+        single-field index); documents without that field are left out."""
         url = f"{cls.database_url(project_id)}:runQuery"
         body = {"structuredQuery": {
             "from": [{"collectionId": collection_name}],
@@ -269,10 +269,10 @@ class FirestoreClient:
     def create_document(cls, collection_name: str, doc_id: str, data: Dict[str, Any],
                         project_id: Optional[str] = None,
                         access_token: Optional[str] = None) -> bool:
-        """Crée le document s'il n'existe pas encore ; False s'il existe déjà (jamais écrasé).
+        """Creates the document unless it exists; False when it already exists (never overwritten).
 
-        Firestore refuse la création d'un id existant (ALREADY_EXISTS) : plusieurs instances
-        qui démarrent ensemble n'en créent qu'une."""
+        Firestore refuses to create an existing id (ALREADY_EXISTS): several instances
+        starting together create it only once."""
         url = f"{cls.database_url(project_id)}/{collection_name}"
         payload = {"fields": dict_to_firestore_fields(data)}
         try:
