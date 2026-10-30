@@ -293,7 +293,7 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
 
       <UiCard>
         <h2 class="text-base font-bold">🕘 Historique</h2>
-        <p class="mb-3 text-xs text-slate-500">Chaque changement d'accès, le plus récent en premier. Non modifiable.</p>
+        <p class="mb-3 text-xs text-slate-500">Les 50 derniers changements d'accès, le plus récent en premier. Non modifiable.</p>
         <p v-if="!history.length" class="text-[13px] text-slate-500">Aucun changement enregistré.</p>
         <div v-else class="overflow-x-auto">
           <table class="w-full text-left text-[13px]" data-testid="history">

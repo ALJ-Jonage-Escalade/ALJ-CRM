@@ -65,7 +65,9 @@ class AccessStore(Protocol):
     def save_request(self, entry: AccessRequestEntry) -> None: ...
     def delete_request(self, email: str) -> None: ...
     def add_history(self, entry: HistoryEntry) -> None: ...
-    def list_history(self) -> List[HistoryEntry]: ...
+    def list_history(self, limit: int) -> List[HistoryEntry]:
+        """The `limit` latest entries, latest first."""
+        ...
 
 
 def _role_entry(doc: Dict[str, Any]) -> RoleEntry:  # Any: a Firestore document
@@ -145,5 +147,5 @@ class FirestoreAccessStore:
         # Id: the date first (readable in the console), then a random part (two changes in the same second)
         FirestoreClient.upsert_document(HISTORY_COLLECTION, f"{entry['at']}-{uuid.uuid4().hex[:8]}", _fields(entry))
 
-    def list_history(self) -> List[HistoryEntry]:
-        return [_history_entry(doc) for doc in FirestoreClient.list_documents(HISTORY_COLLECTION)]
+    def list_history(self, limit: int) -> List[HistoryEntry]:
+        return [_history_entry(doc) for doc in FirestoreClient.list_latest(HISTORY_COLLECTION, "at", limit)]

@@ -100,9 +100,9 @@ class InMemoryAccessStore:
         self.writes += 1
         self.history.append(HistoryEntry(**entry))  # type: ignore[typeddict-item]
 
-    def list_history(self) -> List[HistoryEntry]:
+    def list_history(self, limit: int) -> List[HistoryEntry]:
         self._check()
-        return list(self.history)
+        return sorted(self.history, key=lambda entry: entry["at"], reverse=True)[:limit]
 
 
 def role_entry(email: str, role: str, display_name: str = "") -> RoleEntry:

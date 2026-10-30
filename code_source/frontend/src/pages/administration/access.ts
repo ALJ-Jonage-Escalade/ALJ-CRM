@@ -6,14 +6,13 @@ import type { Schemas } from "../../lib/client";
 export type AccessRole = Schemas["AccessEntry"]["role"];
 export type HistoryAction = Schemas["AccessHistoryEntry"]["action"];
 
-/** The roles an admin may give, highest first. */
-export const ROLE_OPTIONS: readonly { value: AccessRole; label: string }[] = [
-  { value: "admin", label: "Administrateur" },
-  { value: "coach", label: "Coach" },
-  { value: "readonly", label: "Lecture seule" },
-];
-
 const ROLE_NAMES: Record<AccessRole, string> = { admin: "Administrateur", coach: "Coach", readonly: "Lecture seule" };
+
+/** The roles an admin may give, highest first. */
+export const ROLE_OPTIONS: readonly { value: AccessRole; label: string }[] = (["admin", "coach", "readonly"] as const).map((role) => ({
+  value: role,
+  label: ROLE_NAMES[role],
+}));
 
 const ACTION_LABELS: Record<HistoryAction, string> = {
   added: "Accès ajouté",

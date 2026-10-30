@@ -36,10 +36,11 @@ class TestFirestoreAccessStore(unittest.TestCase):
         self.assertEqual(self.store.get_request("d@alj.example")["last_requested_at"], "t2")
         self.store.delete_request("d@alj.example")
         self.assertEqual(self.store.list_requests(), [])
-        for _ in range(2):  # same second: two entries
-            self.store.add_history({"at": "2026-10-30T09:00:00+00:00", "author": "bootstrap", "action": "bootstrap",
+        for at in ("2026-10-30T09:00:00+00:00", "2026-10-30T09:00:00+00:00", "2026-10-31T09:00:00+00:00"):  # same second: two entries
+            self.store.add_history({"at": at, "author": "bootstrap", "action": "bootstrap",
                                     "target_email": "a@alj.example", "old_role": None, "new_role": "admin"})
-        self.assertEqual(len(self.store.list_history()), 2)
+        self.assertEqual(len(self.store.list_history(10)), 3)
+        self.assertEqual([h["at"] for h in self.store.list_history(1)], ["2026-10-31T09:00:00+00:00"])
 
 
 class TestCreateDocument(unittest.TestCase):
@@ -64,3 +65,29 @@ class TestCreateDocument(unittest.TestCase):
     def test_other_error(self):
         with self.assertRaises(FirestoreError):
             self._post(500)
+
+
+class TestListLatest(unittest.TestCase):
+    """REST runQuery: ordered by the field, latest first, limited on the server."""
+
+    def test_query_and_documents(self):
+        resp = MagicMock(status_code=200, text="")
+        resp.json.return_value = [
+            {"document": {"name": "projects/p/databases/(default)/documents/access_history/h1",
+                          "fields": {"at": {"stringValue": "2026-10-30"}}, "updateTime": "u"}},
+            {"readTime": "r"},  # no document: skipped
+        ]
+        with patch.object(FirestoreClient, "get_access_token", return_value="t"), \
+             patch("infrastructure.firestore.client.requests.post", return_value=resp) as post:
+            docs = FirestoreClient.list_latest("access_history", "at", 50)
+        self.assertTrue(post.call_args.args[0].endswith(":runQuery"))
+        query = post.call_args.kwargs["json"]["structuredQuery"]
+        self.assertEqual(query["orderBy"], [{"field": {"fieldPath": "at"}, "direction": "DESCENDING"}])
+        self.assertEqual(query["limit"], 50)
+        self.assertEqual([(d["_doc_id"], d["at"]) for d in docs], [("h1", "2026-10-30")])
+
+    def test_error(self):
+        with patch.object(FirestoreClient, "get_access_token", return_value="t"), \
+             patch("infrastructure.firestore.client.requests.post", return_value=MagicMock(status_code=500, text="")):
+            with self.assertRaises(FirestoreError):
+                FirestoreClient.list_latest("access_history", "at", 50)

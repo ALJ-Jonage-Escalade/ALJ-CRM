@@ -27,7 +27,7 @@ logger = logging.getLogger("alj")
 
 # A dismissed address is not recorded again for this long; a request nobody answered is dropped after it
 REQUEST_DAYS = 30
-HISTORY_LIMIT = 200
+HISTORY_LIMIT = 50
 DISPLAY_NAME_MAX = 100
 BOOTSTRAP_AUTHOR = "bootstrap"
 
@@ -109,7 +109,8 @@ class AccessRules:
         return sorted(pending, key=lambda request: request["last_requested_at"], reverse=True)
 
     def history(self, limit: int = HISTORY_LIMIT) -> List[HistoryEntry]:
-        return sorted(self.store.list_history(), key=lambda entry: entry["at"], reverse=True)[:limit]
+        """The latest changes, latest first: only those are read."""
+        return self.store.list_history(limit)
 
     # ------------------------------------------------------------------ Changes
     def grant(self, author: str, email: str, role: str, display_name: str = "") -> RoleEntry:

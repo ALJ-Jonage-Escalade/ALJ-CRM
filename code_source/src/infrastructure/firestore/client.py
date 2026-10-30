@@ -214,6 +214,37 @@ class FirestoreClient:
                 break
         return results
 
+    @classmethod
+    def list_latest(cls, collection_name: str, field: str, limit: int,
+                    project_id: Optional[str] = None,
+                    access_token: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Les `limit` documents de plus grande valeur de `field`, du plus grand au plus petit (index simple
+        automatique de Firestore) ; les documents sans ce champ sont ignorés."""
+        url = f"{cls.database_url(project_id)}:runQuery"
+        body = {"structuredQuery": {
+            "from": [{"collectionId": collection_name}],
+            "orderBy": [{"field": {"fieldPath": field}, "direction": "DESCENDING"}],
+            "limit": limit,
+        }}
+        try:
+            resp = requests.post(url, headers=cls._headers(access_token), json=body, timeout=30)
+        except requests.RequestException as e:
+            raise FirestoreError(f"Firestore injoignable ({collection_name}) : {e}")
+        if resp.status_code != 200:
+            raise FirestoreError(
+                f"Requête Firestore {collection_name} : HTTP {resp.status_code} - {resp.text[:200]}"
+            )
+        results: List[Dict[str, Any]] = []
+        for row in resp.json():
+            doc = row.get("document")
+            if not doc:
+                continue
+            data = firestore_fields_to_dict(doc.get("fields", {}))
+            data["_doc_id"] = doc.get("name", "").rsplit("/", 1)[-1]
+            data["_update_time"] = doc.get("updateTime")
+            results.append(data)
+        return results
+
     # ------------------------------------------------------------------
     # Écriture
     # ------------------------------------------------------------------

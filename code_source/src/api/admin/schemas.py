@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -60,7 +60,3 @@ class AccessHistoryEntry(BaseModel):
 class AccessDone(BaseModel):
     status: Literal["success"]
 
-
-AccessEntries = List[AccessEntry]
-AccessRequests = List[AccessRequest]
-AccessHistory = List[AccessHistoryEntry]
