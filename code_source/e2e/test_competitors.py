@@ -118,11 +118,12 @@ def test_add_member_outside_the_list(mobile_page, test_data, competition, member
     outsider = members["outsider"]
     page = open_screen(mobile_page)
     open_competition(page, competition["nom"])
-    page.get_by_test_id("toggle-add").click()
+    page.get_by_test_id("add-competitor-btn").click()
     page.get_by_test_id("member-search").fill(outsider["nom"][:4])
     result = page.get_by_test_id("member-result").filter(has_text=f"{outsider['nom']} {outsider['prenom']}")
     result.get_by_test_id("member-add").click()
     expect(participant_card(page, outsider)).to_be_visible()
+    expect(page.get_by_test_id("member-search")).to_have_value("")  # the dialog stays open for the next one
     expect(page.get_by_test_id("kpi-selected")).to_have_text("4")
     _assert_stored(test_data, competition, outsider, selectionne=True)
 
