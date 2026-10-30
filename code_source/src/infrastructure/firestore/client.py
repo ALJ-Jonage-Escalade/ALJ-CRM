@@ -235,6 +235,29 @@ class FirestoreClient:
         )
 
     @classmethod
+    def create_document(cls, collection_name: str, doc_id: str, data: Dict[str, Any],
+                        project_id: Optional[str] = None,
+                        access_token: Optional[str] = None) -> bool:
+        """Crée le document s'il n'existe pas encore ; False s'il existe déjà (jamais écrasé).
+
+        Firestore refuse la création d'un id existant (ALREADY_EXISTS) : plusieurs instances
+        qui démarrent ensemble n'en créent qu'une."""
+        url = f"{cls.database_url(project_id)}/{collection_name}"
+        payload = {"fields": dict_to_firestore_fields(data)}
+        try:
+            resp = requests.post(url, headers=cls._headers(access_token), params={"documentId": doc_id},
+                                 json=payload, timeout=30)
+        except requests.RequestException as e:
+            raise FirestoreError(f"Firestore injoignable ({collection_name}/{doc_id}) : {e}")
+        if resp.status_code in (200, 201):
+            return True
+        if resp.status_code == 409:
+            return False
+        raise FirestoreError(
+            f"Création Firestore {collection_name}/{doc_id} : HTTP {resp.status_code} - {resp.text[:200]}"
+        )
+
+    @classmethod
     def update_fields(cls, collection_name: str, doc_id: str, patch: Dict[str, Any],
                       project_id: Optional[str] = None,
                       access_token: Optional[str] = None,

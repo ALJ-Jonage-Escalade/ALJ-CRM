@@ -7,7 +7,11 @@ _src_dir = os.path.dirname(os.path.abspath(__file__))
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 from fastapi import FastAPI
+from starlette.concurrency import run_in_threadpool
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -20,7 +24,16 @@ from infrastructure import runtime_env
 runtime_env.validate()
 
 
-app = FastAPI(title="Admin Escalade API")
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Startup: the bootstrap admin (BOOTSTRAP_ADMIN_EMAIL) joins the access list if absent; never blocks startup."""
+    from infrastructure.security import role_directory
+    from services.access.bootstrap import run_at_startup
+    await run_in_threadpool(run_at_startup, role_directory.current())
+    yield
+
+
+app = FastAPI(title="Admin Escalade API", lifespan=lifespan)
 
 # Access control (Firebase token + firestore.rules roles): enforced on Cloud Run and in the
 # Docker image (ALJ_API_AUTH=required), off for the desktop app's local server, which is
@@ -28,7 +41,6 @@ app = FastAPI(title="Admin Escalade API")
 import re
 from fastapi.routing import APIRoute
 from infrastructure.firestore.cloud_database import CloudDatabase
-from starlette.concurrency import run_in_threadpool
 
 
 # Paths of the routes that only read/write Firestore collections (competitions, coaches,
@@ -86,6 +98,7 @@ from api.competitions import coaches, competitions, helloasso_items, participant
 from api.competitions import members as competition_members
 from api.competitions import payments, results
 from api.activities import planning, presence
+from api.admin import access
 from api.auth import me
 from api.communications import attestations, email, whatsapp
 from api.members import dashboard, members, seasons
@@ -98,14 +111,14 @@ from services.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
              results, payments, members, seasons, dashboard, email, whatsapp, attestations,
              planning, presence, members_map, pivot, ffme,
-             helloasso, google_auth, cloud_db, me,
+             helloasso, google_auth, cloud_db, me, access,
              pages, pwa, health):
     app.include_router(_api.router)
 pages.mount_static(app)
 # Every route of these routers skips the SQLite cache refresh: a route that reads or writes the
 # cache (members, app settings, HelloAsso payments…) must live in another router, even under
-# /api/competitions (results batch, check-all-paid). /api/me reads no data at all.
-FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items, me)
+# /api/competitions (results batch, check-all-paid). /api/me and /api/admin/access only use the access list.
+FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items, me, access)
                             for r in _api.router.routes if isinstance(r, APIRoute))
 app.add_exception_handler(ServiceError, service_error_handler)
 

@@ -14,7 +14,8 @@ AUTH = "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1"
 FIRESTORE = "http://127.0.0.1:8081/v1/projects/demo-alj/databases/(default)/documents"
 
 COLLECTIONS = ("competitions", "coaches", "adherents", "planning", "helloasso_items",
-               "email_templates", "app_settings", "crm_users", "crm_purchases")
+               "email_templates", "app_settings", "crm_users", "crm_purchases",
+               "access_roles", "access_requests", "access_history")
 
 
 def _emulator_running() -> bool:

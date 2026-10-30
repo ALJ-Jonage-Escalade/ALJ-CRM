@@ -27,11 +27,17 @@ Connexion : le bouton « Se connecter » ouvre le sélecteur de comptes de l'ém
 
 | Compte | Rôle |
 |---|---|
-| `albus.dumbledore@alj-escalade.fr` | admin (domaine du club) |
-| `severus.snape@hogwarts.example` | coach (custom claim) |
-| `argus.filch@hogwarts.example` | lecture seule (custom claim) |
+| `albus.dumbledore@alj-escalade.fr` | admin |
+| `severus.snape@hogwarts.example` | coach |
+| `argus.filch@hogwarts.example` | lecture seule |
 
-« Add new account » permet d'en créer d'autres (e-mail libre, claims JSON).
+Les rôles sont dans la liste des accès de l'émulateur (collection `access_roles`, écrite par `seed_emulator.py`), comme
+en production. Des données d'émulateur créées avant cette liste (« Accès réservé » pour Albus) se réparent sans tout
+réinitialiser : `uv run python dev/seed/seed_emulator.py --access-only` (comptes de test et leurs rôles, le reste est
+gardé). En mode dev, le serveur relit la liste à chaque appel : un seed ou une modification dans l'interface de
+l'émulateur s'applique tout de suite. « Add new account » crée un compte sans rôle : il est refusé, et sa demande apparaît sur
+Administration › Accès, où Albus peut lui donner un rôle. L'administrateur initial (`BOOTSTRAP_ADMIN_EMAIL`) n'est
+jamais ajouté en mode dev.
 
 ## Bon à savoir
 

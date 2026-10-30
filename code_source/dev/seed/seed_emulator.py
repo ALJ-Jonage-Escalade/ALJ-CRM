@@ -4,6 +4,7 @@ Fills the local Firestore emulator with FAKE data (Harry Potter universe).
     cd code_source
     set -a && source dev/dev.env && set +a
     python dev/seed/seed_emulator.py
+    python dev/seed/seed_emulator.py --access-only   # keeps the data: only the login accounts and their roles
 
 Fully resets the emulator database, then follows the production path:
 1. temporary SQLite database with the current schema, filled by the same functions as
@@ -38,12 +39,12 @@ PREVIOUS_SEASON = "2025-2026"
 RETURNING_RATIO = 0.7          # share of members already registered the previous season
 EMAIL_DOMAIN = "hogwarts.example"   # reserved domain: no e-mail can ever be delivered
 
-# Fake Google accounts in the Auth emulator, one per role (see api_auth):
-# (uid, e-mail, display name, custom claims)
+# Fake Google accounts in the Auth emulator, one per role, listed in the access list (access_roles, see
+# role_directory): (uid, e-mail, display name, role)
 DEV_ACCOUNTS = [
-    ("dev-dumbledore", "albus.dumbledore@alj-escalade.fr", "Albus Dumbledore (admin)", {}),
-    ("dev-snape", f"severus.snape@{EMAIL_DOMAIN}", "Severus Snape (coach)", {"coach": True}),
-    ("dev-filch", f"argus.filch@{EMAIL_DOMAIN}", "Argus Filch (read-only)", {"readonly": True}),
+    ("dev-dumbledore", "albus.dumbledore@alj-escalade.fr", "Albus Dumbledore", "admin"),
+    ("dev-snape", f"severus.snape@{EMAIL_DOMAIN}", "Severus Snape", "coach"),
+    ("dev-filch", f"argus.filch@{EMAIL_DOMAIN}", "Argus Filch", "readonly"),
 ]
 
 
@@ -79,24 +80,35 @@ def drop_server_cache() -> None:
             os.remove(path)
 
 
-def seed_auth_accounts(auth_host: str, project: str) -> None:
-    """Recreates the login accounts (simulated google.com provider, roles through custom claims)."""
+def seed_auth_accounts(auth_host: str, project: str, reset: bool = True) -> None:
+    """Recreates the login accounts (simulated google.com provider); their roles are in the access list. Without
+    `reset`, the other accounts are kept and a dev account that exists already is signed in again (same account)."""
     base = f"http://{auth_host}"
-    admin = {"Authorization": "Bearer owner"}   # emulator admin token
-    requests.delete(f"{base}/emulator/v1/projects/{project}/accounts", timeout=30).raise_for_status()
-    for sub, email, name, claims in DEV_ACCOUNTS:
+    if reset:
+        requests.delete(f"{base}/emulator/v1/projects/{project}/accounts", timeout=30).raise_for_status()
+    for sub, email, name, _role in DEV_ACCOUNTS:
         id_token = json.dumps({"sub": sub, "email": email, "email_verified": True, "name": name})
-        resp = requests.post(
+        requests.post(
             f"{base}/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=demo",
             json={"postBody": f"id_token={id_token}&providerId=google.com",
                   "requestUri": "http://localhost", "returnSecureToken": True},
-            timeout=30)
-        resp.raise_for_status()
-        if claims:
-            requests.post(
-                f"{base}/identitytoolkit.googleapis.com/v1/projects/{project}/accounts:update",
-                headers=admin, json={"localId": resp.json()["localId"], "customAttributes": json.dumps(claims)},
-                timeout=30).raise_for_status()
+            timeout=30).raise_for_status()
+
+
+def seed_access_roles() -> None:
+    """The access list (Administration › Accès): one entry per dev account (rewritten as seeded), one history entry
+    each. The only source of roles: without it, no dev account can sign in."""
+    from infrastructure.firestore.access_store import FirestoreAccessStore
+    from services.access.rules import iso
+
+    store = FirestoreAccessStore()
+    at = iso(datetime.datetime.now(datetime.timezone.utc))
+    for _sub, email, name, role in DEV_ACCOUNTS:
+        store.save_role({"email": email, "role": role, "display_name": name, "last_sign_in_at": None,
+                         "created_at": at, "created_by": "seed", "updated_at": at, "updated_by": "seed"})
+        store.add_history({"at": at, "author": "seed", "action": "added", "target_email": email,
+                           "old_role": None, "new_role": role})
+        store.delete_request(email)  # refused before the seed (--access-only): the account now has its role
 
 
 # --------------------------------------------------------------------------
@@ -441,9 +453,21 @@ def seed_helloasso_items(competitions):
     return len(items)
 
 
+def seed_access_only(project: str) -> int:
+    """Emulator data seeded before the access list existed (or roles changed on the page): the dev accounts and their
+    roles, everything else kept."""
+    seed_auth_accounts(os.environ["FIREBASE_AUTH_EMULATOR_HOST"], project, reset=False)
+    seed_access_roles()
+    print("🔑 Login accounts: " + ", ".join(f"{email} ({role})" for _, email, _, role in DEV_ACCOUNTS))
+    print("✅ Done (data kept)")
+    return 0
+
+
 def main() -> int:
     host = ensure_emulator()
     project = runtime_env.project_id_override()
+    if "--access-only" in sys.argv[1:]:
+        return seed_access_only(project)
 
     from faker import Faker
     from hp_names import COACHES
@@ -482,7 +506,8 @@ def main() -> int:
     print(f"🧾 {seed_helloasso_items(competitions)} HelloAsso payments")
 
     seed_auth_accounts(os.environ["FIREBASE_AUTH_EMULATOR_HOST"], project)
-    print("🔑 Login accounts: " + ", ".join(email for _, email, _, _ in DEV_ACCOUNTS))
+    seed_access_roles()
+    print("🔑 Login accounts: " + ", ".join(f"{email} ({role})" for _, email, _, role in DEV_ACCOUNTS))
     print("✅ Done — emulator UI: http://localhost:4000/firestore")
     return 0
 

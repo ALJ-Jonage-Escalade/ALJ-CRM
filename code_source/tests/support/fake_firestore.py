@@ -50,6 +50,11 @@ class FakeFirestore:
         self._touch(collection_name, doc_id)
         return True
 
+    def create_document(self, collection_name, doc_id, data, project_id=None, access_token=None):
+        if str(doc_id) in self._col(collection_name):
+            return False
+        return self.upsert_document(collection_name, doc_id, data)
+
     def update_fields(self, collection_name, doc_id, patch, project_id=None, access_token=None,
                       expected_update_time=None):
         if expected_update_time:
@@ -86,7 +91,8 @@ class FakeFirestore:
 def use_fake_firestore(test: unittest.TestCase) -> FakeFirestore:
     """Replace FirestoreClient by an in-memory store for the duration of `test`."""
     fake = FakeFirestore()
-    for name in ("get_document", "list_documents", "upsert_document", "update_fields", "delete_document", "batch_upsert"):
+    for name in ("get_document", "list_documents", "upsert_document", "create_document", "update_fields", "delete_document",
+                 "batch_upsert"):
         p = patch.object(FirestoreClient, name, getattr(fake, name))
         p.start()
         test.addCleanup(p.stop)

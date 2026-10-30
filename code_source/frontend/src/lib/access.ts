@@ -109,6 +109,18 @@ export const PAGES = [
     screen: "any",
     offlineRead: false,
   },
+  {
+    id: "administration",
+    icon: "🔐",
+    label: "Administration",
+    short: "Admin",
+    href: "/bureau/administration",
+    access: "admin",
+    screen: "any",
+    offlineRead: false,
+    // Online only: who has access is never kept on the device
+    children: [{ id: "acces", label: "Accès", path: "", access: "admin", offline: "none" }],
+  },
 ] as const satisfies readonly {
   id: string;
   icon: string;

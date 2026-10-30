@@ -17,7 +17,7 @@ WEB_DIR = os.path.join(CODE_ROOT, "web")
 
 # Office pages of the Vue application (frontend/src/router.ts): its entry page answers them. The pages are public,
 # the data stays behind the API (ID token, roles).
-_SPA_PAGES = frozenset({"adherents", "communications", "competitions", "outils", "parametres", "planning"})
+_SPA_PAGES = frozenset({"adherents", "administration", "communications", "competitions", "outils", "parametres", "planning"})
 # Sub-pages of the office pages (frontend/src/lib/access.ts subPages, plans/sub-menus.md): /bureau/<page>/<sub-page>,
 # and /competitions/<sub-page> for the competitions (each one public in api_auth.PUBLIC_PATHS)
 SPA_SUB_PAGES = {

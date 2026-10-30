@@ -29,6 +29,8 @@ import NotFoundPage from "./pages/NotFoundPage.vue";
 
 // Loaded when opened: Accueil (the most opened page) does not wait for them
 const AdherentsPage = () => import("./pages/AdherentsPage.vue");
+const AdministrationPage = () => import("./pages/AdministrationPage.vue");
+const AdministrationAccessPage = () => import("./pages/administration/AdministrationAccessPage.vue");
 const CommunicationsPage = () => import("./pages/CommunicationsPage.vue");
 const OutilsPage = () => import("./pages/OutilsPage.vue");
 const ParametresPage = () => import("./pages/ParametresPage.vue");
@@ -43,6 +45,7 @@ const OutilsFfmeImportPage = () => import("./pages/outils/OutilsFfmeImportPage.v
 
 /** Component of each sub-page, by page then sub-page id (lib/access.ts subPages). */
 const SUB_COMPONENTS: Partial<Record<PageId, Record<string, RouteComponent>>> = {
+  administration: { acces: AdministrationAccessPage },
   competitions: {
     competitions: CompetitionsListPage,
     helloasso: CompetitionsHelloAssoPage,
@@ -107,6 +110,12 @@ export const routes: RouteRecordRaw[] = [
     children: subRoutes("outils", "outils", true),
   },
   { path: "/bureau/parametres", name: "parametres", component: ParametresPage, meta: { access: pageAccess("parametres") } },
+  {
+    path: "/bureau/administration",
+    component: AdministrationPage,
+    meta: { access: pageAccess("administration") },
+    children: subRoutes("administration", "administration"),
+  },
   { path: "/:unknown(.*)*", component: NotFoundPage, meta: { access: "public" } },
 ];
 

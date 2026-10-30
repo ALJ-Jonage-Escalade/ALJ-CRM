@@ -3,7 +3,7 @@ Sign-in against the Firebase Auth emulator without its account picker.
 
 The emulator accepts an unsigned Google id_token (a plain JSON object), exactly as
 dev/seed/seed_emulator.py does with accounts:signInWithIdp: signing in with the seeded `sub`
-reuses the seeded account, custom claims (roles) included. Only the picker test goes through
+reuses the seeded account, whose role is in the seeded access list (access_roles). Only the picker test goes through
 the real redirect flow.
 """
 from dataclasses import dataclass
@@ -24,6 +24,8 @@ ACCOUNTS = {
     "readonly": Account("dev-filch", "argus.filch@hogwarts.example"),
     # Not seeded: created on first sign-in, without any role
     "stranger": Account("e2e-stranger", "stranger@hogwarts.example"),
+    # Not seeded either: asks for access, then gets it (test_administration.py only, never refused elsewhere)
+    "applicant": Account("e2e-applicant", "neville.longbottom@hogwarts.example"),
 }
 
 # window.__aljE2E, exposed by the app in emulator mode only (frontend/src/lib/firebase.ts)

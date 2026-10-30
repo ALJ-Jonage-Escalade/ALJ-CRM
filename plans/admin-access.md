@@ -37,6 +37,8 @@ Durable decisions that apply across all phases:
   - Errors: 400 validation, 409 safeguard refusals, French messages shown as-is by the page.
 - **`/api/me`**: same answer. As a side effect it records the sign-in date (with a role) or an access request (without
   a role); it passes on a 503.
+- **Bootstrap role**: the bootstrap address is admin while it is not listed and whenever the list can't be read; once
+  listed, its listed role applies (story 28: a change made on the page sticks).
 - **Bootstrap**: `BOOTSTRAP_ADMIN_EMAIL`, read through the secret store and set once on the Cloud Run service (kept by
   every deploy from GitHub). Created if absent at startup, never overwritten, skipped in dev mode, never blocks startup.
 - **Frontend**: page id `administration` (access `admin`) in `lib/access.ts`, route `/bureau/administration`; first
@@ -58,13 +60,13 @@ The emulator seed writes `access_roles` entries for the dev accounts (admin, coa
 
 ### Acceptance criteria
 
-- [ ] The dev accounts sign in on the emulator with the same roles as before, without custom claims
-- [ ] A club-domain address with no entry, and a token with a custom claim but no entry, get no role
-- [ ] An unverified e-mail gets no role, even if it is listed
-- [ ] Directory unit tests: listed role, unknown address, case/whitespace, cache served within 60 s and reloaded after,
+- [x] The dev accounts sign in on the emulator with the same roles as before, without custom claims
+- [x] A club-domain address with no entry, and a token with a custom claim but no entry, get no role
+- [x] An unverified e-mail gets no role, even if it is listed
+- [x] Directory unit tests: listed role, unknown address, case/whitespace, cache served within 60 s and reloaded after,
       `invalidate()` takes effect at once, "unavailable" when the store fails after expiry
-- [ ] `api_auth` tests: 503 when the directory is unavailable (on a protected route and on `/api/me`)
-- [ ] No personal e-mail address left in `src/` (grep)
+- [x] `api_auth` tests: 503 when the directory is unavailable (on a protected route and on `/api/me`)
+- [x] No personal e-mail address left in `src/` (grep)
 
 ---
 
@@ -84,12 +86,12 @@ the 503 behaviour when Firestore is down.
 
 ### Acceptance criteria
 
-- [ ] Fresh store + setting → one admin entry and one `bootstrap` history entry
-- [ ] Two concurrent bootstraps (fake store) → a single entry and a single history entry
-- [ ] An existing entry for that address (e.g. demoted to coach) is kept as is
-- [ ] The bootstrap address is admin with an empty list and with an unreadable store; others get 503
-- [ ] Dev mode: no bootstrap; empty setting: warning logged; store error: logged, startup continues
-- [ ] Setup guide updated (command, rollback caveat, 503 behaviour)
+- [x] Fresh store + setting → one admin entry and one `bootstrap` history entry
+- [x] Two concurrent bootstraps (fake store) → a single entry and a single history entry
+- [x] An existing entry for that address (e.g. demoted to coach) is kept as is
+- [x] The bootstrap address is admin with an empty list and with an unreadable store; others get 503
+- [x] Dev mode: no bootstrap; empty setting: warning logged; store error: logged, startup continues
+- [x] Setup guide updated (command, rollback caveat, 503 behaviour)
 
 ---
 
@@ -106,11 +108,11 @@ hidden from the menu and refused by the router guards for coach and read-only us
 
 ### Acceptance criteria
 
-- [ ] An admin sees « Administration » in the menu and the Accès table lists the seeded entries
-- [ ] Coach and read-only: no menu entry; typing the address redirects as for other admin pages; the API answers 403
-- [ ] Offline: the sub-page is disabled ("En ligne uniquement")
-- [ ] Route inventory test, Firestore-only router list, OpenAPI contract and generated types updated
-- [ ] Vitest: menu/router shows Administration only to admins; the table renders the API answer
+- [x] An admin sees « Administration » in the menu and the Accès table lists the seeded entries
+- [x] Coach and read-only: no menu entry; typing the address redirects as for other admin pages; the API answers 403
+- [x] Offline: the sub-page is disabled ("En ligne uniquement")
+- [x] Route inventory test, Firestore-only router list, OpenAPI contract and generated types updated
+- [x] Vitest: menu/router shows Administration only to admins; the table renders the API answer
 
 ---
 
@@ -128,11 +130,11 @@ role, display name), inline role and name editing, and removal after confirmatio
 
 ### Acceptance criteria
 
-- [ ] Unit (fake store): each operation writes the right entry and exactly one history entry
-- [ ] Duplicate add, invalid e-mail → 400; self-removal, self-demotion, last-admin removal/demotion → 409, French message
-- [ ] A change is seen at once on the same instance (directory invalidated)
-- [ ] TestClient: coach and read-only get 403 on every write; success bodies match the response models
-- [ ] Vitest: add, change role, rename, remove after confirmation, refusal message shown
+- [x] Unit (fake store): each operation writes the right entry and exactly one history entry
+- [x] Duplicate add, invalid e-mail → 400; self-removal, self-demotion, last-admin removal/demotion → 409, French message
+- [x] A change is seen at once on the same instance (directory invalidated)
+- [x] TestClient: coach and read-only get 403 on every write; success bodies match the response models
+- [x] Vitest: add, change role, rename, remove after confirmation, refusal message shown
 
 ---
 
@@ -147,9 +149,9 @@ sub-page: date, author, action, target, old → new role. No route edits or dele
 
 ### Acceptance criteria
 
-- [ ] Changes made in phase 4 appear newest first with author and old/new role
-- [ ] No write route exists on history (route inventory)
-- [ ] TestClient: admin-only; Vitest: the block renders the entries
+- [x] Changes made in phase 4 appear newest first with author and old/new role
+- [x] No write route exists on history (route inventory)
+- [x] TestClient: admin-only; Vitest: the block renders the entries
 
 ---
 
@@ -167,11 +169,11 @@ name, date) with "grant" (role picker → creates the entry, removes the request
 
 ### Acceptance criteria
 
-- [ ] Unit: repeated sign-in updates a single request; a dismissed address isn't recorded again for 30 days; requests
+- [x] Unit: repeated sign-in updates a single request; a dismissed address isn't recorded again for 30 days; requests
       older than 30 days are dropped; a granted request becomes an entry and leaves the requests
-- [ ] `/api/me` without a role records the request; with a 503 it records nothing and passes the 503 on
-- [ ] Vitest: grant with a role, dismiss, no-role message
-- [ ] e2e (emulator): a new account signs in and is refused, appears as a request, the admin grants it coach, the
+- [x] `/api/me` without a role records the request; with a 503 it records nothing and passes the 503 on
+- [x] Vitest: grant with a role, dismiss, no-role message
+- [x] e2e (emulator): a new account signs in and is refused, appears as a request, the admin grants it coach, the
       account then opens a coach page
 
 ---
@@ -187,9 +189,9 @@ Firestore writes). The Accès table shows the date.
 
 ### Acceptance criteria
 
-- [ ] Unit: first sign-in of the day writes, later ones the same day don't, next day writes again (fake clock)
-- [ ] A write failure doesn't fail `/api/me`
-- [ ] The Accès table shows the date (or « jamais »)
+- [x] Unit: first sign-in of the day writes, later ones the same day don't, next day writes again (fake clock)
+- [x] A write failure doesn't fail `/api/me`
+- [x] The Accès table shows the date (or « jamais »)
 
 ---
 
@@ -199,7 +201,8 @@ Firestore writes). The Accès table shows the date.
 
 ### What to build
 
-A one-off migration script in the git-ignored `scripts_temporaires/` writes today's users (the former hardcoded lists
+A one-off migration script in the git-ignored `scripts_temporaires/` (`migrate_access_roles.py`: reads the former
+lists from `main` through git, takes the club-domain accounts with `--club-admin`, dry run unless `--apply`) writes today's users (the former hardcoded lists
 and the club-domain accounts in use) into the production `access_roles`, with one history entry each. Docs: `AGENTS.md`
 data rule "roles live only in `access_roles`, never in code"; account tables in `README.md`, `ARCHITECTURE.md` and
 `dev/README.md`. Bump `APP_VERSION` and `VERSION`. Deploy order: run the migration → deploy → set
@@ -209,5 +212,5 @@ data rule "roles live only in `access_roles`, never in code"; account tables in 
 
 - [ ] Migration script run (dry-run first) against production with the club's approval; every current user listed
 - [ ] After deploy, current users keep their access; the bootstrap admin is set and listed
-- [ ] Docs and `AGENTS.md` rule updated; version bumped in both files
-- [ ] All checks pass as in CI (Python, frontend, OpenAPI contract, e2e)
+- [x] Docs and `AGENTS.md` rule updated; version bumped in both files
+- [x] All checks pass as in CI (Python, frontend, OpenAPI contract, e2e)

@@ -82,6 +82,8 @@ Arrêt : `Ctrl+C` pour le serveur, `docker compose -f dev/docker-compose.yml dow
 | `severus.snape@hogwarts.example` | coach |
 | `argus.filch@hogwarts.example` | lecture seule |
 
+Les rôles viennent de la liste des accès (page **Administration › Accès**), en dev comme en production.
+
 ### À savoir
 
 - Un bandeau orange « DEV » en bas de page confirme le branchement sur l'émulateur.

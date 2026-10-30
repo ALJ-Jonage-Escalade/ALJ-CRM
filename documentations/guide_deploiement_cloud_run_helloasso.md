@@ -103,6 +103,27 @@ GOOGLE_PROJECT_ID="alj-2027"
 
 *Note : Ces variables peuvent également être saisies directement dans l'interface graphique Google Cloud Console (Cloud Run → alj-escalade-api → Modifier et déployer une nouvelle révision → Variables et secrets).*
 
+### 👑 Administrateur initial (`BOOTSTRAP_ADMIN_EMAIL`, une seule fois par projet)
+
+Les accès au CRM (qui peut se connecter, avec quel rôle) se gèrent sur la page **Administration › Accès**
+(collection Firestore `access_roles`), jamais dans le code. Pour qu'un projet neuf ait un premier administrateur,
+une adresse est donnée **une fois** au service Cloud Run :
+
+```bash
+gcloud run services update alj-escalade-api --region europe-west1 \
+    --update-env-vars BOOTSTRAP_ADMIN_EMAIL=prenom.nom@alj-escalade.fr
+```
+
+- Cette commande crée une nouvelle révision, qui reçoit **tout le trafic tout de suite**.
+- Les déploiements depuis GitHub (section 7) gardent la variable : inutile de la redonner.
+- Au démarrage, si cette adresse n'est pas dans la liste des accès, le serveur l'y ajoute comme administrateur (une
+  seule fois, même si plusieurs instances démarrent ensemble ; une entrée existante n'est jamais modifiée). Sans la
+  variable, un avertissement `BOOTSTRAP_ADMIN_EMAIL is not set` apparaît dans les journaux.
+- **Accès de secours** : si Firestore est illisible, toutes les autres connexions répondent `503` (« Rôle non
+  vérifiable »), jamais `403` : les pages gardent leur copie hors ligne. Cette adresse reste administrateur.
+- **Retour arrière** : revenir à une révision antérieure à cette variable (`--rollback`) fait perdre l'accès de
+  secours, pas la liste des accès (elle est dans Firestore, indépendante du code).
+
 ---
 
 ## 5. 🔔 Configuration du Webhook dans HelloAsso
@@ -138,7 +159,7 @@ Dès que votre URL Cloud Run est active, configurez les notifications HelloAsso 
       --update-secrets HELLOASSO_CLIENT_ID=helloasso-client-id:latest,HELLOASSO_CLIENT_SECRET=helloasso-client-secret:latest,HELLOASSO_ORG_SLUG=helloasso-org-slug:latest
   ```
 - **Fail-closed** : en production, une notification qui ne peut être vérifiée ni par le jeton ni par l'API est refusée (`503`).
-- **API `/api/*`, `/docs`** : réservées aux comptes connectés à la PWA. La PWA envoie le jeton Firebase (`Authorization: Bearer …`) ; le serveur vérifie sa signature et applique les rôles de `firestore.rules` (coach requis, admin pour `POST /api/planning`). Restent publics : `/`, `/competitions`, `/annuaire`, `/health`, `/api/web-version`, `/sw.js`, `/manifest.webmanifest` et le webhook. Contrôle actif dans l'image Docker (`ALJ_API_AUTH=required`), désactivé pour le serveur local de l'application de bureau.
+- **API `/api/*`, `/docs`** : réservées aux comptes connectés à la PWA. La PWA envoie le jeton Firebase (`Authorization: Bearer …`) ; le serveur vérifie sa signature, puis lit le rôle de l'adresse vérifiée dans la liste des accès (Administration › Accès, collection `access_roles` ; coach requis, admin pour les écritures sensibles et `/api/admin/*`). Liste illisible : `503`. Restent publics : `/`, `/competitions`, `/annuaire`, `/health`, `/api/web-version`, `/sw.js`, `/manifest.webmanifest` et le webhook. Contrôle actif dans l'image Docker (`ALJ_API_AUTH=required`), désactivé pour le serveur local de l'application de bureau.
 
 ---
 
@@ -207,7 +228,8 @@ Vérifiez dans la PWA mobile que l'adhérent Lucas MARTIN passe immédiatement e
    https://alj-escalade-api-xxxxxxxx-ew.a.run.app/bureau/
    ```
    *(La redirection automatique depuis `/` vers `/bureau/` s'opère pour tout navigateur d'ordinateur).*
-2. Connectez-vous avec votre compte Google autorisé (`@alj-escalade.fr` ou compte administrateur).
+2. Connectez-vous avec un compte Google listé sur la page **Administration › Accès** (au premier déploiement :
+   l'adresse `BOOTSTRAP_ADMIN_EMAIL`). Un compte non listé est refusé et sa demande apparaît dans « Demandes d'accès ».
 3. Accédez à la page **Adhérents** (`/bureau/adherents`) :
    - Vérifiez l'affichage complet du tableau avec le tri interactif sur chaque colonne.
    - Testez le filtrage des sous-catégories (par défaut, les listes d'attente sont exclues).
@@ -243,6 +265,7 @@ Depuis Cloud Shell, dans `../code_source` :
 ```
 
 Le script reste l'outil pour `--test`, `--rollback` et `--cleanup`. Le push suivant sur `main` renvoie le trafic sur la dernière révision.
+Une révision antérieure à `BOOTSTRAP_ADMIN_EMAIL` (section 4) n'a pas l'accès de secours ; la liste des accès, elle, ne change pas.
 
 ### Mise en place (une seule fois)
 

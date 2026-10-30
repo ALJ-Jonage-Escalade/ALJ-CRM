@@ -631,7 +631,7 @@ class TestBureauAccess(unittest.TestCase):
         self.env.stop()
 
     def test_portal_public_api_protected(self):
-        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions",
+        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/administration", "/bureau/communications", "/bureau/competitions",
                      "/bureau/planning", "/bureau/outils", "/bureau/parametres", "/bureau/competitions/helloasso",
                      "/bureau/competitions/bilan", "/bureau/competitions/coachs", "/competitions/helloasso",
                      "/competitions/bilan", "/competitions/coachs", "/bureau/outils/pivot", "/bureau/outils/stats",
@@ -650,7 +650,7 @@ class TestBureauAccess(unittest.TestCase):
 
     def test_required_role_for_portal(self):
         r = api_auth.required_role
-        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres"):
+        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/administration", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres"):
             self.assertIsNone(r("GET", path), path)
         self.assertEqual(r("GET", "/api/email-status"), Role.COACH)
 

@@ -51,3 +51,14 @@ def _test_client_host(monkeypatch):
         sys.path.insert(0, src)
     from infrastructure.security import api_auth
     monkeypatch.setattr(api_auth, "LOCAL_HOSTS", api_auth.LOCAL_HOSTS | {"testserver"})
+
+
+@pytest.fixture(autouse=True)
+def _in_memory_access_list():
+    """The access list (Firestore access_roles…) in memory and empty: no test reads the real one, and an address only
+    has a role once a test lists it (support/fake_access.grant_roles)."""
+    from support.fake_access import install_access
+    from infrastructure.security import role_directory
+    install_access()
+    yield
+    role_directory.install(None)

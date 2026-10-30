@@ -65,6 +65,14 @@ describe("createAuth", () => {
   const UNREACHABLE = "Serveur injoignable : vérifiez la connexion réseau.";
   it.each([
     ["a server error", async () => json({}, 500), "Le serveur ne répond pas correctement (erreur 500).", false],
+    // The access list could not be read: the role stays unchecked, with the server's reason
+    [
+      "an unreadable access list",
+      async () => json({ status: "error", message: "Rôle non vérifiable : liste illisible." }, 503),
+      "Rôle non vérifiable : liste illisible.",
+      false,
+    ],
+    ["a 503 without body", async () => new Response("", { status: 503 }), "Rôle non vérifiable pour le moment.", false],
     [
       "no network",
       async () => {

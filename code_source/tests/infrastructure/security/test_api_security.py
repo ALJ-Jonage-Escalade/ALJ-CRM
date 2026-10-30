@@ -6,6 +6,7 @@ Tests de sécurité de l'API Cloud Run :
 
 import datetime
 import os
+import re
 import sys
 import time
 import unittest
@@ -29,9 +30,20 @@ from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
 from infrastructure.helloasso.webhook import HelloAssoWebhookService
 from server import app
+from support.fake_access import FakeClock, InMemoryAccessStore, grant_roles, install_access, role_entry
 
 PROJECT = api_auth.DEFAULT_PROJECT_ID
 KID = "test-kid"
+
+# The access list of these tests (support/fake_access): conftest starts every test with an empty one
+ADMIN = "albus@alj-escalade.fr"
+COACH = "severus@hogwarts.example"
+READONLY = "argus@hogwarts.example"
+STRANGER = "pirate@gmail.com"
+
+
+def list_accounts():
+    grant_roles({ADMIN: "admin", COACH: "coach", READONLY: "readonly"})
 
 
 def _make_key_and_cert():
@@ -50,7 +62,7 @@ KEY, CERT_PEM = _make_key_and_cert()
 OTHER_KEY, _ = _make_key_and_cert()
 
 
-def make_token(email="coach@alj-escalade.fr", key=KEY, kid=KID, aud=PROJECT,
+def make_token(email=ADMIN, key=KEY, kid=KID, aud=PROJECT,
                iss=None, exp_delta=3600, verified=True, **claims):
     now = int(time.time())
     payload = {
@@ -64,6 +76,7 @@ def make_token(email="coach@alj-escalade.fr", key=KEY, kid=KID, aud=PROJECT,
 
 class _CertsMixin:
     def setUp(self):
+        list_accounts()
         self._saved = dict(api_auth._certs_cache)
         api_auth._certs_cache["keys"] = {KID: CERT_PEM}
         api_auth._certs_cache["expires"] = time.time() + 3600
@@ -114,54 +127,108 @@ class TestRoles(unittest.TestCase):
             self.assertEqual(r(method, path), Role.COACH, path)
 
     def test_role_for_claims(self):
+        """The access list is the only source of roles, for a verified address."""
+        list_accounts()
         f = api_auth.role_for_claims
-        self.assertEqual(f({"email": "Bureau@ALJ-Escalade.fr", "email_verified": True}), Role.ADMIN)
-        self.assertEqual(f({"email": "lopez.dav@gmail.com", "email_verified": True}), Role.ADMIN)
-        self.assertEqual(f({"email": "stephane.loridant@orange.fr", "email_verified": True}), Role.COACH)
-        self.assertEqual(f({"email": "muah.did@gmail.com", "email_verified": True}), Role.READONLY)
+        self.assertEqual(f({"email": ADMIN, "email_verified": True}), Role.ADMIN)
+        self.assertEqual(f({"email": " Severus@Hogwarts.EXAMPLE ", "email_verified": True}), Role.COACH)
+        self.assertEqual(f({"email": READONLY, "email_verified": True}), Role.READONLY)
         self.assertIsNone(f({"email": "inconnu@gmail.com", "email_verified": True}))
-        # Adresse non vérifiée : aucun rôle par e-mail
-        self.assertIsNone(f({"email": "x@alj-escalade.fr", "email_verified": False}))
-        # Custom claims; the highest level wins
-        self.assertEqual(f({"email": "a@b.c", "coach": True}), Role.COACH)
-        self.assertEqual(f({"admin": True}), Role.ADMIN)
-        self.assertEqual(f({"readonly": True, "coach": True}), Role.COACH)
+        # Unverified address: no role, even when listed
+        self.assertIsNone(f({"email": ADMIN, "email_verified": False}))
+        self.assertIsNone(f({"email": ADMIN}))
+
+    def test_former_rules_grant_nothing(self):
+        """Neither the club domain nor custom claims give a role any more: only the access list does."""
+        list_accounts()
+        f = api_auth.role_for_claims
+        self.assertIsNone(f({"email": "bureau@alj-escalade.fr", "email_verified": True}))
+        self.assertIsNone(f({"email": "a@b.c", "email_verified": True, "coach": True}))
+        self.assertIsNone(f({"admin": True}))
+        self.assertIsNone(f({"email": "x@hogwarts.example", "email_verified": True, "admin": True, "readonly": True}))
 
     def test_has_role_follows_the_hierarchy(self):
-        self.assertTrue(api_auth.has_role({"admin": True}, Role.COACH))
-        self.assertTrue(api_auth.has_role({"coach": True}, Role.READONLY))
-        self.assertFalse(api_auth.has_role({"readonly": True}, Role.COACH))
+        list_accounts()
+        admin, coach, readonly = ({"email": e, "email_verified": True} for e in (ADMIN, COACH, READONLY))
+        self.assertTrue(api_auth.has_role(admin, Role.COACH))
+        self.assertTrue(api_auth.has_role(coach, Role.READONLY))
+        self.assertFalse(api_auth.has_role(readonly, Role.COACH))
         self.assertFalse(api_auth.has_role({"email": "inconnu@gmail.com", "email_verified": True}, Role.READONLY))
         self.assertLess(Role.READONLY, Role.COACH)
         self.assertLess(Role.COACH, Role.ADMIN)
 
+    def test_admin_routes_require_admin(self):
+        r = api_auth.required_role
+        for method in ("GET", "POST", "PATCH", "DELETE"):
+            for path in ("/api/admin/access/roles", "/api/admin/access/roles/a@b.c", "/api/admin/access/requests",
+                         "/api/admin/access/requests/a@b.c/grant", "/api/admin/access/history"):
+                self.assertEqual(r(method, path), Role.ADMIN, f"{method} {path}")
+        self.assertEqual(r("GET", "/api/administration"), Role.COACH)  # not under /api/admin/
+
     def test_rules_hold_no_role_list(self):
-        """firestore.rules denies every client: roles live in api_auth.py only (plan phase 3)."""
+        """firestore.rules denies every client: roles live in the access list only (plan phase 3)."""
         with open(os.path.join(_code_root, "firestore", "firestore.rules"), encoding="utf-8") as f:
             rules = f.read()
         self.assertNotIn("@", rules)
         self.assertNotIn("request.auth", rules)
 
-    def test_role_lists_not_copied_to_the_web_app(self):
-        """The web app reads the role on /api/me: no copy of the role lists in any frontend file (plan phase 12)."""
-        listed = set(api_auth.ADMIN_EMAILS) | set(api_auth.COACH_EMAILS) | set(api_auth.READONLY_EMAILS)
-        self.assertTrue(listed)
-        texts = [os.path.join(_code_root, "frontend", "index.html")]
-        for root in (os.path.join(_code_root, "web"), os.path.join(_code_root, "frontend", "src")):
-            texts += [os.path.join(d, n) for d, _, names in os.walk(root) for n in names
-                      if n.endswith((".ts", ".vue", ".js", ".html", ".json", ".css"))]
-        self.assertGreater(len(texts), 10)
-        for path in texts:
+    def test_no_personal_address_in_the_code(self):
+        """Roles live in the access list, never in code (GDPR): no personal mailbox in the app's sources."""
+        personal = re.compile(r"[a-z0-9_.+-]+@(?:gmail|googlemail|orange|wanadoo|free|sfr|laposte|hotmail|outlook|live|yahoo"
+                              r"|icloud|me|aol|gmx|protonmail|neuf|bbox)\.[a-z.]+")
+        club_mailbox = "amicalelaique.jonage@gmail.com"  # the club's own address (e-mail footer)
+        sources = []
+        for root in (os.path.join(_code_root, "src"), os.path.join(_code_root, "frontend", "src")):
+            sources += [os.path.join(d, n) for d, _, names in os.walk(root) for n in names
+                        if n.endswith((".py", ".ts", ".vue", ".js", ".html")) and not n.endswith(".test.ts")]
+        self.assertGreater(len(sources), 50)
+        found = []
+        for path in sources:
             with open(path, encoding="utf-8") as f:
-                content = f.read().lower()
-            for email in listed:
-                self.assertNotIn(email.lower(), content, path)
+                found += [f"{os.path.relpath(path, _code_root)}: {email}"
+                          for email in personal.findall(f.read().lower()) if email != club_mailbox]
+        self.assertEqual(found, [])
+
+
+class TestRoleDirectoryFailure(_CertsMixin, unittest.TestCase):
+    """The access list can't be read: 503 for everyone but the bootstrap admin, never 403."""
+
+    def setUp(self):
+        super().setUp()
+        self.clock = FakeClock()
+        self.store = InMemoryAccessStore()
+        self.store.save_role(role_entry(COACH, "coach"))
+        install_access(self.store, self.clock, bootstrap_email="boot@alj-escalade.fr")
+        self.client = TestClient(app)
+        self.env = patch.dict(os.environ, {"ALJ_API_AUTH": "required"})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def get(self, path, email):
+        return self.client.get(path, headers={"Authorization": f"Bearer {make_token(email=email)}"})
+
+    def test_unreadable_list(self):
+        self.store.failing = True
+        for path in ("/api/me", "/api/email-status"):
+            r = self.get(path, COACH)
+            self.assertEqual(r.status_code, 503, path)
+            self.assertIn("Rôle non vérifiable", r.json()["message"])
+        self.assertEqual(self.get("/api/me", "boot@alj-escalade.fr").json()["role"], "admin")
+        self.assertEqual(self.get("/api/email-status", "boot@alj-escalade.fr").status_code, 200)
+
+    def test_cached_list_served_within_the_minute(self):
+        self.assertEqual(self.get("/api/me", COACH).json()["role"], "coach")
+        self.store.failing = True
+        self.assertEqual(self.get("/api/me", COACH).json()["role"], "coach")
+        self.clock.advance(seconds=61)
+        self.assertEqual(self.get("/api/me", COACH).status_code, 503)
+
 
 class TestTokenVerification(_CertsMixin, unittest.TestCase):
 
     def test_valid_token(self):
         claims = api_auth.verify_firebase_token(make_token())
-        self.assertEqual(claims["email"], "coach@alj-escalade.fr")
+        self.assertEqual(claims["email"], ADMIN)
 
     def assertRejected(self, token, status=401):
         with self.assertRaises(api_auth.AuthError) as ctx:
@@ -206,26 +273,27 @@ class TestMeRoute(_CertsMixin, unittest.TestCase):
 
     def test_role_of_each_account(self):
         cases = [
-            (make_token(email="albus@alj-escalade.fr"), "admin"),
-            (make_token(email="stephane.loridant@orange.fr"), "coach"),
-            (make_token(email="pirate@gmail.com", coach=True), "coach"),
-            (make_token(email="muah.did@gmail.com"), "readonly"),
-            (make_token(email="pirate@gmail.com"), None),                      # signed in, no access: 200, not 403
-            (make_token(email="albus@alj-escalade.fr", verified=False), None),  # address rules need a verified e-mail
+            (make_token(email=ADMIN), "admin"),
+            (make_token(email=COACH), "coach"),
+            (make_token(email=READONLY), "readonly"),
+            (make_token(email=STRANGER, coach=True), None),                     # custom claims grant nothing
+            (make_token(email="bureau@alj-escalade.fr"), None),                 # nor the club domain
+            (make_token(email=STRANGER), None),                                 # signed in, no access: 200, not 403
+            (make_token(email=ADMIN, verified=False), None),                    # the list needs a verified e-mail
         ]
         for token, role in cases:
             r = self.me(token)
             self.assertEqual(r.status_code, 200, role)
             self.assertEqual(r.json()["role"], role)
-        self.assertEqual(self.me(make_token(email="albus@alj-escalade.fr")).json()["email"], "albus@alj-escalade.fr")
+        self.assertEqual(self.me(make_token(email=ADMIN)).json()["email"], ADMIN)
 
     def test_emulator_token_in_dev_mode_only(self):
         """Dev mode (emulator, token checks off): the unsigned emulator token is read as is."""
-        emulator_token = jwt.encode({"sub": "dev-snape", "email": "severus@hogwarts.example", "email_verified": True,
-                                     "coach": True}, key=None, algorithm="none")
+        emulator_token = jwt.encode({"sub": "dev-snape", "email": COACH, "email_verified": True},
+                                    key=None, algorithm="none")
         r = self.me(emulator_token, ALJ_API_AUTH="off", ALJ_ENV="dev")
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json(), {"email": "severus@hogwarts.example", "role": "coach"})
+        self.assertEqual(r.json(), {"email": COACH, "role": "coach"})
         # Token checks off outside dev mode (local server): no unverified token is trusted
         self.assertEqual(self.me(emulator_token, ALJ_API_AUTH="off", ALJ_ENV="prod").status_code, 401)
         # Token checks on: the unsigned token is refused, even in dev mode
@@ -234,10 +302,10 @@ class TestMeRoute(_CertsMixin, unittest.TestCase):
     def test_local_server_verifies_the_token(self):
         """Token checks off outside dev mode (lancer_site_web.bat): /api/me still verifies the token and answers the role."""
         local = {"ALJ_API_AUTH": "off", "ALJ_ENV": "prod"}
-        r = self.me(make_token(email="albus@alj-escalade.fr"), **local)
+        r = self.me(make_token(email=ADMIN), **local)
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json(), {"email": "albus@alj-escalade.fr", "role": "admin"})
-        self.assertEqual(self.me(make_token(email="stephane.loridant@orange.fr"), **local).json()["role"], "coach")
+        self.assertEqual(r.json(), {"email": ADMIN, "role": "admin"})
+        self.assertEqual(self.me(make_token(email=COACH), **local).json()["role"], "coach")
         self.assertEqual(self.me(**local).status_code, 401)
         self.assertEqual(self.me("abc", **local).status_code, 401)
         self.assertEqual(self.me(make_token(exp_delta=-3600), **local).status_code, 401)
@@ -274,26 +342,26 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
         self.assertEqual(r.status_code, 401)
         self.assertEqual(r.headers.get("www-authenticate"), "Bearer")
         self.assertEqual(self.get("/api/email-status", "abc").status_code, 401)
-        self.assertEqual(self.get("/api/email-status", make_token(email="muah.did@gmail.com")).status_code, 403)
-        self.assertEqual(self.get("/api/email-status", make_token(email="pirate@gmail.com")).status_code, 403)
-        self.assertEqual(self.get("/api/email-status", make_token()).status_code, 200)
+        self.assertEqual(self.get("/api/email-status", make_token(email=READONLY)).status_code, 403)
+        self.assertEqual(self.get("/api/email-status", make_token(email=STRANGER)).status_code, 403)
+        self.assertEqual(self.get("/api/email-status", make_token(email=COACH)).status_code, 200)
         self.assertEqual(self.get("/docs").status_code, 401)
         self.assertEqual(self.client.post("/api/send-email", json={}).status_code, 401)
         self.assertEqual(self.client.post("/api/helloasso/sync").status_code, 401)
 
     def test_readonly_role_end_to_end(self):
         """Readonly can read competitions, and nothing else."""
-        readonly = make_token(email="muah.did@gmail.com")
+        readonly = make_token(email=READONLY)
         with patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.list_competition_docs", return_value=[]):
             self.assertEqual(self.get("/api/competitions", readonly).status_code, 200)
         self.assertEqual(self.get("/api/email-status", readonly).status_code, 403)
         r = self.client.post("/api/competitions", json={}, headers={"Authorization": f"Bearer {readonly}"})
         self.assertEqual(r.status_code, 403)
-        self.assertEqual(self.get("/api/competitions", make_token(email="pirate@gmail.com")).status_code, 403)
+        self.assertEqual(self.get("/api/competitions", make_token(email=STRANGER)).status_code, 403)
         self.assertEqual(self.get("/api/competitions").status_code, 401)
 
     def test_planning_write_requires_admin(self):
-        coach = make_token(email="stephane.loridant@orange.fr")
+        coach = make_token(email=COACH)
         r = self.client.post("/api/planning", json=[], headers={"Authorization": f"Bearer {coach}"})
         self.assertEqual(r.status_code, 403)
         with patch("api.activities.planning.PlanningRepository.save_planning_data") as save:

@@ -51,6 +51,10 @@ Run from `code_source/` (the script always uploads `code_source/`); Windows scri
 ## Data & domain rules
 - Firestore is the source of truth (`crm_<table>` collections); `database.db` is a SQLite cache rebuilt from it (`infrastructure/firestore/cloud_database.py`). Write routes must go through the repositories of `infrastructure/sqlite/` (`MemberRepository`, `PlanningRepository`, …; connection and schema in `SqliteDatabase`) so changes are replicated
 - FFME CSV export (`exports/membership_excel.generate_ffme_csv`): strict format (`;` separator, `dd/mm/yyyy` dates); `tests/exports/test_ffme_golden_master.py` must stay byte-identical, or the reference is renewed with the club's approval
+- Access roles live only in the Firestore `access_roles` collection (page Administration › Accès), never in code:
+  no e-mail list, domain rule or custom claim grants a role. Read through `infrastructure/security/role_directory`,
+  change through `services/access/rules.AccessRules` (safeguards + one `access_history` entry per change). First admin
+  of a project: the Cloud Run variable `BOOTSTRAP_ADMIN_EMAIL` (`documentations/guide_deploiement_cloud_run_helloasso.md` § 4)
 - App settings (key/value: HelloAsso campaign, WhatsApp text, results batch e-mail…) live only in the Firestore `app_settings` collection: `infrastructure/firestore/app_settings.AppSettingsRepository`
 - HelloAsso `customFields`: the value can be in `answer` or `value` — always read both
 - Name matching: use `normalize_string` / `normalize_name` from `domain/utils.py`; never rebuild paths by hand, import `CODE_ROOT` / `ROOT_DIR` / `DATA_ROOT` from `src/paths.py`
