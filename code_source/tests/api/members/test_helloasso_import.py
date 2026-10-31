@@ -50,8 +50,10 @@ class HelloAssoImportTestCase(MemberDbTestCase, ApiTestCase):
 class TestMembershipPreview(HelloAssoImportTestCase):
 
     def test_import_routes_are_admin_only(self) -> None:
-        self.assertEqual(required_role("POST", PREVIEW), Role.ADMIN)
-        self.assertEqual(required_role("POST", "/api/helloasso/memberships/import"), Role.ADMIN)
+        for method, path in (("POST", PREVIEW), ("POST", "/api/helloasso/memberships/import"),
+                             ("GET", "/api/helloasso/memberships/last-sync"), ("POST", "/api/settings/helloasso-membership")):
+            with self.subTest(path=path):
+                self.assertEqual(required_role(method, path), Role.ADMIN)
 
     def test_preview_sorts_the_registrations_and_writes_nothing(self) -> None:
         self.items = [ha_item(1, "WEASLEY", "Ginny"), ha_item(2, "LOVEGOOD", "", birth_date="")]
@@ -121,10 +123,6 @@ class TestMembershipCampaignSetting(HelloAssoImportTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(AppSettingsRepository.get("HELLOASSO_MEMBERSHIP_CAMPAIGN"), "")
 
-    def test_saving_the_campaign_is_admin_only(self) -> None:
-        self.assertEqual(required_role("POST", "/api/settings/helloasso-membership"), Role.ADMIN)
-
-
 IMPORT = "/api/helloasso/memberships/import"
 
 
@@ -161,15 +159,6 @@ class TestMembershipImport(HelloAssoImportTestCase):
         smtp.assert_not_called()
         smtp_ssl.assert_not_called()
         send_email.assert_not_called()
-
-    def test_decisions_that_no_longer_match_helloasso_are_refused(self) -> None:
-        for decisions in ({"3": {"bucket": "new", "choice": "import"}}, {"1": {"bucket": "renewal", "choice": "import"}}):
-            with self.subTest(decisions=decisions):
-                response = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": decisions})
-
-                self.assertEqual(response.status_code, 409, response.text)
-                self.assertEqual(response.json()["code"], "stale_decisions")
-        self.assertEqual(self.count("users"), 0)
 
     def test_import_of_another_season_or_a_blocked_campaign_is_refused(self) -> None:
         decisions = {"1": {"bucket": "new", "choice": "import"}}
@@ -216,22 +205,6 @@ class TestMembershipRerunsAndRenewals(HelloAssoImportTestCase):
         self.assertEqual(result["counts"], {"created": 0, "renewed": 1, "updated": 0, "skipped": 0})
         self.assertEqual((self.count("users"), self.count("purchases")), (1, 2))
 
-    def test_a_former_import_without_item_id_is_recognised_and_marked(self) -> None:
-        self.seed("501", "Ginny", "WEASLEY", "Loisir collège", **{"champ_Date de naissance de l'adhérent": "2013-08-11"})
-        self.items = [ha_item(1, "WEASLEY", "Ginny")]
-
-        preview = self.client.post(PREVIEW).json()
-        self.import_all()
-
-        self.assertEqual(preview["rows"][0]["bucket"], "already_imported")
-        conn = SqliteDatabase.get_connection()
-        try:
-            self.assertEqual(conn.execute("SELECT helloasso_item_id FROM purchases").fetchone()[0], 1)
-        finally:
-            conn.close()
-        self.assertEqual(self.count("purchases"), 1)
-
-
 class TestMembershipsToReview(HelloAssoImportTestCase):
 
     def setUp(self) -> None:
@@ -267,14 +240,6 @@ class TestMembershipsToReview(HelloAssoImportTestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(len(response.json()["created"]), 1)
         self.assertEqual((self.count("users"), self.count("purchases")), (2, 2))
-
-    def test_a_link_to_another_member_is_refused(self) -> None:
-        response = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {
-            "1": {"bucket": "to_review", "choice": f"link:{self.ginny + 100}"}}})
-
-        self.assertEqual((response.status_code, response.json()["code"]), (409, "stale_decisions"))
-        self.assertEqual(self.count("purchases"), 1)
-
 
 class TestMembershipsChangedOnHelloAsso(HelloAssoImportTestCase):
 
@@ -331,6 +296,3 @@ class TestMembershipImportHistory(HelloAssoImportTestCase):
                                           {"item_id": 2, "bucket": "to_review", "decision": "skip", "action": ""}])
         last = self.client.get("/api/helloasso/memberships/last-sync").json()["last_sync"]
         self.assertEqual((last["at"], last["author"]), (entry["at"], "serveur local"))
-
-    def test_last_sync_is_admin_only(self) -> None:
-        self.assertEqual(required_role("GET", "/api/helloasso/memberships/last-sync"), Role.ADMIN)

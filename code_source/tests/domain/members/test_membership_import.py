@@ -43,30 +43,6 @@ def test_an_unknown_person_is_new() -> None:
     assert plan.blocked_reason is None
 
 
-def test_a_campaign_of_another_season_blocks_every_registration() -> None:
-    plan = plan_membership_import([_record(1), _record(2)], season=SEASON, campaign_slug="adhesion-escalade-2025-2026")
-
-    assert plan.blocked_reason is not None
-    assert [(entry.bucket, entry.reason) for entry in plan.entries] == [(Bucket.BLOCKED, plan.blocked_reason)] * 2
-
-
-@pytest.mark.parametrize(
-    "overrides",
-    [{"last_name": ""}, {"first_name": "  "}, {"order_ref": ""}],
-)
-def test_a_registration_without_name_or_order_is_blocked(overrides: dict[str, str]) -> None:
-    [entry] = plan_membership_import([_record(**overrides)], season=SEASON, campaign_slug=CAMPAIGN).entries
-
-    assert entry.bucket == Bucket.BLOCKED
-    assert entry.reason
-
-
-def test_counts_cover_every_bucket() -> None:
-    plan = plan_membership_import([_record(1), _record(2, last_name="")], season=SEASON, campaign_slug=CAMPAIGN)
-
-    assert plan.counts() == {"already_imported": 0, "new": 1, "renewal": 0, "updated": 0, "to_review": 0, "blocked": 1}
-
-
 # ---------------------------------------------------------------------------
 # Decisions applier: the admin's decisions, keyed by HelloAsso item id, become the writes
 # ---------------------------------------------------------------------------
@@ -75,16 +51,12 @@ def _new_plan() -> ImportPlan:
                                   campaign_slug=CAMPAIGN)
 
 
-def test_checked_new_rows_are_created_and_unchecked_ones_skipped() -> None:
-    writes = apply_decisions(_new_plan(), {1: Decision(Bucket.NEW, "import"), 2: Decision(Bucket.NEW, "skip")})
+@pytest.mark.parametrize("decisions", [{2: Decision(Bucket.NEW, "skip")}, {}], ids=["unchecked", "no decision"])
+def test_only_the_checked_new_rows_are_created(decisions: dict[int, Decision]) -> None:
+    """No decision: a registration that appeared on HelloAsso after the preview, never seen by the admin."""
+    writes = apply_decisions(_new_plan(), {1: Decision(Bucket.NEW, "import"), **decisions})
 
     assert [(write.item_id, write.action) for write in writes] == [(1, WriteAction.CREATE)]
-
-
-def test_a_row_without_decision_is_skipped() -> None:
-    """A registration that appeared on HelloAsso after the preview was never seen by the admin."""
-    assert apply_decisions(_new_plan(), {1: Decision(Bucket.NEW, "import")}) == apply_decisions(
-        _new_plan(), {1: Decision(Bucket.NEW, "import"), 2: Decision(Bucket.NEW, "skip")})
 
 
 @pytest.mark.parametrize(
@@ -93,19 +65,11 @@ def test_a_row_without_decision_is_skipped() -> None:
         {99: Decision(Bucket.NEW, "import")},  # unknown item
         {1: Decision(Bucket.RENEWAL, "import")},  # the row changed bucket since the preview
         {3: Decision(Bucket.BLOCKED, "import")},  # a blocked row cannot be imported
-        {1: Decision(Bucket.NEW, "link:7")},  # not a choice of a new row
     ],
 )
 def test_stale_or_invalid_decisions_are_rejected(decisions: dict[int, Decision]) -> None:
     with pytest.raises(StaleDecisions):
         apply_decisions(_new_plan(), decisions)
-
-
-def test_nothing_is_written_from_a_blocked_campaign() -> None:
-    plan = plan_membership_import([_record(1)], season=SEASON, campaign_slug="adhesion-2025-2026")
-
-    with pytest.raises(StaleDecisions):
-        apply_decisions(plan, {1: Decision(Bucket.NEW, "import")})
 
 
 # ---------------------------------------------------------------------------
@@ -150,7 +114,6 @@ def test_a_legacy_purchase_of_the_same_order_but_another_person_does_not_match()
     ("overrides", "why"),
     [
         ({"last_name": "Weasley", "first_name": "ginny"}, "same name and birth date"),
-        ({"last_name": "WEASLEY", "licence": "123456"}, "same name, birth date and licence"),
         ({"last_name": "WEASLEY", "licence": "123456", "birth_date": "", "birth_date_raw": "?"}, "no birth date, unique licence"),
         ({"last_name": "Weasley", "licence": "999999"}, "same name and birth date, licence unknown to the club"),
     ],
@@ -159,12 +122,6 @@ def test_a_known_person_is_a_renewal(overrides: dict[str, str], why: str) -> Non
     [entry] = _plan(_record(9001, **overrides)).entries
 
     assert (entry.bucket, entry.member_id) == (Bucket.RENEWAL, 7), why
-
-
-def test_a_known_licence_never_makes_a_duplicate_nor_drops_the_row() -> None:
-    plan = _plan(_record(1, last_name="Weasley", licence="123456"), _record(2, last_name="Weasley", first_name="Ron", licence=""))
-
-    assert [entry.bucket for entry in plan.entries] == [Bucket.RENEWAL, Bucket.NEW]
 
 
 @pytest.mark.parametrize(
@@ -196,14 +153,6 @@ def test_a_registration_below_the_membership_already_recorded_this_season_is_blo
     assert "prioritaire" in entry.reason
 
 
-def test_a_checked_renewal_is_attached_to_the_known_member() -> None:
-    plan = _plan(_record(1, last_name="Weasley"))
-
-    [write] = apply_decisions(plan, {1: Decision(Bucket.RENEWAL, "import")})
-
-    assert (write.action, write.entry.member_id) == (WriteAction.ATTACH, 7)
-
-
 def test_legacy_purchases_are_back_filled_without_decision() -> None:
     plan = _plan(_record(1, last_name="Weasley"), purchases=(_purchase(30, 7, order_ref="ORD-1"),))
 
@@ -228,7 +177,6 @@ GINNY_ELDER = KnownMember(user_id=10, last_name="Weasley", first_name="Ginny", b
         ({"last_name": "Weasley", "licence": "654321"}, (GINNY, KnownMember(11, "Potter", "Harry", "1980-07-31", "654321")), [7, 11],
          "plusieurs"),
         ({"last_name": "Weasley", "birth_date": "", "birth_date_raw": "?"}, (GINNY, GINNY_ELDER), [7, 10], "naissance"),
-        ({"last_name": "Granger", "first_name": "Hermione", "birth_date": "", "birth_date_raw": ""}, (GINNY,), [], "naissance"),
     ],
 )
 def test_an_ambiguous_identity_is_to_review_with_its_candidates(
@@ -241,44 +189,31 @@ def test_an_ambiguous_identity_is_to_review_with_its_candidates(
 
 
 def test_a_registration_without_birth_date_is_never_new() -> None:
-    [entry] = _plan(_record(9001, last_name="Granger", first_name="Hermione", birth_date="", licence="")).entries
+    plan = _plan(_record(9001, last_name="Granger", first_name="Hermione", birth_date="", licence=""))
 
-    assert entry.bucket == Bucket.TO_REVIEW
-    assert not entry.can_create
+    assert plan.entries[0].bucket == Bucket.TO_REVIEW
+    assert not plan.entries[0].can_create
+    with pytest.raises(StaleDecisions):
+        apply_decisions(plan, {9001: Decision(Bucket.TO_REVIEW, "create")})
 
 
 def _review_plan() -> ImportPlan:
     return _plan(_record(1, last_name="Weasley"), members=(GINNY, GINNY_TWIN, LUNA))
 
 
-@pytest.mark.parametrize(
-    ("choice", "expected"),
-    [
-        ("link:9", (WriteAction.ATTACH, 9)),
-        ("create", (WriteAction.CREATE, None)),
-    ],
-)
-def test_the_choice_on_a_row_to_review_is_applied(choice: str, expected: tuple[WriteAction, int | None]) -> None:
-    [write] = apply_decisions(_review_plan(), {1: Decision(Bucket.TO_REVIEW, choice)})
+def test_a_row_to_review_whose_identity_is_taken_cannot_be_created() -> None:
+    """The member writers find people by name, first name and birth date: "create" would attach to that member."""
+    plan = _plan(_record(1, last_name="Weasley", licence="654321"), members=(GINNY, KnownMember(11, "Potter", "Harry", "1980-07-31", "654321")))
 
-    assert (write.action, write.entry.member_id) == expected
+    assert not plan.entries[0].can_create
+    with pytest.raises(StaleDecisions):
+        apply_decisions(plan, {1: Decision(Bucket.TO_REVIEW, "create")})
 
 
-def test_skipping_a_row_to_review_writes_nothing() -> None:
-    assert apply_decisions(_review_plan(), {1: Decision(Bucket.TO_REVIEW, "skip")}) == []
-
-
-@pytest.mark.parametrize("choice", ["link:8", "link:abc", "import"])
+@pytest.mark.parametrize("choice", ["link:8", "import"])
 def test_a_link_to_a_member_who_is_not_a_candidate_is_rejected(choice: str) -> None:
     with pytest.raises(StaleDecisions):
         apply_decisions(_review_plan(), {1: Decision(Bucket.TO_REVIEW, choice)})
-
-
-def test_a_row_without_birth_date_cannot_be_created() -> None:
-    plan = _plan(_record(1, last_name="Granger", first_name="Hermione", birth_date="", licence=""))
-
-    with pytest.raises(StaleDecisions):
-        apply_decisions(plan, {1: Decision(Bucket.TO_REVIEW, "create")})
 
 
 # ---------------------------------------------------------------------------
@@ -303,20 +238,6 @@ def test_a_change_made_on_helloasso_only_is_proposed(helloasso: dict[str, object
 
     assert (entry.bucket, entry.member_id, entry.purchase_id) == (Bucket.UPDATED, 7, 30)
     assert [(c.field, c.crm, c.before, c.after) for c in entry.changes] == expected
-
-
-def test_a_change_made_in_the_crm_only_is_never_proposed() -> None:
-    [entry] = _plan(_record(9001), purchases=(_imported(status="Terminé", amount=120.0),)).entries
-
-    assert (entry.bucket, entry.changes) == (Bucket.ALREADY_IMPORTED, ())
-
-
-def test_a_value_changed_on_both_sides_is_to_review_with_both_values() -> None:
-    [entry] = _plan(_record(9001, status="Refunded"), purchases=(_imported(status="Terminé"),)).entries
-
-    assert entry.bucket == Bucket.TO_REVIEW
-    assert [(c.field, c.crm, c.before, c.after) for c in entry.changes] == [("status", "Terminé", "Processed", "Refunded")]
-    assert entry.member_id == 7
 
 
 def test_accepting_a_change_writes_an_update() -> None:

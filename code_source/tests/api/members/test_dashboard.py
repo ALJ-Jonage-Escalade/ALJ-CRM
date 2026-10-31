@@ -24,7 +24,8 @@ class TestMembershipDashboard(MemberDbTestCase, ApiTestCase):
 
         campaigns = [{"formSlug": "adhesions-reglage-2026-2027", "formType": "Membership", "title": "Adhésions"}]
         with patch("infrastructure.helloasso.api.get_campaigns", return_value=campaigns), \
-                patch("infrastructure.helloasso.api.get_items", side_effect=get_items):
+                patch("infrastructure.helloasso.api.get_items", side_effect=get_items), \
+                patch("api.members.dashboard.geocode_missing_addresses"):  # background task: would call Nominatim
             response = self.client.get("/api/dashboard")
         self.assertEqual(response.status_code, 200, response.text)
         return response.json(), read

@@ -73,20 +73,23 @@ class MembersSnapshot:
 class PlanEntry:
     """What the import would do with one registration. member_id: the person it is attached to (renewal, already
     imported); purchase_id: the membership it already is; backfill: a former purchase without HelloAsso item id,
-    which the import marks with it."""
+    which the import marks with it; identity_taken: a member already has its name, first name and birth date (the
+    member writers find people by these, so "create" would attach to that member instead)."""
     record: MembershipRecord
     bucket: Bucket
     reason: str
     member_id: Optional[int] = None
     purchase_id: Optional[int] = None
     backfill: bool = False
+    identity_taken: bool = False
     candidates: tuple[KnownMember, ...] = ()  # to_review: the members it may be
     changes: tuple[FieldChange, ...] = ()  # updated, or to_review when the CRM changed the value too
 
     @property
     def can_create(self) -> bool:
-        """A new member can be created from it: never without a birth date (age rules, groups, FFME export)."""
-        return bool(self.record.birth_date)
+        """A new member can be created from it: never without a birth date (age rules, groups, FFME export), nor when a
+        member already has the same identity."""
+        return bool(self.record.birth_date) and not self.identity_taken
 
     @property
     def item_id(self) -> int:
@@ -170,7 +173,8 @@ def _classify(record: MembershipRecord, base: _Base) -> PlanEntry:
     if not same_name and not same_licence:
         return PlanEntry(record, Bucket.NEW, "Personne inconnue du club : nouvel adhérent.")
     if len(same_identity) > 1 or (same_identity and same_licence):
-        return _to_review(record, "Correspond à plusieurs adhérents : choisissez le bon.", same_identity + same_licence)
+        return _to_review(record, "Correspond à plusieurs adhérents : choisissez le bon.", same_identity + same_licence,
+                          identity_taken=True)
     if same_licence:
         return _to_review(record, "Licence FFME connue, mais sous un autre nom ou une autre date de naissance.", same_licence + same_name)
     return _to_review(record, "Même nom et prénom qu'un adhérent, mais date de naissance différente.", same_name)
@@ -206,9 +210,10 @@ def _imported_entry(record: MembershipRecord, known: KnownPurchase) -> PlanEntry
                      changes=fields)
 
 
-def _to_review(record: MembershipRecord, reason: str, candidates: Iterable[KnownMember]) -> PlanEntry:
+def _to_review(record: MembershipRecord, reason: str, candidates: Iterable[KnownMember], identity_taken: bool = False) -> PlanEntry:
     unique = {member.user_id: member for member in candidates}
-    return PlanEntry(record, Bucket.TO_REVIEW, reason, candidates=tuple(unique[user_id] for user_id in sorted(unique)))
+    return PlanEntry(record, Bucket.TO_REVIEW, reason, identity_taken=identity_taken,
+                     candidates=tuple(unique[user_id] for user_id in sorted(unique)))
 
 
 _WRITTEN = (Bucket.NEW, Bucket.RENEWAL)

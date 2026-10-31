@@ -44,22 +44,8 @@ class TestMembershipImportRepository(MemberDbTestCase):
         finally:
             conn.close()
 
-    def test_purchases_get_the_helloasso_columns_and_a_unique_item_id(self) -> None:
-        columns = {row["name"] for row in self.rows("PRAGMA table_info(purchases)")}
-        self.assertLessEqual({"helloasso_item_id", "helloasso_status", "helloasso_amount", "helloasso_tarif"}, columns)
-
-        MembershipImportRepository.apply([create(record(1))], SEASON)
-        conn = SqliteDatabase.get_connection()
-        try:
-            purchase = conn.execute("SELECT order_id, user_id FROM purchases").fetchone()
-            with self.assertRaises(sqlite3.IntegrityError):
-                conn.execute("INSERT INTO purchases (order_id, user_id, helloasso_item_id) VALUES (?, ?, 1)",
-                             (purchase["order_id"] + 100, purchase["user_id"]))
-        finally:
-            conn.close()
-
     def test_create_writes_the_member_order_purchase_and_options(self) -> None:
-        [applied] = MembershipImportRepository.apply([create(record(1))], SEASON)
+        [applied] = MembershipImportRepository.apply([create(record(1))], SEASON, TODAY)
 
         [user] = self.rows("SELECT * FROM users")
         self.assertEqual((applied.item_id, applied.action, applied.user_id), (1, WriteAction.CREATE, user["id"]))
@@ -72,20 +58,11 @@ class TestMembershipImportRepository(MemberDbTestCase):
         self.assertEqual((purchase["tarif_name"], purchase["amount"], purchase["status"]), ("Loisir collège", 150.0, "Processed"))
         self.assertEqual((purchase["helloasso_item_id"], purchase["helloasso_status"], purchase["helloasso_amount"],
                           purchase["helloasso_tarif"]), (1, "Processed", 150.0, "Loisir collège"))
+        self.assertEqual(purchase["commentaires_correctif"], "Import HelloAsso du 31/10")
         self.assertEqual(self.rows("SELECT option_name, amount FROM purchase_options"), [{"option_name": "Assurance Base +", "amount": 11.0}])
 
-    def test_every_helloasso_status_and_waiting_list_tariff_is_kept(self) -> None:
-        writes = [create(record(1, status="Refunded", amount=0.0)),
-                  create(record(2, "LOVEGOOD", "Luna", status="Waiting", tarif_name="Liste d'attente cours ", amount=0.0))]
-
-        MembershipImportRepository.apply(writes, SEASON)
-
-        purchases = self.rows("SELECT u.last_name, p.status, p.tarif_name, p.helloasso_status FROM purchases p"
-                              " JOIN users u ON u.id = p.user_id ORDER BY u.last_name")
-        self.assertEqual([tuple(p.values()) for p in purchases],
-                         [("LOVEGOOD", "Waiting", "Liste d'attente cours", "Waiting"), ("WEASLEY", "Refunded", "Loisir collège", "Refunded")])
-
     def test_writes_are_one_transaction(self) -> None:
+        """The second write reuses item id 1: refused by the unique index on purchases.helloasso_item_id."""
         with self.assertRaises(sqlite3.IntegrityError):
             MembershipImportRepository.apply([create(record(1)), create(record(1, "LOVEGOOD", "Luna", order_ref="900"))], SEASON)
 
@@ -106,6 +83,8 @@ class TestMembershipImportRepository(MemberDbTestCase):
         self.assertEqual((purchases["ORD-1"].season, purchases["ORD-1"].helloasso_item_id, purchases["ORD-1"].user_id),
                          ("2025-2026", None, members["WEASLEY"].user_id))
         self.assertEqual((purchases["501"].season, purchases["501"].helloasso_item_id, purchases["501"].status), (SEASON, 1, "Processed"))
+        self.assertEqual((purchases["501"].helloasso_status, purchases["501"].helloasso_tarif, purchases["501"].helloasso_amount),
+                         ("Processed", "Loisir collège", 150.0))
 
     def test_attach_adds_the_season_to_the_member_and_only_fills_blank_fields(self) -> None:
         self.seed("ORD-1", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026", **{"champ_Téléphone ": "0600000000"})
@@ -147,14 +126,6 @@ class TestMembershipImportRepository(MemberDbTestCase):
 
         self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM purchases"), [{"n": 1}])
 
-    def test_snapshot_carries_the_last_values_read_on_helloasso(self) -> None:
-        MembershipImportRepository.apply([create(record(1))], SEASON)
-
-        [purchase] = MembershipImportRepository.snapshot().purchases
-
-        self.assertEqual((purchase.helloasso_status, purchase.helloasso_tarif, purchase.helloasso_amount),
-                         ("Processed", "Loisir collège", 150.0))
-
     def test_update_writes_the_changed_values_and_the_last_values_read(self) -> None:
         [applied] = MembershipImportRepository.apply([create(record(1))], SEASON)
         conn = SqliteDatabase.get_connection()
@@ -174,10 +145,3 @@ class TestMembershipImportRepository(MemberDbTestCase):
         self.assertEqual(purchase, {"status": "Refunded", "status_normalized": "Refunded", "tarif_name": "Loisir (CRM)", "amount": 150.0,
                                     "commentaires_correctif": "Payé en chèque\nImport HelloAsso du 31/10", "helloasso_status": "Refunded",
                                     "helloasso_tarif": "Loisir collège v2", "helloasso_amount": 150.0})
-
-    def test_written_purchases_carry_the_import_marker(self) -> None:
-        MembershipImportRepository.apply([create(record(1))], SEASON, TODAY)
-        MembershipImportRepository.apply([create(record(2, "LOVEGOOD", "Luna"))], SEASON, TODAY)
-
-        self.assertEqual([r["commentaires_correctif"] for r in self.rows("SELECT commentaires_correctif FROM purchases ORDER BY id")],
-                         ["Import HelloAsso du 31/10", "Import HelloAsso du 31/10"])

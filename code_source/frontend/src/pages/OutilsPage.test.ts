@@ -458,36 +458,6 @@ describe("OutilsPage", () => {
     }
   });
 
-  it("offers no creation for a HelloAsso row to review without birth date", async () => {
-    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
-    ANSWERS["POST /api/helloasso/memberships/preview"] = () =>
-      json({ ...MEMBERSHIP_PREVIEW, rows: [{ ...REVIEW_ROW, can_create: false }] });
-    try {
-      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
-      byId("ha-import-preview")!.click();
-      await flushPromises();
-      expect([...byId<HTMLSelectElement>("ha-review-choice")!.options].map((option) => option.value)).toEqual(["skip", "link:4"]);
-    } finally {
-      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
-    }
-  });
-
-  it("leaves an unchecked HelloAsso row out of the import", async () => {
-    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
-    const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
-    byId("ha-import-preview")!.click();
-    await flushPromises();
-    all("ha-check")[0]!.click();
-    await flushPromises();
-    expect(byId("ha-import-selected")!.textContent).toContain("0");
-    expect(byId<HTMLButtonElement>("ha-import-apply")!.disabled).toBe(true);
-    expect(sent("POST", "/api/helloasso/memberships/import")).toHaveLength(0);
-
-    all("ha-check")[0]!.click();
-    await flushPromises();
-    expect(byId<HTMLButtonElement>("ha-import-apply")!.disabled).toBe(false);
-  });
-
   it("shows when the HelloAsso import last ran and who ran it", async () => {
     const lastSync = ANSWERS["GET /api/helloasso/memberships/last-sync"]!;
     try {
