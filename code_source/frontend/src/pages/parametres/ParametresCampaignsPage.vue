@@ -227,7 +227,7 @@ onMounted(load);
         </table>
       </div>
       <p v-else-if="!helloAssoError" data-testid="campaigns-empty" class="mt-2 text-[13px] text-slate-500">
-        Aucune campagne publique ou privée de ce type sur HelloAsso.
+        Aucune campagne publique, privée ou en brouillon de ce type sur HelloAsso.
       </p>
     </UiCard>
   </div>

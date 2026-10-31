@@ -18,7 +18,7 @@ def form(slug: str, form_type: str = "Event", state: str = "Public", start: Opti
 def test_campaign_table_keeps_the_kind_and_listed_states() -> None:
     forms = [form("comp-public"), form("comp-private", state="Private"), form("comp-draft", state="Draft"),
              form("comp-disabled", state="Disabled"), form("adhesion", form_type="Membership")]
-    assert [row["slug"] for row in campaign_table(forms, "competitions", None)] == ["comp-public", "comp-private"]
+    assert [row["slug"] for row in campaign_table(forms, "competitions", None)] == ["comp-public", "comp-private", "comp-draft"]
     assert [row["slug"] for row in campaign_table(forms, "membership", None)] == ["adhesion"]
 
 
@@ -41,7 +41,6 @@ def test_campaign_row_fields() -> None:
 
 @pytest.mark.parametrize("forms, warning", [
     ([form("comp", state="Disabled")], "Campagne désactivée sur HelloAsso"),
-    ([form("comp", state="Draft")], "Campagne en brouillon sur HelloAsso"),
     ([form("comp", form_type="Membership")], "Formulaire de type Membership (attendu : Event)"),
     ([], NOT_FOUND_WARNING),
 ])
@@ -50,6 +49,11 @@ def test_active_campaign_listed_with_a_warning(forms: list, warning: str) -> Non
     active = [row for row in rows if row["active"]]
     assert [(row["slug"], row["warning"]) for row in active] == [("comp", warning)]
     assert "other" in [row["slug"] for row in rows]
+
+
+def test_active_draft_campaign_listed_without_warning() -> None:
+    rows = campaign_table([form("comp", state="Draft")], "competitions", {"form_type": "Event", "slug": "comp"})
+    assert [(row["slug"], row["state"], row["active"], row["warning"]) for row in rows] == [("comp", "Draft", True, None)]
 
 
 @pytest.mark.parametrize("value, kind, expected", [

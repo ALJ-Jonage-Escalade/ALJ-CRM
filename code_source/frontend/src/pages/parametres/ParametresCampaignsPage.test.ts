@@ -44,6 +44,7 @@ function campaignsBody(competitionsActive: string | null = "competitions-2025"):
       active: competitionsActive ? { form_type: "Event", slug: competitionsActive } : null,
       configured: competitionsActive !== null,
       campaigns: [
+        campaign("competitions-2027", { title: "Compétitions 2027-2028", state: "Draft" }),
         campaign("competitions-2026", {
           title: "Compétitions 2026-2027",
           state: "Private",
@@ -103,6 +104,10 @@ describe("ParametresCampaignsPage", () => {
     expect(current.find('[data-testid="campaign-start"]').text()).toBe("15/09/2026");
     expect(current.find('[data-testid="campaign-end"]').text()).toBe("30/06/2027");
     expect(current.find("a").attributes("href")).toBe("https://www.helloasso.com/associations/club/evenements/competitions-2026");
+
+    const draft = row("competitions", "competitions-2027");
+    expect(draft.find('[data-testid="campaign-state"]').text()).toBe("Brouillon");
+    expect(draft.find('[data-testid="campaign-choose"]').exists()).toBe(true);
 
     const old = row("competitions", "competitions-2025");
     expect(old.find('[data-testid="campaign-state"]').text()).toBe("Désactivé");

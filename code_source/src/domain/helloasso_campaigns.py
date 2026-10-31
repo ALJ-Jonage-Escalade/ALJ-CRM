@@ -17,13 +17,13 @@ CampaignKind = Literal["membership", "competitions"]
 
 # HelloAsso form type of each kind
 FORM_TYPE_OF_KIND: Dict[str, str] = {"membership": "Membership", "competitions": "Event"}
-# States listed in the tables (Draft, Disabled and Deleted forms take no payment)
-LISTED_STATES = ("Public", "Private")
+# States listed in the tables: drafts too, so next season's form can be chosen before it opens
+# (Disabled and Deleted forms take no payment)
+LISTED_STATES = ("Public", "Private", "Draft")
 # Every state but Deleted: the active campaign is found even once disabled
 LOOKUP_STATES = ("Public", "Private", "Draft", "Disabled")
 
 _STATE_WARNINGS = {
-    "Draft": "Campagne en brouillon sur HelloAsso",
     "Disabled": "Campagne désactivée sur HelloAsso",
     "Deleted": "Campagne supprimée sur HelloAsso",
 }
@@ -112,7 +112,7 @@ def active_warning(form: Optional[Dict[str, Any]], expected_form_type: str) -> O
 
 
 def campaign_table(forms: Iterable[Dict[str, Any]], kind: str, active: Optional[CampaignRef]) -> List[CampaignRow]:  # Any: HelloAsso JSON
-    """Rows of a kind's table: its Public / Private forms, newest first, and the active campaign always, flagged with
+    """Rows of a kind's table: its Public / Private / Draft forms, newest first, and the active campaign always, flagged with
     a warning when it no longer matches (other type, disabled, not found). `forms` may hold every type and state."""
     form_type = FORM_TYPE_OF_KIND[kind]
     all_forms = list(forms)

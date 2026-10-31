@@ -32,7 +32,8 @@ the active one of each type.
     production has a value chosen.
 - **D3 — Which campaigns are listed.**
   - Membership table: `formTypes=Membership`; competitions table: `formTypes=Event`.
-  - States `Public` and `Private` only (no `Draft`, `Disabled`, `Deleted`).
+  - States `Public`, `Private` and `Draft` (drafts so next season's form can be chosen before it opens; no
+    `Disabled`, `Deleted`).
   - The active campaign is always listed, even when it no longer matches the filter (disabled, other type, not found):
     shown with a warning badge.
   - Sorted by `startDate`, newest first; `meta.createdAt` when `startDate` is missing (membership forms may have none).
