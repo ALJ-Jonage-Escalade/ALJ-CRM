@@ -71,11 +71,12 @@ def _result(result: ImportResult) -> MembershipImportResult:
     def members(action: WriteAction) -> list[ImportedMember]:
         return [_imported(applied, result.plan) for applied in result.applied if applied.action == action]
 
-    created = members(WriteAction.CREATE)
+    created, renewed = members(WriteAction.CREATE), members(WriteAction.ATTACH)
+    written = len(created) + len(renewed)
     return MembershipImportResult(
         status="success", season=result.plan.season,
-        counts=ImportCounts(created=len(created), renewed=0, updated=0, skipped=len(result.plan.entries) - len(result.applied)),
-        created=created, renewed=[], updated=[],
+        counts=ImportCounts(created=len(created), renewed=len(renewed), updated=0, skipped=len(result.plan.entries) - written),
+        created=created, renewed=renewed, updated=[],
     )
 
 

@@ -15,6 +15,7 @@ import datetime
 import logging
 import sqlite3
 
+from domain.members.purchase_priority import STATUS_PRIORITY, purchase_priority_score, status_score  # noqa: F401 - re-exported
 from domain.members.sex import parse_sex
 from domain.utils import normalize_name
 
@@ -22,24 +23,6 @@ logger = logging.getLogger("alj")
 
 SCHEMA_TARGET_VERSION = 2
 SEASON_ACTIVE = "2026-2027"
-
-# Table de priorité des statuts — CENTRALISÉE (phase 3)
-# "Terminé" = licence FFME confirmée : état le plus avancé du workflow, il ne doit
-# jamais être rétrogradé par une nouvelle synchro HelloAsso ("Validated"/"Validé").
-STATUS_PRIORITY = {
-    "processed": 10,
-    "traité": 10,
-    "traite": 10,
-    "validated": 9,
-    "validé": 8,
-    "valide": 8,
-    "terminé": 10,
-    "termine": 10,
-    "en cours": 5,
-    "canceled": 1,
-    "annulé": 1,
-    "annule": 1,
-}
 
 STATUS_NORMALIZATION = {
     "processed": "Traité",
@@ -251,23 +234,6 @@ def normalize_status(status):
     return STATUS_NORMALIZATION.get(str(status or "").strip().lower(), str(status or "").strip())
 
 
-def status_score(status):
-    return STATUS_PRIORITY.get(str(status or "").strip().lower(), 0)
-
-
-def purchase_priority_score(status, tarif_name, amount):
-    """Score de priorité d'une inscription : statut + pénalité liste d'attente / montant nul."""
-    base = status_score(status)
-    tarif_lower = str(tarif_name or "").strip().lower()
-    try:
-        amt_val = float(amount) if amount else 0.0
-    except (ValueError, TypeError):
-        amt_val = 0.0
-    if "attente" in tarif_lower or amt_val == 0.0:
-        base -= 20
-    return base
-
-
 def is_true(val):
     return str(val or "").strip().lower() in ("oui", "true", "vrai", "1", "yes")
 
@@ -333,6 +299,30 @@ def resolve_season_id(cur, season_name):
     return cur.lastrowid
 
 
+def fill_blank_user_fields(cur, user_id, rec, now_iso, field_map):
+    """Copies the fields of `rec` into the user's columns that are still blank: a value of the base is never overwritten."""
+    dyn = _dynamic_field_values(rec)
+    for src_col, dst_col in field_map.items():
+        new_val = clean_legacy_text(_get(rec, src_col))
+        if new_val:
+            if dst_col == "sex":
+                new_val = sex_code(new_val, _get(rec, "order_ref"))
+                if new_val is None:
+                    continue
+            cur.execute(
+                f'UPDATE users SET "{dst_col}" = ?, updated_at = ? '  # noqa: S608 - dst_col issu de USER_FIELD_MAP
+                f'WHERE id = ? AND (("{dst_col}" IS NULL) OR (TRIM("{dst_col}") = ""))',
+                (new_val, now_iso, user_id),
+            )
+    for dst_col, new_val in dyn.items():
+        if new_val:
+            cur.execute(
+                f'UPDATE users SET "{dst_col}" = ?, updated_at = ? '  # noqa: S608 - dst_col issu de DYNAMIC_USER_FIELDS
+                f'WHERE id = ? AND (("{dst_col}" IS NULL) OR (TRIM("{dst_col}") = ""))',
+                (new_val, now_iso, user_id),
+            )
+
+
 def upsert_user_v2(cur, rec, now_iso, field_map):
     """Crée ou complète un user. rec = dict HelloAsso ou ligne legacy (adherents JOIN seasons).
     Retourne (user_id, created)."""
@@ -355,26 +345,7 @@ def upsert_user_v2(cur, rec, now_iso, field_map):
         if legacy_id is not None:
             cur.execute("UPDATE users SET legacy_adherent_id=? WHERE id=? AND legacy_adherent_id IS NULL",
                         (legacy_id, user_id))
-        dyn = _dynamic_field_values(rec)
-        for src_col, dst_col in field_map.items():
-            new_val = clean_legacy_text(_get(rec, src_col))
-            if new_val:
-                if dst_col == "sex":
-                    new_val = sex_code(new_val, _get(rec, "order_ref"))
-                    if new_val is None:
-                        continue
-                cur.execute(
-                    f'UPDATE users SET "{dst_col}" = ?, updated_at = ? '  # noqa: S608 - dst_col issu de USER_FIELD_MAP
-                    f'WHERE id = ? AND (("{dst_col}" IS NULL) OR (TRIM("{dst_col}") = ""))',
-                    (new_val, now_iso, user_id),
-                )
-        for dst_col, new_val in dyn.items():
-            if new_val:
-                cur.execute(
-                    f'UPDATE users SET "{dst_col}" = ?, updated_at = ? '  # noqa: S608 - dst_col issu de DYNAMIC_USER_FIELDS
-                    f'WHERE id = ? AND (("{dst_col}" IS NULL) OR (TRIM("{dst_col}") = ""))',
-                    (new_val, now_iso, user_id),
-                )
+        fill_blank_user_fields(cur, user_id, rec, now_iso, field_map)
         return user_id, False
 
     values = {dst: clean_legacy_text(_get(rec, src)) for src, dst in field_map.items()}

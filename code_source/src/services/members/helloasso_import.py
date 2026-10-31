@@ -108,4 +108,5 @@ class MembershipImportService:
             items = helloasso_api.fetch_form_items(campaign.form_type, campaign.slug)
         except helloasso_api.HelloAssoApiError as e:
             raise UpstreamUnavailable(e.message, e.code) from e
-        return plan_membership_import(map_membership_items(items), season=season, campaign_slug=campaign.slug)
+        return plan_membership_import(map_membership_items(items), season=season, campaign_slug=campaign.slug,
+                                      snapshot=MembershipImportRepository.snapshot())

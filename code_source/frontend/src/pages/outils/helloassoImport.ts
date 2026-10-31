@@ -74,3 +74,24 @@ export function memberHref(member: { user_id: number; purchase_id: number }, sea
   const query = new URLSearchParams({ id: String(member.user_id), saison: season, achat: String(member.purchase_id) });
   return `/bureau/adherents?${query.toString()}`;
 }
+
+/** The lists of the result screen: the members written, by what the import did. */
+export const RESULT_GROUPS = [
+  { key: "created", icon: "🆕", testId: "ha-created" },
+  { key: "renewed", icon: "🔁", testId: "ha-renewed" },
+  { key: "updated", icon: "✏️", testId: "ha-updated" },
+] as const satisfies readonly { key: keyof MembershipImportResult["counts"]; icon: string; testId: string }[];
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count > 1 ? many : one}`;
+}
+
+/** Headline of the result screen. */
+export function resultSummary(result: MembershipImportResult): string {
+  const { created, renewed, updated, skipped } = result.counts;
+  return (
+    `🎉 Import terminé (saison ${result.season}) : ${plural(created, "adhérent créé", "adhérents créés")}, ` +
+    `${plural(renewed, "renouvellement", "renouvellements")}, ${plural(updated, "inscription mise à jour", "inscriptions mises à jour")}, ` +
+    `${plural(skipped, "inscription non importée", "inscriptions non importées")}.`
+  );
+}

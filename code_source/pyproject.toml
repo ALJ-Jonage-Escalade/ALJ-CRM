@@ -77,6 +77,7 @@ follow_imports = "silent"
 files = [
     "src/domain/members/helloasso_membership.py",
     "src/domain/members/membership_import.py",
+    "src/domain/members/purchase_priority.py",
     "src/services/members/helloasso_import.py",
     "src/api/members/helloasso_import.py",
     "src/api/members/helloasso_import_schemas.py",

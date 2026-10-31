@@ -89,3 +89,46 @@ class TestMembershipImportRepository(MemberDbTestCase):
 
         self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM users"), [{"n": 0}])
         self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM purchases"), [{"n": 0}])
+
+    def test_snapshot_lists_the_members_and_their_purchases(self) -> None:
+        self.seed("ORD-1", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026",
+                  **{"champ_Numéro de Licence FFME (6 chiffres)": "12 34 56"})
+        MembershipImportRepository.apply([create(record(1, "LOVEGOOD", "Luna"))], SEASON)
+
+        snapshot = MembershipImportRepository.snapshot()
+
+        members = {m.last_name: m for m in snapshot.members}
+        self.assertEqual((members["WEASLEY"].first_name, members["WEASLEY"].birth_date, members["WEASLEY"].licence),
+                         ("Ginny", "2017-03-10", "123456"))
+        purchases = {p.order_ref: p for p in snapshot.purchases}
+        self.assertEqual((purchases["ORD-1"].season, purchases["ORD-1"].helloasso_item_id, purchases["ORD-1"].user_id),
+                         ("2025-2026", None, members["WEASLEY"].user_id))
+        self.assertEqual((purchases["501"].season, purchases["501"].helloasso_item_id, purchases["501"].status), (SEASON, 1, "Processed"))
+
+    def test_attach_adds_the_season_to_the_member_and_only_fills_blank_fields(self) -> None:
+        self.seed("ORD-1", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026", **{"champ_Téléphone ": "0600000000"})
+        [user] = self.rows("SELECT id FROM users")
+        renewal = record(1, "Weasley", "Ginny", birth_date="2017-03-10",
+                         custom_fields={"Téléphone ": "0611223344", "Ville": "Jonage"})
+
+        [applied] = MembershipImportRepository.apply(
+            [ImportWrite(PlanEntry(renewal, Bucket.RENEWAL, "renouvellement", member_id=user["id"]), WriteAction.ATTACH)], SEASON)
+
+        self.assertEqual(applied.user_id, user["id"])
+        [updated] = self.rows("SELECT * FROM users")
+        self.assertEqual((updated["last_name"], updated["phone"], updated["city"]), ("WEASLEY", "0600000000", "Jonage"))
+        seasons = self.rows("SELECT s.name, p.helloasso_item_id FROM purchases p JOIN orders o ON o.id = p.order_id"
+                            " JOIN seasons s ON s.id = o.season_id ORDER BY s.name")
+        self.assertEqual([tuple(r.values()) for r in seasons], [("2025-2026", None), (SEASON, 1)])
+
+    def test_backfill_marks_a_former_purchase_with_its_item_id(self) -> None:
+        self.seed("501", "Ginny", "WEASLEY", "Loisir collège")
+        [purchase] = self.rows("SELECT id, user_id FROM purchases")
+        entry = PlanEntry(record(1), Bucket.ALREADY_IMPORTED, "déjà là", purchase["user_id"], purchase["id"], backfill=True)
+
+        MembershipImportRepository.apply([ImportWrite(entry, WriteAction.BACKFILL)], SEASON)
+
+        self.assertEqual(self.rows("SELECT helloasso_item_id, helloasso_status, helloasso_amount, helloasso_tarif, status FROM purchases"),
+                         [{"helloasso_item_id": 1, "helloasso_status": "Processed", "helloasso_amount": 150.0,
+                           "helloasso_tarif": "Loisir collège", "status": "Validated"}])
+        self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM users"), [{"n": 1}])

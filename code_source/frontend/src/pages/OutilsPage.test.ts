@@ -124,9 +124,9 @@ const ANSWERS: Record<string, Answer> = {
     json({
       status: "success",
       season: "2026-2027",
-      counts: { created: 1, renewed: 0, updated: 0, skipped: 1 },
+      counts: { created: 1, renewed: 1, updated: 0, skipped: 1 },
       created: [{ item_id: 1, user_id: 7, purchase_id: 12, last_name: "WEASLEY", first_name: "Ginny", tarif_name: "Loisir collège" }],
-      renewed: [],
+      renewed: [{ item_id: 3, user_id: 4, purchase_id: 13, last_name: "GRANGER", first_name: "Hermione", tarif_name: "Compétition" }],
       updated: [],
     }),
   "GET /api/ffme/export": () => file("import_ffme_20261022.csv"),
@@ -355,6 +355,10 @@ describe("OutilsPage", () => {
     const link = byId<HTMLAnchorElement>("ha-created")!.querySelector("a")!;
     expect(link.textContent).toContain("WEASLEY Ginny");
     expect(link.getAttribute("href")).toBe("/bureau/adherents?id=7&saison=2026-2027&achat=12");
+    expect(byId("ha-import-done")!.textContent).toContain("1 renouvellement");
+    const renewed = byId<HTMLAnchorElement>("ha-renewed")!.querySelector("a")!;
+    expect(renewed.textContent).toContain("GRANGER Hermione");
+    expect(renewed.getAttribute("href")).toBe("/bureau/adherents?id=4&saison=2026-2027&achat=13");
     expect(byId("ha-import-result")).toBeNull();
   });
 

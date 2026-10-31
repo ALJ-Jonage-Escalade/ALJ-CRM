@@ -202,3 +202,51 @@ class TestMembershipImport(HelloAssoImportTestCase):
         self.assertEqual((blocked.status_code, blocked.json()["code"]), (409, "campaign_blocked"))
         self.assertIn("2026-2027", blocked.json()["message"])
         self.assertEqual(self.count("users"), 0)
+
+
+class TestMembershipRerunsAndRenewals(HelloAssoImportTestCase):
+
+    def import_all(self) -> dict[str, Any]:  # Any: JSON body
+        preview = self.client.post(PREVIEW).json()
+        decisions = {str(row["item_id"]): {"bucket": row["bucket"], "choice": "import"}
+                     for row in preview["rows"] if row["bucket"] in ("new", "renewal")}
+        response = self.client.post(IMPORT, json={"season": preview["season"], "decisions": decisions})
+        self.assertEqual(response.status_code, 200, response.text)
+        return dict(response.json())
+
+    def test_running_the_import_twice_creates_no_duplicate(self) -> None:
+        self.items = [ha_item(1, "WEASLEY", "Ginny"), ha_item(2, "LOVEGOOD", "Luna", birth_date="13/02/2012")]
+        self.import_all()
+
+        second = self.client.post(PREVIEW).json()
+        self.import_all()
+
+        self.assertEqual(second["counts"]["already_imported"], 2)
+        self.assertEqual((self.count("users"), self.count("orders"), self.count("purchases")), (2, 2, 2))
+
+    def test_a_returning_member_gets_the_new_season_on_their_record(self) -> None:
+        self.seed("ORD-OLD", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026",
+                  **{"champ_Date de naissance de l'adhérent": "2013-08-11", "champ_Téléphone ": "0600000000"})
+        self.items = [ha_item(1, "Weasley", "Ginny")]
+
+        result = self.import_all()
+
+        [renewed] = result["renewed"]
+        self.assertEqual((renewed["last_name"], renewed["first_name"]), ("Weasley", "Ginny"))
+        self.assertEqual(result["counts"], {"created": 0, "renewed": 1, "updated": 0, "skipped": 0})
+        self.assertEqual((self.count("users"), self.count("purchases")), (1, 2))
+
+    def test_a_former_import_without_item_id_is_recognised_and_marked(self) -> None:
+        self.seed("501", "Ginny", "WEASLEY", "Loisir collège", **{"champ_Date de naissance de l'adhérent": "2013-08-11"})
+        self.items = [ha_item(1, "WEASLEY", "Ginny")]
+
+        preview = self.client.post(PREVIEW).json()
+        self.import_all()
+
+        self.assertEqual(preview["rows"][0]["bucket"], "already_imported")
+        conn = SqliteDatabase.get_connection()
+        try:
+            self.assertEqual(conn.execute("SELECT helloasso_item_id FROM purchases").fetchone()[0], 1)
+        finally:
+            conn.close()
+        self.assertEqual(self.count("purchases"), 1)

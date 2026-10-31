@@ -11,6 +11,8 @@ from enum import Enum
 from typing import Iterable, Mapping, Optional
 
 from domain.members.helloasso_membership import MembershipRecord, season_guard
+from domain.members.purchase_priority import purchase_priority_score
+from domain.utils import normalize_name
 
 
 class Bucket(str, Enum):
@@ -23,11 +25,45 @@ class Bucket(str, Enum):
 
 
 @dataclass(frozen=True)
+class KnownMember:
+    """A person of the members base, with the keys the import recognises them by."""
+    user_id: int
+    last_name: str
+    first_name: str
+    birth_date: str  # ISO, "" when unknown
+    licence: str  # FFME licence, digits only
+
+
+@dataclass(frozen=True)
+class KnownPurchase:
+    """A membership already in the base: the CRM values, and the HelloAsso registration it comes from when known."""
+    purchase_id: int
+    user_id: int
+    order_ref: str
+    season: str
+    helloasso_item_id: Optional[int]
+    status: str
+    tarif_name: str
+    amount: float
+
+
+@dataclass(frozen=True)
+class MembersSnapshot:
+    members: list[KnownMember] = field(default_factory=list)
+    purchases: list[KnownPurchase] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class PlanEntry:
-    """What the import would do with one registration."""
+    """What the import would do with one registration. member_id: the person it is attached to (renewal, already
+    imported); purchase_id: the membership it already is; backfill: a former purchase without HelloAsso item id,
+    which the import marks with it."""
     record: MembershipRecord
     bucket: Bucket
     reason: str
+    member_id: Optional[int] = None
+    purchase_id: Optional[int] = None
+    backfill: bool = False
 
     @property
     def item_id(self) -> int:
@@ -55,26 +91,115 @@ def _missing_data(record: MembershipRecord) -> Optional[str]:
         return "Nom ou prénom de l'adhérent manquant sur HelloAsso."
     if not record.order_ref:
         return "Référence de commande HelloAsso manquante."
-    if not record.birth_date:
-        return "Date de naissance manquante ou illisible."
     return None
 
 
-def _classify(record: MembershipRecord) -> PlanEntry:
+def _person_key(last_name: str, first_name: str) -> tuple[str, str]:
+    return normalize_name(last_name), normalize_name(first_name)
+
+
+class _Base:
+    """The snapshot, indexed for the planner."""
+
+    def __init__(self, snapshot: MembersSnapshot, season: str) -> None:
+        self.members = {member.user_id: member for member in snapshot.members}
+        self.by_item = {p.helloasso_item_id: p for p in snapshot.purchases if p.helloasso_item_id is not None}
+        self.legacy = [p for p in snapshot.purchases if p.helloasso_item_id is None]
+        self.season_purchases = [p for p in snapshot.purchases if p.season == season]
+
+    def same_name(self, record: MembershipRecord) -> list[KnownMember]:
+        key = _person_key(record.last_name, record.first_name)
+        return [m for m in self.members.values() if _person_key(m.last_name, m.first_name) == key]
+
+    def same_licence(self, record: MembershipRecord) -> list[KnownMember]:
+        if not record.licence:
+            return []
+        return [m for m in self.members.values() if m.licence and m.licence == record.licence]
+
+    def legacy_purchase(self, record: MembershipRecord) -> Optional[KnownPurchase]:
+        """A purchase written before the item ids were stored: same order, same person."""
+        people = {m.user_id for m in self.same_name(record)
+                  if not (record.birth_date and m.birth_date) or m.birth_date == record.birth_date}
+        return next((p for p in self.legacy if p.order_ref == record.order_ref and p.user_id in people), None)
+
+
+def _classify(record: MembershipRecord, base: _Base) -> PlanEntry:
     missing = _missing_data(record)
     if missing:
         return PlanEntry(record, Bucket.BLOCKED, missing)
-    return PlanEntry(record, Bucket.NEW, "Personne inconnue du club : nouvel adhérent.")
+    known = base.by_item.get(record.item_id)
+    if known:
+        return PlanEntry(record, Bucket.ALREADY_IMPORTED, "Inscription déjà importée.", known.user_id, known.purchase_id)
+    legacy = base.legacy_purchase(record)
+    if legacy:
+        return PlanEntry(record, Bucket.ALREADY_IMPORTED, "Inscription déjà présente (import antérieur) : elle sera marquée.",
+                         legacy.user_id, legacy.purchase_id, backfill=True)
+    same_name, same_licence = base.same_name(record), base.same_licence(record)
+    if not record.birth_date:
+        if len(same_licence) == 1:
+            return PlanEntry(record, Bucket.RENEWAL, "Date de naissance illisible, adhérent reconnu par sa licence FFME.",
+                             same_licence[0].user_id)
+        return PlanEntry(record, Bucket.BLOCKED, "Date de naissance manquante ou illisible.")
+    same_identity = [m for m in same_name if m.birth_date == record.birth_date]
+    if len(same_identity) == 1 and (not same_licence or same_licence == same_identity):
+        return PlanEntry(record, Bucket.RENEWAL, "Adhérent reconnu (nom, prénom et date de naissance).", same_identity[0].user_id)
+    if not same_name and not same_licence:
+        return PlanEntry(record, Bucket.NEW, "Personne inconnue du club : nouvel adhérent.")
+    return PlanEntry(record, Bucket.TO_REVIEW, "Identité ambiguë : à vérifier.")
 
 
-def plan_membership_import(records: Iterable[MembershipRecord], *, season: str, campaign_slug: str) -> ImportPlan:
-    """The plan of the import of these registrations into `season`."""
+_WRITTEN = (Bucket.NEW, Bucket.RENEWAL)
+LOWER_PRIORITY = ("Inscription moins prioritaire qu'une autre inscription de la même personne cette saison "
+                  "(statut, liste d'attente ou montant nul) : non importée.")
+
+
+# Who a registration is for, to compare the registrations of one person: a member of the base, or a new person
+PersonKey = tuple[object, ...]
+
+
+def _member_person(user_id: int) -> PersonKey:
+    return ("member", user_id)
+
+
+def _priority_person(entry: PlanEntry) -> PersonKey:
+    if entry.member_id is not None:
+        return _member_person(entry.member_id)
+    return ("new", *_person_key(entry.record.last_name, entry.record.first_name), entry.record.birth_date)
+
+
+def _apply_priority(entries: list[PlanEntry], base: _Base) -> list[PlanEntry]:
+    """Of several registrations of one person this season, those of lower priority score are not imported
+    (purchase_priority_score, the rule of the member writers)."""
+    best: dict[PersonKey, int] = {}
+
+    def consider(person: PersonKey, score: int) -> None:
+        best[person] = max(best.get(person, score), score)
+
+    for purchase in base.season_purchases:
+        consider(_member_person(purchase.user_id), purchase_priority_score(purchase.status, purchase.tarif_name, purchase.amount))
+    for entry in entries:
+        if entry.bucket in _WRITTEN:
+            record = entry.record
+            consider(_priority_person(entry), purchase_priority_score(record.status, record.tarif_name, record.amount))
+    result = []
+    for entry in entries:
+        record = entry.record
+        if entry.bucket in _WRITTEN and purchase_priority_score(record.status, record.tarif_name, record.amount) < best[_priority_person(entry)]:
+            entry = PlanEntry(record, Bucket.BLOCKED, LOWER_PRIORITY, entry.member_id)
+        result.append(entry)
+    return result
+
+
+def plan_membership_import(records: Iterable[MembershipRecord], *, season: str, campaign_slug: str,
+                           snapshot: Optional[MembersSnapshot] = None) -> ImportPlan:
+    """The plan of the import of these registrations into `season`, against the members already in the base."""
     records = list(records)
     blocked_reason = season_guard(campaign_slug, season)
     if blocked_reason:
         entries = [PlanEntry(record, Bucket.BLOCKED, blocked_reason) for record in records]
     else:
-        entries = [_classify(record) for record in records]
+        base = _Base(snapshot or MembersSnapshot(), season)
+        entries = _apply_priority([_classify(record, base) for record in records], base)
     return ImportPlan(season=season, campaign_slug=campaign_slug, entries=entries, blocked_reason=blocked_reason)
 
 
@@ -98,6 +223,8 @@ class Decision:
 
 class WriteAction(str, Enum):
     CREATE = "create"  # new member, with this season's membership
+    ATTACH = "attach"  # this season's membership attached to a known member, blank personal fields filled
+    BACKFILL = "backfill"  # a former purchase marked with its HelloAsso item id (written whatever the decisions)
 
 
 @dataclass(frozen=True)
@@ -117,6 +244,8 @@ def _write_for(entry: PlanEntry, decision: Decision) -> Optional[ImportWrite]:
         return None
     if entry.bucket == Bucket.NEW and decision.choice == IMPORT:
         return ImportWrite(entry, WriteAction.CREATE)
+    if entry.bucket == Bucket.RENEWAL and decision.choice == IMPORT:
+        return ImportWrite(entry, WriteAction.ATTACH)
     raise StaleDecisions(f"Inscription {entry.item_id} : choix « {decision.choice} » impossible.")
 
 
@@ -131,6 +260,8 @@ def apply_decisions(plan: ImportPlan, decisions: Mapping[int, Decision]) -> list
     for entry in plan.entries:
         decision = decisions.get(entry.item_id)
         write = _write_for(entry, decision) if decision else None
+        if entry.backfill and (not decision or decision.bucket == entry.bucket):
+            write = ImportWrite(entry, WriteAction.BACKFILL)
         if write:
             writes.append(write)
     return writes

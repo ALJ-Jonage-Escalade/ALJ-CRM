@@ -11,6 +11,9 @@ from domain.members.membership_import import (
     Bucket,
     Decision,
     ImportPlan,
+    KnownMember,
+    KnownPurchase,
+    MembersSnapshot,
     StaleDecisions,
     WriteAction,
     apply_decisions,
@@ -103,3 +106,107 @@ def test_nothing_is_written_from_a_blocked_campaign() -> None:
 
     with pytest.raises(StaleDecisions):
         apply_decisions(plan, {1: Decision(Bucket.NEW, "import")})
+
+
+# ---------------------------------------------------------------------------
+# Re-runs and renewals: the planner against the members already in the base
+# ---------------------------------------------------------------------------
+GINNY = KnownMember(user_id=7, last_name="WEASLEY", first_name="Ginny", birth_date="2013-08-11", licence="123456")
+LUNA = KnownMember(user_id=8, last_name="LOVEGOOD", first_name="Luna", birth_date="2012-02-13", licence="")
+
+
+def _purchase(purchase_id: int, user_id: int, **overrides: object) -> KnownPurchase:
+    purchase = KnownPurchase(purchase_id=purchase_id, user_id=user_id, order_ref="ORD-9001", season=SEASON, helloasso_item_id=None,
+                             status="Processed", tarif_name="Loisir collège", amount=150.0)
+    return replace(purchase, **overrides)  # type: ignore[arg-type]  # overrides of the dataclass fields
+
+
+def _plan(*records: MembershipRecord, members: tuple[KnownMember, ...] = (GINNY, LUNA),
+          purchases: tuple[KnownPurchase, ...] = ()) -> ImportPlan:
+    snapshot = MembersSnapshot(members=list(members), purchases=list(purchases))
+    return plan_membership_import(records, snapshot=snapshot, season=SEASON, campaign_slug=CAMPAIGN)
+
+
+def test_a_registration_whose_item_id_is_stored_is_already_imported() -> None:
+    [entry] = _plan(_record(9001), purchases=(_purchase(30, 7, helloasso_item_id=9001),)).entries
+
+    assert (entry.bucket, entry.member_id, entry.purchase_id, entry.backfill) == (Bucket.ALREADY_IMPORTED, 7, 30, False)
+
+
+def test_a_legacy_purchase_of_the_same_order_and_person_is_already_imported_and_back_filled() -> None:
+    [entry] = _plan(_record(9001, last_name="Weasley"), purchases=(_purchase(30, 7),)).entries
+
+    assert (entry.bucket, entry.member_id, entry.purchase_id, entry.backfill) == (Bucket.ALREADY_IMPORTED, 7, 30, True)
+
+
+def test_a_legacy_purchase_of_the_same_order_but_another_person_does_not_match() -> None:
+    [entry] = _plan(_record(9001, last_name="Lovegood", first_name="Luna", birth_date="2012-02-13"),
+                    purchases=(_purchase(30, 7),)).entries
+
+    assert (entry.bucket, entry.member_id) == (Bucket.RENEWAL, 8)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "why"),
+    [
+        ({"last_name": "Weasley", "first_name": "ginny"}, "same name and birth date"),
+        ({"last_name": "WEASLEY", "licence": "123456"}, "same name, birth date and licence"),
+        ({"last_name": "WEASLEY", "licence": "123456", "birth_date": "", "birth_date_raw": "?"}, "no birth date, unique licence"),
+        ({"last_name": "Weasley", "licence": "999999"}, "same name and birth date, licence unknown to the club"),
+    ],
+)
+def test_a_known_person_is_a_renewal(overrides: dict[str, str], why: str) -> None:
+    [entry] = _plan(_record(9001, **overrides)).entries
+
+    assert (entry.bucket, entry.member_id) == (Bucket.RENEWAL, 7), why
+
+
+def test_a_known_licence_never_makes_a_duplicate_nor_drops_the_row() -> None:
+    plan = _plan(_record(1, last_name="Weasley", licence="123456"), _record(2, last_name="Weasley", first_name="Ron", licence=""))
+
+    assert [entry.bucket for entry in plan.entries] == [Bucket.RENEWAL, Bucket.NEW]
+
+
+@pytest.mark.parametrize(
+    ("registrations", "expected"),
+    [
+        # (status, tariff, amount) of two registrations of one person this season
+        ((("Refunded", "Loisir collège", 150.0), ("Processed", "Loisir collège", 150.0)), [Bucket.BLOCKED, Bucket.NEW]),
+        ((("Processed", "Liste d'attente cours", 0.0), ("Processed", "Loisir collège", 150.0)), [Bucket.BLOCKED, Bucket.NEW]),
+        ((("Processed", "Loisir collège", 150.0), ("Processed", "Compétition", 200.0)), [Bucket.NEW, Bucket.NEW]),
+    ],
+)
+def test_the_priority_score_decides_between_several_registrations_of_one_person(
+        registrations: tuple[tuple[str, str, float], ...], expected: list[Bucket]) -> None:
+    records = [_record(i, last_name="Granger", first_name="Hermione", order_ref=f"ORD-{i}", status=status, tarif_name=tarif, amount=amount)
+               for i, (status, tarif, amount) in enumerate(registrations, start=1)]
+
+    plan = _plan(*records)
+
+    assert [entry.bucket for entry in plan.entries] == expected
+    if Bucket.BLOCKED in expected:
+        assert "prioritaire" in plan.entries[0].reason
+
+
+def test_a_registration_below_the_membership_already_recorded_this_season_is_blocked() -> None:
+    [entry] = _plan(_record(9001, last_name="Weasley", order_ref="ORD-2", status="Canceled"),
+                    purchases=(_purchase(30, 7, order_ref="ORD-1", helloasso_item_id=8000),)).entries
+
+    assert entry.bucket == Bucket.BLOCKED
+    assert "prioritaire" in entry.reason
+
+
+def test_a_checked_renewal_is_attached_to_the_known_member() -> None:
+    plan = _plan(_record(1, last_name="Weasley"))
+
+    [write] = apply_decisions(plan, {1: Decision(Bucket.RENEWAL, "import")})
+
+    assert (write.action, write.entry.member_id) == (WriteAction.ATTACH, 7)
+
+
+def test_legacy_purchases_are_back_filled_without_decision() -> None:
+    plan = _plan(_record(1, last_name="Weasley"), purchases=(_purchase(30, 7, order_ref="ORD-1"),))
+
+    [write] = apply_decisions(plan, {})
+
+    assert (write.action, write.entry.purchase_id) == (WriteAction.BACKFILL, 30)

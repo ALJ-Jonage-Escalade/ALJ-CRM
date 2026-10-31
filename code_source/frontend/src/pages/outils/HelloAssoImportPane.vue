@@ -21,6 +21,8 @@ import {
   isCheckable,
   memberHref,
   personLabel,
+  RESULT_GROUPS,
+  resultSummary,
   rowsOf,
   type Choices,
   type MembershipImportResult,
@@ -132,17 +134,15 @@ defineExpose({ reload: reset });
     </p>
 
     <div v-if="done" data-testid="ha-import-done" class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-      <div class="mb-2 text-[15px] font-bold text-emerald-800">
-        🎉 Import terminé (saison {{ done.season }}) : {{ done.counts.created }} adhérent{{ done.counts.created > 1 ? "s" : "" }} créé{{
-          done.counts.created > 1 ? "s" : ""
-        }}, {{ done.counts.skipped }} inscription(s) non importée(s).
-      </div>
-      <ul v-if="done.created.length" class="flex flex-col gap-1 text-[13px]">
-        <li v-for="member in done.created" :key="member.item_id" data-testid="ha-created">
-          🆕
-          <a :href="memberHref(member, done.season)" class="font-semibold text-blue-700 underline">{{ personLabel(member) }}</a>
-          <span class="text-slate-500">— {{ member.tarif_name }}</span>
-        </li>
+      <div class="mb-2 text-[15px] font-bold text-emerald-800">{{ resultSummary(done) }}</div>
+      <ul class="flex flex-col gap-1 text-[13px]">
+        <template v-for="group in RESULT_GROUPS" :key="group.key">
+          <li v-for="member in done[group.key]" :key="member.item_id" :data-testid="group.testId">
+            {{ group.icon }}
+            <a :href="memberHref(member, done.season)" class="font-semibold text-blue-700 underline">{{ personLabel(member) }}</a>
+            <span class="text-slate-500">— {{ member.tarif_name }}</span>
+          </li>
+        </template>
       </ul>
     </div>
 
