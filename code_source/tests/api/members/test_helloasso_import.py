@@ -250,3 +250,47 @@ class TestMembershipRerunsAndRenewals(HelloAssoImportTestCase):
         finally:
             conn.close()
         self.assertEqual(self.count("purchases"), 1)
+
+
+class TestMembershipsToReview(HelloAssoImportTestCase):
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.seed("ORD-OLD", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026",
+                  **{"champ_Date de naissance de l'adhérent": "2013-09-11"})
+        conn = SqliteDatabase.get_connection()
+        try:
+            self.ginny = int(conn.execute("SELECT id FROM users").fetchone()[0])
+        finally:
+            conn.close()
+        self.items = [ha_item(1, "WEASLEY", "Ginny", birth_date="11/08/2013")]
+
+    def test_a_row_to_review_lists_its_candidates(self) -> None:
+        [row] = self.client.post(PREVIEW).json()["rows"]
+
+        self.assertEqual(row["bucket"], "to_review")
+        self.assertTrue(row["can_create"])
+        self.assertEqual(row["candidates"], [{"user_id": self.ginny, "last_name": "WEASLEY", "first_name": "Ginny",
+                                              "birth_date": "2013-09-11", "licence": ""}])
+
+    def test_linking_a_row_to_review_attaches_it_to_the_candidate(self) -> None:
+        response = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {
+            "1": {"bucket": "to_review", "choice": f"link:{self.ginny}"}}})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual([member["user_id"] for member in response.json()["renewed"]], [self.ginny])
+        self.assertEqual((self.count("users"), self.count("purchases")), (1, 2))
+
+    def test_creating_from_a_row_to_review_makes_a_new_member(self) -> None:
+        response = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {"1": {"bucket": "to_review", "choice": "create"}}})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(len(response.json()["created"]), 1)
+        self.assertEqual((self.count("users"), self.count("purchases")), (2, 2))
+
+    def test_a_link_to_another_member_is_refused(self) -> None:
+        response = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {
+            "1": {"bucket": "to_review", "choice": f"link:{self.ginny + 100}"}}})
+
+        self.assertEqual((response.status_code, response.json()["code"]), (409, "stale_decisions"))
+        self.assertEqual(self.count("purchases"), 1)

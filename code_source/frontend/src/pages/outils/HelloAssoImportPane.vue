@@ -23,6 +23,7 @@ import {
   personLabel,
   RESULT_GROUPS,
   resultSummary,
+  reviewOptions,
   rowsOf,
   type Choices,
   type MembershipImportResult,
@@ -61,8 +62,8 @@ async function loadPreview(): Promise<void> {
   }
 }
 
-function toggle(itemId: number, checked: boolean): void {
-  choices.value = { ...choices.value, [itemId]: checked ? "import" : "skip" };
+function choose(itemId: number, choice: string): void {
+  choices.value = { ...choices.value, [itemId]: choice };
 }
 
 async function apply(): Promise<void> {
@@ -200,7 +201,7 @@ defineExpose({ reload: reset });
                       data-testid="ha-check"
                       :checked="choices[row.item_id] === 'import'"
                       :aria-label="`Importer ${personLabel(row)}`"
-                      @change="toggle(row.item_id, ($event.target as HTMLInputElement).checked)"
+                      @change="choose(row.item_id, ($event.target as HTMLInputElement).checked ? 'import' : 'skip')"
                     />
                   </td>
                   <td class="px-2.5 py-1.5 font-semibold">{{ personLabel(row) }}</td>
@@ -208,7 +209,19 @@ defineExpose({ reload: reset });
                   <td class="px-2.5 py-1.5">{{ row.tarif_name }}</td>
                   <td class="px-2.5 py-1.5">{{ formatEuros(row.amount) }}</td>
                   <td class="px-2.5 py-1.5">{{ row.status }}</td>
-                  <td class="px-2.5 py-1.5 text-slate-500">{{ row.reason }}</td>
+                  <td class="px-2.5 py-1.5 text-slate-500">
+                    {{ row.reason }}
+                    <select
+                      v-if="row.bucket === 'to_review'"
+                      data-testid="ha-review-choice"
+                      :value="choices[row.item_id]"
+                      :aria-label="`Choix pour ${personLabel(row)}`"
+                      class="mt-1 block w-full min-w-56 rounded-md border border-slate-300 px-1.5 py-1 text-xs text-slate-800"
+                      @change="choose(row.item_id, ($event.target as HTMLSelectElement).value)"
+                    >
+                      <option v-for="option in reviewOptions(row)" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </td>
                 </tr>
               </tbody>
             </table>

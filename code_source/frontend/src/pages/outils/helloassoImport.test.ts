@@ -14,6 +14,8 @@ const ROW = (item_id: number, bucket: MembershipRow["bucket"]): MembershipRow =>
   tarif_name: "Loisir",
   amount: 150,
   status: "Processed",
+  candidates: [],
+  can_create: true,
 });
 const PREVIEW: MembershipPreview = {
   status: "success",

@@ -93,6 +93,8 @@ const MEMBERSHIP_PREVIEW = {
       tarif_name: "Loisir collège",
       amount: 150,
       status: "Processed",
+      candidates: [],
+      can_create: true,
     },
     {
       item_id: 2,
@@ -107,8 +109,21 @@ const MEMBERSHIP_PREVIEW = {
       tarif_name: "Adultes autonomes",
       amount: 120,
       status: "Processed",
+      candidates: [],
+      can_create: false,
     },
   ],
+};
+const REVIEW_ROW = {
+  ...MEMBERSHIP_PREVIEW.rows[0]!,
+  item_id: 3,
+  bucket: "to_review",
+  reason: "Même nom et prénom qu'un adhérent, mais date de naissance différente.",
+  last_name: "GRANGER",
+  first_name: "Hermione",
+  birth_date: "2013-09-19",
+  candidates: [{ user_id: 4, last_name: "GRANGER", first_name: "Hermione", birth_date: "2012-09-19", licence: "123456" }],
+  can_create: true,
 };
 
 type Answer = (body: unknown, url: URL) => Response;
@@ -360,6 +375,57 @@ describe("OutilsPage", () => {
     expect(renewed.textContent).toContain("GRANGER Hermione");
     expect(renewed.getAttribute("href")).toBe("/bureau/adherents?id=4&saison=2026-2027&achat=13");
     expect(byId("ha-import-result")).toBeNull();
+  });
+
+  it("asks for a choice on each HelloAsso row to review, skipped by default", async () => {
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () =>
+      json({
+        ...MEMBERSHIP_PREVIEW,
+        rows: [...MEMBERSHIP_PREVIEW.rows, REVIEW_ROW],
+        counts: { ...MEMBERSHIP_PREVIEW.counts, to_review: 1 },
+      });
+    try {
+      const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      const select = byId<HTMLSelectElement>("ha-review-choice")!;
+      expect(select.value).toBe("skip");
+      expect([...select.options].map((option) => option.textContent.trim())).toEqual([
+        "— Ignorer cette inscription —",
+        "Rattacher à GRANGER Hermione (né(e) le 2012-09-19, licence 123456)",
+        "Créer un nouvel adhérent",
+      ]);
+      expect(byId("ha-row-to_review")!.textContent).toContain("date de naissance différente");
+
+      select.value = "link:4";
+      select.dispatchEvent(new Event("change"));
+      await flushPromises();
+      expect(byId("ha-import-selected")!.textContent).toContain("2");
+      byId("ha-import-apply")!.click();
+      await flushPromises();
+      expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
+        season: "2026-2027",
+        decisions: { 1: { bucket: "new", choice: "import" }, 3: { bucket: "to_review", choice: "link:4" } },
+      });
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("offers no creation for a HelloAsso row to review without birth date", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () =>
+      json({ ...MEMBERSHIP_PREVIEW, rows: [{ ...REVIEW_ROW, can_create: false }] });
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      expect([...byId<HTMLSelectElement>("ha-review-choice")!.options].map((option) => option.value)).toEqual(["skip", "link:4"]);
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
   });
 
   it("leaves an unchecked HelloAsso row out of the import", async () => {

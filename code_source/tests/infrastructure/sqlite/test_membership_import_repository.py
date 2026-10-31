@@ -12,7 +12,7 @@ from support.member_db import MemberDbTestCase
 from domain.members.helloasso_membership import MembershipRecord
 from domain.members.membership_import import Bucket, ImportWrite, PlanEntry, WriteAction
 from infrastructure.sqlite.connection import SqliteDatabase
-from infrastructure.sqlite.membership_import import MembershipImportRepository
+from infrastructure.sqlite.membership_import import MembershipImportRepository, MembershipWriteRefused
 
 SEASON = "2026-2027"
 
@@ -132,3 +132,15 @@ class TestMembershipImportRepository(MemberDbTestCase):
                          [{"helloasso_item_id": 1, "helloasso_status": "Processed", "helloasso_amount": 150.0,
                            "helloasso_tarif": "Loisir collège", "status": "Validated"}])
         self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM users"), [{"n": 1}])
+
+    def test_a_registration_below_the_member_s_membership_this_season_is_refused(self) -> None:
+        self.seed("ORD-1", "Ginny", "WEASLEY", "Loisir collège")
+        [user] = self.rows("SELECT id FROM users")
+        cancelled = record(1, status="Canceled", amount=0.0)
+
+        with self.assertRaises(MembershipWriteRefused):
+            MembershipImportRepository.apply(
+                [create(record(2, "LOVEGOOD", "Luna")),
+                 ImportWrite(PlanEntry(cancelled, Bucket.TO_REVIEW, "à vérifier", member_id=user["id"]), WriteAction.ATTACH)], SEASON)
+
+        self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM purchases"), [{"n": 1}])

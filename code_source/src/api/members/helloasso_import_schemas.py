@@ -33,8 +33,18 @@ class BucketCounts(BaseModel):
     blocked: int
 
 
+class MembershipCandidate(BaseModel):
+    """A member a registration to review may be (choice "link:<user_id>")."""
+    user_id: int
+    last_name: str
+    first_name: str
+    birth_date: str
+    licence: str
+
+
 class MembershipRow(BaseModel):
-    """One HelloAsso registration and what the import would do with it."""
+    """One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
+    whether a new member can be created from it (never without a birth date)."""
     item_id: int
     bucket: BucketName
     reason: str
@@ -47,6 +57,8 @@ class MembershipRow(BaseModel):
     tarif_name: str
     amount: float
     status: str
+    candidates: List[MembershipCandidate]
+    can_create: bool
 
 
 class MembershipPreview(BaseModel):

@@ -3214,6 +3214,22 @@ export interface components {
             campaign?: string;
         };
         /**
+         * MembershipCandidate
+         * @description A member a registration to review may be (choice "link:<user_id>").
+         */
+        MembershipCandidate: {
+            /** User Id */
+            user_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Birth Date */
+            birth_date: string;
+            /** Licence */
+            licence: string;
+        };
+        /**
          * MembershipDecision
          * @description The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>
          *     (rows to review). bucket: the bucket the preview showed the row in (a row that changed since is refused).
@@ -3278,7 +3294,8 @@ export interface components {
         };
         /**
          * MembershipRow
-         * @description One HelloAsso registration and what the import would do with it.
+         * @description One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
+         *     whether a new member can be created from it (never without a birth date).
          */
         MembershipRow: {
             /** Item Id */
@@ -3308,6 +3325,10 @@ export interface components {
             amount: number;
             /** Status */
             status: string;
+            /** Candidates */
+            candidates: components["schemas"]["MembershipCandidate"][];
+            /** Can Create */
+            can_create: boolean;
         };
         /**
          * NewMember

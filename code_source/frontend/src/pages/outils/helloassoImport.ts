@@ -95,3 +95,20 @@ export function resultSummary(result: MembershipImportResult): string {
     `${plural(skipped, "inscription non importée", "inscriptions non importées")}.`
   );
 }
+
+export type MembershipCandidate = Schemas["MembershipCandidate"];
+
+/** The choices of a row to review: skip (the default), link to one of its candidates, or create a new member when it
+    has a birth date. */
+export function reviewOptions(row: MembershipRow): { value: string; label: string }[] {
+  return [
+    { value: "skip", label: "— Ignorer cette inscription —" },
+    ...row.candidates.map((member) => ({ value: `link:${member.user_id}`, label: `Rattacher à ${candidateLabel(member)}` })),
+    ...(row.can_create ? [{ value: "create", label: "Créer un nouvel adhérent" }] : []),
+  ];
+}
+
+function candidateLabel(member: MembershipCandidate): string {
+  const details = [`né(e) le ${member.birth_date || "?"}`, ...(member.licence ? [`licence ${member.licence}`] : [])];
+  return `${personLabel(member)} (${details.join(", ")})`;
+}

@@ -7800,6 +7800,40 @@
         "title": "MembershipCampaignUpdate",
         "description": "Slug or HelloAsso URL of the membership form; empty: back to the default."
       },
+      "MembershipCandidate": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "last_name",
+          "first_name",
+          "birth_date",
+          "licence"
+        ],
+        "title": "MembershipCandidate",
+        "description": "A member a registration to review may be (choice \"link:<user_id>\")."
+      },
       "MembershipDecision": {
         "properties": {
           "bucket": {
@@ -8004,6 +8038,17 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "can_create": {
+            "type": "boolean",
+            "title": "Can Create"
           }
         },
         "type": "object",
@@ -8019,10 +8064,12 @@
           "licence",
           "tarif_name",
           "amount",
-          "status"
+          "status",
+          "candidates",
+          "can_create"
         ],
         "title": "MembershipRow",
-        "description": "One HelloAsso registration and what the import would do with it."
+        "description": "One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and\nwhether a new member can be created from it (never without a birth date)."
       },
       "NewMember": {
         "properties": {

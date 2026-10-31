@@ -6,7 +6,7 @@ Every registration lands in exactly one bucket, with the reason shown to the adm
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Iterable, Mapping, Optional
 
@@ -64,6 +64,12 @@ class PlanEntry:
     member_id: Optional[int] = None
     purchase_id: Optional[int] = None
     backfill: bool = False
+    candidates: tuple[KnownMember, ...] = ()  # to_review: the members it may be
+
+    @property
+    def can_create(self) -> bool:
+        """A new member can be created from it: never without a birth date (age rules, groups, FFME export)."""
+        return bool(self.record.birth_date)
 
     @property
     def item_id(self) -> int:
@@ -139,13 +145,23 @@ def _classify(record: MembershipRecord, base: _Base) -> PlanEntry:
         if len(same_licence) == 1:
             return PlanEntry(record, Bucket.RENEWAL, "Date de naissance illisible, adhérent reconnu par sa licence FFME.",
                              same_licence[0].user_id)
-        return PlanEntry(record, Bucket.BLOCKED, "Date de naissance manquante ou illisible.")
+        return _to_review(record, "Date de naissance manquante ou illisible : choisissez l'adhérent à compléter.",
+                          same_name + same_licence)
     same_identity = [m for m in same_name if m.birth_date == record.birth_date]
     if len(same_identity) == 1 and (not same_licence or same_licence == same_identity):
         return PlanEntry(record, Bucket.RENEWAL, "Adhérent reconnu (nom, prénom et date de naissance).", same_identity[0].user_id)
     if not same_name and not same_licence:
         return PlanEntry(record, Bucket.NEW, "Personne inconnue du club : nouvel adhérent.")
-    return PlanEntry(record, Bucket.TO_REVIEW, "Identité ambiguë : à vérifier.")
+    if len(same_identity) > 1 or (same_identity and same_licence):
+        return _to_review(record, "Correspond à plusieurs adhérents : choisissez le bon.", same_identity + same_licence)
+    if same_licence:
+        return _to_review(record, "Licence FFME connue, mais sous un autre nom ou une autre date de naissance.", same_licence + same_name)
+    return _to_review(record, "Même nom et prénom qu'un adhérent, mais date de naissance différente.", same_name)
+
+
+def _to_review(record: MembershipRecord, reason: str, candidates: Iterable[KnownMember]) -> PlanEntry:
+    unique = {member.user_id: member for member in candidates}
+    return PlanEntry(record, Bucket.TO_REVIEW, reason, candidates=tuple(unique[user_id] for user_id in sorted(unique)))
 
 
 _WRITTEN = (Bucket.NEW, Bucket.RENEWAL)
@@ -210,6 +226,18 @@ IMPORT = "import"  # a checked new / renewal / updated row
 SKIP = "skip"  # an unchecked row; the default of every row
 
 
+CREATE = "create"  # a row to review: a new member
+LINK_PREFIX = "link:"  # a row to review: "link:<member id>", attached to that candidate
+
+
+def _linked_member(choice: str) -> Optional[int]:
+    """The member id of a "link:<member id>" choice, None for another choice."""
+    if not choice.startswith(LINK_PREFIX):
+        return None
+    member_id = choice[len(LINK_PREFIX):]
+    return int(member_id) if member_id.isdigit() else None
+
+
 class StaleDecisions(ValueError):
     """The decisions do not match the plan recomputed on confirm (unknown item, bucket changed, invalid choice)."""
 
@@ -246,6 +274,12 @@ def _write_for(entry: PlanEntry, decision: Decision) -> Optional[ImportWrite]:
         return ImportWrite(entry, WriteAction.CREATE)
     if entry.bucket == Bucket.RENEWAL and decision.choice == IMPORT:
         return ImportWrite(entry, WriteAction.ATTACH)
+    if entry.bucket == Bucket.TO_REVIEW:
+        if decision.choice == CREATE and entry.can_create:
+            return ImportWrite(entry, WriteAction.CREATE)
+        member_id = _linked_member(decision.choice)
+        if member_id is not None and member_id in {member.user_id for member in entry.candidates}:
+            return ImportWrite(replace(entry, member_id=member_id), WriteAction.ATTACH)
     raise StaleDecisions(f"Inscription {entry.item_id} : choix « {decision.choice} » impossible.")
 
 

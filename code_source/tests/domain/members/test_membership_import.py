@@ -52,9 +52,9 @@ def test_a_campaign_of_another_season_blocks_every_registration() -> None:
 
 @pytest.mark.parametrize(
     "overrides",
-    [{"last_name": ""}, {"first_name": "  "}, {"order_ref": ""}, {"birth_date": "", "birth_date_raw": "onze août"}],
+    [{"last_name": ""}, {"first_name": "  "}, {"order_ref": ""}],
 )
-def test_a_registration_without_name_order_or_birth_date_is_blocked(overrides: dict[str, str]) -> None:
+def test_a_registration_without_name_or_order_is_blocked(overrides: dict[str, str]) -> None:
     [entry] = plan_membership_import([_record(**overrides)], season=SEASON, campaign_slug=CAMPAIGN).entries
 
     assert entry.bucket == Bucket.BLOCKED
@@ -210,3 +210,72 @@ def test_legacy_purchases_are_back_filled_without_decision() -> None:
     [write] = apply_decisions(plan, {})
 
     assert (write.action, write.entry.purchase_id) == (WriteAction.BACKFILL, 30)
+
+
+# ---------------------------------------------------------------------------
+# "À vérifier": ambiguous identities are left to the admin, with the candidate members
+# ---------------------------------------------------------------------------
+GINNY_TWIN = KnownMember(user_id=9, last_name="Weasley", first_name="Ginny", birth_date="2013-08-11", licence="")
+GINNY_ELDER = KnownMember(user_id=10, last_name="Weasley", first_name="Ginny", birth_date="1981-08-11", licence="")
+
+
+@pytest.mark.parametrize(
+    ("overrides", "members", "candidates", "reason_word"),
+    [
+        ({"last_name": "Weazley", "licence": "123456"}, (GINNY, LUNA), [7], "licence"),
+        ({"last_name": "Weasley", "birth_date": "2013-09-11"}, (GINNY, LUNA), [7], "naissance"),
+        ({"last_name": "Weasley"}, (GINNY, GINNY_TWIN), [7, 9], "plusieurs"),
+        ({"last_name": "Weasley", "licence": "654321"}, (GINNY, KnownMember(11, "Potter", "Harry", "1980-07-31", "654321")), [7, 11],
+         "plusieurs"),
+        ({"last_name": "Weasley", "birth_date": "", "birth_date_raw": "?"}, (GINNY, GINNY_ELDER), [7, 10], "naissance"),
+        ({"last_name": "Granger", "first_name": "Hermione", "birth_date": "", "birth_date_raw": ""}, (GINNY,), [], "naissance"),
+    ],
+)
+def test_an_ambiguous_identity_is_to_review_with_its_candidates(
+        overrides: dict[str, str], members: tuple[KnownMember, ...], candidates: list[int], reason_word: str) -> None:
+    [entry] = _plan(_record(9001, **overrides), members=members).entries
+
+    assert entry.bucket == Bucket.TO_REVIEW
+    assert [member.user_id for member in entry.candidates] == candidates
+    assert reason_word in entry.reason.lower()
+
+
+def test_a_registration_without_birth_date_is_never_new() -> None:
+    [entry] = _plan(_record(9001, last_name="Granger", first_name="Hermione", birth_date="", licence="")).entries
+
+    assert entry.bucket == Bucket.TO_REVIEW
+    assert not entry.can_create
+
+
+def _review_plan() -> ImportPlan:
+    return _plan(_record(1, last_name="Weasley"), members=(GINNY, GINNY_TWIN, LUNA))
+
+
+@pytest.mark.parametrize(
+    ("choice", "expected"),
+    [
+        ("link:9", (WriteAction.ATTACH, 9)),
+        ("create", (WriteAction.CREATE, None)),
+    ],
+)
+def test_the_choice_on_a_row_to_review_is_applied(choice: str, expected: tuple[WriteAction, int | None]) -> None:
+    [write] = apply_decisions(_review_plan(), {1: Decision(Bucket.TO_REVIEW, choice)})
+
+    assert (write.action, write.entry.member_id) == expected
+
+
+def test_skipping_a_row_to_review_writes_nothing() -> None:
+    assert apply_decisions(_review_plan(), {1: Decision(Bucket.TO_REVIEW, "skip")}) == []
+
+
+@pytest.mark.parametrize("choice", ["link:8", "link:abc", "import"])
+def test_a_link_to_a_member_who_is_not_a_candidate_is_rejected(choice: str) -> None:
+    with pytest.raises(StaleDecisions):
+        apply_decisions(_review_plan(), {1: Decision(Bucket.TO_REVIEW, choice)})
+
+
+def test_a_row_without_birth_date_cannot_be_created() -> None:
+    plan = _plan(_record(1, last_name="Granger", first_name="Hermione", birth_date="", licence=""))
+
+    with pytest.raises(StaleDecisions):
+        apply_decisions(plan, {1: Decision(Bucket.TO_REVIEW, "create")})

@@ -19,6 +19,10 @@ from infrastructure.sqlite.connection import SqliteDatabase
 logger = logging.getLogger("alj")
 
 
+class MembershipWriteRefused(Exception):
+    """A write the members base refuses (nothing of the import is then written)."""
+
+
 @dataclass(frozen=True)
 class AppliedWrite:
     item_id: int
@@ -41,8 +45,10 @@ def _add_membership(cur: sqlite3.Cursor, write: ImportWrite, user_id: int, seaso
                                          fields["payer_lastName"], fields["payer_firstName"], fields["payer_email"],
                                          season_id, now_iso)
     purchase_id = schema_v2.insert_purchase_v2(cur, order_id, user_id, fields, now_iso, legacy_season_id=season_id)
-    if purchase_id is None:  # the planner keeps the registrations of lower priority out (purchase_priority_score)
-        raise sqlite3.IntegrityError(f"Inscription {write.item_id} : une inscription plus prioritaire existe déjà")
+    if purchase_id is None:  # a membership of higher priority this season (purchase_priority_score)
+        record = write.entry.record
+        raise MembershipWriteRefused(f"{record.last_name} {record.first_name} a déjà une inscription plus prioritaire cette saison "
+                                     f"(statut, liste d'attente ou montant) : l'inscription HelloAsso {write.item_id} n'est pas importée.")
     schema_v2.insert_options_v2(cur, purchase_id, fields)
     _record_helloasso_values(cur, purchase_id, write)
     return AppliedWrite(write.item_id, write.action, user_id, purchase_id)

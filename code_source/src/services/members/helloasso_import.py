@@ -19,7 +19,7 @@ from domain.members.helloasso_membership import (
 from domain.members.membership_import import Decision, ImportPlan, StaleDecisions, apply_decisions, plan_membership_import
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.helloasso import api as helloasso_api
-from infrastructure.sqlite.membership_import import AppliedWrite, MembershipImportRepository
+from infrastructure.sqlite.membership_import import AppliedWrite, MembershipImportRepository, MembershipWriteRefused
 from services.errors import Conflict, InvalidRequest, UpstreamUnavailable
 from services.members.seasons import SeasonService
 
@@ -99,7 +99,11 @@ class MembershipImportService:
             writes = apply_decisions(plan, decisions)
         except StaleDecisions as e:
             raise Conflict(f"{e} Relancez l'aperçu.", "stale_decisions") from e
-        return ImportResult(plan, MembershipImportRepository.apply(writes, active))
+        try:
+            applied = MembershipImportRepository.apply(writes, active)
+        except MembershipWriteRefused as e:
+            raise Conflict(f"{e} Rien n'a été importé.", "write_refused") from e
+        return ImportResult(plan, applied)
 
     @staticmethod
     def _plan(season: str) -> ImportPlan:
