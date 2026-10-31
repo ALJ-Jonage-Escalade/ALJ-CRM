@@ -1,4 +1,4 @@
-"""Import of the HelloAsso membership campaign into the members (admin, api_auth.py): campaign setting, preview, import."""
+"""Import of the HelloAsso membership campaign into the members (admin, api_auth.py): preview, import, last import."""
 
 from __future__ import annotations
 
@@ -8,10 +8,8 @@ from api.members.helloasso_import_schemas import (
     BucketCounts,
     ImportCounts,
     ImportedMember,
-    MembershipCampaignSetting,
     MembershipCandidate,
     MembershipChange,
-    MembershipCampaignUpdate,
     MembershipImportRequest,
     MembershipImportResult,
     MembershipLastImport,
@@ -24,14 +22,10 @@ from api.responses import error_responses
 from domain.members.helloasso_membership import MembershipRecord
 from domain.members.membership_import import Bucket, Decision, ImportPlan, PlanEntry, WriteAction
 from infrastructure.sqlite.membership_import import AppliedWrite
-from services.members.helloasso_import import CampaignSetting, ImportResult
+from services.members.helloasso_import import ImportResult
 from services.members.helloasso_import import MembershipImportService as Service
 
 router = APIRouter()
-
-
-def _setting(setting: CampaignSetting) -> MembershipCampaignSetting:
-    return MembershipCampaignSetting(campaign=setting.reference, resolved=setting.campaign.slug, source=setting.source)
 
 
 def _row(entry: PlanEntry) -> MembershipRow:
@@ -54,16 +48,6 @@ def _preview(plan: ImportPlan) -> MembershipPreview:
         status="success", season=plan.season, campaign=plan.campaign_slug, blocked_reason=plan.blocked_reason,
         counts=BucketCounts(**plan.counts()), rows=[_row(entry) for entry in plan.entries],
     )
-
-
-@router.get("/api/settings/helloasso-membership", response_model=MembershipCampaignSetting, responses=error_responses(400))
-def get_membership_campaign() -> MembershipCampaignSetting:
-    return _setting(Service.campaign_setting())
-
-
-@router.post("/api/settings/helloasso-membership", response_model=MembershipCampaignSetting, responses=error_responses(400))
-def save_membership_campaign(data: MembershipCampaignUpdate) -> MembershipCampaignSetting:
-    return _setting(Service.save_campaign(data.campaign))
 
 
 @router.post("/api/helloasso/memberships/preview", response_model=MembershipPreview, responses=error_responses(400, 502))

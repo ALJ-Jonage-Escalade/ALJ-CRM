@@ -116,14 +116,3 @@ export function batchReport(b: Schemas["BatchReport"], now?: Date): string[] {
     ),
   ];
 }
-
-const CAMPAIGN_SOURCES: Record<Schemas["MembershipCampaignSetting"]["source"], string> = {
-  setting: "réglée ici",
-  environment: "variable CAMPAIGN_SLUG du serveur",
-  default: "par défaut pour la saison active",
-};
-
-/** The form the HelloAsso membership import reads, and where its slug comes from. */
-export function membershipCampaignText(setting: Schemas["MembershipCampaignSetting"]): string {
-  return `Campagne lue : ${setting.resolved} (${CAMPAIGN_SOURCES[setting.source]})`;
-}

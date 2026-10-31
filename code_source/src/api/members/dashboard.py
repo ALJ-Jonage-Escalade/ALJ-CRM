@@ -49,11 +49,11 @@ def get_target_slug() -> str:
 @router.get("/api/dashboard")
 def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: bool = False):
     """Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
-    des adhésions (réglage HELLOASSO_MEMBERSHIP_CAMPAIGN) et les inscriptions sont lues par le même mapper."""
+    des adhésions (MembershipImportService.campaign) et les inscriptions sont lues par le même mapper."""
     print("-> Interrogation de l'API HelloAsso...")
 
     campaigns = helloasso_api.get_campaigns()
-    target_slug = MembershipImportService.campaign_setting().campaign.slug
+    target_slug = MembershipImportService.campaign().slug
     target_camp = next((c for c in campaigns if c.get('formSlug') == target_slug), None)
 
     if not target_camp:

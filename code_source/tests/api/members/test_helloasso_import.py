@@ -11,7 +11,6 @@ from support.api_case import ApiTestCase
 from support.helloasso_items import ha_item, ha_refunded_payment
 from support.member_db import MemberDbTestCase
 
-from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.helloasso.api import HelloAssoApiError
 from infrastructure.security.api_auth import Role, required_role
 from infrastructure.sqlite.connection import SqliteDatabase
@@ -51,7 +50,7 @@ class TestMembershipPreview(HelloAssoImportTestCase):
 
     def test_import_routes_are_admin_only(self) -> None:
         for method, path in (("POST", PREVIEW), ("POST", "/api/helloasso/memberships/import"),
-                             ("GET", "/api/helloasso/memberships/last-sync"), ("POST", "/api/settings/helloasso-membership")):
+                             ("GET", "/api/helloasso/memberships/last-sync")):
             with self.subTest(path=path):
                 self.assertEqual(required_role(method, path), Role.ADMIN)
 
@@ -71,25 +70,28 @@ class TestMembershipPreview(HelloAssoImportTestCase):
         self.assertTrue(rows[2]["reason"])
         self.assertEqual((self.count("users"), self.count("orders"), self.count("purchases")), (0, 0, 0))
 
-    def test_preview_reads_the_campaign_setting_then_the_environment_then_the_default(self) -> None:
+    def test_preview_reads_the_environment_then_the_default_campaign_of_the_season(self) -> None:
         self.client.post(PREVIEW)
-        with patch.dict(os.environ, {"CAMPAIGN_SLUG": "adhesions-env-2026-2027"}):
-            self.client.post(PREVIEW)
-            AppSettingsRepository.save("HELLOASSO_MEMBERSHIP_CAMPAIGN",
-                                       "https://www.helloasso.com/associations/alj/adhesions/adhesions-reglage-2026-2027")
+        with patch.dict(os.environ, {"CAMPAIGN_SLUG": "https://www.helloasso.com/associations/alj/adhesions/adhesions-env-2026-2027"}):
             self.client.post(PREVIEW)
 
-        self.assertEqual(self.fetched, [("Membership", CAMPAIGN), ("Membership", "adhesions-env-2026-2027"),
-                                        ("Membership", "adhesions-reglage-2026-2027")])
+        self.assertEqual(self.fetched, [("Membership", CAMPAIGN), ("Membership", "adhesions-env-2026-2027")])
 
     def test_a_campaign_of_another_season_blocks_the_whole_preview(self) -> None:
-        AppSettingsRepository.save("HELLOASSO_MEMBERSHIP_CAMPAIGN", "adhesion-escalade-2025-2026")
         self.items = [ha_item(1, "WEASLEY", "Ginny")]
 
-        body = self.client.post(PREVIEW).json()
+        with patch.dict(os.environ, {"CAMPAIGN_SLUG": "adhesion-escalade-2025-2026"}):
+            body = self.client.post(PREVIEW).json()
 
         self.assertIn("2026-2027", body["blocked_reason"])
         self.assertEqual([row["bucket"] for row in body["rows"]], ["blocked"])
+
+    def test_an_unreadable_campaign_is_refused(self) -> None:
+        with patch.dict(os.environ, {"CAMPAIGN_SLUG": "https://www.helloasso.com/associations"}):
+            response = self.client.post(PREVIEW)
+
+        self.assertEqual((response.status_code, response.json()["code"]), (400, "invalid_campaign"))
+        self.assertEqual(self.fetched, [])
 
     def test_helloasso_failures_are_explicit_errors(self) -> None:
         for raised, code in ((HelloAssoApiError("Identifiants HelloAsso absents", "helloasso_credentials_missing"),
@@ -104,24 +106,6 @@ class TestMembershipPreview(HelloAssoImportTestCase):
                 self.assertEqual(response.json()["code"], code)
                 self.assertIn("HelloAsso", response.json()["message"])
 
-
-class TestMembershipCampaignSetting(HelloAssoImportTestCase):
-
-    def test_campaign_setting_round_trip(self) -> None:
-        self.assertEqual(self.client.get("/api/settings/helloasso-membership").json(),
-                         {"campaign": "", "resolved": CAMPAIGN, "source": "default"})
-
-        saved = self.client.post("/api/settings/helloasso-membership", json={"campaign": "adhesions-reglage-2026-2027"})
-
-        self.assertEqual(saved.status_code, 200, saved.text)
-        self.assertEqual(self.client.get("/api/settings/helloasso-membership").json(),
-                         {"campaign": "adhesions-reglage-2026-2027", "resolved": "adhesions-reglage-2026-2027", "source": "setting"})
-
-    def test_an_unreadable_campaign_is_refused(self) -> None:
-        response = self.client.post("/api/settings/helloasso-membership", json={"campaign": "https://www.helloasso.com/associations"})
-
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(AppSettingsRepository.get("HELLOASSO_MEMBERSHIP_CAMPAIGN"), "")
 
 IMPORT = "/api/helloasso/memberships/import"
 
@@ -165,8 +149,8 @@ class TestMembershipImport(HelloAssoImportTestCase):
         other_season = self.client.post(IMPORT, json={"season": "2025-2026", "decisions": decisions})
         self.assertEqual((other_season.status_code, other_season.json()["code"]), (409, "stale_decisions"))
 
-        AppSettingsRepository.save("HELLOASSO_MEMBERSHIP_CAMPAIGN", "adhesion-escalade-2025-2026")
-        blocked = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": decisions})
+        with patch.dict(os.environ, {"CAMPAIGN_SLUG": "adhesion-escalade-2025-2026"}):
+            blocked = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": decisions})
 
         self.assertEqual((blocked.status_code, blocked.json()["code"]), (409, "campaign_blocked"))
         self.assertIn("2026-2027", blocked.json()["message"])

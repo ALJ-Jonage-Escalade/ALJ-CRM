@@ -198,7 +198,7 @@ def map_membership_items(items: Iterable[Mapping[str, Any]]) -> list[MembershipR
 
 
 # ---------------------------------------------------------------------------
-# Campaign (app setting HELLOASSO_MEMBERSHIP_CAMPAIGN) and season guard
+# Campaign (services.members.helloasso_import) and season guard
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class MembershipCampaign:

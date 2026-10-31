@@ -94,8 +94,6 @@ EXPECTED_ROUTES = {
     ("GET", "/api/seasons"),
     ("POST", "/api/send-email"),
     ("GET", "/api/settings/competitions-results"),
-    ("GET", "/api/settings/helloasso-membership"),
-    ("POST", "/api/settings/helloasso-membership"),
     ("POST", "/api/settings/competitions-results"),
     ("GET", "/api/web-version"),
     ("GET", "/api/whatsapp-template"),

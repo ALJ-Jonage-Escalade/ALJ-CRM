@@ -10,10 +10,6 @@ export function createMembersApi(client: ApiClient) {
     seasons: () => unwrap(client.GET("/api/seasons")),
     /** Tariff names of the current season. */
     seasonTarifs: () => unwrap(client.GET("/api/season-tarifs")),
-    /** The HelloAsso membership campaign set in Paramètres, and the form slug it resolves to. */
-    membershipCampaign: () => unwrap(client.GET("/api/settings/helloasso-membership")),
-    /** Slug or HelloAsso URL; empty: back to the default campaign of the season. */
-    saveMembershipCampaign: (campaign: string) => unwrap(client.POST("/api/settings/helloasso-membership", { body: { campaign } })),
     /** Reads the HelloAsso membership campaign and sorts its registrations for the active season; writes nothing. */
     helloAssoPreview: () => unwrap(client.POST("/api/helloasso/memberships/preview")),
     /** When the HelloAsso membership import last ran, and who ran it (null before the first one). */

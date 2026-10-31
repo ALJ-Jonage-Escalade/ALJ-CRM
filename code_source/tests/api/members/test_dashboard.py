@@ -3,6 +3,7 @@ mapper as the members import (HelloAsso mocked, fake data only)."""
 
 from __future__ import annotations
 
+import os
 from typing import Any
 from unittest.mock import patch
 
@@ -10,7 +11,6 @@ from support.api_case import ApiTestCase
 from support.helloasso_items import ha_item
 from support.member_db import MemberDbTestCase
 
-from infrastructure.firestore.app_settings import AppSettingsRepository
 
 
 class TestMembershipDashboard(MemberDbTestCase, ApiTestCase):
@@ -30,13 +30,13 @@ class TestMembershipDashboard(MemberDbTestCase, ApiTestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json(), read
 
-    def test_the_dashboard_reads_the_campaign_setting_and_the_shared_mapper(self) -> None:
-        AppSettingsRepository.save("HELLOASSO_MEMBERSHIP_CAMPAIGN", "adhesions-reglage-2026-2027")
+    def test_the_dashboard_reads_the_import_campaign_and_the_shared_mapper(self) -> None:
         luna = ha_item(2, "LOVEGOOD", "Luna", customFields=[{"name": "Ville", "value": "Meyzieu"}, {"name": "Code postal", "answer": "69330"}],
                        options=[{"name": "Assurance Base +", "amount": 1100}])
         donation = dict(ha_item(3, "MALFOY", "Draco"), type="Donation")
 
-        body, read = self.dashboard([ha_item(1, "WEASLEY", "Ginny"), luna, donation])
+        with patch.dict(os.environ, {"CAMPAIGN_SLUG": "adhesions-reglage-2026-2027"}):
+            body, read = self.dashboard([ha_item(1, "WEASLEY", "Ginny"), luna, donation])
 
         self.assertEqual(read, [("Membership", "adhesions-reglage-2026-2027")])
         self.assertEqual(body["total_inscrits"], 2)
@@ -46,8 +46,7 @@ class TestMembershipDashboard(MemberDbTestCase, ApiTestCase):
         self.assertEqual(body["tariffs"], [{"name": "Loisir collège", "count": 2}])
 
     def test_an_unknown_campaign_is_reported(self) -> None:
-        AppSettingsRepository.save("HELLOASSO_MEMBERSHIP_CAMPAIGN", "adhesions-autre-2026-2027")
-
-        body, read = self.dashboard([])
+        with patch.dict(os.environ, {"CAMPAIGN_SLUG": "adhesions-autre-2026-2027"}):
+            body, read = self.dashboard([])
 
         self.assertEqual((body, read), ({"error": "Campagne introuvable"}, []))

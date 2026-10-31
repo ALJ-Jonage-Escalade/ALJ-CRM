@@ -9,19 +9,6 @@ from pydantic import BaseModel
 from api.request_body import RequestBody
 
 BucketName = Literal["already_imported", "new", "renewal", "updated", "to_review", "blocked"]
-CampaignSource = Literal["setting", "environment", "default"]
-
-
-class MembershipCampaignSetting(BaseModel):
-    """campaign: as saved in Paramètres ("" when not set); resolved: the form slug the import reads."""
-    campaign: str
-    resolved: str
-    source: CampaignSource
-
-
-class MembershipCampaignUpdate(RequestBody):
-    """Slug or HelloAsso URL of the membership form; empty: back to the default."""
-    campaign: str = ""
 
 
 class BucketCounts(BaseModel):

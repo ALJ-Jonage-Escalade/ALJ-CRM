@@ -512,29 +512,11 @@ export interface paths {
         /**
          * Get Dashboard Data
          * @description Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
-         *     des adhésions (réglage HELLOASSO_MEMBERSHIP_CAMPAIGN) et les inscriptions sont lues par le même mapper.
+         *     des adhésions (MembershipImportService.campaign) et les inscriptions sont lues par le même mapper.
          */
         get: operations["get_dashboard_data_api_dashboard_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/helloasso-membership": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Membership Campaign */
-        get: operations["get_membership_campaign_api_settings_helloasso_membership_get"];
-        put?: never;
-        /** Save Membership Campaign */
-        post: operations["save_membership_campaign_api_settings_helloasso_membership_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3210,32 +3192,6 @@ export interface components {
             message: string;
         };
         /**
-         * MembershipCampaignSetting
-         * @description campaign: as saved in Paramètres ("" when not set); resolved: the form slug the import reads.
-         */
-        MembershipCampaignSetting: {
-            /** Campaign */
-            campaign: string;
-            /** Resolved */
-            resolved: string;
-            /**
-             * Source
-             * @enum {string}
-             */
-            source: "setting" | "environment" | "default";
-        };
-        /**
-         * MembershipCampaignUpdate
-         * @description Slug or HelloAsso URL of the membership form; empty: back to the default.
-         */
-        MembershipCampaignUpdate: {
-            /**
-             * Campaign
-             * @default
-             */
-            campaign?: string;
-        };
-        /**
          * MembershipCandidate
          * @description A member a registration to review may be (choice "link:<user_id>").
          */
@@ -5250,77 +5206,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_membership_campaign_api_settings_helloasso_membership_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MembershipCampaignSetting"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
-    save_membership_campaign_api_settings_helloasso_membership_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MembershipCampaignUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MembershipCampaignSetting"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */

@@ -1637,7 +1637,7 @@
     "/api/dashboard": {
       "get": {
         "summary": "Get Dashboard Data",
-        "description": "Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import\ndes adhésions (réglage HELLOASSO_MEMBERSHIP_CAMPAIGN) et les inscriptions sont lues par le même mapper.",
+        "description": "Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import\ndes adhésions (MembershipImportService.campaign) et les inscriptions sont lues par le même mapper.",
         "operationId": "get_dashboard_data_api_dashboard_get",
         "parameters": [
           {
@@ -1657,80 +1657,6 @@
             "content": {
               "application/json": {
                 "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/settings/helloasso-membership": {
-      "get": {
-        "summary": "Get Membership Campaign",
-        "operationId": "get_membership_campaign_api_settings_helloasso_membership_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MembershipCampaignSetting"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Save Membership Campaign",
-        "operationId": "save_membership_campaign_api_settings_helloasso_membership_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MembershipCampaignUpdate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MembershipCampaignSetting"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
               }
             }
           },
@@ -7776,48 +7702,6 @@
           "message"
         ],
         "title": "MemberUpdated"
-      },
-      "MembershipCampaignSetting": {
-        "properties": {
-          "campaign": {
-            "type": "string",
-            "title": "Campaign"
-          },
-          "resolved": {
-            "type": "string",
-            "title": "Resolved"
-          },
-          "source": {
-            "type": "string",
-            "enum": [
-              "setting",
-              "environment",
-              "default"
-            ],
-            "title": "Source"
-          }
-        },
-        "type": "object",
-        "required": [
-          "campaign",
-          "resolved",
-          "source"
-        ],
-        "title": "MembershipCampaignSetting",
-        "description": "campaign: as saved in Paramètres (\"\" when not set); resolved: the form slug the import reads."
-      },
-      "MembershipCampaignUpdate": {
-        "properties": {
-          "campaign": {
-            "type": "string",
-            "title": "Campaign",
-            "default": ""
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "MembershipCampaignUpdate",
-        "description": "Slug or HelloAsso URL of the membership form; empty: back to the default."
       },
       "MembershipCandidate": {
         "properties": {
