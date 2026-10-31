@@ -35,6 +35,8 @@ STATUS_NORMALIZATION = {
     "annule": "Annulé",
     "canceled": "Annulé",
     "en cours": "En cours",
+    "refunded": "Annulé",  # a refund on HelloAsso counts as a cancellation
+    "refunding": "Annulé",
 }
 
 V2_DDL = """

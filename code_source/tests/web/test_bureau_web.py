@@ -110,6 +110,8 @@ class TestBureauFiles(unittest.TestCase):
         # 2. Validation commande annulée
         with self.assertRaises(ValueError):
             build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": 150, "status": "Annulé"})
+        with self.assertRaises(ValueError):
+            build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": 150, "status": "Refunded"})
 
         # 3. Payeur par défaut = adhérent
         m = {"first_name": "alex", "last_name": "martin", "amount": 195, "season_name": "2026-2027"}

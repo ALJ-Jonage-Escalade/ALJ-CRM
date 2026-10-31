@@ -8119,6 +8119,14 @@
             "type": "string",
             "title": "Order Date"
           },
+          "payment_date": {
+            "type": "string",
+            "title": "Payment Date"
+          },
+          "refund_date": {
+            "type": "string",
+            "title": "Refund Date"
+          },
           "last_name": {
             "type": "string",
             "title": "Last Name"
@@ -8173,6 +8181,8 @@
           "reason",
           "order_ref",
           "order_date",
+          "payment_date",
+          "refund_date",
           "last_name",
           "first_name",
           "birth_date",
@@ -8185,7 +8195,7 @@
           "changes"
         ],
         "title": "MembershipRow",
-        "description": "One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and\nwhether a new member can be created from it (never without a birth date)."
+        "description": "One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and\nwhether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),\n\"\" when missing: order_date the registration, payment_date the first payment, refund_date the refund (status\nRefunded / Refunding)."
       },
       "NewMember": {
         "properties": {

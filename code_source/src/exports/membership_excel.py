@@ -7,6 +7,7 @@ import csv
 
 from paths import ROOT_DIR
 from domain.members.sex import parse_sex
+from domain.members.view import is_cancelled
 
 logger = logging.getLogger("alj")
 
@@ -116,7 +117,7 @@ def generate_ffme_csv(participants_data, output_path=None, include_termine=False
         commentaires = str(p.get("commentaires_correctif", "")).lower()
         is_manual = "ajout manuel" in commentaires
         
-        if "attente" in tarif_name or (amount == 0.0 and not is_manual) or "annul" in status or "cancel" in status:
+        if "attente" in tarif_name or (amount == 0.0 and not is_manual) or is_cancelled(status):
             continue
         if not include_termine and "termin" in status:
             continue

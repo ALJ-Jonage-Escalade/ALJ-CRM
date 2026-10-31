@@ -3361,7 +3361,9 @@ export interface components {
         /**
          * MembershipRow
          * @description One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
-         *     whether a new member can be created from it (never without a birth date).
+         *     whether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),
+         *     "" when missing: order_date the registration, payment_date the first payment, refund_date the refund (status
+         *     Refunded / Refunding).
          */
         MembershipRow: {
             /** Item Id */
@@ -3377,6 +3379,10 @@ export interface components {
             order_ref: string;
             /** Order Date */
             order_date: string;
+            /** Payment Date */
+            payment_date: string;
+            /** Refund Date */
+            refund_date: string;
             /** Last Name */
             last_name: string;
             /** First Name */

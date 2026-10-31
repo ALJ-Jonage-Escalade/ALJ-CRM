@@ -53,12 +53,16 @@ class MembershipChange(BaseModel):
 
 class MembershipRow(BaseModel):
     """One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
-    whether a new member can be created from it (never without a birth date)."""
+    whether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),
+    "" when missing: order_date the registration, payment_date the first payment, refund_date the refund (status
+    Refunded / Refunding)."""
     item_id: int
     bucket: BucketName
     reason: str
     order_ref: str
     order_date: str
+    payment_date: str
+    refund_date: str
     last_name: str
     first_name: str
     birth_date: str

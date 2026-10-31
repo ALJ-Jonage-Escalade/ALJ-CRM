@@ -86,8 +86,17 @@ class TestMemberView(unittest.TestCase):
         self.assertEqual((m["commentaires_correctif"], m["raw_passports"], m["raw_diplomas"]),
                          ("Certificat papier", "Orange", ""))
 
+    def test_is_cancelled_counts_a_refund_as_a_cancellation(self):
+        for status, cancelled in (("Canceled", True), ("Cancelled", True), ("Annulé", True), ("annule", True),
+                                  ("Refunded", True), ("Refunding", True), ("Remboursé", True),
+                                  ("Processed", False), ("Validé", False), ("Terminé", False), ("", False), (None, False)):
+            with self.subTest(status=status):
+                self.assertEqual(member_view.is_cancelled(status), cancelled)
+
     def test_normalizers(self):
         self.assertEqual(member_view.normalize_status(" Canceled "), "Annulé")
+        self.assertEqual(member_view.normalize_status("Refunded"), "Annulé")
+        self.assertEqual(member_view.normalize_status("Refunding"), "Annulé")
         self.assertEqual(member_view.normalize_status("Autre"), "Autre")
 
 

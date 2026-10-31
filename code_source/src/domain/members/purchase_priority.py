@@ -22,6 +22,8 @@ STATUS_PRIORITY = {
     "canceled": 1,
     "annulé": 1,
     "annule": 1,
+    "refunded": 1,
+    "refunding": 1,
 }
 
 

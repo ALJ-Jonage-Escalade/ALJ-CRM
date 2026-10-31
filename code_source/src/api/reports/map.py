@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from api.reports import resolve_season
 from api.reports.schemas import MapMember, MapPoint, MapPoints
 from api.responses import error, error_responses, internal_error
+from domain.members.view import is_cancelled
 from domain.utils import clean_city_name
 from infrastructure.geocoding import geocode_missing_addresses
 from infrastructure.sqlite.geocache import GeocacheRepository
@@ -27,7 +28,7 @@ def map_points(season: str, background_tasks: Optional[BackgroundTasks] = None) 
     missing_addresses: Set[str] = set()
 
     for row in MemberRepository.load_direct_data(season):
-        if "annul" in str(row.get("status", "Validé")).lower():
+        if is_cancelled(row.get("status")):
             continue
 
         city = clean_city_name(row.get("city") or "").upper()

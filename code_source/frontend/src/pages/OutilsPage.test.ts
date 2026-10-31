@@ -86,6 +86,8 @@ const MEMBERSHIP_PREVIEW = {
       reason: "Personne inconnue du club : nouvel adhérent.",
       order_ref: "501",
       order_date: "2026-09-01T10:00:00+02:00",
+      payment_date: "2026-09-01T10:05:00+02:00",
+      refund_date: "",
       last_name: "WEASLEY",
       first_name: "Ginny",
       birth_date: "2013-08-11",
@@ -103,6 +105,8 @@ const MEMBERSHIP_PREVIEW = {
       reason: "Date de naissance manquante ou illisible.",
       order_ref: "502",
       order_date: "2026-09-01T10:00:00+02:00",
+      payment_date: "2026-09-01T10:05:00+02:00",
+      refund_date: "",
       last_name: "LOVEGOOD",
       first_name: "Luna",
       birth_date: "",
@@ -351,8 +355,20 @@ describe("OutilsPage", () => {
   });
 
   it("shows when each HelloAsso registration was made, the latest first", async () => {
-    const earlier = { ...MEMBERSHIP_PREVIEW.rows[0]!, item_id: 3, first_name: "Ron", order_date: "2026-08-20T09:00:00+02:00" };
-    const later = { ...MEMBERSHIP_PREVIEW.rows[0]!, item_id: 4, first_name: "Fred", order_date: "2026-09-12T18:30:00+02:00" };
+    const earlier = {
+      ...MEMBERSHIP_PREVIEW.rows[0]!,
+      item_id: 3,
+      first_name: "Ron",
+      order_date: "2026-08-20T09:00:00+02:00",
+      payment_date: "",
+    };
+    const later = {
+      ...MEMBERSHIP_PREVIEW.rows[0]!,
+      item_id: 4,
+      first_name: "Fred",
+      order_date: "2026-09-12T18:30:00+02:00",
+      payment_date: "2026-09-15T08:00:00+02:00",
+    };
     const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
     ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [earlier, later] });
     try {
@@ -364,6 +380,7 @@ describe("OutilsPage", () => {
         "12/09/2026",
         "20/08/2026",
       ]);
+      expect(all("ha-row-new").map((row) => row.querySelector("[data-testid=ha-payment-date]")?.textContent)).toEqual(["15/09/2026", "—"]);
       expect(all("ha-row-new")[0]!.textContent).toContain("WEASLEY Fred");
     } finally {
       ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
@@ -445,6 +462,8 @@ describe("OutilsPage", () => {
       ...MEMBERSHIP_PREVIEW.rows[0]!,
       item_id: 4,
       bucket: "updated",
+      status: "Refunded",
+      refund_date: "2026-10-14T09:30:00+02:00",
       changes: [{ field: "status", crm: "Processed", before: "Processed", after: "Refunded" }],
     };
     const conflict = {
@@ -460,6 +479,7 @@ describe("OutilsPage", () => {
       byId("ha-import-preview")!.click();
       await flushPromises();
       expect(byId("ha-row-updated")!.textContent).toContain("Statut : Processed → Refunded");
+      expect(byId("ha-refund-date")!.textContent).toBe("Remboursé le 14/10/2026");
       expect(byId("ha-row-to_review")!.textContent).toContain("Montant : CRM 120.00 · HelloAsso 0.00 (avant 150.00)");
       expect(byId("ha-review-choice")).toBeNull();
       const checks = all("ha-check").map((box) => box as HTMLInputElement);

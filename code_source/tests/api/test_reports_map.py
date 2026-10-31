@@ -54,7 +54,7 @@ def test_map_points_grouped_by_address(client):
 
 
 def test_map_points_skip_cancelled_and_unplaced_members(client):
-    rows = [_row("Ron", "Weasley", status="Annulé"), _row("Neville", "Londubat", city=""),
+    rows = [_row("Ron", "Weasley", status="Annulé"), _row("Ginny", "Weasley", status="Refunded"), _row("Neville", "Londubat", city=""),
             _row("Harry", "Potter", address="4 Privet Drive"),
             _row("Drago", "Malefoy", address="9 impasse Inconnue")]  # not found by the geocoding: not retried
     response, _, geocode = _get(client, rows)

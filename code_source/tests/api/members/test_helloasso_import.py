@@ -8,7 +8,7 @@ from typing import Any
 from unittest.mock import patch
 
 from support.api_case import ApiTestCase
-from support.helloasso_items import ha_item
+from support.helloasso_items import ha_item, ha_refunded_payment
 from support.member_db import MemberDbTestCase
 
 from infrastructure.firestore.app_settings import AppSettingsRepository
@@ -256,13 +256,14 @@ class TestMembershipsChangedOnHelloAsso(HelloAssoImportTestCase):
             conn.close()
 
     def test_a_refund_on_helloasso_is_proposed_and_applied(self) -> None:
-        self.items = [ha_item(1, "WEASLEY", "Ginny", state="Refunded")]
+        self.items = [ha_item(1, "WEASLEY", "Ginny", payments=[ha_refunded_payment()])]
 
         [row] = self.client.post(PREVIEW).json()["rows"]
         result = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {"1": {"bucket": "updated", "choice": "import"}}}).json()
 
         self.assertEqual(row["bucket"], "updated")
         self.assertEqual(row["changes"], [{"field": "status", "crm": "Processed", "before": "Processed", "after": "Refunded"}])
+        self.assertEqual((row["payment_date"], row["refund_date"]), ("2026-09-01T10:05:00+02:00", "2026-10-14T09:30:00+02:00"))
         self.assertEqual(result["counts"]["updated"], 1)
         self.assertEqual([m["last_name"] for m in result["updated"]], ["WEASLEY"])
         self.assertEqual(self.purchase(), {"status": "Refunded", "amount": 150.0, "helloasso_status": "Refunded"})
@@ -272,7 +273,7 @@ class TestMembershipsChangedOnHelloAsso(HelloAssoImportTestCase):
         self.assertEqual(self.purchase()["status"], "Terminé")
 
         self.assertEqual(self.client.post(PREVIEW).json()["rows"][0]["bucket"], "already_imported")
-        self.items = [ha_item(1, "WEASLEY", "Ginny", state="Refunded")]
+        self.items = [ha_item(1, "WEASLEY", "Ginny", payments=[ha_refunded_payment()])]
         [row] = self.client.post(PREVIEW).json()["rows"]
 
         self.assertEqual(row["bucket"], "to_review")

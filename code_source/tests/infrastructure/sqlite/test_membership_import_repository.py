@@ -142,6 +142,6 @@ class TestMembershipImportRepository(MemberDbTestCase):
 
         [purchase] = self.rows("SELECT status, status_normalized, tarif_name, amount, commentaires_correctif, helloasso_status,"
                                " helloasso_tarif, helloasso_amount FROM purchases")
-        self.assertEqual(purchase, {"status": "Refunded", "status_normalized": "Refunded", "tarif_name": "Loisir (CRM)", "amount": 150.0,
+        self.assertEqual(purchase, {"status": "Refunded", "status_normalized": "Annulé", "tarif_name": "Loisir (CRM)", "amount": 150.0,
                                     "commentaires_correctif": "Payé en chèque\nImport HelloAsso du 31/10", "helloasso_status": "Refunded",
                                     "helloasso_tarif": "Loisir collège v2", "helloasso_amount": 150.0})

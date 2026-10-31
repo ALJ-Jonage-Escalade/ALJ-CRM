@@ -38,7 +38,8 @@ def _row(entry: PlanEntry) -> MembershipRow:
     record = entry.record
     return MembershipRow(
         item_id=record.item_id, bucket=entry.bucket.value, reason=entry.reason, order_ref=record.order_ref,
-        order_date=record.order_date, last_name=record.last_name, first_name=record.first_name,
+        order_date=record.order_date, payment_date=record.payment_date,
+        refund_date=record.refund_date, last_name=record.last_name, first_name=record.first_name,
         birth_date=record.birth_date or record.birth_date_raw, licence=record.licence, tarif_name=record.tarif_name,
         amount=record.amount, status=record.status, can_create=entry.can_create,
         candidates=[MembershipCandidate(user_id=member.user_id, last_name=member.last_name, first_name=member.first_name,

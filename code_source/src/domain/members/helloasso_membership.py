@@ -60,6 +60,8 @@ class MembershipRecord:
     birth_date: str  # ISO date, "" when missing or unreadable
     birth_date_raw: str  # as typed on the form
     licence: str  # FFME licence, digits only
+    payment_date: str = ""  # first payment made (instalments: the first one), "" when none
+    refund_date: str = ""  # refunded (status Refunded / Refunding): when the refund was started
     options: Dict[str, float] = field(default_factory=dict)  # insurance option name -> amount in euros
     custom_fields: Dict[str, str] = field(default_factory=dict)
 
@@ -126,17 +128,49 @@ def _field_by_words(custom_fields: Mapping[str, str], *words: str) -> str:
     return ""
 
 
+# Payment states (HelloAsso v5 PaymentState): a refund is recorded on the payments, never in the item state
+_REFUND_STATES = ("Refunded", "Refunding")
+_COUNTING_PAYMENT_STATES = ("Authorized", "Registered")
+_UNPAID_STATES = ("Pending", "Refused", "Canceled", "Abandoned", "Error", "Init", "WaitingAuthentication")
+# Item states of a valid registration, the only ones a refund on its payments replaces
+_PAID_ITEM_STATES = ("Processed", "Registered", "")
+
+
+def _meta_date(entity: Mapping[str, Any], key: str) -> str:  # Any: raw HelloAsso JSON
+    return str((entity.get("meta") or {}).get(key) or "").strip()
+
+
+def _refund(payments: list[Mapping[str, Any]]) -> tuple[str, str]:  # Any: raw HelloAsso JSON
+    """(payment state, date) of the refund of a registration whose payments are all refunded or being refunded,
+    ("", "") while a payment still counts. Date: the latest refund operation started, else the latest payment update."""
+    refunded = [payment for payment in payments if payment.get("state") in _REFUND_STATES]
+    if not refunded or any(payment.get("state") in _COUNTING_PAYMENT_STATES for payment in payments):
+        return "", ""
+    state = "Refunding" if any(payment.get("state") == "Refunding" for payment in refunded) else "Refunded"
+    started = [_meta_date(operation, "createdAt") for payment in refunded for operation in payment.get("refundOperations") or []]
+    dates = [date for date in started if date] or [date for date in (_meta_date(payment, "updatedAt") for payment in refunded) if date]
+    return state, max(dates, default="")
+
+
+def _payment_date(payments: list[Mapping[str, Any]]) -> str:  # Any: raw HelloAsso JSON
+    made = [str(payment.get("date") or "").strip() for payment in payments if payment.get("state") not in _UNPAID_STATES]
+    return min((date for date in made if date), default="")
+
+
 def map_membership_item(item: Mapping[str, Any]) -> MembershipRecord:  # Any: raw HelloAsso JSON
     order = item.get("order") or {}
     user = item.get("user") or {}
     payer = item.get("payer") or {}
     custom_fields = {str(f.get("name") or ""): _custom_value(f) for f in item.get("customFields") or []}
     birth_date_raw = _field_by_words(custom_fields, "naissance")
+    payments = [payment for payment in item.get("payments") or [] if isinstance(payment, Mapping)]
+    status = str(item.get("state") or "").strip()
+    refund_state, refund_date = _refund(payments) if status in _PAID_ITEM_STATES else ("", "")
     return MembershipRecord(
         item_id=int(item.get("id") or 0),
         order_ref=str(order.get("id") or "").strip(),
         order_date=str(order.get("date") or "").strip(),
-        status=str(item.get("state") or "").strip(),
+        status=refund_state or status,
         tarif_name=str(item.get("name") or "").strip(),
         amount=(item.get("amount") or 0) / 100,
         last_name=str(user.get("lastName") or "").strip(),
@@ -146,6 +180,8 @@ def map_membership_item(item: Mapping[str, Any]) -> MembershipRecord:  # Any: ra
         payer_email=str(payer.get("email") or "").strip(),
         birth_date=parse_birth_date(birth_date_raw),
         birth_date_raw=birth_date_raw,
+        payment_date=_payment_date(payments),
+        refund_date=refund_date,
         licence=re.sub(r"\D", "", _field_by_words(custom_fields, "licence")),
         options={str(o.get("name") or "").strip(): (o.get("amount") or 0) / 100 for o in item.get("options") or []},
         custom_fields=custom_fields,

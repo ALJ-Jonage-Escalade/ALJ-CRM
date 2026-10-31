@@ -24,3 +24,9 @@ def ha_item(item_id: int, last_name: str, first_name: str, birth_date: str = "11
     }
     item.update(overrides)
     return item
+
+
+def ha_refunded_payment(refunded_at: str = "2026-10-14T09:30:00+02:00") -> dict[str, Any]:  # Any: HelloAsso JSON
+    """A payment refunded on HelloAsso: the refund is on the payment, the item keeps its state (Processed)."""
+    return {"id": 77, "date": "2026-09-01T10:05:00+02:00", "amount": 15000, "state": "Refunded",
+            "refundOperations": [{"id": 5, "amount": 15000, "status": "Processed", "meta": {"createdAt": refunded_at}}]}

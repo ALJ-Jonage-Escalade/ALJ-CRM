@@ -2,7 +2,7 @@
    registration of the campaign into a bucket; the preview shows one section per bucket. */
 import type { BadgeColor } from "../../components/ui/palette";
 import type { Schemas } from "../../lib/client";
-import { formatDateTime, parseDate } from "../../lib/format";
+import { formatDateTime, formatDayText, parseDate } from "../../lib/format";
 
 export type MembershipPreview = Schemas["MembershipPreview"];
 export type MembershipRow = Schemas["MembershipRow"];
@@ -29,6 +29,12 @@ export const BUCKETS: readonly BucketInfo[] = [
 export function rowsOf(preview: MembershipPreview, bucket: BucketName): MembershipRow[] {
   const registered = (row: MembershipRow): number => parseDate(row.order_date)?.getTime() ?? 0;
   return preview.rows.filter((row) => row.bucket === bucket).sort((a, b) => registered(b) - registered(a));
+}
+
+/** « Remboursé le 14/10/2026 » (« Remboursement en cours depuis le … » while HelloAsso processes it). */
+export function refundText(row: MembershipRow): string {
+  const day = formatDayText(row.refund_date);
+  return row.status === "Refunding" ? `Remboursement en cours depuis le ${day}` : `Remboursé le ${day}`;
 }
 
 export function personLabel(row: { last_name: string; first_name: string }): string {

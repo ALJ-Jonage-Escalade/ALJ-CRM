@@ -124,3 +124,53 @@ def test_legacy_fields_feed_the_member_writers() -> None:
     assert (fields["opt_Assurance Base ++"], fields["opt_Montant Assurance Base ++"]) == ("Oui", 15.0)
     assert (fields["opt_Assurance Option ski de piste"], fields["opt_Montant Assurance Option ski de piste"]) == ("Oui", 3.0)
     assert (fields["opt_Assurance Base"], fields["opt_Montant Assurance Base"]) == ("Non", 0.0)
+
+
+def _payment(state: str, date: str = "2026-09-01T10:05:00+02:00", **overrides: Any) -> dict[str, Any]:  # Any: raw HelloAsso JSON
+    payment: dict[str, Any] = {"id": 77, "date": date, "amount": 15000, "state": state, "refundOperations": []}
+    payment.update(overrides)
+    return payment
+
+
+def test_map_membership_item_reads_the_payment_date() -> None:
+    record = map_membership_item(_item(payments=[_payment("Authorized", "2026-09-03T08:00:00+02:00")]))
+
+    assert (record.status, record.payment_date, record.refund_date) == ("Processed", "2026-09-03T08:00:00+02:00", "")
+
+
+def test_map_membership_item_keeps_the_first_payment_of_an_instalment_plan() -> None:
+    payments = [_payment("Pending", "2026-11-03T08:00:00+02:00"), _payment("Authorized", "2026-09-03T08:00:00+02:00")]
+
+    assert map_membership_item(_item(payments=payments)).payment_date == "2026-09-03T08:00:00+02:00"
+
+
+def test_map_membership_item_without_payment_has_no_payment_date() -> None:
+    assert map_membership_item(_item()).payment_date == ""
+
+
+@pytest.mark.parametrize("payment_state", ["Refunded", "Refunding"])
+def test_map_membership_item_reads_a_refund_on_the_payments(payment_state: str) -> None:
+    refund = {"id": 5, "amount": 15000, "status": "Processed", "meta": {"createdAt": "2026-10-14T09:30:00+02:00"}}
+    payment = _payment(payment_state, refundOperations=[refund], meta={"updatedAt": "2026-10-15T00:00:00+02:00"})
+
+    record = map_membership_item(_item(state="Processed", payments=[payment]))
+
+    assert (record.status, record.refund_date) == (payment_state, "2026-10-14T09:30:00+02:00")
+
+
+def test_map_membership_item_dates_a_refund_without_operation_by_the_payment_update() -> None:
+    payment = _payment("Refunded", meta={"updatedAt": "2026-10-15T11:00:00+02:00"})
+
+    assert map_membership_item(_item(payments=[payment])).refund_date == "2026-10-15T11:00:00+02:00"
+
+
+def test_map_membership_item_is_not_refunded_while_a_payment_still_counts() -> None:
+    payments = [_payment("Refunded"), _payment("Authorized")]
+
+    record = map_membership_item(_item(payments=payments))
+
+    assert (record.status, record.refund_date) == ("Processed", "")
+
+
+def test_map_membership_item_keeps_a_cancellation_of_the_item() -> None:
+    assert map_membership_item(_item(state="Canceled", payments=[_payment("Refunded")])).status == "Canceled"
