@@ -8,7 +8,9 @@ follow the real API (data + pagination, amounts in cents).
 
     uvicorn helloasso_fake:app --app-dir e2e/fakes --port 8095
 """
-from fastapi import FastAPI, HTTPException, Request
+from typing import List, Optional
+
+from fastapi import FastAPI, HTTPException, Query, Request
 
 app = FastAPI(title="Fake HelloAsso")
 _state = {"forms": [], "items": []}
@@ -39,8 +41,10 @@ def token():
 
 
 @app.get("/v5/organizations/{org}/forms")
-def forms(org: str):
-    return _page(_state["forms"])
+def forms(org: str, states: Optional[List[str]] = Query(None), formTypes: Optional[List[str]] = Query(None)):  # noqa: N803 - HelloAsso's parameter name
+    # Same filters as the real API (absent = no filter)
+    return _page([form for form in _state["forms"]
+                  if (not states or form.get("state") in states) and (not formTypes or form.get("formType") in formTypes)])
 
 
 @app.get("/v5/organizations/{org}/forms/{form_type}/{form_slug}/items")

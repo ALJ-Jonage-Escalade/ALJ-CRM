@@ -1,4 +1,6 @@
 import os
+from typing import Any, Dict, Iterable, List
+
 import requests
 from dotenv import load_dotenv
 
@@ -158,3 +160,33 @@ def get_order(order_id):
 def get_payment(payment_id):
     """Paiement (référence la commande et les articles réglés)."""
     return _get_resource(f"/payments/{int(payment_id)}")
+
+
+def list_forms(form_types: Iterable[str], states: Iterable[str]) -> List[Dict[str, Any]]:  # Any: HelloAsso JSON
+    """Formulaires (campagnes) de l'organisation filtrés par type et état, toutes les pages lues.
+
+    Contrairement à get_campaigns(), lève HelloAssoApiError (identifiants absents, réseau, erreur
+    HTTP) au lieu de renvoyer une liste vide ou partielle : la page Paramètres affiche l'erreur."""
+    if not credentials_configured():
+        raise HelloAssoApiError("Identifiants API HelloAsso non configurés")
+    token = get_access_token()
+    if not token:
+        raise HelloAssoApiError("Jeton d'accès HelloAsso indisponible")
+    url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms"
+    params = {"formTypes": list(form_types), "states": list(states), "pageSize": 100}
+    forms: List[Dict[str, Any]] = []
+    while True:
+        try:
+            response = requests.get(url, headers={"Authorization": f"Bearer {token}"}, params=params,
+                                    timeout=REQUEST_TIMEOUT_SECONDS)
+        except requests.exceptions.RequestException as e:
+            raise HelloAssoApiError(f"API HelloAsso injoignable : {e}")
+        if response.status_code >= 300:
+            raise HelloAssoApiError(f"API HelloAsso : HTTP {response.status_code}")
+        body = response.json()
+        page = body.get("data") or []
+        forms.extend(page)
+        next_token = (body.get("pagination") or {}).get("continuationToken")
+        if not page or not next_token or next_token == params.get("continuationToken"):
+            return forms
+        params["continuationToken"] = next_token

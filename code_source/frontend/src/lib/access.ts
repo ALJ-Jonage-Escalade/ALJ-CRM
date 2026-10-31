@@ -108,6 +108,11 @@ export const PAGES = [
     access: "admin",
     screen: "any",
     offlineRead: false,
+    // Online only: the settings are never kept on the device
+    children: [
+      { id: "general", label: "Général", path: "", access: "admin", offline: "none" },
+      { id: "campagnes", label: "Campagne HelloAsso", path: "campagnes", access: "admin", offline: "none" },
+    ],
   },
   {
     id: "administration",

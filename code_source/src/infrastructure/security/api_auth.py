@@ -142,6 +142,8 @@ def required_role(method: str, path: str) -> Optional[Role]:
         return Role.ADMIN  # modification des templates d'emails réservée aux administrateurs
     if path.startswith("/api/whatsapp-template") and method not in ("GET", "HEAD"):
         return Role.ADMIN  # modification du template WhatsApp réservée aux administrateurs
+    if path.startswith("/api/helloasso/campaigns") and method not in ("GET", "HEAD"):
+        return Role.ADMIN  # choix des campagnes HelloAsso actives réservé aux administrateurs ; la liste reste lisible
     if path.startswith("/api/settings") and method not in ("GET", "HEAD"):
         return Role.ADMIN  # modification des paramètres généraux réservée aux administrateurs
     if path.startswith("/api/ffme") and method not in ("GET", "HEAD"):

@@ -4,25 +4,44 @@ from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks
 
+import logging
+
+from domain.competitions.matching import parse_campaign_identifier
 from domain.constants import get_active_season
-from domain.utils import is_helloasso_url
+from infrastructure.firestore.app_settings import HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository
+from infrastructure.firestore.client import FirestoreError
 from infrastructure.geocoding import geocode_missing_addresses
 from infrastructure.helloasso.api import get_campaigns, get_items
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.geocache import GeocacheRepository
 
+logger = logging.getLogger("alj")
+
 router = APIRouter()
 
 
-def get_target_slug():
-    """Slug de la campagne d'adhésion : lu à chaque appel pour prendre en compte
-    les modifications faites dans la page Paramètres sans redémarrer l'application."""
-    slug = (SecretStore.get_secret("CAMPAIGN_SLUG") or "").strip()
-    if not slug:
-        slug = f"adhesion-escalade-{get_active_season()}-amicale-laique-escalade-2"
-    if is_helloasso_url(slug):
-        slug = [s for s in slug.split("/") if s.strip()][-1]
-    return slug
+def _chosen_membership_campaign() -> str:
+    """Campaign chosen in Paramètres › Campagne HelloAsso, or "" (not chosen, Firestore unreadable)."""
+    try:
+        return (AppSettingsRepository.get(HELLOASSO_MEMBERSHIP_CAMPAIGN) or "").strip()
+    except FirestoreError as e:
+        logger.warning("Membership campaign setting unreadable, falling back to CAMPAIGN_SLUG: %s", e)
+        return ""
+
+
+def get_target_slug() -> str:
+    """Slug de la campagne d'adhésion, lu à chaque appel (un changement s'applique sans redémarrage).
+
+    Ordre : réglage Firestore HELLOASSO_MEMBERSHIP_CAMPAIGN, puis variable CAMPAIGN_SLUG, puis le slug
+    par défaut de la saison (ces deux derniers sont un repli temporaire)."""
+    ref = _chosen_membership_campaign() or (SecretStore.get_secret("CAMPAIGN_SLUG") or "").strip()
+    if not ref:
+        return f"adhesion-escalade-{get_active_season()}-amicale-laique-escalade-2"
+    try:
+        return parse_campaign_identifier(ref)["slug"]
+    except ValueError:
+        # Unrecognised URL: its last segment, as before
+        return [segment for segment in ref.split("/") if segment.strip()][-1]
 
 
 @router.get("/api/dashboard")

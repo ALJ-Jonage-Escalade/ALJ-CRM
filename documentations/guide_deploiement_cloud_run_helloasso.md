@@ -103,6 +103,10 @@ GOOGLE_PROJECT_ID="alj-2027"
 
 *Note : Ces variables peuvent également être saisies directement dans l'interface graphique Google Cloud Console (Cloud Run → alj-escalade-api → Modifier et déployer une nouvelle révision → Variables et secrets).*
 
+*Campagnes HelloAsso : les campagnes actives se choisissent dans **Paramètres › Campagne HelloAsso** (réglages Firestore
+`HELLOASSO_MEMBERSHIP_CAMPAIGN` et `HELLOASSO_ANNUAL_CAMPAIGN`), sans redéploiement. `CAMPAIGN_SLUG` n'est plus qu'un repli
+pour les adhésions tant qu'aucune campagne n'y a été choisie ; il sera retiré ensuite.*
+
 ### 👑 Administrateur initial (`BOOTSTRAP_ADMIN_EMAIL`, une seule fois par projet)
 
 Les accès au CRM (qui peut se connecter, avec quel rôle) se gèrent sur la page **Administration › Accès**

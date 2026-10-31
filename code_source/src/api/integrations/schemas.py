@@ -1,13 +1,13 @@
-"""Bodies of the Google connection and server cache routes (Paramètres page of the Vue app).
+"""Bodies of the Google connection, server cache and HelloAsso campaign routes (Paramètres page of the Vue app).
 
 The response models are the API contract: the frontend's TypeScript types are generated from them
 (dev/export_openapi.py, then `npm run gen:api` in frontend/)."""
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.request_body import RequestBody
 
@@ -80,3 +80,46 @@ class CloudDbSync(BaseModel):
     status: Literal["success", "skipped"]
     message: str
     result: Optional[SyncCounters] = None
+
+
+class HelloAssoCampaignRef(BaseModel):
+    """An active campaign, as saved in the app settings."""
+    form_type: str
+    slug: str
+
+
+class HelloAssoCampaignChoice(RequestBody):
+    """Campaign chosen in Paramètres › Campagne HelloAsso: form_type must be the type of the kind
+    (Membership for membership, Event for competitions)."""
+    form_type: str
+    slug: str
+
+
+class HelloAssoCampaign(BaseModel):
+    """A HelloAsso form (campaign). Dates as HelloAsso gives them (ISO 8601), null when not set."""
+    form_type: str
+    slug: str
+    title: str
+    private_title: str
+    state: str = Field(description="Public, Private, Draft, Disabled or Deleted; empty when not found on HelloAsso")
+    url: str
+    start_date: Optional[str]
+    end_date: Optional[str]
+    created_at: Optional[str]
+    active: bool
+    warning: Optional[str] = Field(description="Why the active campaign no longer matches the list (disabled, not found…)")
+
+
+class HelloAssoCampaignKind(BaseModel):
+    """configured: false when no campaign was chosen and the default is in use (membership: the CAMPAIGN_SLUG
+    variable or the seasonal slug)."""
+    active: Optional[HelloAssoCampaignRef]
+    configured: bool
+    campaigns: List[HelloAssoCampaign]
+
+
+class HelloAssoCampaigns(BaseModel):
+    """error: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty."""
+    membership: HelloAssoCampaignKind
+    competitions: HelloAssoCampaignKind
+    error: Optional[str]
