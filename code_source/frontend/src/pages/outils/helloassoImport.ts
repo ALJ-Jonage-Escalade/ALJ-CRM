@@ -2,6 +2,7 @@
    registration of the campaign into a bucket; the preview shows one section per bucket. */
 import type { BadgeColor } from "../../components/ui/palette";
 import type { Schemas } from "../../lib/client";
+import { formatDateTime, parseDate } from "../../lib/format";
 
 export type MembershipPreview = Schemas["MembershipPreview"];
 export type MembershipRow = Schemas["MembershipRow"];
@@ -133,4 +134,13 @@ export function reviewOptions(row: MembershipRow): { value: string; label: strin
 function candidateLabel(member: MembershipCandidate): string {
   const details = [`né(e) le ${member.birth_date || "?"}`, ...(member.licence ? [`licence ${member.licence}`] : [])];
   return `${personLabel(member)} (${details.join(", ")})`;
+}
+
+/** « Dernière synchro : date, par X », or the empty state before the first import. */
+export function lastSyncText(last: Schemas["MembershipLastImport"] | null): string {
+  if (!last) {
+    return "Aucune synchronisation des adhésions HelloAsso pour l'instant.";
+  }
+  const date = parseDate(last.at);
+  return `Dernière synchro : ${date ? formatDateTime(date) : last.at}, par ${last.author}`;
 }

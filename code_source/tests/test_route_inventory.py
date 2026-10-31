@@ -69,6 +69,7 @@ EXPECTED_ROUTES = {
     ("PUT", "/api/helloasso/campaigns/{kind}"),
     ("GET", "/api/helloasso/items"),
     ("POST", "/api/helloasso/memberships/import"),
+    ("GET", "/api/helloasso/memberships/last-sync"),
     ("POST", "/api/helloasso/memberships/preview"),
     ("PUT", "/api/helloasso/items/{id_item}/ignore"),
     ("PUT", "/api/helloasso/items/{id_item}/link"),

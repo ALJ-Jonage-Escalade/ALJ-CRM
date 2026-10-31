@@ -6,9 +6,10 @@ maps and classifies them. Knows nothing about HTTP: failures are raised as servi
 
 from __future__ import annotations
 
+import datetime
 import os
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Optional
 
 from domain.members.helloasso_membership import (
     MembershipCampaign,
@@ -18,6 +19,7 @@ from domain.members.helloasso_membership import (
 )
 from domain.members.membership_import import Decision, ImportPlan, StaleDecisions, apply_decisions, plan_membership_import
 from infrastructure.firestore.app_settings import AppSettingsRepository
+from infrastructure.firestore.membership_import_history import ImportedItem, ImportHistoryEntry, MembershipImportHistory
 from infrastructure.helloasso import api as helloasso_api
 from infrastructure.sqlite.membership_import import AppliedWrite, MembershipImportRepository, MembershipWriteRefused
 from services.errors import Conflict, InvalidRequest, UpstreamUnavailable
@@ -34,6 +36,7 @@ CampaignSource = Literal["setting", "environment", "default"]
 class ImportResult:
     plan: ImportPlan  # the plan recomputed on confirm, the decisions applied to it
     applied: list[AppliedWrite]
+    history_id: str
 
 
 @dataclass(frozen=True)
@@ -84,10 +87,10 @@ class MembershipImportService:
         return MembershipImportService._plan(MembershipImportService.active_season())
 
     @staticmethod
-    def import_(season: str, decisions: dict[int, Decision]) -> ImportResult:
-        """Reads HelloAsso again, recomputes the plan and applies the admin's decisions (keyed by HelloAsso item id).
-        Refused (Conflict) when the campaign is blocked or the decisions no longer match: nothing is then written.
-        Sends no e-mail."""
+    def import_(season: str, decisions: dict[int, Decision], author: str) -> ImportResult:
+        """Reads HelloAsso again, recomputes the plan and applies the admin's decisions (keyed by HelloAsso item id),
+        then records the import in the history. Refused (Conflict) when the campaign is blocked or the decisions no
+        longer match: nothing is then written. Sends no e-mail. `author`: e-mail of the admin."""
         active = MembershipImportService.active_season()
         if season != active:
             raise Conflict(f"L'aperçu portait sur la saison {season}, la saison active est {active} : relancez l'aperçu.",
@@ -103,7 +106,18 @@ class MembershipImportService:
             applied = MembershipImportRepository.apply(writes, active)
         except MembershipWriteRefused as e:
             raise Conflict(f"{e} Rien n'a été importé.", "write_refused") from e
-        return ImportResult(plan, applied)
+        actions = {written.item_id: written.action.value for written in applied}
+        items = [ImportedItem(item_id=entry.item_id, bucket=entry.bucket.value, action=actions.get(entry.item_id, ""),
+                              decision=decisions[entry.item_id].choice if entry.item_id in decisions else "skip")
+                 for entry in plan.entries]
+        history_id = MembershipImportHistory.record(ImportHistoryEntry(
+            at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), author=author, season=plan.season,
+            campaign=plan.campaign_slug, counts=plan.counts(), items=items))
+        return ImportResult(plan, applied, history_id)
+
+    @staticmethod
+    def last_import() -> Optional[ImportHistoryEntry]:
+        return MembershipImportHistory.latest()
 
     @staticmethod
     def _plan(season: str) -> ImportPlan:

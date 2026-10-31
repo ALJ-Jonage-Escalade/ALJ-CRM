@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from api.members.helloasso_import_schemas import (
     BucketCounts,
@@ -14,9 +14,12 @@ from api.members.helloasso_import_schemas import (
     MembershipCampaignUpdate,
     MembershipImportRequest,
     MembershipImportResult,
+    MembershipLastImport,
+    MembershipLastSync,
     MembershipPreview,
     MembershipRow,
 )
+from api.admin.access import author_of
 from api.responses import error_responses
 from domain.members.membership_import import Bucket, Decision, ImportPlan, PlanEntry, WriteAction
 from infrastructure.sqlite.membership_import import AppliedWrite
@@ -80,14 +83,25 @@ def _result(result: ImportResult) -> MembershipImportResult:
     created, renewed, updated = members(WriteAction.CREATE), members(WriteAction.ATTACH), members(WriteAction.UPDATE)
     written = len(created) + len(renewed) + len(updated)
     return MembershipImportResult(
-        status="success", season=result.plan.season,
+        status="success", season=result.plan.season, history_id=result.history_id,
         counts=ImportCounts(created=len(created), renewed=len(renewed), updated=len(updated), skipped=len(result.plan.entries) - written),
         created=created, renewed=renewed, updated=updated,
     )
 
 
 @router.post("/api/helloasso/memberships/import", response_model=MembershipImportResult, responses=error_responses(400, 409, 502))
-def import_memberships(data: MembershipImportRequest) -> MembershipImportResult:
-    """Reads HelloAsso again and applies the admin's decisions to the recomputed plan. Sends no e-mail."""
+def import_memberships(request: Request, data: MembershipImportRequest) -> MembershipImportResult:
+    """Reads HelloAsso again and applies the admin's decisions to the recomputed plan, recorded in the history.
+    Sends no e-mail."""
     decisions = {item_id: Decision(Bucket(decision.bucket), decision.choice) for item_id, decision in data.decisions.items()}
-    return _result(Service.import_(data.season, decisions))
+    return _result(Service.import_(data.season, decisions, author_of(request)))
+
+
+@router.get("/api/helloasso/memberships/last-sync", response_model=MembershipLastSync)
+def last_membership_sync() -> MembershipLastSync:
+    """When the latest import ran, and who ran it."""
+    last = Service.last_import()
+    if last is None:
+        return MembershipLastSync(last_sync=None)
+    return MembershipLastSync(last_sync=MembershipLastImport(at=last["at"], author=last["author"], season=last["season"],
+                                                             campaign=last["campaign"]))

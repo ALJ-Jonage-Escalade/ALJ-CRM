@@ -4,7 +4,7 @@
    The preview writes nothing; the new, renewal and changed rows start checked, and the checked ones are imported once
    confirmed (the server reads HelloAsso again and refuses decisions that no longer match). The result lists the members
    written, linked to their record. Online only: disabled with an explanation when the device is offline. */
-import { computed, inject, ref } from "vue";
+import { computed, inject, onMounted, ref } from "vue";
 import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
@@ -20,6 +20,7 @@ import {
   decisionsOf,
   initialChoices,
   isCheckable,
+  lastSyncText,
   memberHref,
   needsIdentityChoice,
   personLabel,
@@ -40,6 +41,21 @@ const choices = ref<Choices>({});
 const done = ref<MembershipImportResult | null>(null);
 const failure = ref("");
 const busy = ref<"preview" | "import" | null>(null);
+const lastSync = ref<string | null>(null); // null until known
+
+async function loadLastSync(): Promise<void> {
+  try {
+    lastSync.value = lastSyncText((await membersApi.helloAssoLastSync()).last_sync);
+  } catch (e) {
+    console.warn("Dernière synchronisation HelloAsso :", e);
+  }
+}
+
+onMounted(() => {
+  if (online.value) {
+    void loadLastSync();
+  }
+});
 
 /** Rows that will be written: the checked ones (rows to review: a choice other than skip). */
 const selectedCount = computed(() => Object.values(choices.value).filter((choice) => choice !== "skip").length);
@@ -87,6 +103,7 @@ async function apply(): Promise<void> {
     const result = await membersApi.helloAssoImport({ season: shown.season, decisions: decisionsOf(shown, choices.value) });
     reset();
     done.value = result;
+    void loadLastSync();
   } catch (e) {
     failure.value = errorText(e);
   } finally {
@@ -109,6 +126,7 @@ defineExpose({ reload: reset });
           Lit la campagne d'adhésion HelloAsso réglée dans Paramètres et classe chaque inscription : nouvel adhérent, renouvellement,
           modification sur HelloAsso, cas à vérifier… L'aperçu n'enregistre rien et aucun e-mail n'est envoyé.
         </p>
+        <p v-if="lastSync" data-testid="ha-last-sync" class="mt-1 text-xs font-semibold text-slate-600">🕒 {{ lastSync }}</p>
       </div>
       <UiButton
         data-testid="ha-import-preview"

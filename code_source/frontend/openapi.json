@@ -1789,7 +1789,7 @@
     "/api/helloasso/memberships/import": {
       "post": {
         "summary": "Import Memberships",
-        "description": "Reads HelloAsso again and applies the admin's decisions to the recomputed plan. Sends no e-mail.",
+        "description": "Reads HelloAsso again and applies the admin's decisions to the recomputed plan, recorded in the history.\nSends no e-mail.",
         "operationId": "import_memberships_api_helloasso_memberships_import_post",
         "requestBody": {
           "content": {
@@ -1848,6 +1848,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/memberships/last-sync": {
+      "get": {
+        "summary": "Last Membership Sync",
+        "description": "When the latest import ran, and who ran it.",
+        "operationId": "last_membership_sync_api_helloasso_memberships_last_sync_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipLastSync"
                 }
               }
             }
@@ -7930,6 +7949,10 @@
             "type": "string",
             "title": "Season"
           },
+          "history_id": {
+            "type": "string",
+            "title": "History Id"
+          },
           "counts": {
             "$ref": "#/components/schemas/ImportCounts"
           },
@@ -7959,12 +7982,63 @@
         "required": [
           "status",
           "season",
+          "history_id",
           "counts",
           "created",
           "renewed",
           "updated"
         ],
-        "title": "MembershipImportResult"
+        "title": "MembershipImportResult",
+        "description": "history_id: the import's entry in the history."
+      },
+      "MembershipLastImport": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "campaign": {
+            "type": "string",
+            "title": "Campaign"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "author",
+          "season",
+          "campaign"
+        ],
+        "title": "MembershipLastImport",
+        "description": "at: ISO date (UTC); author: e-mail of the admin who ran it."
+      },
+      "MembershipLastSync": {
+        "properties": {
+          "last_sync": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MembershipLastImport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "last_sync"
+        ],
+        "title": "MembershipLastSync",
+        "description": "The latest import, null before the first one."
       },
       "MembershipPreview": {
         "properties": {

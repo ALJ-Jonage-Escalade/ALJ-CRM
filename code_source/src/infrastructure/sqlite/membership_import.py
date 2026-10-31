@@ -11,6 +11,7 @@ import logging
 import re
 import sqlite3
 from dataclasses import dataclass
+from typing import Optional
 
 from domain.members.membership_import import ImportWrite, KnownMember, KnownPurchase, MembersSnapshot, WriteAction
 from infrastructure.sqlite import schema_v2
@@ -93,6 +94,23 @@ def _update(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: st
     return AppliedWrite(write.item_id, write.action, entry.member_id, entry.purchase_id)
 
 
+# Purchases written for the members (not a back-fill, which only marks a purchase with its item id)
+_MARKED = (WriteAction.CREATE, WriteAction.ATTACH, WriteAction.UPDATE)
+
+
+def import_marker(day: datetime.date) -> str:
+    return f"Import HelloAsso du {day.strftime('%d/%m')}"
+
+
+def _append_marker(cur: sqlite3.Cursor, purchase_id: int, marker: str) -> None:
+    """The marker appended to the purchase's comment, on its own line (the comment is kept)."""
+    row = cur.execute("SELECT commentaires_correctif FROM purchases WHERE id = ?", (purchase_id,)).fetchone()
+    comment = str((row[0] if row else "") or "").rstrip()
+    if comment.endswith(marker):
+        return
+    cur.execute("UPDATE purchases SET commentaires_correctif = ? WHERE id = ?", (f"{comment}\n{marker}" if comment else marker, purchase_id))
+
+
 _WRITERS = {WriteAction.CREATE: _create, WriteAction.ATTACH: _attach, WriteAction.BACKFILL: _backfill, WriteAction.UPDATE: _update}
 
 _SNAPSHOT_PURCHASES = """
@@ -124,8 +142,10 @@ class MembershipImportRepository:
             conn.close()
 
     @classmethod
-    def apply(cls, writes: list[ImportWrite], season: str) -> list[AppliedWrite]:
-        """Applies the writes in one transaction: all of them, or none (the error is raised)."""
+    def apply(cls, writes: list[ImportWrite], season: str, day: Optional[datetime.date] = None) -> list[AppliedWrite]:
+        """Applies the writes in one transaction: all of them, or none (the error is raised). The purchases written get
+        "Import HelloAsso du JJ/MM" (`day`, today by default) appended to their comment."""
+        marker = import_marker(day or datetime.date.today())
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
@@ -133,6 +153,9 @@ class MembershipImportRepository:
             now_iso = datetime.datetime.now().isoformat(timespec="seconds")
             season_id = schema_v2.resolve_season_id(cur, season)
             applied = [_WRITERS[write.action](cur, write, season_id, now_iso) for write in writes]
+            for written in applied:
+                if written.action in _MARKED:
+                    _append_marker(cur, written.purchase_id, marker)
             conn.commit()
             logger.info("Import HelloAsso : %d inscription(s) écrite(s) pour la saison %s", len(applied), season)
             return applied

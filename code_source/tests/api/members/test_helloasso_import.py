@@ -332,3 +332,25 @@ class TestMembershipsChangedOnHelloAsso(HelloAssoImportTestCase):
 
         self.assertEqual(row["bucket"], "to_review")
         self.assertEqual(row["changes"], [{"field": "status", "crm": "Terminé", "before": "Processed", "after": "Refunded"}])
+
+
+class TestMembershipImportHistory(HelloAssoImportTestCase):
+
+    def test_each_import_leaves_one_history_entry_and_the_last_sync(self) -> None:
+        self.assertEqual(self.client.get("/api/helloasso/memberships/last-sync").json(), {"last_sync": None})
+        self.items = [ha_item(1, "WEASLEY", "Ginny"), ha_item(2, "LOVEGOOD", "Luna", birth_date="")]
+
+        result = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {"1": {"bucket": "new", "choice": "import"}}}).json()
+
+        history = self.fake.store["helloasso_membership_imports"]
+        self.assertEqual(list(history), [result["history_id"]])
+        entry = history[result["history_id"]]
+        self.assertEqual((entry["author"], entry["season"], entry["campaign"]), ("serveur local", "2026-2027", CAMPAIGN))
+        self.assertEqual(entry["counts"], {"already_imported": 0, "new": 1, "renewal": 0, "updated": 0, "to_review": 1, "blocked": 0})
+        self.assertEqual(entry["items"], [{"item_id": 1, "bucket": "new", "decision": "import", "action": "create"},
+                                          {"item_id": 2, "bucket": "to_review", "decision": "skip", "action": ""}])
+        last = self.client.get("/api/helloasso/memberships/last-sync").json()["last_sync"]
+        self.assertEqual((last["at"], last["author"]), (entry["at"], "serveur local"))
+
+    def test_last_sync_is_admin_only(self) -> None:
+        self.assertEqual(required_role("GET", "/api/helloasso/memberships/last-sync"), Role.ADMIN)

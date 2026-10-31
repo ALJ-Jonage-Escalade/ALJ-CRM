@@ -571,9 +571,30 @@ export interface paths {
         put?: never;
         /**
          * Import Memberships
-         * @description Reads HelloAsso again and applies the admin's decisions to the recomputed plan. Sends no e-mail.
+         * @description Reads HelloAsso again and applies the admin's decisions to the recomputed plan, recorded in the history.
+         *     Sends no e-mail.
          */
         post: operations["import_memberships_api_helloasso_memberships_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/helloasso/memberships/last-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Last Membership Sync
+         * @description When the latest import ran, and who ran it.
+         */
+        get: operations["last_membership_sync_api_helloasso_memberships_last_sync_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3273,7 +3294,10 @@ export interface components {
                 [key: string]: components["schemas"]["MembershipDecision"];
             };
         };
-        /** MembershipImportResult */
+        /**
+         * MembershipImportResult
+         * @description history_id: the import's entry in the history.
+         */
         MembershipImportResult: {
             /**
              * Status
@@ -3282,6 +3306,8 @@ export interface components {
             status: "success";
             /** Season */
             season: string;
+            /** History Id */
+            history_id: string;
             counts: components["schemas"]["ImportCounts"];
             /** Created */
             created: components["schemas"]["ImportedMember"][];
@@ -3289,6 +3315,27 @@ export interface components {
             renewed: components["schemas"]["ImportedMember"][];
             /** Updated */
             updated: components["schemas"]["ImportedMember"][];
+        };
+        /**
+         * MembershipLastImport
+         * @description at: ISO date (UTC); author: e-mail of the admin who ran it.
+         */
+        MembershipLastImport: {
+            /** At */
+            at: string;
+            /** Author */
+            author: string;
+            /** Season */
+            season: string;
+            /** Campaign */
+            campaign: string;
+        };
+        /**
+         * MembershipLastSync
+         * @description The latest import, null before the first one.
+         */
+        MembershipLastSync: {
+            last_sync: components["schemas"]["MembershipLastImport"] | null;
         };
         /**
          * MembershipPreview
@@ -5374,6 +5421,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    last_membership_sync_api_helloasso_memberships_last_sync_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipLastSync"];
                 };
             };
         };

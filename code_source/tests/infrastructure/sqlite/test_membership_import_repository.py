@@ -3,6 +3,7 @@ database: schema, one transaction, every HelloAsso value kept (fake data only)."
 
 from __future__ import annotations
 
+import datetime
 import sqlite3
 from dataclasses import replace
 from typing import Any
@@ -15,6 +16,7 @@ from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.membership_import import MembershipImportRepository, MembershipWriteRefused
 
 SEASON = "2026-2027"
+TODAY = datetime.date(2026, 10, 31)
 
 
 def record(item_id: int, last_name: str = "WEASLEY", first_name: str = "Ginny", **overrides: Any) -> MembershipRecord:  # Any: fields
@@ -165,10 +167,17 @@ class TestMembershipImportRepository(MemberDbTestCase):
         entry = PlanEntry(refunded, Bucket.UPDATED, "modifiée", applied.user_id, applied.purchase_id,
                           changes=(FieldChange("status", "Processed", "Processed", "Refunded"),))
 
-        MembershipImportRepository.apply([ImportWrite(entry, WriteAction.UPDATE)], SEASON)
+        MembershipImportRepository.apply([ImportWrite(entry, WriteAction.UPDATE)], SEASON, TODAY)
 
         [purchase] = self.rows("SELECT status, status_normalized, tarif_name, amount, commentaires_correctif, helloasso_status,"
                                " helloasso_tarif, helloasso_amount FROM purchases")
         self.assertEqual(purchase, {"status": "Refunded", "status_normalized": "Refunded", "tarif_name": "Loisir (CRM)", "amount": 150.0,
-                                    "commentaires_correctif": "Payé en chèque", "helloasso_status": "Refunded",
+                                    "commentaires_correctif": "Payé en chèque\nImport HelloAsso du 31/10", "helloasso_status": "Refunded",
                                     "helloasso_tarif": "Loisir collège v2", "helloasso_amount": 150.0})
+
+    def test_written_purchases_carry_the_import_marker(self) -> None:
+        MembershipImportRepository.apply([create(record(1))], SEASON, TODAY)
+        MembershipImportRepository.apply([create(record(2, "LOVEGOOD", "Luna"))], SEASON, TODAY)
+
+        self.assertEqual([r["commentaires_correctif"] for r in self.rows("SELECT commentaires_correctif FROM purchases ORDER BY id")],
+                         ["Import HelloAsso du 31/10", "Import HelloAsso du 31/10"])

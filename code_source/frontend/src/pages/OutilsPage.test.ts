@@ -137,10 +137,12 @@ const ANSWERS: Record<string, Answer> = {
   "POST /api/presence/export": () => file("Feuilles.xlsx"),
   "GET /api/ffme/stats": () => json(STATS),
   "POST /api/helloasso/memberships/preview": () => json(MEMBERSHIP_PREVIEW),
+  "GET /api/helloasso/memberships/last-sync": () => json({ last_sync: null }),
   "POST /api/helloasso/memberships/import": () =>
     json({
       status: "success",
       season: "2026-2027",
+      history_id: "2026-10-31T09:15:00+00:00-abcd1234",
       counts: { created: 1, renewed: 1, updated: 0, skipped: 1 },
       created: [{ item_id: 1, user_id: 7, purchase_id: 12, last_name: "WEASLEY", first_name: "Ginny", tarif_name: "Loisir collège" }],
       renewed: [{ item_id: 3, user_id: 4, purchase_id: 13, last_name: "GRANGER", first_name: "Hermione", tarif_name: "Compétition" }],
@@ -484,6 +486,25 @@ describe("OutilsPage", () => {
     all("ha-check")[0]!.click();
     await flushPromises();
     expect(byId<HTMLButtonElement>("ha-import-apply")!.disabled).toBe(false);
+  });
+
+  it("shows when the HelloAsso import last ran and who ran it", async () => {
+    const lastSync = ANSWERS["GET /api/helloasso/memberships/last-sync"]!;
+    try {
+      const first = await render("admin", "/bureau/outils/helloasso-import");
+      expect(first.byId("ha-last-sync")!.textContent).toContain("Aucune synchronisation");
+      first.wrapper.unmount();
+      document.body.innerHTML = "";
+
+      ANSWERS["GET /api/helloasso/memberships/last-sync"] = () =>
+        json({
+          last_sync: { at: "2026-10-31T09:15:00+00:00", author: "albus.dumbledore@alj-escalade.fr", season: "2026-2027", campaign: "x" },
+        });
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      expect(byId("ha-last-sync")!.textContent).toMatch(/Dernière synchro : 31\/10\/2026 \d\d:15, par albus.dumbledore@alj-escalade.fr/);
+    } finally {
+      ANSWERS["GET /api/helloasso/memberships/last-sync"] = lastSync;
+    }
   });
 
   it("blocks the HelloAsso preview of a campaign of another season, with the reason", async () => {

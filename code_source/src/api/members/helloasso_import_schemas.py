@@ -112,9 +112,24 @@ class ImportCounts(BaseModel):
 
 
 class MembershipImportResult(BaseModel):
+    """history_id: the import's entry in the history."""
     status: Literal["success"]
     season: str
+    history_id: str
     counts: ImportCounts
     created: List[ImportedMember]
     renewed: List[ImportedMember]
     updated: List[ImportedMember]
+
+
+class MembershipLastImport(BaseModel):
+    """at: ISO date (UTC); author: e-mail of the admin who ran it."""
+    at: str
+    author: str
+    season: str
+    campaign: str
+
+
+class MembershipLastSync(BaseModel):
+    """The latest import, null before the first one."""
+    last_sync: Optional[MembershipLastImport]
