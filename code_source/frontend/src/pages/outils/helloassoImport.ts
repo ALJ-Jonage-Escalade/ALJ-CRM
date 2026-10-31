@@ -25,8 +25,10 @@ export const BUCKETS: readonly BucketInfo[] = [
   { name: "blocked", label: "⛔ Ignorés / bloqués", color: "red" },
 ];
 
+/** The rows of a bucket, the latest registrations first. */
 export function rowsOf(preview: MembershipPreview, bucket: BucketName): MembershipRow[] {
-  return preview.rows.filter((row) => row.bucket === bucket);
+  const registered = (row: MembershipRow): number => parseDate(row.order_date)?.getTime() ?? 0;
+  return preview.rows.filter((row) => row.bucket === bucket).sort((a, b) => registered(b) - registered(a));
 }
 
 export function personLabel(row: { last_name: string; first_name: string }): string {

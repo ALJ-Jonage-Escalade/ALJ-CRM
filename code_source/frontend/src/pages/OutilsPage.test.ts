@@ -350,6 +350,26 @@ describe("OutilsPage", () => {
     expect(byId("ha-section-renewal")).toBeNull();
   });
 
+  it("shows when each HelloAsso registration was made, the latest first", async () => {
+    const earlier = { ...MEMBERSHIP_PREVIEW.rows[0]!, item_id: 3, first_name: "Ron", order_date: "2026-08-20T09:00:00+02:00" };
+    const later = { ...MEMBERSHIP_PREVIEW.rows[0]!, item_id: 4, first_name: "Fred", order_date: "2026-09-12T18:30:00+02:00" };
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [earlier, later] });
+    try {
+      const { byId, all } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+
+      expect(all("ha-row-new").map((row) => row.querySelector("[data-testid=ha-order-date]")?.textContent)).toEqual([
+        "12/09/2026",
+        "20/08/2026",
+      ]);
+      expect(all("ha-row-new")[0]!.textContent).toContain("WEASLEY Fred");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
   it("imports the checked HelloAsso rows once confirmed, then lists the created members with a link to their record", async () => {
     const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(false);
     const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");

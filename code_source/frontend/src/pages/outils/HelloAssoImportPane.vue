@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* Synchronisation of the HelloAsso membership campaign (admin): the server reads the campaign set in Paramètres and
-   sorts every registration into a bucket (new, renewal, changed on HelloAsso, to review, already imported, blocked).
+   sorts every registration into a bucket (new, renewal, changed on HelloAsso, to review, already imported, blocked),
+   the latest registrations first.
    The preview writes nothing; the new, renewal and changed rows start checked, and the checked ones are imported once
    confirmed (the server reads HelloAsso again and refuses decisions that no longer match). The result lists the members
    written, linked to their record. Online only: disabled with an explanation when the device is offline. */
@@ -11,7 +12,7 @@ import UiCard from "../../components/ui/UiCard.vue";
 import UiTile from "../../components/ui/UiTile.vue";
 import { useNetworkUp } from "../../composables/network";
 import { CLIENT_KEY, errorText } from "../../lib/client";
-import { formatEuros } from "../../lib/format";
+import { formatDayText, formatEuros } from "../../lib/format";
 import { createMembersApi } from "../../services/members";
 import { dialogs } from "../../composables/dialogs";
 import {
@@ -200,6 +201,7 @@ defineExpose({ reload: reset });
                 <tr>
                   <th class="w-8 px-2.5 py-1.5"><span class="sr-only">Importer</span></th>
                   <th class="px-2.5 py-1.5">Adhérent</th>
+                  <th class="px-2.5 py-1.5">Inscrit le</th>
                   <th class="px-2.5 py-1.5">Naissance</th>
                   <th class="px-2.5 py-1.5">Tarif</th>
                   <th class="px-2.5 py-1.5">Montant</th>
@@ -225,6 +227,7 @@ defineExpose({ reload: reset });
                     />
                   </td>
                   <td class="px-2.5 py-1.5 font-semibold">{{ personLabel(row) }}</td>
+                  <td class="px-2.5 py-1.5" data-testid="ha-order-date">{{ formatDayText(row.order_date) || "—" }}</td>
                   <td class="px-2.5 py-1.5">{{ row.birth_date || "—" }}</td>
                   <td class="px-2.5 py-1.5">{{ row.tarif_name }}</td>
                   <td class="px-2.5 py-1.5">{{ formatEuros(row.amount) }}</td>
