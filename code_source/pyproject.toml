@@ -80,6 +80,7 @@ files = [
     "src/services/members/helloasso_import.py",
     "src/api/members/helloasso_import.py",
     "src/api/members/helloasso_import_schemas.py",
+    "src/infrastructure/sqlite/membership_import.py",
     "src/infrastructure/sqlite/schema_v2.py",
     "src/domain/constants.py",
     "src/api/__init__.py",

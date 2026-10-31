@@ -129,3 +129,20 @@ def test_season_guard_refuses_a_campaign_of_another_season(slug: str, allowed: b
     assert (reason is None) == allowed
     if not allowed:
         assert "2026-2027" in str(reason)
+
+
+def test_legacy_fields_feed_the_member_writers() -> None:
+    item = _item(options=[{"name": "Assurance Base ++ (recommandée)", "amount": 1500}, {"name": "Option ski de piste", "amount": 300}],
+                 customFields=[{"name": "Date de naissance de l'adhérent", "answer": "11/08/2013"},
+                               {"name": "Téléphone ", "value": "0611223344"}])
+
+    fields = map_membership_item(item).legacy_fields()
+
+    assert fields["order_ref"] == "501"
+    assert (fields["user_lastName"], fields["user_firstName"], fields["payer_email"]) == ("Weasley", "Ginny", "molly@terrier.example")
+    assert (fields["status"], fields["tarif_name"], fields["amount"]) == ("Processed", "Loisir collège", 150.0)
+    assert fields["champ_Date de naissance de l'adhérent"] == "2013-08-11"
+    assert fields["champ_Téléphone "] == "0611223344"
+    assert (fields["opt_Assurance Base ++"], fields["opt_Montant Assurance Base ++"]) == ("Oui", 15.0)
+    assert (fields["opt_Assurance Option ski de piste"], fields["opt_Montant Assurance Option ski de piste"]) == ("Oui", 3.0)
+    assert (fields["opt_Assurance Base"], fields["opt_Montant Assurance Base"]) == ("Non", 0.0)

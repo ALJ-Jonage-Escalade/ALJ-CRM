@@ -16,10 +16,11 @@ from domain.members.helloasso_membership import (
     map_membership_items,
     parse_membership_campaign,
 )
-from domain.members.membership_import import ImportPlan, plan_membership_import
+from domain.members.membership_import import Decision, ImportPlan, StaleDecisions, apply_decisions, plan_membership_import
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.helloasso import api as helloasso_api
-from services.errors import InvalidRequest, UpstreamUnavailable
+from infrastructure.sqlite.membership_import import AppliedWrite, MembershipImportRepository
+from services.errors import Conflict, InvalidRequest, UpstreamUnavailable
 from services.members.seasons import SeasonService
 
 CAMPAIGN_SETTING = "HELLOASSO_MEMBERSHIP_CAMPAIGN"
@@ -27,6 +28,12 @@ CAMPAIGN_SETTING = "HELLOASSO_MEMBERSHIP_CAMPAIGN"
 CAMPAIGN_ENV = "CAMPAIGN_SLUG"
 
 CampaignSource = Literal["setting", "environment", "default"]
+
+
+@dataclass(frozen=True)
+class ImportResult:
+    plan: ImportPlan  # the plan recomputed on confirm, the decisions applied to it
+    applied: list[AppliedWrite]
 
 
 @dataclass(frozen=True)
@@ -74,7 +81,28 @@ class MembershipImportService:
     @staticmethod
     def preview() -> ImportPlan:
         """What the import would do now, for the active season. Writes nothing."""
-        season = MembershipImportService.active_season()
+        return MembershipImportService._plan(MembershipImportService.active_season())
+
+    @staticmethod
+    def import_(season: str, decisions: dict[int, Decision]) -> ImportResult:
+        """Reads HelloAsso again, recomputes the plan and applies the admin's decisions (keyed by HelloAsso item id).
+        Refused (Conflict) when the campaign is blocked or the decisions no longer match: nothing is then written.
+        Sends no e-mail."""
+        active = MembershipImportService.active_season()
+        if season != active:
+            raise Conflict(f"L'aperçu portait sur la saison {season}, la saison active est {active} : relancez l'aperçu.",
+                           "stale_decisions")
+        plan = MembershipImportService._plan(active)
+        if plan.blocked_reason:
+            raise Conflict(plan.blocked_reason, "campaign_blocked")
+        try:
+            writes = apply_decisions(plan, decisions)
+        except StaleDecisions as e:
+            raise Conflict(f"{e} Relancez l'aperçu.", "stale_decisions") from e
+        return ImportResult(plan, MembershipImportRepository.apply(writes, active))
+
+    @staticmethod
+    def _plan(season: str) -> ImportPlan:
         campaign = MembershipImportService.campaign_setting().campaign
         try:
             items = helloasso_api.fetch_form_items(campaign.form_type, campaign.slug)

@@ -560,6 +560,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/helloasso/memberships/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Memberships
+         * @description Reads HelloAsso again and applies the admin's decisions to the recomputed plan. Sends no e-mail.
+         */
+        post: operations["import_memberships_api_helloasso_memberships_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/email-templates": {
         parameters: {
             query?: never;
@@ -2836,6 +2856,35 @@ export interface components {
             /** Nb Unlinked */
             nb_unlinked: number;
         };
+        /** ImportCounts */
+        ImportCounts: {
+            /** Created */
+            created: number;
+            /** Renewed */
+            renewed: number;
+            /** Updated */
+            updated: number;
+            /** Skipped */
+            skipped: number;
+        };
+        /**
+         * ImportedMember
+         * @description A member the import wrote, for the link to their record.
+         */
+        ImportedMember: {
+            /** Item Id */
+            item_id: number;
+            /** User Id */
+            user_id: number;
+            /** Purchase Id */
+            purchase_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Tarif Name */
+            tarif_name: string;
+        };
         /** ItemIgnore */
         ItemIgnore: {
             /** Ignore */
@@ -3163,6 +3212,49 @@ export interface components {
              * @default
              */
             campaign?: string;
+        };
+        /**
+         * MembershipDecision
+         * @description The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>
+         *     (rows to review). bucket: the bucket the preview showed the row in (a row that changed since is refused).
+         */
+        MembershipDecision: {
+            /**
+             * Bucket
+             * @enum {string}
+             */
+            bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
+            /** Choice */
+            choice: string;
+        };
+        /**
+         * MembershipImportRequest
+         * @description decisions: by HelloAsso item id; a row without decision is skipped.
+         */
+        MembershipImportRequest: {
+            /** Season */
+            season: string;
+            /** Decisions */
+            decisions: {
+                [key: string]: components["schemas"]["MembershipDecision"];
+            };
+        };
+        /** MembershipImportResult */
+        MembershipImportResult: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Season */
+            season: string;
+            counts: components["schemas"]["ImportCounts"];
+            /** Created */
+            created: components["schemas"]["ImportedMember"][];
+            /** Renewed */
+            renewed: components["schemas"]["ImportedMember"][];
+            /** Updated */
+            updated: components["schemas"]["ImportedMember"][];
         };
         /**
          * MembershipPreview
@@ -5172,6 +5264,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    import_memberships_api_helloasso_memberships_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembershipImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipImportResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Bad Gateway */

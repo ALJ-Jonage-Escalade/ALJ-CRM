@@ -16,5 +16,7 @@ export function createMembersApi(client: ApiClient) {
     saveMembershipCampaign: (campaign: string) => unwrap(client.POST("/api/settings/helloasso-membership", { body: { campaign } })),
     /** Reads the HelloAsso membership campaign and sorts its registrations for the active season; writes nothing. */
     helloAssoPreview: () => unwrap(client.POST("/api/helloasso/memberships/preview")),
+    /** Reads HelloAsso again and applies the decisions (by HelloAsso item id) to the recomputed plan. */
+    helloAssoImport: (body: Schemas["MembershipImportRequest"]) => unwrap(client.POST("/api/helloasso/memberships/import", { body })),
   };
 }

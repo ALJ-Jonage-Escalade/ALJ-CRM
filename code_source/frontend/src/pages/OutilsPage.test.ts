@@ -120,6 +120,15 @@ const ANSWERS: Record<string, Answer> = {
   "POST /api/presence/export": () => file("Feuilles.xlsx"),
   "GET /api/ffme/stats": () => json(STATS),
   "POST /api/helloasso/memberships/preview": () => json(MEMBERSHIP_PREVIEW),
+  "POST /api/helloasso/memberships/import": () =>
+    json({
+      status: "success",
+      season: "2026-2027",
+      counts: { created: 1, renewed: 0, updated: 0, skipped: 1 },
+      created: [{ item_id: 1, user_id: 7, purchase_id: 12, last_name: "WEASLEY", first_name: "Ginny", tarif_name: "Loisir collège" }],
+      renewed: [],
+      updated: [],
+    }),
   "GET /api/ffme/export": () => file("import_ffme_20261022.csv"),
   "POST /api/ffme/preview": () => json(PREVIEW),
   "POST /api/ffme/import": () =>
@@ -320,6 +329,49 @@ describe("OutilsPage", () => {
     expect(all("ha-row-new").map((row) => row.textContent)).toEqual([expect.stringContaining("WEASLEY Ginny")]);
     expect(byId("ha-row-blocked")!.textContent).toContain("Date de naissance manquante ou illisible.");
     expect(byId("ha-section-renewal")).toBeNull();
+  });
+
+  it("imports the checked HelloAsso rows once confirmed, then lists the created members with a link to their record", async () => {
+    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(false);
+    const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
+    byId("ha-import-preview")!.click();
+    await flushPromises();
+    const [checkbox] = all("ha-check").map((box) => box as HTMLInputElement);
+    expect(checkbox!.checked).toBe(true);
+
+    byId("ha-import-apply")!.click();
+    await flushPromises();
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(sent("POST", "/api/helloasso/memberships/import")).toHaveLength(0);
+
+    confirm.mockResolvedValue(true);
+    byId("ha-import-apply")!.click();
+    await flushPromises();
+    expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
+      season: "2026-2027",
+      decisions: { 1: { bucket: "new", choice: "import" } },
+    });
+    expect(byId("ha-import-done")!.textContent).toContain("1 adhérent créé");
+    const link = byId<HTMLAnchorElement>("ha-created")!.querySelector("a")!;
+    expect(link.textContent).toContain("WEASLEY Ginny");
+    expect(link.getAttribute("href")).toBe("/bureau/adherents?id=7&saison=2026-2027&achat=12");
+    expect(byId("ha-import-result")).toBeNull();
+  });
+
+  it("leaves an unchecked HelloAsso row out of the import", async () => {
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
+    byId("ha-import-preview")!.click();
+    await flushPromises();
+    all("ha-check")[0]!.click();
+    await flushPromises();
+    expect(byId("ha-import-selected")!.textContent).toContain("0");
+    expect(byId<HTMLButtonElement>("ha-import-apply")!.disabled).toBe(true);
+    expect(sent("POST", "/api/helloasso/memberships/import")).toHaveLength(0);
+
+    all("ha-check")[0]!.click();
+    await flushPromises();
+    expect(byId<HTMLButtonElement>("ha-import-apply")!.disabled).toBe(false);
   });
 
   it("blocks the HelloAsso preview of a campaign of another season, with the reason", async () => {

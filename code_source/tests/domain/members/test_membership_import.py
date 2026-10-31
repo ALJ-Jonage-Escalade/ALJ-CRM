@@ -7,7 +7,15 @@ from dataclasses import replace
 import pytest
 
 from domain.members.helloasso_membership import MembershipRecord
-from domain.members.membership_import import Bucket, plan_membership_import
+from domain.members.membership_import import (
+    Bucket,
+    Decision,
+    ImportPlan,
+    StaleDecisions,
+    WriteAction,
+    apply_decisions,
+    plan_membership_import,
+)
 
 SEASON = "2026-2027"
 CAMPAIGN = "adhesion-escalade-2026-2027-amicale-laique-escalade-2"
@@ -54,3 +62,44 @@ def test_counts_cover_every_bucket() -> None:
     plan = plan_membership_import([_record(1), _record(2, last_name="")], season=SEASON, campaign_slug=CAMPAIGN)
 
     assert plan.counts() == {"already_imported": 0, "new": 1, "renewal": 0, "updated": 0, "to_review": 0, "blocked": 1}
+
+
+# ---------------------------------------------------------------------------
+# Decisions applier: the admin's decisions, keyed by HelloAsso item id, become the writes
+# ---------------------------------------------------------------------------
+def _new_plan() -> ImportPlan:
+    return plan_membership_import([_record(1), _record(2, first_name="Ron"), _record(3, last_name="")], season=SEASON,
+                                  campaign_slug=CAMPAIGN)
+
+
+def test_checked_new_rows_are_created_and_unchecked_ones_skipped() -> None:
+    writes = apply_decisions(_new_plan(), {1: Decision(Bucket.NEW, "import"), 2: Decision(Bucket.NEW, "skip")})
+
+    assert [(write.item_id, write.action) for write in writes] == [(1, WriteAction.CREATE)]
+
+
+def test_a_row_without_decision_is_skipped() -> None:
+    """A registration that appeared on HelloAsso after the preview was never seen by the admin."""
+    assert apply_decisions(_new_plan(), {1: Decision(Bucket.NEW, "import")}) == apply_decisions(
+        _new_plan(), {1: Decision(Bucket.NEW, "import"), 2: Decision(Bucket.NEW, "skip")})
+
+
+@pytest.mark.parametrize(
+    "decisions",
+    [
+        {99: Decision(Bucket.NEW, "import")},  # unknown item
+        {1: Decision(Bucket.RENEWAL, "import")},  # the row changed bucket since the preview
+        {3: Decision(Bucket.BLOCKED, "import")},  # a blocked row cannot be imported
+        {1: Decision(Bucket.NEW, "link:7")},  # not a choice of a new row
+    ],
+)
+def test_stale_or_invalid_decisions_are_rejected(decisions: dict[int, Decision]) -> None:
+    with pytest.raises(StaleDecisions):
+        apply_decisions(_new_plan(), decisions)
+
+
+def test_nothing_is_written_from_a_blocked_campaign() -> None:
+    plan = plan_membership_import([_record(1)], season=SEASON, campaign_slug="adhesion-2025-2026")
+
+    with pytest.raises(StaleDecisions):
+        apply_decisions(plan, {1: Decision(Bucket.NEW, "import")})

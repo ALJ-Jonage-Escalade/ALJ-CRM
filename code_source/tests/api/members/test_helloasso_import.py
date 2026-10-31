@@ -143,3 +143,62 @@ class TestMembershipCampaignSetting(HelloAssoImportTestCase):
 
     def test_saving_the_campaign_is_admin_only(self) -> None:
         self.assertEqual(required_role("POST", "/api/settings/helloasso-membership"), Role.ADMIN)
+
+
+IMPORT = "/api/helloasso/memberships/import"
+
+
+class TestMembershipImport(HelloAssoImportTestCase):
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.items = [ha_item(1, "WEASLEY", "Ginny"), ha_item(2, "LOVEGOOD", "Luna", birth_date="13/02/2012")]
+
+    def test_preview_then_import_creates_the_checked_new_members_only(self) -> None:
+        preview = self.client.post(PREVIEW).json()
+        self.assertEqual([row["bucket"] for row in preview["rows"]], ["new", "new"])
+
+        with patch("smtplib.SMTP") as smtp, patch("smtplib.SMTP_SSL") as smtp_ssl, \
+                patch("infrastructure.mail.repository.EmailRepository.send_email") as send_email:
+            response = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {
+                "1": {"bucket": "new", "choice": "import"}, "2": {"bucket": "new", "choice": "skip"}}})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["season"], "2026-2027")
+        [created] = body["created"]
+        self.assertEqual((created["item_id"], created["last_name"], created["first_name"]), (1, "WEASLEY", "Ginny"))
+        self.assertEqual(body["counts"], {"created": 1, "renewed": 0, "updated": 0, "skipped": 1})
+        self.assertEqual((self.count("users"), self.count("orders"), self.count("purchases"), self.count("purchase_options")),
+                         (1, 1, 1, 1))
+        conn = SqliteDatabase.get_connection()
+        try:
+            purchase = conn.execute("SELECT id, user_id, helloasso_item_id FROM purchases").fetchone()
+        finally:
+            conn.close()
+        self.assertEqual((created["user_id"], created["purchase_id"], purchase["helloasso_item_id"]),
+                         (purchase["user_id"], purchase["id"], 1))
+        smtp.assert_not_called()
+        smtp_ssl.assert_not_called()
+        send_email.assert_not_called()
+
+    def test_decisions_that_no_longer_match_helloasso_are_refused(self) -> None:
+        for decisions in ({"3": {"bucket": "new", "choice": "import"}}, {"1": {"bucket": "renewal", "choice": "import"}}):
+            with self.subTest(decisions=decisions):
+                response = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": decisions})
+
+                self.assertEqual(response.status_code, 409, response.text)
+                self.assertEqual(response.json()["code"], "stale_decisions")
+        self.assertEqual(self.count("users"), 0)
+
+    def test_import_of_another_season_or_a_blocked_campaign_is_refused(self) -> None:
+        decisions = {"1": {"bucket": "new", "choice": "import"}}
+        other_season = self.client.post(IMPORT, json={"season": "2025-2026", "decisions": decisions})
+        self.assertEqual((other_season.status_code, other_season.json()["code"]), (409, "stale_decisions"))
+
+        AppSettingsRepository.save("HELLOASSO_MEMBERSHIP_CAMPAIGN", "adhesion-escalade-2025-2026")
+        blocked = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": decisions})
+
+        self.assertEqual((blocked.status_code, blocked.json()["code"]), (409, "campaign_blocked"))
+        self.assertIn("2026-2027", blocked.json()["message"])
+        self.assertEqual(self.count("users"), 0)

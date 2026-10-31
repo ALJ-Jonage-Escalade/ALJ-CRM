@@ -1786,6 +1786,75 @@
         }
       }
     },
+    "/api/helloasso/memberships/import": {
+      "post": {
+        "summary": "Import Memberships",
+        "description": "Reads HelloAsso again and applies the admin's decisions to the recomputed plan. Sends no e-mail.",
+        "operationId": "import_memberships_api_helloasso_memberships_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/email-templates": {
       "get": {
         "summary": "Get Email Templates",
@@ -6714,6 +6783,73 @@
         ],
         "title": "HelloAssoSyncStats"
       },
+      "ImportCounts": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "renewed": {
+            "type": "integer",
+            "title": "Renewed"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "renewed",
+          "updated",
+          "skipped"
+        ],
+        "title": "ImportCounts"
+      },
+      "ImportedMember": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "purchase_id": {
+            "type": "integer",
+            "title": "Purchase Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "tarif_name": {
+            "type": "string",
+            "title": "Tarif Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "user_id",
+          "purchase_id",
+          "last_name",
+          "first_name",
+          "tarif_name"
+        ],
+        "title": "ImportedMember",
+        "description": "A member the import wrote, for the link to their record."
+      },
       "ItemIgnore": {
         "properties": {
           "ignore": {
@@ -7663,6 +7799,104 @@
         "type": "object",
         "title": "MembershipCampaignUpdate",
         "description": "Slug or HelloAsso URL of the membership form; empty: back to the default."
+      },
+      "MembershipDecision": {
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "already_imported",
+              "new",
+              "renewal",
+              "updated",
+              "to_review",
+              "blocked"
+            ],
+            "title": "Bucket"
+          },
+          "choice": {
+            "type": "string",
+            "title": "Choice"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bucket",
+          "choice"
+        ],
+        "title": "MembershipDecision",
+        "description": "The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>\n(rows to review). bucket: the bucket the preview showed the row in (a row that changed since is refused)."
+      },
+      "MembershipImportRequest": {
+        "properties": {
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "decisions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MembershipDecision"
+            },
+            "type": "object",
+            "title": "Decisions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "season",
+          "decisions"
+        ],
+        "title": "MembershipImportRequest",
+        "description": "decisions: by HelloAsso item id; a row without decision is skipped."
+      },
+      "MembershipImportResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ImportCounts"
+          },
+          "created": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedMember"
+            },
+            "type": "array",
+            "title": "Created"
+          },
+          "renewed": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedMember"
+            },
+            "type": "array",
+            "title": "Renewed"
+          },
+          "updated": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedMember"
+            },
+            "type": "array",
+            "title": "Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "season",
+          "counts",
+          "created",
+          "renewed",
+          "updated"
+        ],
+        "title": "MembershipImportResult"
       },
       "MembershipPreview": {
         "properties": {

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 /* Synchronisation of the HelloAsso membership campaign (admin): the server reads the campaign set in Paramètres and
    sorts every registration into a bucket (new, renewal, changed on HelloAsso, to review, already imported, blocked).
-   The preview writes nothing. Online only: disabled with an explanation when the device is offline. */
-import { inject, ref } from "vue";
+   The preview writes nothing; the new, renewal and changed rows start checked, and the checked ones are imported once
+   confirmed (the server reads HelloAsso again and refuses decisions that no longer match). The result lists the members
+   written, linked to their record. Online only: disabled with an explanation when the device is offline. */
+import { computed, inject, ref } from "vue";
 import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
@@ -11,30 +13,79 @@ import { useNetworkUp } from "../../composables/network";
 import { CLIENT_KEY, errorText } from "../../lib/client";
 import { formatEuros } from "../../lib/format";
 import { createMembersApi } from "../../services/members";
-import { BUCKETS, personLabel, rowsOf, type MembershipPreview } from "./helloassoImport";
+import { dialogs } from "../../composables/dialogs";
+import {
+  BUCKETS,
+  decisionsOf,
+  initialChoices,
+  isCheckable,
+  memberHref,
+  personLabel,
+  rowsOf,
+  type Choices,
+  type MembershipImportResult,
+  type MembershipPreview,
+} from "./helloassoImport";
 
 const membersApi = createMembersApi(inject(CLIENT_KEY)!);
 const online = useNetworkUp();
 
 const preview = ref<MembershipPreview | null>(null);
+const choices = ref<Choices>({});
+const done = ref<MembershipImportResult | null>(null);
 const failure = ref("");
-const busy = ref(false);
+const busy = ref<"preview" | "import" | null>(null);
+
+/** Rows that will be written: the checked ones (rows to review: a choice other than skip). */
+const selectedCount = computed(() => Object.values(choices.value).filter((choice) => choice !== "skip").length);
 
 function reset(): void {
   preview.value = null;
+  choices.value = {};
+  done.value = null;
   failure.value = "";
 }
 
 async function loadPreview(): Promise<void> {
-  busy.value = true;
-  failure.value = "";
+  busy.value = "preview";
+  reset();
   try {
     preview.value = await membersApi.helloAssoPreview();
+    choices.value = initialChoices(preview.value);
   } catch (e) {
-    preview.value = null;
     failure.value = errorText(e);
   } finally {
-    busy.value = false;
+    busy.value = null;
+  }
+}
+
+function toggle(itemId: number, checked: boolean): void {
+  choices.value = { ...choices.value, [itemId]: checked ? "import" : "skip" };
+}
+
+async function apply(): Promise<void> {
+  const shown = preview.value;
+  if (!shown || !selectedCount.value) {
+    return;
+  }
+  const confirmed = await dialogs.confirm({
+    title: "Importer les adhésions HelloAsso",
+    message: `Enregistrer ${selectedCount.value} inscription(s) HelloAsso dans la base des adhérents (saison ${shown.season}) ? Aucun e-mail n'est envoyé.`,
+    confirmLabel: "Importer",
+  });
+  if (!confirmed) {
+    return;
+  }
+  busy.value = "import";
+  failure.value = "";
+  try {
+    const result = await membersApi.helloAssoImport({ season: shown.season, decisions: decisionsOf(shown, choices.value) });
+    reset();
+    done.value = result;
+  } catch (e) {
+    failure.value = errorText(e);
+  } finally {
+    busy.value = null;
   }
 }
 
@@ -54,7 +105,12 @@ defineExpose({ reload: reset });
           modification sur HelloAsso, cas à vérifier… L'aperçu n'enregistre rien et aucun e-mail n'est envoyé.
         </p>
       </div>
-      <UiButton data-testid="ha-import-preview" :disabled="!online || busy" :busy="busy && 'Lecture de HelloAsso…'" @click="loadPreview">
+      <UiButton
+        data-testid="ha-import-preview"
+        :disabled="!online || !!busy"
+        :busy="busy === 'preview' && 'Lecture de HelloAsso…'"
+        @click="loadPreview"
+      >
         🔍 Prévisualiser l'import
       </UiButton>
     </div>
@@ -74,6 +130,21 @@ defineExpose({ reload: reset });
     >
       ❌ {{ failure }}
     </p>
+
+    <div v-if="done" data-testid="ha-import-done" class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+      <div class="mb-2 text-[15px] font-bold text-emerald-800">
+        🎉 Import terminé (saison {{ done.season }}) : {{ done.counts.created }} adhérent{{ done.counts.created > 1 ? "s" : "" }} créé{{
+          done.counts.created > 1 ? "s" : ""
+        }}, {{ done.counts.skipped }} inscription(s) non importée(s).
+      </div>
+      <ul v-if="done.created.length" class="flex flex-col gap-1 text-[13px]">
+        <li v-for="member in done.created" :key="member.item_id" data-testid="ha-created">
+          🆕
+          <a :href="memberHref(member, done.season)" class="font-semibold text-blue-700 underline">{{ personLabel(member) }}</a>
+          <span class="text-slate-500">— {{ member.tarif_name }}</span>
+        </li>
+      </ul>
+    </div>
 
     <div v-if="preview" data-testid="ha-import-result" class="border-t border-slate-200 pt-4">
       <p data-testid="ha-import-campaign" class="mb-3 text-[13px] text-slate-600">
@@ -106,6 +177,7 @@ defineExpose({ reload: reset });
             <table class="w-full text-xs">
               <thead class="bg-slate-50 text-left">
                 <tr>
+                  <th class="w-8 px-2.5 py-1.5"><span class="sr-only">Importer</span></th>
                   <th class="px-2.5 py-1.5">Adhérent</th>
                   <th class="px-2.5 py-1.5">Naissance</th>
                   <th class="px-2.5 py-1.5">Tarif</th>
@@ -121,6 +193,16 @@ defineExpose({ reload: reset });
                   :data-testid="`ha-row-${bucket.name}`"
                   class="border-t border-slate-100"
                 >
+                  <td class="px-2.5 py-1.5">
+                    <input
+                      v-if="isCheckable(row)"
+                      type="checkbox"
+                      data-testid="ha-check"
+                      :checked="choices[row.item_id] === 'import'"
+                      :aria-label="`Importer ${personLabel(row)}`"
+                      @change="toggle(row.item_id, ($event.target as HTMLInputElement).checked)"
+                    />
+                  </td>
                   <td class="px-2.5 py-1.5 font-semibold">{{ personLabel(row) }}</td>
                   <td class="px-2.5 py-1.5">{{ row.birth_date || "—" }}</td>
                   <td class="px-2.5 py-1.5">{{ row.tarif_name }}</td>
@@ -133,6 +215,18 @@ defineExpose({ reload: reset });
           </div>
         </section>
       </template>
+
+      <div v-if="!preview.blocked_reason" class="flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-200 pt-3">
+        <UiButton
+          data-testid="ha-import-apply"
+          :disabled="!online || !!busy || !selectedCount"
+          :busy="busy === 'import' && 'Import en cours…'"
+          @click="apply"
+        >
+          ✅ Importer la sélection
+        </UiButton>
+        <span data-testid="ha-import-selected" class="text-xs text-slate-500">{{ selectedCount }} inscription(s) sélectionnée(s)</span>
+      </div>
     </div>
   </UiCard>
 </template>

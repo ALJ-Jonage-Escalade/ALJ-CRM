@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, Optional
+from typing import Iterable, Mapping, Optional
 
 from domain.members.helloasso_membership import MembershipRecord, season_guard
 
@@ -76,3 +76,61 @@ def plan_membership_import(records: Iterable[MembershipRecord], *, season: str, 
     else:
         entries = [_classify(record) for record in records]
     return ImportPlan(season=season, campaign_slug=campaign_slug, entries=entries, blocked_reason=blocked_reason)
+
+
+# ---------------------------------------------------------------------------
+# Decisions applier: the admin's choices on the preview become the writes
+# ---------------------------------------------------------------------------
+IMPORT = "import"  # a checked new / renewal / updated row
+SKIP = "skip"  # an unchecked row; the default of every row
+
+
+class StaleDecisions(ValueError):
+    """The decisions do not match the plan recomputed on confirm (unknown item, bucket changed, invalid choice)."""
+
+
+@dataclass(frozen=True)
+class Decision:
+    """The admin's choice for one row, with the bucket the preview showed it in."""
+    bucket: Bucket
+    choice: str
+
+
+class WriteAction(str, Enum):
+    CREATE = "create"  # new member, with this season's membership
+
+
+@dataclass(frozen=True)
+class ImportWrite:
+    entry: PlanEntry
+    action: WriteAction
+
+    @property
+    def item_id(self) -> int:
+        return self.entry.item_id
+
+
+def _write_for(entry: PlanEntry, decision: Decision) -> Optional[ImportWrite]:
+    if decision.bucket != entry.bucket:
+        raise StaleDecisions(f"Inscription {entry.item_id} : elle a changé sur HelloAsso depuis l'aperçu.")
+    if decision.choice == SKIP:
+        return None
+    if entry.bucket == Bucket.NEW and decision.choice == IMPORT:
+        return ImportWrite(entry, WriteAction.CREATE)
+    raise StaleDecisions(f"Inscription {entry.item_id} : choix « {decision.choice} » impossible.")
+
+
+def apply_decisions(plan: ImportPlan, decisions: Mapping[int, Decision]) -> list[ImportWrite]:
+    """The writes of the admin's decisions, in the order of the plan. A row without decision is skipped (unchecked, or
+    not shown by the preview). Raises StaleDecisions when one decision does not match the plan: nothing is written."""
+    entries = {entry.item_id: entry for entry in plan.entries}
+    unknown = sorted(set(decisions) - set(entries))
+    if unknown:
+        raise StaleDecisions(f"Inscriptions inconnues de la campagne : {', '.join(map(str, unknown))}.")
+    writes = []
+    for entry in plan.entries:
+        decision = decisions.get(entry.item_id)
+        write = _write_for(entry, decision) if decision else None
+        if write:
+            writes.append(write)
+    return writes

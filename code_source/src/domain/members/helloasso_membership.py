@@ -18,6 +18,31 @@ from domain.utils import is_helloasso_url, normalize_string
 _BIRTH_DATE_FORMATS = ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y")
 
 
+# Insurance options of the form, as the members base names them (purchase_options.option_name)
+INSURANCE_OPTIONS = (
+    "Assurance Base", "Assurance Base +", "Assurance Base ++",
+    "Assurance Option ski de piste", "Assurance Option VTT", "Assurance Option Trail",
+)
+# Birth date field of the flat format (schema_v2.DOB_COLUMN)
+BIRTH_DATE_FIELD = "champ_Date de naissance de l'adhérent"
+
+
+def insurance_of(option_name: str) -> Optional[str]:
+    """The insurance of INSURANCE_OPTIONS a HelloAsso option is, None for another option."""
+    lowered = option_name.lower()
+    if "assurance base ++" in lowered:
+        return "Assurance Base ++"
+    if "assurance base +" in lowered:
+        return "Assurance Base +"
+    if "assurance base" in lowered:
+        return "Assurance Base"
+    for keyword, insurance in (("ski de piste", "Assurance Option ski de piste"), ("vtt", "Assurance Option VTT"),
+                               ("trail", "Assurance Option Trail")):
+        if keyword in lowered:
+            return insurance
+    return None
+
+
 @dataclass(frozen=True)
 class MembershipRecord:
     """One registration of the membership campaign (one person, one tariff)."""
@@ -37,6 +62,38 @@ class MembershipRecord:
     licence: str  # FFME licence, digits only
     options: Dict[str, float] = field(default_factory=dict)  # insurance option name -> amount in euros
     custom_fields: Dict[str, str] = field(default_factory=dict)
+
+    def insurance(self) -> Dict[str, float]:
+        """Amount of each insurance of the club's list (INSURANCE_OPTIONS) the registration took."""
+        taken: Dict[str, float] = {}
+        for option_name, amount in self.options.items():
+            insurance = insurance_of(option_name)
+            if insurance:
+                taken[insurance] = amount
+        return taken
+
+    def legacy_fields(self) -> Dict[str, Any]:  # Any: text fields and amounts
+        """The registration in the flat format of the former HelloAsso exports (`champ_*`, `opt_*`), read by the
+        member writers (infrastructure/sqlite/schema_v2.py) and the membership dashboard."""
+        fields: Dict[str, Any] = {f"champ_{name}": value for name, value in self.custom_fields.items()}  # Any: as above
+        fields.update({
+            "order_ref": self.order_ref,
+            "order_date": self.order_date,
+            "status": self.status,
+            "tarif_name": self.tarif_name,
+            "amount": self.amount,
+            "user_lastName": self.last_name,
+            "user_firstName": self.first_name,
+            "payer_lastName": self.payer_last_name,
+            "payer_firstName": self.payer_first_name,
+            "payer_email": self.payer_email,
+            BIRTH_DATE_FIELD: self.birth_date or self.birth_date_raw,
+        })
+        taken = self.insurance()
+        for insurance in INSURANCE_OPTIONS:
+            fields[f"opt_{insurance}"] = "Oui" if insurance in taken else "Non"
+            fields[f"opt_Montant {insurance}"] = taken.get(insurance, 0.0)
+        return fields
 
 
 def _custom_value(custom_field: Mapping[str, Any]) -> str:  # Any: raw HelloAsso JSON

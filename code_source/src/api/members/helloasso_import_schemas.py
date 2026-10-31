@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -57,3 +57,42 @@ class MembershipPreview(BaseModel):
     blocked_reason: Optional[str]
     counts: BucketCounts
     rows: List[MembershipRow]
+
+
+class MembershipDecision(RequestBody):
+    """The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>
+    (rows to review). bucket: the bucket the preview showed the row in (a row that changed since is refused)."""
+    bucket: BucketName
+    choice: str
+
+
+class MembershipImportRequest(RequestBody):
+    """decisions: by HelloAsso item id; a row without decision is skipped."""
+    season: str
+    decisions: Dict[int, MembershipDecision]
+
+
+class ImportedMember(BaseModel):
+    """A member the import wrote, for the link to their record."""
+    item_id: int
+    user_id: int
+    purchase_id: int
+    last_name: str
+    first_name: str
+    tarif_name: str
+
+
+class ImportCounts(BaseModel):
+    created: int
+    renewed: int
+    updated: int
+    skipped: int  # rows of the plan nothing was written for
+
+
+class MembershipImportResult(BaseModel):
+    status: Literal["success"]
+    season: str
+    counts: ImportCounts
+    created: List[ImportedMember]
+    renewed: List[ImportedMember]
+    updated: List[ImportedMember]

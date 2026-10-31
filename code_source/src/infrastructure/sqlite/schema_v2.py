@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS purchases (
     is_modified TEXT DEFAULT 'Non',
     commentaires_correctif TEXT DEFAULT '',
     document_sante TEXT DEFAULT '',
+    helloasso_item_id INTEGER, helloasso_status TEXT, helloasso_amount REAL, helloasso_tarif TEXT,
     legacy_adherent_id INTEGER,
     legacy_season_id INTEGER,
     created_at TEXT, updated_at TEXT,
