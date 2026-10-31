@@ -1637,7 +1637,7 @@
     "/api/dashboard": {
       "get": {
         "summary": "Get Dashboard Data",
-        "description": "Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import\ndes adhésions (MembershipImportService.campaign) et les inscriptions sont lues par le même mapper.",
+        "description": "Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import\ndes adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.",
         "operationId": "get_dashboard_data_api_dashboard_get",
         "parameters": [
           {

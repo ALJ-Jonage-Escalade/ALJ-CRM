@@ -2,58 +2,35 @@
 
 from __future__ import annotations
 
-import logging
-
 from fastapi import APIRouter, BackgroundTasks
 
-from domain.competitions.matching import parse_campaign_identifier
-from domain.constants import get_active_season
-from domain.members.helloasso_membership import map_membership_items
-from infrastructure.firestore.app_settings import HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository
-from infrastructure.firestore.client import FirestoreError
+from domain.members.helloasso_membership import map_membership_items, parse_membership_campaign
 from infrastructure.geocoding import geocode_missing_addresses
 from infrastructure.helloasso import api as helloasso_api
-from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.geocache import GeocacheRepository
 from services.members.helloasso_import import MembershipImportService
-
-logger = logging.getLogger("alj")
 
 router = APIRouter()
 
 
-def _chosen_membership_campaign() -> str:
-    """Campaign chosen in Paramètres › Campagne HelloAsso, or "" (not chosen, Firestore unreadable)."""
-    try:
-        return (AppSettingsRepository.get(HELLOASSO_MEMBERSHIP_CAMPAIGN) or "").strip()
-    except FirestoreError as e:
-        logger.warning("Membership campaign setting unreadable, falling back to CAMPAIGN_SLUG: %s", e)
-        return ""
-
-
 def get_target_slug() -> str:
-    """Slug de la campagne d'adhésion, lu à chaque appel (un changement s'applique sans redémarrage).
-
-    Ordre : réglage Firestore HELLOASSO_MEMBERSHIP_CAMPAIGN, puis variable CAMPAIGN_SLUG, puis le slug
-    par défaut de la saison (ces deux derniers sont un repli temporaire)."""
-    ref = _chosen_membership_campaign() or (SecretStore.get_secret("CAMPAIGN_SLUG") or "").strip()
-    if not ref:
-        return f"adhesion-escalade-{get_active_season()}-amicale-laique-escalade-2"
+    """Slug of the membership campaign, the import's (MembershipImportService.campaign_reference). A reference that
+    cannot be read gives its last URL segment, as before."""
+    reference = MembershipImportService.campaign_reference()
     try:
-        return parse_campaign_identifier(ref)["slug"]
+        return parse_membership_campaign(reference).slug
     except ValueError:
-        # Unrecognised URL: its last segment, as before
-        return [segment for segment in ref.split("/") if segment.strip()][-1]
+        return [segment for segment in reference.split("/") if segment.strip()][-1]
 
 
 @router.get("/api/dashboard")
 def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: bool = False):
     """Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
-    des adhésions (MembershipImportService.campaign) et les inscriptions sont lues par le même mapper."""
+    des adhésions (get_target_slug) et les inscriptions sont lues par le même mapper."""
     print("-> Interrogation de l'API HelloAsso...")
 
     campaigns = helloasso_api.get_campaigns()
-    target_slug = MembershipImportService.campaign().slug
+    target_slug = get_target_slug()
     target_camp = next((c for c in campaigns if c.get('formSlug') == target_slug), None)
 
     if not target_camp:

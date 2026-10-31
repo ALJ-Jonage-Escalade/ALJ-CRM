@@ -16,7 +16,7 @@ Durable decisions that apply across all phases:
 - **Schema** (SQLite v2 cache, replicated to Firestore like the other purchase columns): new nullable columns on `purchases`:
   `helloasso_item_id` (unique when present), `helloasso_status`, `helloasso_amount`, `helloasso_tarif` (last values seen from HelloAsso)
 - **Identity**: normalised last name + first name + birth date (`normalize_name` helpers); FFME licence is a second identity key, never a duplicate signal
-- **Campaign**: `CAMPAIGN_SLUG` env var → default slug pattern for the active season (`MembershipImportService.campaign()`). The Paramètres setting first built here was removed: the campaign choice is reworked in another PR
+- **Campaign**: the `HELLOASSO_MEMBERSHIP_CAMPAIGN` setting chosen in Paramètres › Campagnes (#81) → `CAMPAIGN_SLUG` env var → default slug pattern for the active season (`MembershipImportService.campaign_reference()`, shared with the dashboard). The Paramètres setting first built here was removed in favour of that page
 - **Import history**: Firestore collection, one document per import (who, when, season, campaign, counts per bucket, item ids with their decision)
 - **Layering**: pure domain modules (item mapper, import planner, decisions applier) ↔ thin service ↔ SQLite repository (writes go through the existing replicated repository path, season always passed explicitly) ↔ router ↔ frontend service in `src/services/` ↔ Outils card
 - **Side effects**: the import sends no e-mail and never deletes or deactivates members
@@ -36,7 +36,7 @@ An admin sets the membership campaign in Paramètres. On the Outils page, a new 
 
 ### Acceptance criteria
 
-- [ ] ~~`HELLOASSO_MEMBERSHIP_CAMPAIGN` is editable in Paramètres~~ (moved to another PR); the campaign resolves env var → default pattern
+- [x] `HELLOASSO_MEMBERSHIP_CAMPAIGN` is editable in Paramètres › Campagnes (#81); the campaign resolves setting → env var → default pattern
 - [ ] A campaign whose slug does not match the active season's years blocks the whole preview with a reason
 - [ ] The item mapper is a pure, shared module, tested with parametrized tables (incl. `answer` vs `value`, unparseable birth date)
 - [ ] The preview route returns counters and rows; no SQLite or Firestore write happens

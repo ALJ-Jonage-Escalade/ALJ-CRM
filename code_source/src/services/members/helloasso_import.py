@@ -1,13 +1,13 @@
 """Import of the HelloAsso membership campaign into the members (plans/helloasso-membership-import.md).
 
-Thin orchestration, no business rule: the campaign is the season's (or CAMPAIGN_SLUG), HelloAsso gives the items, the domain
-maps and classifies them. Knows nothing about HTTP: failures are raised as services.errors.
+Thin orchestration, no business rule: the campaign is the one chosen in Paramètres › Campagnes (else CAMPAIGN_SLUG, else the
+season's default form), HelloAsso gives the items, the domain maps and classifies them. Knows nothing about HTTP: failures are raised as services.errors.
 """
 
 from __future__ import annotations
 
 import datetime
-import os
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
@@ -18,13 +18,18 @@ from domain.members.helloasso_membership import (
     parse_membership_campaign,
 )
 from domain.members.membership_import import Decision, ImportPlan, StaleDecisions, apply_decisions, plan_membership_import
+from infrastructure.firestore.app_settings import HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository
+from infrastructure.firestore.client import FirestoreError
 from infrastructure.firestore.membership_import_history import ImportedItem, ImportHistoryEntry, MembershipImportHistory
 from infrastructure.helloasso import api as helloasso_api
+from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.membership_import import AppliedWrite, MembershipImportRepository, MembershipWriteRefused
 from services.errors import Conflict, InvalidRequest, UpstreamUnavailable
 from services.members.seasons import SeasonService
 
-# Server variable naming the membership form when it does not follow the club's default name for the season
+logger = logging.getLogger("alj")
+
+# Server variable naming the membership form while none is chosen in Paramètres (temporary fallback)
 CAMPAIGN_ENV = "CAMPAIGN_SLUG"
 
 
@@ -49,10 +54,22 @@ class MembershipImportService:
         return SeasonService.list_seasons()["active"]
 
     @staticmethod
+    def campaign_reference() -> str:
+        """Reference of the membership form, read on each call (a change applies without restart): the campaign chosen
+        in Paramètres › Campagnes, else the CAMPAIGN_SLUG server variable, else the club's default form of the season.
+        Firestore unreadable: the variable, then the default."""
+        try:
+            chosen = (AppSettingsRepository.get(HELLOASSO_MEMBERSHIP_CAMPAIGN) or "").strip()
+        except FirestoreError as e:
+            logger.warning("Membership campaign setting unreadable, falling back to %s: %s", CAMPAIGN_ENV, e)
+            chosen = ""
+        return (chosen or (SecretStore.get_secret(CAMPAIGN_ENV) or "").strip()
+                or default_membership_campaign(MembershipImportService.active_season()))
+
+    @staticmethod
     def campaign() -> MembershipCampaign:
-        """The membership form read: the CAMPAIGN_SLUG server variable, else the club's default form of the season."""
-        from_env = (os.environ.get(CAMPAIGN_ENV) or "").strip()
-        return _parse(from_env or default_membership_campaign(MembershipImportService.active_season()))
+        """The membership form read by the import (campaign_reference). InvalidRequest when it cannot be read."""
+        return _parse(MembershipImportService.campaign_reference())
 
     @staticmethod
     def preview() -> ImportPlan:

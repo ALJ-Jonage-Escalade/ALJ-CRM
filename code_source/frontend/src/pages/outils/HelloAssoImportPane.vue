@@ -1,7 +1,7 @@
 <script setup lang="ts">
-/* Synchronisation of the HelloAsso membership campaign (admin): the server reads the campaign of the active season and
-   sorts every registration into a bucket (new, renewal, changed on HelloAsso, to review, already imported, blocked),
-   the latest registrations first.
+/* Synchronisation of the HelloAsso membership campaign (admin): the server reads the campaign chosen in Paramètres ›
+   Campagnes and sorts every registration into a bucket (new, renewal, changed on HelloAsso, to review, already
+   imported, blocked), the latest registrations first.
    The preview writes nothing; the new, renewal and changed rows start checked, and the checked ones are imported once
    confirmed (the server reads HelloAsso again and refuses decisions that no longer match). The result lists the members
    written, linked to their record. Online only: disabled with an explanation when the device is offline. */
@@ -125,8 +125,8 @@ defineExpose({ reload: reset });
           <UiBadge color="blue" variant="soft">Campagne d'adhésion</UiBadge>
         </h2>
         <p class="text-[13px] text-slate-500">
-          Lit la campagne d'adhésion HelloAsso de la saison active et classe chaque inscription : nouvel adhérent, renouvellement,
-          modification sur HelloAsso, cas à vérifier… L'aperçu n'enregistre rien et aucun e-mail n'est envoyé.
+          Lit la campagne d'adhésion HelloAsso choisie dans Paramètres › Campagnes et classe chaque inscription : nouvel adhérent,
+          renouvellement, modification sur HelloAsso, cas à vérifier… L'aperçu n'enregistre rien et aucun e-mail n'est envoyé.
         </p>
         <p v-if="lastSync" data-testid="ha-last-sync" class="mt-1 text-xs font-semibold text-slate-600">🕒 {{ lastSync }}</p>
       </div>

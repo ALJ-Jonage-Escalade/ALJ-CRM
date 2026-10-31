@@ -512,7 +512,7 @@ export interface paths {
         /**
          * Get Dashboard Data
          * @description Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
-         *     des adhésions (MembershipImportService.campaign) et les inscriptions sont lues par le même mapper.
+         *     des adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.
          */
         get: operations["get_dashboard_data_api_dashboard_get"];
         put?: never;
