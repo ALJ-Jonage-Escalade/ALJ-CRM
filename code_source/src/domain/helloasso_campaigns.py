@@ -10,9 +10,11 @@ Input: the forms of HelloAsso's `GET /organizations/{org}/forms` (FormLightModel
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Dict, Iterable, List, Literal, Optional, TypedDict
 
 from domain.competitions.matching import parse_campaign_identifier
+from domain.utils import normalize_string
 
 CampaignKind = Literal["membership", "competitions"]
 
@@ -99,9 +101,23 @@ def campaign_row(form: Dict[str, Any], active: bool = False, warning: Optional[s
     }
 
 
-def _sort_key(row: CampaignRow) -> str:
-    """Newest first: start date, or creation date when the form has none (membership forms may not)."""
-    return row["start_date"] or row["created_at"] or ""
+# Order of the states in a table; the others (Disabled, Deleted, not found: an active campaign only) come last
+_STATE_ORDER = {"Public": 0, "Private": 1, "Draft": 2}
+
+
+def _start_timestamp(row: CampaignRow) -> Optional[float]:
+    try:
+        return datetime.fromisoformat(row["start_date"]).timestamp() if row["start_date"] else None
+    except ValueError:
+        return None
+
+
+def _sort_key(row: CampaignRow) -> tuple[int, int, float, str]:
+    """State (Public, Private, Draft, then the others), then start date, newest first (forms without one after),
+    then title in alphabetical order (case and accents ignored)."""
+    start = _start_timestamp(row)
+    return (_STATE_ORDER.get(row["state"], len(_STATE_ORDER)), start is None, -(start or 0.0),
+            normalize_string(row["title"] or row["slug"]))
 
 
 def _is_competition(form: Dict[str, Any]) -> bool:  # Any: HelloAsso JSON
@@ -134,7 +150,7 @@ def active_warning(form: Optional[Dict[str, Any]], kind: str) -> Optional[str]: 
 
 
 def campaign_table(forms: Iterable[Dict[str, Any]], kind: str, active: Optional[CampaignRef]) -> List[CampaignRow]:  # Any: HelloAsso JSON
-    """Rows of a kind's table: its Public / Private / Draft forms, newest first, and the active campaign always, flagged
+    """Rows of a kind's table: its Public / Private / Draft forms (order: _sort_key), and the active campaign always, flagged
     with a warning when it no longer matches (other type or activity, disabled, not found). `forms` may hold every type
     and state."""
     all_forms = list(forms)
@@ -149,12 +165,12 @@ def campaign_table(forms: Iterable[Dict[str, Any]], kind: str, active: Optional[
                          "warning": NOT_FOUND_WARNING})
         else:
             rows.append(campaign_row(active_form, active=True, warning=active_warning(active_form, kind)))
-    return sorted(rows, key=_sort_key, reverse=True)
+    return sorted(rows, key=_sort_key)
 
 
 def other_events_table(forms: Iterable[Dict[str, Any]]) -> List[CampaignRow]:  # Any: HelloAsso JSON
-    """Rows of the "Autres" table: the Public / Private / Draft Event forms of another activity than "Compétition",
-    newest first. Nothing to choose there: `active` is always False."""
+    """Rows of the "Autres" table: the Public / Private / Draft Event forms of another activity than "Compétition"
+    (order: _sort_key). Nothing to choose there: `active` is always False."""
     rows = [campaign_row(form) for form in forms
             if _text(form.get("formType")) == "Event" and not _is_competition(form) and _listed(form)]
-    return sorted(rows, key=_sort_key, reverse=True)
+    return sorted(rows, key=_sort_key)

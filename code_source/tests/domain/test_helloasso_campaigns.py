@@ -37,11 +37,18 @@ def test_competitions_only_of_the_competition_activity_others_apart() -> None:
         ("soiree", "Fête", False), ("unknown", "Compétition", False)]
 
 
-def test_campaign_table_newest_first_created_at_when_no_start_date() -> None:
-    forms = [form("old", form_type="Membership", start="2024-09-01T00:00:00+02:00"),
-             form("undated", form_type="Membership", created="2025-06-15T10:00:00+02:00"),
-             form("new", form_type="Membership", start="2026-09-01T00:00:00+02:00")]
-    assert [row["slug"] for row in campaign_table(forms, "membership", None)] == ["new", "undated", "old"]
+def test_campaign_table_sorted_by_state_then_start_date_then_title() -> None:
+    forms = [form("draft", state="Draft", start="2027-09-01T00:00:00+02:00"),
+             form("private-new", state="Private", start="2026-09-01T00:00:00+02:00"),
+             form("public-undated-b", title="Équipe B"),
+             form("public-old", start="2024-09-01T00:00:00+02:00"),
+             form("public-undated-a", title="équipe a"),
+             form("public-new", start="2026-09-01T10:00:00+02:00"),
+             form("public-new-utc", start="2026-09-01T07:00:00+00:00"),  # 09:00 in Paris: before public-new
+             form("disabled", state="Disabled", start="2028-01-01T00:00:00+01:00")]
+    active = {"form_type": "Event", "slug": "disabled"}
+    assert [row["slug"] for row in campaign_table(forms, "competitions", active)] == [
+        "public-new", "public-new-utc", "public-old", "public-undated-a", "public-undated-b", "private-new", "draft", "disabled"]
 
 
 def test_campaign_row_fields() -> None:
