@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Request
 
 from api.members.helloasso_import_schemas import (
@@ -15,6 +17,7 @@ from api.members.helloasso_import_schemas import (
     MembershipLastImport,
     MembershipLastSync,
     MembershipPreview,
+    MembershipPreviewRequest,
     MembershipRow,
 )
 from api.admin.access import author_of
@@ -51,9 +54,9 @@ def _preview(plan: ImportPlan) -> MembershipPreview:
 
 
 @router.post("/api/helloasso/memberships/preview", response_model=MembershipPreview, responses=error_responses(400, 502))
-def preview_membership_import() -> MembershipPreview:
+def preview_membership_import(data: Optional[MembershipPreviewRequest] = None) -> MembershipPreview:
     """Reads the membership campaign on HelloAsso and sorts its registrations for the active season. Writes nothing."""
-    return _preview(Service.preview())
+    return _preview(Service.preview(data.campaign if data else None))
 
 
 def _imported(applied: AppliedWrite, records: dict[int, MembershipRecord]) -> ImportedMember:
@@ -82,7 +85,7 @@ def import_memberships(request: Request, data: MembershipImportRequest) -> Membe
     """Reads HelloAsso again and applies the admin's decisions to the recomputed plan, recorded in the history.
     Sends no e-mail."""
     decisions = {item_id: Decision(Bucket(decision.bucket), decision.choice) for item_id, decision in data.decisions.items()}
-    return _result(Service.import_(data.season, decisions, author_of(request)))
+    return _result(Service.import_(data.season, decisions, author_of(request), data.campaign))
 
 
 @router.get("/api/helloasso/memberships/last-sync", response_model=MembershipLastSync)

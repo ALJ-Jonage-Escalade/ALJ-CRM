@@ -132,6 +132,37 @@ const REVIEW_ROW = {
   can_create: true,
 };
 
+function membershipForm(slug: string, title: string, state: string, active = false) {
+  return {
+    form_type: "Membership",
+    slug,
+    title,
+    private_title: "",
+    state,
+    activity_type: "",
+    url: "",
+    start_date: null,
+    end_date: null,
+    created_at: null,
+    active,
+    warning: null,
+  };
+}
+const MEMBERSHIP_CAMPAIGNS = {
+  error: null,
+  warning: null,
+  others: [],
+  competitions: { active: null, configured: false, campaigns: [] },
+  membership: {
+    active: { form_type: "Membership", slug: "adhesion-escalade-2026-2027-amicale-laique-escalade-2" },
+    configured: true,
+    campaigns: [
+      membershipForm("adhesion-escalade-2026-2027-amicale-laique-escalade-2", "Adhésions 2026-2027", "Public", true),
+      membershipForm("adhesions-bis-2026-2027", "Adhésions de janvier", "Draft"),
+    ],
+  },
+};
+
 type Answer = (body: unknown, url: URL) => Response;
 const ANSWERS: Record<string, Answer> = {
   "GET /api/seasons": () => json({ seasons: ["2026-2027", "2025-2026"], active: "2026-2027" }),
@@ -142,6 +173,7 @@ const ANSWERS: Record<string, Answer> = {
   "GET /api/ffme/stats": () => json(STATS),
   "POST /api/helloasso/memberships/preview": () => json(MEMBERSHIP_PREVIEW),
   "GET /api/helloasso/memberships/last-sync": () => json({ last_sync: null }),
+  "GET /api/helloasso/campaigns": () => json(MEMBERSHIP_CAMPAIGNS),
   "POST /api/helloasso/memberships/import": () =>
     json({
       status: "success",
@@ -354,6 +386,49 @@ describe("OutilsPage", () => {
     expect(byId("ha-section-renewal")).toBeNull();
   });
 
+  it("lists the club's membership campaigns, the active one selected, and previews and imports the one picked for this sync", async () => {
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+    const select = byId<HTMLSelectElement>("ha-import-campaign-select")!;
+    expect(select.value).toBe("adhesion-escalade-2026-2027-amicale-laique-escalade-2");
+    expect([...select.options].map((option) => option.textContent.trim())).toEqual([
+      "Adhésions 2026-2027 (campagne active)",
+      "Adhésions de janvier (brouillon)",
+    ]);
+    byId("ha-import-preview")!.click();
+    await flushPromises();
+    expect(byId("ha-import-result")).not.toBeNull();
+
+    select.value = "adhesions-bis-2026-2027";
+    select.dispatchEvent(new Event("change"));
+    await flushPromises();
+    expect(byId("ha-import-result")).toBeNull();
+    byId("ha-import-preview")!.click();
+    await flushPromises();
+    byId("ha-import-apply")!.click();
+    await flushPromises();
+
+    expect(sent("POST", "/api/helloasso/memberships/preview").map((call) => call.body)).toEqual([
+      { campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2" },
+      { campaign: "adhesions-bis-2026-2027" },
+    ]);
+    expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toMatchObject({ campaign: "adhesions-bis-2026-2027" });
+  });
+
+  it("previews the active HelloAsso campaign when the campaign list can't be read", async () => {
+    const campaigns = ANSWERS["GET /api/helloasso/campaigns"]!;
+    ANSWERS["GET /api/helloasso/campaigns"] = () => json({ code: "storage_unavailable", message: "Firestore injoignable" }, 503);
+    try {
+      const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      expect(byId("ha-import-campaign-select")).toBeNull();
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      expect(sent("POST", "/api/helloasso/memberships/preview").at(-1)!.body).toEqual({ campaign: null });
+    } finally {
+      ANSWERS["GET /api/helloasso/campaigns"] = campaigns;
+    }
+  });
+
   it("shows when each HelloAsso registration was made, the latest first", async () => {
     const earlier = {
       ...MEMBERSHIP_PREVIEW.rows[0]!,
@@ -405,6 +480,7 @@ describe("OutilsPage", () => {
     await flushPromises();
     expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
       season: "2026-2027",
+      campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
       decisions: { 1: { bucket: "new", choice: "import" } },
     });
     expect(byId("ha-import-done")!.textContent).toContain("1 adhérent créé");
@@ -448,6 +524,7 @@ describe("OutilsPage", () => {
       await flushPromises();
       expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
         season: "2026-2027",
+        campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
         decisions: { 1: { bucket: "new", choice: "import" }, 3: { bucket: "to_review", choice: "link:4" } },
       });
     } finally {
@@ -491,6 +568,7 @@ describe("OutilsPage", () => {
       await flushPromises();
       expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
         season: "2026-2027",
+        campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
         decisions: { 4: { bucket: "updated", choice: "import" }, 5: { bucket: "to_review", choice: "import" } },
       });
     } finally {

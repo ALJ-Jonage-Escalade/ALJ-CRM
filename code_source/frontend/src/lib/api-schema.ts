@@ -3241,11 +3241,13 @@ export interface components {
         };
         /**
          * MembershipImportRequest
-         * @description decisions: by HelloAsso item id; a row without decision is skipped.
+         * @description decisions: by HelloAsso item id; a row without decision is skipped. campaign: the one of the preview.
          */
         MembershipImportRequest: {
             /** Season */
             season: string;
+            /** Campaign */
+            campaign?: string | null;
             /** Decisions */
             decisions: {
                 [key: string]: components["schemas"]["MembershipDecision"];
@@ -3313,6 +3315,15 @@ export interface components {
             counts: components["schemas"]["BucketCounts"];
             /** Rows */
             rows: components["schemas"]["MembershipRow"][];
+        };
+        /**
+         * MembershipPreviewRequest
+         * @description campaign: slug of the membership form to read for this sync only (never saved); null or blank: the active one
+         *     (Paramètres › Campagnes).
+         */
+        MembershipPreviewRequest: {
+            /** Campaign */
+            campaign?: string | null;
         };
         /**
          * MembershipRow
@@ -5226,7 +5237,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MembershipPreviewRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -5244,6 +5259,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Bad Gateway */

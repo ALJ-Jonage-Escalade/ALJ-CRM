@@ -77,6 +77,13 @@ class TestMembershipPreview(HelloAssoImportTestCase):
 
         self.assertEqual(self.fetched, [("Membership", CAMPAIGN), ("Membership", "adhesions-env-2026-2027")])
 
+    def test_preview_reads_the_campaign_chosen_for_this_sync_without_saving_it(self) -> None:
+        response = self.client.post(PREVIEW, json={"campaign": "adhesions-bis-2026-2027"})
+        self.client.post(PREVIEW, json={"campaign": " "})
+
+        self.assertEqual(response.json()["campaign"], "adhesions-bis-2026-2027")
+        self.assertEqual(self.fetched, [("Membership", "adhesions-bis-2026-2027"), ("Membership", CAMPAIGN)])
+
     def test_a_campaign_of_another_season_blocks_the_whole_preview(self) -> None:
         self.items = [ha_item(1, "WEASLEY", "Ginny")]
 
@@ -143,6 +150,15 @@ class TestMembershipImport(HelloAssoImportTestCase):
         smtp.assert_not_called()
         smtp_ssl.assert_not_called()
         send_email.assert_not_called()
+
+    def test_the_import_reads_the_campaign_chosen_for_this_sync_and_records_it(self) -> None:
+        response = self.client.post(IMPORT, json={"season": "2026-2027", "campaign": "adhesions-bis-2026-2027",
+                                                  "decisions": {"1": {"bucket": "new", "choice": "import"}}})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.fetched, [("Membership", "adhesions-bis-2026-2027")])
+        last = self.client.get("/api/helloasso/memberships/last-sync").json()["last_sync"]
+        self.assertEqual(last["campaign"], "adhesions-bis-2026-2027")
 
     def test_import_of_another_season_or_a_blocked_campaign_is_refused(self) -> None:
         decisions = {"1": {"bucket": "new", "choice": "import"}}

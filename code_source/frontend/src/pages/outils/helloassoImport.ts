@@ -25,6 +25,24 @@ export const BUCKETS: readonly BucketInfo[] = [
   { name: "blocked", label: "⛔ Ignorés / bloqués", color: "red" },
 ];
 
+export type MembershipCampaigns = Schemas["HelloAssoCampaigns"]["membership"];
+
+const STATE_SUFFIXES: Record<string, string> = { Private: " (privée)", Draft: " (brouillon)" };
+
+/** The options of the campaign select: the club's membership forms (Paramètres › Campagnes order), the active one
+    marked; it is added when HelloAsso could not list it. */
+export function campaignOptions(membership: MembershipCampaigns): { value: string; label: string }[] {
+  const options = membership.campaigns.map((campaign) => ({
+    value: campaign.slug,
+    label: `${campaign.title || campaign.slug}${campaign.active ? " (campagne active)" : (STATE_SUFFIXES[campaign.state] ?? "")}`,
+  }));
+  const active = membership.active;
+  if (active && !options.some((option) => option.value === active.slug)) {
+    options.unshift({ value: active.slug, label: `${active.slug} (campagne active)` });
+  }
+  return options;
+}
+
 /** The rows of a bucket, the latest registrations first. */
 export function rowsOf(preview: MembershipPreview, bucket: BucketName): MembershipRow[] {
   const registered = (row: MembershipRow): number => parseDate(row.order_date)?.getTime() ?? 0;

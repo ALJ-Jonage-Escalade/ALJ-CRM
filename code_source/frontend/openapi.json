@@ -1678,6 +1678,23 @@
         "summary": "Preview Membership Import",
         "description": "Reads the membership campaign on HelloAsso and sorts its registrations for the active season. Writes nothing.",
         "operationId": "preview_membership_import_api_helloasso_memberships_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/MembershipPreviewRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1705,6 +1722,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -7805,6 +7832,17 @@
             "type": "string",
             "title": "Season"
           },
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          },
           "decisions": {
             "additionalProperties": {
               "$ref": "#/components/schemas/MembershipDecision"
@@ -7820,7 +7858,7 @@
           "decisions"
         ],
         "title": "MembershipImportRequest",
-        "description": "decisions: by HelloAsso item id; a row without decision is skipped."
+        "description": "decisions: by HelloAsso item id; a row without decision is skipped. campaign: the one of the preview."
       },
       "MembershipImportResult": {
         "properties": {
@@ -7972,6 +8010,25 @@
         ],
         "title": "MembershipPreview",
         "description": "blocked_reason: the whole campaign is refused (another season), every row is then blocked."
+      },
+      "MembershipPreviewRequest": {
+        "properties": {
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MembershipPreviewRequest",
+        "description": "campaign: slug of the membership form to read for this sync only (never saved); null or blank: the active one\n(Paramètres › Campagnes)."
       },
       "MembershipRow": {
         "properties": {

@@ -10,8 +10,9 @@ export function createMembersApi(client: ApiClient) {
     seasons: () => unwrap(client.GET("/api/seasons")),
     /** Tariff names of the current season. */
     seasonTarifs: () => unwrap(client.GET("/api/season-tarifs")),
-    /** Reads the HelloAsso membership campaign and sorts its registrations for the active season; writes nothing. */
-    helloAssoPreview: () => unwrap(client.POST("/api/helloasso/memberships/preview")),
+    /** Reads the HelloAsso membership campaign and sorts its registrations for the active season; writes nothing.
+        campaign: slug of the form picked for this sync only (never saved), null for the active one. */
+    helloAssoPreview: (campaign: string | null) => unwrap(client.POST("/api/helloasso/memberships/preview", { body: { campaign } })),
     /** When the HelloAsso membership import last ran, and who ran it (null before the first one). */
     helloAssoLastSync: () => unwrap(client.GET("/api/helloasso/memberships/last-sync")),
     /** Reads HelloAsso again and applies the decisions (by HelloAsso item id) to the recomputed plan. */

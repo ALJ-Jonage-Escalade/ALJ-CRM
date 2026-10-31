@@ -67,25 +67,27 @@ class MembershipImportService:
                 or default_membership_campaign(MembershipImportService.active_season()))
 
     @staticmethod
-    def campaign() -> MembershipCampaign:
-        """The membership form read by the import (campaign_reference). InvalidRequest when it cannot be read."""
-        return _parse(MembershipImportService.campaign_reference())
+    def campaign(chosen: Optional[str] = None) -> MembershipCampaign:
+        """The membership form read by the import: `chosen` (a campaign picked for this sync only, never saved), else
+        campaign_reference. InvalidRequest when it cannot be read."""
+        return _parse((chosen or "").strip() or MembershipImportService.campaign_reference())
 
     @staticmethod
-    def preview() -> ImportPlan:
-        """What the import would do now, for the active season. Writes nothing."""
-        return MembershipImportService._plan(MembershipImportService.active_season())
+    def preview(chosen_campaign: Optional[str] = None) -> ImportPlan:
+        """What the import would do now, for the active season. Writes nothing. `chosen_campaign`: see campaign()."""
+        return MembershipImportService._plan(MembershipImportService.active_season(), chosen_campaign)
 
     @staticmethod
-    def import_(season: str, decisions: dict[int, Decision], author: str) -> ImportResult:
+    def import_(season: str, decisions: dict[int, Decision], author: str, chosen_campaign: Optional[str] = None) -> ImportResult:
         """Reads HelloAsso again, recomputes the plan and applies the admin's decisions (keyed by HelloAsso item id),
         then records the import in the history. Refused (Conflict) when the campaign is blocked or the decisions no
-        longer match: nothing is then written. Sends no e-mail. `author`: e-mail of the admin."""
+        longer match: nothing is then written. Sends no e-mail. `author`: e-mail of the admin; `chosen_campaign`: the
+        one of the preview (see campaign())."""
         active = MembershipImportService.active_season()
         if season != active:
             raise Conflict(f"L'aperçu portait sur la saison {season}, la saison active est {active} : relancez l'aperçu.",
                            "stale_decisions")
-        plan = MembershipImportService._plan(active)
+        plan = MembershipImportService._plan(active, chosen_campaign)
         if plan.blocked_reason:
             raise Conflict(plan.blocked_reason, "campaign_blocked")
         try:
@@ -110,8 +112,8 @@ class MembershipImportService:
         return MembershipImportHistory.latest()
 
     @staticmethod
-    def _plan(season: str) -> ImportPlan:
-        campaign = MembershipImportService.campaign()
+    def _plan(season: str, chosen_campaign: Optional[str]) -> ImportPlan:
+        campaign = MembershipImportService.campaign(chosen_campaign)
         try:
             items = helloasso_api.fetch_form_items(campaign.form_type, campaign.slug)
         except helloasso_api.HelloAssoApiError as e:

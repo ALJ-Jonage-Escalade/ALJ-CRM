@@ -1,6 +1,6 @@
 <script setup lang="ts">
-/* Synchronisation of the HelloAsso membership campaign (admin): the server reads the campaign chosen in Paramètres ›
-   Campagnes and sorts every registration into a bucket (new, renewal, changed on HelloAsso, to review, already
+/* Synchronisation of the HelloAsso membership campaign (admin): the server reads the campaign picked in the select
+   (the one chosen in Paramètres › Campagnes at first; another one applies to this sync only, nothing is saved) and sorts every registration into a bucket (new, renewal, changed on HelloAsso, to review, already
    imported, blocked), the latest registrations first.
    The preview writes nothing; the new, renewal and changed rows start checked, and the checked ones are imported once
    confirmed (the server reads HelloAsso again and refuses decisions that no longer match). The result lists the members
@@ -13,10 +13,12 @@ import UiTile from "../../components/ui/UiTile.vue";
 import { useNetworkUp } from "../../composables/network";
 import { CLIENT_KEY, errorText } from "../../lib/client";
 import { formatDayText, formatEuros } from "../../lib/format";
+import { createIntegrationsApi } from "../../services/integrations";
 import { createMembersApi } from "../../services/members";
 import { dialogs } from "../../composables/dialogs";
 import {
   BUCKETS,
+  campaignOptions,
   changeLines,
   decisionsOf,
   initialChoices,
@@ -35,7 +37,9 @@ import {
   type MembershipPreview,
 } from "./helloassoImport";
 
-const membersApi = createMembersApi(inject(CLIENT_KEY)!);
+const client = inject(CLIENT_KEY)!;
+const membersApi = createMembersApi(client);
+const integrationsApi = createIntegrationsApi(client);
 const online = useNetworkUp();
 
 const preview = ref<MembershipPreview | null>(null);
@@ -44,6 +48,25 @@ const done = ref<MembershipImportResult | null>(null);
 const failure = ref("");
 const busy = ref<"preview" | "import" | null>(null);
 const lastSync = ref<string | null>(null); // null until known
+// The membership forms of the select, empty until loaded (or when they can't be read: the server's active one is used)
+const campaigns = ref<{ value: string; label: string }[]>([]);
+const campaign = ref<string | null>(null); // null: the active one, chosen by the server
+
+async function loadCampaigns(): Promise<void> {
+  try {
+    const membership = (await integrationsApi.helloAssoCampaigns()).membership;
+    campaigns.value = campaignOptions(membership);
+    campaign.value = membership.active?.slug ?? campaigns.value[0]?.value ?? null;
+  } catch (e) {
+    console.warn("Campagnes HelloAsso :", e);
+  }
+}
+
+/** Another campaign: the preview shown no longer matches it. */
+function pickCampaign(slug: string): void {
+  campaign.value = slug;
+  reset();
+}
 
 async function loadLastSync(): Promise<void> {
   try {
@@ -56,6 +79,7 @@ async function loadLastSync(): Promise<void> {
 onMounted(() => {
   if (online.value) {
     void loadLastSync();
+    void loadCampaigns();
   }
 });
 
@@ -73,7 +97,7 @@ async function loadPreview(): Promise<void> {
   busy.value = "preview";
   reset();
   try {
-    preview.value = await membersApi.helloAssoPreview();
+    preview.value = await membersApi.helloAssoPreview(campaign.value);
     choices.value = initialChoices(preview.value);
   } catch (e) {
     failure.value = errorText(e);
@@ -88,6 +112,7 @@ function choose(itemId: number, choice: string): void {
 
 async function apply(): Promise<void> {
   const shown = preview.value;
+  const previewedCampaign = campaign.value;
   if (!shown || !selectedCount.value) {
     return;
   }
@@ -102,7 +127,11 @@ async function apply(): Promise<void> {
   busy.value = "import";
   failure.value = "";
   try {
-    const result = await membersApi.helloAssoImport({ season: shown.season, decisions: decisionsOf(shown, choices.value) });
+    const result = await membersApi.helloAssoImport({
+      season: shown.season,
+      campaign: previewedCampaign,
+      decisions: decisionsOf(shown, choices.value),
+    });
     reset();
     done.value = result;
     void loadLastSync();
@@ -125,9 +154,22 @@ defineExpose({ reload: reset });
           <UiBadge color="blue" variant="soft">Campagne d'adhésion</UiBadge>
         </h2>
         <p class="text-[13px] text-slate-500">
-          Lit la campagne d'adhésion HelloAsso choisie dans Paramètres › Campagnes et classe chaque inscription : nouvel adhérent,
-          renouvellement, modification sur HelloAsso, cas à vérifier… L'aperçu n'enregistre rien et aucun e-mail n'est envoyé.
+          Lit la campagne d'adhésion HelloAsso choisie ci-dessous (par défaut la campagne active de Paramètres › Campagnes ; un autre choix
+          ne vaut que pour cette synchronisation) et classe chaque inscription : nouvel adhérent, renouvellement, modification sur
+          HelloAsso, cas à vérifier… L'aperçu n'enregistre rien et aucun e-mail n'est envoyé.
         </p>
+        <label v-if="campaigns.length" class="mt-2 flex flex-wrap items-center gap-2 text-[12.5px] font-semibold text-slate-500">
+          Campagne
+          <select
+            data-testid="ha-import-campaign-select"
+            :value="campaign"
+            :disabled="!!busy"
+            class="min-w-0 max-w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[12.5px] text-slate-800"
+            @change="pickCampaign(($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="option in campaigns" :key="option.value" :value="option.value">{{ option.label }}</option>
+          </select>
+        </label>
         <p v-if="lastSync" data-testid="ha-last-sync" class="mt-1 text-xs font-semibold text-slate-600">🕒 {{ lastSync }}</p>
       </div>
       <UiButton

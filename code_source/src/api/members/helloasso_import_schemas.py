@@ -79,9 +79,16 @@ class MembershipDecision(RequestBody):
     choice: str
 
 
+class MembershipPreviewRequest(RequestBody):
+    """campaign: slug of the membership form to read for this sync only (never saved); null or blank: the active one
+    (Paramètres › Campagnes)."""
+    campaign: Optional[str] = None
+
+
 class MembershipImportRequest(RequestBody):
-    """decisions: by HelloAsso item id; a row without decision is skipped."""
+    """decisions: by HelloAsso item id; a row without decision is skipped. campaign: the one of the preview."""
     season: str
+    campaign: Optional[str] = None
     decisions: Dict[int, MembershipDecision]
 
 
