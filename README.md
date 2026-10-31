@@ -82,7 +82,9 @@ Arrêt : `Ctrl+C` pour le serveur, `docker compose -f dev/docker-compose.yml dow
 | `severus.snape@hogwarts.example` | coach |
 | `argus.filch@hogwarts.example` | lecture seule |
 
-Les rôles viennent de la liste des accès (page **Administration › Accès**), en dev comme en production.
+Les rôles viennent de la liste des accès (page **Administration › Accès**), en dev comme en production. On y accède
+sur invitation : un administrateur invite une adresse, qui reçoit un e-mail (en dev : dans Mailpit) et obtient son rôle
+en se connectant avec un compte Google de cette adresse dans les 7 jours.
 
 ### À savoir
 

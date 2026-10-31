@@ -1,25 +1,33 @@
-"""Administration › Accès: who may use the CRM and with which role, the access requests and the history.
+"""Administration › Accès: who may use the CRM and with which role, the invitations and the history.
 
 Admins only on every method (api_auth.required_role). Firestore only (server.py FIRESTORE_ONLY_PATHS): never waits for
-the SQLite cache. Refusals: 400 (invalid e-mail or role), 404 (unknown entry or request), 409 (already listed, an admin
-removing or demoting themselves, the last admin), with French messages shown as they are by the page.
+the SQLite cache. Refusals: 400 (invalid e-mail or role), 404 (unknown entry), 409 (already listed or invited, nothing
+to resend, an admin removing or demoting themselves, the last admin), with French messages shown as they are by the page.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Dict, List
 
 from fastapi import APIRouter, Request
 
-from api.admin.schemas import AccessDone, AccessEntry, AccessEntryIn, AccessEntryPatch, AccessGrant, AccessHistoryEntry, AccessRequest
+from api.admin.schemas import AccessDone, AccessEntry, AccessEntryIn, AccessEntryPatch, AccessHistoryEntry, AccessInvitation
 from api.auth.me import signed_in_claims
 from api.responses import SUCCESS, error_responses
-from infrastructure.firestore.access_store import AccessRequestEntry, HistoryEntry, RoleEntry
+from infrastructure.firestore.access_store import HistoryEntry, RoleEntry
+from services.access import invitations
 from services.access import rules as access_rules
 
 router = APIRouter(prefix="/api/admin/access")
 
 LOCAL_AUTHOR = "serveur local"
+
+
+def page_origin(request: Request) -> str:
+    """Where the admin's page is served (the browser's Origin), for the link of an invitation without APP_PUBLIC_URL;
+    the server's address when there is none (Cloud Run's base URL says http, behind its proxy)."""
+    origin = request.headers.get("origin", "")
+    return origin if origin.startswith(("https://", "http://")) else str(request.base_url)
 
 
 def author_of(request: Request) -> str:
@@ -28,18 +36,20 @@ def author_of(request: Request) -> str:
     return str((claims or {}).get("email") or LOCAL_AUTHOR).strip().lower()
 
 
-def _request_body(request: AccessRequestEntry) -> Dict[str, Any]:  # Any: an AccessRequest body
-    return {k: v for k, v in request.items() if k != "dismissed_at"}
-
-
 @router.get("/roles", response_model=List[AccessEntry])
 def list_roles() -> List[RoleEntry]:
     return access_rules.current().list_roles()
 
 
-@router.post("/roles", status_code=201, response_model=AccessEntry, responses=error_responses(400, 409))
-def add_role(request: Request, body: AccessEntryIn) -> RoleEntry:
-    return access_rules.current().grant(author_of(request), body.email, body.role, body.display_name)
+@router.post("/roles", status_code=201, response_model=AccessInvitation, responses=error_responses(400, 409))
+def invite(request: Request, body: AccessEntryIn) -> invitations.Invitation:
+    return invitations.invite(access_rules.current(), author_of(request), body.email, body.role, body.display_name,
+                              page_origin(request))
+
+
+@router.post("/roles/{email}/invitation", response_model=AccessInvitation, responses=error_responses(404, 409))
+def resend_invitation(request: Request, email: str) -> invitations.Invitation:
+    return invitations.resend(access_rules.current(), author_of(request), email, page_origin(request))
 
 
 @router.patch("/roles/{email}", response_model=AccessEntry, responses=error_responses(400, 404, 409))
@@ -58,22 +68,6 @@ def update_role(request: Request, email: str, body: AccessEntryPatch) -> RoleEnt
 @router.delete("/roles/{email}", response_model=AccessDone, responses=error_responses(404, 409))
 def remove_role(request: Request, email: str) -> Dict[str, str]:
     access_rules.current().remove(author_of(request), email)
-    return SUCCESS
-
-
-@router.get("/requests", response_model=List[AccessRequest])
-def list_requests() -> List[Dict[str, Any]]:  # Any: AccessRequest bodies
-    return [_request_body(r) for r in access_rules.current().list_requests()]
-
-
-@router.post("/requests/{email}/grant", status_code=201, response_model=AccessEntry, responses=error_responses(400, 404, 409))
-def grant_request(request: Request, email: str, body: AccessGrant) -> RoleEntry:
-    return access_rules.current().grant_request(author_of(request), email, body.role, body.display_name)
-
-
-@router.delete("/requests/{email}", response_model=AccessDone, responses=error_responses(404))
-def dismiss_request(request: Request, email: str) -> Dict[str, str]:
-    access_rules.current().dismiss_request(author_of(request), email)
     return SUCCESS
 
 

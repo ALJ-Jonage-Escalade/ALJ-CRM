@@ -1,9 +1,10 @@
-/* What the Accès sub-page shows of the access list, its requests and history: labels, dates, the add form check. */
+/* What the Accès sub-page shows of the access list, its invitations and history: labels, dates, the invite form check. */
 import { looksLikeEmail } from "../../lib/email";
 import { formatDate, formatDateTime, parseDate } from "../../lib/format";
 import type { Schemas } from "../../lib/client";
 
-export type AccessRole = Schemas["AccessEntry"]["role"];
+export type AccessEntry = Schemas["AccessEntry"];
+export type AccessRole = AccessEntry["role"];
 export type HistoryAction = Schemas["AccessHistoryEntry"]["action"];
 
 const ROLE_NAMES: Record<AccessRole, string> = { admin: "Administrateur", coach: "Coach", readonly: "Lecture seule" };
@@ -15,12 +16,12 @@ export const ROLE_OPTIONS: readonly { value: AccessRole; label: string }[] = (["
 }));
 
 const ACTION_LABELS: Record<HistoryAction, string> = {
+  invited: "Invitation",
+  invitation_resent: "Invitation renvoyée",
   added: "Accès ajouté",
   role_changed: "Rôle modifié",
   name_changed: "Nom modifié",
   removed: "Accès retiré",
-  request_granted: "Demande acceptée",
-  request_dismissed: "Demande ignorée",
   bootstrap: "Administrateur initial",
 };
 
@@ -62,7 +63,46 @@ export function dateTime(at: string): string {
   return date ? formatDateTime(date) : at;
 }
 
-/** Why the add form can't be sent (empty when it can); the server checks again. */
+/** Where an entry stands: an access in use, an invitation still open, or one nobody accepted in time (no role then). */
+export type AccessStatus = "active" | "invited" | "expired";
+
+export function accessStatus(entry: Pick<AccessEntry, "invitation_expires_at">, now: Date): AccessStatus {
+  if (!entry.invitation_expires_at) {
+    return "active";
+  }
+  const expires = parseDate(entry.invitation_expires_at);
+  return expires && expires > now ? "invited" : "expired";
+}
+
+/** « Actif », « Invité · expire le 06/11/2026 », « Invitation expirée le 06/11/2026 ». */
+export function statusLabel(entry: Pick<AccessEntry, "invitation_expires_at">, now: Date): string {
+  const expires = parseDate(entry.invitation_expires_at);
+  const day = expires ? ` le ${formatDate(expires)}` : "";
+  switch (accessStatus(entry, now)) {
+    case "active":
+      return "Actif";
+    case "invited":
+      return `Invité · expire${day}`;
+    case "expired":
+      return `Invitation expirée${day}`;
+  }
+}
+
+/** An open or expired invitation whose last e-mail did not go out. */
+export function emailNotSent(entry: Pick<AccessEntry, "invitation_expires_at" | "invitation_sent_at">): boolean {
+  return Boolean(entry.invitation_expires_at) && !entry.invitation_sent_at;
+}
+
+/** The toast after an invitation or a resend: done, or kept without its e-mail and why. */
+export function invitationMessage(invitation: Schemas["AccessInvitation"]): string {
+  const email = invitation.entry.email;
+  if (invitation.email_sent) {
+    return `✉️ Invitation envoyée à ${email} (${roleName(invitation.entry.role)}).`;
+  }
+  return `⚠️ Invitation enregistrée pour ${email}, mais l'e-mail n'a pas pu être envoyé : ${invitation.email_error ?? "erreur inconnue"}. Utilisez « Renvoyer » ou prévenez la personne vous-même.`;
+}
+
+/** Why the invite form can't be sent (empty when it can); the server checks again. */
 export function addFormError(email: string): string {
   const address = email.trim();
   if (!address) {

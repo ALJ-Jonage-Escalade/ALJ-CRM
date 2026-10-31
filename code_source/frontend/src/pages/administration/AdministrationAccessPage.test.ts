@@ -1,5 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { AUTH_KEY, type Auth } from "../../composables/auth";
 import { dialogs } from "../../composables/dialogs";
@@ -21,18 +21,28 @@ const entry = (email: string, role: string, extra: object = {}) => ({
   created_by: null,
   updated_at: null,
   updated_by: null,
+  invited_at: null,
+  invitation_expires_at: null,
+  invitation_sent_at: null,
+  accepted_at: null,
   ...extra,
 });
+const NOW = new Date("2026-11-01T12:00:00Z");
 const ENTRIES = [
   entry(ME, "admin", { display_name: "Albus", last_sign_in_at: "2026-10-30T09:00:00+00:00" }),
   entry("severus@alj.example", "coach"),
+  entry("neville@alj.example", "coach", {
+    invited_at: "2026-10-30T09:00:00+00:00",
+    invitation_expires_at: "2026-11-06T09:00:00+00:00",
+    invitation_sent_at: "2026-10-30T09:00:00+00:00",
+  }),
+  entry("draco@alj.example", "readonly", { invited_at: "2026-10-20T09:00:00+00:00", invitation_expires_at: "2026-10-27T09:00:00+00:00" }),
 ];
-const REQUEST = {
-  email: "draco@alj.example",
-  google_display_name: "Draco Malfoy",
-  first_requested_at: "2026-10-29T08:00:00+00:00",
-  last_requested_at: "2026-10-30T08:30:00+00:00",
-};
+const invitation = (email: string, emailSent = true) => ({
+  entry: entry(email, "coach", { invitation_expires_at: "2026-11-08T12:00:00+00:00" }),
+  email_sent: emailSent,
+  email_error: emailSent ? null : "quota dépassé",
+});
 const HISTORY = [
   {
     at: "2026-10-30T09:05:00+00:00",
@@ -48,7 +58,6 @@ const HISTORY = [
 type Answer = (body: unknown) => Response;
 const ANSWERS: Record<string, Answer> = {
   "GET /api/admin/access/roles": () => json(ENTRIES),
-  "GET /api/admin/access/requests": () => json([REQUEST]),
   "GET /api/admin/access/history": () => json(HISTORY),
 };
 
@@ -76,23 +85,27 @@ function render(answers: Record<string, Answer> = {}) {
   });
   const writes = () => calls.filter((c) => c.method !== "GET");
   const row = (email: string) => wrapper.find(`[data-testid="access-table"] tr[data-email="${email}"]`);
-  const request = (email: string) => wrapper.find(`[data-testid="requests"] li[data-email="${email}"]`);
-  return { wrapper, calls, writes, row, request };
+  return { wrapper, calls, writes, row };
 }
 
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
 describe("AdministrationAccessPage", () => {
-  it("lists the access entries, the requests and the history", async () => {
-    const { wrapper, row, request } = render();
+  it("lists the access entries and the history", async () => {
+    const { wrapper, row } = render();
     await flushPromises();
     expect(row(ME).text()).toContain("Albus");
     expect(row(ME).find('[data-testid="entry-last-sign-in"]').text()).toBe("30/10/2026");
     expect(row("severus@alj.example").find('[data-testid="entry-last-sign-in"]').text()).toBe("Jamais");
     expect((row("severus@alj.example").find('[data-testid="entry-role"]').element as HTMLSelectElement).value).toBe("coach");
-    expect(request("draco@alj.example").text()).toContain("Draco Malfoy");
     const history = wrapper.find('[data-testid="history"]').text();
     expect(history).toContain("Rôle modifié");
     expect(history).toContain("Lecture seule → Coach");
@@ -107,8 +120,41 @@ describe("AdministrationAccessPage", () => {
     expect(row("severus@alj.example").find('[data-testid="entry-remove"]').attributes("disabled")).toBeUndefined();
   });
 
-  it("adds a person, after checking the address", async () => {
-    const { wrapper, writes } = render({ "POST /api/admin/access/roles": (body) => json(entry("x", "coach", body as object), 201) });
+  it("shows where each invitation stands, with a resend for the pending and expired ones", async () => {
+    const { row } = render();
+    await flushPromises();
+    expect(row("severus@alj.example").find('[data-testid="entry-status"]').text()).toBe("Actif");
+    expect(row("severus@alj.example").find('[data-testid="entry-resend"]').exists()).toBe(false);
+    expect(row("neville@alj.example").find('[data-testid="entry-status"]').text()).toBe("Invité · expire le 06/11/2026");
+    expect(row("neville@alj.example").find('[data-testid="entry-email-not-sent"]').exists()).toBe(false);
+    expect(row("neville@alj.example").find('[data-testid="entry-resend"]').exists()).toBe(true);
+    const expired = row("draco@alj.example");
+    expect(expired.find('[data-testid="entry-status"]').text()).toContain("Invitation expirée le 27/10/2026");
+    expect(expired.find('[data-testid="entry-email-not-sent"]').exists()).toBe(true);
+  });
+
+  it("resends an invitation", async () => {
+    const { wrapper, row, writes } = render({
+      "POST /api/admin/access/roles/draco@alj.example/invitation": () => json(invitation("draco@alj.example")),
+    });
+    await flushPromises();
+    await row("draco@alj.example").find('[data-testid="entry-resend"]').trigger("click");
+    await flushPromises();
+    expect(writes()).toEqual([{ method: "POST", path: "/api/admin/access/roles/draco@alj.example/invitation", body: undefined }]);
+    expect(wrapper.text()).toContain("Invitation envoyée à draco@alj.example");
+  });
+
+  it("says when the invitation was kept but its e-mail failed", async () => {
+    const { wrapper } = render({ "POST /api/admin/access/roles": () => json(invitation("luna@alj.example", false), 201) });
+    await flushPromises();
+    await wrapper.find('[data-testid="access-email"]').setValue("luna@alj.example");
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(wrapper.text()).toContain("l'e-mail n'a pas pu être envoyé : quota dépassé");
+  });
+
+  it("invites a person, after checking the address", async () => {
+    const { wrapper, writes } = render({ "POST /api/admin/access/roles": () => json(invitation("neville@alj.example"), 201) });
     await flushPromises();
     await wrapper.find('[data-testid="access-add"]').trigger("submit");
     expect(wrapper.find('[data-testid="access-add-error"]').text()).toContain("Saisissez");
@@ -170,30 +216,6 @@ describe("AdministrationAccessPage", () => {
     await flushPromises();
     expect(confirm).toHaveBeenCalledTimes(2);
     expect(writes()).toEqual([{ method: "DELETE", path: "/api/admin/access/roles/severus@alj.example", body: undefined }]);
-  });
-
-  it("grants a request with the chosen role, or dismisses it", async () => {
-    const { request, writes } = render({
-      "POST /api/admin/access/requests/draco@alj.example/grant": () => json(entry("draco@alj.example", "coach"), 201),
-    });
-    await flushPromises();
-    const grant = request("draco@alj.example").find('[data-testid="request-grant"]');
-    expect(grant.attributes("disabled")).toBeDefined(); // no role chosen yet
-    await request("draco@alj.example").find('[data-testid="request-role"]').setValue("coach");
-    await grant.trigger("click");
-    await flushPromises();
-    await request("draco@alj.example").find('[data-testid="request-dismiss"]').trigger("click");
-    await flushPromises();
-    expect(writes()).toEqual([
-      { method: "POST", path: "/api/admin/access/requests/draco@alj.example/grant", body: { role: "coach" } },
-      { method: "DELETE", path: "/api/admin/access/requests/draco@alj.example", body: undefined },
-    ]);
-  });
-
-  it("says when there is no request", async () => {
-    const { wrapper } = render({ "GET /api/admin/access/requests": () => json([]) });
-    await flushPromises();
-    expect(wrapper.find('[data-testid="requests-empty"]').exists()).toBe(true);
   });
 
   it("shows a load error with a retry", async () => {

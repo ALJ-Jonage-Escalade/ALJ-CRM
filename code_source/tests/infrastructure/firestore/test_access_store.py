@@ -1,4 +1,4 @@
-"""Firestore access store: the three collections, through FirestoreClient (in-memory stand-in)."""
+"""Firestore access store: the two collections, through FirestoreClient (in-memory stand-in)."""
 
 from __future__ import annotations
 
@@ -30,12 +30,20 @@ class TestFirestoreAccessStore(unittest.TestCase):
         self.store.delete_role("a@alj.example")
         self.assertIsNone(self.store.get_role("a@alj.example"))
 
-    def test_requests_and_history(self):
-        self.store.save_request({"email": "d@alj.example", "google_display_name": "D", "first_requested_at": "t1",
-                                 "last_requested_at": "t2", "dismissed_at": None})
-        self.assertEqual(self.store.get_request("d@alj.example")["last_requested_at"], "t2")
-        self.store.delete_request("d@alj.example")
-        self.assertEqual(self.store.list_requests(), [])
+    def test_invitation_fields(self):
+        self.store.create_role(role_entry("i@alj.example", "coach", invited_at="2026-10-30T09:00:00+00:00",
+                                          invitation_expires_at="2026-11-06T09:00:00+00:00"))
+        self.store.update_role("i@alj.example", {"invitation_expires_at": None, "accepted_at": "2026-10-31T09:00:00+00:00"})
+        entry = self.store.get_role("i@alj.example")
+        self.assertEqual((entry["invited_at"], entry["invitation_expires_at"], entry["invitation_sent_at"], entry["accepted_at"]),
+                         ("2026-10-30T09:00:00+00:00", None, None, "2026-10-31T09:00:00+00:00"))
+
+    def test_entry_written_before_invitations(self):
+        self.fake.store.setdefault(access_store.ROLES_COLLECTION, {})["old@alj.example"] = {"email": "old@alj.example", "role": "coach"}
+        entry = self.store.get_role("old@alj.example")
+        self.assertEqual((entry["invited_at"], entry["invitation_expires_at"], entry["accepted_at"]), (None, None, None))
+
+    def test_history(self):
         for at in ("2026-10-30T09:00:00+00:00", "2026-10-30T09:00:00+00:00", "2026-10-31T09:00:00+00:00"):  # same second: two entries
             self.store.add_history({"at": at, "author": "bootstrap", "action": "bootstrap",
                                     "target_email": "a@alj.example", "old_role": None, "new_role": "admin"})

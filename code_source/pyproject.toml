@@ -135,6 +135,7 @@ files = [
     "src/services/access/__init__.py",
     "src/services/access/rules.py",
     "src/services/access/bootstrap.py",
+    "src/services/access/invitations.py",
     "src/api/admin/__init__.py",
     "src/api/admin/schemas.py",
     "src/api/admin/access.py",

@@ -124,6 +124,23 @@ gcloud run services update alj-escalade-api --region europe-west1 \
 - **Retour arrière** : revenir à une révision antérieure à cette variable (`--rollback`) fait perdre l'accès de
   secours, pas la liste des accès (elle est dans Firestore, indépendante du code).
 
+### ✉️ Adresse publique du bureau (`APP_PUBLIC_URL`, pour les invitations)
+
+L'accès au CRM se fait **sur invitation** : sur **Administration › Accès**, un administrateur invite une adresse avec
+un rôle, et la personne reçoit un e-mail avec le lien du bureau. Elle obtient son rôle en se connectant avec un compte
+Google de cette adresse dans les **7 jours** (sinon : bouton « Renvoyer »). Le lien de l'e-mail est construit à partir
+de cette variable :
+
+```bash
+gcloud run services update alj-escalade-api --region europe-west1 \
+    --update-env-vars APP_PUBLIC_URL=https://alj-escalade-api-xxxxxxxx-ew.a.run.app
+```
+
+- Adresse sans `/bureau/` (ajouté par le serveur) : l'URL `run.app` du service, ou le domaine personnalisé s'il y en a un.
+- Les déploiements (section 7 et `deploy_cloud_run.sh`) gardent la variable.
+- Sans elle, le lien reprend l'adresse de la page de l'administrateur : une invitation envoyée depuis la révision de
+  test (`--test`) pointerait alors vers l'URL de test, supprimée par `--cleanup`.
+
 ---
 
 ## 5. 🔔 Configuration du Webhook dans HelloAsso
@@ -229,7 +246,7 @@ Vérifiez dans la PWA mobile que l'adhérent Lucas MARTIN passe immédiatement e
    ```
    *(La redirection automatique depuis `/` vers `/bureau/` s'opère pour tout navigateur d'ordinateur).*
 2. Connectez-vous avec un compte Google listé sur la page **Administration › Accès** (au premier déploiement :
-   l'adresse `BOOTSTRAP_ADMIN_EMAIL`). Un compte non listé est refusé et sa demande apparaît dans « Demandes d'accès ».
+   l'adresse `BOOTSTRAP_ADMIN_EMAIL`). Un compte non invité est refusé : un administrateur l'invite depuis cette page.
 3. Accédez à la page **Adhérents** (`/bureau/adherents`) :
    - Vérifiez l'affichage complet du tableau avec le tri interactif sur chaque colonne.
    - Testez le filtrage des sous-catégories (par défaut, les listes d'attente sont exclues).

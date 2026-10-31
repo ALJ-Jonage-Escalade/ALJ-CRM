@@ -1,6 +1,8 @@
-"""Access rules: changes to the access list, their safeguards and history, the access requests and sign-in dates."""
+"""Access rules: invitations and changes to the access list, their safeguards and history, and sign-ins."""
 
 from __future__ import annotations
+
+from unittest.mock import patch
 
 import pytest
 
@@ -44,35 +46,146 @@ def actions(store: InMemoryAccessStore) -> list[tuple[str, str, str | None, str 
     return [(h["action"], h["target_email"], h["old_role"], h["new_role"]) for h in store.history]
 
 
-# ---------------------------------------------------------------- Changes
-def test_grant_normalises_and_records(rules: AccessRules, store: InMemoryAccessStore) -> None:
-    entry = rules.grant(ADMIN, "  Neville@ALJ.example ", "coach", "  Neville   L. ")
+# ---------------------------------------------------------------- Invitations
+def test_invite_normalises_and_records(rules: AccessRules, store: InMemoryAccessStore) -> None:
+    entry = rules.invite(ADMIN, "  Neville@ALJ.example ", "coach", "  Neville   L. ")
     assert entry["email"] == "neville@alj.example"
-    assert store.roles["neville@alj.example"]["role"] == "coach"
-    assert store.roles["neville@alj.example"]["display_name"] == "Neville L."
-    assert store.roles["neville@alj.example"]["created_by"] == ADMIN
-    assert actions(store) == [("added", "neville@alj.example", None, "coach")]
+    assert store.roles["neville@alj.example"] == entry
+    assert (entry["role"], entry["display_name"], entry["created_by"]) == ("coach", "Neville L.", ADMIN)
+    assert (entry["invited_at"], entry["invitation_expires_at"]) == ("2026-10-30T09:00:00+00:00", "2026-11-06T09:00:00+00:00")
+    assert entry["invitation_sent_at"] is None and entry["accepted_at"] is None
+    assert actions(store) == [("invited", "neville@alj.example", None, "coach")]
     assert store.history[0]["author"] == ADMIN
     assert store.history[0]["at"] == "2026-10-30T09:00:00+00:00"
 
 
 @pytest.mark.parametrize("email", ["", "pas-une-adresse", "a@b"])
-def test_grant_refuses_an_invalid_address(rules: AccessRules, store: InMemoryAccessStore, email: str) -> None:
+def test_invite_refuses_an_invalid_address(rules: AccessRules, store: InMemoryAccessStore, email: str) -> None:
     with pytest.raises(InvalidRequest):
-        rules.grant(ADMIN, email, "coach")
+        rules.invite(ADMIN, email, "coach")
     assert store.history == []
 
 
-def test_grant_refuses_an_unknown_role(rules: AccessRules) -> None:
+def test_invite_refuses_an_unknown_role(rules: AccessRules) -> None:
     with pytest.raises(InvalidRequest):
-        rules.grant(ADMIN, STRANGER, "owner")
+        rules.invite(ADMIN, STRANGER, "owner")
 
 
-def test_grant_refuses_a_listed_address(rules: AccessRules, store: InMemoryAccessStore) -> None:
-    with pytest.raises(Conflict, match="déjà un accès"):
-        rules.grant(ADMIN, " SEVERUS@alj.example", "admin")
+def test_invite_refuses_a_listed_address(rules: AccessRules, store: InMemoryAccessStore) -> None:
+    with pytest.raises(Conflict, match="déjà un accès") as refused:
+        rules.invite(ADMIN, " SEVERUS@alj.example", "admin")
+    assert refused.value.code == "already_listed"
     assert store.roles[COACH]["role"] == "coach"
     assert store.history == []
+
+
+def test_invite_twice_points_to_resend(rules: AccessRules) -> None:
+    rules.invite(ADMIN, STRANGER, "coach")
+    with pytest.raises(Conflict, match="Renvoyer") as refused:
+        rules.invite(ADMIN, STRANGER, "admin")
+    assert refused.value.code == "already_invited"
+
+
+def test_pending_invitation_gives_the_role_until_it_expires(rules: AccessRules, directory: RoleDirectory, clock: FakeClock) -> None:
+    rules.invite(ADMIN, STRANGER, "coach")
+    clock.advance(days=7, seconds=-1)
+    assert directory.role_of(STRANGER) == Role.COACH
+    assert directory.expired_invitation_of(STRANGER) is None
+    clock.advance(seconds=1)
+    assert directory.role_of(STRANGER) is None
+    assert directory.expired_invitation_of(STRANGER) == "2026-11-06T09:00:00+00:00"
+
+
+def test_entries_without_invitation_never_expire(directory: RoleDirectory, clock: FakeClock) -> None:
+    clock.advance(days=365)
+    assert directory.role_of(COACH) == Role.COACH
+    assert directory.expired_invitation_of(COACH) is None
+    assert directory.expired_invitation_of(STRANGER) is None
+
+
+def test_unreadable_expiry_counts_as_expired(store: InMemoryAccessStore, directory: RoleDirectory) -> None:
+    store.save_role(role_entry(STRANGER, "coach", invitation_expires_at="bientôt"))
+    assert directory.role_of(STRANGER) is None
+
+
+def test_bootstrap_address_stays_admin_with_an_expired_invitation(store: InMemoryAccessStore, clock: FakeClock) -> None:
+    store.save_role(role_entry(STRANGER, "readonly", invitation_expires_at="2026-10-01T09:00:00+00:00"))
+    assert RoleDirectory(store, clock, bootstrap_email=STRANGER).role_of(STRANGER) == Role.ADMIN
+
+
+def test_accept_invitation(rules: AccessRules, directory: RoleDirectory, store: InMemoryAccessStore, clock: FakeClock) -> None:
+    rules.invite(ADMIN, STRANGER, "coach")
+    clock.advance(days=3)
+    rules.accept_invitation(" Draco@ALJ.example")
+    assert store.roles[STRANGER]["invitation_expires_at"] is None
+    assert store.roles[STRANGER]["accepted_at"] == "2026-11-02T09:00:00+00:00"
+    clock.advance(days=30)
+    assert directory.role_of(STRANGER) == Role.COACH
+    writes = store.writes
+    rules.accept_invitation(STRANGER)  # already accepted: nothing written
+    assert store.writes == writes
+
+
+def test_accept_is_tried_again_after_a_failed_write(rules: AccessRules, store: InMemoryAccessStore) -> None:
+    rules.invite(ADMIN, STRANGER, "coach")
+    with patch.object(store, "update_role", side_effect=RuntimeError("quota")), pytest.raises(RuntimeError):
+        rules.accept_invitation(STRANGER)
+    rules.accept_invitation(STRANGER)  # same day, same instance: not remembered as done
+    assert store.roles[STRANGER]["invitation_expires_at"] is None
+
+
+def test_accept_skips_an_entry_removed_meanwhile(rules: AccessRules, directory: RoleDirectory, store: InMemoryAccessStore) -> None:
+    rules.invite(ADMIN, STRANGER, "coach")
+    directory.entries()  # cached with the invitation
+    del store.roles[STRANGER]  # removed on another instance
+    rules.accept_invitation(STRANGER)
+    assert STRANGER not in store.roles
+
+
+def test_accept_ignores_entries_without_invitation(rules: AccessRules, store: InMemoryAccessStore) -> None:
+    rules.accept_invitation(COACH)
+    rules.accept_invitation(STRANGER)
+    assert store.writes == 0
+
+
+def test_renew_invitation(rules: AccessRules, directory: RoleDirectory, store: InMemoryAccessStore, clock: FakeClock) -> None:
+    rules.invite(ADMIN, STRANGER, "coach")
+    rules.mark_invitation_sent(STRANGER)
+    clock.advance(days=10)
+    assert directory.role_of(STRANGER) is None
+    entry = rules.renew_invitation(OTHER_ADMIN, STRANGER)
+    assert (entry["invited_at"], entry["invitation_expires_at"]) == ("2026-11-09T09:00:00+00:00", "2026-11-16T09:00:00+00:00")
+    assert entry["invitation_sent_at"] is None
+    assert store.roles[STRANGER] == entry
+    assert directory.role_of(STRANGER) == Role.COACH
+    assert actions(store)[-1] == ("invitation_resent", STRANGER, "coach", "coach")
+    assert store.history[-1]["author"] == OTHER_ADMIN
+
+
+def test_renew_refused_for_an_accepted_access(rules: AccessRules) -> None:
+    with pytest.raises(Conflict) as refused:
+        rules.renew_invitation(ADMIN, COACH)
+    assert refused.value.code == "not_invited"
+    with pytest.raises(NotFound):
+        rules.renew_invitation(ADMIN, STRANGER)
+
+
+def test_mark_invitation_sent(rules: AccessRules, store: InMemoryAccessStore, clock: FakeClock) -> None:
+    rules.invite(ADMIN, STRANGER, "coach")
+    clock.advance(seconds=2)
+    assert rules.mark_invitation_sent(STRANGER)["invitation_sent_at"] == "2026-10-30T09:00:02+00:00"
+    assert store.roles[STRANGER]["invitation_sent_at"] == "2026-10-30T09:00:02+00:00"
+    assert len(store.history) == 1
+
+
+def test_pending_invitation_can_be_changed_and_removed(rules: AccessRules, store: InMemoryAccessStore) -> None:
+    rules.invite(ADMIN, STRANGER, "coach")
+    assert rules.change_role(ADMIN, STRANGER, "readonly")["invitation_expires_at"] == "2026-11-06T09:00:00+00:00"
+    rules.remove(ADMIN, STRANGER)
+    assert STRANGER not in store.roles
+
+
+# ---------------------------------------------------------------- Changes
 
 
 def test_change_role_applies_at_once(rules: AccessRules, directory: RoleDirectory, store: InMemoryAccessStore) -> None:
@@ -140,83 +253,6 @@ def test_an_admin_among_several_can_go(rules: AccessRules, store: InMemoryAccess
     assert store.roles[OTHER_ADMIN]["role"] == "coach"
 
 
-# ---------------------------------------------------------------- Access requests
-def test_refused_sign_in_becomes_a_request(rules: AccessRules, store: InMemoryAccessStore) -> None:
-    rules.record_refused_sign_in(" Draco@ALJ.example", "Draco Malfoy")
-    assert [r["email"] for r in rules.list_requests()] == [STRANGER]
-    request = store.requests[STRANGER]
-    assert request["google_display_name"] == "Draco Malfoy"
-    assert request["first_requested_at"] == request["last_requested_at"] == "2026-10-30T09:00:00+00:00"
-
-
-def test_repeated_sign_in_updates_the_same_request(rules: AccessRules, store: InMemoryAccessStore, clock: FakeClock) -> None:
-    rules.record_refused_sign_in(STRANGER, "Draco")
-    writes = store.writes
-    rules.record_refused_sign_in(STRANGER, "Draco")  # same day: nothing written
-    assert store.writes == writes
-    clock.advance(days=2)
-    rules.record_refused_sign_in(STRANGER, "Draco M.")
-    assert len(store.requests) == 1
-    assert store.requests[STRANGER]["first_requested_at"] == "2026-10-30T09:00:00+00:00"
-    assert store.requests[STRANGER]["last_requested_at"] == "2026-11-01T09:00:00+00:00"
-    assert store.requests[STRANGER]["google_display_name"] == "Draco M."
-
-
-def test_grant_request(rules: AccessRules, store: InMemoryAccessStore, directory: RoleDirectory) -> None:
-    rules.record_refused_sign_in(STRANGER, "Draco Malfoy")
-    entry = rules.grant_request(ADMIN, STRANGER, "coach")
-    assert entry["display_name"] == "Draco Malfoy"
-    assert directory.role_of(STRANGER) == Role.COACH
-    assert rules.list_requests() == []
-    assert actions(store) == [("request_granted", STRANGER, None, "coach")]
-
-
-def test_grant_without_request(rules: AccessRules) -> None:
-    with pytest.raises(NotFound):
-        rules.grant_request(ADMIN, STRANGER, "coach")
-
-
-def test_manual_grant_clears_the_request(rules: AccessRules) -> None:
-    rules.record_refused_sign_in(STRANGER)
-    rules.grant(ADMIN, STRANGER, "readonly")
-    assert rules.list_requests() == []
-
-
-def test_dismissed_address_ignored_for_30_days(rules: AccessRules, store: InMemoryAccessStore, clock: FakeClock) -> None:
-    rules.record_refused_sign_in(STRANGER)
-    rules.dismiss_request(ADMIN, STRANGER)
-    assert rules.list_requests() == []
-    assert actions(store) == [("request_dismissed", STRANGER, None, None)]
-    clock.advance(days=29)
-    rules.record_refused_sign_in(STRANGER)
-    assert rules.list_requests() == []
-    clock.advance(days=1)
-    rules.record_refused_sign_in(STRANGER)
-    assert [r["email"] for r in rules.list_requests()] == [STRANGER]
-    assert store.requests[STRANGER]["first_requested_at"] == "2026-11-29T09:00:00+00:00"
-
-
-def test_requests_older_than_30_days_dropped(rules: AccessRules, store: InMemoryAccessStore, clock: FakeClock) -> None:
-    rules.record_refused_sign_in(STRANGER)
-    clock.advance(days=10)
-    rules.record_refused_sign_in("neville@alj.example")
-    clock.advance(days=20)
-    assert [r["email"] for r in rules.list_requests()] == ["neville@alj.example"]
-    assert STRANGER not in store.requests  # deleted on read
-
-
-def test_requests_latest_first(rules: AccessRules, clock: FakeClock) -> None:
-    rules.record_refused_sign_in(STRANGER)
-    clock.advance(hours=1)
-    rules.record_refused_sign_in("neville@alj.example")
-    assert [r["email"] for r in rules.list_requests()] == ["neville@alj.example", STRANGER]
-
-
-def test_invalid_address_never_recorded(rules: AccessRules, store: InMemoryAccessStore) -> None:
-    rules.record_refused_sign_in("not an address")
-    assert store.requests == {}
-
-
 # ---------------------------------------------------------------- Sign-in dates
 def test_last_sign_in_written_once_a_day(rules: AccessRules, store: InMemoryAccessStore, clock: FakeClock) -> None:
     rules.record_sign_in(COACH)
@@ -245,20 +281,21 @@ def test_sign_in_of_an_unlisted_address(rules: AccessRules, store: InMemoryAcces
 
 # ---------------------------------------------------------------- History
 def test_history_latest_first(rules: AccessRules, clock: FakeClock) -> None:
-    rules.grant(ADMIN, STRANGER, "readonly")
+    rules.invite(ADMIN, STRANGER, "readonly")
     clock.advance(minutes=1)
     rules.change_role(ADMIN, STRANGER, "coach")
-    assert [h["action"] for h in rules.history()] == ["role_changed", "added"]
+    assert [h["action"] for h in rules.history()] == ["role_changed", "invited"]
     assert len(rules.history(limit=1)) == 1
 
 
 def test_without_day_memory_the_store_is_read_again(store: InMemoryAccessStore, directory: RoleDirectory, clock: FakeClock) -> None:
-    """Dev mode: the emulator re-seeded under a running server loses the request; the next sign-in records it again."""
+    """Dev mode: the emulator re-seeded under a running server loses the sign-in date; the next sign-in writes it again."""
     rules = AccessRules(store, directory, clock, remember_days=False)
-    rules.record_refused_sign_in(STRANGER)
-    store.requests.clear()  # re-seed
-    rules.record_refused_sign_in(STRANGER)
-    assert STRANGER in store.requests
+    rules.record_sign_in(COACH)
+    store.save_role(role_entry(COACH, "coach"))  # re-seed
+    directory.invalidate()
+    rules.record_sign_in(COACH)
+    assert store.roles[COACH]["last_sign_in_at"] == "2026-10-30T09:00:00+00:00"
 
 
 def test_server_rules_forget_the_days_in_dev_mode(monkeypatch: pytest.MonkeyPatch) -> None:

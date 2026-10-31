@@ -99,16 +99,25 @@ def seed_access_roles() -> None:
     """The access list (Administration › Accès): one entry per dev account (rewritten as seeded), one history entry
     each. The only source of roles: without it, no dev account can sign in."""
     from infrastructure.firestore.access_store import FirestoreAccessStore
-    from services.access.rules import iso
+    from services.access.rules import INVITATION_DAYS, iso
 
     store = FirestoreAccessStore()
-    at = iso(datetime.datetime.now(datetime.timezone.utc))
+    now = datetime.datetime.now(datetime.timezone.utc)
+    at = iso(now)
     for _sub, email, name, role in DEV_ACCOUNTS:
         store.save_role({"email": email, "role": role, "display_name": name, "last_sign_in_at": None,
-                         "created_at": at, "created_by": "seed", "updated_at": at, "updated_by": "seed"})
+                         "created_at": at, "created_by": "seed", "updated_at": at, "updated_by": "seed",
+                         "invited_at": None, "invitation_expires_at": None, "invitation_sent_at": None, "accepted_at": None})
         store.add_history({"at": at, "author": "seed", "action": "added", "target_email": email,
                            "old_role": None, "new_role": role})
-        store.delete_request(email)  # refused before the seed (--access-only): the account now has its role
+    # Two invitations nobody accepted, to see their statuses on the page (no emulator account: nobody can sign in)
+    for email, name, invited_days_ago in ((f"luna.lovegood@{EMAIL_DOMAIN}", "Luna Lovegood", 2),
+                                          (f"gilderoy.lockhart@{EMAIL_DOMAIN}", "Gilderoy Lockhart", 10)):
+        invited = now - datetime.timedelta(days=invited_days_ago)
+        store.save_role({"email": email, "role": "coach", "display_name": name, "last_sign_in_at": None,
+                         "created_at": iso(invited), "created_by": "seed", "updated_at": iso(invited), "updated_by": "seed",
+                         "invited_at": iso(invited), "invitation_expires_at": iso(invited + datetime.timedelta(days=INVITATION_DAYS)),
+                         "invitation_sent_at": iso(invited), "accepted_at": None})
 
 
 # --------------------------------------------------------------------------

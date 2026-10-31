@@ -1,9 +1,9 @@
-"""Who may use the CRM: the access list, the access requests and their history, in Firestore.
+"""Who may use the CRM: the access list and its history, in Firestore.
 
-Three collections, read and written by the server only (firestore.rules refuses every client). No `crm_`
+Two collections, read and written by the server only (firestore.rules refuses every client). No `crm_`
 prefix: they are not copied into the SQLite cache.
-- `access_roles`: one document per normalised e-mail (its id), with the role. The only source of roles.
-- `access_requests`: one document per normalised e-mail that signed in without access.
+- `access_roles`: one document per normalised e-mail (its id), with the role. The only source of roles. An invited
+  person's entry also holds the invitation dates (services/access/rules.py).
 - `access_history`: write-once entries, one per change.
 
 Dates are ISO 8601 strings in UTC (`2026-10-30T09:15:00+00:00`): they sort as text.
@@ -17,7 +17,6 @@ from typing import Any, Dict, List, Optional, Protocol, TypedDict
 from infrastructure.firestore.client import META_KEYS, FirestoreClient
 
 ROLES_COLLECTION = "access_roles"
-REQUESTS_COLLECTION = "access_requests"
 HISTORY_COLLECTION = "access_history"
 
 
@@ -30,20 +29,16 @@ class RoleEntry(TypedDict):
     created_by: Optional[str]
     updated_at: Optional[str]
     updated_by: Optional[str]
-
-
-class AccessRequestEntry(TypedDict):
-    email: str
-    google_display_name: str
-    first_requested_at: str
-    last_requested_at: str
-    dismissed_at: Optional[str]
+    invited_at: Optional[str]
+    invitation_expires_at: Optional[str]  # null: no pending invitation (accepted, or an entry added before invitations)
+    invitation_sent_at: Optional[str]  # null: the invitation e-mail could not be sent
+    accepted_at: Optional[str]
 
 
 class HistoryEntry(TypedDict):
     at: str
     author: str  # e-mail of the admin, or "bootstrap"
-    action: str  # added | role_changed | name_changed | removed | request_granted | request_dismissed | bootstrap
+    action: str  # invited | invitation_resent | added (before invitations) | role_changed | name_changed | removed | bootstrap
     target_email: str
     old_role: Optional[str]
     new_role: Optional[str]
@@ -60,10 +55,6 @@ class AccessStore(Protocol):
     def save_role(self, entry: RoleEntry) -> None: ...
     def update_role(self, email: str, fields: Dict[str, Any]) -> None: ...  # Any: values of RoleEntry fields
     def delete_role(self, email: str) -> None: ...
-    def list_requests(self) -> List[AccessRequestEntry]: ...
-    def get_request(self, email: str) -> Optional[AccessRequestEntry]: ...
-    def save_request(self, entry: AccessRequestEntry) -> None: ...
-    def delete_request(self, email: str) -> None: ...
     def add_history(self, entry: HistoryEntry) -> None: ...
     def list_history(self, limit: int) -> List[HistoryEntry]:
         """The `limit` latest entries, latest first."""
@@ -80,16 +71,10 @@ def _role_entry(doc: Dict[str, Any]) -> RoleEntry:  # Any: a Firestore document
         created_by=doc.get("created_by"),
         updated_at=doc.get("updated_at"),
         updated_by=doc.get("updated_by"),
-    )
-
-
-def _request_entry(doc: Dict[str, Any]) -> AccessRequestEntry:  # Any: a Firestore document
-    return AccessRequestEntry(
-        email=str(doc.get("email") or doc.get("_doc_id") or ""),
-        google_display_name=str(doc.get("google_display_name") or ""),
-        first_requested_at=str(doc.get("first_requested_at") or ""),
-        last_requested_at=str(doc.get("last_requested_at") or ""),
-        dismissed_at=doc.get("dismissed_at"),
+        invited_at=doc.get("invited_at"),
+        invitation_expires_at=doc.get("invitation_expires_at"),
+        invitation_sent_at=doc.get("invitation_sent_at"),
+        accepted_at=doc.get("accepted_at"),
     )
 
 
@@ -129,19 +114,6 @@ class FirestoreAccessStore:
 
     def delete_role(self, email: str) -> None:
         FirestoreClient.delete_document(ROLES_COLLECTION, email)
-
-    def list_requests(self) -> List[AccessRequestEntry]:
-        return [_request_entry(doc) for doc in FirestoreClient.list_documents(REQUESTS_COLLECTION)]
-
-    def get_request(self, email: str) -> Optional[AccessRequestEntry]:
-        doc = FirestoreClient.get_document(REQUESTS_COLLECTION, email)
-        return _request_entry(doc) if doc else None
-
-    def save_request(self, entry: AccessRequestEntry) -> None:
-        FirestoreClient.upsert_document(REQUESTS_COLLECTION, entry["email"], _fields(entry))
-
-    def delete_request(self, email: str) -> None:
-        FirestoreClient.delete_document(REQUESTS_COLLECTION, email)
 
     def add_history(self, entry: HistoryEntry) -> None:
         # Id: the date first (readable in the console), then a random part (two changes in the same second)

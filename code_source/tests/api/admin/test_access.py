@@ -1,4 +1,4 @@
-"""Routes of Administration › Accès (/api/admin/access) and the sign-ins /api/me records, token checks on."""
+"""Routes of Administration › Accès (/api/admin/access) and what /api/me does with invitations, token checks on."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any, Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from server import app
 from support.fake_access import FakeClock, InMemoryAccessStore, install_access, role_entry
@@ -32,13 +32,25 @@ def clock() -> FakeClock:
 
 
 @pytest.fixture
-def client(store: InMemoryAccessStore, clock: FakeClock, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+def sent() -> MagicMock:
+    """The invitation e-mails: EmailRepository.send_email, faked."""
+    return MagicMock(return_value=True)
+
+
+@pytest.fixture
+def client(store: InMemoryAccessStore, clock: FakeClock, sent: MagicMock, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     install_access(store, clock)
     monkeypatch.setenv("ALJ_API_AUTH", "required")
+    monkeypatch.delenv("APP_PUBLIC_URL", raising=False)
     # The token's claims: the e-mail is the bearer token itself (signatures are tested in test_api_security)
     with patch("infrastructure.security.api_auth.verify_firebase_token",
-               side_effect=lambda token: {"sub": token, "email": token, "email_verified": True, "name": "Google Name"}):
+               side_effect=lambda token: {"sub": token, "email": token, "email_verified": True, "name": "Google Name"}), \
+         patch("services.access.invitations.EmailRepository.send_email", sent):
         yield TestClient(app)
+
+
+def me(client: TestClient, who: str) -> Any:  # Any: the JSON body
+    return client.get("/api/me", headers={"Authorization": f"Bearer {who}"}).json()
 
 
 def call(client: TestClient, method: str, path: str, who: str = ADMIN, **body: Any) -> Any:  # Any: JSON bodies
@@ -46,8 +58,7 @@ def call(client: TestClient, method: str, path: str, who: str = ADMIN, **body: A
 
 
 ROUTES = [("GET", "/roles"), ("POST", "/roles"), ("PATCH", f"/roles/{COACH}"), ("DELETE", f"/roles/{COACH}"),
-          ("GET", "/requests"), ("POST", f"/requests/{STRANGER}/grant"), ("DELETE", f"/requests/{STRANGER}"),
-          ("GET", "/history")]
+          ("POST", f"/roles/{COACH}/invitation"), ("GET", "/history")]
 
 
 @pytest.mark.parametrize("method, path", ROUTES)
@@ -68,14 +79,52 @@ def test_list(client: TestClient) -> None:
     assert r.status_code == 200
     assert [(e["email"], e["role"]) for e in r.json()] == [(ADMIN, "admin"), (READONLY, "readonly"), (COACH, "coach")]
     assert set(r.json()[0]) == {"email", "role", "display_name", "last_sign_in_at", "created_at", "created_by",
-                                "updated_at", "updated_by"}
+                                "updated_at", "updated_by", "invited_at", "invitation_expires_at", "invitation_sent_at",
+                                "accepted_at"}
 
 
-def test_add_then_the_person_signs_in(client: TestClient) -> None:
-    r = call(client, "POST", "/roles", email=" Neville@ALJ.example ", role="coach", display_name="Neville")
+def test_invite_then_the_person_signs_in(client: TestClient, store: InMemoryAccessStore, sent: MagicMock, clock: FakeClock) -> None:
+    r = client.post(BASE + "/roles", headers={"Authorization": f"Bearer {ADMIN}", "Origin": "http://localhost:5173"},
+                    json={"email": " Neville@ALJ.example ", "role": "coach", "display_name": "Neville"})
     assert r.status_code == 201
-    assert (r.json()["email"], r.json()["role"], r.json()["created_by"]) == ("neville@alj.example", "coach", ADMIN)
-    assert client.get("/api/me", headers={"Authorization": "Bearer neville@alj.example"}).json()["role"] == "coach"
+    entry = r.json()["entry"]
+    assert (entry["email"], entry["role"], entry["created_by"]) == ("neville@alj.example", "coach", ADMIN)
+    assert (r.json()["email_sent"], r.json()["email_error"]) == (True, None)
+    assert entry["invitation_sent_at"] == "2026-10-30T09:00:00+00:00"
+    assert sent.call_args.kwargs["to_email"] == "neville@alj.example"
+    assert "http://localhost:5173/bureau/" in sent.call_args.kwargs["body"]  # the admin's page, without APP_PUBLIC_URL
+    clock.advance(days=6)
+    assert me(client, "neville@alj.example") == {"email": "neville@alj.example", "role": "coach", "invitation_expired_at": None}
+    assert store.roles["neville@alj.example"]["invitation_expires_at"] is None  # accepted: never expires now
+    assert store.roles["neville@alj.example"]["accepted_at"] == "2026-11-05T09:00:00+00:00"
+    clock.advance(days=30)
+    assert me(client, "neville@alj.example")["role"] == "coach"
+
+
+def test_invitation_expired(client: TestClient, clock: FakeClock) -> None:
+    call(client, "POST", "/roles", email="neville@alj.example", role="coach")
+    clock.advance(days=7)
+    assert me(client, "neville@alj.example") == {"email": "neville@alj.example", "role": None,
+                                                  "invitation_expired_at": "2026-11-06T09:00:00+00:00"}
+    r = call(client, "POST", "/roles/neville@alj.example/invitation")
+    assert r.status_code == 200
+    assert r.json()["entry"]["invitation_expires_at"] == "2026-11-13T09:00:00+00:00"
+    assert me(client, "neville@alj.example")["role"] == "coach"
+
+
+def test_invitation_email_failure(client: TestClient, store: InMemoryAccessStore, sent: MagicMock) -> None:
+    sent.side_effect = ValueError("Aucune configuration d'envoi d'e-mails")
+    r = call(client, "POST", "/roles", email="neville@alj.example", role="coach")
+    assert r.status_code == 201
+    assert (r.json()["email_sent"], r.json()["email_error"]) == (False, "Aucune configuration d'envoi d'e-mails")
+    assert store.roles["neville@alj.example"]["invitation_sent_at"] is None
+
+
+def test_resend_refused_for_an_accepted_access(client: TestClient, sent: MagicMock) -> None:
+    r = call(client, "POST", f"/roles/{COACH}/invitation")
+    assert (r.status_code, r.json()["code"]) == (409, "not_invited")
+    assert call(client, "POST", f"/roles/{STRANGER}/invitation").status_code == 404
+    sent.assert_not_called()
 
 
 def test_add_refusals(client: TestClient) -> None:
@@ -84,6 +133,9 @@ def test_add_refusals(client: TestClient) -> None:
     assert "invalide" in r.json()["message"]
     r = call(client, "POST", "/roles", email=COACH.upper(), role="admin")
     assert (r.status_code, r.json()["code"]) == (409, "already_listed")
+    call(client, "POST", "/roles", email="neville@alj.example", role="coach")
+    r = call(client, "POST", "/roles", email="neville@alj.example", role="coach")
+    assert (r.status_code, r.json()["code"]) == (409, "already_invited")
     assert call(client, "POST", "/roles", email=STRANGER, role="owner").status_code == 422
 
 
@@ -111,51 +163,35 @@ def test_remove(client: TestClient) -> None:
     assert client.get("/api/email-status", headers={"Authorization": f"Bearer {COACH}"}).status_code == 403
 
 
-def test_request_from_a_refused_sign_in_then_granted(client: TestClient, store: InMemoryAccessStore) -> None:
-    me = client.get("/api/me", headers={"Authorization": f"Bearer {STRANGER}"})
-    assert me.json() == {"email": STRANGER, "role": None}
-    requests = call(client, "GET", "/requests").json()
-    assert requests == [{"email": STRANGER, "google_display_name": "Google Name",
-                         "first_requested_at": "2026-10-30T09:00:00+00:00", "last_requested_at": "2026-10-30T09:00:00+00:00"}]
-    r = call(client, "POST", f"/requests/{STRANGER}/grant", role="coach")
-    assert r.status_code == 201
-    assert (r.json()["role"], r.json()["display_name"]) == ("coach", "Google Name")
-    assert call(client, "GET", "/requests").json() == []
-    assert client.get("/api/me", headers={"Authorization": f"Bearer {STRANGER}"}).json()["role"] == "coach"
-    assert call(client, "POST", f"/requests/{STRANGER}/grant", role="coach").status_code == 404
-
-
-def test_dismiss_request(client: TestClient) -> None:
-    client.get("/api/me", headers={"Authorization": f"Bearer {STRANGER}"})
-    assert call(client, "DELETE", f"/requests/{STRANGER}").json() == {"status": "success"}
-    assert call(client, "GET", "/requests").json() == []
-    assert call(client, "DELETE", f"/requests/{STRANGER}").status_code == 404
-
-
 def test_history(client: TestClient, clock: FakeClock) -> None:
     call(client, "POST", "/roles", email=STRANGER, role="readonly")
     clock.advance(minutes=1)
     call(client, "PATCH", f"/roles/{STRANGER}", role="coach")
     history = call(client, "GET", "/history").json()
     assert [(h["action"], h["author"], h["old_role"], h["new_role"]) for h in history] == [
-        ("role_changed", ADMIN, "readonly", "coach"), ("added", ADMIN, None, "readonly")]
+        ("role_changed", ADMIN, "readonly", "coach"), ("invited", ADMIN, None, "readonly")]
 
 
 def test_me_records_the_sign_in_date(client: TestClient, store: InMemoryAccessStore) -> None:
     client.get("/api/me", headers={"Authorization": f"Bearer {COACH}"})
     assert store.roles[COACH]["last_sign_in_at"] == "2026-10-30T09:00:00+00:00"
-    assert store.requests == {}
 
 
-def test_me_passes_on_503_and_records_nothing(client: TestClient, store: InMemoryAccessStore) -> None:
+def test_me_of_a_stranger_writes_nothing(client: TestClient, store: InMemoryAccessStore) -> None:
+    assert me(client, STRANGER) == {"email": STRANGER, "role": None, "invitation_expired_at": None}
+    assert store.writes == 3  # the fixture's entries only
+
+
+def test_me_passes_on_503(client: TestClient, store: InMemoryAccessStore) -> None:
     store.failing = True
     r = client.get("/api/me", headers={"Authorization": f"Bearer {STRANGER}"})
     assert (r.status_code, r.json()["code"]) == (503, "access_unavailable")
-    store.failing = False
-    assert store.requests == {}
 
 
-def test_me_answers_when_the_record_fails(client: TestClient, store: InMemoryAccessStore) -> None:
-    with patch.object(store, "save_request", side_effect=RuntimeError("quota")):
-        r = client.get("/api/me", headers={"Authorization": f"Bearer {STRANGER}"})
-    assert r.json() == {"email": STRANGER, "role": None}
+def test_me_answers_when_the_acceptance_fails(client: TestClient, store: InMemoryAccessStore) -> None:
+    call(client, "POST", "/roles", email="neville@alj.example", role="coach")
+    with patch.object(store, "update_role", side_effect=RuntimeError("quota")):
+        assert me(client, "neville@alj.example")["role"] == "coach"
+    assert store.roles["neville@alj.example"]["invitation_expires_at"] is not None
+    me(client, "neville@alj.example")  # tried again on the next page load
+    assert store.roles["neville@alj.example"]["invitation_expires_at"] is None

@@ -4,8 +4,13 @@ Every change goes through here: it enforces the safeguards (no admin removes or 
 keeps an admin), writes exactly one history entry and drops the role cache of this instance, so the change applies
 at once here and within a minute on the others (role_directory.CACHE_SECONDS).
 
-Sign-ins (GET /api/me) record the last sign-in date of a listed person, or an access request for an unknown one,
-at most once a day per address and instance: /api/me is called on every page load.
+Access is by invitation only: an admin invites an address with a role, and the person gets it by signing in with a
+Google account of that address within INVITATION_DAYS (role_directory: an expired invitation gives no role). The
+invitation e-mail is only a convenience, sent by services/access/invitations.py.
+
+Sign-ins (GET /api/me) accept a pending invitation (on every call until the write succeeds) and record the last
+sign-in date, at most once a day per address and instance: /api/me is called on every page load. An address without
+access leaves nothing.
 """
 
 from __future__ import annotations
@@ -17,16 +22,16 @@ from typing import Dict, List, Optional
 
 from domain.validators import validate_email
 from infrastructure import runtime_env
-from infrastructure.firestore.access_store import AccessRequestEntry, AccessStore, HistoryEntry, RoleEntry
+from infrastructure.firestore.access_store import AccessStore, HistoryEntry, RoleEntry
 from infrastructure.security import role_directory
-from infrastructure.security.role_directory import Clock, RoleDirectory, normalized_email
+from infrastructure.security.role_directory import Clock, RoleDirectory, invitation_expired, normalized_email, parsed
 from infrastructure.security.roles import ROLES_BY_NAME, RoleName
 from services.errors import Conflict, InvalidRequest, NotFound
 
 logger = logging.getLogger("alj")
 
-# A dismissed address is not recorded again for this long; a request nobody answered is dropped after it
-REQUEST_DAYS = 30
+# An invitation not accepted within this time gives no role until an admin resends it
+INVITATION_DAYS = 7
 HISTORY_LIMIT = 50
 DISPLAY_NAME_MAX = 100
 BOOTSTRAP_AUTHOR = "bootstrap"
@@ -34,16 +39,6 @@ BOOTSTRAP_AUTHOR = "bootstrap"
 
 def iso(at: datetime.datetime) -> str:
     return at.astimezone(datetime.timezone.utc).isoformat(timespec="seconds")
-
-
-def parsed(value: Optional[str]) -> Optional[datetime.datetime]:
-    if not value:
-        return None
-    try:
-        at = datetime.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return at if at.tzinfo else at.replace(tzinfo=datetime.timezone.utc)
 
 
 def checked_email(email: object) -> str:
@@ -77,7 +72,6 @@ class AccessRules:
         # reading the store again. Off in dev mode, where a re-seed empties the store under a running server.
         self._remember_days = remember_days
         self._sign_in_days: Dict[str, datetime.date] = {}
-        self._request_days: Dict[str, datetime.date] = {}
 
     # ------------------------------------------------------------------ Reads
     def list_roles(self) -> List[RoleEntry]:
@@ -90,32 +84,52 @@ class AccessRules:
             raise NotFound(f"Aucun accès pour {normalized_email(email)}.", "not_listed")
         return entry
 
-    def list_requests(self) -> List[AccessRequestEntry]:
-        """Pending requests, latest first. Requests nobody answered for REQUEST_DAYS, and dismissals older than that,
-        are deleted here."""
-        now = self.clock()
-        pending: List[AccessRequestEntry] = []
-        for request in self.store.list_requests():
-            dismissed = parsed(request["dismissed_at"])
-            last = parsed(request["last_requested_at"]) or parsed(request["first_requested_at"])
-            if dismissed is not None:
-                if self._expired(dismissed, now):
-                    self.store.delete_request(request["email"])
-                continue
-            if last is None or self._expired(last, now):
-                self.store.delete_request(request["email"])
-                continue
-            pending.append(request)
-        return sorted(pending, key=lambda request: request["last_requested_at"], reverse=True)
-
     def history(self, limit: int = HISTORY_LIMIT) -> List[HistoryEntry]:
         """The latest changes, latest first: only those are read."""
         return self.store.list_history(limit)
 
     # ------------------------------------------------------------------ Changes
-    def grant(self, author: str, email: str, role: str, display_name: str = "") -> RoleEntry:
-        """Gives access to a new address; refused when it already has one."""
-        return self._create(author, checked_email(email), checked_role(role), display_name, "added")
+    def invite(self, author: str, email: str, role: str, display_name: str = "") -> RoleEntry:
+        """Invites a new address for INVITATION_DAYS; refused when it is already listed. The e-mail is not sent here
+        (`mark_invitation_sent` once it is)."""
+        address = checked_email(email)
+        new_role = checked_role(role)
+        now = self.clock()
+        at = iso(now)
+        entry = RoleEntry(email=address, role=new_role, display_name=clean_display_name(display_name), last_sign_in_at=None,
+                          created_at=at, created_by=author, updated_at=at, updated_by=author, invited_at=at,
+                          invitation_expires_at=iso(now + datetime.timedelta(days=INVITATION_DAYS)),
+                          invitation_sent_at=None, accepted_at=None)
+        if not self.store.create_role(entry):
+            existing = self.store.get_role(address)
+            if existing is not None and existing["invitation_expires_at"]:
+                raise Conflict(f"{address} a déjà une invitation : utilisez « Renvoyer » pour l'envoyer à nouveau.",
+                               "already_invited")
+            raise Conflict(f"{address} a déjà un accès.", "already_listed")
+        self._history(author, "invited", address, None, new_role)
+        self.directory.invalidate()
+        return entry
+
+    def renew_invitation(self, author: str, email: str) -> RoleEntry:
+        """A pending or expired invitation gets INVITATION_DAYS again (before its e-mail is sent again); refused for
+        an accepted invitation or an entry added before invitations."""
+        entry = self.entry_of(email)
+        if not entry["invitation_expires_at"]:
+            raise Conflict(f"{entry['email']} a déjà accepté son accès : rien à renvoyer.", "not_invited")
+        now = self.clock()
+        changed = self._updated(author, entry, invited_at=iso(now),
+                                invitation_expires_at=iso(now + datetime.timedelta(days=INVITATION_DAYS)),
+                                invitation_sent_at=None)
+        self._history(author, "invitation_resent", entry["email"], entry["role"], entry["role"])
+        return changed
+
+    def mark_invitation_sent(self, email: str) -> RoleEntry:
+        """The invitation e-mail of this entry went out (no history entry: the invitation already has one)."""
+        entry = self.entry_of(email)
+        fields = {"invitation_sent_at": iso(self.clock())}
+        self.store.update_role(entry["email"], fields)
+        self.directory.invalidate()
+        return RoleEntry(**{**entry, **fields})  # type: ignore[typeddict-item]  # fields are RoleEntry keys
 
     def change_role(self, author: str, email: str, role: str) -> RoleEntry:
         entry = self.entry_of(email)
@@ -149,19 +163,21 @@ class AccessRules:
         self._history(author, "removed", entry["email"], entry["role"], None)
         self.directory.invalidate()
 
-    def grant_request(self, author: str, email: str, role: str, display_name: Optional[str] = None) -> RoleEntry:
-        """Gives access to a pending request: the request becomes an entry of the list."""
-        request = self._pending_request(email)
-        name = request["google_display_name"] if display_name is None else display_name
-        return self._create(author, request["email"], checked_role(role), name, "request_granted")
-
-    def dismiss_request(self, author: str, email: str) -> None:
-        """The request leaves the list; the address is not recorded again for REQUEST_DAYS."""
-        request = self._pending_request(email)
-        self.store.save_request({**request, "dismissed_at": iso(self.clock())})
-        self._history(author, "request_dismissed", request["email"], None, None)
-
     # ------------------------------------------------------------------ Sign-ins (GET /api/me)
+    def accept_invitation(self, email: str) -> None:
+        """A person with a role signed in: their pending invitation becomes an accepted one. Checked on every sign-in
+        (not once a day), so a failed write is tried again on the next one."""
+        email = normalized_email(email)
+        cached = self.directory.entries().get(email)
+        if cached is None or not cached["invitation_expires_at"]:
+            return
+        entry = self.store.get_role(email)  # read again: the cache may still hold an entry removed meanwhile
+        if entry is None or not entry["invitation_expires_at"] or invitation_expired(entry, self.clock()):
+            self.directory.invalidate()
+            return
+        self.store.update_role(email, {"invitation_expires_at": None, "accepted_at": iso(self.clock())})
+        self.directory.invalidate()
+
     def record_sign_in(self, email: str) -> None:
         """Last sign-in date of a listed person, written at most once a day."""
         email = normalized_email(email)
@@ -177,55 +193,8 @@ class AccessRules:
             self.store.update_role(email, {"last_sign_in_at": iso(now)})
         self._sign_in_days[email] = today
 
-    def record_refused_sign_in(self, email: str, google_display_name: str = "") -> None:
-        """An access request for a verified address without access: one per address, updated on a new sign-in, not
-        recorded while dismissed less than REQUEST_DAYS ago."""
-        try:
-            email = checked_email(email)
-        except InvalidRequest:
-            return
-        now = self.clock()
-        today = now.date()
-        if self._remembered(self._request_days, email, today):
-            return
-        request = self.store.get_request(email)
-        self._request_days[email] = today
-        if request is not None:
-            dismissed = parsed(request["dismissed_at"])
-            if dismissed is not None and not self._expired(dismissed, now):
-                return
-            last = parsed(request["last_requested_at"])
-            if dismissed is None and last is not None and not self._expired(last, now):
-                self.store.save_request({**request, "last_requested_at": iso(now),
-                                         "google_display_name": clean_display_name(google_display_name)
-                                         or request["google_display_name"]})
-                return
-        self.store.save_request(AccessRequestEntry(
-            email=email, google_display_name=clean_display_name(google_display_name),
-            first_requested_at=iso(now), last_requested_at=iso(now), dismissed_at=None))
-
     # ------------------------------------------------------------------ Helpers
-    def _create(self, author: str, email: str, role: RoleName, display_name: str, action: str) -> RoleEntry:
-        at = iso(self.clock())
-        entry = RoleEntry(email=email, role=role, display_name=clean_display_name(display_name), last_sign_in_at=None,
-                          created_at=at, created_by=author, updated_at=at, updated_by=author)
-        if not self.store.create_role(entry):
-            raise Conflict(f"{email} a déjà un accès.", "already_listed")
-        if self.store.get_request(email) is not None:
-            self.store.delete_request(email)  # the person now has access
-        self._request_days.pop(email, None)
-        self._history(author, action, email, None, role)
-        self.directory.invalidate()
-        return entry
-
-    def _pending_request(self, email: str) -> AccessRequestEntry:
-        email = normalized_email(email)
-        request = next((r for r in self.list_requests() if r["email"] == email), None)
-        if request is None:
-            raise NotFound(f"Aucune demande d'accès en attente pour {email}.", "no_request")
-        return request
-
-    def _updated(self, author: str, entry: RoleEntry, **fields: str) -> RoleEntry:
+    def _updated(self, author: str, entry: RoleEntry, **fields: Optional[str]) -> RoleEntry:
         fields = {**fields, "updated_at": iso(self.clock()), "updated_by": author}
         self.store.update_role(entry["email"], fields)
         self.directory.invalidate()
@@ -246,10 +215,6 @@ class AccessRules:
     @staticmethod
     def _is_self(author: str, entry: RoleEntry) -> bool:
         return normalized_email(author) == entry["email"]
-
-    @staticmethod
-    def _expired(at: datetime.datetime, now: datetime.datetime) -> bool:
-        return now - at >= datetime.timedelta(days=REQUEST_DAYS)
 
 
 _current: Optional[AccessRules] = None

@@ -1,4 +1,4 @@
-"""In-memory access list (Firestore access_roles / access_requests / access_history) and a settable clock.
+"""In-memory access list (Firestore access_roles / access_history) and a settable clock.
 
 tests/conftest.py installs one for every test: no test reads the real access list, and none has a role unless it
 lists the address (`grant_roles`)."""
@@ -8,7 +8,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, List, Optional
 
-from infrastructure.firestore.access_store import AccessRequestEntry, HistoryEntry, RoleEntry
+from infrastructure.firestore.access_store import HistoryEntry, RoleEntry
 from infrastructure.security import role_directory
 from infrastructure.security.role_directory import RoleDirectory
 
@@ -33,7 +33,6 @@ class StoreDown(RuntimeError):
 class InMemoryAccessStore:
     def __init__(self) -> None:
         self.roles: Dict[str, RoleEntry] = {}
-        self.requests: Dict[str, AccessRequestEntry] = {}
         self.history: List[HistoryEntry] = []
         self.failing = False
         self.role_reads = 0
@@ -76,25 +75,6 @@ class InMemoryAccessStore:
         self.writes += 1
         self.roles.pop(email, None)
 
-    def list_requests(self) -> List[AccessRequestEntry]:
-        self._check()
-        return [AccessRequestEntry(**r) for r in self.requests.values()]  # type: ignore[typeddict-item]
-
-    def get_request(self, email: str) -> Optional[AccessRequestEntry]:
-        self._check()
-        request = self.requests.get(email)
-        return AccessRequestEntry(**request) if request else None  # type: ignore[typeddict-item]
-
-    def save_request(self, entry: AccessRequestEntry) -> None:
-        self._check()
-        self.writes += 1
-        self.requests[entry["email"]] = AccessRequestEntry(**entry)  # type: ignore[typeddict-item]
-
-    def delete_request(self, email: str) -> None:
-        self._check()
-        self.writes += 1
-        self.requests.pop(email, None)
-
     def add_history(self, entry: HistoryEntry) -> None:
         self._check()
         self.writes += 1
@@ -105,9 +85,12 @@ class InMemoryAccessStore:
         return sorted(self.history, key=lambda entry: entry["at"], reverse=True)[:limit]
 
 
-def role_entry(email: str, role: str, display_name: str = "") -> RoleEntry:
-    return RoleEntry(email=email, role=role, display_name=display_name, last_sign_in_at=None,
-                     created_at=None, created_by=None, updated_at=None, updated_by=None)
+def role_entry(email: str, role: str, display_name: str = "", **fields: Optional[str]) -> RoleEntry:
+    """An entry added before invitations (never expires); `fields` sets others, e.g. invitation_expires_at."""
+    entry = RoleEntry(email=email, role=role, display_name=display_name, last_sign_in_at=None,
+                      created_at=None, created_by=None, updated_at=None, updated_by=None,
+                      invited_at=None, invitation_expires_at=None, invitation_sent_at=None, accepted_at=None)
+    return RoleEntry(**{**entry, **fields})  # type: ignore[typeddict-item]  # fields are RoleEntry keys
 
 
 def install_access(store: Optional[InMemoryAccessStore] = None, clock: Optional[FakeClock] = None,

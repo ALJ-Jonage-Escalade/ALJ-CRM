@@ -24,7 +24,8 @@ def bootstrap_admin(store: AccessStore, clock: Clock, email: str) -> bool:
     at = iso(clock())
     created = store.create_role(RoleEntry(
         email=address, role="admin", display_name="", last_sign_in_at=None,
-        created_at=at, created_by=BOOTSTRAP_AUTHOR, updated_at=at, updated_by=BOOTSTRAP_AUTHOR))
+        created_at=at, created_by=BOOTSTRAP_AUTHOR, updated_at=at, updated_by=BOOTSTRAP_AUTHOR,
+        invited_at=None, invitation_expires_at=None, invitation_sent_at=None, accepted_at=None))
     if created:
         store.add_history(HistoryEntry(at=at, author=BOOTSTRAP_AUTHOR, action="bootstrap", target_email=address,
                                        old_role=None, new_role="admin"))

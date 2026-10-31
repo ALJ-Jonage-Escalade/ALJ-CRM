@@ -152,6 +152,12 @@ describe("createAuth", () => {
     expect(auth.state.value).toEqual({ status: "signedIn", user: FILCH, role: null });
   });
 
+  it("keeps the end date of an expired invitation", async () => {
+    const { auth, emit } = setup(async () => json({ email: FILCH.email, role: null, invitation_expired_at: "2026-11-06T09:00:00+00:00" }));
+    await emit(FILCH);
+    expect(auth.state.value).toEqual({ status: "signedIn", user: FILCH, role: null, invitationExpiredAt: "2026-11-06T09:00:00+00:00" });
+  });
+
   it("signs in through the competitions page and comes back to the current page", () => {
     const { auth, deps } = setup(async () => json({}));
     auth.login();
