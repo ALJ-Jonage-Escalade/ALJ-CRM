@@ -61,10 +61,11 @@ def get_me(request: Request) -> Me | JSONResponse:
         role = role_for_claims(claims)
     except AccessUnavailable:
         return error(503, ACCESS_UNAVAILABLE_MESSAGE, "access_unavailable")
+    shown_email = str(claims.get("email") or "")
     email = verified_email(claims)
     if not email:
-        return Me(email=str(claims.get("email") or ""), role=None)
+        return Me(email=shown_email, role=None)
     if role is None:
-        return Me(email=str(claims.get("email") or ""), role=None, invitation_expired_at=_expired_invitation(email))
+        return Me(email=shown_email, role=None, invitation_expired_at=_expired_invitation(email))
     _record_sign_in(email)
-    return Me(email=str(claims.get("email") or ""), role=ROLE_NAMES[role])
+    return Me(email=shown_email, role=ROLE_NAMES[role])
