@@ -35,3 +35,8 @@ class Conflict(ServiceError):
 
 class StorageUnavailable(ServiceError):
     code = "unavailable"
+
+
+class UpstreamUnavailable(ServiceError):
+    """An outside service (HelloAsso) could not be reached or refused the call."""
+    code = "upstream_unavailable"

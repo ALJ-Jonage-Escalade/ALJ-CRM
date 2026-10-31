@@ -1,0 +1,131 @@
+"""HelloAsso membership item mapper: a raw HelloAsso v5 item becomes a flat membership record (fake data only)."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from domain.members.helloasso_membership import (
+    default_membership_campaign,
+    map_membership_item,
+    map_membership_items,
+    parse_membership_campaign,
+    season_guard,
+)
+
+
+def _item(**overrides: Any) -> dict[str, Any]:  # Any: raw HelloAsso JSON
+    item: dict[str, Any] = {
+        "id": 9001,
+        "type": "Membership",
+        "state": "Processed",
+        "name": "Loisir collège",
+        "amount": 15000,
+        "order": {"id": 501, "date": "2026-09-01T10:00:00+02:00"},
+        "user": {"firstName": "Ginny", "lastName": "Weasley"},
+        "payer": {"firstName": "Molly", "lastName": "Weasley", "email": "molly@terrier.example"},
+        "options": [],
+        "customFields": [
+            {"name": "Date de naissance de l'adhérent", "answer": "11/08/2013"},
+            {"name": "Numéro de Licence FFME (6 chiffres)", "answer": "123 456"},
+            {"name": "Ville", "answer": "Jonage"},
+        ],
+    }
+    item.update(overrides)
+    return item
+
+
+def test_map_membership_item_reads_identity_order_and_payment() -> None:
+    record = map_membership_item(_item())
+
+    assert record.item_id == 9001
+    assert (record.order_ref, record.order_date) == ("501", "2026-09-01T10:00:00+02:00")
+    assert (record.status, record.tarif_name, record.amount) == ("Processed", "Loisir collège", 150.0)
+    assert (record.last_name, record.first_name) == ("Weasley", "Ginny")
+    assert (record.payer_last_name, record.payer_first_name, record.payer_email) == ("Weasley", "Molly", "molly@terrier.example")
+    assert record.birth_date == "2013-08-11"
+    assert record.licence == "123456"
+    assert record.custom_fields["Ville"] == "Jonage"
+
+
+@pytest.mark.parametrize(
+    ("custom_field", "expected_licence"),
+    [
+        ({"name": "Numéro de Licence FFME (6 chiffres)", "answer": "654321"}, "654321"),
+        ({"name": "Numéro de Licence FFME (6 chiffres)", "value": "654321"}, "654321"),
+        ({"name": "Numéro de Licence FFME (6 chiffres)", "answer": "", "value": "654321"}, "654321"),
+        ({"name": "Numéro de Licence FFME (6 chiffres)", "answer": "n° 65-43-21"}, "654321"),
+        ({"name": "Numéro de Licence FFME (6 chiffres)", "answer": "pas encore"}, ""),
+    ],
+)
+def test_map_membership_item_reads_custom_fields_from_answer_or_value(custom_field: dict[str, str], expected_licence: str) -> None:
+    assert map_membership_item(_item(customFields=[custom_field])).licence == expected_licence
+
+
+@pytest.mark.parametrize(
+    ("typed", "expected"),
+    [
+        ("11/08/2013", "2013-08-11"),
+        ("2013-08-11", "2013-08-11"),
+        ("2013-08-11T00:00:00", "2013-08-11"),
+        (" 11-08-2013 ", "2013-08-11"),
+        ("31/02/2013", ""),
+        ("onze août", ""),
+        ("", ""),
+    ],
+)
+def test_map_membership_item_parses_the_birth_date(typed: str, expected: str) -> None:
+    record = map_membership_item(_item(customFields=[{"name": "Date de naissance de l'adhérent", "value": typed}]))
+
+    assert (record.birth_date, record.birth_date_raw) == (expected, typed.strip())
+
+
+def test_map_membership_item_reads_the_insurance_options() -> None:
+    options = [{"name": "Assurance Base +", "amount": 1100}, {"name": "Assurance Option VTT", "amount": 500}]
+
+    record = map_membership_item(_item(options=options))
+
+    assert record.options == {"Assurance Base +": 11.0, "Assurance Option VTT": 5.0}
+
+
+def test_map_membership_items_keeps_the_registrations_only() -> None:
+    items = [_item(id=1), _item(id=2, type="Donation"), _item(id=3, type="Registration")]
+
+    assert [record.item_id for record in map_membership_items(items)] == [1, 3]
+
+
+@pytest.mark.parametrize(
+    ("reference", "expected"),
+    [
+        ("adhesion-escalade-2026-2027", ("Membership", "adhesion-escalade-2026-2027")),
+        ("https://www.helloasso.com/associations/alj/adhesions/adhesion-escalade-2026-2027", ("Membership", "adhesion-escalade-2026-2027")),
+        ("https://www.helloasso.com/associations/alj/adhesions/adhesion-escalade-2026-2027/", ("Membership", "adhesion-escalade-2026-2027")),
+        ("Event:stage-ete-2026-2027", ("Event", "stage-ete-2026-2027")),
+    ],
+)
+def test_parse_membership_campaign_reads_a_slug_or_a_helloasso_url(reference: str, expected: tuple[str, str]) -> None:
+    campaign = parse_membership_campaign(reference)
+
+    assert (campaign.form_type, campaign.slug) == expected
+
+
+def test_default_membership_campaign_follows_the_season() -> None:
+    assert default_membership_campaign("2027-2028") == "adhesion-escalade-2027-2028-amicale-laique-escalade-2"
+
+
+@pytest.mark.parametrize(
+    ("slug", "allowed"),
+    [
+        ("adhesion-escalade-2026-2027-amicale-laique-escalade-2", True),
+        ("adhesions-saison-2026-2027", True),
+        ("adhesion-escalade-2025-2026-amicale-laique-escalade-2", False),
+        ("adhesion-escalade", False),
+    ],
+)
+def test_season_guard_refuses_a_campaign_of_another_season(slug: str, allowed: bool) -> None:
+    reason = season_guard(slug, "2026-2027")
+
+    assert (reason is None) == allowed
+    if not allowed:
+        assert "2026-2027" in str(reason)

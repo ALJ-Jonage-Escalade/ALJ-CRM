@@ -22,7 +22,7 @@ _SPA_PAGES = frozenset({"adherents", "administration", "communications", "compet
 # and /competitions/<sub-page> for the competitions (each one public in api_auth.PUBLIC_PATHS)
 SPA_SUB_PAGES = {
     "competitions": frozenset({"helloasso", "bilan", "coachs"}),
-    "outils": frozenset({"pivot", "stats", "presence", "ffme", "ffme-import"}),
+    "outils": frozenset({"pivot", "stats", "presence", "ffme", "ffme-import", "helloasso-import"}),
     "parametres": frozenset({"campagnes"}),
 }
 # Former addresses of the competitions management pages (phone and office, until plan phase 11): now the competitions

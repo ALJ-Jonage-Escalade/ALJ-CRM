@@ -10,7 +10,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from services.errors import Conflict, InvalidRequest, NotFound, ServiceError, StorageUnavailable
+from services.errors import Conflict, InvalidRequest, NotFound, ServiceError, StorageUnavailable, UpstreamUnavailable
 
 # Member and competition data must not be kept in the browser's HTTP cache (personal data),
 # so responses are never stored: the page keeps the last body in memory and sends
@@ -79,6 +79,7 @@ SERVICE_ERROR_STATUS = (
     (InvalidRequest, 400),
     (Conflict, 409),
     (StorageUnavailable, 503),
+    (UpstreamUnavailable, 502),
 )
 
 

@@ -45,6 +45,10 @@ const ANSWERS: Record<string, () => Response> = {
       last_status: "",
       cron_schedule: "Tous les jours à 07h00",
     }),
+  "GET /api/settings/helloasso-membership": () =>
+    json({ campaign: "", resolved: "adhesion-escalade-2026-2027-amicale-laique-escalade-2", source: "default" }),
+  "POST /api/settings/helloasso-membership": () =>
+    json({ campaign: "adhesions-2026-2027", resolved: "adhesions-2026-2027", source: "setting" }),
   "POST /api/cloud-db/sync": () =>
     json({ status: "error", message: "Erreur de synchronisation (1 erreur(s), détails dans les journaux)." }, 500),
   "POST /api/settings/competitions-results": () => json({ status: "success", notification_email: "nouvelle@alj.example", saved: true }),
@@ -89,6 +93,23 @@ describe("ParametresGeneralPage", () => {
     expect(byId("cache-pending").text()).toBe("⏳ 2 en attente");
     expect((byId("results-email").element as HTMLInputElement).value).toBe("resultats@alj.example");
     expect(byId("results-last-run").text()).toBe("Jamais exécuté");
+  });
+
+  it("saves the HelloAsso membership campaign, showing the campaign it resolves to", async () => {
+    const { byId, calls } = render();
+    await flushPromises();
+    expect((byId("membership-campaign").element as HTMLInputElement).value).toBe("");
+    expect(byId("membership-campaign-resolved").text()).toContain("adhesion-escalade-2026-2027-amicale-laique-escalade-2");
+    expect(byId("membership-campaign-resolved").text()).toContain("par défaut");
+
+    await byId("membership-campaign").setValue("adhesions-2026-2027");
+    byId("membership-campaign").element.closest("form")!.dispatchEvent(new Event("submit"));
+    await flushPromises();
+
+    const post = calls.find((c) => c.method === "POST" && c.path === "/api/settings/helloasso-membership");
+    expect(JSON.parse(post!.body!)).toEqual({ campaign: "adhesions-2026-2027" });
+    expect(byId("membership-campaign-resolved").text()).toContain("adhesions-2026-2027");
+    expect(byId("toast").text()).toBe("✅ Campagne d'adhésion HelloAsso enregistrée : adhesions-2026-2027");
   });
 
   it("shows a status the server could not give", async () => {

@@ -1673,6 +1673,119 @@
         }
       }
     },
+    "/api/settings/helloasso-membership": {
+      "get": {
+        "summary": "Get Membership Campaign",
+        "operationId": "get_membership_campaign_api_settings_helloasso_membership_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipCampaignSetting"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Save Membership Campaign",
+        "operationId": "save_membership_campaign_api_settings_helloasso_membership_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipCampaignUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipCampaignSetting"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/memberships/preview": {
+      "post": {
+        "summary": "Preview Membership Import",
+        "description": "Reads the membership campaign on HelloAsso and sorts its registrations for the active season. Writes nothing.",
+        "operationId": "preview_membership_import_api_helloasso_memberships_preview_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/email-templates": {
       "get": {
         "summary": "Get Email Templates",
@@ -4414,6 +4527,44 @@
           "details"
         ],
         "title": "BatchReport"
+      },
+      "BucketCounts": {
+        "properties": {
+          "already_imported": {
+            "type": "integer",
+            "title": "Already Imported"
+          },
+          "new": {
+            "type": "integer",
+            "title": "New"
+          },
+          "renewal": {
+            "type": "integer",
+            "title": "Renewal"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "to_review": {
+            "type": "integer",
+            "title": "To Review"
+          },
+          "blocked": {
+            "type": "integer",
+            "title": "Blocked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "already_imported",
+          "new",
+          "renewal",
+          "updated",
+          "to_review",
+          "blocked"
+        ],
+        "title": "BucketCounts"
       },
       "CloudDbStatus": {
         "properties": {
@@ -7470,6 +7621,174 @@
           "message"
         ],
         "title": "MemberUpdated"
+      },
+      "MembershipCampaignSetting": {
+        "properties": {
+          "campaign": {
+            "type": "string",
+            "title": "Campaign"
+          },
+          "resolved": {
+            "type": "string",
+            "title": "Resolved"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "setting",
+              "environment",
+              "default"
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campaign",
+          "resolved",
+          "source"
+        ],
+        "title": "MembershipCampaignSetting",
+        "description": "campaign: as saved in Paramètres (\"\" when not set); resolved: the form slug the import reads."
+      },
+      "MembershipCampaignUpdate": {
+        "properties": {
+          "campaign": {
+            "type": "string",
+            "title": "Campaign",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MembershipCampaignUpdate",
+        "description": "Slug or HelloAsso URL of the membership form; empty: back to the default."
+      },
+      "MembershipPreview": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "campaign": {
+            "type": "string",
+            "title": "Campaign"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/BucketCounts"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "season",
+          "campaign",
+          "blocked_reason",
+          "counts",
+          "rows"
+        ],
+        "title": "MembershipPreview",
+        "description": "blocked_reason: the whole campaign is refused (another season), every row is then blocked."
+      },
+      "MembershipRow": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "already_imported",
+              "new",
+              "renewal",
+              "updated",
+              "to_review",
+              "blocked"
+            ],
+            "title": "Bucket"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "order_ref": {
+            "type": "string",
+            "title": "Order Ref"
+          },
+          "order_date": {
+            "type": "string",
+            "title": "Order Date"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence"
+          },
+          "tarif_name": {
+            "type": "string",
+            "title": "Tarif Name"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "bucket",
+          "reason",
+          "order_ref",
+          "order_date",
+          "last_name",
+          "first_name",
+          "birth_date",
+          "licence",
+          "tarif_name",
+          "amount",
+          "status"
+        ],
+        "title": "MembershipRow",
+        "description": "One HelloAsso registration and what the import would do with it."
       },
       "NewMember": {
         "properties": {

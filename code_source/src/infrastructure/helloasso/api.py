@@ -122,7 +122,13 @@ def get_items(campaign_type, campaign_slug):
 # Lecture unitaire (vérification des notifications webhook)
 # ---------------------------------------------------------------------------
 class HelloAssoApiError(Exception):
-    """Appel à l'API HelloAsso impossible (identifiants, réseau, erreur serveur)."""
+    """Appel à l'API HelloAsso impossible (identifiants, réseau, erreur serveur).
+    `code`: helloasso_credentials_missing or helloasso_unavailable."""
+
+    def __init__(self, message, code="helloasso_unavailable"):
+        super().__init__(message)
+        self.message = message
+        self.code = code
 
 
 def credentials_configured():
@@ -212,3 +218,36 @@ def get_public_form(form_type: str, form_slug: str, token: str) -> Dict[str, Any
         raise HelloAssoApiError(f"API HelloAsso : HTTP {response.status_code}")
     body = response.json()
     return body if isinstance(body, dict) else {}
+
+
+def fetch_form_items(form_type: str, slug: str) -> list:
+    """Every item (with custom fields) of a form, every page. Unlike get_items, a failure is raised
+    (HelloAssoApiError), never answered as an empty campaign: the members import must not mistake it."""
+    if not credentials_configured():
+        raise HelloAssoApiError("Identifiants de l'API HelloAsso non configurés sur le serveur.",
+                                "helloasso_credentials_missing")
+    token = get_access_token()
+    if not token:
+        raise HelloAssoApiError("Connexion à l'API HelloAsso refusée (jeton d'accès indisponible).")
+    url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms/{form_type}/{slug}/items"
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {"withDetails": "true", "pageSize": 100}
+    items: list = []
+    while True:
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
+        except requests.exceptions.RequestException as e:
+            raise HelloAssoApiError(f"API HelloAsso injoignable : {type(e).__name__}")
+        if response.status_code == 404:
+            raise HelloAssoApiError(f"Campagne HelloAsso introuvable : {form_type}/{slug}.", "helloasso_campaign_not_found")
+        if response.status_code >= 300:
+            raise HelloAssoApiError(f"API HelloAsso : HTTP {response.status_code}")
+        data = response.json()
+        page = data.get("data") or []
+        if not page:
+            return items
+        items.extend(page)
+        token_next = (data.get("pagination") or {}).get("continuationToken")
+        if not token_next or token_next == params.get("continuationToken"):
+            return items
+        params["continuationToken"] = token_next

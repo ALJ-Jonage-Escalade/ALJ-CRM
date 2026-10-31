@@ -97,6 +97,7 @@ export const PAGES = [
       { id: "presence", label: "Fiches de présence", path: "presence", access: "staff", offline: "none" },
       { id: "ffme", label: "Export FFME", path: "ffme", access: "staff", offline: "none" },
       { id: "ffme-import", label: "Import FFME", path: "ffme-import", access: "admin", offline: "none" },
+      { id: "helloasso-import", label: "Import HelloAsso", path: "helloasso-import", access: "admin", offline: "none" },
     ],
   },
   {

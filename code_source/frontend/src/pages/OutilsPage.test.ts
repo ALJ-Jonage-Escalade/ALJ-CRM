@@ -73,6 +73,44 @@ const PREVIEW = {
   ],
 };
 
+const MEMBERSHIP_PREVIEW = {
+  status: "success",
+  season: "2026-2027",
+  campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+  blocked_reason: null,
+  counts: { already_imported: 0, new: 1, renewal: 0, updated: 0, to_review: 0, blocked: 1 },
+  rows: [
+    {
+      item_id: 1,
+      bucket: "new",
+      reason: "Personne inconnue du club : nouvel adhérent.",
+      order_ref: "501",
+      order_date: "2026-09-01T10:00:00+02:00",
+      last_name: "WEASLEY",
+      first_name: "Ginny",
+      birth_date: "2013-08-11",
+      licence: "",
+      tarif_name: "Loisir collège",
+      amount: 150,
+      status: "Processed",
+    },
+    {
+      item_id: 2,
+      bucket: "blocked",
+      reason: "Date de naissance manquante ou illisible.",
+      order_ref: "502",
+      order_date: "2026-09-01T10:00:00+02:00",
+      last_name: "LOVEGOOD",
+      first_name: "Luna",
+      birth_date: "",
+      licence: "",
+      tarif_name: "Adultes autonomes",
+      amount: 120,
+      status: "Processed",
+    },
+  ],
+};
+
 type Answer = (body: unknown, url: URL) => Response;
 const ANSWERS: Record<string, Answer> = {
   "GET /api/seasons": () => json({ seasons: ["2026-2027", "2025-2026"], active: "2026-2027" }),
@@ -81,6 +119,7 @@ const ANSWERS: Record<string, Answer> = {
   "GET /api/presence/config": () => json(CONFIG),
   "POST /api/presence/export": () => file("Feuilles.xlsx"),
   "GET /api/ffme/stats": () => json(STATS),
+  "POST /api/helloasso/memberships/preview": () => json(MEMBERSHIP_PREVIEW),
   "GET /api/ffme/export": () => file("import_ffme_20261022.csv"),
   "POST /api/ffme/preview": () => json(PREVIEW),
   "POST /api/ffme/import": () =>
@@ -263,6 +302,81 @@ describe("OutilsPage", () => {
     expect(document.getElementById("refused-page")!.textContent).toContain("Import FFME est réservée aux administrateurs");
     expect(coach.byId("sub-side-map")!.getAttribute("aria-current")).toBe("page");
     expect(document.querySelector("h1")!.textContent).toBe("Outils");
+  });
+
+  it("previews the HelloAsso membership campaign: campaign, counters and rows per bucket", async () => {
+    const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
+    expect(sent("POST", "/api/helloasso/memberships/preview")).toHaveLength(0);
+
+    byId("ha-import-preview")!.click();
+    await flushPromises();
+
+    expect(sent("POST", "/api/helloasso/memberships/preview")).toHaveLength(1);
+    expect(byId("ha-import-campaign")!.textContent).toContain("adhesion-escalade-2026-2027-amicale-laique-escalade-2");
+    expect(byId("ha-import-campaign")!.textContent).toContain("2026-2027");
+    expect(byId("ha-count-new")!.textContent).toContain("1");
+    expect(byId("ha-count-blocked")!.textContent).toContain("1");
+    expect(byId("ha-count-renewal")!.textContent).toContain("0");
+    expect(all("ha-row-new").map((row) => row.textContent)).toEqual([expect.stringContaining("WEASLEY Ginny")]);
+    expect(byId("ha-row-blocked")!.textContent).toContain("Date de naissance manquante ou illisible.");
+    expect(byId("ha-section-renewal")).toBeNull();
+  });
+
+  it("blocks the HelloAsso preview of a campaign of another season, with the reason", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const reason = "La campagne « adhesion-escalade-2025-2026 » ne correspond pas à la saison active 2026-2027 : import bloqué.";
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, blocked_reason: reason });
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      expect(byId("ha-import-blocked")!.textContent).toContain(reason);
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("shows the HelloAsso error on the card", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () =>
+      json(
+        {
+          status: "error",
+          message: "Identifiants de l'API HelloAsso non configurés sur le serveur.",
+          code: "helloasso_credentials_missing",
+        },
+        502,
+      );
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      expect(byId("ha-import-error")!.textContent).toContain("Identifiants de l'API HelloAsso non configurés");
+      expect(byId("ha-import-campaign")).toBeNull();
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("disables the HelloAsso import offline, with an explanation", async () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+    expect(byId<HTMLButtonElement>("ha-import-preview")!.disabled).toBe(true);
+    expect(byId("ha-import-offline")!.textContent).toContain("hors ligne");
+
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+    window.dispatchEvent(new Event("online"));
+    await flushPromises();
+    expect(byId<HTMLButtonElement>("ha-import-preview")!.disabled).toBe(false);
+    expect(byId("ha-import-offline")).toBeNull();
+    expect(sent("POST", "/api/helloasso/memberships/preview")).toHaveLength(0);
+  });
+
+  it("keeps the HelloAsso import away from coaches", async () => {
+    const coach = await render("coach", "/bureau/outils/helloasso-import");
+    expect(coach.router.currentRoute.value.fullPath).toBe("/bureau/outils?reserve=helloasso-import");
+    expect(coach.byId("sub-side-helloasso-import")).toBeNull();
+    expect(coach.byId("ha-import-preview")).toBeNull();
   });
 
   it("opens the former tab address on its sub-page", async () => {

@@ -522,6 +522,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/helloasso-membership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Membership Campaign */
+        get: operations["get_membership_campaign_api_settings_helloasso_membership_get"];
+        put?: never;
+        /** Save Membership Campaign */
+        post: operations["save_membership_campaign_api_settings_helloasso_membership_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/helloasso/memberships/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Membership Import
+         * @description Reads the membership campaign on HelloAsso and sorts its registrations for the active season. Writes nothing.
+         */
+        post: operations["preview_membership_import_api_helloasso_memberships_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/email-templates": {
         parameters: {
             query?: never;
@@ -1643,6 +1681,21 @@ export interface components {
             notification_email: string;
             /** Details */
             details: components["schemas"]["BatchCompetition"][];
+        };
+        /** BucketCounts */
+        BucketCounts: {
+            /** Already Imported */
+            already_imported: number;
+            /** New */
+            new: number;
+            /** Renewal */
+            renewal: number;
+            /** Updated */
+            updated: number;
+            /** To Review */
+            to_review: number;
+            /** Blocked */
+            blocked: number;
         };
         /** CloudDbStatus */
         CloudDbStatus: {
@@ -3084,6 +3137,85 @@ export interface components {
             status: "success";
             /** Message */
             message: string;
+        };
+        /**
+         * MembershipCampaignSetting
+         * @description campaign: as saved in Paramètres ("" when not set); resolved: the form slug the import reads.
+         */
+        MembershipCampaignSetting: {
+            /** Campaign */
+            campaign: string;
+            /** Resolved */
+            resolved: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "setting" | "environment" | "default";
+        };
+        /**
+         * MembershipCampaignUpdate
+         * @description Slug or HelloAsso URL of the membership form; empty: back to the default.
+         */
+        MembershipCampaignUpdate: {
+            /**
+             * Campaign
+             * @default
+             */
+            campaign?: string;
+        };
+        /**
+         * MembershipPreview
+         * @description blocked_reason: the whole campaign is refused (another season), every row is then blocked.
+         */
+        MembershipPreview: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Season */
+            season: string;
+            /** Campaign */
+            campaign: string;
+            /** Blocked Reason */
+            blocked_reason: string | null;
+            counts: components["schemas"]["BucketCounts"];
+            /** Rows */
+            rows: components["schemas"]["MembershipRow"][];
+        };
+        /**
+         * MembershipRow
+         * @description One HelloAsso registration and what the import would do with it.
+         */
+        MembershipRow: {
+            /** Item Id */
+            item_id: number;
+            /**
+             * Bucket
+             * @enum {string}
+             */
+            bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
+            /** Reason */
+            reason: string;
+            /** Order Ref */
+            order_ref: string;
+            /** Order Date */
+            order_date: string;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Birth Date */
+            birth_date: string;
+            /** Licence */
+            licence: string;
+            /** Tarif Name */
+            tarif_name: string;
+            /** Amount */
+            amount: number;
+            /** Status */
+            status: string;
         };
         /**
          * NewMember
@@ -4940,6 +5072,115 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_membership_campaign_api_settings_helloasso_membership_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipCampaignSetting"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    save_membership_campaign_api_settings_helloasso_membership_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembershipCampaignUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipCampaignSetting"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_membership_import_api_helloasso_memberships_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
