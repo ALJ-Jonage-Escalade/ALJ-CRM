@@ -104,6 +104,7 @@ files = [
     "src/api/members/schemas.py",
     "src/api/integrations/cloud_db.py",
     "src/api/integrations/helloasso_campaigns.py",
+    "src/infrastructure/helloasso/form_activities.py",
     "src/domain/helloasso_campaigns.py",
     "src/api/members/seasons.py",
     "src/api/ffme/schemas.py",

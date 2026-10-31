@@ -25,8 +25,9 @@ FORM_TYPE_OF_KIND: Dict[str, str] = {"membership": "Membership", "competitions":
 LISTED_STATES = ("Public", "Private", "Draft")
 # Every state but Deleted: the active campaign is found even once disabled
 LOOKUP_STATES = ("Public", "Private", "Draft", "Disabled")
-# HelloAsso activity "Compétition" of the Event forms (GET /values/form/Event/types). `activityTypeId` is returned by the
-# forms list but not documented there: a form without it is not taken as a competitions campaign.
+# HelloAsso activity "Compétition" of the Event forms (GET /values/form/Event/types). `activityTypeId` is not in the
+# forms list: added from each form's details (infrastructure/helloasso/form_activities.py). A form without it (details
+# unreadable) is not taken as a competitions campaign.
 COMPETITION_ACTIVITY_TYPE_ID = 3
 
 _STATE_WARNINGS = {

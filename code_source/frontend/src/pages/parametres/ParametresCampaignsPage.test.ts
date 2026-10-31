@@ -28,6 +28,7 @@ const campaign = (slug: string, extra: Partial<Schemas["HelloAssoCampaign"]> = {
 function campaignsBody(competitionsActive: string | null = "competitions-2025"): Schemas["HelloAssoCampaigns"] {
   return {
     error: null,
+    warning: null,
     others: [campaign("soiree-club", { title: "Soirée du club", activity_type: "Fête", start_date: "2026-12-12T19:00:00+01:00" })],
     membership: {
       active: { form_type: "Membership", slug: "adhesion-2026" },
@@ -184,6 +185,14 @@ describe("ParametresCampaignsPage", () => {
     await flushPromises();
     expect(byId("campaigns-helloasso-error").exists()).toBe(false);
     expect(wrapper.findAll('[data-testid="campaign-choose"]').length).toBeGreaterThan(0);
+  });
+
+  it("warns when the activity of some forms could not be read", async () => {
+    const warning = "Activité de 1 formulaire(s) illisible sur HelloAsso pour le moment : classé(s) dans « Autres ».";
+    const { byId } = render({ "GET /api/helloasso/campaigns": () => json({ ...campaignsBody(), warning }) });
+    await flushPromises();
+    expect(byId("campaigns-helloasso-warning").text()).toContain(warning);
+    expect(byId("campaigns-helloasso-error").exists()).toBe(false);
   });
 
   it("reports a request that failed", async () => {

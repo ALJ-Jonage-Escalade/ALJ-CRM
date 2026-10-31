@@ -14,6 +14,8 @@ from fastapi import FastAPI, HTTPException, Query, Request
 
 app = FastAPI(title="Fake HelloAsso")
 _state = {"forms": [], "items": []}
+# Fields of a form given by its details (/public) only, not by the forms list
+_DETAIL_ONLY = ("activityType", "activityTypeId")
 
 
 def _page(data: list) -> dict:
@@ -42,9 +44,17 @@ def token():
 
 @app.get("/v5/organizations/{org}/forms")
 def forms(org: str, states: Optional[List[str]] = Query(None), formTypes: Optional[List[str]] = Query(None)):  # noqa: N803 - HelloAsso's parameter name
-    # Same filters as the real API (absent = no filter)
-    return _page([form for form in _state["forms"]
+    # Same filters as the real API (absent = no filter); like the real API, the list has no activity (see /public)
+    return _page([{key: value for key, value in form.items() if key not in _DETAIL_ONLY} for form in _state["forms"]
                   if (not states or form.get("state") in states) and (not formTypes or form.get("formType") in formTypes)])
+
+
+@app.get("/v5/organizations/{org}/forms/{form_type}/{form_slug}/public")
+def form_public(org: str, form_type: str, form_slug: str):
+    found = next((form for form in _state["forms"] if form.get("formSlug") == form_slug and form.get("formType") == form_type), None)
+    if found is None:
+        raise HTTPException(404)
+    return found
 
 
 @app.get("/v5/organizations/{org}/forms/{form_type}/{form_slug}/items")

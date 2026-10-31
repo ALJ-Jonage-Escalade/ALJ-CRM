@@ -53,6 +53,8 @@ const choosing = ref("");
 const syncNotice = ref(false);
 
 const helloAssoError = computed(() => campaigns.value?.error ?? "");
+// Some activities could not be read: those forms are in "Autres" until the next load
+const helloAssoWarning = computed(() => campaigns.value?.warning ?? "");
 // The club's other Event forms (not "Compétition"), once loaded: nothing to choose there
 const others = computed(() => campaigns.value?.others ?? []);
 // Each kind with its campaigns, once loaded
@@ -143,6 +145,14 @@ onMounted(load);
       <span>⚠️ {{ helloAssoError }} Les campagnes actives restent affichées ; le choix est indisponible.</span>
       <UiButton variant="warning" small data-testid="campaigns-retry" :busy="loading && 'Chargement…'" @click="load">Réessayer</UiButton>
     </div>
+    <p
+      v-if="helloAssoWarning"
+      data-testid="campaigns-helloasso-warning"
+      role="status"
+      class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-[13px] text-amber-800"
+    >
+      ⚠️ {{ helloAssoWarning }}
+    </p>
     <p
       v-if="syncNotice"
       data-testid="campaigns-sync-notice"

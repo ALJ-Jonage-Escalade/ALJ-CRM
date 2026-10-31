@@ -11,6 +11,7 @@ from api.integrations import helloasso_campaigns as route
 from infrastructure.firestore.app_settings import COLLECTION, HELLOASSO_COMPETITION_CAMPAIGN, HELLOASSO_MEMBERSHIP_CAMPAIGN
 from infrastructure.firestore.app_settings import AppSettingsRepository as Settings
 from infrastructure.firestore.client import FirestoreError
+from infrastructure.helloasso import form_activities
 from infrastructure.helloasso.api import HelloAssoApiError
 
 FORMS = [
@@ -32,9 +33,12 @@ class TestHelloAssoCampaigns(ApiTestCase):
         self.list_forms = self.patch_helloasso(return_value=FORMS)
 
     def patch_helloasso(self, **behaviour: Any) -> Any:  # Any: the mock
-        credentials = patch.object(route.helloasso_api, "credentials_configured", return_value=True)
-        credentials.start()
-        self.addCleanup(credentials.stop)
+        for name, value in (("credentials_configured", True), ("require_access_token", "token")):
+            patcher = patch.object(route.helloasso_api, name, return_value=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        form_activities.install(form_activities.ActivityCache())
+        self.addCleanup(form_activities.install, None)
         listing = patch.object(route.helloasso_api, "list_forms", **behaviour)
         mock = listing.start()
         self.addCleanup(listing.stop)
@@ -61,6 +65,35 @@ class TestHelloAssoCampaigns(ApiTestCase):
         self.assertEqual([(c["slug"], c["activity_type"]) for c in body["others"]], [("soiree-club", "Fête")])
         types, states = self.list_forms.call_args.args
         self.assertEqual((sorted(types), sorted(states)), (["Event", "Membership"], ["Disabled", "Draft", "Private", "Public"]))
+
+    def test_activities_read_from_the_details_once_then_cached(self) -> None:
+        listed = [{key: value for key, value in form.items() if not key.startswith("activity")} for form in FORMS]
+        self.list_forms.return_value = listed
+        details = {form["formSlug"]: form for form in FORMS}
+        with patch.object(route.helloasso_api, "get_public_form", side_effect=lambda _type, slug, _token: details[slug]) as read:
+            first, second = self.campaigns(), self.campaigns()
+        self.assertEqual(sorted(call.args[1] for call in read.call_args_list), ["competitions-2025", "competitions-2026", "soiree-club"])
+        self.assertEqual(self.list_forms.call_args.kwargs, {"token": "token"})
+        for body in (first, second):
+            self.assertEqual([c["slug"] for c in body["competitions"]["campaigns"]], ["competitions-2026"])
+            self.assertEqual([c["slug"] for c in body["others"]], ["soiree-club"])
+            self.assertIsNone(body["warning"])
+
+    def test_unreadable_activity_goes_to_others_with_a_warning(self) -> None:
+        listed = [{key: value for key, value in form.items() if not key.startswith("activity")} for form in FORMS]
+        self.list_forms.return_value = listed
+        details = {form["formSlug"]: form for form in FORMS}
+
+        def read(_type: str, slug: str, _token: str) -> Dict[str, Any]:  # Any: HelloAsso JSON
+            if slug == "competitions-2026":
+                raise HelloAssoApiError("API HelloAsso : HTTP 500")
+            return details[slug]
+
+        with patch.object(route.helloasso_api, "get_public_form", side_effect=read):
+            body = self.campaigns()
+        self.assertEqual(body["warning"], route._activities_unread(1))
+        self.assertIsNone(body["error"])
+        self.assertEqual([c["slug"] for c in body["others"]], ["soiree-club", "competitions-2026"])
 
     def test_membership_default_when_not_chosen(self) -> None:
         with patch.object(route, "get_target_slug", return_value="adhesion-env"):

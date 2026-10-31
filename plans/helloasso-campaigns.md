@@ -32,15 +32,19 @@ the active one of each type.
     production has a value chosen.
 - **D3 — Which campaigns are listed.**
   - Membership table: `formTypes=Membership`; competitions table: `formTypes=Event` with `activityTypeId == 3`
-    ("Compétition", from `GET /values/form/Event/types`; the field is returned by the forms list but not documented
-    there, so a form without it is not a competitions campaign).
+    ("Compétition", from `GET /values/form/Event/types`). The forms list does not give the activity: it is read from
+    each Event form's details (`/forms/Event/{slug}/public`, documented, `AccessPublicData`), up to 4 in parallel
+    with the page's single OAuth token, and cached in memory per form for 24 h (none in dev; failures not cached;
+    `infrastructure/helloasso/form_activities.py`, feature-only until the shared cache of #82). A form whose details
+    can't be read goes to "Autres" and the page shows a warning (`warning` field).
   - "Autres" table, read-only (nothing to choose): the other Event forms (`activityTypeId != 3` or missing), with
     their `activityType`. An active competitions campaign of another activity gets a warning.
   - States `Public`, `Private` and `Draft` (drafts so next season's form can be chosen before it opens; no
     `Disabled`, `Deleted`).
   - The active campaign is always listed, even when it no longer matches the filter (disabled, other type, not found):
     shown with a warning badge.
-  - Sorted by `startDate`, newest first; `meta.createdAt` when `startDate` is missing (membership forms may have none).
+  - Sorted by state (Public, Private, Draft, then the others: an active campaign disabled or not found), then
+    `startDate` newest first (forms without one after), then title in alphabetical order (case and accents ignored).
 - **D4 — Columns** (from the list call only; no per-row `/public` call):
 
   | Column | Content |

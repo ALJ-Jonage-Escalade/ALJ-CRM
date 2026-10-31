@@ -6316,6 +6316,17 @@
               }
             ],
             "title": "Error"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
           }
         },
         "type": "object",
@@ -6323,10 +6334,11 @@
           "membership",
           "competitions",
           "others",
-          "error"
+          "error",
+          "warning"
         ],
         "title": "HelloAssoCampaigns",
-        "description": "competitions: Event forms of the \"Compétition\" activity; others: the other Event forms, for information.\nerror: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty."
+        "description": "competitions: Event forms of the \"Compétition\" activity; others: the other Event forms, for information.\nerror: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty.\nwarning: the activity of some Event forms could not be read (they are listed in others)."
       },
       "HelloAssoItem": {
         "properties": {

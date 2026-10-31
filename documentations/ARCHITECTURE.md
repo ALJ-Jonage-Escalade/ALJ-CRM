@@ -91,7 +91,10 @@ ALJ-CRM/                         ← racine du dépôt
     `firestore/app_settings.py` : réglages applicatifs (collection `app_settings`, seul emplacement). Campagnes HelloAsso
     actives, choisies dans **Paramètres › Campagne HelloAsso** (`api/integrations/helloasso_campaigns.py`), au format
     `FormType:slug` : `HELLOASSO_MEMBERSHIP_CAMPAIGN` (adhésions, lue par `/api/dashboard`) et `HELLOASSO_ANNUAL_CAMPAIGN`
-    (formulaire Event de la saison, lu par la synchro et le webhook des compétitions).
+    (formulaire Event d'activité « Compétition » de la saison, lu par la synchro et le webhook des compétitions).
+    L'activité des formulaires Event n'est pas dans la liste HelloAsso : lue sur leur détail
+    (`helloasso/form_activities.py`, gardée 24 h en mémoire par formulaire ; cache propre à la page en attendant un cache
+    commun, issue #82).
   - `security/api_auth.py` : middleware Firebase (rôles `readonly < coach < admin`). Seul juge des droits : `firestore.rules` refuse tout accès client.
   - `security/role_directory.py` : rôle d'une adresse vérifiée, lu dans la liste des accès (`firestore/access_store.py`, collection `access_roles`), gardée 60 s en mémoire ; liste illisible → `503`. Changements : `services/access/rules.py` (garde-fous, historique), administrateur initial : `services/access/bootstrap.py`.
   - `mail/` (envoi, campagnes, corps HTML), `helloasso/` (API v5, webhook), `security/secret_store.py`, `google/drive.py` (OAuth Google, Drive).

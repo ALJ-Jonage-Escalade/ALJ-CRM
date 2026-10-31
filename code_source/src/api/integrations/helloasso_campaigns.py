@@ -23,6 +23,7 @@ from infrastructure.firestore.app_settings import (
 )
 from infrastructure.firestore.client import FirestoreError
 from infrastructure.helloasso import api as helloasso_api
+from infrastructure.helloasso import form_activities
 from services.errors import InvalidRequest, StorageUnavailable
 
 logger = logging.getLogger("alj")
@@ -53,23 +54,32 @@ def _active_campaign(kind: str) -> tuple[CampaignRef | None, bool]:
     return active, configured
 
 
-def _helloasso_forms() -> tuple[List[Dict[str, Any]], str | None]:  # Any: HelloAsso JSON
-    """Membership and Event forms of the club (every state but Deleted), or the error shown by the page."""
+def _activities_unread(count: int) -> str:
+    return (f"Activité de {count} formulaire(s) illisible sur HelloAsso pour le moment : classé(s) dans « Autres ». "
+            "Actualisez dans un instant.")
+
+
+def _helloasso_forms() -> tuple[List[Dict[str, Any]], str | None, str | None]:  # Any: HelloAsso JSON
+    """Membership and Event forms of the club (every state but Deleted), Event ones with their activity (one token
+    for every call), then the error shown by the page and the warning when some activities could not be read."""
     if not helloasso_api.credentials_configured():
-        return [], CREDENTIALS_MISSING
+        return [], CREDENTIALS_MISSING, None
     try:
-        return helloasso_api.list_forms(campaigns.FORM_TYPE_OF_KIND.values(), campaigns.LOOKUP_STATES), None
+        token = helloasso_api.require_access_token()
+        forms = helloasso_api.list_forms(campaigns.FORM_TYPE_OF_KIND.values(), campaigns.LOOKUP_STATES, token=token)
     except Exception as e:  # HelloAssoApiError, or an unexpected answer: the active campaigns are still shown
         internal_error(e, "list_helloasso_campaigns")
-        return [], HELLOASSO_UNREACHABLE
+        return [], HELLOASSO_UNREACHABLE, None
+    forms, unread = form_activities.with_activities(forms, token)
+    return forms, None, _activities_unread(unread) if unread else None
 
 
 @router.get("", response_model=HelloAssoCampaigns, responses=error_responses(503))
 def list_campaigns() -> Dict[str, Any]:  # Any: response body, checked by response_model
     # Settings first: they don't need HelloAsso (a Firestore failure is a 503 before HelloAsso is called)
     actives = {kind: _active_campaign(kind) for kind in SETTING_OF_KIND}
-    forms, error = _helloasso_forms()
-    body: Dict[str, Any] = {"error": error}  # Any: response body
+    forms, error, warning = _helloasso_forms()
+    body: Dict[str, Any] = {"error": error, "warning": warning}  # Any: response body
     for kind, (active, configured) in actives.items():
         # No list without HelloAsso: the page shows the active campaign alone
         rows = campaigns.campaign_table(forms, kind, active) if error is None else []

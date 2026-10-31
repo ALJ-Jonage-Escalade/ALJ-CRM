@@ -57,7 +57,7 @@ jamais ajouté en mode dev.
   `HELLOASSO_API_BASE_URL` / `HELLOASSO_OAUTH_URL` les redirigent vers un faux HelloAsso local
   (`e2e/fakes/helloasso_fake.py`, utilisé par les tests e2e) ; `check_env.py` refuse toute autre adresse.
   Pour la page **Paramètres › Campagne HelloAsso**, charger quelques formulaires datés dans le faux
-  (`uvicorn helloasso_fake:app --app-dir e2e/fakes --port 8095`, il filtre sur `states` / `formTypes` comme l'API) :
+  (`uvicorn helloasso_fake:app --app-dir e2e/fakes --port 8095`, il filtre sur `states` / `formTypes` comme l'API ; comme elle, la liste n'a pas `activityType` / `activityTypeId`, lus sur le détail `/public` de chaque formulaire) :
   ```bash
   curl -X PUT localhost:8095/_e2e/state -H 'Content-Type: application/json' -d '{"items": [], "forms": [
     {"formSlug": "adhesion-2026", "formType": "Membership", "state": "Public", "title": "Adhésion 2026-2027",

@@ -121,8 +121,10 @@ class HelloAssoCampaignKind(BaseModel):
 
 class HelloAssoCampaigns(BaseModel):
     """competitions: Event forms of the "Compétition" activity; others: the other Event forms, for information.
-    error: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty."""
+    error: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty.
+    warning: the activity of some Event forms could not be read (they are listed in others)."""
     membership: HelloAssoCampaignKind
     competitions: HelloAssoCampaignKind
     others: List[HelloAssoCampaign]
     error: Optional[str]
+    warning: Optional[str]

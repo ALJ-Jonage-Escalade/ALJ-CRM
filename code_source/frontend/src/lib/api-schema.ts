@@ -2653,6 +2653,7 @@ export interface components {
          * HelloAssoCampaigns
          * @description competitions: Event forms of the "Compétition" activity; others: the other Event forms, for information.
          *     error: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty.
+         *     warning: the activity of some Event forms could not be read (they are listed in others).
          */
         HelloAssoCampaigns: {
             membership: components["schemas"]["HelloAssoCampaignKind"];
@@ -2661,6 +2662,8 @@ export interface components {
             others: components["schemas"]["HelloAssoCampaign"][];
             /** Error */
             error: string | null;
+            /** Warning */
+            warning: string | null;
         };
         /**
          * HelloAssoItem

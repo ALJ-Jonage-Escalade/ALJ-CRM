@@ -162,16 +162,24 @@ def get_payment(payment_id):
     return _get_resource(f"/payments/{int(payment_id)}")
 
 
-def list_forms(form_types: Iterable[str], states: Iterable[str]) -> List[Dict[str, Any]]:  # Any: HelloAsso JSON
-    """Formulaires (campagnes) de l'organisation filtrés par type et état, toutes les pages lues.
-
-    Contrairement à get_campaigns(), lève HelloAssoApiError (identifiants absents, réseau, erreur
-    HTTP) au lieu de renvoyer une liste vide ou partielle : la page Paramètres affiche l'erreur."""
+def require_access_token() -> str:
+    """Jeton d'accès OAuth2, ou HelloAssoApiError (identifiants absents, authentification refusée).
+    À réutiliser pour les appels d'une même requête : get_access_token() en redemande un à chaque appel (#82)."""
     if not credentials_configured():
         raise HelloAssoApiError("Identifiants API HelloAsso non configurés")
     token = get_access_token()
     if not token:
         raise HelloAssoApiError("Jeton d'accès HelloAsso indisponible")
+    return token
+
+
+def list_forms(form_types: Iterable[str], states: Iterable[str], token: str | None = None) -> List[Dict[str, Any]]:  # Any: HelloAsso JSON
+    """Formulaires (campagnes) de l'organisation filtrés par type et état, toutes les pages lues.
+
+    Contrairement à get_campaigns(), lève HelloAssoApiError (identifiants absents, réseau, erreur
+    HTTP) au lieu de renvoyer une liste vide ou partielle : la page Paramètres affiche l'erreur.
+    `token` : jeton déjà obtenu (require_access_token), sinon un nouveau est demandé."""
+    token = token or require_access_token()
     url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms"
     params = {"formTypes": list(form_types), "states": list(states), "pageSize": 100}
     forms: List[Dict[str, Any]] = []
@@ -190,3 +198,17 @@ def list_forms(form_types: Iterable[str], states: Iterable[str]) -> List[Dict[st
         if not page or not next_token or next_token == params.get("continuationToken"):
             return forms
         params["continuationToken"] = next_token
+
+
+def get_public_form(form_type: str, form_slug: str, token: str) -> Dict[str, Any]:  # Any: HelloAsso JSON
+    """Détail public d'un formulaire (FormPublicModel : activityType, activityTypeId… absents de list_forms).
+    Lève HelloAssoApiError (réseau, erreur HTTP)."""
+    url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms/{form_type}/{form_slug}/public"
+    try:
+        response = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=REQUEST_TIMEOUT_SECONDS)
+    except requests.exceptions.RequestException as e:
+        raise HelloAssoApiError(f"API HelloAsso injoignable : {e}")
+    if response.status_code >= 300:
+        raise HelloAssoApiError(f"API HelloAsso : HTTP {response.status_code}")
+    body = response.json()
+    return body if isinstance(body, dict) else {}

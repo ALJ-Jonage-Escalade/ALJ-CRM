@@ -59,3 +59,28 @@ def test_list_forms_raises_without_token() -> None:
     with patch.object(api, "credentials_configured", return_value=True), patch.object(api, "get_access_token", return_value=None), \
             pytest.raises(HelloAssoApiError):
         api.list_forms(["Event"], ["Public"])
+
+
+def test_list_forms_reuses_the_given_token() -> None:
+    with patch.object(api, "get_access_token") as new_token, \
+            patch.object(api.requests, "get", return_value=answer(data=[])) as get:
+        api.list_forms(["Event"], ["Public"], token="given")  # noqa: S106 - fake token
+    new_token.assert_not_called()
+    assert get.call_args.kwargs["headers"] == {"Authorization": "Bearer given"}
+
+
+def test_get_public_form() -> None:
+    response = MagicMock(status_code=200)
+    response.json.return_value = {"formSlug": "comp", "activityTypeId": 3}
+    with patch.object(api.requests, "get", return_value=response) as get:
+        assert api.get_public_form("Event", "comp", "given") == {"formSlug": "comp", "activityTypeId": 3}
+    assert get.call_args.args[0].endswith("/forms/Event/comp/public")
+
+
+@pytest.mark.parametrize("behaviour", [
+    {"side_effect": requests.exceptions.ConnectionError("down")},
+    {"return_value": answer(status=404)},
+])
+def test_get_public_form_raises_on_request_error(behaviour: dict) -> None:
+    with patch.object(api.requests, "get", **behaviour), pytest.raises(HelloAssoApiError):
+        api.get_public_form("Event", "comp", "given")
