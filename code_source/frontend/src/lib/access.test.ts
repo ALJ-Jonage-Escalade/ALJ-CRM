@@ -144,4 +144,13 @@ describe("sub-pages", () => {
     ]);
     expect(subPages("planning")).toEqual([]);
   });
+
+  it("split the settings into Général and Campagne HelloAsso, for admins online only", () => {
+    const settings = subPages("parametres");
+    expect(settings.map((s) => [s.label, subHref("parametres", s)])).toEqual([
+      ["Général", "/bureau/parametres"],
+      ["Campagne HelloAsso", "/bureau/parametres/campagnes"],
+    ]);
+    expect(settings.every((s) => s.access === "admin" && s.offline === "none")).toBe(true);
+  });
 });

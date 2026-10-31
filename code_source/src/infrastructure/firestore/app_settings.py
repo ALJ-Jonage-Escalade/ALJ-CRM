@@ -23,6 +23,9 @@ COLLECTION = "app_settings"
 LEGACY_COLLECTION = collection_for("app_settings")
 
 WHATSAPP_TEMPLATE = "whatsapp_template"
+# Active HelloAsso campaigns, saved as "FormType:slug" (Paramètres › Campagne HelloAsso)
+HELLOASSO_MEMBERSHIP_CAMPAIGN = "HELLOASSO_MEMBERSHIP_CAMPAIGN"
+HELLOASSO_COMPETITION_CAMPAIGN = "HELLOASSO_ANNUAL_CAMPAIGN"
 
 
 class AppSettingsRepository:

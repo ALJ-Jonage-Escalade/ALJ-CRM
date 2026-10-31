@@ -103,7 +103,7 @@ from api.auth import me
 from api.communications import attestations, email, whatsapp
 from api.members import dashboard, members, seasons
 from api.ffme import ffme
-from api.integrations import cloud_db, google_auth, helloasso
+from api.integrations import cloud_db, google_auth, helloasso, helloasso_campaigns
 from api.reports import map as members_map, pivot
 from api.web import health, pages, pwa
 from api.responses import service_error_handler
@@ -111,14 +111,16 @@ from services.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
              results, payments, members, seasons, dashboard, email, whatsapp, attestations,
              planning, presence, members_map, pivot, ffme,
-             helloasso, google_auth, cloud_db, me, access,
+             helloasso, helloasso_campaigns, google_auth, cloud_db, me, access,
              pages, pwa, health):
     app.include_router(_api.router)
 pages.mount_static(app)
 # Every route of these routers skips the SQLite cache refresh: a route that reads or writes the
 # cache (members, app settings, HelloAsso payments…) must live in another router, even under
-# /api/competitions (results batch, check-all-paid). /api/me and /api/admin/access only use the access list.
-FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items, me, access)
+# /api/competitions (results batch, check-all-paid). /api/me and /api/admin/access only use the access list,
+# /api/helloasso/campaigns the app_settings collection and HelloAsso.
+FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items, me, access,
+                                                       helloasso_campaigns)
                             for r in _api.router.routes if isinstance(r, APIRoute))
 app.add_exception_handler(ServiceError, service_error_handler)
 

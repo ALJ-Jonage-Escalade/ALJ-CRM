@@ -2983,6 +2983,107 @@
         }
       }
     },
+    "/api/helloasso/campaigns": {
+      "get": {
+        "summary": "List Campaigns",
+        "operationId": "list_campaigns_api_helloasso_campaigns_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HelloAssoCampaigns"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/campaigns/{kind}": {
+      "put": {
+        "summary": "Choose Campaign",
+        "operationId": "choose_campaign_api_helloasso_campaigns__kind__put",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "membership",
+                "competitions"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HelloAssoCampaignChoice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HelloAssoCampaignRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/google/status": {
       "get": {
         "summary": "Get Google Auth Status",
@@ -6017,6 +6118,227 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HelloAssoCampaign": {
+        "properties": {
+          "form_type": {
+            "type": "string",
+            "title": "Form Type"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "private_title": {
+            "type": "string",
+            "title": "Private Title"
+          },
+          "state": {
+            "type": "string",
+            "title": "State",
+            "description": "Public, Private, Draft, Disabled or Deleted; empty when not found on HelloAsso"
+          },
+          "activity_type": {
+            "type": "string",
+            "title": "Activity Type",
+            "description": "HelloAsso activity of an Event form (\"Compétition\"…), empty when not given"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning",
+            "description": "Why the active campaign no longer matches the list (disabled, not found…)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "form_type",
+          "slug",
+          "title",
+          "private_title",
+          "state",
+          "activity_type",
+          "url",
+          "start_date",
+          "end_date",
+          "created_at",
+          "active",
+          "warning"
+        ],
+        "title": "HelloAssoCampaign",
+        "description": "A HelloAsso form (campaign). Dates as HelloAsso gives them (ISO 8601), null when not set."
+      },
+      "HelloAssoCampaignChoice": {
+        "properties": {
+          "form_type": {
+            "type": "string",
+            "title": "Form Type"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "form_type",
+          "slug"
+        ],
+        "title": "HelloAssoCampaignChoice",
+        "description": "Campaign chosen in Paramètres › Campagne HelloAsso: form_type must be the type of the kind\n(Membership for membership, Event for competitions)."
+      },
+      "HelloAssoCampaignKind": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HelloAssoCampaignRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "campaigns": {
+            "items": {
+              "$ref": "#/components/schemas/HelloAssoCampaign"
+            },
+            "type": "array",
+            "title": "Campaigns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active",
+          "configured",
+          "campaigns"
+        ],
+        "title": "HelloAssoCampaignKind",
+        "description": "configured: false when no campaign was chosen and the default is in use (membership: the CAMPAIGN_SLUG\nvariable or the seasonal slug)."
+      },
+      "HelloAssoCampaignRef": {
+        "properties": {
+          "form_type": {
+            "type": "string",
+            "title": "Form Type"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "form_type",
+          "slug"
+        ],
+        "title": "HelloAssoCampaignRef",
+        "description": "An active campaign, as saved in the app settings."
+      },
+      "HelloAssoCampaigns": {
+        "properties": {
+          "membership": {
+            "$ref": "#/components/schemas/HelloAssoCampaignKind"
+          },
+          "competitions": {
+            "$ref": "#/components/schemas/HelloAssoCampaignKind"
+          },
+          "others": {
+            "items": {
+              "$ref": "#/components/schemas/HelloAssoCampaign"
+            },
+            "type": "array",
+            "title": "Others"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "membership",
+          "competitions",
+          "others",
+          "error",
+          "warning"
+        ],
+        "title": "HelloAssoCampaigns",
+        "description": "competitions: Event forms of the \"Compétition\" activity; others: the other Event forms, for information.\nerror: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty.\nwarning: the activity of some Event forms could not be read (they are listed in others)."
       },
       "HelloAssoItem": {
         "properties": {

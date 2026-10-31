@@ -63,13 +63,13 @@ def sync_helloasso_api():
     """Synchronise la campagne annuelle HelloAsso vers Firestore."""
     from services.competitions.store import invalidate_cache
     try:
-        from infrastructure.firestore.app_settings import AppSettingsRepository
+        from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
         from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
         from domain.competitions import matching as competition_matching
 
-        slug = AppSettingsRepository.get("HELLOASSO_ANNUAL_CAMPAIGN")
+        slug = AppSettingsRepository.get(HELLOASSO_COMPETITION_CAMPAIGN)
         if not (slug or "").strip():
-            return {"status": "error", "message": "Aucune campagne annuelle configurée. Veuillez configurer le slug de la campagne."}
+            return {"status": "error", "message": "Aucune campagne compétitions choisie : choisissez-la dans Paramètres › Campagne HelloAsso."}
 
         ident = competition_matching.parse_campaign_identifier(slug)
         from infrastructure.helloasso.api import get_items

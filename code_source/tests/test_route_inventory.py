@@ -65,6 +65,8 @@ EXPECTED_ROUTES = {
     ("POST", "/api/ffme/import"),
     ("POST", "/api/ffme/preview"),
     ("GET", "/api/ffme/stats"),
+    ("GET", "/api/helloasso/campaigns"),
+    ("PUT", "/api/helloasso/campaigns/{kind}"),
     ("GET", "/api/helloasso/items"),
     ("PUT", "/api/helloasso/items/{id_item}/ignore"),
     ("PUT", "/api/helloasso/items/{id_item}/link"),

@@ -983,6 +983,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/helloasso/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Campaigns */
+        get: operations["list_campaigns_api_helloasso_campaigns_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/helloasso/campaigns/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Choose Campaign */
+        put: operations["choose_campaign_api_helloasso_campaigns__kind__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/google/status": {
         parameters: {
             query?: never;
@@ -2542,6 +2576,94 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HelloAssoCampaign
+         * @description A HelloAsso form (campaign). Dates as HelloAsso gives them (ISO 8601), null when not set.
+         */
+        HelloAssoCampaign: {
+            /** Form Type */
+            form_type: string;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Private Title */
+            private_title: string;
+            /**
+             * State
+             * @description Public, Private, Draft, Disabled or Deleted; empty when not found on HelloAsso
+             */
+            state: string;
+            /**
+             * Activity Type
+             * @description HelloAsso activity of an Event form ("Compétition"…), empty when not given
+             */
+            activity_type: string;
+            /** Url */
+            url: string;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Active */
+            active: boolean;
+            /**
+             * Warning
+             * @description Why the active campaign no longer matches the list (disabled, not found…)
+             */
+            warning: string | null;
+        };
+        /**
+         * HelloAssoCampaignChoice
+         * @description Campaign chosen in Paramètres › Campagne HelloAsso: form_type must be the type of the kind
+         *     (Membership for membership, Event for competitions).
+         */
+        HelloAssoCampaignChoice: {
+            /** Form Type */
+            form_type: string;
+            /** Slug */
+            slug: string;
+        };
+        /**
+         * HelloAssoCampaignKind
+         * @description configured: false when no campaign was chosen and the default is in use (membership: the CAMPAIGN_SLUG
+         *     variable or the seasonal slug).
+         */
+        HelloAssoCampaignKind: {
+            active: components["schemas"]["HelloAssoCampaignRef"] | null;
+            /** Configured */
+            configured: boolean;
+            /** Campaigns */
+            campaigns: components["schemas"]["HelloAssoCampaign"][];
+        };
+        /**
+         * HelloAssoCampaignRef
+         * @description An active campaign, as saved in the app settings.
+         */
+        HelloAssoCampaignRef: {
+            /** Form Type */
+            form_type: string;
+            /** Slug */
+            slug: string;
+        };
+        /**
+         * HelloAssoCampaigns
+         * @description competitions: Event forms of the "Compétition" activity; others: the other Event forms, for information.
+         *     error: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty.
+         *     warning: the activity of some Event forms could not be read (they are listed in others).
+         */
+        HelloAssoCampaigns: {
+            membership: components["schemas"]["HelloAssoCampaignKind"];
+            competitions: components["schemas"]["HelloAssoCampaignKind"];
+            /** Others */
+            others: components["schemas"]["HelloAssoCampaign"][];
+            /** Error */
+            error: string | null;
+            /** Warning */
+            warning: string | null;
         };
         /**
          * HelloAssoItem
@@ -5864,6 +5986,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HelloAssoSync"];
+                };
+            };
+        };
+    };
+    list_campaigns_api_helloasso_campaigns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HelloAssoCampaigns"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    choose_campaign_api_helloasso_campaigns__kind__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "membership" | "competitions";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HelloAssoCampaignChoice"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HelloAssoCampaignRef"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

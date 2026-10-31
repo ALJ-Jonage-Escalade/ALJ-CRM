@@ -165,6 +165,13 @@ class TestRoles(unittest.TestCase):
                 self.assertEqual(r(method, path), Role.ADMIN, f"{method} {path}")
         self.assertEqual(r("GET", "/api/administration"), Role.COACH)  # not under /api/admin/
 
+    def test_helloasso_campaign_choice_requires_admin(self):
+        """Coaches see the campaigns (Compétitions › HelloAsso), only admins choose the active one."""
+        r = api_auth.required_role
+        self.assertEqual(r("GET", "/api/helloasso/campaigns"), Role.COACH)
+        for kind in ("membership", "competitions"):
+            self.assertEqual(r("PUT", f"/api/helloasso/campaigns/{kind}"), Role.ADMIN, kind)
+
     def test_rules_hold_no_role_list(self):
         """firestore.rules denies every client: roles live in the access list only (plan phase 3)."""
         with open(os.path.join(_code_root, "firestore", "firestore.rules"), encoding="utf-8") as f:

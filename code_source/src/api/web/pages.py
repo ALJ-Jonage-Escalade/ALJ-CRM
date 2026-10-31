@@ -23,6 +23,7 @@ _SPA_PAGES = frozenset({"adherents", "administration", "communications", "compet
 SPA_SUB_PAGES = {
     "competitions": frozenset({"helloasso", "bilan", "coachs"}),
     "outils": frozenset({"pivot", "stats", "presence", "ffme", "ffme-import"}),
+    "parametres": frozenset({"campagnes"}),
 }
 # Former addresses of the competitions management pages (phone and office, until plan phase 11): now the competitions
 # screen itself, where coaches change everything

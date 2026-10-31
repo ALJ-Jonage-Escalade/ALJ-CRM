@@ -34,6 +34,8 @@ const AdministrationAccessPage = () => import("./pages/administration/Administra
 const CommunicationsPage = () => import("./pages/CommunicationsPage.vue");
 const OutilsPage = () => import("./pages/OutilsPage.vue");
 const ParametresPage = () => import("./pages/ParametresPage.vue");
+const ParametresGeneralPage = () => import("./pages/parametres/ParametresGeneralPage.vue");
+const ParametresCampaignsPage = () => import("./pages/parametres/ParametresCampaignsPage.vue");
 const PlanningPage = () => import("./pages/PlanningPage.vue");
 const CompetitionsHelloAssoPage = () => import("./pages/competitions/CompetitionsHelloAssoPage.vue"); // online only
 const OutilsMapPage = () => import("./pages/outils/OutilsMapPage.vue");
@@ -46,6 +48,7 @@ const OutilsFfmeImportPage = () => import("./pages/outils/OutilsFfmeImportPage.v
 /** Component of each sub-page, by page then sub-page id (lib/access.ts subPages). */
 const SUB_COMPONENTS: Partial<Record<PageId, Record<string, RouteComponent>>> = {
   administration: { acces: AdministrationAccessPage },
+  parametres: { general: ParametresGeneralPage, campagnes: ParametresCampaignsPage },
   competitions: {
     competitions: CompetitionsListPage,
     helloasso: CompetitionsHelloAssoPage,
@@ -109,7 +112,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { access: pageAccess("outils") },
     children: subRoutes("outils", "outils", true),
   },
-  { path: "/bureau/parametres", name: "parametres", component: ParametresPage, meta: { access: pageAccess("parametres") } },
+  {
+    path: "/bureau/parametres",
+    component: ParametresPage,
+    meta: { access: pageAccess("parametres") },
+    children: subRoutes("parametres", "parametres"),
+  },
   {
     path: "/bureau/administration",
     component: AdministrationPage,

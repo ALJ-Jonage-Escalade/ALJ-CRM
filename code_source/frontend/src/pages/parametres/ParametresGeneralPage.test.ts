@@ -1,12 +1,12 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
-import type { Auth } from "../composables/auth";
-import { AUTH_KEY } from "../composables/auth";
-import { API_KEY, type ApiFetch } from "../lib/api";
-import { CLIENT_KEY, createApiClient } from "../lib/client";
-import ParametresPage from "./ParametresPage.vue";
-import { dialogs } from "../composables/dialogs";
+import type { Auth } from "../../composables/auth";
+import { AUTH_KEY } from "../../composables/auth";
+import { API_KEY, type ApiFetch } from "../../lib/api";
+import { CLIENT_KEY, createApiClient } from "../../lib/client";
+import ParametresGeneralPage from "./ParametresGeneralPage.vue";
+import { dialogs } from "../../composables/dialogs";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -66,7 +66,7 @@ function render(answers = ANSWERS) {
     retry: vi.fn(async () => {}),
     stop: vi.fn(),
   };
-  const wrapper = mount(ParametresPage, {
+  const wrapper = mount(ParametresGeneralPage, {
     global: {
       provide: { [AUTH_KEY]: auth, [API_KEY]: api, [CLIENT_KEY]: createApiClient(api, "http://alj.test") },
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
@@ -78,7 +78,7 @@ function render(answers = ANSWERS) {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("ParametresPage", () => {
+describe("ParametresGeneralPage", () => {
   it("shows the Google connection, the server cache and the batch settings", async () => {
     const { byId } = render();
     await flushPromises();
