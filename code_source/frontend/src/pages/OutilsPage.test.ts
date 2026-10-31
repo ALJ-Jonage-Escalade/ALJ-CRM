@@ -384,6 +384,7 @@ describe("OutilsPage", () => {
     expect(all("ha-row-new").map((row) => row.textContent)).toEqual([expect.stringContaining("WEASLEY Ginny")]);
     expect(byId("ha-row-blocked")!.textContent).toContain("Date de naissance manquante ou illisible.");
     expect(all("ha-licence").map((cell) => cell.textContent)).toEqual(["—", "—"]);
+    expect(all("ha-birth-date").map((cell) => cell.textContent)).toEqual(["11/08/2013", "—"]);
     expect(byId("ha-section-renewal")).toBeNull();
   });
 
@@ -527,7 +528,7 @@ describe("OutilsPage", () => {
       expect(select.value).toBe("skip");
       expect([...select.options].map((option) => option.textContent.trim())).toEqual([
         "— Ignorer cette inscription —",
-        "Rattacher à GRANGER Hermione (né(e) le 2012-09-19, licence 123456)",
+        "Rattacher à GRANGER Hermione (né(e) le 19/09/2012, licence 123456)",
         "Créer un nouvel adhérent",
       ]);
       expect(byId("ha-row-to_review")!.textContent).toContain("date de naissance différente");

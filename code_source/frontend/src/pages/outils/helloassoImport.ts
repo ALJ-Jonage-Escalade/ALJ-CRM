@@ -158,7 +158,7 @@ export function reviewOptions(row: MembershipRow): { value: string; label: strin
 }
 
 function candidateLabel(member: MembershipCandidate): string {
-  const details = [`né(e) le ${member.birth_date || "?"}`, ...(member.licence ? [`licence ${member.licence}`] : [])];
+  const details = [`né(e) le ${formatDayText(member.birth_date) || "?"}`, ...(member.licence ? [`licence ${member.licence}`] : [])];
   return `${personLabel(member)} (${details.join(", ")})`;
 }
 
