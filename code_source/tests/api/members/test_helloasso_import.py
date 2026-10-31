@@ -8,6 +8,7 @@ from typing import Any
 from unittest.mock import patch
 
 from support.api_case import ApiTestCase
+from support.helloasso_items import ha_item
 from support.member_db import MemberDbTestCase
 
 from infrastructure.firestore.app_settings import AppSettingsRepository
@@ -17,27 +18,6 @@ from infrastructure.sqlite.connection import SqliteDatabase
 
 CAMPAIGN = "adhesion-escalade-2026-2027-amicale-laique-escalade-2"
 PREVIEW = "/api/helloasso/memberships/preview"
-
-
-def ha_item(item_id: int, last_name: str, first_name: str, birth_date: str = "11/08/2013", **overrides: Any) -> dict[str, Any]:  # Any: HelloAsso JSON
-    item: dict[str, Any] = {
-        "id": item_id,
-        "type": "Membership",
-        "state": "Processed",
-        "name": "Loisir collège",
-        "amount": 15000,
-        "order": {"id": 500 + item_id, "date": "2026-09-01T10:00:00+02:00"},
-        "user": {"firstName": first_name, "lastName": last_name},
-        "payer": {"firstName": "Molly", "lastName": last_name, "email": "parent@terrier.example"},
-        "options": [{"name": "Assurance Base", "amount": 0}],
-        "customFields": [
-            {"name": "Date de naissance de l'adhérent", "answer": birth_date},
-            {"name": "Sexe", "answer": "Femme"},
-            {"name": "Ville", "answer": "Jonage"},
-        ],
-    }
-    item.update(overrides)
-    return item
 
 
 class HelloAssoImportTestCase(MemberDbTestCase, ApiTestCase):

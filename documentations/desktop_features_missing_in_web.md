@@ -41,6 +41,7 @@
 | Map, pivot table | Outils (`MembersMap.vue` with `/api/reports/map-points`; `PivotPane.vue` with `/api/reports/pivot-records`) |
 | Google OAuth connection / token test | Paramètres (`ParametresPage.vue`, `/api/auth/google/*`) |
 | HelloAsso sync | `/api/helloasso/sync` |
+| HelloAsso membership campaign → members (former `exports/membership_excel.update_membership_excel` pipeline, removed) | Outils › Import HelloAsso (`HelloAssoImportPane.vue`) → `/api/helloasso/memberships/preview`, `/api/helloasso/memberships/import` |
 | Daily MyCompet results task (Windows task at 07:00) | Cloud Scheduler job `batch-resultats-competitions`, working once `fix/job_comp_update` is merged (see `plan_fix_job_comp_update.md` on that branch) |
 
 ## No longer needed

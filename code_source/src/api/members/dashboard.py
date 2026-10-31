@@ -8,12 +8,14 @@ from fastapi import APIRouter, BackgroundTasks
 
 from domain.competitions.matching import parse_campaign_identifier
 from domain.constants import get_active_season
+from domain.members.helloasso_membership import map_membership_items
 from infrastructure.firestore.app_settings import HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.client import FirestoreError
 from infrastructure.geocoding import geocode_missing_addresses
-from infrastructure.helloasso.api import get_campaigns, get_items
+from infrastructure.helloasso import api as helloasso_api
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.geocache import GeocacheRepository
+from services.members.helloasso_import import MembershipImportService
 
 logger = logging.getLogger("alj")
 
@@ -46,21 +48,20 @@ def get_target_slug() -> str:
 
 @router.get("/api/dashboard")
 def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: bool = False):
-    """Route principale renvoyant toutes les données formatées pour le frontend."""
+    """Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
+    des adhésions (réglage HELLOASSO_MEMBERSHIP_CAMPAIGN) et les inscriptions sont lues par le même mapper."""
     print("-> Interrogation de l'API HelloAsso...")
-    
-    campaigns = get_campaigns()
-    target_slug = get_target_slug()
+
+    campaigns = helloasso_api.get_campaigns()
+    target_slug = MembershipImportService.campaign_setting().campaign.slug
     target_camp = next((c for c in campaigns if c.get('formSlug') == target_slug), None)
-    
+
     if not target_camp:
         return {"error": "Campagne introuvable"}
-        
+
     c_type = target_camp.get('formType')
-    items = get_items(c_type, target_slug)
-    
-    inscrits = [i for i in items if i.get('type') in ('Registration', 'Membership')]
-    
+    records = map_membership_items(helloasso_api.get_items(c_type, target_slug))
+
     participants = []
     tariffs_count = {}
     map_data_dict = {}
@@ -69,73 +70,12 @@ def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: 
     geocache = GeocacheRepository.get_geocache()
     missing_addresses = set()
 
-    for item in inscrits:
-        flat_item = {
-            "order_ref": item.get("order", {}).get("id"),
-            "order_date": item.get("order", {}).get("date"),
-            "status": item.get("state"),
-            "tarif_name": item.get("name") or "".strip(),
-            "amount": item.get("amount", 0) / 100,
-            "user_firstName": item.get("user", {}).get("firstName") or "",
-            "user_lastName": item.get("user", {}).get("lastName") or "",
-            "payer_firstName": item.get("payer", {}).get("firstName") or "",
-            "payer_lastName": item.get("payer", {}).get("lastName") or "",
-            "payer_email": item.get("payer", {}).get("email") or "",
-        }
-        
-        # Parse HelloAsso checkout options for insurance selections
-        options = item.get("options", [])
-        flat_item["opt_Assurance Base"] = "Non"
-        flat_item["opt_Montant Assurance Base"] = 0.0
-        flat_item["opt_Assurance Base +"] = "Non"
-        flat_item["opt_Montant Assurance Base +"] = 0.0
-        flat_item["opt_Assurance Base ++"] = "Non"
-        flat_item["opt_Montant Assurance Base ++"] = 0.0
-        flat_item["opt_Assurance Option ski de piste"] = "Non"
-        flat_item["opt_Montant Assurance Option ski de piste"] = 0.0
-        flat_item["opt_Assurance Option VTT"] = "Non"
-        flat_item["opt_Montant Assurance Option VTT"] = 0.0
-        flat_item["opt_Assurance Option Trail"] = "Non"
-        flat_item["opt_Montant Assurance Option Trail"] = 0.0
-        
-        for opt in options:
-            opt_name = opt.get("name") or "".strip()
-            opt_amount = opt.get("amount", 0) / 100
-            if "Assurance Base ++" in opt_name:
-                flat_item["opt_Assurance Base ++"] = "Oui"
-                flat_item["opt_Montant Assurance Base ++"] = opt_amount
-            elif "Assurance Base +" in opt_name:
-                flat_item["opt_Assurance Base +"] = "Oui"
-                flat_item["opt_Montant Assurance Base +"] = opt_amount
-            elif "Assurance Base" in opt_name:
-                flat_item["opt_Assurance Base"] = "Oui"
-                flat_item["opt_Montant Assurance Base"] = opt_amount
-            elif "ski de piste" in opt_name.lower():
-                flat_item["opt_Assurance Option ski de piste"] = "Oui"
-                flat_item["opt_Montant Assurance Option ski de piste"] = opt_amount
-            elif "vtt" in opt_name.lower():
-                flat_item["opt_Assurance Option VTT"] = "Oui"
-                flat_item["opt_Montant Assurance Option VTT"] = opt_amount
-            elif "trail" in opt_name.lower():
-                flat_item["opt_Assurance Option Trail"] = "Oui"
-                flat_item["opt_Montant Assurance Option Trail"] = opt_amount
-        
-        custom_fields = item.get("customFields", [])
-        city = ""
-        zip_code = ""
-        address = ""
-        
-        for field in custom_fields:
-            name = field.get("name") or ""
-            val = field.get("answer", field.get("value") or "")
-            flat_item[f"champ_{name}"] = val
-            
-            if name.lower() == "ville":
-                city = val.strip().upper()
-            elif name.lower() == "code postal":
-                zip_code = val.strip()
-            elif "adresse" in name.lower() and "rue" in name.lower():
-                address = val.strip()
+    for record in records:
+        flat_item = record.legacy_fields()
+        fields = {name.lower(): value.strip() for name, value in record.custom_fields.items()}
+        city = fields.get("ville", "").upper()
+        zip_code = fields.get("code postal", "")
+        address = next((value for name, value in fields.items() if "adresse" in name and "rue" in name), "")
 
         flat_item["city"] = city
         flat_item["address"] = address

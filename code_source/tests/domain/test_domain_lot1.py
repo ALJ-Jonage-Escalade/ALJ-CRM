@@ -10,7 +10,7 @@ if _src_dir not in sys.path:
 
 from domain.members.models import Member
 from domain.validators import validate_amount, validate_email
-from domain.constants import get_active_season, get_drive_temp_filename
+from domain.constants import get_active_season
 
 class TestDomainLot1(unittest.TestCase):
 
@@ -76,11 +76,6 @@ class TestDomainLot1(unittest.TestCase):
         season = get_active_season()
         self.assertIsInstance(season, str)
         self.assertGreater(len(season), 0)
-        
-        # Test du helper de fichier temporaire
-        temp_fn = get_drive_temp_filename()
-        self.assertIn(season, temp_fn)
-        self.assertTrue(temp_fn.endswith(".xlsx"))
 
 if __name__ == "__main__":
     unittest.main()
