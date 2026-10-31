@@ -247,6 +247,7 @@ defineExpose({ reload: reset });
                   <th class="px-2.5 py-1.5">Inscrit le</th>
                   <th class="px-2.5 py-1.5">Payé le</th>
                   <th class="px-2.5 py-1.5">Naissance</th>
+                  <th class="px-2.5 py-1.5">Licence</th>
                   <th class="px-2.5 py-1.5">Tarif</th>
                   <th class="px-2.5 py-1.5">Montant</th>
                   <th class="px-2.5 py-1.5">Statut HelloAsso</th>
@@ -274,6 +275,7 @@ defineExpose({ reload: reset });
                   <td class="px-2.5 py-1.5" data-testid="ha-order-date">{{ formatDayText(row.order_date) || "—" }}</td>
                   <td class="px-2.5 py-1.5" data-testid="ha-payment-date">{{ formatDayText(row.payment_date) || "—" }}</td>
                   <td class="px-2.5 py-1.5">{{ row.birth_date || "—" }}</td>
+                  <td class="px-2.5 py-1.5 font-mono" data-testid="ha-licence">{{ row.licence || "—" }}</td>
                   <td class="px-2.5 py-1.5">{{ row.tarif_name }}</td>
                   <td class="px-2.5 py-1.5">{{ formatEuros(row.amount) }}</td>
                   <td class="px-2.5 py-1.5">

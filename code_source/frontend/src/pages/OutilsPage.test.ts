@@ -383,6 +383,7 @@ describe("OutilsPage", () => {
     expect(byId("ha-count-renewal")!.textContent).toContain("0");
     expect(all("ha-row-new").map((row) => row.textContent)).toEqual([expect.stringContaining("WEASLEY Ginny")]);
     expect(byId("ha-row-blocked")!.textContent).toContain("Date de naissance manquante ou illisible.");
+    expect(all("ha-licence").map((cell) => cell.textContent)).toEqual(["—", "—"]);
     expect(byId("ha-section-renewal")).toBeNull();
   });
 
@@ -426,6 +427,21 @@ describe("OutilsPage", () => {
       expect(sent("POST", "/api/helloasso/memberships/preview").at(-1)!.body).toEqual({ campaign: null });
     } finally {
       ANSWERS["GET /api/helloasso/campaigns"] = campaigns;
+    }
+  });
+
+  it("shows the FFME licence given on HelloAsso", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const licensed = { ...MEMBERSHIP_PREVIEW.rows[0]!, licence: "123456" };
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [licensed] });
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+
+      expect(byId("ha-row-new")!.querySelector("[data-testid=ha-licence]")!.textContent).toBe("123456");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
     }
   });
 
