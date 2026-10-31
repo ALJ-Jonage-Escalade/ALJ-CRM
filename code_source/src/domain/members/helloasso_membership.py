@@ -161,7 +161,6 @@ def map_membership_items(items: Iterable[Mapping[str, Any]]) -> list[MembershipR
     return [map_membership_item(item) for item in items if item.get("type") in REGISTRATION_TYPES]
 
 
-
 # ---------------------------------------------------------------------------
 # Campaign (app setting HELLOASSO_MEMBERSHIP_CAMPAIGN) and season guard
 # ---------------------------------------------------------------------------

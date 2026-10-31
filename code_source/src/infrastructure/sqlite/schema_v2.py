@@ -15,7 +15,7 @@ import datetime
 import logging
 import sqlite3
 
-from domain.members.purchase_priority import STATUS_PRIORITY, purchase_priority_score, status_score  # noqa: F401 - re-exported
+from domain.members.purchase_priority import purchase_priority_score, status_score
 from domain.members.sex import parse_sex
 from domain.utils import normalize_name
 

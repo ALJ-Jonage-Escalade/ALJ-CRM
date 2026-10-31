@@ -34,9 +34,9 @@ class AppliedWrite:
 
 def _record_helloasso_values(cur: sqlite3.Cursor, purchase_id: int, write: ImportWrite) -> None:
     """The registration the purchase comes from, and the values HelloAsso gave for it."""
-    rec = write.entry.record
+    record = write.entry.record
     cur.execute("UPDATE purchases SET helloasso_item_id = ?, helloasso_status = ?, helloasso_amount = ?, helloasso_tarif = ?"
-                " WHERE id = ?", (rec.item_id, rec.status, rec.amount, rec.tarif_name.strip(), purchase_id))
+                " WHERE id = ?", (record.item_id, record.status, record.amount, record.tarif_name.strip(), purchase_id))
 
 
 def _add_membership(cur: sqlite3.Cursor, write: ImportWrite, user_id: int, season_id: int, now_iso: str) -> AppliedWrite:
@@ -80,16 +80,16 @@ def _backfill(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: 
 
 def _update(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: str) -> AppliedWrite:
     """The values HelloAsso changed (entry.changes) written on the purchase; the other values stay as in the CRM."""
-    entry, rec = write.entry, write.entry.record
+    entry, record = write.entry, write.entry.record
     if entry.member_id is None or entry.purchase_id is None:
         raise ValueError(f"Inscription {write.item_id} : achat à mettre à jour non indiqué")
-    new_values = {"status": rec.status, "tarif_name": rec.tarif_name.strip(), "amount": rec.amount}
+    new_values = {"status": record.status, "tarif_name": record.tarif_name.strip(), "amount": record.amount}
     for change in entry.changes:
         column = change.field
         cur.execute(f'UPDATE purchases SET "{column}" = ?, updated_at = ? WHERE id = ?',  # noqa: S608 - column: a key of new_values
                     (new_values[column], now_iso, entry.purchase_id))
         if column == "status":
-            cur.execute("UPDATE purchases SET status_normalized = ? WHERE id = ?", (schema_v2.normalize_status(rec.status), entry.purchase_id))
+            cur.execute("UPDATE purchases SET status_normalized = ? WHERE id = ?", (schema_v2.normalize_status(record.status), entry.purchase_id))
     _record_helloasso_values(cur, entry.purchase_id, write)
     return AppliedWrite(write.item_id, write.action, entry.member_id, entry.purchase_id)
 

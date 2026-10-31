@@ -21,6 +21,7 @@ from api.members.helloasso_import_schemas import (
 )
 from api.admin.access import author_of
 from api.responses import error_responses
+from domain.members.helloasso_membership import MembershipRecord
 from domain.members.membership_import import Bucket, Decision, ImportPlan, PlanEntry, WriteAction
 from infrastructure.sqlite.membership_import import AppliedWrite
 from services.members.helloasso_import import CampaignSetting, ImportResult
@@ -70,15 +71,17 @@ def preview_membership_import() -> MembershipPreview:
     return _preview(Service.preview())
 
 
-def _imported(applied: AppliedWrite, plan: ImportPlan) -> ImportedMember:
-    record = next(entry.record for entry in plan.entries if entry.item_id == applied.item_id)
+def _imported(applied: AppliedWrite, records: dict[int, MembershipRecord]) -> ImportedMember:
+    record = records[applied.item_id]
     return ImportedMember(item_id=applied.item_id, user_id=applied.user_id, purchase_id=applied.purchase_id,
                           last_name=record.last_name, first_name=record.first_name, tarif_name=record.tarif_name)
 
 
 def _result(result: ImportResult) -> MembershipImportResult:
+    records = {entry.item_id: entry.record for entry in result.plan.entries}
+
     def members(action: WriteAction) -> list[ImportedMember]:
-        return [_imported(applied, result.plan) for applied in result.applied if applied.action == action]
+        return [_imported(applied, records) for applied in result.applied if applied.action == action]
 
     created, renewed, updated = members(WriteAction.CREATE), members(WriteAction.ATTACH), members(WriteAction.UPDATE)
     written = len(created) + len(renewed) + len(updated)

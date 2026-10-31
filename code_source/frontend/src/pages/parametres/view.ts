@@ -124,6 +124,6 @@ const CAMPAIGN_SOURCES: Record<Schemas["MembershipCampaignSetting"]["source"], s
 };
 
 /** The form the HelloAsso membership import reads, and where its slug comes from. */
-export function membershipCampaignText(s: Schemas["MembershipCampaignSetting"]): string {
-  return `Campagne lue : ${s.resolved} (${CAMPAIGN_SOURCES[s.source]})`;
+export function membershipCampaignText(setting: Schemas["MembershipCampaignSetting"]): string {
+  return `Campagne lue : ${setting.resolved} (${CAMPAIGN_SOURCES[setting.source]})`;
 }

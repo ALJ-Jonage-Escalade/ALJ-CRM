@@ -237,7 +237,7 @@ def fetch_form_items(form_type: str, slug: str) -> list:
         try:
             response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
         except requests.exceptions.RequestException as e:
-            raise HelloAssoApiError(f"API HelloAsso injoignable : {type(e).__name__}")
+            raise HelloAssoApiError(f"API HelloAsso injoignable : {type(e).__name__}") from e
         if response.status_code == 404:
             raise HelloAssoApiError(f"Campagne HelloAsso introuvable : {form_type}/{slug}.", "helloasso_campaign_not_found")
         if response.status_code >= 300:
