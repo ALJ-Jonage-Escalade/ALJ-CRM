@@ -15,6 +15,7 @@ const campaign = (slug: string, extra: Partial<Schemas["HelloAssoCampaign"]> = {
   title: slug,
   private_title: "",
   state: "Public",
+  activity_type: "Compétition",
   url: `https://www.helloasso.com/associations/club/evenements/${slug}`,
   start_date: null,
   end_date: null,
@@ -27,6 +28,7 @@ const campaign = (slug: string, extra: Partial<Schemas["HelloAssoCampaign"]> = {
 function campaignsBody(competitionsActive: string | null = "competitions-2025"): Schemas["HelloAssoCampaigns"] {
   return {
     error: null,
+    others: [campaign("soiree-club", { title: "Soirée du club", activity_type: "Fête", start_date: "2026-12-12T19:00:00+01:00" })],
     membership: {
       active: { form_type: "Membership", slug: "adhesion-2026" },
       configured: false,
@@ -114,6 +116,12 @@ describe("ParametresCampaignsPage", () => {
     expect(old.find('[data-testid="campaign-warning"]').text()).toContain("Campagne désactivée sur HelloAsso");
     expect(section("competitions").find('[data-testid="campaigns-active"]').text()).toContain("Compétitions 2025-2026");
     expect(section("competitions").find('[data-testid="campaigns-default"]').exists()).toBe(false);
+
+    const party = row("others", "soiree-club");
+    expect(party.find('[data-testid="campaign-activity"]').text()).toBe("Fête");
+    expect(party.find('[data-testid="campaign-start"]').text()).toBe("12/12/2026");
+    expect(party.find('[data-testid="campaign-choose"]').exists()).toBe(false);
+    expect(row("competitions", "soiree-club").exists()).toBe(false);
   });
 
   it("chooses a campaign once confirmed, then shows it active and the sync notice", async () => {
@@ -159,6 +167,7 @@ describe("ParametresCampaignsPage", () => {
         error: "Impossible de lire les campagnes sur HelloAsso pour le moment.",
         membership: { ...body.membership, campaigns: [] },
         competitions: { ...body.competitions, campaigns: [] },
+        others: [],
       });
     };
     const { section, byId, wrapper } = render({
@@ -168,6 +177,7 @@ describe("ParametresCampaignsPage", () => {
     expect(byId("campaigns-helloasso-error").text()).toContain("Impossible de lire les campagnes sur HelloAsso");
     expect(section("competitions").find('[data-testid="campaigns-active"]').text()).toContain("competitions-2025");
     expect(wrapper.find('[data-testid="campaign-choose"]').exists()).toBe(false);
+    expect(section("others").exists()).toBe(false);
 
     failing = false;
     await byId("campaigns-retry").trigger("click");

@@ -3,6 +3,7 @@
 Two kinds of campaign, one active of each, saved in the Firestore `app_settings` as "FormType:slug":
 - membership: the Membership form whose registrations the dashboard shows;
 - competitions: the seasonal Event form that competition payments are matched against.
+The other Event forms (parties, trips…) are listed apart, for information ("Autres").
 
 Input: the forms of HelloAsso's `GET /organizations/{org}/forms` (FormLightModel).
 """
@@ -22,6 +23,9 @@ FORM_TYPE_OF_KIND: Dict[str, str] = {"membership": "Membership", "competitions":
 LISTED_STATES = ("Public", "Private", "Draft")
 # Every state but Deleted: the active campaign is found even once disabled
 LOOKUP_STATES = ("Public", "Private", "Draft", "Disabled")
+# HelloAsso activity "Compétition" of the Event forms (GET /values/form/Event/types). `activityTypeId` is returned by the
+# forms list but not documented there: a form without it is not taken as a competitions campaign.
+COMPETITION_ACTIVITY_TYPE_ID = 3
 
 _STATE_WARNINGS = {
     "Disabled": "Campagne désactivée sur HelloAsso",
@@ -42,6 +46,7 @@ class CampaignRow(TypedDict):
     title: str
     private_title: str
     state: str
+    activity_type: str
     url: str
     start_date: Optional[str]
     end_date: Optional[str]
@@ -84,6 +89,7 @@ def campaign_row(form: Dict[str, Any], active: bool = False, warning: Optional[s
         "title": _text(form.get("title")),
         "private_title": _text(form.get("privateTitle")),
         "state": _text(form.get("state")),
+        "activity_type": _text(form.get("activityType")),
         "url": _text(form.get("url")),
         "start_date": _optional(form.get("startDate")),
         "end_date": _optional(form.get("endDate")),
@@ -98,13 +104,29 @@ def _sort_key(row: CampaignRow) -> str:
     return row["start_date"] or row["created_at"] or ""
 
 
-def active_warning(form: Optional[Dict[str, Any]], expected_form_type: str) -> Optional[str]:  # Any: HelloAsso JSON
+def _is_competition(form: Dict[str, Any]) -> bool:  # Any: HelloAsso JSON
+    return form.get("activityTypeId") == COMPETITION_ACTIVITY_TYPE_ID
+
+
+def _of_kind(form: Dict[str, Any], kind: str) -> bool:  # Any: HelloAsso JSON
+    """Form of the kind's type, and for competitions of the "Compétition" activity."""
+    return _text(form.get("formType")) == FORM_TYPE_OF_KIND[kind] and (kind != "competitions" or _is_competition(form))
+
+
+def _listed(form: Dict[str, Any]) -> bool:  # Any: HelloAsso JSON
+    return _text(form.get("state")) in LISTED_STATES
+
+
+def active_warning(form: Optional[Dict[str, Any]], kind: str) -> Optional[str]:  # Any: HelloAsso JSON
     """Why the active campaign is not among the listed ones, or None when it is."""
     if form is None:
         return NOT_FOUND_WARNING
     form_type = _text(form.get("formType"))
+    expected_form_type = FORM_TYPE_OF_KIND[kind]
     if form_type != expected_form_type:
         return f"Formulaire de type {form_type or 'inconnu'} (attendu : {expected_form_type})"
+    if kind == "competitions" and not _is_competition(form):
+        return f"Activité « {_text(form.get('activityType')) or 'non renseignée'} » (attendue : Compétition)"
     state = _text(form.get("state"))
     if state not in LISTED_STATES:
         return _STATE_WARNINGS.get(state, f"Campagne à l'état {state or 'inconnu'} sur HelloAsso")
@@ -112,19 +134,27 @@ def active_warning(form: Optional[Dict[str, Any]], expected_form_type: str) -> O
 
 
 def campaign_table(forms: Iterable[Dict[str, Any]], kind: str, active: Optional[CampaignRef]) -> List[CampaignRow]:  # Any: HelloAsso JSON
-    """Rows of a kind's table: its Public / Private / Draft forms, newest first, and the active campaign always, flagged with
-    a warning when it no longer matches (other type, disabled, not found). `forms` may hold every type and state."""
-    form_type = FORM_TYPE_OF_KIND[kind]
+    """Rows of a kind's table: its Public / Private / Draft forms, newest first, and the active campaign always, flagged
+    with a warning when it no longer matches (other type or activity, disabled, not found). `forms` may hold every type
+    and state."""
     all_forms = list(forms)
     active_slug = active["slug"] if active else None
     rows = [campaign_row(form, active=_text(form.get("formSlug")) == active_slug)
             for form in all_forms
-            if _text(form.get("formType")) == form_type and _text(form.get("state")) in LISTED_STATES]
+            if _of_kind(form, kind) and _listed(form)]
     if active and not any(row["active"] for row in rows):
         active_form = next((form for form in all_forms if _text(form.get("formSlug")) == active_slug), None)
         if active_form is None:
             rows.append({**campaign_row({"formType": active["form_type"], "formSlug": active_slug}), "active": True,
                          "warning": NOT_FOUND_WARNING})
         else:
-            rows.append(campaign_row(active_form, active=True, warning=active_warning(active_form, form_type)))
+            rows.append(campaign_row(active_form, active=True, warning=active_warning(active_form, kind)))
+    return sorted(rows, key=_sort_key, reverse=True)
+
+
+def other_events_table(forms: Iterable[Dict[str, Any]]) -> List[CampaignRow]:  # Any: HelloAsso JSON
+    """Rows of the "Autres" table: the Public / Private / Draft Event forms of another activity than "Compétition",
+    newest first. Nothing to choose there: `active` is always False."""
+    rows = [campaign_row(form) for form in forms
+            if _text(form.get("formType")) == "Event" and not _is_competition(form) and _listed(form)]
     return sorted(rows, key=_sort_key, reverse=True)

@@ -31,13 +31,16 @@ the active one of each type.
     variable, then the seasonal default slug. The last two are a temporary fallback, removed in a later change once
     production has a value chosen.
 - **D3 — Which campaigns are listed.**
-  - Membership table: `formTypes=Membership`; competitions table: `formTypes=Event`.
+  - Membership table: `formTypes=Membership`; competitions table: `formTypes=Event` with `activityTypeId == 3`
+    ("Compétition", from `GET /values/form/Event/types`; the field is returned by the forms list but not documented
+    there, so a form without it is not a competitions campaign).
+  - "Autres" table, read-only (nothing to choose): the other Event forms (`activityTypeId != 3` or missing), with
+    their `activityType`. An active competitions campaign of another activity gets a warning.
   - States `Public`, `Private` and `Draft` (drafts so next season's form can be chosen before it opens; no
     `Disabled`, `Deleted`).
   - The active campaign is always listed, even when it no longer matches the filter (disabled, other type, not found):
     shown with a warning badge.
   - Sorted by `startDate`, newest first; `meta.createdAt` when `startDate` is missing (membership forms may have none).
-  - To revisit if the club's competition form turns out to be a `PaymentForm`.
 - **D4 — Columns** (from the list call only; no per-row `/public` call):
 
   | Column | Content |

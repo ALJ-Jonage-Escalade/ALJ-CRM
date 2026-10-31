@@ -102,6 +102,7 @@ class HelloAssoCampaign(BaseModel):
     title: str
     private_title: str
     state: str = Field(description="Public, Private, Draft, Disabled or Deleted; empty when not found on HelloAsso")
+    activity_type: str = Field(description="HelloAsso activity of an Event form (\"Compétition\"…), empty when not given")
     url: str
     start_date: Optional[str]
     end_date: Optional[str]
@@ -119,7 +120,9 @@ class HelloAssoCampaignKind(BaseModel):
 
 
 class HelloAssoCampaigns(BaseModel):
-    """error: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty."""
+    """competitions: Event forms of the "Compétition" activity; others: the other Event forms, for information.
+    error: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty."""
     membership: HelloAssoCampaignKind
     competitions: HelloAssoCampaignKind
+    others: List[HelloAssoCampaign]
     error: Optional[str]

@@ -63,9 +63,13 @@ jamais ajouté en mode dev.
     {"formSlug": "adhesion-2026", "formType": "Membership", "state": "Public", "title": "Adhésion 2026-2027",
      "meta": {"createdAt": "2026-07-01T10:00:00+02:00"}},
     {"formSlug": "competitions-2026", "formType": "Event", "state": "Private", "title": "Compétitions 2026-2027",
+     "activityType": "Compétition", "activityTypeId": 3,
      "startDate": "2026-09-15T00:00:00+02:00", "endDate": "2027-06-30T23:59:00+02:00"},
     {"formSlug": "competitions-2025", "formType": "Event", "state": "Disabled", "title": "Compétitions 2025-2026",
-     "startDate": "2025-09-15T00:00:00+02:00", "endDate": "2026-06-30T23:59:00+02:00"}]}'
+     "activityType": "Compétition", "activityTypeId": 3,
+     "startDate": "2025-09-15T00:00:00+02:00", "endDate": "2026-06-30T23:59:00+02:00"},
+    {"formSlug": "soiree-club-2026", "formType": "Event", "state": "Public", "title": "Soirée du club",
+     "activityType": "Fête", "activityTypeId": 1, "startDate": "2026-12-12T19:00:00+01:00"}]}'
   ```
 - **Service worker** : en cas de page figée après un changement, « Mettre à jour » sur le badge
   de version ou désenregistrer le SW (DevTools → Application).

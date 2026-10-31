@@ -74,6 +74,7 @@ def list_campaigns() -> Dict[str, Any]:  # Any: response body, checked by respon
         # No list without HelloAsso: the page shows the active campaign alone
         rows = campaigns.campaign_table(forms, kind, active) if error is None else []
         body[kind] = {"active": active, "configured": configured, "campaigns": rows}
+    body["others"] = campaigns.other_events_table(forms)
     return body
 
 

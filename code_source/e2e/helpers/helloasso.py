@@ -25,7 +25,8 @@ _ids = itertools.count(900_001)
 
 
 def form(slug: str, form_type: str = "Event") -> dict:
-    return {"formSlug": slug, "formType": form_type, "title": slug, "state": "Public"}
+    competition = {"activityType": "Compétition", "activityTypeId": 3} if form_type == "Event" else {}
+    return {"formSlug": slug, "formType": form_type, "title": slug, "state": "Public", **competition}
 
 
 def item(first_name: str, last_name: str, amount_eur: float, licence: str = "", competition_number: str = "",

@@ -17,8 +17,11 @@ FORMS = [
     {"formSlug": "adhesion-2026", "formType": "Membership", "state": "Public", "title": "Adhésion 2026-2027",
      "startDate": "2026-09-01T00:00:00+02:00", "meta": {"createdAt": "2026-07-01T10:00:00+02:00"}},
     {"formSlug": "competitions-2026", "formType": "Event", "state": "Private", "title": "Compétitions 2026-2027",
-     "startDate": "2026-09-15T00:00:00+02:00", "endDate": "2027-06-30T23:59:00+02:00"},
-    {"formSlug": "competitions-2025", "formType": "Event", "state": "Disabled", "title": "Compétitions 2025-2026"},
+     "activityType": "Compétition", "activityTypeId": 3, "startDate": "2026-09-15T00:00:00+02:00", "endDate": "2027-06-30T23:59:00+02:00"},
+    {"formSlug": "competitions-2025", "formType": "Event", "state": "Disabled", "title": "Compétitions 2025-2026",
+     "activityType": "Compétition", "activityTypeId": 3},
+    {"formSlug": "soiree-club", "formType": "Event", "state": "Public", "title": "Soirée du club", "activityType": "Fête",
+     "activityTypeId": 1},
 ]
 
 
@@ -55,6 +58,7 @@ class TestHelloAssoCampaigns(ApiTestCase):
         self.assertEqual(list(rows), ["competitions-2026", "competitions-2025"])
         self.assertEqual(rows["competitions-2025"]["warning"], "Campagne désactivée sur HelloAsso")
         self.assertIsNone(rows["competitions-2026"]["warning"])
+        self.assertEqual([(c["slug"], c["activity_type"]) for c in body["others"]], [("soiree-club", "Fête")])
         types, states = self.list_forms.call_args.args
         self.assertEqual((sorted(types), sorted(states)), (["Event", "Membership"], ["Disabled", "Draft", "Private", "Public"]))
 
@@ -72,7 +76,7 @@ class TestHelloAssoCampaigns(ApiTestCase):
         body = self.campaigns()
         self.assertEqual(body["error"], route.HELLOASSO_UNREACHABLE)
         self.assertEqual(body["competitions"]["active"], {"form_type": "Event", "slug": "competitions-2026"})
-        self.assertEqual((body["membership"]["campaigns"], body["competitions"]["campaigns"]), ([], []))
+        self.assertEqual((body["membership"]["campaigns"], body["competitions"]["campaigns"], body["others"]), ([], [], []))
 
     def test_missing_credentials(self) -> None:
         with patch.object(route.helloasso_api, "credentials_configured", return_value=False):

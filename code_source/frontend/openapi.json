@@ -6142,6 +6142,11 @@
             "title": "State",
             "description": "Public, Private, Draft, Disabled or Deleted; empty when not found on HelloAsso"
           },
+          "activity_type": {
+            "type": "string",
+            "title": "Activity Type",
+            "description": "HelloAsso activity of an Event form (\"Compétition\"…), empty when not given"
+          },
           "url": {
             "type": "string",
             "title": "Url"
@@ -6203,6 +6208,7 @@
           "title",
           "private_title",
           "state",
+          "activity_type",
           "url",
           "start_date",
           "end_date",
@@ -6293,6 +6299,13 @@
           "competitions": {
             "$ref": "#/components/schemas/HelloAssoCampaignKind"
           },
+          "others": {
+            "items": {
+              "$ref": "#/components/schemas/HelloAssoCampaign"
+            },
+            "type": "array",
+            "title": "Others"
+          },
           "error": {
             "anyOf": [
               {
@@ -6309,10 +6322,11 @@
         "required": [
           "membership",
           "competitions",
+          "others",
           "error"
         ],
         "title": "HelloAssoCampaigns",
-        "description": "error: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty."
+        "description": "competitions: Event forms of the \"Compétition\" activity; others: the other Event forms, for information.\nerror: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty."
       },
       "HelloAssoItem": {
         "properties": {

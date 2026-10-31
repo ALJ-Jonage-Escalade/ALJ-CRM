@@ -2595,6 +2595,11 @@ export interface components {
              * @description Public, Private, Draft, Disabled or Deleted; empty when not found on HelloAsso
              */
             state: string;
+            /**
+             * Activity Type
+             * @description HelloAsso activity of an Event form ("Compétition"…), empty when not given
+             */
+            activity_type: string;
             /** Url */
             url: string;
             /** Start Date */
@@ -2646,11 +2651,14 @@ export interface components {
         };
         /**
          * HelloAssoCampaigns
-         * @description error: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty.
+         * @description competitions: Event forms of the "Compétition" activity; others: the other Event forms, for information.
+         *     error: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty.
          */
         HelloAssoCampaigns: {
             membership: components["schemas"]["HelloAssoCampaignKind"];
             competitions: components["schemas"]["HelloAssoCampaignKind"];
+            /** Others */
+            others: components["schemas"]["HelloAssoCampaign"][];
             /** Error */
             error: string | null;
         };

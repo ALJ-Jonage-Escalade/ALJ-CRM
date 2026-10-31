@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /* Paramètres › Campagne HelloAsso (admins): the club's HelloAsso campaigns of each kind, with their dates, and the
    choice of the active one: the membership form shown by the dashboard, the seasonal Event form competition payments
-   are matched against. Online only: nothing is kept on the device. */
+   are matched against (activity "Compétition"). The club's other Event forms are listed apart, for information.
+   Online only: nothing is kept on the device. */
 import { computed, inject, onMounted, ref } from "vue";
 import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
@@ -30,7 +31,7 @@ const KINDS: { kind: CampaignKind; title: string; description: string; impact: s
   {
     kind: "competitions",
     title: "🏆 Compétitions",
-    description: "Formulaire de la saison sur lequel les compétiteurs paient leurs inscriptions.",
+    description: "Formulaire de la saison (événement d'activité « Compétition ») sur lequel les compétiteurs paient leurs inscriptions.",
     impact: "Les nouveaux paiements HelloAsso ne seront rapprochés qu'avec ce formulaire.",
   },
 ];
@@ -52,6 +53,8 @@ const choosing = ref("");
 const syncNotice = ref(false);
 
 const helloAssoError = computed(() => campaigns.value?.error ?? "");
+// The club's other Event forms (not "Compétition"), once loaded: nothing to choose there
+const others = computed(() => campaigns.value?.others ?? []);
 // Each kind with its campaigns, once loaded
 const sections = computed(() => {
   const loaded = campaigns.value;
@@ -229,6 +232,59 @@ onMounted(load);
       <p v-else-if="!helloAssoError" data-testid="campaigns-empty" class="mt-2 text-[13px] text-slate-500">
         Aucune campagne publique, privée ou en brouillon de ce type sur HelloAsso.
       </p>
+    </UiCard>
+
+    <UiCard v-if="campaigns && !helloAssoError" data-testid="campaigns-others">
+      <h3 class="text-[15px] font-bold">📋 Autres</h3>
+      <p class="mt-1 text-[13px] text-slate-500">
+        Autres événements du club sur HelloAsso (activité autre que « Compétition »), pour information.
+      </p>
+      <div v-if="others.length" class="mt-2 overflow-x-auto">
+        <table class="w-full text-left text-[13px]" data-testid="campaigns-table">
+          <thead class="text-[11.5px] text-slate-500 uppercase">
+            <tr>
+              <th class="py-1.5 pr-3">Campagne</th>
+              <th class="py-1.5 pr-3">Slug</th>
+              <th class="py-1.5 pr-3">Activité</th>
+              <th class="py-1.5 pr-3">État</th>
+              <th class="py-1.5 pr-3">Début</th>
+              <th class="py-1.5 pr-3">Fin</th>
+              <th class="py-1.5">Créée le</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="campaign in others"
+              :key="campaign.slug"
+              :data-slug="campaign.slug"
+              data-testid="campaign-row"
+              class="border-t border-slate-100"
+            >
+              <td class="py-1.5 pr-3">
+                <a v-if="campaign.url" :href="campaign.url" target="_blank" rel="noopener noreferrer" class="font-semibold underline">
+                  {{ campaign.title || campaign.slug }}
+                </a>
+                <span v-else class="font-semibold">{{ campaign.title || campaign.slug }}</span>
+                <span v-if="campaign.private_title && campaign.private_title !== campaign.title" class="block text-xs text-slate-500">
+                  {{ campaign.private_title }}
+                </span>
+              </td>
+              <td class="py-1.5 pr-3 font-mono text-[11.5px] break-all text-slate-600">{{ campaign.slug }}</td>
+              <td class="py-1.5 pr-3" data-testid="campaign-activity">{{ campaign.activity_type || "—" }}</td>
+              <td class="py-1.5 pr-3" data-testid="campaign-state">
+                <UiBadge v-if="stateOf(campaign)" :color="stateOf(campaign)?.color ?? 'slate'" variant="soft">
+                  {{ stateOf(campaign)?.label }}
+                </UiBadge>
+                <span v-else>{{ campaign.state || "—" }}</span>
+              </td>
+              <td class="py-1.5 pr-3 whitespace-nowrap" data-testid="campaign-start">{{ dayText(campaign.start_date) }}</td>
+              <td class="py-1.5 pr-3 whitespace-nowrap" data-testid="campaign-end">{{ dayText(campaign.end_date) }}</td>
+              <td class="py-1.5 whitespace-nowrap" data-testid="campaign-created">{{ dayText(campaign.created_at) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-else data-testid="campaigns-empty" class="mt-2 text-[13px] text-slate-500">Aucun autre événement sur HelloAsso.</p>
     </UiCard>
   </div>
   <UiToast :message="toast.message.value" />
