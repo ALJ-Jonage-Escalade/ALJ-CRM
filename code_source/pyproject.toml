@@ -7,7 +7,7 @@ dependencies = [
     "uvicorn==0.54.0",
     "requests==2.34.2",
     "PyJWT[crypto]==2.15.1",
-    "pandas==3.0.6",
+    "pandas==3.1.0",
     "openpyxl==3.1.5",
     "python-dotenv==1.2.4",
     "geopy==2.5.0",
