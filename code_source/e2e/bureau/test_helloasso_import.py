@@ -39,7 +39,8 @@ def _import(page):
 
 
 def test_import_from_the_membership_campaign(page, fake_helloasso):
-    tag = uuid.uuid4().hex[:6]
+    # Letters only: 4 digits or more in the Adhérents search also match phone numbers (seeded members found by chance)
+    tag = uuid.uuid4().hex[:6].translate(str.maketrans("0123456789", "ghijklmnop"))
     joined, left_out = f"Rusard{tag}", f"Trelawney{tag}"
     first_run = [helloasso.membership_item("Argus", joined, "12/03/1990"),
                  helloasso.membership_item("Sibylle", left_out, "09/03/1985")]
