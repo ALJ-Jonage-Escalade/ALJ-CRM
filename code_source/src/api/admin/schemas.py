@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from infrastructure.security.roles import RoleName
 
-HistoryAction = Literal["added", "role_changed", "name_changed", "removed", "request_granted", "request_dismissed", "bootstrap"]
+HistoryAction = Literal["invited", "invitation_resent", "added", "role_changed", "name_changed", "removed", "bootstrap"]
 
 
 class AccessEntry(BaseModel):
@@ -21,6 +21,10 @@ class AccessEntry(BaseModel):
     created_by: Optional[str]
     updated_at: Optional[str]
     updated_by: Optional[str]
+    invited_at: Optional[str]
+    invitation_expires_at: Optional[str] = Field(description="null: no pending invitation (accepted, or added before invitations)")
+    invitation_sent_at: Optional[str] = Field(description="null: the invitation e-mail could not be sent")
+    accepted_at: Optional[str]
 
 
 class AccessEntryIn(BaseModel):
@@ -35,17 +39,11 @@ class AccessEntryPatch(BaseModel):
     display_name: Optional[str] = None
 
 
-class AccessRequest(BaseModel):
-    """A verified Google account that signed in without access."""
-    email: str
-    google_display_name: str
-    first_requested_at: str
-    last_requested_at: str
-
-
-class AccessGrant(BaseModel):
-    role: RoleName
-    display_name: Optional[str] = Field(default=None, description="null: the Google display name of the request")
+class AccessInvitation(BaseModel):
+    """An invitation created or sent again; the entry is kept when its e-mail fails."""
+    entry: AccessEntry
+    email_sent: bool
+    email_error: Optional[str] = Field(description="Why the e-mail was not sent; null when it was")
 
 
 class AccessHistoryEntry(BaseModel):

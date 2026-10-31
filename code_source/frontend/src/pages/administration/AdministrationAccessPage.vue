@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* Administration › Accès: who may use the CRM and with which role (the only source of roles, server
-   role_directory), the access requests of the accounts that signed in without access, and the history of the changes.
-   Every refusal (own access, last admin, address already listed) comes from the server and is shown as it is. */
+   role_directory), the invitations (a role given on the first Google sign-in within 7 days) and the history of the
+   changes. Every refusal (own access, last admin, address already listed) comes from the server and is shown as it is. */
 import { computed, inject, onMounted, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
@@ -12,16 +12,20 @@ import { useToast } from "../../composables/toast";
 import { CLIENT_KEY, errorText, type Schemas } from "../../lib/client";
 import { createAdminApi } from "../../services/admin";
 import {
+  accessStatus,
   actionLabel,
   addFormError,
   authorLabel,
   dateTime,
+  emailNotSent,
+  invitationMessage,
   isOwnEntry,
   lastSignIn,
   roleChange,
   roleName,
   ROLE_OPTIONS,
   accessRole,
+  statusLabel,
   type AccessRole,
 } from "./access";
 
@@ -32,16 +36,18 @@ const toast = useToast();
 const signedInEmail = computed(() => (auth.state.value.status === "signedIn" ? auth.state.value.user.email : ""));
 
 const entries = ref<Schemas["AccessEntry"][]>([]);
-const requests = ref<Schemas["AccessRequest"][]>([]);
 const history = ref<Schemas["AccessHistoryEntry"][]>([]);
 const loaded = ref(false);
 const loadError = ref("");
+/** When the list was read: the invitation statuses are worked out against it. */
+const now = ref(new Date());
 /** E-mail of the row whose change is being sent (its buttons wait). */
 const busy = ref("");
 
 async function load(): Promise<void> {
   try {
-    [entries.value, requests.value, history.value] = await Promise.all([adminApi.roles(), adminApi.requests(), adminApi.history()]);
+    [entries.value, history.value] = await Promise.all([adminApi.roles(), adminApi.history()]);
+    now.value = new Date();
     loadError.value = "";
   } catch (e) {
     loadError.value = errorText(e);
@@ -53,12 +59,14 @@ async function load(): Promise<void> {
 onMounted(load);
 defineExpose({ reload: load });
 
-/** Sends one change, then reloads the three lists (the history gets its entry); the server's refusal is shown. */
-async function change(email: string, send: () => Promise<unknown>, done: string): Promise<boolean> {
+/** Sends one change, then reloads both lists (the history gets its entry); the server's refusal is shown. `done`: the
+   message, or a function of the answer giving it and how long it stays. */
+async function change<T>(email: string, send: () => Promise<T>, done: string | ((answer: T) => [string, number])): Promise<boolean> {
   busy.value = email;
   try {
-    await send();
-    toast.show(done);
+    const answer = await send();
+    const [message, duration] = typeof done === "string" ? [done, undefined] : done(answer);
+    toast.show(message, duration);
     return true;
   } catch (e) {
     toast.show(`❌ ${errorText(e)}`, 8000);
@@ -69,7 +77,12 @@ async function change(email: string, send: () => Promise<unknown>, done: string)
   }
 }
 
-// ------------------------------------------------------------ Add a person
+/** An invitation's toast: kept longer when its e-mail failed (the admin has to act). */
+function invitationDone(invitation: Schemas["AccessInvitation"]): [string, number] {
+  return [invitationMessage(invitation), invitation.email_sent ? 4000 : 12000];
+}
+
+// ------------------------------------------------------------ Invite a person
 const newEmail = ref("");
 const newName = ref("");
 const newRole = ref<AccessRole>("coach");
@@ -85,7 +98,7 @@ async function add(): Promise<void> {
   const body = { email, role: newRole.value, display_name: newName.value.trim() };
   adding.value = true;
   try {
-    if (await change(email, () => adminApi.addRole(body), `✅ Accès ${roleName(body.role)} donné à ${email}.`)) {
+    if (await change(email, () => adminApi.invite(body), invitationDone)) {
       newEmail.value = "";
       newName.value = "";
     }
@@ -95,6 +108,10 @@ async function add(): Promise<void> {
 }
 
 // ------------------------------------------------------------ Change an entry
+function resend(entry: Schemas["AccessEntry"]): void {
+  void change(entry.email, () => adminApi.resendInvitation(entry.email), invitationDone);
+}
+
 function onRoleChange(entry: Schemas["AccessEntry"], event: Event): void {
   const role = event.target instanceof HTMLSelectElement ? accessRole(event.target.value) : null;
   if (!role) {
@@ -117,28 +134,26 @@ async function rename(entry: Schemas["AccessEntry"]): Promise<void> {
 }
 
 async function remove(entry: Schemas["AccessEntry"]): Promise<void> {
-  const ok = await dialogs.confirm({
-    title: "Retirer l'accès",
-    message: `${entry.email} (${roleName(entry.role)}) ne pourra plus consulter les données du club.`,
-    confirmLabel: "Retirer l'accès",
-    variant: "danger",
-  });
+  const invitation = accessStatus(entry, now.value) !== "active";
+  const ok = await dialogs.confirm(
+    invitation
+      ? {
+          title: "Annuler l'invitation",
+          message: `${entry.email} (${roleName(entry.role)}) ne pourra pas se connecter avec le lien reçu.`,
+          confirmLabel: "Annuler l'invitation",
+          variant: "danger",
+        }
+      : {
+          title: "Retirer l'accès",
+          message: `${entry.email} (${roleName(entry.role)}) ne pourra plus consulter les données du club.`,
+          confirmLabel: "Retirer l'accès",
+          variant: "danger",
+        },
+  );
   if (ok) {
-    await change(entry.email, () => adminApi.removeRole(entry.email), `🗑️ Accès de ${entry.email} retiré.`);
+    const done = invitation ? `🗑️ Invitation de ${entry.email} annulée.` : `🗑️ Accès de ${entry.email} retiré.`;
+    await change(entry.email, () => adminApi.removeRole(entry.email), done);
   }
-}
-
-// ------------------------------------------------------------ Access requests
-/** Role chosen for each request before granting it. */
-const grantRoles = ref<Record<string, AccessRole>>({});
-
-function grant(request: Schemas["AccessRequest"]): void {
-  const role = grantRoles.value[request.email] ?? "readonly";
-  void change(request.email, () => adminApi.grantRequest(request.email, { role }), `✅ Accès ${roleName(role)} donné à ${request.email}.`);
-}
-
-function dismiss(request: Schemas["AccessRequest"]): void {
-  void change(request.email, () => adminApi.dismissRequest(request.email), `🙈 Demande de ${request.email} ignorée (30 jours).`);
 }
 
 const FIELD = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[13px]";
@@ -164,6 +179,10 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
         <p class="mb-3 text-xs text-slate-500">
           Les personnes autorisées à se connecter, avec leur rôle. Un changement s'applique en moins d'une minute.
         </p>
+        <p class="mb-3 text-xs text-slate-500">
+          Une invitation envoie un lien par e-mail : la personne reçoit son rôle en se connectant avec un compte Google de cette adresse
+          dans les 7 jours. Passé ce délai, utilisez « Renvoyer ».
+        </p>
 
         <form
           class="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3"
@@ -171,7 +190,7 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
           @submit.prevent="add"
         >
           <div class="min-w-56 flex-1">
-            <label for="access-email" :class="LABEL">Adresse e-mail Google</label>
+            <label for="access-email" :class="LABEL">Adresse e-mail (compte Google)</label>
             <input
               id="access-email"
               v-model="newEmail"
@@ -192,7 +211,7 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
               <option v-for="option in ROLE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
           </div>
-          <UiButton type="submit" small data-testid="access-add" :busy="adding && 'Ajout…'">➕ Ajouter</UiButton>
+          <UiButton type="submit" small data-testid="access-add" :busy="adding && 'Invitation…'">✉️ Inviter</UiButton>
           <p v-if="addError" data-testid="access-add-error" role="alert" class="w-full text-xs text-red-700">{{ addError }}</p>
         </form>
 
@@ -203,6 +222,7 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
                 <th class="py-1.5 pr-3">Nom</th>
                 <th class="py-1.5 pr-3">E-mail</th>
                 <th class="py-1.5 pr-3">Rôle</th>
+                <th class="py-1.5 pr-3">Statut</th>
                 <th class="py-1.5 pr-3">Dernière connexion</th>
                 <th class="py-1.5"></th>
               </tr>
@@ -224,8 +244,32 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
                     <option v-for="option in ROLE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
                   </select>
                 </td>
+                <td class="py-1.5 pr-3" data-testid="entry-status">
+                  <span
+                    :class="{
+                      'text-amber-700': accessStatus(entry, now) === 'invited',
+                      'font-semibold text-red-700': accessStatus(entry, now) === 'expired',
+                    }"
+                  >
+                    {{ statusLabel(entry, now) }}
+                  </span>
+                  <span v-if="emailNotSent(entry)" data-testid="entry-email-not-sent" class="block text-xs text-red-700">
+                    E-mail non envoyé
+                  </span>
+                </td>
                 <td class="py-1.5 pr-3 whitespace-nowrap" data-testid="entry-last-sign-in">{{ lastSignIn(entry.last_sign_in_at) }}</td>
                 <td class="py-1.5 text-right whitespace-nowrap">
+                  <UiButton
+                    v-if="accessStatus(entry, now) !== 'active'"
+                    small
+                    variant="muted"
+                    class="mr-1.5"
+                    data-testid="entry-resend"
+                    :disabled="busy === entry.email"
+                    @click="resend(entry)"
+                  >
+                    ✉️ Renvoyer
+                  </UiButton>
                   <UiButton small variant="muted" data-testid="entry-rename" :disabled="busy === entry.email" @click="rename(entry)">
                     ✏️ Nom
                   </UiButton>
@@ -245,50 +289,6 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
             </tbody>
           </table>
         </div>
-      </UiCard>
-
-      <UiCard>
-        <h2 class="text-base font-bold">📨 Demandes d'accès</h2>
-        <p class="mb-3 text-xs text-slate-500">
-          Les comptes Google qui se sont connectés sans accès. Une demande ignorée ne revient pas avant 30 jours ; sans réponse, elle
-          disparaît après 30 jours.
-        </p>
-        <p v-if="!requests.length" data-testid="requests-empty" class="text-[13px] text-slate-500">Aucune demande en attente.</p>
-        <ul v-else class="flex flex-col gap-2" data-testid="requests">
-          <li
-            v-for="request in requests"
-            :key="request.email"
-            :data-email="request.email"
-            class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 px-3 py-2"
-          >
-            <div class="min-w-48 flex-1">
-              <div class="font-semibold break-all">{{ request.email }}</div>
-              <div class="text-xs text-slate-500">
-                {{ request.google_display_name || "Nom Google inconnu" }} · le {{ dateTime(request.last_requested_at) }}
-              </div>
-            </div>
-            <select
-              v-model="grantRoles[request.email]"
-              data-testid="request-role"
-              :aria-label="`Rôle pour ${request.email}`"
-              :class="FIELD"
-            >
-              <option :value="undefined" disabled>Rôle…</option>
-              <option v-for="option in ROLE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
-            </select>
-            <UiButton
-              small
-              data-testid="request-grant"
-              :disabled="busy === request.email || !grantRoles[request.email]"
-              @click="grant(request)"
-            >
-              ✅ Accorder
-            </UiButton>
-            <UiButton small variant="muted" data-testid="request-dismiss" :disabled="busy === request.email" @click="dismiss(request)">
-              Ignorer
-            </UiButton>
-          </li>
-        </ul>
       </UiCard>
 
       <UiCard>

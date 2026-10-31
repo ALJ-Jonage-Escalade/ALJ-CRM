@@ -18,7 +18,8 @@ export interface SessionUser {
 export type AuthState =
   | { status: "loading" }
   | { status: "signedOut" }
-  | { status: "signedIn"; user: SessionUser; role: Role }
+  /** `invitationExpiredAt`: without a role, when this address's invitation ran out (unset: never invited). */
+  | { status: "signedIn"; user: SessionUser; role: Role; invitationExpiredAt?: string }
   /** Signed in, but the server could not tell the role (offline: the network is down; server error, token refused). */
   | { status: "error"; user: SessionUser; message: string; offline: boolean };
 
@@ -50,7 +51,7 @@ const ROLES: readonly Role[] = ["admin", "coach", "readonly", null];
 /** A refusal or an unexpected answer of /api/me, with the message shown to the user. */
 class MeError extends Error {}
 
-async function readMe(res: Response): Promise<{ email: string; role: Role }> {
+async function readMe(res: Response): Promise<{ email: string; role: Role; invitationExpiredAt?: string }> {
   if (res.status === 401) {
     throw new MeError("Session refusée par le serveur : reconnectez-vous.");
   }
@@ -62,12 +63,15 @@ async function readMe(res: Response): Promise<{ email: string; role: Role }> {
   if (!res.ok) {
     throw new MeError(`Le serveur ne répond pas correctement (erreur ${res.status}).`);
   }
-  const body = (await res.json()) as { email?: unknown; role?: unknown };
+  const body = (await res.json()) as { email?: unknown; role?: unknown; invitation_expired_at?: unknown };
   const role = ROLES.find((r) => r === body.role);
   if (role === undefined) {
     throw new MeError("Réponse inattendue du serveur.");
   }
-  return { email: typeof body.email === "string" ? body.email : "", role };
+  const email = typeof body.email === "string" ? body.email : "";
+  return typeof body.invitation_expired_at === "string"
+    ? { email, role, invitationExpiredAt: body.invitation_expired_at }
+    : { email, role };
 }
 
 /** fetch rejects with a TypeError offline; Firebase, renewing the token, with auth/network-request-failed. */
@@ -100,7 +104,10 @@ export function createAuth(deps: AuthDeps): Auth {
     let next: AuthState;
     try {
       const me = await readMe(await deps.fetchMe());
-      next = { status: "signedIn", user: { uid: user.uid, email: me.email || user.email }, role: me.role };
+      const signedInUser = { uid: user.uid, email: me.email || user.email };
+      next = me.invitationExpiredAt
+        ? { status: "signedIn", user: signedInUser, role: me.role, invitationExpiredAt: me.invitationExpiredAt }
+        : { status: "signedIn", user: signedInUser, role: me.role };
     } catch (e) {
       next = { status: "error", user, message: errorMessage(e), offline: isNetworkError(e) };
     }

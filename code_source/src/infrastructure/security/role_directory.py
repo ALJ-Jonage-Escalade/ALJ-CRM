@@ -7,6 +7,9 @@ The bootstrap address (`BOOTSTRAP_ADMIN_EMAIL`, set on the Cloud Run service) is
 is not listed, and when the list cannot be read. Once listed (created at startup, services/access/bootstrap.py), its
 listed role applies, so a change made on the page sticks.
 
+An invitation not accepted in time (`invitation_expires_at` past) gives no role: the entry stays on the page, where an
+admin resends or removes it (services/access/rules.py).
+
 When the list cannot be read and the cache has expired, every other address gets AccessUnavailable, which the API
 answers with 503 (never 403): the pages keep their "role could not be checked" state and the copy kept on the device.
 """
@@ -35,6 +38,25 @@ def utc_now() -> datetime.datetime:
 
 def normalized_email(email: object) -> str:
     return str(email or "").strip().lower()
+
+
+def parsed(value: Optional[str]) -> Optional[datetime.datetime]:
+    """An ISO date of the store (UTC when it has no zone); None when empty or not a date."""
+    if not value:
+        return None
+    try:
+        at = datetime.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return at if at.tzinfo else at.replace(tzinfo=datetime.timezone.utc)
+
+
+def invitation_expired(entry: RoleEntry, now: datetime.datetime) -> bool:
+    """The entry is an invitation nobody accepted in time. An unreadable date counts as expired."""
+    if not entry["invitation_expires_at"]:
+        return False
+    expires = parsed(entry["invitation_expires_at"])
+    return expires is None or now >= expires
 
 
 class AccessUnavailable(Exception):
@@ -80,9 +102,16 @@ class RoleDirectory:
                 return Role.ADMIN
             raise
         entry = entries.get(email)
-        if entry is None:
+        if entry is None or invitation_expired(entry, self.clock()):
             return Role.ADMIN if self.bootstrap_email and email == self.bootstrap_email else None
         return role_named(entry["role"])
+
+    def expired_invitation_of(self, email: str) -> Optional[str]:
+        """When this address was invited but did not sign in in time: the end date of its invitation; None otherwise."""
+        entry = self.entries().get(normalized_email(email))
+        if entry is None or not invitation_expired(entry, self.clock()):
+            return None
+        return entry["invitation_expires_at"]
 
     def invalidate(self) -> None:
         """Drops the cached list: the next question reads it again."""

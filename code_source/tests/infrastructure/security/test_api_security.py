@@ -293,7 +293,7 @@ class TestMeRoute(_CertsMixin, unittest.TestCase):
                                     key=None, algorithm="none")
         r = self.me(emulator_token, ALJ_API_AUTH="off", ALJ_ENV="dev")
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json(), {"email": COACH, "role": "coach"})
+        self.assertEqual(r.json(), {"email": COACH, "role": "coach", "invitation_expired_at": None})
         # Token checks off outside dev mode (local server): no unverified token is trusted
         self.assertEqual(self.me(emulator_token, ALJ_API_AUTH="off", ALJ_ENV="prod").status_code, 401)
         # Token checks on: the unsigned token is refused, even in dev mode
@@ -304,7 +304,7 @@ class TestMeRoute(_CertsMixin, unittest.TestCase):
         local = {"ALJ_API_AUTH": "off", "ALJ_ENV": "prod"}
         r = self.me(make_token(email=ADMIN), **local)
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json(), {"email": ADMIN, "role": "admin"})
+        self.assertEqual(r.json(), {"email": ADMIN, "role": "admin", "invitation_expired_at": None})
         self.assertEqual(self.me(make_token(email=COACH), **local).json()["role"], "coach")
         self.assertEqual(self.me(**local).status_code, 401)
         self.assertEqual(self.me("abc", **local).status_code, 401)

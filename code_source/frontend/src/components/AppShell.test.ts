@@ -99,8 +99,9 @@ describe("AppShell", () => {
     const { wrapper, auth, api } = render({ status: "signedIn", user: USER, role });
     expect(wrapper.find("#gate").text()).toContain("Accès réservé");
     expect(wrapper.find('[data-testid="gate-account"]').text()).toBe(USER.email);
-    // Without any role, the sign-in was recorded as an access request
-    expect(wrapper.find('[data-testid="gate-request-sent"]').exists()).toBe(role === null);
+    // Without any role: access is by invitation only
+    expect(wrapper.find('[data-testid="gate-not-invited"]').exists()).toBe(role === null);
+    expect(wrapper.find('[data-testid="gate-invitation-expired"]').exists()).toBe(false);
     // Read-only accounts may still open the competitions: the gate links to them
     expect(wrapper.findAll('[data-testid="gate-pages"] a').map((link) => link.attributes("data-page"))).toEqual(
       role === "readonly" ? ["competitions"] : [],
@@ -111,6 +112,12 @@ describe("AppShell", () => {
     await flushPromises();
     expect(auth.logout).toHaveBeenCalledOnce();
     expect(api).not.toHaveBeenCalled(); // no club data asked for a non-staff account
+  });
+
+  it("tells an invited person their invitation expired", () => {
+    const { wrapper } = render({ status: "signedIn", user: USER, role: null, invitationExpiredAt: "2026-11-06T09:00:00+00:00" });
+    expect(wrapper.find('[data-testid="gate-invitation-expired"]').text()).toContain("a expiré le 06/11/2026");
+    expect(wrapper.find('[data-testid="gate-not-invited"]').exists()).toBe(false);
   });
 
   it("keeps the menu offline, towards the pages readable offline", async () => {

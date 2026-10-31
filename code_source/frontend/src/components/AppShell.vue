@@ -24,6 +24,7 @@ import {
   type PageId,
 } from "../lib/access";
 import { API_KEY } from "../lib/api";
+import { formatDate, parseDate } from "../lib/format";
 import { isStaff, roleLabel } from "../lib/roles";
 import { isEmulator } from "../lib/runtime";
 import { offlineStore, STORE_KEY } from "../lib/store";
@@ -44,6 +45,11 @@ const auth = inject(AUTH_KEY)!;
 const api = inject(API_KEY)!;
 const store = inject(STORE_KEY, null) ?? offlineStore();
 const state = auth.state;
+/** « 06/11/2026 » when the signed-in address was invited but did not sign in in time; empty otherwise. */
+const invitationExpiredOn = computed(() => {
+  const expired = state.value.status === "signedIn" ? parseDate(state.value.invitationExpiredAt) : null;
+  return expired ? formatDate(expired) : "";
+});
 
 /* Changes made offline and not sent yet (competitions outbox) go with the store on logout: asked first, on any page. */
 async function logout(): Promise<void> {
@@ -204,15 +210,26 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         <p class="my-1.5 leading-normal">
           Connecté en tant que
           <b data-testid="gate-account">{{ email }}</b>
-          : ce compte n'est pas autorisé à consulter le bureau. Déconnectez-vous et utilisez un compte coach ou administrateur.
+          <template v-if="state.role !== null">
+            : ce compte n'est pas autorisé à consulter le bureau. Déconnectez-vous et utilisez un compte coach ou administrateur.
+          </template>
+          <template v-else>.</template>
         </p>
-        <!-- Without any role, the sign-in was recorded as an access request (server: /api/me, Administration › Accès) -->
+        <!-- Without any role: access is by invitation only (Administration › Accès), to this exact Google address -->
         <p
-          v-if="state.role === null"
-          data-testid="gate-request-sent"
+          v-if="state.role === null && invitationExpiredOn"
+          data-testid="gate-invitation-expired"
+          class="my-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-900"
+        >
+          ⏰ Votre invitation a expiré le {{ invitationExpiredOn }}. Demandez à un administrateur du club de vous la renvoyer.
+        </p>
+        <p
+          v-else-if="state.role === null"
+          data-testid="gate-not-invited"
           class="my-2 rounded-lg border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-[13px] text-sky-900"
         >
-          📨 Votre demande d'accès a été transmise aux administrateurs du club : ils vous donneront un rôle s'il y a lieu.
+          ✉️ Le bureau est accessible sur invitation, et ce compte Google n'en a pas. Demandez à un administrateur du club de vous inviter à
+          cette adresse, ou déconnectez-vous pour utiliser le compte Google qui a reçu l'invitation.
         </p>
         <!-- No menu here: the pages the role may still open (the competitions for a read-only account) -->
         <p v-if="nav.length" data-testid="gate-pages" class="my-1.5 leading-normal">
