@@ -142,6 +142,17 @@ class _Base:
             return []
         return [m for m in self.members.values() if m.licence and m.licence == record.licence]
 
+    def close_names(self, record: MembershipRecord) -> list[KnownMember]:
+        """Members born the same day whose name nearly matches: same last name, same first name, or the two swapped
+        (a typo or a field mix-up on HelloAsso or in the CRM)."""
+        last_name, first_name = _person_key(record.last_name, record.first_name)
+
+        def close(member: KnownMember) -> bool:
+            member_last, member_first = _person_key(member.last_name, member.first_name)
+            return member_last == last_name or member_first == first_name or (member_last, member_first) == (first_name, last_name)
+
+        return [m for m in self.members.values() if record.birth_date and m.birth_date == record.birth_date and close(m)]
+
     def legacy_purchase(self, record: MembershipRecord) -> Optional[KnownPurchase]:
         """A purchase written before the item ids were stored: same order, same person."""
         people = {m.user_id for m in self.same_name(record)
@@ -171,6 +182,10 @@ def _classify(record: MembershipRecord, base: _Base) -> PlanEntry:
     if len(same_identity) == 1 and (not same_licence or same_licence == same_identity):
         return PlanEntry(record, Bucket.RENEWAL, "Adhérent reconnu (nom, prénom et date de naissance).", same_identity[0].user_id)
     if not same_name and not same_licence:
+        close_names = base.close_names(record)
+        if close_names:
+            return _to_review(record, "Nom proche d'un adhérent né le même jour (faute de frappe, nom et prénom inversés ?) : "
+                                      "rattachez-le ou créez un nouvel adhérent.", close_names)
         return PlanEntry(record, Bucket.NEW, "Personne inconnue du club : nouvel adhérent.")
     if len(same_identity) > 1 or (same_identity and same_licence):
         return _to_review(record, "Correspond à plusieurs adhérents : choisissez le bon.", same_identity + same_licence,

@@ -94,7 +94,7 @@ Running the import again is safe, and returning members are recognised. Items wh
 
 ### What to build
 
-Ambiguous identities go to `to_review` instead of being guessed: licence matches but name differs, name matches but birth date differs, several candidates, or missing birth date without a unique licence match (never created as `new`). Each row lists candidate members and offers link to a candidate / create new / skip, defaulting to skip. The applier honours the choice on import.
+Ambiguous identities go to `to_review` instead of being guessed: licence matches but name differs, name matches but birth date differs, several candidates, or missing birth date without a unique licence match (never created as `new`). A name close to a member born the same day (same last name, same first name, or the two swapped: a typo or a field mix-up) also goes to `to_review` with that member as candidate, instead of `new`. Each row lists candidate members and offers link to a candidate / create new / skip, defaulting to skip. The applier honours the choice on import.
 
 ### Acceptance criteria
 

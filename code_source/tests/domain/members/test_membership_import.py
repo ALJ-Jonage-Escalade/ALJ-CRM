@@ -188,6 +188,34 @@ def test_an_ambiguous_identity_is_to_review_with_its_candidates(
     assert reason_word in entry.reason.lower()
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"first_name": "Ginevra"},  # first name typed otherwise
+        {"last_name": "Weazley"},  # last name misspelled
+        {"last_name": "Ginny", "first_name": "Weasley"},  # last and first name swapped
+    ],
+)
+def test_a_close_name_with_the_same_birth_date_is_to_review_not_new(overrides: dict[str, str]) -> None:
+    [entry] = _plan(_record(9001, **overrides)).entries
+
+    assert entry.bucket == Bucket.TO_REVIEW
+    assert [member.user_id for member in entry.candidates] == [7]
+    assert "proche" in entry.reason.lower()
+    assert entry.can_create  # another person after all: the admin may still create them
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"last_name": "Granger", "first_name": "Hermione"},  # same birth date, another name
+        {"first_name": "Ron", "birth_date": "2011-03-01"},  # a sibling: same last name, another birth date
+    ],
+)
+def test_a_person_without_a_close_name_and_birth_date_is_new(overrides: dict[str, str]) -> None:
+    assert _plan(_record(9001, **overrides)).entries[0].bucket == Bucket.NEW
+
+
 def test_a_registration_without_birth_date_is_never_new() -> None:
     plan = _plan(_record(9001, last_name="Granger", first_name="Hermione", birth_date="", licence=""))
 
