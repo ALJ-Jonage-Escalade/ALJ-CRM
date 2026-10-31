@@ -26,6 +26,7 @@ import html
 from typing import Dict, Any, List, Optional
 
 from infrastructure.helloasso import api as helloasso_api
+from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL
 from infrastructure.security.api_auth import auth_enforced, constant_time_equals
 from infrastructure.security.secret_store import SecretStore
 
@@ -605,7 +606,7 @@ class HelloAssoWebhookService:
                 subject=subject,
                 body=plain_body,
                 html_body=html_body,
-                from_email="inscription@alj-escalade.fr",
+                from_email=DEFAULT_SENDER_EMAIL,
                 from_name="ALJ Escalade - Compétitions"
             )
             if ok:

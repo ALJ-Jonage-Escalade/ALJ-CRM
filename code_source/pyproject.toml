@@ -129,4 +129,13 @@ files = [
     "src/infrastructure/geocoding.py",
     "src/infrastructure/sqlite/connection.py",
     "src/infrastructure/firestore/app_settings.py",
+    "src/infrastructure/firestore/access_store.py",
+    "src/infrastructure/security/roles.py",
+    "src/infrastructure/security/role_directory.py",
+    "src/services/access/__init__.py",
+    "src/services/access/rules.py",
+    "src/services/access/bootstrap.py",
+    "src/api/admin/__init__.py",
+    "src/api/admin/schemas.py",
+    "src/api/admin/access.py",
 ]

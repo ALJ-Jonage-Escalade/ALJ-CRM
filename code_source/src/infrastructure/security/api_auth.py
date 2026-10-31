@@ -1,26 +1,26 @@
 """
-Authentification de l'API FastAPI (Cloud Run).
+Authentication of the FastAPI API (Cloud Run).
 
-Principe
---------
-- L'application Vue (frontend/, installable en PWA) est connectée à Firebase
+Principle
+---------
+- The Vue app (frontend/, installable as a PWA) signs in through Firebase
   Authentication (Google).
-  Chaque appel à l'API envoie le jeton d'identité Firebase de l'utilisateur dans
-  l'en-tête ``Authorization: Bearer <ID token>``.
-- Le serveur vérifie la signature du jeton (clés publiques Google), son audience
-  (projet Firebase), son émetteur et sa date d'expiration, puis déduit le rôle de
-  l'utilisateur avec EXACTEMENT les mêmes règles que firestore.rules
-  (admin / coach / lecture seule).
-- Toute route non publique exige au minimum le rôle « coach » ; certaines
-  écritures exigent « admin » (fail-closed : une nouvelle route est protégée par
-  défaut). Exception: reads listed in READONLY_READ_PREFIXES are open to readonly.
+  Every API call sends the user's Firebase ID token in the
+  ``Authorization: Bearer <ID token>`` header.
+- The server checks the token's signature (Google public keys), audience
+  (Firebase project), issuer and expiry, then reads the role of the verified
+  address in the access list (role_directory: admin / coach / read-only).
+  Unreadable list: 503, never 403.
+- Every non-public route needs at least the "coach" role; some writes need
+  "admin" (fail-closed: a new route is protected by default). Exception: reads
+  listed in READONLY_READ_PREFIXES are open to readonly.
 
 Activation
 ----------
-- ``ALJ_API_AUTH=required`` (positionné dans le Dockerfile) ou exécution sur
-  Cloud Run (variable ``K_SERVICE`` injectée par la plateforme) : contrôle actif.
-- ``ALJ_API_AUTH=off`` : désactivé (serveur local de l'application de bureau,
-  qui n'écoute que sur 127.0.0.1).
+- ``ALJ_API_AUTH=required`` (set in the Dockerfile) or running on Cloud Run
+  (``K_SERVICE`` variable injected by the platform): checks on.
+- ``ALJ_API_AUTH=off``: checks off (local server of the desktop app, which only
+  listens on 127.0.0.1).
 """
 
 from __future__ import annotations
@@ -30,12 +30,14 @@ import os
 import re
 import threading
 import time
-from enum import IntEnum
 from typing import Any, Dict, Optional
 
 import requests
 
 from infrastructure import runtime_env
+from infrastructure.security import role_directory
+from infrastructure.security.role_directory import AccessUnavailable, normalized_email
+from infrastructure.security.roles import Role
 from infrastructure.security.secret_store import SecretStore
 
 DEFAULT_PROJECT_ID = "smart-amplifier-510811-n6"
@@ -45,29 +47,11 @@ FIREBASE_CERTS_URL = (
 )
 
 # ---------------------------------------------------------------------------
-# Rôles : seul juge des droits (firestore.rules refuse tout client). L'application web
-# n'en garde aucune copie : elle lit le rôle sur /api/me.
+# Roles: the only judge of access rights (firestore.rules refuses every client). They come from the
+# access list (Administration › Accès, Firestore collection access_roles): never an address in the code.
+# The web app keeps no copy of them: it reads the role from /api/me.
 # ---------------------------------------------------------------------------
-ADMIN_EMAIL_DOMAINS = ("alj-escalade.fr",)
-ADMIN_EMAILS = frozenset({
-    "lopez.dav@gmail.com",
-})
-COACH_EMAILS = frozenset({
-    "stephane.loridant@orange.fr",
-})
-READONLY_EMAILS = frozenset({
-    "muah.did@gmail.com",
-    "clement.dlf78@gmail.com",
-    "delphine0910@gmail.com",
-})
-
-
-
-class Role(IntEnum):
-    """Access levels, lowest to highest: a higher level includes the lower ones."""
-    READONLY = 1
-    COACH = 2
-    ADMIN = 3
+ACCESS_UNAVAILABLE_MESSAGE = "Rôle non vérifiable : la liste des accès est momentanément illisible. Réessayez dans un instant."
 
 # Routes accessibles sans authentification (pages statiques, santé, version,
 # webhook HelloAsso qui dispose de sa propre vérification).
@@ -148,6 +132,8 @@ def required_role(method: str, path: str) -> Optional[Role]:
         return Role.READONLY
     if path == "/api/planning" and method not in ("GET", "HEAD"):
         return Role.ADMIN  # remplacement du planning complet réservé aux admins ; les coachs modifient les créneaux
+    if path == "/api/admin" or path.startswith("/api/admin/"):
+        return Role.ADMIN  # Administration (access list, requests, history): reads included
     if path.startswith("/api/attestations"):
         return Role.ADMIN  # attestations réservées aux administrateurs
     if path.startswith("/api/members") and method not in ("GET", "HEAD"):
@@ -171,24 +157,16 @@ def required_role(method: str, path: str) -> Optional[Role]:
 # Rôles
 # ---------------------------------------------------------------------------
 def role_for_claims(claims: Dict[str, Any]) -> Optional[Role]:
-    """Highest role of a user (None: no access)."""
-    email = str(claims.get("email") or "").strip().lower()
-    # Les règles basées sur l'adresse ne valent que pour une adresse vérifiée
-    # (toujours le cas pour une connexion Google).
-    email_ok = bool(email) and claims.get("email_verified") is True
+    """Role of a signed-in user in the access list (None: no access); AccessUnavailable when the list can't be read."""
+    email = verified_email(claims)
+    return role_directory.current().role_of(email) if email else None
 
-    if claims.get("admin") is True or (
-        email_ok and (
-            any(email.endswith("@" + d) for d in ADMIN_EMAIL_DOMAINS)
-            or email in ADMIN_EMAILS
-        )
-    ):
-        return Role.ADMIN
-    if claims.get("coach") is True or (email_ok and email in COACH_EMAILS):
-        return Role.COACH
-    if claims.get("readonly") is True or (email_ok and email in READONLY_EMAILS):
-        return Role.READONLY
-    return None
+
+def verified_email(claims: Dict[str, Any]) -> str:
+    """The account's normalised e-mail, only when Google verified it (always the case for a Google sign-in): nobody
+    can claim an address they don't own. Empty otherwise."""
+    email = normalized_email(claims.get("email"))
+    return email if email and claims.get("email_verified") is True else ""
 
 
 def has_role(claims: Dict[str, Any], needed: Role) -> bool:
@@ -314,7 +292,11 @@ def authorize_request(method: str, path: str, authorization: Optional[str]) -> O
     if not token:
         raise AuthError(401, "Authentification requise : connectez-vous avec votre compte Google")
     claims = verify_firebase_token(token)
-    if not has_role(claims, role):
+    try:
+        allowed = has_role(claims, role)
+    except AccessUnavailable:
+        raise AuthError(503, ACCESS_UNAVAILABLE_MESSAGE)
+    if not allowed:
         raise AuthError(403, f"Accès refusé : rôle « {role.name.lower()} » requis pour {claims.get('email') or 'ce compte'}")
     return claims
 

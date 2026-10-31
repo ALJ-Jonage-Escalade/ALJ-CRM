@@ -16,7 +16,12 @@ const TEMPLATE: Template = {
 function render(template: Partial<Template> = {}) {
   const draft = ref<Template>({ ...TEMPLATE, ...template });
   const wrapper = mount(TemplateForm, {
-    props: { modelValue: draft.value, "onUpdate:modelValue": (v: Template) => (draft.value = v) },
+    props: {
+      modelValue: draft.value,
+      defaultSender: { sender_email: "club@alj.example", sender_name: "Club" },
+      senderSuggestions: ["club@alj.example"],
+      "onUpdate:modelValue": (v: Template) => (draft.value = v),
+    },
     attachTo: document.body,
   });
   const byId = (id: string) => wrapper.find(`[data-testid="${id}"]`);

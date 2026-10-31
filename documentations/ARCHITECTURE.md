@@ -90,6 +90,7 @@ ALJ-CRM/                         ← racine du dépôt
   - `firestore/client.py` : client REST Firestore (sans gRPC) ; `firestore/competition_repository.py` : compétitions (façade `CompetitionFirestoreRepository` composant les mixins de `firestore/competitions/` : adhérents, épreuves, participants, miroir HelloAsso, coachs) ;
     `firestore/app_settings.py` : réglages applicatifs (collection `app_settings`, seul emplacement).
   - `security/api_auth.py` : middleware Firebase (rôles `readonly < coach < admin`). Seul juge des droits : `firestore.rules` refuse tout accès client.
+  - `security/role_directory.py` : rôle d'une adresse vérifiée, lu dans la liste des accès (`firestore/access_store.py`, collection `access_roles`), gardée 60 s en mémoire ; liste illisible → `503`. Changements : `services/access/rules.py` (garde-fous, historique), administrateur initial : `services/access/bootstrap.py`.
   - `mail/` (envoi, campagnes, corps HTML), `helloasso/` (API v5, webhook), `security/secret_store.py`, `google/drive.py` (OAuth Google, Drive).
 
 ---
@@ -138,7 +139,7 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
   fige la liste complète des routes.
 
 **Auth** : `ALJ_API_AUTH=required` (Docker) ou présence de `K_SERVICE` (Cloud Run) → jeton Firebase obligatoire, fail-closed.
-Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protégées. Les listes d'e-mails admin/coach/lecture sont **codées en dur** dans `api_auth.py`, seul endroit : l'application Vue lit le rôle sur `GET /api/me` (un test vérifie qu'aucun fichier du front n'en garde de copie). `firestore.rules` ne contient plus de rôle : il refuse tout client.
+Pages statiques publiques (`PUBLIC_PATHS` / `PUBLIC_PREFIXES`), données protégées. Les rôles viennent de la **liste des accès** (page Administration › Accès, collection Firestore `access_roles`), jamais du code ni des custom claims : `GET /api/me` répond le rôle à l'application Vue et enregistre la date de dernière connexion, ou une demande d'accès (`access_requests`) pour un compte vérifié non listé. Chaque changement est inscrit dans `access_history`. L'adresse `BOOTSTRAP_ADMIN_EMAIL` (variable Cloud Run) est ajoutée comme admin au démarrage si elle manque, et reste admin si Firestore est illisible. `firestore.rules` ne contient plus de rôle : il refuse tout client.
 
 ---
 
@@ -278,7 +279,7 @@ La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[too
 
 - **Documentation partiellement périmée** : `../GEMINI.md` (racine et `code_source/`) décrit encore Tkinter, un fonctionnement 100 % Windows/Excel/Drive et des chemins de l'ancien poste. `architecture_actuelle.md` et `plan_migration.md` datent de la migration Tkinter→PySide6. `plan_architecture_cloud_mobile.md` annonce `APP_VERSION 2.3.0`, `512Mi`. `pyproject.toml` dit `2.0.5`. **Faire confiance au code et à `VERSION`, puis `base_firestore.md` et `plan_frontend_vue.md` (les plus récents). `plan_pages_web_bureau.md` décrit les anciennes pages web, supprimées.**
 - `../GEMINI.md` impose une convention utile : scripts de diagnostic jetables dans `scripts_temporaires/` (ignoré par git), jamais à la racine.
-- **Admins codés en dur** (`api_auth.py` seulement) : à terme, passer par les custom claims Firebase.
+- **Firestore indisponible** : seul l'administrateur initial (`BOOTSTRAP_ADMIN_EMAIL`) garde l'accès ; les autres reçoivent `503` (rôle non vérifiable) jusqu'au retour de Firestore.
 - **Exports FFME** : CSV strict (`;`, dates `jj/mm/aaaa`) ; le golden master doit rester vert ou être renouvelé avec accord du club.
 - **Sauvegardes** : API backup SQLite (jamais de copie brute avec WAL), PITR Firestore 7 j, export quotidien 14 j, retour arrière via `MEMBER_BACKEND=drive`.
 - Le dépôt contient aussi `../.agents`, `.idea/`, `.jolli/` (outillage local).

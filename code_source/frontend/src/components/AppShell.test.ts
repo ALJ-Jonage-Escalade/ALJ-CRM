@@ -99,6 +99,8 @@ describe("AppShell", () => {
     const { wrapper, auth, api } = render({ status: "signedIn", user: USER, role });
     expect(wrapper.find("#gate").text()).toContain("Accès réservé");
     expect(wrapper.find('[data-testid="gate-account"]').text()).toBe(USER.email);
+    // Without any role, the sign-in was recorded as an access request
+    expect(wrapper.find('[data-testid="gate-request-sent"]').exists()).toBe(role === null);
     // Read-only accounts may still open the competitions: the gate links to them
     expect(wrapper.findAll('[data-testid="gate-pages"] a').map((link) => link.attributes("data-page"))).toEqual(
       role === "readonly" ? ["competitions"] : [],
@@ -115,7 +117,7 @@ describe("AppShell", () => {
     const { wrapper, auth } = render({ status: "error", user: USER, message: "Serveur injoignable", offline: true });
     expect(wrapper.find("#gate").text()).toContain("Serveur injoignable");
     expect(wrapper.find('[data-testid="offline-pages"]').exists()).toBe(true);
-    expect(wrapper.findAll("nav a")).toHaveLength(8);
+    expect(wrapper.findAll("nav a")).toHaveLength(9);
     expect(wrapper.find("#content").exists()).toBe(false);
     expect(wrapper.find("#logout-btn").exists()).toBe(true);
     await wrapper.find("#gate-retry").trigger("click");
@@ -159,7 +161,7 @@ describe("AppShell", () => {
     const { wrapper } = render({ status: "error", user: USER, message: "Serveur injoignable", offline: true });
     expect(wrapper.find('nav a[data-page="accueil"]').attributes("aria-current")).toBe("page");
     expect(wrapper.find('nav a[data-page="adherents"]').attributes("aria-current")).toBeUndefined();
-    expect(wrapper.findAll("nav a")).toHaveLength(8);
+    expect(wrapper.findAll("nav a")).toHaveLength(9);
   });
 
   it("lists Adhérents on a computer and the directory on a phone", () => {
@@ -170,7 +172,7 @@ describe("AppShell", () => {
   });
 
   it.each([
-    ["admin", 8],
+    ["admin", 9],
     ["coach", 6],
     ["readonly", 1],
     [null, 0],
@@ -184,6 +186,7 @@ describe("AppShell", () => {
     const { wrapper } = render({ status: "signedIn", user: USER, role: "coach" });
     expect(wrapper.find('nav a[data-page="parametres"]').exists()).toBe(false);
     expect(wrapper.find('nav a[data-page="communications"]').exists()).toBe(false);
+    expect(wrapper.find('nav a[data-page="administration"]').exists()).toBe(false);
   });
 
   it("keeps an admin page from a coach", async () => {

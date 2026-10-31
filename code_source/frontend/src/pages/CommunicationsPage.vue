@@ -12,15 +12,7 @@ import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText } from "../lib/client";
 import { createCommunicationsApi } from "../services/communications";
 import EmailPreview from "./communications/EmailPreview.vue";
-import {
-  DEFAULT_SENDER_EMAIL,
-  DEFAULT_SENDER_NAME,
-  initialTemplate,
-  newNameError,
-  newTemplate,
-  preview,
-  type Template,
-} from "./communications/editor";
+import { initialTemplate, newNameError, newTemplate, preview, type Sender, type Template } from "./communications/editor";
 import TemplateForm from "./communications/TemplateForm.vue";
 import { dialogs } from "../composables/dialogs";
 
@@ -36,7 +28,10 @@ const selected = ref("");
 const draft = ref<Template | null>(null);
 const signature = ref(true);
 const saving = ref(false);
-const shown = computed(() => (draft.value ? preview(draft.value) : null));
+/** The club's default sender and the addresses offered, both from the server. */
+const defaultSender = ref<Sender>({ sender_email: "", sender_name: "" });
+const senderSuggestions = ref<string[]>([]);
+const shown = computed(() => (draft.value ? preview(draft.value, defaultSender.value) : null));
 
 function select(template: Template | undefined): void {
   selected.value = template?.name ?? "";
@@ -45,7 +40,10 @@ function select(template: Template | undefined): void {
 
 async function loadTemplates(wanted?: string): Promise<void> {
   try {
-    templates.value = (await communicationsApi.emailTemplates()).templates;
+    const answer = await communicationsApi.emailTemplates();
+    templates.value = answer.templates;
+    defaultSender.value = { sender_email: answer.default_sender_email, sender_name: answer.default_sender_name };
+    senderSuggestions.value = answer.sender_suggestions;
     loadError.value = "";
     select(initialTemplate(templates.value, wanted));
   } catch (e) {
@@ -94,7 +92,7 @@ async function create(): Promise<void> {
   }
   creatingBusy.value = true;
   try {
-    const sender = draft.value ?? { sender_email: DEFAULT_SENDER_EMAIL, sender_name: DEFAULT_SENDER_NAME };
+    const sender = draft.value ?? defaultSender.value;
     await communicationsApi.saveEmailTemplate(newTemplate(name, sender));
     creating.value = false;
     toast.show(`➕ Nouveau modèle « ${name} » créé avec succès !`);
@@ -209,7 +207,16 @@ onMounted(() => {
           </p>
         </UiCard>
 
-        <TemplateForm v-if="draft" v-model="draft" v-model:signature="signature" :saving="saving" @save="save" @invalid="toast.show" />
+        <TemplateForm
+          v-if="draft"
+          v-model="draft"
+          v-model:signature="signature"
+          :saving="saving"
+          :default-sender="defaultSender"
+          :sender-suggestions="senderSuggestions"
+          @save="save"
+          @invalid="toast.show"
+        />
 
         <UiCard>
           <form class="flex flex-col gap-2" @submit.prevent="saveWhatsapp">

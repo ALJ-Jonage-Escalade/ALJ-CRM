@@ -45,10 +45,19 @@ class FakeFirestore:
         return [self._out(collection_name, doc_id, doc)
                 for doc_id, doc in self._col(collection_name).items()]
 
+    def list_latest(self, collection_name, field, limit, project_id=None, access_token=None):
+        docs = [self._out(collection_name, doc_id, doc) for doc_id, doc in self._col(collection_name).items() if field in doc]
+        return sorted(docs, key=lambda doc: doc[field], reverse=True)[:limit]
+
     def upsert_document(self, collection_name, doc_id, data, project_id=None, access_token=None):
         self._col(collection_name)[str(doc_id)] = {k: v for k, v in data.items() if k not in self.META}
         self._touch(collection_name, doc_id)
         return True
+
+    def create_document(self, collection_name, doc_id, data, project_id=None, access_token=None):
+        if str(doc_id) in self._col(collection_name):
+            return False
+        return self.upsert_document(collection_name, doc_id, data)
 
     def update_fields(self, collection_name, doc_id, patch, project_id=None, access_token=None,
                       expected_update_time=None):
@@ -86,7 +95,8 @@ class FakeFirestore:
 def use_fake_firestore(test: unittest.TestCase) -> FakeFirestore:
     """Replace FirestoreClient by an in-memory store for the duration of `test`."""
     fake = FakeFirestore()
-    for name in ("get_document", "list_documents", "upsert_document", "update_fields", "delete_document", "batch_upsert"):
+    for name in ("get_document", "list_documents", "list_latest", "upsert_document", "create_document", "update_fields",
+                 "delete_document", "batch_upsert"):
         p = patch.object(FirestoreClient, name, getattr(fake, name))
         p.start()
         test.addCleanup(p.stop)

@@ -21,10 +21,11 @@ const TEMPLATE: Template = {
   sender_email: "competitions@alj-escalade.fr",
   sender_name: "ALJ Compétitions",
 };
+const CLUB_SENDER = { sender_email: "inscription@alj-escalade.fr", sender_name: "Amicale Laïque Jonage - Inscriptions" };
 
 describe("preview", () => {
   it("renders the variables with the demo member", () => {
-    expect(preview(TEMPLATE)).toEqual({
+    expect(preview(TEMPLATE, CLUB_SENDER)).toEqual({
       from: "ALJ Compétitions <competitions@alj-escalade.fr>",
       subject: "Licence 847291",
       body: "Bonjour Alex",
@@ -36,7 +37,7 @@ describe("preview", () => {
   });
 
   it("falls back to the club's sender and placeholders", () => {
-    expect(preview({ ...TEMPLATE, subject: "", body: "", sender_email: " ", sender_name: "" })).toEqual({
+    expect(preview({ ...TEMPLATE, subject: "", body: "", sender_email: " ", sender_name: "" }, CLUB_SENDER)).toEqual({
       from: "Amicale Laïque Jonage - Inscriptions <inscription@alj-escalade.fr>",
       subject: "(Sans objet)",
       body: "(Message vide)",
@@ -78,7 +79,8 @@ describe("new templates", () => {
       subject: "Sujet du courriel",
       sender_email: "competitions@alj-escalade.fr",
     });
-    expect(newTemplate("Stage", { sender_email: "", sender_name: "" }).sender_name).toBe("Amicale Laïque Jonage - Inscriptions");
+    // Empty sender: left to the server, which puts the club's default
+    expect(newTemplate("Stage", { sender_email: " ", sender_name: "" })).toMatchObject({ sender_email: "", sender_name: "" });
   });
 
   it("show the requested template, else the instalment reminder, else the first", () => {

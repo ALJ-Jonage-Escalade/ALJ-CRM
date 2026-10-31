@@ -323,13 +323,13 @@ export function renderFor(text: string, m: Member): string {
 
 export const SIGNATURE_TEXT = "ALJ Escalade — Section de l'Amicale Laïque de Jonage\ncontact@alj-escalade.fr";
 
-/** Default template of the certificate e-mail, when the club has none named « échéance ». */
+/** Default template of the certificate e-mail, when the club has none named « échéance » (the server picks the sender). */
 export const DEFAULT_ATTESTATION_TEMPLATE: Template = {
   name: "Attestation échéance",
   subject: "Attestation de paiement et d'échéance - Amicale Laïque de Jonage",
   body: "Bonjour {first_name},\n\nNous avons le plaisir de vous transmettre en pièce jointe l'attestation de paiement pour votre adhésion ou celle de votre enfant à la section escalade de l'Amicale Laïque de Jonage.\n\nSportivement,\nL'équipe ALJ Escalade",
-  sender_email: "inscription@alj-escalade.fr",
-  sender_name: "Amicale Laïque Jonage - Inscriptions",
+  sender_email: "",
+  sender_name: "",
 };
 
 /** Templates offered for the certificate e-mail, the « échéance » one first chosen. */

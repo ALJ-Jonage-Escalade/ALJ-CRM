@@ -15,6 +15,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 import server
+from api.admin import access
 from api.auth import me
 from api.competitions import coaches, competitions, helloasso_items, participants
 from api.competitions import members as competition_members
@@ -63,7 +64,7 @@ class TestSqliteCacheScope(unittest.TestCase):
 
     def test_every_firestore_router_route_skips_cache(self):
         routes = api_routes(competitions.router, participants.router, coaches.router,
-                            competition_members.router, helloasso_items.router, me.router)
+                            competition_members.router, helloasso_items.router, me.router, access.router)
         self.assertGreater(len(routes), 15)
         for r in routes:
             self.assertFalse(server.uses_sqlite_cache(concrete(r.path)), r.path)
@@ -75,7 +76,7 @@ class TestSqliteCacheScope(unittest.TestCase):
         settings, members…), whatever its prefix: the results batch and check-all-paid live
         under /api/competitions in routers that must not join the Firestore-only list."""
         firestore_only = set(map(id, api_routes(competitions.router, participants.router, coaches.router,
-                                                competition_members.router, helloasso_items.router, me.router)))
+                                                competition_members.router, helloasso_items.router, me.router, access.router)))
         routes = [r for r in app_routes(server.app.routes)
                   if id(r) not in firestore_only and r.path.startswith("/api/")]
         self.assertIn("/api/competitions/cron/fetch-results", [r.path for r in routes])

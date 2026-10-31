@@ -3318,6 +3318,402 @@
           },
           "401": {
             "description": "Not signed in"
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/access/roles": {
+      "get": {
+        "summary": "List Roles",
+        "operationId": "list_roles_api_admin_access_roles_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AccessEntry"
+                  },
+                  "type": "array",
+                  "title": "Response List Roles Api Admin Access Roles Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Add Role",
+        "operationId": "add_role_api_admin_access_roles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessEntryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/access/roles/{email}": {
+      "patch": {
+        "summary": "Update Role",
+        "operationId": "update_role_api_admin_access_roles__email__patch",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Email"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessEntryPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove Role",
+        "operationId": "remove_role_api_admin_access_roles__email__delete",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessDone"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/access/requests": {
+      "get": {
+        "summary": "List Requests",
+        "operationId": "list_requests_api_admin_access_requests_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AccessRequest"
+                  },
+                  "type": "array",
+                  "title": "Response List Requests Api Admin Access Requests Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/access/requests/{email}/grant": {
+      "post": {
+        "summary": "Grant Request",
+        "operationId": "grant_request_api_admin_access_requests__email__grant_post",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Email"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessGrant"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/access/requests/{email}": {
+      "delete": {
+        "summary": "Dismiss Request",
+        "operationId": "dismiss_request_api_admin_access_requests__email__delete",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessDone"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/access/history": {
+      "get": {
+        "summary": "History",
+        "operationId": "history_api_admin_access_history_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AccessHistoryEntry"
+                  },
+                  "type": "array",
+                  "title": "Response History Api Admin Access History Get"
+                }
+              }
+            }
           }
         }
       }
@@ -3450,6 +3846,303 @@
   },
   "components": {
     "schemas": {
+      "AccessDone": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "AccessDone"
+      },
+      "AccessEntry": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "coach",
+              "readonly"
+            ],
+            "title": "Role"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "last_sign_in_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sign In At",
+            "description": "ISO date of the last sign-in, at most once a day; null: never"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "role",
+          "display_name",
+          "last_sign_in_at",
+          "created_at",
+          "created_by",
+          "updated_at",
+          "updated_by"
+        ],
+        "title": "AccessEntry",
+        "description": "A person with access to the CRM."
+      },
+      "AccessEntryIn": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "coach",
+              "readonly"
+            ],
+            "title": "Role"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "role"
+        ],
+        "title": "AccessEntryIn"
+      },
+      "AccessEntryPatch": {
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "admin",
+                  "coach",
+                  "readonly"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "title": "AccessEntryPatch",
+        "description": "Fields left out (or null) are kept."
+      },
+      "AccessGrant": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "coach",
+              "readonly"
+            ],
+            "title": "Role"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name",
+            "description": "null: the Google display name of the request"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "AccessGrant"
+      },
+      "AccessHistoryEntry": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author",
+            "description": "E-mail of the admin, or « bootstrap »"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "added",
+              "role_changed",
+              "name_changed",
+              "removed",
+              "request_granted",
+              "request_dismissed",
+              "bootstrap"
+            ],
+            "title": "Action"
+          },
+          "target_email": {
+            "type": "string",
+            "title": "Target Email"
+          },
+          "old_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "admin",
+                  "coach",
+                  "readonly"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Role"
+          },
+          "new_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "admin",
+                  "coach",
+                  "readonly"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "author",
+          "action",
+          "target_email",
+          "old_role",
+          "new_role"
+        ],
+        "title": "AccessHistoryEntry"
+      },
+      "AccessRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "google_display_name": {
+            "type": "string",
+            "title": "Google Display Name"
+          },
+          "first_requested_at": {
+            "type": "string",
+            "title": "First Requested At"
+          },
+          "last_requested_at": {
+            "type": "string",
+            "title": "Last Requested At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "google_display_name",
+          "first_requested_at",
+          "last_requested_at"
+        ],
+        "title": "AccessRequest",
+        "description": "A verified Google account that signed in without access."
+      },
       "ApiErrorBody": {
         "properties": {
           "status": {
@@ -4823,14 +5516,33 @@
             },
             "type": "array",
             "title": "Templates"
+          },
+          "default_sender_email": {
+            "type": "string",
+            "title": "Default Sender Email"
+          },
+          "default_sender_name": {
+            "type": "string",
+            "title": "Default Sender Name"
+          },
+          "sender_suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sender Suggestions"
           }
         },
         "type": "object",
         "required": [
           "status",
-          "templates"
+          "templates",
+          "default_sender_email",
+          "default_sender_name",
+          "sender_suggestions"
         ],
-        "title": "EmailTemplates"
+        "title": "EmailTemplates",
+        "description": "default_sender_*: used by the server when a template's sender is empty."
       },
       "FfmeFile": {
         "properties": {

@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, Response
 
 from api.communications.schemas import AttestationRequest, AttestationSend, AttestationSent
 from api.responses import error, error_responses, internal_error
+from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from services.documents import Doc
 from services.members.members import MemberService
 
@@ -86,10 +87,10 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
     subject = apply_template_variables(raw_subject, member)
     body = apply_template_variables(raw_body, member)
 
-    sender_email = (tmpl.get("sender_email") if tmpl else None) or "inscription@alj-escalade.fr"
+    sender_email = (tmpl.get("sender_email") if tmpl else None) or DEFAULT_SENDER_EMAIL
     if not EmailDispatchService.is_allowed_sender(sender_email):
         return error(403, f"Adresse d'expédition non autorisée : {sender_email}")
-    sender_name = (tmpl.get("sender_name") if tmpl else None) or "Amicale Laïque Jonage - Inscriptions"
+    sender_name = (tmpl.get("sender_name") if tmpl else None) or DEFAULT_SENDER_NAME
 
     # HTML built from the template, then personalised with escaped values
     html_body = apply_template_variables(

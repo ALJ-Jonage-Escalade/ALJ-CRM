@@ -51,10 +51,10 @@ def test_desktop_layout(page):
     expect(page.locator("#who")).to_contain_text("albus.dumbledore@alj-escalade.fr")  # same session on the page
 
 
-ADMIN_PAGES = ["communications", "parametres"]
+ADMIN_PAGES = ["communications", "parametres", "administration"]
 
 
-@pytest.mark.parametrize("role, count", [("admin", 8), ("coach", 6)])
+@pytest.mark.parametrize("role, count", [("admin", 9), ("coach", 6)])
 def test_menu_and_cards_follow_the_role(page, role, count):
     page.goto("/bureau/")
     login_as(page, role)
@@ -78,7 +78,8 @@ def test_non_staff_sees_no_office_menu(page, role, pages):
         expect(page.locator(f"#gate a[data-page='{name}']")).to_be_visible()
 
 
-@pytest.mark.parametrize("name, label", [("parametres", "Paramètres"), ("communications", "Communications")])
+@pytest.mark.parametrize("name, label", [("parametres", "Paramètres"), ("communications", "Communications"),
+                                         ("administration", "Administration")])
 def test_coach_is_sent_back_from_an_admin_page(page, name, label):
     """Vue app: the router guards send a coach back to Accueil, which names the page."""
     page.goto(f"/bureau/{name}")

@@ -574,7 +574,12 @@ class TestBureauFiles(unittest.TestCase):
         # An empty sender falls back to the club's address
         saved = client.post("/api/email-templates", json={**base, "name": "Défaut"}).json()["template"]
         self.assertEqual(saved["sender_email"], "inscription@alj-escalade.fr")
-        self.assertEqual(client.get("/api/email-templates").json()["templates"][0]["sender_email"], "inscription@alj-escalade.fr")
+        listed = client.get("/api/email-templates").json()
+        self.assertEqual(listed["templates"][0]["sender_email"], "inscription@alj-escalade.fr")
+        # The Vue app takes the club's sender settings from this answer instead of its own copy
+        self.assertEqual(listed["default_sender_email"], "inscription@alj-escalade.fr")
+        self.assertEqual(listed["default_sender_name"], "Amicale Laïque Jonage - Inscriptions")
+        self.assertIn("contact@alj-escalade.fr", listed["sender_suggestions"])
 
     def test_whatsapp_template_endpoints(self):
         """GET et POST /api/whatsapp-template enregistrent et lisent le texte WhatsApp."""
@@ -626,7 +631,7 @@ class TestBureauAccess(unittest.TestCase):
         self.env.stop()
 
     def test_portal_public_api_protected(self):
-        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions",
+        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/administration", "/bureau/communications", "/bureau/competitions",
                      "/bureau/planning", "/bureau/outils", "/bureau/parametres", "/bureau/competitions/helloasso",
                      "/bureau/competitions/bilan", "/bureau/competitions/coachs", "/competitions/helloasso",
                      "/competitions/bilan", "/competitions/coachs", "/bureau/outils/pivot", "/bureau/outils/stats",
@@ -645,7 +650,7 @@ class TestBureauAccess(unittest.TestCase):
 
     def test_required_role_for_portal(self):
         r = api_auth.required_role
-        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres"):
+        for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/administration", "/bureau/communications", "/bureau/competitions", "/bureau/planning", "/bureau/outils", "/bureau/parametres"):
             self.assertIsNone(r("GET", path), path)
         self.assertEqual(r("GET", "/api/email-status"), Role.COACH)
 

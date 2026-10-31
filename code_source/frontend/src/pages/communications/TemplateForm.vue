@@ -5,20 +5,11 @@
 import { nextTick, ref, useTemplateRef } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
-import {
-  insertText,
-  linkTags,
-  linkTarget,
-  SENDER_SUGGESTIONS,
-  templateError,
-  VARIABLES,
-  wrapSelection,
-  type Edit,
-  type Template,
-} from "./editor";
+import { insertText, linkTags, linkTarget, templateError, VARIABLES, wrapSelection, type Edit, type Sender, type Template } from "./editor";
 import { dialogs } from "../../composables/dialogs";
 
-defineProps<{ saving?: boolean }>();
+/** defaultSender: what the server puts when the sender is left empty, shown as placeholder. */
+defineProps<{ saving?: boolean; defaultSender: Sender; senderSuggestions: readonly string[] }>();
 const emit = defineEmits<{ save: []; invalid: [message: string] }>();
 const draft = defineModel<Template>({ required: true });
 const signature = defineModel<boolean>("signature", { default: true });
@@ -97,11 +88,11 @@ const TOOL =
             type="email"
             list="sender-suggestions"
             data-testid="sender-email"
-            placeholder="inscription@alj-escalade.fr"
+            :placeholder="defaultSender.sender_email"
             :class="INPUT"
           />
-          <datalist id="sender-suggestions">
-            <option v-for="address in SENDER_SUGGESTIONS" :key="address" :value="address" />
+          <datalist id="sender-suggestions" data-testid="sender-suggestions">
+            <option v-for="address in senderSuggestions" :key="address" :value="address" />
           </datalist>
         </div>
         <div>
@@ -111,7 +102,7 @@ const TOOL =
             v-model="draft.sender_name"
             type="text"
             data-testid="sender-name"
-            placeholder="Amicale Laïque Jonage - Inscriptions"
+            :placeholder="defaultSender.sender_name"
             :class="INPUT"
           />
         </div>

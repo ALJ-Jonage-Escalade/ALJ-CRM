@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from api.communications.schemas import EmailDispatch, EmailStatus, EmailTemplate, EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate
 from api.responses import error, error_responses, internal_error
 from infrastructure.mail.dispatch import EmailDispatchService
+from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
 from infrastructure.security.secret_store import SecretStore
 
 router = APIRouter()
@@ -22,7 +23,13 @@ def get_email_templates() -> EmailTemplates | JSONResponse:
         rows = EmailDispatchService.list_templates()
         # Old rows may hold NULL columns
         templates = [EmailTemplate(**{field: str(row.get(field) or "") for field in EmailTemplate.model_fields}) for row in rows]
-        return EmailTemplates(status="success", templates=templates)
+        return EmailTemplates(
+            status="success",
+            templates=templates,
+            default_sender_email=DEFAULT_SENDER_EMAIL,
+            default_sender_name=DEFAULT_SENDER_NAME,
+            sender_suggestions=list(SENDER_SUGGESTIONS),
+        )
     except Exception as e:
         return error(500, internal_error(e, "get_email_templates"))
 
@@ -35,7 +42,6 @@ def _same_name(a: str, b: str) -> bool:
 def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved | JSONResponse:
     """Crée ou met à jour un modèle d'e-mail dans la BDD SQLite (synchronisé avec Firestore)."""
     try:
-        from infrastructure.sqlite.connection import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
         from infrastructure.sqlite.email_templates import EmailTemplateRepository
         if not data.name:
             return error(400, "Le nom du modèle est obligatoire.")

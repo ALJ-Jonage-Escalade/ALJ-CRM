@@ -20,14 +20,12 @@ from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as CompetitionRepository,
 )
 from infrastructure.mail.repository import EmailRepository
+from infrastructure.mail.senders import CLUB_SENDER_DOMAIN
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
 
 
 class EmailDispatchService:
     """Service d'orchestration pour l'envoi d'e-mails personnalisés."""
-
-    # Sender addresses: club domain or the configured sending account
-    CLUB_SENDER_DOMAIN = "alj-escalade.fr"
 
     @classmethod
     def is_allowed_sender(cls, sender_email: Optional[str]) -> bool:
@@ -38,7 +36,7 @@ class EmailDispatchService:
             return True
         configured = {(SecretStore.get_secret(k) or "").strip().lower()
                       for k in ("SMTP_FROM_EMAIL", "GMAIL_USER_EMAIL", "SMTP_USER")}
-        return email.endswith("@" + cls.CLUB_SENDER_DOMAIN) or email in configured - {""}
+        return email.endswith("@" + CLUB_SENDER_DOMAIN) or email in configured - {""}
 
     @classmethod
     def known_member_emails(cls) -> set:

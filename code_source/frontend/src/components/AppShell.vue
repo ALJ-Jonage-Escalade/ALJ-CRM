@@ -206,6 +206,14 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
           <b data-testid="gate-account">{{ email }}</b>
           : ce compte n'est pas autorisé à consulter le bureau. Déconnectez-vous et utilisez un compte coach ou administrateur.
         </p>
+        <!-- Without any role, the sign-in was recorded as an access request (server: /api/me, Administration › Accès) -->
+        <p
+          v-if="state.role === null"
+          data-testid="gate-request-sent"
+          class="my-2 rounded-lg border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-[13px] text-sky-900"
+        >
+          📨 Votre demande d'accès a été transmise aux administrateurs du club : ils vous donneront un rôle s'il y a lieu.
+        </p>
         <!-- No menu here: the pages the role may still open (the competitions for a read-only account) -->
         <p v-if="nav.length" data-testid="gate-pages" class="my-1.5 leading-normal">
           Accessible avec ce compte :

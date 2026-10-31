@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from infrastructure.sqlite.connection import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SqliteDatabase
+from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from infrastructure.sqlite.connection import SqliteDatabase
 
 
 class EmailTemplateRepository:

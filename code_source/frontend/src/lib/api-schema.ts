@@ -1140,6 +1140,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/access/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Roles */
+        get: operations["list_roles_api_admin_access_roles_get"];
+        put?: never;
+        /** Add Role */
+        post: operations["add_role_api_admin_access_roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/access/roles/{email}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Role */
+        delete: operations["remove_role_api_admin_access_roles__email__delete"];
+        options?: never;
+        head?: never;
+        /** Update Role */
+        patch: operations["update_role_api_admin_access_roles__email__patch"];
+        trace?: never;
+    };
+    "/api/admin/access/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Requests */
+        get: operations["list_requests_api_admin_access_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/access/requests/{email}/grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Grant Request */
+        post: operations["grant_request_api_admin_access_requests__email__grant_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/access/requests/{email}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Dismiss Request */
+        delete: operations["dismiss_request_api_admin_access_requests__email__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/access/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** History */
+        get: operations["history_api_admin_access_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/index": {
         parameters: {
             query?: never;
@@ -1288,6 +1392,115 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccessDone */
+        AccessDone: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+        };
+        /**
+         * AccessEntry
+         * @description A person with access to the CRM.
+         */
+        AccessEntry: {
+            /** Email */
+            email: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "coach" | "readonly";
+            /** Display Name */
+            display_name: string;
+            /**
+             * Last Sign In At
+             * @description ISO date of the last sign-in, at most once a day; null: never
+             */
+            last_sign_in_at: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Created By */
+            created_by: string | null;
+            /** Updated At */
+            updated_at: string | null;
+            /** Updated By */
+            updated_by: string | null;
+        };
+        /** AccessEntryIn */
+        AccessEntryIn: {
+            /** Email */
+            email: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "coach" | "readonly";
+            /**
+             * Display Name
+             * @default
+             */
+            display_name?: string;
+        };
+        /**
+         * AccessEntryPatch
+         * @description Fields left out (or null) are kept.
+         */
+        AccessEntryPatch: {
+            /** Role */
+            role?: ("admin" | "coach" | "readonly") | null;
+            /** Display Name */
+            display_name?: string | null;
+        };
+        /** AccessGrant */
+        AccessGrant: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "coach" | "readonly";
+            /**
+             * Display Name
+             * @description null: the Google display name of the request
+             */
+            display_name?: string | null;
+        };
+        /** AccessHistoryEntry */
+        AccessHistoryEntry: {
+            /** At */
+            at: string;
+            /**
+             * Author
+             * @description E-mail of the admin, or « bootstrap »
+             */
+            author: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "added" | "role_changed" | "name_changed" | "removed" | "request_granted" | "request_dismissed" | "bootstrap";
+            /** Target Email */
+            target_email: string;
+            /** Old Role */
+            old_role: ("admin" | "coach" | "readonly") | null;
+            /** New Role */
+            new_role: ("admin" | "coach" | "readonly") | null;
+        };
+        /**
+         * AccessRequest
+         * @description A verified Google account that signed in without access.
+         */
+        AccessRequest: {
+            /** Email */
+            email: string;
+            /** Google Display Name */
+            google_display_name: string;
+            /** First Requested At */
+            first_requested_at: string;
+            /** Last Requested At */
+            last_requested_at: string;
+        };
         /**
          * ApiErrorBody
          * @description Body of error(): what the frontend's API client turns into an ApiError.
@@ -2040,7 +2253,10 @@ export interface components {
              */
             sender_name?: string;
         };
-        /** EmailTemplates */
+        /**
+         * EmailTemplates
+         * @description default_sender_*: used by the server when a template's sender is empty.
+         */
         EmailTemplates: {
             /**
              * Status
@@ -2049,6 +2265,12 @@ export interface components {
             status: "success";
             /** Templates */
             templates: components["schemas"]["EmailTemplate"][];
+            /** Default Sender Email */
+            default_sender_email: string;
+            /** Default Sender Name */
+            default_sender_name: string;
+            /** Sender Suggestions */
+            sender_suggestions: string[];
         };
         /**
          * FfmeFile
@@ -5926,6 +6148,339 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    list_roles_api_admin_access_roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessEntry"][];
+                };
+            };
+        };
+    };
+    add_role_api_admin_access_roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessEntryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessEntry"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_role_api_admin_access_roles__email__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                email: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessDone"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_role_api_admin_access_roles__email__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                email: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessEntryPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessEntry"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_requests_api_admin_access_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRequest"][];
+                };
+            };
+        };
+    };
+    grant_request_api_admin_access_requests__email__grant_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                email: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessGrant"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessEntry"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_request_api_admin_access_requests__email__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                email: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessDone"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    history_api_admin_access_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessHistoryEntry"][];
+                };
             };
         };
     };

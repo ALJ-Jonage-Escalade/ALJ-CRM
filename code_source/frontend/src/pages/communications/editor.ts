@@ -5,23 +5,17 @@ import { looksLikeEmail } from "../../lib/email";
 
 export type Template = Schemas["EmailTemplate"];
 
-export const DEFAULT_SENDER_EMAIL = "inscription@alj-escalade.fr";
-export const DEFAULT_SENDER_NAME = "Amicale Laïque Jonage - Inscriptions";
-export const SENDER_SUGGESTIONS = [
-  "inscription@alj-escalade.fr",
-  "contact@alj-escalade.fr",
-  "competitions@alj-escalade.fr",
-  "admin@alj-escalade.fr",
-];
+/** The club's default sender, sent by the server (infrastructure/mail/senders.py). */
+export type Sender = Pick<Template, "sender_email" | "sender_name">;
 
-/** Contents of a new template; the sender is the one being edited. */
-export function newTemplate(name: string, sender: Pick<Template, "sender_email" | "sender_name">): Template {
+/** Contents of a new template; the sender is the one being edited (empty: the server puts the club's default). */
+export function newTemplate(name: string, sender: Sender): Template {
   return {
     name,
     subject: "Sujet du courriel",
     body: "Bonjour {first_name},\n\nSaisissez votre texte ici.\n\nSportivement,\nL'équipe ALJ Escalade",
-    sender_email: sender.sender_email.trim() || DEFAULT_SENDER_EMAIL,
-    sender_name: sender.sender_name.trim() || DEFAULT_SENDER_NAME,
+    sender_email: sender.sender_email.trim(),
+    sender_name: sender.sender_name.trim(),
   };
 }
 
@@ -58,9 +52,9 @@ export interface Preview {
   body: string;
 }
 
-export function preview(t: Template): Preview {
-  const name = t.sender_name.trim() || DEFAULT_SENDER_NAME;
-  const email = t.sender_email.trim() || DEFAULT_SENDER_EMAIL;
+export function preview(t: Template, defaultSender: Sender): Preview {
+  const name = t.sender_name.trim() || defaultSender.sender_name;
+  const email = t.sender_email.trim() || defaultSender.sender_email;
   return { from: `${name} <${email}>`, subject: renderDemo(t.subject) || "(Sans objet)", body: renderDemo(t.body) || "(Message vide)" };
 }
 

@@ -75,10 +75,16 @@ describe("app routes", () => {
     }
   });
 
-  it.each(["/bureau/communications", "/bureau/parametres"])("send a coach back from %s", async (path) => {
+  it.each(["/bureau/communications", "/bureau/parametres", "/bureau/administration"])("send a coach back from %s", async (path) => {
     const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
     await router.push(path);
     expect(router.currentRoute.value.fullPath).toBe(`/bureau/?reserve=${path}`);
+  });
+
+  it("open Administration › Accès to an admin, at the page's own address", async () => {
+    const router = createAppRouter(fakeAuth(signedIn("admin")).auth, createMemoryHistory());
+    await router.push("/bureau/administration");
+    expect([router.currentRoute.value.name, router.currentRoute.value.meta.sub]).toEqual(["administration", "acces"]);
   });
 
   it.each(["/bureau/adherents", "/bureau/planning", "/bureau/outils/ffme", "/index", "/index?vue=pwa"])(

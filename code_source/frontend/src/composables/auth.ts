@@ -54,6 +54,11 @@ async function readMe(res: Response): Promise<{ email: string; role: Role }> {
   if (res.status === 401) {
     throw new MeError("Session refusée par le serveur : reconnectez-vous.");
   }
+  if (res.status === 503) {
+    // The access list could not be read: the role stays unchecked (never "no access"), the server says why
+    const body = (await res.json().catch(() => null)) as { message?: unknown } | null;
+    throw new MeError(typeof body?.message === "string" && body.message ? body.message : "Rôle non vérifiable pour le moment.");
+  }
   if (!res.ok) {
     throw new MeError(`Le serveur ne répond pas correctement (erreur ${res.status}).`);
   }

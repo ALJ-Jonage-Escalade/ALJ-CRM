@@ -17,6 +17,7 @@ if _src_dir not in sys.path:
 
 from domain.utils import apply_template_variables, sanitize_email_header  # noqa: E402
 from infrastructure.mail.dispatch import EmailDispatchService  # noqa: E402
+from support.fake_access import grant_roles  # noqa: E402
 
 EVIL_NAME = '<a href="https://evil.example">Pay here</a>'
 
@@ -119,6 +120,7 @@ class TestSendEmailRoute(unittest.TestCase):
         self.client = TestClient(app)
 
     def _send(self, claims, payload):
+        grant_roles({"coach@example.com": "coach", "albus@alj-escalade.fr": "admin"})
         with patch.dict(os.environ, {"ALJ_API_AUTH": "required"}), \
              patch("infrastructure.security.api_auth.verify_firebase_token", return_value=claims), \
              patch.object(EmailDispatchService, "known_member_emails",
@@ -129,14 +131,14 @@ class TestSendEmailRoute(unittest.TestCase):
         return resp, dispatch
 
     def test_coach_to_unknown_address_refused(self):
-        coach = {"sub": "c", "email": "coach@example.com", "email_verified": True, "coach": True}
+        coach = {"sub": "c", "email": "coach@example.com", "email_verified": True}
         resp, dispatch = self._send(coach, {"subject": "s", "body": "b",
                                             "recipients": [{"email": "spy@evil.example"}]})
         self.assertEqual(resp.status_code, 403)
         dispatch.assert_not_called()
 
     def test_coach_to_member_allowed(self):
-        coach = {"sub": "c", "email": "coach@example.com", "email_verified": True, "coach": True}
+        coach = {"sub": "c", "email": "coach@example.com", "email_verified": True}
         resp, dispatch = self._send(coach, {"subject": "s", "body": "b",
                                             "recipients": [{"email": "harry.potter@hogwarts.example"}]})
         self.assertEqual(resp.status_code, 200)

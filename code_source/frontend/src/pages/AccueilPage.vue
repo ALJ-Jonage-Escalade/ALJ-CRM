@@ -91,6 +91,12 @@ const LINKS: { href: string; title: string; text: string; access: Access; screen
     text: "Connexion Google du club, statut de la base de données et services associés.",
     access: pageAccess("parametres"),
   },
+  {
+    href: "/bureau/administration",
+    title: "🔐 Administration",
+    text: "Accès au CRM : qui peut se connecter, avec quel rôle, demandes d'accès et historique.",
+    access: pageAccess("administration"),
+  },
 ];
 const BANNER = "https://alj-escalade.fr/wp-content/uploads/2026/09/De-nouveaux-blocs-tous-les-15-jours-3-1024x512.png";
 

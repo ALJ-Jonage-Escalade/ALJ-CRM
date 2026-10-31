@@ -214,6 +214,37 @@ class FirestoreClient:
                 break
         return results
 
+    @classmethod
+    def list_latest(cls, collection_name: str, field: str, limit: int,
+                    project_id: Optional[str] = None,
+                    access_token: Optional[str] = None) -> List[Dict[str, Any]]:
+        """The `limit` documents with the highest `field` value, highest first (Firestore's automatic
+        single-field index); documents without that field are left out."""
+        url = f"{cls.database_url(project_id)}:runQuery"
+        body = {"structuredQuery": {
+            "from": [{"collectionId": collection_name}],
+            "orderBy": [{"field": {"fieldPath": field}, "direction": "DESCENDING"}],
+            "limit": limit,
+        }}
+        try:
+            resp = requests.post(url, headers=cls._headers(access_token), json=body, timeout=30)
+        except requests.RequestException as e:
+            raise FirestoreError(f"Firestore injoignable ({collection_name}) : {e}")
+        if resp.status_code != 200:
+            raise FirestoreError(
+                f"Requête Firestore {collection_name} : HTTP {resp.status_code} - {resp.text[:200]}"
+            )
+        results: List[Dict[str, Any]] = []
+        for row in resp.json():
+            doc = row.get("document")
+            if not doc:
+                continue
+            data = firestore_fields_to_dict(doc.get("fields", {}))
+            data["_doc_id"] = doc.get("name", "").rsplit("/", 1)[-1]
+            data["_update_time"] = doc.get("updateTime")
+            results.append(data)
+        return results
+
     # ------------------------------------------------------------------
     # Écriture
     # ------------------------------------------------------------------
@@ -232,6 +263,29 @@ class FirestoreClient:
             return True
         raise FirestoreError(
             f"Écriture Firestore {collection_name}/{doc_id} : HTTP {resp.status_code} - {resp.text[:200]}"
+        )
+
+    @classmethod
+    def create_document(cls, collection_name: str, doc_id: str, data: Dict[str, Any],
+                        project_id: Optional[str] = None,
+                        access_token: Optional[str] = None) -> bool:
+        """Creates the document unless it exists; False when it already exists (never overwritten).
+
+        Firestore refuses to create an existing id (ALREADY_EXISTS): several instances
+        starting together create it only once."""
+        url = f"{cls.database_url(project_id)}/{collection_name}"
+        payload = {"fields": dict_to_firestore_fields(data)}
+        try:
+            resp = requests.post(url, headers=cls._headers(access_token), params={"documentId": doc_id},
+                                 json=payload, timeout=30)
+        except requests.RequestException as e:
+            raise FirestoreError(f"Firestore injoignable ({collection_name}/{doc_id}) : {e}")
+        if resp.status_code in (200, 201):
+            return True
+        if resp.status_code == 409:
+            return False
+        raise FirestoreError(
+            f"Création Firestore {collection_name}/{doc_id} : HTTP {resp.status_code} - {resp.text[:200]}"
         )
 
     @classmethod
