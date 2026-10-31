@@ -279,3 +279,52 @@ def test_a_row_without_birth_date_cannot_be_created() -> None:
 
     with pytest.raises(StaleDecisions):
         apply_decisions(plan, {1: Decision(Bucket.TO_REVIEW, "create")})
+
+
+# ---------------------------------------------------------------------------
+# Changes on HelloAsso: status, amount or tariff that HelloAsso changed since the last import
+# ---------------------------------------------------------------------------
+def _imported(**overrides: object) -> KnownPurchase:
+    """Item 9001, imported as Processed / Loisir collège / 150 €, values unchanged since unless overridden."""
+    return _purchase(30, 7, helloasso_item_id=9001, helloasso_status="Processed", helloasso_tarif="Loisir collège",
+                     helloasso_amount=150.0, **overrides)
+
+
+@pytest.mark.parametrize(
+    ("helloasso", "expected"),
+    [
+        ({"status": "Refunded"}, [("status", "Processed", "Processed", "Refunded")]),
+        ({"tarif_name": "Compétition U13", "amount": 200.0},
+         [("tarif_name", "Loisir collège", "Loisir collège", "Compétition U13"), ("amount", "150.00", "150.00", "200.00")]),
+    ],
+)
+def test_a_change_made_on_helloasso_only_is_proposed(helloasso: dict[str, object], expected: list[tuple[str, str, str, str]]) -> None:
+    [entry] = _plan(_record(9001, **helloasso), purchases=(_imported(),)).entries
+
+    assert (entry.bucket, entry.member_id, entry.purchase_id) == (Bucket.UPDATED, 7, 30)
+    assert [(c.field, c.crm, c.before, c.after) for c in entry.changes] == expected
+
+
+def test_a_change_made_in_the_crm_only_is_never_proposed() -> None:
+    [entry] = _plan(_record(9001), purchases=(_imported(status="Terminé", amount=120.0),)).entries
+
+    assert (entry.bucket, entry.changes) == (Bucket.ALREADY_IMPORTED, ())
+
+
+def test_a_value_changed_on_both_sides_is_to_review_with_both_values() -> None:
+    [entry] = _plan(_record(9001, status="Refunded"), purchases=(_imported(status="Terminé"),)).entries
+
+    assert entry.bucket == Bucket.TO_REVIEW
+    assert [(c.field, c.crm, c.before, c.after) for c in entry.changes] == [("status", "Terminé", "Processed", "Refunded")]
+    assert entry.member_id == 7
+
+
+def test_accepting_a_change_writes_an_update() -> None:
+    plan = _plan(_record(9001, status="Refunded"), _record(9002, order_ref="ORD-9002", last_name="Lovegood", first_name="Luna",
+                                                             birth_date="2012-02-13", status="Refunded"),
+                 purchases=(_imported(), _purchase(31, 8, order_ref="ORD-9002", helloasso_item_id=9002, helloasso_status="Processed",
+                                                   helloasso_tarif="Loisir collège", helloasso_amount=150.0, status="Terminé")))
+
+    writes = apply_decisions(plan, {9001: Decision(Bucket.UPDATED, "import"), 9002: Decision(Bucket.TO_REVIEW, "import")})
+
+    assert [(w.item_id, w.action) for w in writes] == [(9001, WriteAction.UPDATE), (9002, WriteAction.UPDATE)]

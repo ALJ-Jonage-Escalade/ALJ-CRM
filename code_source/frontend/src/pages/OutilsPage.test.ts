@@ -95,6 +95,7 @@ const MEMBERSHIP_PREVIEW = {
       status: "Processed",
       candidates: [],
       can_create: true,
+      changes: [],
     },
     {
       item_id: 2,
@@ -111,6 +112,7 @@ const MEMBERSHIP_PREVIEW = {
       status: "Processed",
       candidates: [],
       can_create: false,
+      changes: [],
     },
   ],
 };
@@ -408,6 +410,46 @@ describe("OutilsPage", () => {
       expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
         season: "2026-2027",
         decisions: { 1: { bucket: "new", choice: "import" }, 3: { bucket: "to_review", choice: "link:4" } },
+      });
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("shows the changes made on HelloAsso, and asks before overwriting a value also changed in the CRM", async () => {
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const changed = {
+      ...MEMBERSHIP_PREVIEW.rows[0]!,
+      item_id: 4,
+      bucket: "updated",
+      changes: [{ field: "status", crm: "Processed", before: "Processed", after: "Refunded" }],
+    };
+    const conflict = {
+      ...MEMBERSHIP_PREVIEW.rows[0]!,
+      item_id: 5,
+      bucket: "to_review",
+      last_name: "LOVEGOOD",
+      changes: [{ field: "amount", crm: "120.00", before: "150.00", after: "0.00" }],
+    };
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [changed, conflict] });
+    try {
+      const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      expect(byId("ha-row-updated")!.textContent).toContain("Statut : Processed → Refunded");
+      expect(byId("ha-row-to_review")!.textContent).toContain("Montant : CRM 120.00 · HelloAsso 0.00 (avant 150.00)");
+      expect(byId("ha-review-choice")).toBeNull();
+      const checks = all("ha-check").map((box) => box as HTMLInputElement);
+      expect(checks.map((box) => box.checked)).toEqual([true, false]);
+
+      checks[1]!.click();
+      await flushPromises();
+      byId("ha-import-apply")!.click();
+      await flushPromises();
+      expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
+        season: "2026-2027",
+        decisions: { 4: { bucket: "updated", choice: "import" }, 5: { bucket: "to_review", choice: "import" } },
       });
     } finally {
       ANSWERS["POST /api/helloasso/memberships/preview"] = preview;

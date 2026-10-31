@@ -42,6 +42,15 @@ class MembershipCandidate(BaseModel):
     licence: str
 
 
+class MembershipChange(BaseModel):
+    """A value HelloAsso changed since the last import: in the CRM now (crm), as HelloAsso gave it last time (before),
+    as HelloAsso gives it now (after). Amounts in euros, two decimals."""
+    field: Literal["status", "tarif_name", "amount"]
+    crm: str
+    before: str
+    after: str
+
+
 class MembershipRow(BaseModel):
     """One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
     whether a new member can be created from it (never without a birth date)."""
@@ -59,6 +68,7 @@ class MembershipRow(BaseModel):
     status: str
     candidates: List[MembershipCandidate]
     can_create: bool
+    changes: List[MembershipChange]
 
 
 class MembershipPreview(BaseModel):

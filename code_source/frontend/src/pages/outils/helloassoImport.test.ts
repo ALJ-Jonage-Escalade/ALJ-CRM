@@ -16,6 +16,7 @@ const ROW = (item_id: number, bucket: MembershipRow["bucket"]): MembershipRow =>
   status: "Processed",
   candidates: [],
   can_create: true,
+  changes: [],
 });
 const PREVIEW: MembershipPreview = {
   status: "success",

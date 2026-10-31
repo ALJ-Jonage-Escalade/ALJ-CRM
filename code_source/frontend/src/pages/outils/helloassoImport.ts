@@ -40,15 +40,37 @@ export type Choices = Record<number, string>;
 /** Buckets whose rows are written when checked; their checkbox starts checked. */
 const CHECKABLE: readonly BucketName[] = ["new", "renewal", "updated"];
 
+/** The row has a checkbox: a new, renewal or changed row, or a row to review whose values changed on both sides
+    (unchecked at first: the HelloAsso values replace the CRM ones only when checked). */
 export function isCheckable(row: MembershipRow): boolean {
-  return CHECKABLE.includes(row.bucket);
+  return CHECKABLE.includes(row.bucket) || (row.bucket === "to_review" && row.changes.length > 0);
+}
+
+/** A row to review for its identity: the admin picks a candidate, a new member or skip. */
+export function needsIdentityChoice(row: MembershipRow): boolean {
+  return row.bucket === "to_review" && row.changes.length === 0;
+}
+
+const FIELD_LABELS: Record<MembershipRow["changes"][number]["field"], string> = {
+  status: "Statut",
+  tarif_name: "Tarif",
+  amount: "Montant",
+};
+
+/** The changes of a row: old → new, or when the CRM changed the value too, both values. */
+export function changeLines(row: MembershipRow): string[] {
+  return row.changes.map((change) =>
+    row.bucket === "to_review"
+      ? `${FIELD_LABELS[change.field]} : CRM ${change.crm} · HelloAsso ${change.after} (avant ${change.before})`
+      : `${FIELD_LABELS[change.field]} : ${change.before} → ${change.after}`,
+  );
 }
 
 /** The choices the preview starts with: the new, renewal and changed rows checked, the rows to review skipped. */
 export function initialChoices(preview: MembershipPreview): Choices {
   const choices: Choices = {};
   for (const row of preview.rows) {
-    if (isCheckable(row)) {
+    if (CHECKABLE.includes(row.bucket)) {
       choices[row.item_id] = "import";
     } else if (row.bucket === "to_review") {
       choices[row.item_id] = "skip";

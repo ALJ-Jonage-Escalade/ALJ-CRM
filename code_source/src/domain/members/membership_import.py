@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import Iterable, Mapping, Optional
+from typing import Iterable, Literal, Mapping, Optional
 
 from domain.members.helloasso_membership import MembershipRecord, season_guard
 from domain.members.purchase_priority import purchase_priority_score
@@ -45,6 +45,22 @@ class KnownPurchase:
     status: str
     tarif_name: str
     amount: float
+    # Last values read on HelloAsso (written by the import); None before the first import
+    helloasso_status: Optional[str] = None
+    helloasso_tarif: Optional[str] = None
+    helloasso_amount: Optional[float] = None
+
+
+ChangedField = Literal["status", "tarif_name", "amount"]
+
+
+@dataclass(frozen=True)
+class FieldChange:
+    """A value HelloAsso changed since the last import: as in the CRM, as HelloAsso gave it last time (before), now (after)."""
+    field: ChangedField
+    crm: str
+    before: str
+    after: str
 
 
 @dataclass(frozen=True)
@@ -65,6 +81,7 @@ class PlanEntry:
     purchase_id: Optional[int] = None
     backfill: bool = False
     candidates: tuple[KnownMember, ...] = ()  # to_review: the members it may be
+    changes: tuple[FieldChange, ...] = ()  # updated, or to_review when the CRM changed the value too
 
     @property
     def can_create(self) -> bool:
@@ -135,7 +152,7 @@ def _classify(record: MembershipRecord, base: _Base) -> PlanEntry:
         return PlanEntry(record, Bucket.BLOCKED, missing)
     known = base.by_item.get(record.item_id)
     if known:
-        return PlanEntry(record, Bucket.ALREADY_IMPORTED, "Inscription déjà importée.", known.user_id, known.purchase_id)
+        return _imported_entry(record, known)
     legacy = base.legacy_purchase(record)
     if legacy:
         return PlanEntry(record, Bucket.ALREADY_IMPORTED, "Inscription déjà présente (import antérieur) : elle sera marquée.",
@@ -157,6 +174,36 @@ def _classify(record: MembershipRecord, base: _Base) -> PlanEntry:
     if same_licence:
         return _to_review(record, "Licence FFME connue, mais sous un autre nom ou une autre date de naissance.", same_licence + same_name)
     return _to_review(record, "Même nom et prénom qu'un adhérent, mais date de naissance différente.", same_name)
+
+
+def _amount_text(amount: float) -> str:
+    return f"{amount:.2f}"
+
+
+def _helloasso_changes(record: MembershipRecord, known: KnownPurchase) -> list[tuple[FieldChange, bool]]:
+    """The values HelloAsso changed since the last import, each with whether the CRM changed it too."""
+    last_status = known.status if known.helloasso_status is None else known.helloasso_status
+    last_tarif = known.tarif_name if known.helloasso_tarif is None else known.helloasso_tarif
+    last_amount = known.amount if known.helloasso_amount is None else known.helloasso_amount
+    values: tuple[tuple[ChangedField, str, str, str], ...] = (
+        ("status", known.status.strip(), last_status.strip(), record.status.strip()),
+        ("tarif_name", known.tarif_name.strip(), last_tarif.strip(), record.tarif_name.strip()),
+        ("amount", _amount_text(known.amount), _amount_text(last_amount), _amount_text(record.amount)),
+    )
+    return [(FieldChange(name, crm, before, after), crm != before)
+            for name, crm, before, after in values if after != before and after != crm]
+
+
+def _imported_entry(record: MembershipRecord, known: KnownPurchase) -> PlanEntry:
+    changes = _helloasso_changes(record, known)
+    if not changes:
+        return PlanEntry(record, Bucket.ALREADY_IMPORTED, "Inscription déjà importée.", known.user_id, known.purchase_id)
+    fields = tuple(change for change, _ in changes)
+    if any(crm_changed for _, crm_changed in changes):
+        return PlanEntry(record, Bucket.TO_REVIEW, "Modifiée sur HelloAsso et dans le CRM : choisissez la valeur à garder.",
+                         known.user_id, known.purchase_id, changes=fields)
+    return PlanEntry(record, Bucket.UPDATED, "Modifiée sur HelloAsso depuis le dernier import.", known.user_id, known.purchase_id,
+                     changes=fields)
 
 
 def _to_review(record: MembershipRecord, reason: str, candidates: Iterable[KnownMember]) -> PlanEntry:
@@ -253,6 +300,7 @@ class WriteAction(str, Enum):
     CREATE = "create"  # new member, with this season's membership
     ATTACH = "attach"  # this season's membership attached to a known member, blank personal fields filled
     BACKFILL = "backfill"  # a former purchase marked with its HelloAsso item id (written whatever the decisions)
+    UPDATE = "update"  # the HelloAsso values of an imported purchase (status, tariff, amount) applied
 
 
 @dataclass(frozen=True)
@@ -274,7 +322,12 @@ def _write_for(entry: PlanEntry, decision: Decision) -> Optional[ImportWrite]:
         return ImportWrite(entry, WriteAction.CREATE)
     if entry.bucket == Bucket.RENEWAL and decision.choice == IMPORT:
         return ImportWrite(entry, WriteAction.ATTACH)
-    if entry.bucket == Bucket.TO_REVIEW:
+    if entry.bucket == Bucket.UPDATED and decision.choice == IMPORT:
+        return ImportWrite(entry, WriteAction.UPDATE)
+    if entry.bucket == Bucket.TO_REVIEW and entry.changes:
+        if decision.choice == IMPORT:
+            return ImportWrite(entry, WriteAction.UPDATE)
+    elif entry.bucket == Bucket.TO_REVIEW:
         if decision.choice == CREATE and entry.can_create:
             return ImportWrite(entry, WriteAction.CREATE)
         member_id = _linked_member(decision.choice)

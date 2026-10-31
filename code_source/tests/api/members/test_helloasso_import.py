@@ -294,3 +294,41 @@ class TestMembershipsToReview(HelloAssoImportTestCase):
 
         self.assertEqual((response.status_code, response.json()["code"]), (409, "stale_decisions"))
         self.assertEqual(self.count("purchases"), 1)
+
+
+class TestMembershipsChangedOnHelloAsso(HelloAssoImportTestCase):
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.items = [ha_item(1, "WEASLEY", "Ginny")]
+        self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {"1": {"bucket": "new", "choice": "import"}}})
+
+    def purchase(self) -> dict[str, Any]:  # Any: SQLite values
+        conn = SqliteDatabase.get_connection()
+        try:
+            return dict(conn.execute("SELECT status, amount, helloasso_status FROM purchases").fetchone())
+        finally:
+            conn.close()
+
+    def test_a_refund_on_helloasso_is_proposed_and_applied(self) -> None:
+        self.items = [ha_item(1, "WEASLEY", "Ginny", state="Refunded")]
+
+        [row] = self.client.post(PREVIEW).json()["rows"]
+        result = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {"1": {"bucket": "updated", "choice": "import"}}}).json()
+
+        self.assertEqual(row["bucket"], "updated")
+        self.assertEqual(row["changes"], [{"field": "status", "crm": "Processed", "before": "Processed", "after": "Refunded"}])
+        self.assertEqual(result["counts"]["updated"], 1)
+        self.assertEqual([m["last_name"] for m in result["updated"]], ["WEASLEY"])
+        self.assertEqual(self.purchase(), {"status": "Refunded", "amount": 150.0, "helloasso_status": "Refunded"})
+
+    def test_a_status_changed_in_the_crm_is_kept_until_helloasso_changes(self) -> None:
+        self.client.post("/api/members/update", json={"user_id": 1, "fields": {"status": "Terminé"}})
+        self.assertEqual(self.purchase()["status"], "Terminé")
+
+        self.assertEqual(self.client.post(PREVIEW).json()["rows"][0]["bucket"], "already_imported")
+        self.items = [ha_item(1, "WEASLEY", "Ginny", state="Refunded")]
+        [row] = self.client.post(PREVIEW).json()["rows"]
+
+        self.assertEqual(row["bucket"], "to_review")
+        self.assertEqual(row["changes"], [{"field": "status", "crm": "Terminé", "before": "Processed", "after": "Refunded"}])

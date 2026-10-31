@@ -3230,6 +3230,24 @@ export interface components {
             licence: string;
         };
         /**
+         * MembershipChange
+         * @description A value HelloAsso changed since the last import: in the CRM now (crm), as HelloAsso gave it last time (before),
+         *     as HelloAsso gives it now (after). Amounts in euros, two decimals.
+         */
+        MembershipChange: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "status" | "tarif_name" | "amount";
+            /** Crm */
+            crm: string;
+            /** Before */
+            before: string;
+            /** After */
+            after: string;
+        };
+        /**
          * MembershipDecision
          * @description The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>
          *     (rows to review). bucket: the bucket the preview showed the row in (a row that changed since is refused).
@@ -3329,6 +3347,8 @@ export interface components {
             candidates: components["schemas"]["MembershipCandidate"][];
             /** Can Create */
             can_create: boolean;
+            /** Changes */
+            changes: components["schemas"]["MembershipChange"][];
         };
         /**
          * NewMember

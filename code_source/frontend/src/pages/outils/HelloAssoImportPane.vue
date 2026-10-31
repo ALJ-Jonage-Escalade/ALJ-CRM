@@ -16,10 +16,12 @@ import { createMembersApi } from "../../services/members";
 import { dialogs } from "../../composables/dialogs";
 import {
   BUCKETS,
+  changeLines,
   decisionsOf,
   initialChoices,
   isCheckable,
   memberHref,
+  needsIdentityChoice,
   personLabel,
   RESULT_GROUPS,
   resultSummary,
@@ -211,8 +213,9 @@ defineExpose({ reload: reset });
                   <td class="px-2.5 py-1.5">{{ row.status }}</td>
                   <td class="px-2.5 py-1.5 text-slate-500">
                     {{ row.reason }}
+                    <span v-for="line in changeLines(row)" :key="line" class="block font-semibold text-slate-700">{{ line }}</span>
                     <select
-                      v-if="row.bucket === 'to_review'"
+                      v-if="needsIdentityChoice(row)"
                       data-testid="ha-review-choice"
                       :value="choices[row.item_id]"
                       :aria-label="`Choix pour ${personLabel(row)}`"

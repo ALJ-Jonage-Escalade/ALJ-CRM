@@ -10,6 +10,7 @@ from api.members.helloasso_import_schemas import (
     ImportedMember,
     MembershipCampaignSetting,
     MembershipCandidate,
+    MembershipChange,
     MembershipCampaignUpdate,
     MembershipImportRequest,
     MembershipImportResult,
@@ -38,6 +39,8 @@ def _row(entry: PlanEntry) -> MembershipRow:
         amount=record.amount, status=record.status, can_create=entry.can_create,
         candidates=[MembershipCandidate(user_id=member.user_id, last_name=member.last_name, first_name=member.first_name,
                                         birth_date=member.birth_date, licence=member.licence) for member in entry.candidates],
+        changes=[MembershipChange(field=change.field, crm=change.crm, before=change.before, after=change.after)
+                 for change in entry.changes],
     )
 
 
@@ -74,12 +77,12 @@ def _result(result: ImportResult) -> MembershipImportResult:
     def members(action: WriteAction) -> list[ImportedMember]:
         return [_imported(applied, result.plan) for applied in result.applied if applied.action == action]
 
-    created, renewed = members(WriteAction.CREATE), members(WriteAction.ATTACH)
-    written = len(created) + len(renewed)
+    created, renewed, updated = members(WriteAction.CREATE), members(WriteAction.ATTACH), members(WriteAction.UPDATE)
+    written = len(created) + len(renewed) + len(updated)
     return MembershipImportResult(
         status="success", season=result.plan.season,
-        counts=ImportCounts(created=len(created), renewed=len(renewed), updated=0, skipped=len(result.plan.entries) - written),
-        created=created, renewed=renewed, updated=[],
+        counts=ImportCounts(created=len(created), renewed=len(renewed), updated=len(updated), skipped=len(result.plan.entries) - written),
+        created=created, renewed=renewed, updated=updated,
     )
 
 

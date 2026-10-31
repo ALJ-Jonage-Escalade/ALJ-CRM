@@ -10,7 +10,7 @@ from typing import Any
 from support.member_db import MemberDbTestCase
 
 from domain.members.helloasso_membership import MembershipRecord
-from domain.members.membership_import import Bucket, ImportWrite, PlanEntry, WriteAction
+from domain.members.membership_import import Bucket, FieldChange, ImportWrite, PlanEntry, WriteAction
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.membership_import import MembershipImportRepository, MembershipWriteRefused
 
@@ -144,3 +144,31 @@ class TestMembershipImportRepository(MemberDbTestCase):
                  ImportWrite(PlanEntry(cancelled, Bucket.TO_REVIEW, "à vérifier", member_id=user["id"]), WriteAction.ATTACH)], SEASON)
 
         self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM purchases"), [{"n": 1}])
+
+    def test_snapshot_carries_the_last_values_read_on_helloasso(self) -> None:
+        MembershipImportRepository.apply([create(record(1))], SEASON)
+
+        [purchase] = MembershipImportRepository.snapshot().purchases
+
+        self.assertEqual((purchase.helloasso_status, purchase.helloasso_tarif, purchase.helloasso_amount),
+                         ("Processed", "Loisir collège", 150.0))
+
+    def test_update_writes_the_changed_values_and_the_last_values_read(self) -> None:
+        [applied] = MembershipImportRepository.apply([create(record(1))], SEASON)
+        conn = SqliteDatabase.get_connection()
+        try:
+            conn.execute("UPDATE purchases SET commentaires_correctif = 'Payé en chèque', tarif_name = 'Loisir (CRM)'")
+            conn.commit()
+        finally:
+            conn.close()
+        refunded = record(1, status="Refunded", tarif_name="Loisir collège v2")
+        entry = PlanEntry(refunded, Bucket.UPDATED, "modifiée", applied.user_id, applied.purchase_id,
+                          changes=(FieldChange("status", "Processed", "Processed", "Refunded"),))
+
+        MembershipImportRepository.apply([ImportWrite(entry, WriteAction.UPDATE)], SEASON)
+
+        [purchase] = self.rows("SELECT status, status_normalized, tarif_name, amount, commentaires_correctif, helloasso_status,"
+                               " helloasso_tarif, helloasso_amount FROM purchases")
+        self.assertEqual(purchase, {"status": "Refunded", "status_normalized": "Refunded", "tarif_name": "Loisir (CRM)", "amount": 150.0,
+                                    "commentaires_correctif": "Payé en chèque", "helloasso_status": "Refunded",
+                                    "helloasso_tarif": "Loisir collège v2", "helloasso_amount": 150.0})

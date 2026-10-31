@@ -7834,6 +7834,40 @@
         "title": "MembershipCandidate",
         "description": "A member a registration to review may be (choice \"link:<user_id>\")."
       },
+      "MembershipChange": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "status",
+              "tarif_name",
+              "amount"
+            ],
+            "title": "Field"
+          },
+          "crm": {
+            "type": "string",
+            "title": "Crm"
+          },
+          "before": {
+            "type": "string",
+            "title": "Before"
+          },
+          "after": {
+            "type": "string",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "crm",
+          "before",
+          "after"
+        ],
+        "title": "MembershipChange",
+        "description": "A value HelloAsso changed since the last import: in the CRM now (crm), as HelloAsso gave it last time (before),\nas HelloAsso gives it now (after). Amounts in euros, two decimals."
+      },
       "MembershipDecision": {
         "properties": {
           "bucket": {
@@ -8049,6 +8083,13 @@
           "can_create": {
             "type": "boolean",
             "title": "Can Create"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipChange"
+            },
+            "type": "array",
+            "title": "Changes"
           }
         },
         "type": "object",
@@ -8066,7 +8107,8 @@
           "amount",
           "status",
           "candidates",
-          "can_create"
+          "can_create",
+          "changes"
         ],
         "title": "MembershipRow",
         "description": "One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and\nwhether a new member can be created from it (never without a birth date)."

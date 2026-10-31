@@ -77,10 +77,27 @@ def _backfill(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: 
     return AppliedWrite(write.item_id, write.action, entry.member_id, entry.purchase_id)
 
 
-_WRITERS = {WriteAction.CREATE: _create, WriteAction.ATTACH: _attach, WriteAction.BACKFILL: _backfill}
+def _update(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: str) -> AppliedWrite:
+    """The values HelloAsso changed (entry.changes) written on the purchase; the other values stay as in the CRM."""
+    entry, rec = write.entry, write.entry.record
+    if entry.member_id is None or entry.purchase_id is None:
+        raise ValueError(f"Inscription {write.item_id} : achat à mettre à jour non indiqué")
+    new_values = {"status": rec.status, "tarif_name": rec.tarif_name.strip(), "amount": rec.amount}
+    for change in entry.changes:
+        column = change.field
+        cur.execute(f'UPDATE purchases SET "{column}" = ?, updated_at = ? WHERE id = ?',  # noqa: S608 - column: a key of new_values
+                    (new_values[column], now_iso, entry.purchase_id))
+        if column == "status":
+            cur.execute("UPDATE purchases SET status_normalized = ? WHERE id = ?", (schema_v2.normalize_status(rec.status), entry.purchase_id))
+    _record_helloasso_values(cur, entry.purchase_id, write)
+    return AppliedWrite(write.item_id, write.action, entry.member_id, entry.purchase_id)
+
+
+_WRITERS = {WriteAction.CREATE: _create, WriteAction.ATTACH: _attach, WriteAction.BACKFILL: _backfill, WriteAction.UPDATE: _update}
 
 _SNAPSHOT_PURCHASES = """
-    SELECT p.id, p.user_id, o.order_ref, s.name AS season, p.helloasso_item_id, p.status, p.tarif_name, p.amount
+    SELECT p.id, p.user_id, o.order_ref, s.name AS season, p.helloasso_item_id, p.status, p.tarif_name, p.amount,
+           p.helloasso_status, p.helloasso_tarif, p.helloasso_amount
     FROM purchases p JOIN orders o ON o.id = p.order_id LEFT JOIN seasons s ON s.id = o.season_id
 """
 
@@ -98,7 +115,9 @@ class MembershipImportRepository:
                        for row in conn.execute("SELECT id, last_name, first_name, birth_date, licence_ffme FROM users")]
             purchases = [KnownPurchase(purchase_id=row["id"], user_id=row["user_id"], order_ref=str(row["order_ref"] or ""),
                                        season=row["season"] or "", helloasso_item_id=row["helloasso_item_id"],
-                                       status=row["status"] or "", tarif_name=row["tarif_name"] or "", amount=float(row["amount"] or 0.0))
+                                       status=row["status"] or "", tarif_name=row["tarif_name"] or "", amount=float(row["amount"] or 0.0),
+                                       helloasso_status=row["helloasso_status"], helloasso_tarif=row["helloasso_tarif"],
+                                       helloasso_amount=row["helloasso_amount"])
                          for row in conn.execute(_SNAPSHOT_PURCHASES)]
             return MembersSnapshot(members=members, purchases=purchases)
         finally:
