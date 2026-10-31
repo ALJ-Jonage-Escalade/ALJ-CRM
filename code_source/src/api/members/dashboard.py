@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks
-
 import logging
+
+from fastapi import APIRouter, BackgroundTasks
 
 from domain.competitions.matching import parse_campaign_identifier
 from domain.constants import get_active_season

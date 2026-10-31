@@ -78,9 +78,9 @@ function dayText(value: string | null): string {
   return value ? formatDayText(value) : "—";
 }
 
-function campaignName(kind: CampaignKind, ref: CampaignRef): string {
-  const listed = campaigns.value?.[kind].campaigns.find((campaign) => campaign.slug === ref.slug);
-  return listed?.title || ref.slug;
+function campaignName(kind: CampaignKind, active: CampaignRef): string {
+  const listed = campaigns.value?.[kind].campaigns.find((campaign) => campaign.slug === active.slug);
+  return listed?.title || active.slug;
 }
 
 async function choose(kind: CampaignKind, title: string, impact: string, campaign: Campaign): Promise<void> {
