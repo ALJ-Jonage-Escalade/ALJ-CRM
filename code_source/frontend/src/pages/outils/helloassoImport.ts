@@ -3,6 +3,7 @@
 import type { BadgeColor } from "../../components/ui/palette";
 import type { Schemas } from "../../lib/client";
 import { formatDateTime, formatDayText, parseDate } from "../../lib/format";
+import { normKey } from "../adherents/members";
 
 export type MembershipPreview = Schemas["MembershipPreview"];
 export type MembershipRow = Schemas["MembershipRow"];
@@ -48,6 +49,24 @@ export function rowsOf(preview: MembershipPreview, bucket: BucketName): Membersh
   const registered = (row: MembershipRow): number => parseDate(row.order_date)?.getTime() ?? 0;
   return preview.rows.filter((row) => row.bucket === bucket).sort((a, b) => registered(b) - registered(a));
 }
+
+/** The rows matching the search of their table (accents and case ignored): name in either order, licence, tarif, birth date, reason. */
+export function searchRows(rows: MembershipRow[], query: string): MembershipRow[] {
+  const wanted = normKey(query);
+  if (!wanted) {
+    return rows;
+  }
+  const searched = (row: MembershipRow): string =>
+    normKey(
+      [personLabel(row), `${row.first_name} ${row.last_name}`, row.licence, row.tarif_name, formatDayText(row.birth_date), row.reason].join(
+        " ",
+      ),
+    );
+  return rows.filter((row) => searched(row).includes(wanted));
+}
+
+/** The buckets shown folded at first: nothing to do on them. */
+export const FOLDED_BUCKETS: readonly BucketName[] = ["already_imported", "blocked"];
 
 /** The icon of each HelloAsso status: the item state (Processed, Registered, Canceled, Unknown), replaced by the payments'
     refund state when every payment was refunded (Refunded, Refunding). */

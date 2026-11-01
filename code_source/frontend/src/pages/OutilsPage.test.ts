@@ -472,6 +472,50 @@ describe("OutilsPage", () => {
     }
   });
 
+  it("filters each HelloAsso table by its own search box, accents and case ignored, the checked rows kept", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const ginny = MEMBERSHIP_PREVIEW.rows[0]!;
+    const rows = [
+      ginny,
+      { ...ginny, item_id: 20, last_name: "DAYRE", first_name: "Staël", licence: "654321" },
+      { ...ginny, item_id: 21, last_name: "WEASLEY", first_name: "Ron", tarif_name: "Adultes autonomes" },
+      MEMBERSHIP_PREVIEW.rows[1]!,
+    ];
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows });
+    try {
+      const { byId, all } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      const search = async (bucket: string, text: string) => {
+        const input = byId("ha-section-" + bucket)!.querySelector<HTMLInputElement>("[data-testid=ha-search]")!;
+        input.value = text;
+        input.dispatchEvent(new Event("input"));
+        await flushPromises();
+      };
+      const names = (bucket: string) => all(`ha-row-${bucket}`).map((row) => row.querySelector("td:nth-child(2)")!.textContent.trim());
+
+      await search("new", "stael");
+      expect(names("new")).toEqual(["DAYRE Staël"]);
+      expect(names("blocked")).toEqual(["LOVEGOOD Luna"]);
+
+      await search("new", "autonomes");
+      expect(names("new")).toEqual(["WEASLEY Ron"]);
+      await search("new", "654321");
+      expect(names("new")).toEqual(["DAYRE Staël"]);
+
+      await search("new", "Dumbledore");
+      expect(names("new")).toEqual([]);
+      expect(byId("ha-section-new")!.querySelector("[data-testid=ha-search-empty]")).not.toBeNull();
+      // Hidden rows stay selected
+      expect(byId("ha-import-selected")!.textContent).toContain("3 inscription(s)");
+
+      await search("new", "");
+      expect(names("new")).toHaveLength(3);
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
   it("shows when each HelloAsso registration was made, the latest first", async () => {
     const earlier = {
       ...MEMBERSHIP_PREVIEW.rows[0]!,

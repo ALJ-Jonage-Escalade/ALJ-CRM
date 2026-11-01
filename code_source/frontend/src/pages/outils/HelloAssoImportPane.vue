@@ -21,6 +21,7 @@ import {
   campaignOptions,
   changeLines,
   decisionsOf,
+  FOLDED_BUCKETS,
   initialChoices,
   isCheckable,
   lastSyncText,
@@ -32,7 +33,9 @@ import {
   resultSummary,
   reviewOptions,
   rowsOf,
+  searchRows,
   statusIcon,
+  type BucketName,
   type Choices,
   type MembershipImportResult,
   type MembershipPreview,
@@ -52,6 +55,8 @@ const lastSync = ref<string | null>(null); // null until known
 // The membership forms of the select, empty until loaded (or when they can't be read: the server's active one is used)
 const campaigns = ref<{ value: string; label: string }[]>([]);
 const campaign = ref<string | null>(null); // null: the active one, chosen by the server
+// The search of each table (a filter of the view only: the checked rows it hides are still imported)
+const searches = ref<Partial<Record<BucketName, string>>>({});
 
 async function loadCampaigns(): Promise<void> {
   try {
@@ -84,12 +89,25 @@ onMounted(() => {
   }
 });
 
+/** The sections of the preview: the non-empty buckets, with their rows and the ones matching their search. */
+const sections = computed(() => {
+  const shown = preview.value;
+  if (!shown) {
+    return [];
+  }
+  return BUCKETS.map((bucket) => {
+    const rows = rowsOf(shown, bucket.name);
+    return { ...bucket, rows, matching: searchRows(rows, searches.value[bucket.name] ?? "") };
+  }).filter((section) => section.rows.length);
+});
+
 /** Rows that will be written: the checked ones (rows to review: a choice other than skip). */
 const selectedCount = computed(() => Object.values(choices.value).filter((choice) => choice !== "skip").length);
 
 function reset(): void {
   preview.value = null;
   choices.value = {};
+  searches.value = {};
   done.value = null;
   failure.value = "";
 }
@@ -233,98 +251,115 @@ defineExpose({ reload: reset });
         </UiTile>
       </div>
 
-      <template v-for="bucket in BUCKETS" :key="bucket.name">
-        <section v-if="rowsOf(preview, bucket.name).length" :data-testid="`ha-section-${bucket.name}`" class="mb-4">
-          <h3 class="mb-1.5 flex items-center gap-2 text-[13.5px] font-bold">
-            {{ bucket.label }}
-            <UiBadge :color="bucket.color">{{ rowsOf(preview, bucket.name).length }}</UiBadge>
-          </h3>
-          <div class="max-h-80 overflow-auto rounded-md border border-slate-200">
-            <!-- Same fixed widths in every section (table-fixed): the columns line up from one table to the next.
+      <!-- Folded or unfolded by the admin; the sections with nothing to do start folded -->
+      <details
+        v-for="section in sections"
+        :key="section.name"
+        :data-testid="`ha-section-${section.name}`"
+        :open="!FOLDED_BUCKETS.includes(section.name)"
+        class="group mb-4"
+      >
+        <summary class="mb-1.5 flex cursor-pointer list-none items-center [&::-webkit-details-marker]:hidden gap-2 text-[13.5px] font-bold">
+          <span aria-hidden="true" class="text-slate-400 transition-transform group-open:rotate-90">▶</span>
+          {{ section.label }}
+          <UiBadge :color="section.color">{{ section.rows.length }}</UiBadge>
+        </summary>
+        <input
+          v-model="searches[section.name]"
+          type="search"
+          data-testid="ha-search"
+          :aria-label="`Rechercher dans ${section.label}`"
+          placeholder="🔍 Rechercher (nom, prénom, licence, tarif, naissance, motif)…"
+          class="mb-1.5 w-full max-w-md rounded-lg border border-slate-300 px-2.5 py-1 text-[12.5px]"
+        />
+        <div class="max-h-80 overflow-auto rounded-md border border-slate-200">
+          <!-- Same fixed widths in every section (table-fixed): the columns line up from one table to the next.
                  Tarif takes the remaining width; below the minimum width, the table scrolls -->
-            <table class="w-full min-w-[1180px] table-fixed text-xs">
-              <colgroup>
-                <col class="w-8" />
-                <col class="w-[170px]" />
-                <col class="w-[84px]" />
-                <col class="w-[84px]" />
-                <col class="w-[84px]" />
-                <col class="w-[76px]" />
-                <col />
-                <col class="w-[72px]" />
-                <col class="w-[72px]" />
-                <col class="w-[350px]" />
-              </colgroup>
-              <thead class="bg-slate-50 text-left">
-                <tr>
-                  <th class="px-2.5 py-1.5"><span class="sr-only">Importer</span></th>
-                  <th class="px-2.5 py-1.5">Adhérent</th>
-                  <th class="px-2.5 py-1.5">Inscrit le</th>
-                  <th class="px-2.5 py-1.5">Payé le</th>
-                  <th class="px-2.5 py-1.5">Naissance</th>
-                  <th class="px-2.5 py-1.5">Licence</th>
-                  <th class="px-2.5 py-1.5">Tarif</th>
-                  <th class="px-2.5 py-1.5">Montant</th>
-                  <th class="px-2.5 py-1.5">Statut HelloAsso</th>
-                  <th class="px-2.5 py-1.5">Motif</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="row in rowsOf(preview, bucket.name)"
-                  :key="row.item_id"
-                  :data-testid="`ha-row-${bucket.name}`"
-                  class="border-t border-slate-100"
-                >
-                  <td class="px-2.5 py-1.5">
-                    <input
-                      v-if="isCheckable(row)"
-                      type="checkbox"
-                      data-testid="ha-check"
-                      :checked="choices[row.item_id] === 'import'"
-                      :aria-label="`Importer ${personLabel(row)}`"
-                      @change="choose(row.item_id, ($event.target as HTMLInputElement).checked ? 'import' : 'skip')"
-                    />
-                  </td>
-                  <td class="px-2.5 py-1.5 font-semibold break-words">{{ personLabel(row) }}</td>
-                  <td class="px-2.5 py-1.5" data-testid="ha-order-date">{{ formatDayText(row.order_date) || "—" }}</td>
-                  <td class="px-2.5 py-1.5" data-testid="ha-payment-date">{{ formatDayText(row.payment_date) || "—" }}</td>
-                  <td class="px-2.5 py-1.5" data-testid="ha-birth-date">{{ formatDayText(row.birth_date) || "—" }}</td>
-                  <td class="px-2.5 py-1.5" data-testid="ha-licence">{{ row.licence || "—" }}</td>
-                  <td class="px-2.5 py-1.5 break-words">{{ row.tarif_name }}</td>
-                  <td class="px-2.5 py-1.5">{{ formatEuros(row.amount) }}</td>
-                  <td class="px-2.5 py-1.5">
-                    <span
-                      role="img"
-                      data-testid="ha-status"
-                      class="cursor-help"
-                      :title="statusIcon(row.status).tooltip"
-                      :aria-label="statusIcon(row.status).tooltip"
-                    >
-                      {{ statusIcon(row.status).icon }}
-                    </span>
-                    <span v-if="row.refund_date" data-testid="ha-refund-date" class="block text-slate-500">{{ refundText(row) }}</span>
-                  </td>
-                  <td class="px-2.5 py-1.5 break-words text-slate-500">
-                    {{ row.reason }}
-                    <span v-for="line in changeLines(row)" :key="line" class="block font-semibold text-slate-700">{{ line }}</span>
-                    <select
-                      v-if="needsIdentityChoice(row)"
-                      data-testid="ha-review-choice"
-                      :value="choices[row.item_id]"
-                      :aria-label="`Choix pour ${personLabel(row)}`"
-                      class="mt-1 block w-full rounded-md border border-slate-300 px-1.5 py-1 text-xs text-slate-800"
-                      @change="choose(row.item_id, ($event.target as HTMLSelectElement).value)"
-                    >
-                      <option v-for="option in reviewOptions(row)" :key="option.value" :value="option.value">{{ option.label }}</option>
-                    </select>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </template>
+          <table class="w-full min-w-[1180px] table-fixed text-xs">
+            <colgroup>
+              <col class="w-8" />
+              <col class="w-[170px]" />
+              <col class="w-[84px]" />
+              <col class="w-[84px]" />
+              <col class="w-[84px]" />
+              <col class="w-[76px]" />
+              <col />
+              <col class="w-[72px]" />
+              <col class="w-[72px]" />
+              <col class="w-[350px]" />
+            </colgroup>
+            <thead class="bg-slate-50 text-left">
+              <tr>
+                <th class="px-2.5 py-1.5"><span class="sr-only">Importer</span></th>
+                <th class="px-2.5 py-1.5">Adhérent</th>
+                <th class="px-2.5 py-1.5">Inscrit le</th>
+                <th class="px-2.5 py-1.5">Payé le</th>
+                <th class="px-2.5 py-1.5">Naissance</th>
+                <th class="px-2.5 py-1.5">Licence</th>
+                <th class="px-2.5 py-1.5">Tarif</th>
+                <th class="px-2.5 py-1.5">Montant</th>
+                <th class="px-2.5 py-1.5">Statut HelloAsso</th>
+                <th class="px-2.5 py-1.5">Motif</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!section.matching.length" data-testid="ha-search-empty">
+                <td colspan="10" class="px-2.5 py-3 text-center text-slate-500">Aucune inscription ne correspond à la recherche.</td>
+              </tr>
+              <tr
+                v-for="row in section.matching"
+                :key="row.item_id"
+                :data-testid="`ha-row-${section.name}`"
+                class="border-t border-slate-100"
+              >
+                <td class="px-2.5 py-1.5">
+                  <input
+                    v-if="isCheckable(row)"
+                    type="checkbox"
+                    data-testid="ha-check"
+                    :checked="choices[row.item_id] === 'import'"
+                    :aria-label="`Importer ${personLabel(row)}`"
+                    @change="choose(row.item_id, ($event.target as HTMLInputElement).checked ? 'import' : 'skip')"
+                  />
+                </td>
+                <td class="px-2.5 py-1.5 font-semibold break-words">{{ personLabel(row) }}</td>
+                <td class="px-2.5 py-1.5" data-testid="ha-order-date">{{ formatDayText(row.order_date) || "—" }}</td>
+                <td class="px-2.5 py-1.5" data-testid="ha-payment-date">{{ formatDayText(row.payment_date) || "—" }}</td>
+                <td class="px-2.5 py-1.5" data-testid="ha-birth-date">{{ formatDayText(row.birth_date) || "—" }}</td>
+                <td class="px-2.5 py-1.5" data-testid="ha-licence">{{ row.licence || "—" }}</td>
+                <td class="px-2.5 py-1.5 break-words">{{ row.tarif_name }}</td>
+                <td class="px-2.5 py-1.5">{{ formatEuros(row.amount) }}</td>
+                <td class="px-2.5 py-1.5">
+                  <span
+                    role="img"
+                    data-testid="ha-status"
+                    class="cursor-help"
+                    :title="statusIcon(row.status).tooltip"
+                    :aria-label="statusIcon(row.status).tooltip"
+                  >
+                    {{ statusIcon(row.status).icon }}
+                  </span>
+                  <span v-if="row.refund_date" data-testid="ha-refund-date" class="block text-slate-500">{{ refundText(row) }}</span>
+                </td>
+                <td class="px-2.5 py-1.5 break-words text-slate-500">
+                  {{ row.reason }}
+                  <span v-for="line in changeLines(row)" :key="line" class="block font-semibold text-slate-700">{{ line }}</span>
+                  <select
+                    v-if="needsIdentityChoice(row)"
+                    data-testid="ha-review-choice"
+                    :value="choices[row.item_id]"
+                    :aria-label="`Choix pour ${personLabel(row)}`"
+                    class="mt-1 block w-full rounded-md border border-slate-300 px-1.5 py-1 text-xs text-slate-800"
+                    @change="choose(row.item_id, ($event.target as HTMLSelectElement).value)"
+                  >
+                    <option v-for="option in reviewOptions(row)" :key="option.value" :value="option.value">{{ option.label }}</option>
+                  </select>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
 
       <div v-if="!preview.blocked_reason" class="flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-200 pt-3">
         <UiButton
