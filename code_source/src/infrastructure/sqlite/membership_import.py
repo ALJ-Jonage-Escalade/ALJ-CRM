@@ -70,6 +70,32 @@ def _attach(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: st
     return _add_membership(cur, write, user_id, season_id, now_iso)
 
 
+def _assign(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: str) -> AppliedWrite:
+    """The registration given by hand to a member: their membership of the season that is not from HelloAsso
+    (entry.purchase_id) takes the HelloAsso order and values, or a membership is added. The member is left as typed."""
+    entry, record = write.entry, write.entry.record
+    if entry.member_id is None:
+        raise ValueError(f"Inscription {write.item_id} : adhérent à rattacher non indiqué")
+    if entry.purchase_id is None:
+        return _add_membership(cur, write, entry.member_id, season_id, now_iso)
+    fields = record.legacy_fields()
+    order_id = schema_v2.upsert_order_v2(cur, fields["order_ref"], fields["order_date"], fields["status"],
+                                         fields["payer_lastName"], fields["payer_firstName"], fields["payer_email"],
+                                         season_id, now_iso)
+    row = cur.execute("SELECT order_id FROM purchases WHERE id = ? AND user_id = ?", (entry.purchase_id, entry.member_id)).fetchone()
+    if row is None:
+        raise MembershipWriteRefused(f"L'adhésion à reprendre de l'inscription HelloAsso {write.item_id} a disparu.")
+    cur.execute("UPDATE purchases SET order_id = ?, tarif_name = ?, amount = ?, status = ?, status_normalized = ?, updated_at = ?"
+                " WHERE id = ?", (order_id, record.tarif_name.strip(), record.amount, record.status,
+                                  schema_v2.normalize_status(record.status), now_iso, entry.purchase_id))
+    cur.execute("DELETE FROM purchase_options WHERE purchase_id = ?", (entry.purchase_id,))
+    schema_v2.insert_options_v2(cur, entry.purchase_id, fields)
+    _record_helloasso_values(cur, entry.purchase_id, write)
+    # The manual order taken over, left without purchase
+    cur.execute("DELETE FROM orders WHERE id = ? AND NOT EXISTS (SELECT 1 FROM purchases WHERE order_id = ?)", (row[0], row[0]))
+    return AppliedWrite(write.item_id, write.action, entry.member_id, entry.purchase_id)
+
+
 def _backfill(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: str) -> AppliedWrite:
     entry = write.entry
     if entry.member_id is None or entry.purchase_id is None:
@@ -95,11 +121,18 @@ def _update(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: st
 
 
 # Purchases written for the members (not a back-fill, which only marks a purchase with its item id)
-_MARKED = (WriteAction.CREATE, WriteAction.ATTACH, WriteAction.UPDATE)
+_MARKED = (WriteAction.CREATE, WriteAction.ATTACH, WriteAction.UPDATE, WriteAction.ASSIGN)
 
 
 def import_marker(day: datetime.date) -> str:
     return f"Import HelloAsso du {day.strftime('%d/%m')}"
+
+
+def assign_note(write: ImportWrite, day: datetime.date, author: str) -> str:
+    """The lines a registration given by hand adds to the membership comment: the admin's comment, then who it was."""
+    record = write.entry.record
+    return (f"[{day.strftime('%d/%m/%Y')}] {write.comment}\n"
+            f"Inscription HelloAsso au nom de {record.last_name} {record.first_name} (commande {record.order_ref}) rattachée par {author}")
 
 
 def _append_marker(cur: sqlite3.Cursor, purchase_id: int, marker: str) -> None:
@@ -111,7 +144,8 @@ def _append_marker(cur: sqlite3.Cursor, purchase_id: int, marker: str) -> None:
     cur.execute("UPDATE purchases SET commentaires_correctif = ? WHERE id = ?", (f"{comment}\n{marker}" if comment else marker, purchase_id))
 
 
-_WRITERS = {WriteAction.CREATE: _create, WriteAction.ATTACH: _attach, WriteAction.BACKFILL: _backfill, WriteAction.UPDATE: _update}
+_WRITERS = {WriteAction.CREATE: _create, WriteAction.ATTACH: _attach, WriteAction.BACKFILL: _backfill, WriteAction.UPDATE: _update,
+            WriteAction.ASSIGN: _assign}
 
 _SNAPSHOT_PURCHASES = """
     SELECT p.id, p.user_id, o.order_ref, s.name AS season, p.helloasso_item_id, p.status, p.tarif_name, p.amount,
@@ -142,10 +176,12 @@ class MembershipImportRepository:
             conn.close()
 
     @classmethod
-    def apply(cls, writes: list[ImportWrite], season: str, day: Optional[datetime.date] = None) -> list[AppliedWrite]:
+    def apply(cls, writes: list[ImportWrite], season: str, day: Optional[datetime.date] = None, author: str = "") -> list[AppliedWrite]:
         """Applies the writes in one transaction: all of them, or none (the error is raised). The purchases written get
-        "Import HelloAsso du JJ/MM" (`day`, today by default) appended to their comment."""
-        marker = import_marker(day or datetime.date.today())
+        "Import HelloAsso du JJ/MM" (`day`, today by default) appended to their comment, after the comment and author
+        (e-mail of the admin) of a registration given by hand."""
+        day = day or datetime.date.today()
+        marker = import_marker(day)
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
@@ -153,7 +189,9 @@ class MembershipImportRepository:
             now_iso = datetime.datetime.now().isoformat(timespec="seconds")
             season_id = schema_v2.resolve_season_id(cur, season)
             applied = [_WRITERS[write.action](cur, write, season_id, now_iso) for write in writes]
-            for written in applied:
+            for write, written in zip(writes, applied, strict=True):
+                if written.action == WriteAction.ASSIGN:
+                    _append_marker(cur, written.purchase_id, assign_note(write, day, author))
                 if written.action in _MARKED:
                     _append_marker(cur, written.purchase_id, marker)
             conn.commit()

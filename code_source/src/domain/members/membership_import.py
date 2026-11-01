@@ -102,6 +102,9 @@ class ImportPlan:
     campaign_slug: str
     entries: list[PlanEntry] = field(default_factory=list)
     blocked_reason: Optional[str] = None  # the whole campaign is refused (season guard)
+    # The base the plan was made against: every member a registration can be attached to by hand, and their purchases
+    members: tuple[KnownMember, ...] = ()
+    season_purchases: tuple[KnownPurchase, ...] = ()  # the purchases of the plan's season
 
     def counts(self) -> dict[str, int]:
         """Number of registrations per bucket, every bucket listed."""
@@ -278,12 +281,13 @@ def plan_membership_import(records: Iterable[MembershipRecord], *, season: str, 
     """The plan of the import of these registrations into `season`, against the members already in the base."""
     records = list(records)
     blocked_reason = season_guard(campaign_slug, season)
+    base = _Base(snapshot or MembersSnapshot(), season)
     if blocked_reason:
         entries = [PlanEntry(record, Bucket.BLOCKED, blocked_reason) for record in records]
     else:
-        base = _Base(snapshot or MembersSnapshot(), season)
         entries = _apply_priority([_classify(record, base) for record in records], base)
-    return ImportPlan(season=season, campaign_slug=campaign_slug, entries=entries, blocked_reason=blocked_reason)
+    return ImportPlan(season=season, campaign_slug=campaign_slug, entries=entries, blocked_reason=blocked_reason,
+                      members=tuple(base.members.values()), season_purchases=tuple(base.season_purchases))
 
 
 # ---------------------------------------------------------------------------
@@ -295,14 +299,21 @@ SKIP = "skip"  # an unchecked row; the default of every row
 
 CREATE = "create"  # a row to review: a new member
 LINK_PREFIX = "link:"  # a row to review: "link:<member id>", attached to that candidate
+# A new, renewal or to-review row: "attach:<member id>", given by hand to any member (the person on HelloAsso is not
+# the member: a parent registered their child under their own name)
+ATTACH_PREFIX = "attach:"
+
+
+def _chosen_member(choice: str, prefix: str) -> Optional[int]:
+    """The member id of a "<prefix><member id>" choice, None for another choice."""
+    if not choice.startswith(prefix):
+        return None
+    member_id = choice[len(prefix):]
+    return int(member_id) if member_id.isdigit() else None
 
 
 def _linked_member(choice: str) -> Optional[int]:
-    """The member id of a "link:<member id>" choice, None for another choice."""
-    if not choice.startswith(LINK_PREFIX):
-        return None
-    member_id = choice[len(LINK_PREFIX):]
-    return int(member_id) if member_id.isdigit() else None
+    return _chosen_member(choice, LINK_PREFIX)
 
 
 class StaleDecisions(ValueError):
@@ -311,9 +322,10 @@ class StaleDecisions(ValueError):
 
 @dataclass(frozen=True)
 class Decision:
-    """The admin's choice for one row, with the bucket the preview showed it in."""
+    """The admin's choice for one row, with the bucket the preview showed it in; comment: why, required for an attach."""
     bucket: Bucket
     choice: str
+    comment: str = ""
 
 
 class WriteAction(str, Enum):
@@ -321,23 +333,30 @@ class WriteAction(str, Enum):
     ATTACH = "attach"  # this season's membership attached to a known member, blank personal fields filled
     BACKFILL = "backfill"  # a former purchase marked with its HelloAsso item id (written whatever the decisions)
     UPDATE = "update"  # the HelloAsso values of an imported purchase (status, tariff, amount) applied
+    # Given by hand to a member: takes over their membership of the season that is not from HelloAsso (purchase_id), or
+    # adds one; nothing written on the member (the HelloAsso person is someone else)
+    ASSIGN = "assign"
 
 
 @dataclass(frozen=True)
 class ImportWrite:
     entry: PlanEntry
     action: WriteAction
+    comment: str = ""  # the admin's comment of an attach by hand
 
     @property
     def item_id(self) -> int:
         return self.entry.item_id
 
 
-def _write_for(entry: PlanEntry, decision: Decision) -> Optional[ImportWrite]:
+def _write_for(entry: PlanEntry, decision: Decision, plan: ImportPlan) -> Optional[ImportWrite]:
     if decision.bucket != entry.bucket:
         raise StaleDecisions(f"Inscription {entry.item_id} : elle a changé sur HelloAsso depuis l'aperçu.")
     if decision.choice == SKIP:
         return None
+    attached = _chosen_member(decision.choice, ATTACH_PREFIX)
+    if attached is not None and _attachable(entry):
+        return _assign(entry, attached, decision.comment, plan)
     if entry.bucket == Bucket.NEW and decision.choice == IMPORT:
         return ImportWrite(entry, WriteAction.CREATE)
     if entry.bucket == Bucket.RENEWAL and decision.choice == IMPORT:
@@ -356,6 +375,43 @@ def _write_for(entry: PlanEntry, decision: Decision) -> Optional[ImportWrite]:
     raise StaleDecisions(f"Inscription {entry.item_id} : choix « {decision.choice} » impossible.")
 
 
+def _attachable(entry: PlanEntry) -> bool:
+    return entry.bucket in (Bucket.NEW, Bucket.RENEWAL) or (entry.bucket == Bucket.TO_REVIEW and not entry.changes)
+
+
+def _assign(entry: PlanEntry, member_id: int, comment: str, plan: ImportPlan) -> ImportWrite:
+    """The attach of `entry` to the member, taking over their membership of the season that is not from HelloAsso."""
+    member = next((member for member in plan.members if member.user_id == member_id), None)
+    if member is None:
+        raise StaleDecisions(f"Inscription {entry.item_id} : adhérent {member_id} introuvable.")
+    who = f"{member.last_name} {member.first_name}".strip()
+    if not comment.strip():
+        raise StaleDecisions(f"Inscription {entry.item_id} rattachée à {who} : un commentaire est requis.")
+    # A former import's purchase, marked with its item id by this import (back-fill), is a HelloAsso one too
+    back_filled = {other.purchase_id for other in plan.entries if other.backfill}
+    purchases = [p for p in plan.season_purchases if p.user_id == member_id]
+    helloasso = [p for p in purchases if p.helloasso_item_id is not None or p.purchase_id in back_filled]
+    if helloasso:
+        raise StaleDecisions(f"{who} a déjà une adhésion HelloAsso {plan.season} (commande {helloasso[0].order_ref}).")
+    manual = [p for p in purchases if p not in helloasso]
+    if len(manual) > 1:
+        raise StaleDecisions(f"{who} a plusieurs adhésions {plan.season} hors HelloAsso : gardez-en une seule avant de rattacher.")
+    taken_over = manual[0].purchase_id if manual else None
+    return ImportWrite(replace(entry, member_id=member_id, purchase_id=taken_over), WriteAction.ASSIGN, comment.strip())
+
+
+def _check_attached_once(writes: list[ImportWrite]) -> None:
+    """A member given a registration by hand gets no other registration of this import."""
+    for write in writes:
+        if write.action != WriteAction.ASSIGN:
+            continue
+        others = [other for other in writes if other is not write and other.action in (WriteAction.ATTACH, WriteAction.ASSIGN)
+                  and other.entry.member_id == write.entry.member_id]
+        if others:
+            raise StaleDecisions(f"Inscription {write.item_id} : l'adhérent choisi l'est déjà pour une autre inscription de cet import "
+                                 f"({others[0].item_id}).")
+
+
 def apply_decisions(plan: ImportPlan, decisions: Mapping[int, Decision]) -> list[ImportWrite]:
     """The writes of the admin's decisions, in the order of the plan. A row without decision is skipped (unchecked, or
     not shown by the preview). Raises StaleDecisions when one decision does not match the plan: nothing is written."""
@@ -366,9 +422,10 @@ def apply_decisions(plan: ImportPlan, decisions: Mapping[int, Decision]) -> list
     writes = []
     for entry in plan.entries:
         decision = decisions.get(entry.item_id)
-        write = _write_for(entry, decision) if decision else None
+        write = _write_for(entry, decision, plan) if decision else None
         if entry.backfill and (not decision or decision.bucket == entry.bucket):
             write = ImportWrite(entry, WriteAction.BACKFILL)
         if write:
             writes.append(write)
+    _check_attached_once(writes)
     return writes

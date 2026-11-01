@@ -2868,12 +2868,14 @@ export interface components {
             renewed: number;
             /** Updated */
             updated: number;
+            /** Attached */
+            attached: number;
             /** Skipped */
             skipped: number;
         };
         /**
          * ImportedMember
-         * @description A member the import wrote, for the link to their record.
+         * @description A member the import wrote, for the link to their record (attached: the member chosen, not the HelloAsso name).
          */
         ImportedMember: {
             /** Item Id */
@@ -3228,7 +3230,8 @@ export interface components {
         /**
          * MembershipDecision
          * @description The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>
-         *     (rows to review). bucket: the bucket the preview showed the row in (a row that changed since is refused).
+         *     (rows to review), attach:<member id> (new, renewal and to-review rows: given by hand to any member, `comment`
+         *     required). bucket: the bucket the preview showed the row in (a row that changed since is refused).
          */
         MembershipDecision: {
             /**
@@ -3238,6 +3241,11 @@ export interface components {
             bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
             /** Choice */
             choice: string;
+            /**
+             * Comment
+             * @default
+             */
+            comment?: string;
         };
         /**
          * MembershipImportRequest
@@ -3274,6 +3282,8 @@ export interface components {
             renewed: components["schemas"]["ImportedMember"][];
             /** Updated */
             updated: components["schemas"]["ImportedMember"][];
+            /** Attached */
+            attached: components["schemas"]["ImportedMember"][];
         };
         /**
          * MembershipLastImport

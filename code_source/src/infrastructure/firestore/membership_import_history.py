@@ -8,7 +8,7 @@ SQLite cache. Dates are ISO 8601 strings in UTC: they sort as text.
 from __future__ import annotations
 
 import uuid
-from typing import Dict, List, Optional, TypedDict
+from typing import Dict, List, NotRequired, Optional, TypedDict
 
 from infrastructure.firestore.client import FirestoreClient
 
@@ -18,8 +18,9 @@ COLLECTION = "helloasso_membership_imports"
 class ImportedItem(TypedDict):
     item_id: int
     bucket: str  # bucket of the plan applied
-    decision: str  # the admin's choice ("import", "skip", "create", "link:<id>"); "skip" when none was sent
-    action: str  # what was written: create | attach | update | backfill, "" for nothing
+    decision: str  # the admin's choice ("import", "skip", "create", "link:<id>", "attach:<id>"); "skip" when none was sent
+    action: str  # what was written: create | attach | update | backfill | assign, "" for nothing
+    comment: NotRequired[str]  # the admin's comment (attach by hand)
 
 
 class ImportHistoryEntry(TypedDict):

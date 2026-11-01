@@ -277,3 +277,79 @@ def test_accepting_a_change_writes_an_update() -> None:
     writes = apply_decisions(plan, {9001: Decision(Bucket.UPDATED, "import"), 9002: Decision(Bucket.TO_REVIEW, "import")})
 
     assert [(w.item_id, w.action) for w in writes] == [(9001, WriteAction.UPDATE), (9002, WriteAction.UPDATE)]
+
+
+# ---------------------------------------------------------------------------
+# Attach by hand: a registration given to any member (a parent registered their child under their own name)
+# ---------------------------------------------------------------------------
+MOLLY = _record(1, first_name="Molly", birth_date="1950-10-30")
+
+
+def test_a_new_row_attached_to_a_member_without_membership_this_season_adds_one() -> None:
+    plan = _plan(MOLLY, purchases=(_purchase(30, 7, season="2025-2026", helloasso_item_id=500),))
+
+    [write] = apply_decisions(plan, {1: Decision(Bucket.NEW, "attach:7", comment="Inscrite par sa mère")})
+
+    assert (write.action, write.entry.member_id, write.entry.purchase_id, write.comment) == (
+        WriteAction.ASSIGN, 7, None, "Inscrite par sa mère")
+
+
+def test_an_attach_takes_over_the_manual_membership_of_the_season() -> None:
+    manual = _purchase(31, 7, order_ref="MANUEL-20261101-101500", status="Validé", amount=0.0)
+    plan = _plan(MOLLY, purchases=(_purchase(30, 7, season="2025-2026", helloasso_item_id=500), manual))
+
+    [write] = apply_decisions(plan, {1: Decision(Bucket.NEW, "attach:7", comment="Inscrite par sa mère")})
+
+    assert (write.action, write.entry.member_id, write.entry.purchase_id) == (WriteAction.ASSIGN, 7, 31)
+
+
+def _manual(purchase_id: int, user_id: int = 7) -> KnownPurchase:
+    return _purchase(purchase_id, user_id, order_ref=f"MANUEL-{purchase_id}", status="Validé", amount=0.0)
+
+
+@pytest.mark.parametrize(("records", "purchases", "decisions", "why"), [
+    ((MOLLY,), (), {1: Decision(Bucket.NEW, "attach:7", comment="  ")}, "commentaire"),
+    ((MOLLY,), (_manual(31), _manual(32)), {1: Decision(Bucket.NEW, "attach:7", comment="Mère")}, "plusieurs adhésions"),
+    ((MOLLY,), (_purchase(30, 7, helloasso_item_id=500),), {1: Decision(Bucket.NEW, "attach:7", comment="Mère")}, "déjà une adhésion HelloAsso"),
+    ((MOLLY, _record(2, first_name="Arthur", birth_date="1950-02-06")), (),
+     {1: Decision(Bucket.NEW, "attach:7", comment="Mère"), 2: Decision(Bucket.NEW, "attach:7", comment="Père")}, "une autre inscription"),
+    ((MOLLY, _record(2)), (), {1: Decision(Bucket.NEW, "attach:7", comment="Mère"), 2: Decision(Bucket.RENEWAL, "import")},
+     "une autre inscription"),
+    ((MOLLY,), (), {1: Decision(Bucket.NEW, "attach:99", comment="Mère")}, "introuvable"),
+], ids=["no comment", "several manual memberships", "helloasso membership", "chosen twice", "renewed in the same import", "unknown member"])
+def test_an_attach_is_refused(records: tuple[MembershipRecord, ...], purchases: tuple[KnownPurchase, ...],
+                              decisions: dict[int, Decision], why: str) -> None:
+    with pytest.raises(StaleDecisions, match=why):
+        apply_decisions(_plan(*records, purchases=purchases), decisions)
+
+
+def test_a_purchase_back_filled_by_the_import_is_a_helloasso_membership_not_a_manual_one() -> None:
+    """A former import's purchase, recognised by its order: the attach must not take it over."""
+    plan = _plan(MOLLY, _record(2, order_ref="ORD-OLD"), purchases=(_purchase(31, 7, order_ref="ORD-OLD"),))
+
+    with pytest.raises(StaleDecisions, match="déjà une adhésion HelloAsso"):
+        apply_decisions(plan, {1: Decision(Bucket.NEW, "attach:7", comment="Mère")})
+
+
+@pytest.mark.parametrize(("purchases", "bucket"), [
+    ((), Bucket.RENEWAL),
+    ((_purchase(30, 7, helloasso_item_id=1, amount=120.0),), Bucket.UPDATED),
+], ids=["renewal", "updated"])
+def test_which_rows_can_be_attached(purchases: tuple[KnownPurchase, ...], bucket: Bucket) -> None:
+    """New, renewal and to-review identity rows can; an imported row (updated, already imported, conflict) cannot."""
+    plan = _plan(_record(1), members=(GINNY, LUNA), purchases=purchases)
+    assert plan.entries[0].bucket == bucket
+    decision = Decision(bucket, "attach:8", comment="Erreur de nom")
+
+    if bucket == Bucket.RENEWAL:
+        [write] = apply_decisions(plan, {1: decision})
+        assert (write.action, write.entry.member_id) == (WriteAction.ASSIGN, 8)
+    else:
+        with pytest.raises(StaleDecisions):
+            apply_decisions(plan, {1: decision})
+
+
+def test_a_row_to_review_can_be_attached_to_a_member_who_is_not_a_candidate() -> None:
+    [write] = apply_decisions(_review_plan(), {1: Decision(Bucket.TO_REVIEW, "attach:8", comment="Erreur de nom")})
+
+    assert (write.action, write.entry.member_id) == (WriteAction.ASSIGN, 8)

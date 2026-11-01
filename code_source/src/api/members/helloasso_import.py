@@ -22,7 +22,6 @@ from api.members.helloasso_import_schemas import (
 )
 from api.admin.access import author_of
 from api.responses import error_responses
-from domain.members.helloasso_membership import MembershipRecord
 from domain.members.membership_import import Bucket, Decision, ImportPlan, PlanEntry, WriteAction
 from infrastructure.sqlite.membership_import import AppliedWrite
 from services.members.helloasso_import import ImportResult
@@ -59,24 +58,28 @@ def preview_membership_import(data: Optional[MembershipPreviewRequest] = None) -
     return _preview(Service.preview(data.campaign if data else None))
 
 
-def _imported(applied: AppliedWrite, records: dict[int, MembershipRecord]) -> ImportedMember:
-    record = records[applied.item_id]
+def _imported(applied: AppliedWrite, plan: ImportPlan) -> ImportedMember:
+    record = next(entry.record for entry in plan.entries if entry.item_id == applied.item_id)
+    last_name, first_name = record.last_name, record.first_name
+    if applied.action == WriteAction.ASSIGN:  # the member chosen: the HelloAsso name is someone else's
+        member = next(member for member in plan.members if member.user_id == applied.user_id)
+        last_name, first_name = member.last_name, member.first_name
     return ImportedMember(item_id=applied.item_id, user_id=applied.user_id, purchase_id=applied.purchase_id,
-                          last_name=record.last_name, first_name=record.first_name, tarif_name=record.tarif_name)
+                          last_name=last_name, first_name=first_name, tarif_name=record.tarif_name)
 
 
 def _result(result: ImportResult) -> MembershipImportResult:
-    records = {entry.item_id: entry.record for entry in result.plan.entries}
-
     def members(action: WriteAction) -> list[ImportedMember]:
-        return [_imported(applied, records) for applied in result.applied if applied.action == action]
+        return [_imported(applied, result.plan) for applied in result.applied if applied.action == action]
 
     created, renewed, updated = members(WriteAction.CREATE), members(WriteAction.ATTACH), members(WriteAction.UPDATE)
-    written = len(created) + len(renewed) + len(updated)
+    attached = members(WriteAction.ASSIGN)
+    written = len(created) + len(renewed) + len(updated) + len(attached)
     return MembershipImportResult(
         status="success", season=result.plan.season, history_id=result.history_id,
-        counts=ImportCounts(created=len(created), renewed=len(renewed), updated=len(updated), skipped=len(result.plan.entries) - written),
-        created=created, renewed=renewed, updated=updated,
+        counts=ImportCounts(created=len(created), renewed=len(renewed), updated=len(updated), attached=len(attached),
+                            skipped=len(result.plan.entries) - written),
+        created=created, renewed=renewed, updated=updated, attached=attached,
     )
 
 
@@ -84,7 +87,8 @@ def _result(result: ImportResult) -> MembershipImportResult:
 def import_memberships(request: Request, data: MembershipImportRequest) -> MembershipImportResult:
     """Reads HelloAsso again and applies the admin's decisions to the recomputed plan, recorded in the history.
     Sends no e-mail."""
-    decisions = {item_id: Decision(Bucket(decision.bucket), decision.choice) for item_id, decision in data.decisions.items()}
+    decisions = {item_id: Decision(Bucket(decision.bucket), decision.choice, decision.comment)
+                 for item_id, decision in data.decisions.items()}
     return _result(Service.import_(data.season, decisions, author_of(request), data.campaign))
 
 

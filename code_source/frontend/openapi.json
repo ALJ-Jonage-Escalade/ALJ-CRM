@@ -6769,6 +6769,10 @@
             "type": "integer",
             "title": "Updated"
           },
+          "attached": {
+            "type": "integer",
+            "title": "Attached"
+          },
           "skipped": {
             "type": "integer",
             "title": "Skipped"
@@ -6779,6 +6783,7 @@
           "created",
           "renewed",
           "updated",
+          "attached",
           "skipped"
         ],
         "title": "ImportCounts"
@@ -6820,7 +6825,7 @@
           "tarif_name"
         ],
         "title": "ImportedMember",
-        "description": "A member the import wrote, for the link to their record."
+        "description": "A member the import wrote, for the link to their record (attached: the member chosen, not the HelloAsso name)."
       },
       "ItemIgnore": {
         "properties": {
@@ -7815,6 +7820,12 @@
           "choice": {
             "type": "string",
             "title": "Choice"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Comment",
+            "default": ""
           }
         },
         "additionalProperties": false,
@@ -7824,7 +7835,7 @@
           "choice"
         ],
         "title": "MembershipDecision",
-        "description": "The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>\n(rows to review). bucket: the bucket the preview showed the row in (a row that changed since is refused)."
+        "description": "The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>\n(rows to review), attach:<member id> (new, renewal and to-review rows: given by hand to any member, `comment`\nrequired). bucket: the bucket the preview showed the row in (a row that changed since is refused)."
       },
       "MembershipImportRequest": {
         "properties": {
@@ -7898,6 +7909,13 @@
             },
             "type": "array",
             "title": "Updated"
+          },
+          "attached": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedMember"
+            },
+            "type": "array",
+            "title": "Attached"
           }
         },
         "type": "object",
@@ -7908,7 +7926,8 @@
           "counts",
           "created",
           "renewed",
-          "updated"
+          "updated",
+          "attached"
         ],
         "title": "MembershipImportResult",
         "description": "history_id: the import's entry in the history."

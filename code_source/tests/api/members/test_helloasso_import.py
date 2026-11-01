@@ -137,7 +137,7 @@ class TestMembershipImport(HelloAssoImportTestCase):
         self.assertEqual(body["season"], "2026-2027")
         [created] = body["created"]
         self.assertEqual((created["item_id"], created["last_name"], created["first_name"]), (1, "WEASLEY", "Ginny"))
-        self.assertEqual(body["counts"], {"created": 1, "renewed": 0, "updated": 0, "skipped": 1})
+        self.assertEqual(body["counts"], {"created": 1, "renewed": 0, "updated": 0, "attached": 0, "skipped": 1})
         self.assertEqual((self.count("users"), self.count("orders"), self.count("purchases"), self.count("purchase_options")),
                          (1, 1, 1, 1))
         conn = SqliteDatabase.get_connection()
@@ -202,7 +202,7 @@ class TestMembershipRerunsAndRenewals(HelloAssoImportTestCase):
 
         [renewed] = result["renewed"]
         self.assertEqual((renewed["last_name"], renewed["first_name"]), ("Weasley", "Ginny"))
-        self.assertEqual(result["counts"], {"created": 0, "renewed": 1, "updated": 0, "skipped": 0})
+        self.assertEqual(result["counts"], {"created": 0, "renewed": 1, "updated": 0, "attached": 0, "skipped": 0})
         self.assertEqual((self.count("users"), self.count("purchases")), (1, 2))
 
 class TestMembershipsToReview(HelloAssoImportTestCase):
@@ -297,3 +297,47 @@ class TestMembershipImportHistory(HelloAssoImportTestCase):
                                           {"item_id": 2, "bucket": "to_review", "decision": "skip", "action": ""}])
         last = self.client.get("/api/helloasso/memberships/last-sync").json()["last_sync"]
         self.assertEqual((last["at"], last["author"]), (entry["at"], "serveur local"))
+
+
+class TestMembershipAttachedByHand(HelloAssoImportTestCase):
+    """A parent registered their child under their own name: the admin creates the child by hand, then attaches the
+    registration to them."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.items = [ha_item(1, "WEASLEY", "Molly", birth_date="30/10/1950")]
+        created = self.client.post("/api/members/create", json={"fields": {
+            "last_name": "WEASLEY", "first_name": "Ginny", "birth_date": "2013-08-11", "tarif_name": "Loisir collège"}})
+        self.assertEqual(created.status_code, 200, created.text)
+        conn = SqliteDatabase.get_connection()
+        try:
+            self.ginny = int(conn.execute("SELECT id FROM users").fetchone()[0])
+        finally:
+            conn.close()
+
+    def attach(self, comment: str) -> Any:  # Any: the HTTP response
+        return self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {
+            "1": {"bucket": "new", "choice": f"attach:{self.ginny}", "comment": comment}}})
+
+    def test_the_registration_takes_over_the_manual_membership_and_is_recognised_next_time(self) -> None:
+        response = self.attach("Inscrite par sa mère")
+
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        [attached] = body["attached"]
+        self.assertEqual((attached["user_id"], attached["last_name"], attached["first_name"]), (self.ginny, "WEASLEY", "Ginny"))
+        self.assertEqual(body["counts"], {"created": 0, "renewed": 0, "updated": 0, "attached": 1, "skipped": 0})
+        self.assertEqual((self.count("users"), self.count("orders"), self.count("purchases")), (1, 1, 1))
+        [entry] = self.fake.store["helloasso_membership_imports"].values()
+        self.assertEqual(entry["items"], [{"item_id": 1, "bucket": "new", "decision": f"attach:{self.ginny}", "action": "assign",
+                                           "comment": "Inscrite par sa mère"}])
+
+        [row] = self.client.post(PREVIEW).json()["rows"]
+        self.assertEqual(row["bucket"], "already_imported")
+
+    def test_an_attach_without_comment_is_refused(self) -> None:
+        response = self.attach(" ")
+
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertIn("commentaire", response.json()["message"])
+        self.assertEqual(self.count("purchases"), 1)

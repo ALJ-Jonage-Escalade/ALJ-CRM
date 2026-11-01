@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.request_body import RequestBody
 
@@ -74,9 +74,11 @@ class MembershipPreview(BaseModel):
 
 class MembershipDecision(RequestBody):
     """The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>
-    (rows to review). bucket: the bucket the preview showed the row in (a row that changed since is refused)."""
+    (rows to review), attach:<member id> (new, renewal and to-review rows: given by hand to any member, `comment`
+    required). bucket: the bucket the preview showed the row in (a row that changed since is refused)."""
     bucket: BucketName
     choice: str
+    comment: str = Field(default="", max_length=1000)
 
 
 class MembershipPreviewRequest(RequestBody):
@@ -93,7 +95,7 @@ class MembershipImportRequest(RequestBody):
 
 
 class ImportedMember(BaseModel):
-    """A member the import wrote, for the link to their record."""
+    """A member the import wrote, for the link to their record (attached: the member chosen, not the HelloAsso name)."""
     item_id: int
     user_id: int
     purchase_id: int
@@ -106,6 +108,7 @@ class ImportCounts(BaseModel):
     created: int
     renewed: int
     updated: int
+    attached: int  # given by hand to a member
     skipped: int  # rows of the plan nothing was written for
 
 
@@ -118,6 +121,7 @@ class MembershipImportResult(BaseModel):
     created: List[ImportedMember]
     renewed: List[ImportedMember]
     updated: List[ImportedMember]
+    attached: List[ImportedMember]
 
 
 class MembershipLastImport(BaseModel):

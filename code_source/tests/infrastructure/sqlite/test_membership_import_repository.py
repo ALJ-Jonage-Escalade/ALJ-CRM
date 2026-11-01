@@ -145,3 +145,52 @@ class TestMembershipImportRepository(MemberDbTestCase):
         self.assertEqual(purchase, {"status": "Refunded", "status_normalized": "Annulé", "tarif_name": "Loisir (CRM)", "amount": 150.0,
                                     "commentaires_correctif": "Payé en chèque\nImport HelloAsso du 31/10", "helloasso_status": "Refunded",
                                     "helloasso_tarif": "Loisir collège v2", "helloasso_amount": 150.0})
+
+    def manual_member(self, comment: str = "") -> dict[str, Any]:  # Any: SQLite values
+        """Ginny created by hand in Adhérents: her membership is a "MANUEL-…" order."""
+        from infrastructure.sqlite.members import MemberRepository
+        ok, _order_ref = MemberRepository.add_manual_member(
+            {"last_name": "WEASLEY", "first_name": "Ginny", "birth_date": "11/08/2013", "tarif_name": "Loisir lycée", "city": "Meyzieu"},
+            season_name=SEASON)
+        self.assertTrue(ok)
+        [purchase] = self.rows("SELECT id, user_id FROM purchases")
+        if comment:
+            conn = SqliteDatabase.get_connection()
+            conn.execute("UPDATE purchases SET commentaires_correctif = ? WHERE id = ?", (comment, purchase["id"]))
+            conn.commit()
+            conn.close()
+        return purchase
+
+    def assign(self, entry: PlanEntry) -> None:
+        MembershipImportRepository.apply([ImportWrite(entry, WriteAction.ASSIGN, "Inscrite par sa mère")], SEASON, TODAY,
+                                         author="albus@alj.example")
+
+    def test_assign_takes_over_the_manual_membership_and_leaves_the_member_as_typed(self) -> None:
+        manual = self.manual_member(comment="Certificat reçu")
+        molly = record(1, "WEASLEY", "Molly", birth_date="1950-10-30", custom_fields={"Ville": "Jonage", "Téléphone ": "0611223344"})
+
+        self.assign(PlanEntry(molly, Bucket.NEW, "nouveau", member_id=manual["user_id"], purchase_id=manual["id"]))
+
+        [user] = self.rows("SELECT last_name, first_name, birth_date, city, phone FROM users")
+        self.assertEqual(tuple(user.values()), ("WEASLEY", "Ginny", "2013-08-11", "Meyzieu", ""))
+        [purchase] = self.rows("SELECT p.*, o.order_ref FROM purchases p JOIN orders o ON o.id = p.order_id")
+        self.assertEqual((purchase["id"], purchase["order_ref"], purchase["status"], purchase["amount"], purchase["tarif_name"],
+                          purchase["helloasso_item_id"]), (manual["id"], "501", "Processed", 150.0, "Loisir collège", 1))
+        self.assertEqual(purchase["commentaires_correctif"].split("\n"), [
+            "Certificat reçu", "[31/10/2026] Inscrite par sa mère",
+            "Inscription HelloAsso au nom de WEASLEY Molly (commande 501) rattachée par albus@alj.example",
+            "Import HelloAsso du 31/10"])
+        self.assertEqual(self.rows("SELECT option_name, amount FROM purchase_options"), [{"option_name": "Assurance Base +", "amount": 11.0}])
+        self.assertEqual([order["order_ref"] for order in self.rows("SELECT order_ref FROM orders")], ["501"])
+
+    def test_assign_adds_a_membership_to_a_member_without_one_this_season(self) -> None:
+        self.seed("ORD-1", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026")
+        [user] = self.rows("SELECT id, phone FROM users")
+        molly = record(1, "WEASLEY", "Molly", birth_date="1950-10-30")
+
+        self.assign(PlanEntry(molly, Bucket.NEW, "nouveau", member_id=user["id"]))
+
+        self.assertEqual(self.rows("SELECT first_name, phone FROM users"), [{"first_name": "Ginny", "phone": user["phone"]}])
+        seasons = self.rows("SELECT s.name, p.helloasso_item_id FROM purchases p JOIN orders o ON o.id = p.order_id"
+                            " JOIN seasons s ON s.id = o.season_id ORDER BY s.name")
+        self.assertEqual([tuple(r.values()) for r in seasons], [("2025-2026", None), (SEASON, 1)])

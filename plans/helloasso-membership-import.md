@@ -170,3 +170,43 @@ A Playwright scenario against the existing fake HelloAsso server covering the fu
 - [ ] The fake HelloAsso serves a membership campaign with new, renewal and to-review cases (fake data only)
 - [ ] The scenario passes locally (`-n 1`) and in CI
 - [ ] The imported member is visible in Adhérents; the unchecked row is not imported
+
+---
+
+## Phase 9: Attach a registration to any member
+
+**Case**: a parent registers a child under the parent's own name: HelloAsso says "WEASLEY Molly", the membership is Ginny's.
+The matcher sees Molly (new, or a renewal of Molly herself when she is a member).
+
+### What to build
+
+A manual decision `attach:<member id>`: the admin attaches a registration to any member of the base, with a required
+comment. The member is created by hand first when needed (Adhérents). No mapping table: the link is
+`purchases.helloasso_item_id`, so later imports recognise the item by its id.
+
+- **Where**: the preview, on the `new` and `renewal` rows ("🔗 Rattacher…" next to the checkbox) and the `to_review`
+  identity rows (an option of the select)
+- **Takeover**: a non-HelloAsso membership of the member this season (e.g. the `MANUEL-…` order of `members/create`)
+  is taken over: the HelloAsso values (order, status, amount, tarif, insurance options) replace the manual ones; the
+  comment and group/slot are kept. Several non-HelloAsso memberships this season: refused. None: a membership is added
+- **Member record**: nothing copied from HelloAsso (its data are the parent's); `link:` keeps filling the blank fields
+- **Comment**: required; appended to the membership comment as `[dd/mm/yyyy] <comment>`, followed by an automatic line
+  (HelloAsso name, order, author); kept in the import history with the decision
+- **Refused** (in the preview and again on import, `stale_decisions`): a member who already has a HelloAsso membership
+  this season, or a member chosen for two registrations of one import
+- **Member search**: every member of the base (any season), from a light list added to the preview answer (id, names,
+  birth date, licence, membership this season); accent-insensitive search in the page
+- **Checkboxes in "À vérifier"**: every writable row has a checkbox; the select starts on "— Choisir… —" (no "Ignorer"
+  option: unchecked = skipped); picking an option checks the row; unchecking keeps the choice. An attach counts only
+  once a member and a comment are given; "Importer" is disabled while a checked row is incomplete
+- **Later imports**: an imported row whose member has another name shows "HelloAsso name → member" (link to the record)
+- **Confirmation**: the dialog lists each attachment ("WEASLEY Molly (commande 12345) → WEASLEY Ginny, née le …")
+- **Out of scope**: undoing an attach (#84)
+
+### Acceptance criteria
+
+- [ ] `attach:<id>` takes over the member's manual membership of the season, or adds one; nothing written on the member
+- [ ] The comment and the automatic line are appended to the membership comment, the comment kept in the history
+- [ ] Attaching to a member already holding a HelloAsso membership this season, or twice in one import, is refused
+- [ ] The next preview shows the item as already imported, "HelloAsso name → member"
+- [ ] "À vérifier" rows have a checkbox, checked when a choice is made; an incomplete attach blocks the import

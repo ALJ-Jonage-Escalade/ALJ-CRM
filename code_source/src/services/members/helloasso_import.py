@@ -47,6 +47,13 @@ def _parse(reference: str) -> MembershipCampaign:
         raise InvalidRequest(str(e), "invalid_campaign") from e
 
 
+def _imported_item(item_id: int, bucket: str, action: str, decision: Optional[Decision]) -> ImportedItem:
+    item = ImportedItem(item_id=item_id, bucket=bucket, action=action, decision=decision.choice if decision else "skip")
+    if decision and decision.comment.strip():
+        item["comment"] = decision.comment.strip()
+    return item
+
+
 class MembershipImportService:
 
     @staticmethod
@@ -95,12 +102,11 @@ class MembershipImportService:
         except StaleDecisions as e:
             raise Conflict(f"{e} Relancez l'aperçu.", "stale_decisions") from e
         try:
-            applied = MembershipImportRepository.apply(writes, active)
+            applied = MembershipImportRepository.apply(writes, active, author=author)
         except MembershipWriteRefused as e:
             raise Conflict(f"{e} Rien n'a été importé.", "write_refused") from e
         actions = {written.item_id: written.action.value for written in applied}
-        items = [ImportedItem(item_id=entry.item_id, bucket=entry.bucket.value, action=actions.get(entry.item_id, ""),
-                              decision=decisions[entry.item_id].choice if entry.item_id in decisions else "skip")
+        items = [_imported_item(entry.item_id, entry.bucket.value, actions.get(entry.item_id, ""), decisions.get(entry.item_id))
                  for entry in plan.entries]
         history_id = MembershipImportHistory.record(ImportHistoryEntry(
             at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), author=author, season=plan.season,
