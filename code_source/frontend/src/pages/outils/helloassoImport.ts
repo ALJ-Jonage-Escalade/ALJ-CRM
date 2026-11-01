@@ -49,6 +49,27 @@ export function rowsOf(preview: MembershipPreview, bucket: BucketName): Membersh
   return preview.rows.filter((row) => row.bucket === bucket).sort((a, b) => registered(b) - registered(a));
 }
 
+/** The icon of each HelloAsso status: the item state (Processed, Registered, Canceled, Unknown), replaced by the payments'
+    refund state when every payment was refunded (Refunded, Refunding). */
+const STATUS_ICONS: Record<string, { icon: string; label: string }> = {
+  Processed: { icon: "✅", label: "Payée" },
+  Registered: { icon: "📝", label: "Enregistrée sans paiement en ligne" },
+  Canceled: { icon: "🚫", label: "Annulée" },
+  Refunded: { icon: "↩️", label: "Remboursée" },
+  Refunding: { icon: "⏳", label: "Remboursement en cours" },
+};
+
+/** French label of a HelloAsso status; an unknown value is shown as is. */
+export function statusLabel(status: string): string {
+  return STATUS_ICONS[status]?.label ?? status;
+}
+
+/** Icon and tooltip of a HelloAsso status (the tooltip ends with the HelloAsso value). */
+export function statusIcon(status: string): { icon: string; tooltip: string } {
+  const known = STATUS_ICONS[status];
+  return { icon: known?.icon ?? "❔", tooltip: `${known?.label ?? "Statut inconnu"} (${status || "vide"})` };
+}
+
 /** « Remboursé le 14/10/2026 » (« Remboursement en cours depuis le … » while HelloAsso processes it). */
 export function refundText(row: MembershipRow): string {
   const day = formatDayText(row.refund_date);
@@ -86,11 +107,12 @@ const FIELD_LABELS: Record<MembershipRow["changes"][number]["field"], string> = 
 
 /** The changes of a row: old → new, or when the CRM changed the value too, both values. */
 export function changeLines(row: MembershipRow): string[] {
-  return row.changes.map((change) =>
-    row.bucket === "to_review"
-      ? `${FIELD_LABELS[change.field]} : CRM ${change.crm} · HelloAsso ${change.after} (avant ${change.before})`
-      : `${FIELD_LABELS[change.field]} : ${change.before} → ${change.after}`,
-  );
+  return row.changes.map((change) => {
+    const text = (value: string): string => (change.field === "status" ? statusLabel(value) : value);
+    return row.bucket === "to_review"
+      ? `${FIELD_LABELS[change.field]} : CRM ${text(change.crm)} · HelloAsso ${text(change.after)} (avant ${text(change.before)})`
+      : `${FIELD_LABELS[change.field]} : ${text(change.before)} → ${text(change.after)}`;
+  });
 }
 
 /** The choices the preview starts with: the new, renewal and changed rows checked, the rows to review skipped. */

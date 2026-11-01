@@ -431,6 +431,32 @@ describe("OutilsPage", () => {
     }
   });
 
+  it("shows each HelloAsso status as an icon, its meaning in the tooltip", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const statuses = ["Processed", "Registered", "Canceled", "Refunded", "Refunding", "Unknown", "Strange"];
+    const rows = statuses.map((status, index) => ({ ...MEMBERSHIP_PREVIEW.rows[0]!, item_id: 10 + index, status }));
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows });
+    try {
+      const { byId, all } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+
+      const icons = all("ha-status").map((icon) => [icon.textContent.trim(), icon.getAttribute("title")]);
+      expect(icons).toEqual([
+        ["✅", "Payée (Processed)"],
+        ["📝", "Enregistrée sans paiement en ligne (Registered)"],
+        ["🚫", "Annulée (Canceled)"],
+        ["↩️", "Remboursée (Refunded)"],
+        ["⏳", "Remboursement en cours (Refunding)"],
+        ["❔", "Statut inconnu (Unknown)"],
+        ["❔", "Statut inconnu (Strange)"],
+      ]);
+      expect(all("ha-status").every((icon) => icon.getAttribute("aria-label") === icon.getAttribute("title"))).toBe(true);
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
   it("shows the FFME licence given on HelloAsso", async () => {
     const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
     const licensed = { ...MEMBERSHIP_PREVIEW.rows[0]!, licence: "123456" };
@@ -565,16 +591,20 @@ describe("OutilsPage", () => {
       item_id: 5,
       bucket: "to_review",
       last_name: "LOVEGOOD",
-      changes: [{ field: "amount", crm: "120.00", before: "150.00", after: "0.00" }],
+      changes: [
+        { field: "amount", crm: "120.00", before: "150.00", after: "0.00" },
+        { field: "status", crm: "Canceled", before: "Processed", after: "Strange" },
+      ],
     };
     ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [changed, conflict] });
     try {
       const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
       byId("ha-import-preview")!.click();
       await flushPromises();
-      expect(byId("ha-row-updated")!.textContent).toContain("Statut : Processed → Refunded");
+      expect(byId("ha-row-updated")!.textContent).toContain("Statut : Payée → Remboursée");
       expect(byId("ha-refund-date")!.textContent).toBe("Remboursé le 14/10/2026");
       expect(byId("ha-row-to_review")!.textContent).toContain("Montant : CRM 120.00 · HelloAsso 0.00 (avant 150.00)");
+      expect(byId("ha-row-to_review")!.textContent).toContain("Statut : CRM Annulée · HelloAsso Strange (avant Payée)");
       expect(byId("ha-review-choice")).toBeNull();
       const checks = all("ha-check").map((box) => box as HTMLInputElement);
       expect(checks.map((box) => box.checked)).toEqual([true, false]);

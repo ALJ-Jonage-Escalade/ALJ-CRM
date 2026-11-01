@@ -32,6 +32,7 @@ import {
   resultSummary,
   reviewOptions,
   rowsOf,
+  statusIcon,
   type Choices,
   type MembershipImportResult,
   type MembershipPreview,
@@ -239,10 +240,24 @@ defineExpose({ reload: reset });
             <UiBadge :color="bucket.color">{{ rowsOf(preview, bucket.name).length }}</UiBadge>
           </h3>
           <div class="max-h-80 overflow-auto rounded-md border border-slate-200">
-            <table class="w-full text-xs">
+            <!-- Same fixed widths in every section (table-fixed): the columns line up from one table to the next.
+                 Tarif takes the remaining width; below the minimum width, the table scrolls -->
+            <table class="w-full min-w-[1180px] table-fixed text-xs">
+              <colgroup>
+                <col class="w-8" />
+                <col class="w-[170px]" />
+                <col class="w-[84px]" />
+                <col class="w-[84px]" />
+                <col class="w-[84px]" />
+                <col class="w-[76px]" />
+                <col />
+                <col class="w-[72px]" />
+                <col class="w-[72px]" />
+                <col class="w-[350px]" />
+              </colgroup>
               <thead class="bg-slate-50 text-left">
                 <tr>
-                  <th class="w-8 px-2.5 py-1.5"><span class="sr-only">Importer</span></th>
+                  <th class="px-2.5 py-1.5"><span class="sr-only">Importer</span></th>
                   <th class="px-2.5 py-1.5">Adhérent</th>
                   <th class="px-2.5 py-1.5">Inscrit le</th>
                   <th class="px-2.5 py-1.5">Payé le</th>
@@ -271,18 +286,26 @@ defineExpose({ reload: reset });
                       @change="choose(row.item_id, ($event.target as HTMLInputElement).checked ? 'import' : 'skip')"
                     />
                   </td>
-                  <td class="px-2.5 py-1.5 font-semibold">{{ personLabel(row) }}</td>
+                  <td class="px-2.5 py-1.5 font-semibold break-words">{{ personLabel(row) }}</td>
                   <td class="px-2.5 py-1.5" data-testid="ha-order-date">{{ formatDayText(row.order_date) || "—" }}</td>
                   <td class="px-2.5 py-1.5" data-testid="ha-payment-date">{{ formatDayText(row.payment_date) || "—" }}</td>
                   <td class="px-2.5 py-1.5" data-testid="ha-birth-date">{{ formatDayText(row.birth_date) || "—" }}</td>
-                  <td class="px-2.5 py-1.5 font-mono" data-testid="ha-licence">{{ row.licence || "—" }}</td>
-                  <td class="px-2.5 py-1.5">{{ row.tarif_name }}</td>
+                  <td class="px-2.5 py-1.5" data-testid="ha-licence">{{ row.licence || "—" }}</td>
+                  <td class="px-2.5 py-1.5 break-words">{{ row.tarif_name }}</td>
                   <td class="px-2.5 py-1.5">{{ formatEuros(row.amount) }}</td>
                   <td class="px-2.5 py-1.5">
-                    {{ row.status }}
+                    <span
+                      role="img"
+                      data-testid="ha-status"
+                      class="cursor-help"
+                      :title="statusIcon(row.status).tooltip"
+                      :aria-label="statusIcon(row.status).tooltip"
+                    >
+                      {{ statusIcon(row.status).icon }}
+                    </span>
                     <span v-if="row.refund_date" data-testid="ha-refund-date" class="block text-slate-500">{{ refundText(row) }}</span>
                   </td>
-                  <td class="px-2.5 py-1.5 text-slate-500">
+                  <td class="px-2.5 py-1.5 break-words text-slate-500">
                     {{ row.reason }}
                     <span v-for="line in changeLines(row)" :key="line" class="block font-semibold text-slate-700">{{ line }}</span>
                     <select
@@ -290,7 +313,7 @@ defineExpose({ reload: reset });
                       data-testid="ha-review-choice"
                       :value="choices[row.item_id]"
                       :aria-label="`Choix pour ${personLabel(row)}`"
-                      class="mt-1 block w-full min-w-56 rounded-md border border-slate-300 px-1.5 py-1 text-xs text-slate-800"
+                      class="mt-1 block w-full rounded-md border border-slate-300 px-1.5 py-1 text-xs text-slate-800"
                       @change="choose(row.item_id, ($event.target as HTMLSelectElement).value)"
                     >
                       <option v-for="option in reviewOptions(row)" :key="option.value" :value="option.value">{{ option.label }}</option>
