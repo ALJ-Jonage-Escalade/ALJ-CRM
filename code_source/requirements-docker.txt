@@ -49,6 +49,8 @@ numpy==2.5.4 ; python_full_version >= '3.12'
     # via pandas
 openpyxl==3.1.5
     # via alj-escalade-manager
+opentelemetry-api==1.45.2
+    # via fastapi
 pandas==3.1.0
     # via alj-escalade-manager
 pillow==13.0.0
@@ -89,6 +91,7 @@ typing-extensions==4.16.0
     # via
     #   anyio
     #   fastapi
+    #   opentelemetry-api
     #   pydantic
     #   pydantic-core
     #   starlette
