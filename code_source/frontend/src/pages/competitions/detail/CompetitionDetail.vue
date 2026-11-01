@@ -18,7 +18,6 @@ import { csvBlob } from "../../../lib/csv";
 import { saveExport, saveFile } from "../../../lib/download";
 import { formatEuros } from "../../../lib/format";
 import CompetitionForm from "../CompetitionForm.vue";
-import CompetitionCharts from "./CompetitionCharts.vue";
 import {
   countLine,
   counts,
@@ -73,12 +72,6 @@ const router = useRouter();
 
 const c = computed(() => props.competition);
 const kpis = computed(() => counts(props.rows));
-const KPIS = computed(() => [
-  { id: "selected", label: "Participe", value: String(kpis.value.selected), color: "text-blue-600" },
-  { id: "unpaid", label: "Paiement en attente", value: String(kpis.value.unpaid), color: "text-amber-600" },
-  { id: "paid", label: "Paiement validé", value: String(kpis.value.paid), color: "text-green-600" },
-  { id: "present", label: "Présents", value: `${kpis.value.present} / ${kpis.value.selected}`, color: "text-violet-600" },
-]);
 /* Wide screens: the competitors in a table, as on the former desktop page; cards elsewhere */
 const wide = useMediaQuery("(min-width: 1280px)");
 const filter = ref<ParticipantFilter>("all");
@@ -607,19 +600,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           </ul>
         </div>
       </template>
-    </div>
-
-    <!-- Statistiques, juste avant la gestion des inscriptions (même rang flex : l'ordre du DOM les départage) -->
-    <div :class="wide ? 'order-2' : 'mt-4'">
-      <div class="mb-3 grid grid-cols-4 gap-2 text-center lg:gap-2.5">
-        <div v-for="k in KPIS" :key="k.id" class="rounded-xl border border-slate-200 bg-white px-1 py-2 shadow-sm lg:px-3 lg:py-2.5">
-          <div :class="['text-xl font-extrabold', k.color]" :data-testid="`kpi-${k.id}`">{{ k.value }}</div>
-          <div class="text-[11px] font-semibold text-slate-500 lg:uppercase">{{ k.label }}</div>
-        </div>
-      </div>
-
-      <!-- Graphiques de répartition (catégorie et discipline) -->
-      <CompetitionCharts :competition="c" :rows="rows" />
     </div>
 
     <div

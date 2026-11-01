@@ -63,7 +63,7 @@ def test_phone_list_then_competition(mobile_page, competition):
     expect(row.get_by_test_id("participe-switch")).to_be_checked()
     expect(row.get_by_test_id("payment-badge")).to_be_visible()
     expect(row.get_by_test_id("emergency-link")).to_have_count(1)
-    expect(page.get_by_test_id("kpi-selected")).to_have_text("1")
+    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (1)")
     assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"), "no horizontal scroll"
     page.get_by_test_id("back-link").click()
     expect(card(page, SEEDED_COMPETITION)).to_be_visible()

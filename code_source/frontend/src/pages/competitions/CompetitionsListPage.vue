@@ -16,7 +16,6 @@ import { COMPETITIONS_KEY } from "./context";
 import CompetitionCalendar from "./list/CompetitionCalendar.vue";
 import CompetitionCards from "./list/CompetitionCards.vue";
 import CompetitionFilters from "./list/CompetitionFilters.vue";
-import CompetitionStats from "./list/CompetitionStats.vue";
 import CompetitionTable from "./list/CompetitionTable.vue";
 import { useCompetitionFilters, type ViewMode } from "./list/filters";
 import ViewSwitcher from "./list/ViewSwitcher.vue";
@@ -34,7 +33,6 @@ const {
   when,
   selectedSeason,
   seasons,
-  seasonCompetitions,
   current,
   archived: archivedCompetitions,
   calendar: calendarCompetitions,
@@ -235,10 +233,8 @@ const listLine = computed(() => {
     <div
       v-else-if="viewMode === 'cards'"
       class="order-1 flex min-w-0 flex-col gap-3 md:order-2 md:col-start-2 md:row-start-1"
-      data-testid="stats-no-selection"
+      data-testid="no-selection"
     >
-      <CompetitionStats :competitions="seasonCompetitions" :today="today" />
-
       <div class="hidden rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-slate-500 md:block">
         <p class="m-0 text-sm font-medium">
           {{

@@ -193,12 +193,11 @@ describe("CompetitionsPage", () => {
     const { byId, all } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
     await settle();
     expect(byId("detail-name").text()).toBe("Coupe du Rhône");
-    expect([byId("kpi-selected").text(), byId("kpi-unpaid").text(), byId("kpi-paid").text(), byId("kpi-present").text()]).toEqual([
-      "2",
-      "1",
-      "1",
-      "0 / 2",
+    expect([byId("filter-selected").text(), byId("filter-unpaid").text()]).toEqual([
+      "✅ Participe : Oui (2)",
+      "⏳ Paiement en attente (1)",
     ]);
+    expect(byId("kpi-selected").exists()).toBe(false);
     expect(all("participant-group").map((g) => g.find("h3").text())).toEqual([
       "Compét. U14 · 1 compétiteur",
       "Compét. U18 · 1 compétiteur",
@@ -445,14 +444,12 @@ describe("CompetitionsPage", () => {
     }
   });
 
-  it("displays statistics tiles when no competition is selected", async () => {
+  it("shows the placeholder, without statistics, when no competition is selected", async () => {
     const server = fakeApi();
     const { byId } = await render(signedIn("coach"), server.api, store, "/competitions");
     await settle();
-    expect(byId("stats-no-selection").exists()).toBe(true);
-    expect(byId("stats-total-competitions").text()).toBe("1");
-    expect(byId("stats-total-competitors").text()).toBe("3");
-    expect(byId("stats-total-budget").text()).toMatch(/24,00\s*€/);
+    expect(byId("no-selection").exists()).toBe(true);
+    expect(byId("competitions-stats-tiles").exists()).toBe(false);
   });
 
   it("opens a sub-page under the page, the shared data loaded once", async () => {
