@@ -119,6 +119,7 @@ const MEMBERSHIP_PREVIEW = {
       changes: [],
     },
   ],
+  members: [] as unknown[],
 };
 const REVIEW_ROW = {
   ...MEMBERSHIP_PREVIEW.rows[0]!,
@@ -179,10 +180,11 @@ const ANSWERS: Record<string, Answer> = {
       status: "success",
       season: "2026-2027",
       history_id: "2026-10-31T09:15:00+00:00-abcd1234",
-      counts: { created: 1, renewed: 1, updated: 0, skipped: 1 },
+      counts: { created: 1, renewed: 1, updated: 0, attached: 0, skipped: 1 },
       created: [{ item_id: 1, user_id: 7, purchase_id: 12, last_name: "WEASLEY", first_name: "Ginny", tarif_name: "Loisir collège" }],
       renewed: [{ item_id: 3, user_id: 4, purchase_id: 13, last_name: "GRANGER", first_name: "Hermione", tarif_name: "Compétition" }],
       updated: [],
+      attached: [],
     }),
   "GET /api/ffme/export": () => file("import_ffme_20261022.csv"),
   "POST /api/ffme/preview": () => json(PREVIEW),
@@ -581,7 +583,7 @@ describe("OutilsPage", () => {
     expect(byId("ha-import-result")).toBeNull();
   });
 
-  it("asks for a choice on each HelloAsso row to review, skipped by default", async () => {
+  it("asks for a choice on each HelloAsso row to review, which checks the row; unchecking keeps the choice", async () => {
     vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
     const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
     ANSWERS["POST /api/helloasso/memberships/preview"] = () =>
@@ -595,18 +597,29 @@ describe("OutilsPage", () => {
       byId("ha-import-preview")!.click();
       await flushPromises();
       const select = byId<HTMLSelectElement>("ha-review-choice")!;
-      expect(select.value).toBe("skip");
+      const check = byId("ha-row-to_review")!.querySelector<HTMLInputElement>("[data-testid=ha-check]")!;
+      expect(select.value).toBe("");
       expect([...select.options].map((option) => option.textContent.trim())).toEqual([
-        "— Ignorer cette inscription —",
+        "— Choisir… —",
         "Rattacher à GRANGER Hermione (né(e) le 19/09/2012, licence 123456)",
         "Créer un nouvel adhérent",
+        "Rattacher à un autre adhérent…",
       ]);
+      expect([check.checked, check.disabled]).toEqual([false, true]);
       expect(byId("ha-row-to_review")!.textContent).toContain("date de naissance différente");
 
       select.value = "link:4";
       select.dispatchEvent(new Event("change"));
       await flushPromises();
+      expect([check.checked, check.disabled]).toEqual([true, false]);
       expect(byId("ha-import-selected")!.textContent).toContain("2");
+
+      check.click();
+      await flushPromises();
+      expect(byId("ha-import-selected")!.textContent).toContain("1");
+      expect(select.value).toBe("link:4");
+      check.click();
+      await flushPromises();
       byId("ha-import-apply")!.click();
       await flushPromises();
       expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
@@ -614,6 +627,139 @@ describe("OutilsPage", () => {
         campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
         decisions: { 1: { bucket: "new", choice: "import" }, 3: { bucket: "to_review", choice: "link:4" } },
       });
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("attaches a HelloAsso registration to another member, with a required comment", async () => {
+    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const imported = ANSWERS["POST /api/helloasso/memberships/import"]!;
+    const molly = { ...MEMBERSHIP_PREVIEW.rows[0]!, first_name: "Molly", birth_date: "1950-10-30" };
+    const members = [
+      { user_id: 9, last_name: "POTTER", first_name: "Harry", birth_date: "2013-07-31", licence: "", membership: "helloasso" },
+      { user_id: 7, last_name: "WEASLEY", first_name: "Ginny", birth_date: "2013-08-11", licence: "123456", membership: "manual" },
+    ];
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [molly], members });
+    ANSWERS["POST /api/helloasso/memberships/import"] = () =>
+      json({
+        status: "success",
+        season: "2026-2027",
+        history_id: "h1",
+        counts: { created: 0, renewed: 0, updated: 0, attached: 1, skipped: 0 },
+        created: [],
+        renewed: [],
+        updated: [],
+        attached: [{ item_id: 1, user_id: 7, purchase_id: 12, last_name: "WEASLEY", first_name: "Ginny", tarif_name: "Loisir collège" }],
+      });
+    try {
+      const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      const type = async (id: string, text: string) => {
+        const field = byId<HTMLInputElement>(id)!;
+        field.value = text;
+        field.dispatchEvent(new Event("input"));
+        await flushPromises();
+      };
+      const apply = byId<HTMLButtonElement>("ha-import-apply")!;
+
+      byId("ha-attach-open")!.click();
+      await flushPromises();
+      expect(byId("ha-row-problem")!.textContent).toContain("Choisissez l'adhérent");
+      expect(byId("ha-import-selected")!.textContent).toContain("0");
+      expect(apply.disabled).toBe(true);
+
+      await type("ha-attach-search", "potter");
+      const [harry] = all("ha-attach-option").map((option) => option as HTMLButtonElement);
+      expect(harry!.textContent).toContain("déjà une adhésion HelloAsso");
+      expect(harry!.disabled).toBe(true);
+
+      await type("ha-attach-search", "ginny");
+      const [ginny] = all("ha-attach-option");
+      expect(ginny!.textContent).toContain("WEASLEY Ginny");
+      ginny!.click();
+      await flushPromises();
+      expect(byId("ha-attach-chosen")!.textContent).toContain("reprend son adhésion manuelle");
+      expect(byId("ha-row-problem")!.textContent).toContain("Commentaire requis");
+      expect(apply.disabled).toBe(true);
+
+      await type("ha-attach-comment", "Inscrite par sa mère");
+      expect(byId("ha-row-problem")).toBeNull();
+      expect(byId("ha-import-selected")!.textContent).toContain("1");
+      apply.click();
+      await flushPromises();
+
+      expect(confirm.mock.calls[0]![0].message).toContain("🔗 WEASLEY Molly (commande 501) → WEASLEY Ginny, né(e) le 11/08/2013");
+      expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
+        season: "2026-2027",
+        campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+        decisions: { 1: { bucket: "new", choice: "attach:7", comment: "Inscrite par sa mère" } },
+      });
+      expect(byId("ha-import-done")!.textContent).toContain("1 inscription rattachée");
+      expect(byId("ha-attached")!.querySelector("a")!.getAttribute("href")).toBe("/bureau/adherents?id=7&saison=2026-2027&achat=12");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+      ANSWERS["POST /api/helloasso/memberships/import"] = imported;
+    }
+  });
+
+  it("cancels an attach, and refuses a member chosen for two registrations", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const ginny = { user_id: 7, last_name: "WEASLEY", first_name: "Ginny", birth_date: "2013-08-11", licence: "", membership: "none" };
+    const rows = [
+      { ...MEMBERSHIP_PREVIEW.rows[0]!, first_name: "Molly" },
+      { ...MEMBERSHIP_PREVIEW.rows[0]!, item_id: 4, first_name: "Arthur" },
+    ];
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows, members: [ginny] });
+    try {
+      const { byId, all } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      const attachTo = async (index: number) => {
+        all("ha-attach-open")[index]!.click();
+        await flushPromises();
+        const search = all("ha-attach-search").at(-1) as HTMLInputElement;
+        search.value = "weasley";
+        search.dispatchEvent(new Event("input"));
+        await flushPromises();
+        all("ha-attach-option")[0]!.click();
+        await flushPromises();
+        const comment = all("ha-attach-comment").at(-1) as HTMLTextAreaElement;
+        comment.value = "Parent";
+        comment.dispatchEvent(new Event("input"));
+        await flushPromises();
+      };
+
+      await attachTo(0);
+      await attachTo(0);
+      expect(byId("ha-row-problem")!.textContent).toContain("déjà choisi(e) pour une autre inscription");
+      expect(byId<HTMLButtonElement>("ha-import-apply")!.disabled).toBe(true);
+
+      byId("ha-attach-cancel")!.click();
+      await flushPromises();
+      expect(byId("ha-row-problem")).toBeNull();
+      expect(all("ha-check").map((box) => (box as HTMLInputElement).checked)).toEqual([true, true]);
+      expect(byId("ha-import-selected")!.textContent).toContain("2");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("names the member an imported HelloAsso registration was attached to", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const ginny = { user_id: 7, last_name: "WEASLEY", first_name: "Ginny", birth_date: "2013-08-11", licence: "" };
+    const imported = { ...MEMBERSHIP_PREVIEW.rows[0]!, bucket: "already_imported", first_name: "Molly", attached_to: ginny };
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [imported] });
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+
+      const person = byId("ha-row-already_imported")!.querySelector("[data-testid=ha-person]")!;
+      expect(person.textContent.replace(/\s+/g, " ").trim()).toBe("WEASLEY Molly → WEASLEY Ginny");
+      expect(person.querySelector("a")!.getAttribute("href")).toBe("/bureau/adherents?id=7&saison=2026-2027");
     } finally {
       ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
     }

@@ -69,8 +69,10 @@ def test_import_from_the_membership_campaign(page, fake_helloasso):
     review = _row(page, "to_review", joined)
     expect(review).to_contain_text("date de naissance différente")
     choice = review.get_by_test_id("ha-review-choice")
-    expect(choice).to_have_value("skip")
+    expect(choice).to_have_value("")
+    expect(review.get_by_test_id("ha-check")).not_to_be_checked()
     choice.select_option(index=1)  # the candidate: the member created by the first run
+    expect(review.get_by_test_id("ha-check")).to_be_checked()
     _import(page)
     expect(page.get_by_test_id("ha-renewed")).to_have_count(2)
     expect(page.get_by_test_id("ha-created")).to_have_count(0)

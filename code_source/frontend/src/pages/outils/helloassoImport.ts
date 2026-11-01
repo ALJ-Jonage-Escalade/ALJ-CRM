@@ -100,22 +100,134 @@ export function personLabel(row: { last_name: string; first_name: string }): str
 }
 
 export type MembershipDecision = Schemas["MembershipDecision"];
-/** The admin's choice for each row, by HelloAsso item id: "import" / "skip", or for a row to review "create" /
-    "skip" / "link:<member id>". */
-export type Choices = Record<number, string>;
+export type MembershipMember = Schemas["MembershipMember"];
+
+/** The admin's choice on a row: whether it is checked (written), what to do with it — "import" (new, renewal,
+    changed row), for a row to review "create" / "link:<member id>" ("" until chosen), "attach:<member id>" to give it
+    to any member ("attach:" while none is picked) — and the comment an attach requires. Unchecking keeps the choice. */
+export interface RowChoice {
+  checked: boolean;
+  choice: string;
+  comment: string;
+}
+/** The choices by HelloAsso item id. */
+export type Choices = Record<number, RowChoice>;
+
+export const ATTACH = "attach:";
 
 /** Buckets whose rows are written when checked; their checkbox starts checked. */
 const CHECKABLE: readonly BucketName[] = ["new", "renewal", "updated"];
 
-/** The row has a checkbox: a new, renewal or changed row, or a row to review whose values changed on both sides
-    (unchecked at first: the HelloAsso values replace the CRM ones only when checked). */
+/** The row has a checkbox: every row that can be written (a row to review once a choice is made). */
 export function isCheckable(row: MembershipRow): boolean {
-  return CHECKABLE.includes(row.bucket) || (row.bucket === "to_review" && row.changes.length > 0);
+  return CHECKABLE.includes(row.bucket) || row.bucket === "to_review";
 }
 
-/** A row to review for its identity: the admin picks a candidate, a new member or skip. */
+/** A row to review for its identity: the admin picks a candidate, a new member or another member. */
 export function needsIdentityChoice(row: MembershipRow): boolean {
   return row.bucket === "to_review" && row.changes.length === 0;
+}
+
+/** The row can be attached by hand to any member: a new or renewal row (link next to the checkbox), a row to review
+    for its identity (option of its select). */
+export function canAttach(row: MembershipRow): boolean {
+  return row.bucket === "new" || row.bucket === "renewal" || needsIdentityChoice(row);
+}
+
+/** The member of an "attach:<member id>" choice, null while none is picked (or for another choice). */
+export function attachedMemberId(choice: string): number | null {
+  const id = choice.startsWith(ATTACH) ? choice.slice(ATTACH.length) : "";
+  return /^\d+$/.test(id) ? Number(id) : null;
+}
+
+const MEMBERSHIP_TAGS: Record<MembershipMember["membership"], string> = {
+  none: "pas encore adhérent(e) cette saison",
+  manual: "reprend son adhésion manuelle",
+  several_manual: "plusieurs adhésions manuelles cette saison",
+  helloasso: "déjà une adhésion HelloAsso cette saison",
+};
+
+/** The member can be given a registration: not when they already have a HelloAsso membership this season, nor
+    several manual ones (the one to take over would be a guess). */
+export function canReceive(member: MembershipMember): boolean {
+  return member.membership === "none" || member.membership === "manual";
+}
+
+/** « WEASLEY Ginny (né(e) le 11/08/2013, licence 123456) · reprend son adhésion manuelle » */
+export function memberOptionLabel(member: MembershipMember): string {
+  return `${candidateLabel(member)} · ${MEMBERSHIP_TAGS[member.membership]}`;
+}
+
+const SEARCH_RESULTS = 8;
+
+/** The members matching the search of an attach (name in either order or licence, accents and case ignored), at
+    most 8; none before something is typed. */
+export function searchMembers(members: readonly MembershipMember[], query: string): MembershipMember[] {
+  const wanted = normKey(query);
+  if (!wanted) {
+    return [];
+  }
+  const searched = (member: MembershipMember): string =>
+    normKey(`${personLabel(member)} ${member.first_name} ${member.last_name} ${member.licence}`);
+  return members.filter((member) => searched(member).includes(wanted)).slice(0, SEARCH_RESULTS);
+}
+
+/** The member of the preview with this id. */
+export function memberOf(preview: MembershipPreview, memberId: number | null): MembershipMember | undefined {
+  return preview.members.find((member) => member.user_id === memberId);
+}
+
+/** Why a checked row cannot be imported yet (an attach without member or comment, or a member chosen twice), null
+    when it can. */
+export function rowProblem(row: MembershipRow, preview: MembershipPreview, choices: Choices): string | null {
+  const current = choices[row.item_id];
+  if (!current?.checked || !current.choice.startsWith(ATTACH)) {
+    return null;
+  }
+  const member = memberOf(preview, attachedMemberId(current.choice));
+  if (!member) {
+    return "Choisissez l'adhérent à rattacher.";
+  }
+  const chosenElsewhere = Object.entries(choices).some(
+    ([itemId, other]) =>
+      Number(itemId) !== row.item_id &&
+      other.checked &&
+      (other.choice === `${ATTACH}${member.user_id}` || other.choice === `link:${member.user_id}`),
+  );
+  if (chosenElsewhere) {
+    return `${personLabel(member)} est déjà choisi(e) pour une autre inscription de cet import.`;
+  }
+  if (!current.comment.trim()) {
+    return `Commentaire requis pour ${personLabel(row)}.`;
+  }
+  return null;
+}
+
+/** The rows the import will write: checked, with a choice, and nothing missing. */
+export function selectedRows(preview: MembershipPreview, choices: Choices): MembershipRow[] {
+  return preview.rows.filter((row) => {
+    const current = choices[row.item_id];
+    return current?.checked && current.choice && !rowProblem(row, preview, choices);
+  });
+}
+
+/** The checked rows that cannot be imported yet: the import waits for them. */
+export function incompleteRows(preview: MembershipPreview, choices: Choices): MembershipRow[] {
+  return preview.rows.filter((row) => rowProblem(row, preview, choices) !== null);
+}
+
+/** « 🔗 WEASLEY Molly (commande 501) → WEASLEY Ginny, né(e) le 11/08/2013 · reprend son adhésion manuelle », one line
+    per checked attach: the confirmation lists them. */
+export function attachLines(preview: MembershipPreview, choices: Choices): string[] {
+  return selectedRows(preview, choices).flatMap((row) => {
+    const member = memberOf(preview, attachedMemberId(choices[row.item_id]?.choice ?? ""));
+    return member
+      ? [
+          `🔗 ${personLabel(row)} (commande ${row.order_ref}) → ${personLabel(member)}, né(e) le ${formatDayText(member.birth_date) || "?"} · ` +
+            MEMBERSHIP_TAGS[member.membership],
+        ]
+      : [];
+  });
 }
 
 const FIELD_LABELS: Record<MembershipRow["changes"][number]["field"], string> = {
@@ -134,34 +246,47 @@ export function changeLines(row: MembershipRow): string[] {
   });
 }
 
-/** The choices the preview starts with: the new, renewal and changed rows checked, the rows to review skipped. */
+/** The choices the preview starts with: the new, renewal and changed rows checked, the rows to review unchecked
+    (a conflict row on its single choice, the others with no choice yet). */
 export function initialChoices(preview: MembershipPreview): Choices {
   const choices: Choices = {};
   for (const row of preview.rows) {
     if (CHECKABLE.includes(row.bucket)) {
-      choices[row.item_id] = "import";
+      choices[row.item_id] = { checked: true, choice: "import", comment: "" };
     } else if (row.bucket === "to_review") {
-      choices[row.item_id] = "skip";
+      choices[row.item_id] = { checked: false, choice: needsIdentityChoice(row) ? "" : "import", comment: "" };
     }
   }
   return choices;
 }
 
-/** Body of the import: the choice of each row, with the bucket the preview showed it in. */
+/** Body of the import: the choice of each checked row (with its comment for an attach), skip for the others, with the
+    bucket the preview showed it in. */
 export function decisionsOf(preview: MembershipPreview, choices: Choices): Record<number, MembershipDecision> {
+  const selected = new Set(selectedRows(preview, choices).map((row) => row.item_id));
   const decisions: Record<number, MembershipDecision> = {};
   for (const row of preview.rows) {
-    const choice = choices[row.item_id];
-    if (choice) {
-      decisions[row.item_id] = { bucket: row.bucket, choice };
+    const current = choices[row.item_id];
+    if (!current) {
+      continue;
+    }
+    if (!selected.has(row.item_id)) {
+      decisions[row.item_id] = { bucket: row.bucket, choice: "skip" };
+    } else if (current.choice.startsWith(ATTACH)) {
+      decisions[row.item_id] = { bucket: row.bucket, choice: current.choice, comment: current.comment.trim() };
+    } else {
+      decisions[row.item_id] = { bucket: row.bucket, choice: current.choice };
     }
   }
   return decisions;
 }
 
 /** Address of an imported member's record in Adhérents (its recordQuery). */
-export function memberHref(member: { user_id: number; purchase_id: number }, season: string): string {
-  const query = new URLSearchParams({ id: String(member.user_id), saison: season, achat: String(member.purchase_id) });
+export function memberHref(member: { user_id: number; purchase_id?: number }, season: string): string {
+  const query = new URLSearchParams({ id: String(member.user_id), saison: season });
+  if (member.purchase_id !== undefined) {
+    query.set("achat", String(member.purchase_id));
+  }
   return `/bureau/adherents?${query.toString()}`;
 }
 
@@ -170,6 +295,7 @@ export const RESULT_GROUPS = [
   { key: "created", icon: "🆕", testId: "ha-created" },
   { key: "renewed", icon: "🔁", testId: "ha-renewed" },
   { key: "updated", icon: "✏️", testId: "ha-updated" },
+  { key: "attached", icon: "🔗", testId: "ha-attached" },
 ] as const satisfies readonly { key: keyof MembershipImportResult["counts"]; icon: string; testId: string }[];
 
 function plural(count: number, one: string, many: string): string {
@@ -178,27 +304,29 @@ function plural(count: number, one: string, many: string): string {
 
 /** Headline of the result screen. */
 export function resultSummary(result: MembershipImportResult): string {
-  const { created, renewed, updated, skipped } = result.counts;
+  const { created, renewed, updated, attached, skipped } = result.counts;
+  const attachedText = attached ? `${plural(attached, "inscription rattachée", "inscriptions rattachées")}, ` : "";
   return (
     `🎉 Import terminé (saison ${result.season}) : ${plural(created, "adhérent créé", "adhérents créés")}, ` +
     `${plural(renewed, "renouvellement", "renouvellements")}, ${plural(updated, "inscription mise à jour", "inscriptions mises à jour")}, ` +
+    attachedText +
     `${plural(skipped, "inscription non importée", "inscriptions non importées")}.`
   );
 }
 
 export type MembershipCandidate = Schemas["MembershipCandidate"];
 
-/** The choices of a row to review: skip (the default), link to one of its candidates, or create a new member when it
-    has a birth date. */
+/** The choices of a row to review (skipping it: unchecked): link to one of its candidates, create a new member when it
+    has a birth date, or attach it to another member (picked in the search). */
 export function reviewOptions(row: MembershipRow): { value: string; label: string }[] {
   return [
-    { value: "skip", label: "— Ignorer cette inscription —" },
     ...row.candidates.map((member) => ({ value: `link:${member.user_id}`, label: `Rattacher à ${candidateLabel(member)}` })),
     ...(row.can_create ? [{ value: "create", label: "Créer un nouvel adhérent" }] : []),
+    { value: ATTACH, label: "Rattacher à un autre adhérent…" },
   ];
 }
 
-function candidateLabel(member: MembershipCandidate): string {
+function candidateLabel(member: Omit<MembershipCandidate, "user_id">): string {
   const details = [`né(e) le ${formatDayText(member.birth_date) || "?"}`, ...(member.licence ? [`licence ${member.licence}`] : [])];
   return `${personLabel(member)} (${details.join(", ")})`;
 }

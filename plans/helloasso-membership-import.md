@@ -205,8 +205,8 @@ comment. The member is created by hand first when needed (Adhérents). No mappin
 
 ### Acceptance criteria
 
-- [ ] `attach:<id>` takes over the member's manual membership of the season, or adds one; nothing written on the member
-- [ ] The comment and the automatic line are appended to the membership comment, the comment kept in the history
-- [ ] Attaching to a member already holding a HelloAsso membership this season, or twice in one import, is refused
-- [ ] The next preview shows the item as already imported, "HelloAsso name → member"
-- [ ] "À vérifier" rows have a checkbox, checked when a choice is made; an incomplete attach blocks the import
+- [x] `attach:<id>` takes over the member's manual membership of the season, or adds one; nothing written on the member
+- [x] The comment and the automatic line are appended to the membership comment, the comment kept in the history
+- [x] Attaching to a member already holding a HelloAsso membership this season, or twice in one import, is refused
+- [x] The next preview shows the item as already imported, "HelloAsso name → member"
+- [x] "À vérifier" rows have a checkbox, checked when a choice is made; an incomplete attach blocks the import

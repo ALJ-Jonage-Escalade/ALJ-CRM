@@ -2,14 +2,16 @@
 /* Synchronisation of the HelloAsso membership campaign (admin): the server reads the campaign picked in the select
    (the one chosen in Paramètres › Campagnes at first; another one applies to this sync only, nothing is saved) and sorts every registration into a bucket (new, renewal, changed on HelloAsso, to review, already
    imported, blocked), the latest registrations first.
-   The preview writes nothing; the new, renewal and changed rows start checked, and the checked ones are imported once
-   confirmed (the server reads HelloAsso again and refuses decisions that no longer match). The result lists the members
+   The preview writes nothing; the new, renewal and changed rows start checked, a row to review is checked once its
+   choice is made, and the checked ones are imported once confirmed. A registration made under another person's name
+   (a parent for their child) is attached by hand to a member, with a comment (the server reads HelloAsso again and refuses decisions that no longer match). The result lists the members
    written, linked to their record. Online only: disabled with an explanation when the device is offline. */
 import { computed, inject, onMounted, ref } from "vue";
 import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
 import UiTile from "../../components/ui/UiTile.vue";
+import AttachPicker from "./AttachPicker.vue";
 import { useNetworkUp } from "../../composables/network";
 import { CLIENT_KEY, errorText } from "../../lib/client";
 import { formatDayText, formatEuros } from "../../lib/format";
@@ -17,11 +19,16 @@ import { createIntegrationsApi } from "../../services/integrations";
 import { createMembersApi } from "../../services/members";
 import { dialogs } from "../../composables/dialogs";
 import {
+  ATTACH,
+  attachedMemberId,
+  attachLines,
   BUCKETS,
   campaignOptions,
+  canAttach,
   changeLines,
   decisionsOf,
   FOLDED_BUCKETS,
+  incompleteRows,
   initialChoices,
   isCheckable,
   lastSyncText,
@@ -32,8 +39,10 @@ import {
   RESULT_GROUPS,
   resultSummary,
   reviewOptions,
+  rowProblem,
   rowsOf,
   searchRows,
+  selectedRows,
   statusIcon,
   type BucketName,
   type Choices,
@@ -101,8 +110,10 @@ const sections = computed(() => {
   }).filter((section) => section.rows.length);
 });
 
-/** Rows that will be written: the checked ones (rows to review: a choice other than skip). */
-const selectedCount = computed(() => Object.values(choices.value).filter((choice) => choice !== "skip").length);
+/** Rows that will be written: the checked ones with nothing missing. */
+const selectedCount = computed(() => (preview.value ? selectedRows(preview.value, choices.value).length : 0));
+/** Checked rows still missing something (an attach without member or comment): the import waits for them. */
+const incompleteCount = computed(() => (preview.value ? incompleteRows(preview.value, choices.value).length : 0));
 
 function reset(): void {
   preview.value = null;
@@ -125,19 +136,49 @@ async function loadPreview(): Promise<void> {
   }
 }
 
+/** The row's choice: picking one checks the row. */
 function choose(itemId: number, choice: string): void {
-  choices.value = { ...choices.value, [itemId]: choice };
+  const current = choices.value[itemId];
+  choices.value = { ...choices.value, [itemId]: { checked: true, choice, comment: current?.comment ?? "" } };
+}
+
+/** Checked or unchecked: the choice is kept. */
+function check(itemId: number, checked: boolean): void {
+  const current = choices.value[itemId];
+  if (current) {
+    choices.value = { ...choices.value, [itemId]: { ...current, checked } };
+  }
+}
+
+/** The member picked for an attach (null: picking another one). */
+function pickMember(itemId: number, memberId: number | null): void {
+  choose(itemId, `${ATTACH}${memberId ?? ""}`);
+}
+
+function setComment(itemId: number, text: string): void {
+  const current = choices.value[itemId];
+  if (current) {
+    choices.value = { ...choices.value, [itemId]: { ...current, comment: text } };
+  }
+}
+
+/** The value of a row's select: an attach shows as its option, whichever member is picked. */
+function selectValue(choice: string): string {
+  return choice.startsWith(ATTACH) ? ATTACH : choice;
 }
 
 async function apply(): Promise<void> {
   const shown = preview.value;
   const previewedCampaign = campaign.value;
-  if (!shown || !selectedCount.value) {
+  if (!shown || !selectedCount.value || incompleteCount.value) {
     return;
   }
+  const attachments = attachLines(shown, choices.value);
   const confirmed = await dialogs.confirm({
     title: "Importer les adhésions HelloAsso",
-    message: `Enregistrer ${selectedCount.value} inscription(s) HelloAsso dans la base des adhérents (saison ${shown.season}) ? Aucun e-mail n'est envoyé.`,
+    message:
+      `Enregistrer ${selectedCount.value} inscription(s) HelloAsso dans la base des adhérents (saison ${shown.season}) ? Aucun e-mail n'est envoyé.` +
+      (attachments.length ? `\n\nRattachements :\n${attachments.join("\n")}` : ""),
     confirmLabel: "Importer",
   });
   if (!confirmed) {
@@ -317,12 +358,22 @@ defineExpose({ reload: reset });
                     v-if="isCheckable(row)"
                     type="checkbox"
                     data-testid="ha-check"
-                    :checked="choices[row.item_id] === 'import'"
+                    :checked="choices[row.item_id]?.checked"
+                    :disabled="!choices[row.item_id]?.choice"
+                    :title="choices[row.item_id]?.choice ? undefined : 'Choisissez d\'abord quoi faire'"
                     :aria-label="`Importer ${personLabel(row)}`"
-                    @change="choose(row.item_id, ($event.target as HTMLInputElement).checked ? 'import' : 'skip')"
+                    @change="check(row.item_id, ($event.target as HTMLInputElement).checked)"
                   />
                 </td>
-                <td class="px-2.5 py-1.5 font-semibold break-words">{{ personLabel(row) }}</td>
+                <td data-testid="ha-person" class="px-2.5 py-1.5 font-semibold break-words">
+                  {{ personLabel(row) }}
+                  <template v-if="row.attached_to">
+                    →
+                    <a :href="memberHref(row.attached_to, preview.season)" class="text-blue-700 underline">
+                      {{ personLabel(row.attached_to) }}
+                    </a>
+                  </template>
+                </td>
                 <td class="px-2.5 py-1.5" data-testid="ha-order-date">{{ formatDayText(row.order_date) || "—" }}</td>
                 <td class="px-2.5 py-1.5" data-testid="ha-payment-date">{{ formatDayText(row.payment_date) || "—" }}</td>
                 <td class="px-2.5 py-1.5" data-testid="ha-birth-date">{{ formatDayText(row.birth_date) || "—" }}</td>
@@ -347,13 +398,38 @@ defineExpose({ reload: reset });
                   <select
                     v-if="needsIdentityChoice(row)"
                     data-testid="ha-review-choice"
-                    :value="choices[row.item_id]"
+                    :value="selectValue(choices[row.item_id]?.choice ?? '')"
                     :aria-label="`Choix pour ${personLabel(row)}`"
                     class="mt-1 block w-full rounded-md border border-slate-300 px-1.5 py-1 text-xs text-slate-800"
                     @change="choose(row.item_id, ($event.target as HTMLSelectElement).value)"
                   >
+                    <option value="" disabled>— Choisir… —</option>
                     <option v-for="option in reviewOptions(row)" :key="option.value" :value="option.value">{{ option.label }}</option>
                   </select>
+                  <AttachPicker
+                    v-if="canAttach(row) && choices[row.item_id]?.choice.startsWith(ATTACH)"
+                    :members="preview.members"
+                    :member-id="attachedMemberId(choices[row.item_id]?.choice ?? '')"
+                    :comment="choices[row.item_id]?.comment ?? ''"
+                    :person="personLabel(row)"
+                    :cancellable="!needsIdentityChoice(row)"
+                    @pick="(memberId) => pickMember(row.item_id, memberId)"
+                    @comment="(text) => setComment(row.item_id, text)"
+                    @cancel="choose(row.item_id, 'import')"
+                  />
+                  <button
+                    v-else-if="canAttach(row) && !needsIdentityChoice(row)"
+                    type="button"
+                    data-testid="ha-attach-open"
+                    title="Inscription faite au nom d'une autre personne (un parent pour son enfant) : la rattacher à un adhérent"
+                    class="mt-1 block text-blue-700 underline"
+                    @click="choose(row.item_id, ATTACH)"
+                  >
+                    🔗 Rattacher…
+                  </button>
+                  <p v-if="rowProblem(row, preview, choices)" data-testid="ha-row-problem" class="mt-1 font-semibold text-red-700">
+                    {{ rowProblem(row, preview, choices) }}
+                  </p>
                 </td>
               </tr>
             </tbody>
@@ -364,13 +440,16 @@ defineExpose({ reload: reset });
       <div v-if="!preview.blocked_reason" class="flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-200 pt-3">
         <UiButton
           data-testid="ha-import-apply"
-          :disabled="!online || !!busy || !selectedCount"
+          :disabled="!online || !!busy || !selectedCount || !!incompleteCount"
           :busy="busy === 'import' && 'Import en cours…'"
           @click="apply"
         >
           ✅ Importer la sélection
         </UiButton>
-        <span data-testid="ha-import-selected" class="text-xs text-slate-500">{{ selectedCount }} inscription(s) sélectionnée(s)</span>
+        <span data-testid="ha-import-selected" class="text-xs text-slate-500">
+          {{ selectedCount }} inscription(s) sélectionnée(s)
+          <b v-if="incompleteCount" class="text-red-700">· {{ incompleteCount }} rattachement(s) à compléter</b>
+        </span>
       </div>
     </div>
   </UiCard>
