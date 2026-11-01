@@ -21,7 +21,7 @@ class BucketCounts(BaseModel):
 
 
 class MembershipCandidate(BaseModel):
-    """A member a registration to review may be (choice "link:<user_id>")."""
+    """A member a registration to review may be (choice "link:<user_id>"), or an imported one is attached to."""
     user_id: int
     last_name: str
     first_name: str
@@ -60,16 +60,30 @@ class MembershipRow(BaseModel):
     candidates: List[MembershipCandidate]
     can_create: bool
     changes: List[MembershipChange]
+    attached_to: Optional[MembershipCandidate] = None  # imported rows: the member, when their name is not the HelloAsso one
+
+
+class MembershipMember(BaseModel):
+    """A member of the base a registration can be attached to by hand (choice "attach:<user_id>"). membership: theirs
+    this season — none, manual (taken over by the attach), several_manual or helloasso (the attach is refused)."""
+    user_id: int
+    last_name: str
+    first_name: str
+    birth_date: str
+    licence: str
+    membership: Literal["none", "manual", "several_manual", "helloasso"]
 
 
 class MembershipPreview(BaseModel):
-    """blocked_reason: the whole campaign is refused (another season), every row is then blocked."""
+    """blocked_reason: the whole campaign is refused (another season), every row is then blocked. members: every member
+    of the base (any season), for the attach by hand."""
     status: Literal["success"]
     season: str
     campaign: str
     blocked_reason: Optional[str]
     counts: BucketCounts
     rows: List[MembershipRow]
+    members: List[MembershipMember]
 
 
 class MembershipDecision(RequestBody):

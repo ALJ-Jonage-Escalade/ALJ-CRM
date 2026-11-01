@@ -18,6 +18,7 @@ from domain.members.membership_import import (
     WriteAction,
     apply_decisions,
     plan_membership_import,
+    season_membership,
 )
 
 SEASON = "2026-2027"
@@ -353,3 +354,30 @@ def test_a_row_to_review_can_be_attached_to_a_member_who_is_not_a_candidate() ->
     [write] = apply_decisions(_review_plan(), {1: Decision(Bucket.TO_REVIEW, "attach:8", comment="Erreur de nom")})
 
     assert (write.action, write.entry.member_id) == (WriteAction.ASSIGN, 8)
+
+
+@pytest.mark.parametrize(("member", "attached_to"), [
+    (replace(GINNY, first_name="Ginny"), None),
+    (replace(GINNY, first_name="Gínny "), None),
+    (GINNY, GINNY),
+], ids=["same name", "same name, other accents", "attached by hand"])
+def test_an_imported_row_names_the_member_it_is_attached_to_when_the_names_differ(member: KnownMember, attached_to: KnownMember) -> None:
+    record = MOLLY if attached_to else _record(1)
+    [entry] = _plan(record, members=(member,), purchases=(_purchase(30, 7, helloasso_item_id=1),)).entries
+
+    assert (entry.bucket, entry.attached_to) == (Bucket.ALREADY_IMPORTED, attached_to)
+    if attached_to:
+        assert "rattachée à WEASLEY Ginny" in entry.reason
+
+
+@pytest.mark.parametrize(("purchases", "expected"), [
+    ((), "none"),
+    ((_purchase(30, 7, season="2025-2026", helloasso_item_id=500),), "none"),
+    ((_manual(31),), "manual"),
+    ((_manual(31), _manual(32)), "several_manual"),
+    ((_purchase(30, 7, helloasso_item_id=500),), "helloasso"),
+], ids=["no purchase", "another season", "manual", "several manual", "helloasso"])
+def test_the_season_membership_of_each_member_is_known_to_the_preview(purchases: tuple[KnownPurchase, ...], expected: str) -> None:
+    plan = _plan(_record(2, last_name="Potter"), purchases=purchases)
+
+    assert season_membership(plan, 7).kind == expected

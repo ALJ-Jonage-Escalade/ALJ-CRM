@@ -341,3 +341,18 @@ class TestMembershipAttachedByHand(HelloAssoImportTestCase):
         self.assertEqual(response.status_code, 409, response.text)
         self.assertIn("commentaire", response.json()["message"])
         self.assertEqual(self.count("purchases"), 1)
+
+    def test_the_preview_lists_every_member_and_their_membership_this_season(self) -> None:
+        preview = self.client.post(PREVIEW).json()
+
+        self.assertEqual(preview["members"], [{"user_id": self.ginny, "last_name": "WEASLEY", "first_name": "Ginny",
+                                               "birth_date": "2013-08-11", "licence": "", "membership": "manual"}])
+
+    def test_an_attached_registration_shows_the_member_next_time(self) -> None:
+        self.attach("Inscrite par sa mère")
+
+        [row] = self.client.post(PREVIEW).json()["rows"]
+
+        self.assertEqual(row["attached_to"], {"user_id": self.ginny, "last_name": "WEASLEY", "first_name": "Ginny",
+                                              "birth_date": "2013-08-11", "licence": ""})
+        self.assertIn("rattachée à WEASLEY Ginny", row["reason"])

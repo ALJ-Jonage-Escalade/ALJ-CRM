@@ -16,18 +16,24 @@ from api.members.helloasso_import_schemas import (
     MembershipImportResult,
     MembershipLastImport,
     MembershipLastSync,
+    MembershipMember,
     MembershipPreview,
     MembershipPreviewRequest,
     MembershipRow,
 )
 from api.admin.access import author_of
 from api.responses import error_responses
-from domain.members.membership_import import Bucket, Decision, ImportPlan, PlanEntry, WriteAction
+from domain.members.membership_import import Bucket, Decision, ImportPlan, KnownMember, PlanEntry, WriteAction, season_membership
 from infrastructure.sqlite.membership_import import AppliedWrite
 from services.members.helloasso_import import ImportResult
 from services.members.helloasso_import import MembershipImportService as Service
 
 router = APIRouter()
+
+
+def _candidate(member: KnownMember) -> MembershipCandidate:
+    return MembershipCandidate(user_id=member.user_id, last_name=member.last_name, first_name=member.first_name,
+                               birth_date=member.birth_date, licence=member.licence)
 
 
 def _row(entry: PlanEntry) -> MembershipRow:
@@ -38,8 +44,8 @@ def _row(entry: PlanEntry) -> MembershipRow:
         refund_date=record.refund_date, last_name=record.last_name, first_name=record.first_name,
         birth_date=record.birth_date or record.birth_date_raw, licence=record.licence, tarif_name=record.tarif_name,
         amount=record.amount, status=record.status, can_create=entry.can_create,
-        candidates=[MembershipCandidate(user_id=member.user_id, last_name=member.last_name, first_name=member.first_name,
-                                        birth_date=member.birth_date, licence=member.licence) for member in entry.candidates],
+        candidates=[_candidate(member) for member in entry.candidates],
+        attached_to=_candidate(entry.attached_to) if entry.attached_to else None,
         changes=[MembershipChange(field=change.field, crm=change.crm, before=change.before, after=change.after)
                  for change in entry.changes],
     )
@@ -49,6 +55,8 @@ def _preview(plan: ImportPlan) -> MembershipPreview:
     return MembershipPreview(
         status="success", season=plan.season, campaign=plan.campaign_slug, blocked_reason=plan.blocked_reason,
         counts=BucketCounts(**plan.counts()), rows=[_row(entry) for entry in plan.entries],
+        members=[MembershipMember(**_candidate(member).model_dump(), membership=season_membership(plan, member.user_id).kind)
+                 for member in sorted(plan.members, key=lambda m: (m.last_name.casefold(), m.first_name.casefold()))],
     )
 
 

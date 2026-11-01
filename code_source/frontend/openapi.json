@@ -7767,7 +7767,7 @@
           "licence"
         ],
         "title": "MembershipCandidate",
-        "description": "A member a registration to review may be (choice \"link:<user_id>\")."
+        "description": "A member a registration to review may be (choice \"link:<user_id>\"), or an imported one is attached to."
       },
       "MembershipChange": {
         "properties": {
@@ -7981,6 +7981,51 @@
         "title": "MembershipLastSync",
         "description": "The latest import, null before the first one."
       },
+      "MembershipMember": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence"
+          },
+          "membership": {
+            "type": "string",
+            "enum": [
+              "none",
+              "manual",
+              "several_manual",
+              "helloasso"
+            ],
+            "title": "Membership"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "last_name",
+          "first_name",
+          "birth_date",
+          "licence",
+          "membership"
+        ],
+        "title": "MembershipMember",
+        "description": "A member of the base a registration can be attached to by hand (choice \"attach:<user_id>\"). membership: theirs\nthis season — none, manual (taken over by the attach), several_manual or helloasso (the attach is refused)."
+      },
       "MembershipPreview": {
         "properties": {
           "status": {
@@ -8016,6 +8061,13 @@
             },
             "type": "array",
             "title": "Rows"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipMember"
+            },
+            "type": "array",
+            "title": "Members"
           }
         },
         "type": "object",
@@ -8025,10 +8077,11 @@
           "campaign",
           "blocked_reason",
           "counts",
-          "rows"
+          "rows",
+          "members"
         ],
         "title": "MembershipPreview",
-        "description": "blocked_reason: the whole campaign is refused (another season), every row is then blocked."
+        "description": "blocked_reason: the whole campaign is refused (another season), every row is then blocked. members: every member\nof the base (any season), for the attach by hand."
       },
       "MembershipPreviewRequest": {
         "properties": {
@@ -8132,6 +8185,16 @@
             },
             "type": "array",
             "title": "Changes"
+          },
+          "attached_to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MembershipCandidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

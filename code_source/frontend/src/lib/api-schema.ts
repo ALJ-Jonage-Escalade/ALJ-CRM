@@ -3195,7 +3195,7 @@ export interface components {
         };
         /**
          * MembershipCandidate
-         * @description A member a registration to review may be (choice "link:<user_id>").
+         * @description A member a registration to review may be (choice "link:<user_id>"), or an imported one is attached to.
          */
         MembershipCandidate: {
             /** User Id */
@@ -3307,8 +3307,31 @@ export interface components {
             last_sync: components["schemas"]["MembershipLastImport"] | null;
         };
         /**
+         * MembershipMember
+         * @description A member of the base a registration can be attached to by hand (choice "attach:<user_id>"). membership: theirs
+         *     this season — none, manual (taken over by the attach), several_manual or helloasso (the attach is refused).
+         */
+        MembershipMember: {
+            /** User Id */
+            user_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Birth Date */
+            birth_date: string;
+            /** Licence */
+            licence: string;
+            /**
+             * Membership
+             * @enum {string}
+             */
+            membership: "none" | "manual" | "several_manual" | "helloasso";
+        };
+        /**
          * MembershipPreview
-         * @description blocked_reason: the whole campaign is refused (another season), every row is then blocked.
+         * @description blocked_reason: the whole campaign is refused (another season), every row is then blocked. members: every member
+         *     of the base (any season), for the attach by hand.
          */
         MembershipPreview: {
             /**
@@ -3325,6 +3348,8 @@ export interface components {
             counts: components["schemas"]["BucketCounts"];
             /** Rows */
             rows: components["schemas"]["MembershipRow"][];
+            /** Members */
+            members: components["schemas"]["MembershipMember"][];
         };
         /**
          * MembershipPreviewRequest
@@ -3380,6 +3405,7 @@ export interface components {
             can_create: boolean;
             /** Changes */
             changes: components["schemas"]["MembershipChange"][];
+            attached_to?: components["schemas"]["MembershipCandidate"] | null;
         };
         /**
          * NewMember

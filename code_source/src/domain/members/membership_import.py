@@ -84,6 +84,7 @@ class PlanEntry:
     identity_taken: bool = False
     candidates: tuple[KnownMember, ...] = ()  # to_review: the members it may be
     changes: tuple[FieldChange, ...] = ()  # updated, or to_review when the CRM changed the value too
+    attached_to: Optional[KnownMember] = None  # imported: the member, when their name is not the HelloAsso one (attach by hand)
 
     @property
     def can_create(self) -> bool:
@@ -169,7 +170,7 @@ def _classify(record: MembershipRecord, base: _Base) -> PlanEntry:
         return PlanEntry(record, Bucket.BLOCKED, missing)
     known = base.by_item.get(record.item_id)
     if known:
-        return _imported_entry(record, known)
+        return _imported_entry(record, known, base.members.get(known.user_id))
     legacy = base.legacy_purchase(record)
     if legacy:
         return PlanEntry(record, Bucket.ALREADY_IMPORTED, "Inscription déjà présente (import antérieur) : elle sera marquée.",
@@ -216,16 +217,21 @@ def _helloasso_changes(record: MembershipRecord, known: KnownPurchase) -> list[t
             for name, crm, before, after in values if after != before and after != crm]
 
 
-def _imported_entry(record: MembershipRecord, known: KnownPurchase) -> PlanEntry:
+def _imported_entry(record: MembershipRecord, known: KnownPurchase, member: Optional[KnownMember]) -> PlanEntry:
+    # Another name than on HelloAsso: attached by hand (a name merely corrected in the CRM shows too)
+    renamed = member and _person_key(member.last_name, member.first_name) != _person_key(record.last_name, record.first_name)
+    attached_to = member if renamed else None
+    to_whom = f", rattachée à {attached_to.last_name} {attached_to.first_name}".rstrip() if attached_to else ""
     changes = _helloasso_changes(record, known)
     if not changes:
-        return PlanEntry(record, Bucket.ALREADY_IMPORTED, "Inscription déjà importée.", known.user_id, known.purchase_id)
+        return PlanEntry(record, Bucket.ALREADY_IMPORTED, f"Inscription déjà importée{to_whom}.", known.user_id, known.purchase_id,
+                         attached_to=attached_to)
     fields = tuple(change for change, _ in changes)
     if any(crm_changed for _, crm_changed in changes):
-        return PlanEntry(record, Bucket.TO_REVIEW, "Modifiée sur HelloAsso et dans le CRM : choisissez la valeur à garder.",
-                         known.user_id, known.purchase_id, changes=fields)
-    return PlanEntry(record, Bucket.UPDATED, "Modifiée sur HelloAsso depuis le dernier import.", known.user_id, known.purchase_id,
-                     changes=fields)
+        return PlanEntry(record, Bucket.TO_REVIEW, f"Modifiée sur HelloAsso et dans le CRM{to_whom} : choisissez la valeur à garder.",
+                         known.user_id, known.purchase_id, changes=fields, attached_to=attached_to)
+    return PlanEntry(record, Bucket.UPDATED, f"Modifiée sur HelloAsso depuis le dernier import{to_whom}.", known.user_id,
+                     known.purchase_id, changes=fields, attached_to=attached_to)
 
 
 def _to_review(record: MembershipRecord, reason: str, candidates: Iterable[KnownMember], identity_taken: bool = False) -> PlanEntry:
@@ -379,6 +385,29 @@ def _attachable(entry: PlanEntry) -> bool:
     return entry.bucket in (Bucket.NEW, Bucket.RENEWAL) or (entry.bucket == Bucket.TO_REVIEW and not entry.changes)
 
 
+MembershipKind = Literal["none", "manual", "several_manual", "helloasso"]
+
+
+@dataclass(frozen=True)
+class SeasonMembership:
+    """A member's membership of the plan's season, as an attach by hand sees it: none, one or several not from HelloAsso
+    (manual: the one an attach takes over), or one from HelloAsso (an attach is then refused). purchases: those of the kind."""
+    kind: MembershipKind
+    purchases: tuple[KnownPurchase, ...] = ()
+
+
+def season_membership(plan: ImportPlan, member_id: int) -> SeasonMembership:
+    # A former import's purchase, marked with its item id by this import (back-fill), is a HelloAsso one too
+    back_filled = {entry.purchase_id for entry in plan.entries if entry.backfill}
+    purchases = [p for p in plan.season_purchases if p.user_id == member_id]
+    helloasso = tuple(p for p in purchases if p.helloasso_item_id is not None or p.purchase_id in back_filled)
+    if helloasso:
+        return SeasonMembership("helloasso", helloasso)
+    if not purchases:
+        return SeasonMembership("none")
+    return SeasonMembership("manual" if len(purchases) == 1 else "several_manual", tuple(purchases))
+
+
 def _assign(entry: PlanEntry, member_id: int, comment: str, plan: ImportPlan) -> ImportWrite:
     """The attach of `entry` to the member, taking over their membership of the season that is not from HelloAsso."""
     member = next((member for member in plan.members if member.user_id == member_id), None)
@@ -387,16 +416,12 @@ def _assign(entry: PlanEntry, member_id: int, comment: str, plan: ImportPlan) ->
     who = f"{member.last_name} {member.first_name}".strip()
     if not comment.strip():
         raise StaleDecisions(f"Inscription {entry.item_id} rattachée à {who} : un commentaire est requis.")
-    # A former import's purchase, marked with its item id by this import (back-fill), is a HelloAsso one too
-    back_filled = {other.purchase_id for other in plan.entries if other.backfill}
-    purchases = [p for p in plan.season_purchases if p.user_id == member_id]
-    helloasso = [p for p in purchases if p.helloasso_item_id is not None or p.purchase_id in back_filled]
-    if helloasso:
-        raise StaleDecisions(f"{who} a déjà une adhésion HelloAsso {plan.season} (commande {helloasso[0].order_ref}).")
-    manual = [p for p in purchases if p not in helloasso]
-    if len(manual) > 1:
+    membership = season_membership(plan, member_id)
+    if membership.kind == "helloasso":
+        raise StaleDecisions(f"{who} a déjà une adhésion HelloAsso {plan.season} (commande {membership.purchases[0].order_ref}).")
+    if membership.kind == "several_manual":
         raise StaleDecisions(f"{who} a plusieurs adhésions {plan.season} hors HelloAsso : gardez-en une seule avant de rattacher.")
-    taken_over = manual[0].purchase_id if manual else None
+    taken_over = membership.purchases[0].purchase_id if membership.purchases else None
     return ImportWrite(replace(entry, member_id=member_id, purchase_id=taken_over), WriteAction.ASSIGN, comment.strip())
 
 
