@@ -22,31 +22,29 @@ def test_phone_layout(mobile_page):
     assert abs(nav["y"] + nav["height"] - viewport["height"]) <= 1, "navigation bar at the bottom of the screen"
     assert nav["width"] == viewport["width"]
     expect(mobile_page.locator(f"{NAV} a")).to_have_count(6)  # a coach: no Communications, no Paramètres
-    # The directory instead of Adhérents, in the menu and on the cards (both pages still open by their address)
+    # The directory instead of Adhérents in the menu (both pages still open by their address)
     expect(mobile_page.locator(f"{NAV} a").filter(visible=True)).to_have_count(5)
     expect(mobile_page.locator(f"{NAV} a[data-page='annuaire']")).to_be_visible()
     expect(mobile_page.locator(f"{NAV} a[data-page='adherents']")).to_be_hidden()
-    expect(mobile_page.locator("#content a[href='/index']")).to_be_visible()
-    expect(mobile_page.locator("#content a[href='/bureau/adherents']")).to_be_hidden()
     expect(mobile_page.get_by_text(f"v{VERSION}", exact=True).filter(visible=True)).to_be_visible()
 
 
 def test_desktop_layout(page):
-    """Side menu with the version; the cards lead to the pages not migrated yet."""
+    """Side menu with the version; no page links in the content, the menu already lists them."""
     page.goto("/bureau/")
     login_as(page, "admin")
     expect(page.locator("#content")).to_contain_text("Connecté en tant que administrateur")
     nav = page.locator(NAV).bounding_box()
     assert nav["x"] < 50 and nav["height"] > 200, "vertical menu on the left"
     expect(page.locator(f"{NAV} a[data-page='accueil']")).to_have_attribute("aria-current", "page")
-    # Adhérents instead of the directory, in the menu and on the cards
+    # Adhérents instead of the directory in the menu
     expect(page.locator(f"{NAV} a[data-page='adherents']")).to_be_visible()
     expect(page.locator(f"{NAV} a[data-page='annuaire']")).to_be_hidden()
-    expect(page.locator("#content a[href='/bureau/adherents']")).to_be_visible()
-    expect(page.locator("#content a[href='/index']")).to_be_hidden()
+    for href in ["/bureau/adherents", "/index", "/bureau/planning", "/bureau/parametres"]:
+        expect(page.locator(f"#content a[href='{href}']")).to_have_count(0)
     expect(page.get_by_text(f"v{VERSION}", exact=True).filter(visible=True)).to_be_visible()
 
-    page.locator("#content a[href='/bureau/competitions']").first.click()  # the button, the card and the widgets
+    page.locator("#content a[href='/bureau/competitions']").first.click()  # « Tout voir » of the widget
     page.wait_for_url("**/bureau/competitions")
     expect(page.locator("#who")).to_contain_text("albus.dumbledore@alj-escalade.fr")  # same session on the page
 
@@ -55,7 +53,7 @@ ADMIN_PAGES = ["communications", "parametres", "administration"]
 
 
 @pytest.mark.parametrize("role, count", [("admin", 9), ("coach", 6)])
-def test_menu_and_cards_follow_the_role(page, role, count):
+def test_menu_follows_the_role(page, role, count):
     page.goto("/bureau/")
     login_as(page, role)
     expect(page.locator("#content")).to_be_visible()
@@ -63,7 +61,6 @@ def test_menu_and_cards_follow_the_role(page, role, count):
     for name in ADMIN_PAGES:
         shown = 1 if role == "admin" else 0
         expect(page.locator(f"{NAV} a[data-page='{name}']")).to_have_count(shown)
-        expect(page.locator(f"#content a[href='/bureau/{name}']")).to_have_count(shown)
 
 
 @pytest.mark.parametrize("role, pages", [("readonly", ["competitions"]), ("stranger", [])])
@@ -111,7 +108,7 @@ def test_in_app_navigation_keeps_the_page_loaded(page):
     page.locator(f"{NAV} a[data-page='parametres']").filter(visible=True).click()
     expect(page.get_by_test_id("cache-status")).to_contain_text("Cache opérationnel")
     page.locator(f"{NAV} a[data-page='accueil']").filter(visible=True).click()
-    expect(page.locator("#content a[href='/bureau/planning']")).to_be_visible()
+    expect(page.get_by_test_id("home-widgets")).to_be_visible()
     assert page.evaluate("() => window.__sameDocument") is True
 
 

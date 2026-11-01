@@ -2,13 +2,11 @@
 import { computed, inject, onMounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import AppShell from "../components/AppShell.vue";
-import PageLink from "../components/PageLink.vue";
 import UiBadge from "../components/ui/UiBadge.vue";
-import { canOpen, pageAccess, pageScreen, PAGES, REFUSED_QUERY, shownOn, type Access, type Screen } from "../lib/access";
+import { PAGES, REFUSED_QUERY } from "../lib/access";
 import { API_KEY } from "../lib/api";
 import { formatDayText } from "../lib/format";
 import { isPast, todayIso, type Competition, type Participant } from "./competitions/competitions";
-import type { Role } from "../lib/roles";
 
 const api = inject(API_KEY, null);
 const comps = ref<Competition[]>([]);
@@ -49,58 +47,7 @@ const pastResultsComps = computed(() =>
     .slice(0, 3),
 );
 
-/* Links to the migrated pages stay in the app; the others load their former page. Only the cards the role may open are
-   shown, and Adhérents or the directory depending on the screen, as in the menu. */
-const LINKS: { href: string; title: string; text: string; access: Access; screen?: Screen }[] = [
-  {
-    href: "/bureau/adherents",
-    title: "👥 Adhérents",
-    text: "Liste des adhérents, filtre par tarif et fiche détaillée.",
-    access: pageAccess("adherents"),
-    screen: pageScreen("adherents"),
-  },
-  {
-    href: "/index",
-    title: "📇 Annuaire",
-    text: "Coordonnées et contacts d'urgence des adhérents, consultables hors ligne.",
-    access: pageAccess("annuaire"),
-    screen: pageScreen("annuaire"),
-  },
-  {
-    href: "/bureau/communications",
-    title: "✉️ Communications",
-    text: "Modèles d'e-mails et de messages du club.",
-    access: pageAccess("communications"),
-  },
-  { href: "/bureau/outils", title: "🛠️ Outils", text: "Carte interactive et analyse des effectifs.", access: pageAccess("outils") },
-  {
-    href: "/bureau/competitions",
-    title: "🏆 Compétitions",
-    text: "Compétitions, participants et paiements HelloAsso.",
-    access: pageAccess("competitions"),
-  },
-  {
-    href: "/bureau/planning",
-    title: "📅 Créneaux & Planning",
-    text: "Création, modification des créneaux, animateurs, tarifs et impression du planning.",
-    access: pageAccess("planning"),
-  },
-  {
-    href: "/bureau/parametres",
-    title: "⚙️ Paramètres",
-    text: "Connexion Google du club, statut de la base de données et services associés.",
-    access: pageAccess("parametres"),
-  },
-  {
-    href: "/bureau/administration",
-    title: "🔐 Administration",
-    text: "Accès au CRM : qui peut se connecter, avec quel rôle, demandes d'accès et historique.",
-    access: pageAccess("administration"),
-  },
-];
 const BANNER = "https://alj-escalade.fr/wp-content/uploads/2026/09/De-nouveaux-blocs-tous-les-15-jours-3-1024x512.png";
-
-const linksFor = (role: Role) => LINKS.filter((link) => canOpen(role, link.access));
 
 // Sent back by the router guards from an admin page: only a known page is named
 const route = useRoute();
@@ -110,16 +57,7 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
 <template>
   <AppShell page="accueil" title="Bureau">
     <template #default="{ role }">
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p class="m-0 text-sm text-slate-600">Bienvenue sur le nouvel espace de gestion de l'ALJ Escalade</p>
-        <RouterLink
-          to="/bureau/competitions"
-          data-testid="goto-competitions"
-          class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white no-underline hover:bg-accent-dark"
-        >
-          🏆 Compétitions
-        </RouterLink>
-      </div>
+      <p class="mb-4 text-sm text-slate-600">Bienvenue sur le nouvel espace de gestion de l'ALJ Escalade</p>
       <p
         v-if="refused"
         id="refused-page"
@@ -128,21 +66,9 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
       >
         ⛔ La page {{ refused }} est réservée aux administrateurs.
       </p>
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
-        <PageLink
-          v-for="link in linksFor(role)"
-          :key="link.href"
-          :href="link.href"
-          :class="shownOn(link.screen ?? 'any', 'block')"
-          class="rounded-xl border border-slate-200 bg-white px-4.5 py-4 text-slate-800 no-underline shadow-sm hover:border-accent"
-        >
-          <b class="mb-1 block text-base">{{ link.title }}</b>
-          <span class="text-[13px] leading-snug text-slate-500">{{ link.text }}</span>
-        </PageLink>
-      </div>
 
       <!-- Widgets Compétitions & Résultats -->
-      <div class="mt-5 grid gap-4 md:grid-cols-2" data-testid="home-widgets">
+      <div class="grid gap-4 md:grid-cols-2" data-testid="home-widgets">
         <!-- Widget 1 : Prochaines compétitions -->
         <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="upcoming-widget">
           <div class="mb-3 flex items-center justify-between">
