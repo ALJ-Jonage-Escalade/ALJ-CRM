@@ -1,4 +1,5 @@
 """Office portal, Accueil: first page of the Vue app (frontend/), one responsive layout for every screen."""
+import re
 from pathlib import Path
 
 import pytest
@@ -45,7 +46,7 @@ def test_desktop_layout(page):
     expect(page.get_by_text(f"v{VERSION}", exact=True).filter(visible=True)).to_be_visible()
 
     page.locator("#content a[href='/bureau/competitions']").first.click()  # « Tout voir » of the widget
-    page.wait_for_url("**/bureau/competitions")
+    page.wait_for_url(re.compile(r"/bureau/competitions(\?id=[^&]+)?$"))  # the first competition opens by itself
     expect(page.locator("#who")).to_contain_text("albus.dumbledore@alj-escalade.fr")  # same session on the page
 
 

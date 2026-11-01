@@ -1,4 +1,4 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, type DOMWrapper } from "@vue/test-utils";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
@@ -159,6 +159,12 @@ async function settle(): Promise<void> {
   }
 }
 
+/** Opens the competition's « Plus » menu: Reka UI opens it on pointerdown or the keyboard, not on a bare click. */
+async function openMore(byId: (id: string) => DOMWrapper<Element>): Promise<void> {
+  byId("detail-more").element.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await flushPromises();
+}
+
 /** Types in an input rendered outside the wrapper (dialogs). */
 async function search(input: HTMLElement, text: string): Promise<void> {
   (input as HTMLInputElement).value = text;
@@ -236,7 +242,7 @@ describe("CompetitionsPage", () => {
       "create-comp",
       "subnav-side",
       "subnav-strip",
-      "add-members",
+      "detail-more",
     ]) {
       expect(byId(id).exists(), id).toBe(false);
     }
@@ -345,7 +351,8 @@ describe("CompetitionsPage", () => {
     await search(inBody("member-search")!, "zzz");
     expect(inBody("add-competitor-dialog")!.textContent).toContain("seuls les adhérents au statut « Terminé » peuvent être ajoutés");
 
-    await byId("load-group").trigger("click");
+    await openMore(byId);
+    inBody("load-group")!.click();
     await settle();
     expect(server.queries.filter((q) => q.path === "/api/competitions/10/load-group").map((q) => q.status)).toEqual([["Terminé"]]);
     expect(document.querySelector("#toast")!.textContent).toContain(
@@ -378,9 +385,11 @@ describe("CompetitionsPage", () => {
     await store.save("competitions", USER.uid, COMPETITIONS, null, "/api/competitions");
     await store.save("competitors", USER.uid, CONTACTS, null, "/api/members/competitors");
     const server = fakeApi({ down: true });
-    const { byId } = await render(offline, server.api, store, "/competitions?id=10");
+    const { byId, inBody } = await render(offline, server.api, store, "/competitions?id=10");
     await settle();
-    await byId("load-group").trigger("click");
+    await openMore(byId);
+    inBody("load-group")!.click();
+    await flushPromises();
     expect(document.querySelector("#toast")!.textContent).toContain("Hors ligne : seules les cases « Participe » et « Présent »");
     expect(server.writes()).toEqual([]);
   });
@@ -442,6 +451,29 @@ describe("CompetitionsPage", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("opens the first competition of the list by itself when the list and the detail are side by side", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(min-width: 768px)",
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    try {
+      const { byId, router } = await render(signedIn("coach"), fakeApi().api, store, "/competitions");
+      await settle();
+      expect(router.currentRoute.value.query.id).toBe("10");
+      expect(byId("detail-name").text()).toBe("Coupe du Rhône");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("opens no competition by itself on a phone, where the detail would hide the list", async () => {
+    const { byId, router } = await render(signedIn("coach"), fakeApi().api, store, "/competitions");
+    await settle();
+    expect(router.currentRoute.value.query.id).toBeUndefined();
+    expect(byId("comp-detail").exists()).toBe(false);
   });
 
   it("shows the placeholder, without statistics, when no competition is selected", async () => {

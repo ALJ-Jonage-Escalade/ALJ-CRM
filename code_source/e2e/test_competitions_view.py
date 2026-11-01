@@ -93,7 +93,7 @@ def test_readonly_sees_no_contacts_nor_management(mobile_page, competition):
     expect(participant(page, competition["member"])).to_be_visible()
     expect(page.get_by_test_id("emergency-link")).to_have_count(0)
     expect(participant(page, competition["member"]).get_by_test_id("participe")).to_have_text("✅ Participe")
-    for testid in ("participe-switch", "participant-actions", "detail-actions", "add-members", "create-comp", "subnav-side",
+    for testid in ("participe-switch", "participant-actions", "detail-actions", "detail-more", "create-comp", "subnav-side",
                    "subnav-strip"):
         expect(page.get_by_test_id(testid)).to_have_count(0)
 
@@ -139,7 +139,7 @@ def test_sign_in_ends_on_competitions(page):
     page.locator("#gate-login").click()
     page.wait_for_url(re.compile(re.escape(AUTH_HOST) + "/emulator/auth/handler"))
     page.get_by_text(ACCOUNTS["coach"].email).click()
-    page.wait_for_url(re.compile(r"/competitions$"))
+    page.wait_for_url(re.compile(r"/competitions(\?id=[^&]+)?$"))  # desktop: the first competition opens by itself
     expect(page.locator("#who")).to_contain_text(ACCOUNTS["coach"].email)
     expect(card(page, SEEDED_COMPETITION)).to_be_visible(timeout=20_000)
 

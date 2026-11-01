@@ -6,6 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
 import { dialogs } from "../../composables/dialogs";
+import { useMediaQuery } from "../../composables/media";
 import { CLIENT_KEY, type Schemas } from "../../lib/client";
 import { plural } from "../../lib/text";
 import { createCompetitionsApi } from "../../services/competitions";
@@ -50,6 +51,19 @@ watch(selectedId, (id) => {
   }
 });
 const selected = computed(() => all.value.find((c) => String(c.id) === selectedId.value));
+/* Side by side (Tailwind's md), the first competition of the list opens by itself instead of an empty detail; not on a
+   phone, where the detail would hide the list */
+const sideBySide = useMediaQuery("(min-width: 768px)");
+watch(
+  [selectedId, current, viewMode, sideBySide],
+  () => {
+    const first = current.value[0];
+    if (!selectedId.value && first && viewMode.value === "cards" && sideBySide.value) {
+      void router.replace({ query: { ...route.query, id: String(first.id) } });
+    }
+  },
+  { immediate: true },
+);
 const rows = computed(() =>
   selected.value
     ? participantRows(

@@ -92,7 +92,7 @@ def test_edit_and_delete_competition(page, test_data):
     page.get_by_test_id("delete-comp").click()
     expect(toast(page)).to_contain_text("Compétition supprimée")
     expect(competition_card(page, renamed)).to_have_count(0)
-    expect(page.get_by_test_id("comp-detail")).to_have_count(0)
+    expect(page.get_by_test_id("detail-name")).not_to_have_text(renamed)  # desktop: the first of the list opens instead
 
     def deleted():
         assert test_data.competition_by_name(renamed) is None

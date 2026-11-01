@@ -68,6 +68,7 @@ def test_competitors_shown_offline_other_changes_refused(mobile_page, competitio
     try:
         expect(page.get_by_test_id("detail-name")).to_have_text(competition["nom"])
         expect(emergency_links(page, member)).to_have_count(1)
+        page.get_by_test_id("detail-more").click()
         page.get_by_test_id("load-group").click()  # any other change needs the network
         expect(toast(page)).to_contain_text("Hors ligne : seules les cases « Participe » et « Présent »")
     finally:

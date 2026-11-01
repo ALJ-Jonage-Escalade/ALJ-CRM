@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* A competitor as a row of the wide-screen table (the former desktop page); ParticipantCard elsewhere. Same test ids,
-   events and rules as the card: « Participe » and « Présent » switches, then the action allowed by the payment. */
+   events and rules as the card, but no « Présent » column: the « Participe » switch, then the action allowed by the payment
+   (« Sur place » once checked in). */
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import { telHref } from "../../adherents/members";
 import { hasPaid, isCancelled, payment, ranking, type Row } from "../competitions";
@@ -66,24 +67,6 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       <span v-else data-testid="participe" class="text-xs font-bold" :class="row.selectionne ? 'text-blue-700' : 'text-slate-400'">
         {{ row.selectionne ? "✅ Oui" : "—" }}
       </span>
-    </td>
-    <td class="px-2.5 py-2">
-      <UiBadge :color="payment(row.statut_paiement).color" data-testid="payment-badge" title="Statut de paiement">
-        {{ payment(row.statut_paiement).label }}
-        <template v-if="row.montant_paye">({{ row.montant_paye }} €)</template>
-      </UiBadge>
-    </td>
-    <td class="px-2.5 py-2 text-center">
-      <input
-        v-if="canWrite"
-        type="checkbox"
-        data-testid="present-switch"
-        aria-label="Présent"
-        class="size-4.5 cursor-pointer accent-green-600"
-        :checked="row.present"
-        @change="onToggle('present', $event)"
-      />
-      <span v-else class="text-xs font-bold" :class="row.present ? 'text-green-700' : 'text-slate-400'">{{ row.present ? "✓" : "—" }}</span>
       <span
         v-if="row.queued.selectionne || row.queued.present"
         data-testid="queued"
@@ -92,6 +75,12 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       >
         ⏳ à envoyer
       </span>
+    </td>
+    <td class="px-2.5 py-2">
+      <UiBadge :color="payment(row.statut_paiement).color" data-testid="payment-badge" title="Statut de paiement">
+        {{ payment(row.statut_paiement).label }}
+        <template v-if="row.montant_paye">({{ row.montant_paye }} €)</template>
+      </UiBadge>
     </td>
     <td class="px-2.5 py-2">
       <div v-if="contactsShown && (row.phone || row.emergency.length)" class="flex flex-col items-start gap-1">

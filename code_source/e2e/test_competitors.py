@@ -134,6 +134,7 @@ def test_load_competition_group(mobile_page, test_data):
     page = open_screen(mobile_page)
     open_competition(page, nom)
     expect(page.get_by_test_id("participant-card")).to_have_count(0)
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("load-group").click()
     expect(page.get_by_test_id("participant-card")).to_have_count(len(group))
     expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (0)")
@@ -142,12 +143,14 @@ def test_load_competition_group(mobile_page, test_data):
         assert {p["statut_paiement"] for p in test_data.competition(cid)["participants"]} == {"non_invite"}
     eventually(loaded)
 
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("load-group").click()
     expect(toast(page)).to_contain_text("déjà présents")
 
     # Never invited: removed all at once
     accept_dialogs(page)
     page.get_by_test_id("filter-notInvited").click()
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("remove-not-invited").click()
     expect(page.get_by_test_id("participant-card")).to_have_count(0)
 
@@ -216,7 +219,9 @@ def test_withdrawal_of_paid_competitor(page, test_data, workflow, mode, badge, s
     _assert_stored(test_data, workflow, workflow["paid"], statut_paiement="paye", selectionne=True)
 
 
-def test_checked_in_competitor_is_locked(page, test_data, workflow):
+def test_checked_in_competitor_is_locked(mobile_page, test_data, workflow):
+    """On a phone: the wide table has no « Présent » column."""
+    page = mobile_page
     _open_workflow(page, workflow)
     card = participant_card(page, workflow["paid"])
     card.get_by_test_id("present-switch").click()
