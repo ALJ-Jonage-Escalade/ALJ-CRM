@@ -11,8 +11,6 @@ export interface CompetitionFilters {
   selectedSeason: Ref<string>;
   /** The seasons to choose from, the current one first even without a competition, newest first */
   seasons: ComputedRef<string[]>;
-  /** Not archived, of the selected season: what the statistics count */
-  seasonCompetitions: ComputedRef<Competition[]>;
   /** The season ones matching the search and the date chips */
   current: ComputedRef<Competition[]>;
   archived: ComputedRef<Competition[]>;
@@ -51,5 +49,5 @@ export function useCompetitionFilters(all: Readonly<Ref<readonly Competition[]>>
   const past = computed(() => all.value.filter((c) => !isArchived(c) && isPast(c, today)));
   const filtered = computed(() => Boolean(search.value) || when.value !== "all" || selectedSeason.value !== "all");
 
-  return { search, when, selectedSeason, seasons, seasonCompetitions, current, archived, calendar, past, filtered };
+  return { search, when, selectedSeason, seasons, current, archived, calendar, past, filtered };
 }

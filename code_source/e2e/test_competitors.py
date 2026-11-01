@@ -48,9 +48,8 @@ def _assert_stored(test_data, competition, member, **expected):
 def test_counters_and_filters(mobile_page, competition, members):
     page = open_screen(mobile_page)
     open_competition(page, competition["nom"])
-    expect(page.get_by_test_id("kpi-selected")).to_have_text("3")
-    expect(page.get_by_test_id("kpi-unpaid")).to_have_text("2")
-    expect(page.get_by_test_id("kpi-paid")).to_have_text("1")
+    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (3)")
+    expect(page.get_by_test_id("filter-unpaid")).to_have_text("⏳ Paiement en attente (2)")
     cards = page.get_by_test_id("participant-card")
     expect(cards).to_have_count(4)
     expect(participant_card(page, members["paid"]).get_by_test_id("payment-badge")).to_have_text("Payé (12 €)")
@@ -74,8 +73,8 @@ def test_select_invited_member(mobile_page, test_data, competition, members):
     page = open_screen(mobile_page)
     open_competition(page, competition["nom"])
     participant_card(page, invited).get_by_test_id("participe-switch").click()
-    expect(page.get_by_test_id("kpi-selected")).to_have_text("4")
-    expect(page.get_by_test_id("kpi-unpaid")).to_have_text("3")
+    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (4)")
+    expect(page.get_by_test_id("filter-unpaid")).to_have_text("⏳ Paiement en attente (3)")
     expect(participant_card(page, invited).get_by_test_id("payment-badge")).to_have_text("En attente")
     _assert_stored(test_data, competition, invited, selectionne=True, statut_paiement="en_attente")
 
@@ -124,7 +123,7 @@ def test_add_member_outside_the_list(mobile_page, test_data, competition, member
     result.get_by_test_id("member-add").click()
     expect(participant_card(page, outsider)).to_be_visible()
     expect(page.get_by_test_id("member-search")).to_have_value("")  # the dialog stays open for the next one
-    expect(page.get_by_test_id("kpi-selected")).to_have_text("4")
+    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (4)")
     _assert_stored(test_data, competition, outsider, selectionne=True)
 
 
@@ -135,20 +134,23 @@ def test_load_competition_group(mobile_page, test_data):
     page = open_screen(mobile_page)
     open_competition(page, nom)
     expect(page.get_by_test_id("participant-card")).to_have_count(0)
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("load-group").click()
     expect(page.get_by_test_id("participant-card")).to_have_count(len(group))
-    expect(page.get_by_test_id("kpi-selected")).to_have_text("0")
+    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (0)")
 
     def loaded():
         assert {p["statut_paiement"] for p in test_data.competition(cid)["participants"]} == {"non_invite"}
     eventually(loaded)
 
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("load-group").click()
     expect(toast(page)).to_contain_text("déjà présents")
 
     # Never invited: removed all at once
     accept_dialogs(page)
     page.get_by_test_id("filter-notInvited").click()
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("remove-not-invited").click()
     expect(page.get_by_test_id("participant-card")).to_have_count(0)
 
@@ -217,13 +219,15 @@ def test_withdrawal_of_paid_competitor(page, test_data, workflow, mode, badge, s
     _assert_stored(test_data, workflow, workflow["paid"], statut_paiement="paye", selectionne=True)
 
 
-def test_checked_in_competitor_is_locked(page, test_data, workflow):
+def test_checked_in_competitor_is_locked(mobile_page, test_data, workflow):
+    """On a phone: the wide table has no « Présent » column."""
+    page = mobile_page
     _open_workflow(page, workflow)
     card = participant_card(page, workflow["paid"])
     card.get_by_test_id("present-switch").click()
     expect(card.get_by_test_id("on-site")).to_contain_text("Sur place")
     expect(card.get_by_test_id("withdraw")).to_have_count(0)
-    expect(page.get_by_test_id("kpi-present")).to_have_text("1 / 2")
+    expect(card.get_by_test_id("present-switch")).to_be_checked()
     _assert_stored(test_data, workflow, workflow["paid"], present=True)
 
 

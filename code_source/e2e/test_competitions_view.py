@@ -63,7 +63,7 @@ def test_phone_list_then_competition(mobile_page, competition):
     expect(row.get_by_test_id("participe-switch")).to_be_checked()
     expect(row.get_by_test_id("payment-badge")).to_be_visible()
     expect(row.get_by_test_id("emergency-link")).to_have_count(1)
-    expect(page.get_by_test_id("kpi-selected")).to_have_text("1")
+    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (1)")
     assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"), "no horizontal scroll"
     page.get_by_test_id("back-link").click()
     expect(card(page, SEEDED_COMPETITION)).to_be_visible()
@@ -93,7 +93,7 @@ def test_readonly_sees_no_contacts_nor_management(mobile_page, competition):
     expect(participant(page, competition["member"])).to_be_visible()
     expect(page.get_by_test_id("emergency-link")).to_have_count(0)
     expect(participant(page, competition["member"]).get_by_test_id("participe")).to_have_text("✅ Participe")
-    for testid in ("participe-switch", "participant-actions", "detail-actions", "add-members", "create-comp", "subnav-side",
+    for testid in ("participe-switch", "participant-actions", "detail-actions", "detail-more", "create-comp", "subnav-side",
                    "subnav-strip"):
         expect(page.get_by_test_id(testid)).to_have_count(0)
 
@@ -139,7 +139,7 @@ def test_sign_in_ends_on_competitions(page):
     page.locator("#gate-login").click()
     page.wait_for_url(re.compile(re.escape(AUTH_HOST) + "/emulator/auth/handler"))
     page.get_by_text(ACCOUNTS["coach"].email).click()
-    page.wait_for_url(re.compile(r"/competitions$"))
+    page.wait_for_url(re.compile(r"/competitions(\?id=[^&]+)?$"))  # desktop: the first competition opens by itself
     expect(page.locator("#who")).to_contain_text(ACCOUNTS["coach"].email)
     expect(card(page, SEEDED_COMPETITION)).to_be_visible(timeout=20_000)
 

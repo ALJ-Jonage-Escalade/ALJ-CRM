@@ -68,6 +68,7 @@ def test_competitors_shown_offline_other_changes_refused(mobile_page, competitio
     try:
         expect(page.get_by_test_id("detail-name")).to_have_text(competition["nom"])
         expect(emergency_links(page, member)).to_have_count(1)
+        page.get_by_test_id("detail-more").click()
         page.get_by_test_id("load-group").click()  # any other change needs the network
         expect(toast(page)).to_contain_text("Hors ligne : seules les cases « Participe » et « Présent »")
     finally:
@@ -101,7 +102,7 @@ def test_change_made_offline_is_sent_later(mobile_page, test_data, competition):
         expect(card.get_by_test_id("queued")).to_be_visible()
         card.get_by_test_id("present-switch").click()  # the same competitor, the other flag
         expect(page.locator("#sync-info")).to_contain_text("2 modifications à envoyer")
-        expect(page.get_by_test_id("kpi-selected")).to_have_text("0")
+        expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (0)")
         assert participant(test_data, competition)["selectionne"] is True  # not sent yet
         # Kept on the device: still there after a restart without network (the page itself needs the network to
         # load here: service workers are blocked)
@@ -140,7 +141,7 @@ def test_change_made_offline_is_refused_when_changed_elsewhere(mobile_page, test
     expect(toast(page)).to_contain_text("modifié entre-temps sur un autre appareil")
     assert participant(test_data, competition)["selectionne"] is True
     expect(participant_card(page, member).get_by_test_id("queued")).to_have_count(0)
-    expect(page.get_by_test_id("kpi-selected")).to_have_text("1")
+    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (1)")
 
 
 def test_change_queued_by_the_former_page_is_sent(mobile_page, test_data, competition):

@@ -36,5 +36,5 @@ def test_selection_reaches_other_phone(mobile_page, second_phone, test_data):
     open_competition(first, nom)
     open_competition(second, nom)
     participant_card(first, member).get_by_test_id("participe-switch").click()
-    expect(second.get_by_test_id("kpi-selected")).to_have_text("1", timeout=SYNC_TIMEOUT)
+    expect(second.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (1)", timeout=SYNC_TIMEOUT)
     expect(participant_card(second, member).get_by_test_id("participe-switch")).to_be_checked()

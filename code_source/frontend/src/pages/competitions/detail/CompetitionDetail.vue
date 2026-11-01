@@ -18,7 +18,6 @@ import { csvBlob } from "../../../lib/csv";
 import { saveExport, saveFile } from "../../../lib/download";
 import { formatEuros } from "../../../lib/format";
 import CompetitionForm from "../CompetitionForm.vue";
-import CompetitionCharts from "./CompetitionCharts.vue";
 import {
   countLine,
   counts,
@@ -73,12 +72,6 @@ const router = useRouter();
 
 const c = computed(() => props.competition);
 const kpis = computed(() => counts(props.rows));
-const KPIS = computed(() => [
-  { id: "selected", label: "Participe", value: String(kpis.value.selected), color: "text-blue-600" },
-  { id: "unpaid", label: "Paiement en attente", value: String(kpis.value.unpaid), color: "text-amber-600" },
-  { id: "paid", label: "Paiement validé", value: String(kpis.value.paid), color: "text-green-600" },
-  { id: "present", label: "Présents", value: `${kpis.value.present} / ${kpis.value.selected}`, color: "text-violet-600" },
-]);
 /* Wide screens: the competitors in a table, as on the former desktop page; cards elsewhere */
 const wide = useMediaQuery("(min-width: 1280px)");
 const filter = ref<ParticipantFilter>("all");
@@ -432,12 +425,22 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         <UiButton variant="muted" small data-testid="email-comp" @click="emailing = true">✉️ Envoyer un email aux compétiteurs</UiButton>
         <!-- Actions secondaires -->
         <UiMenu label="⋯ Plus" small :busy="fetching && 'Recherche MyCompet…'" aria-label="Plus d'actions" data-testid="detail-more">
+          <UiMenuItem data-testid="load-group" @select="loadGroup">🧗 Charger le groupe « Compétition »</UiMenuItem>
           <UiMenuItem data-testid="fetch-results" @select="fetchResults()">🏆 Trouver les résultats</UiMenuItem>
           <UiMenuItem data-testid="export-csv" :disabled="!rows.length" @select="exportCsv">📥 Export CSV</UiMenuItem>
           <UiMenuItem data-testid="export-excel-menu" :disabled="!rows.length" @select="exportFile('excel')">📊 Export Excel</UiMenuItem>
           <UiMenuItem data-testid="export-pdf-menu" :disabled="!rows.length" @select="exportFile('pdf')">📄 Export PDF</UiMenuItem>
           <UiMenuItem :data-testid="isArchived(c) ? 'unarchive-comp' : 'archive-comp'" @select="archive(!isArchived(c))">
             {{ isArchived(c) ? "♻️ Désarchiver" : "📦 Archiver" }}
+          </UiMenuItem>
+          <UiMenuItem
+            danger
+            data-testid="remove-not-invited"
+            :disabled="!notInvited.length || writer.busy.value"
+            title="Retirer de cette compétition tous les athlètes jamais invités (ils restent dans la base du club)"
+            @select="removeNotInvited"
+          >
+            🗑️ Retirer les non invités ({{ notInvited.length }})
           </UiMenuItem>
           <UiMenuItem danger data-testid="delete-comp" :disabled="writer.busy.value" @select="remove">🗑️ Supprimer</UiMenuItem>
         </UiMenu>
@@ -550,14 +553,13 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
                 Participe
               </th>
               <th class="px-2.5 py-2">Paiement</th>
-              <th class="px-2.5 py-2 text-center" title="Pointage sur place le jour de l'épreuve">Présent</th>
               <th class="px-2.5 py-2">Contact</th>
               <th v-if="canWrite" class="px-2.5 py-2 text-center">Action</th>
             </tr>
           </thead>
           <tbody v-for="[group, list] in groups" :key="group" data-testid="participant-group">
             <tr class="border-t border-slate-200 bg-slate-100/70">
-              <th :colspan="canWrite ? 7 : 6" class="px-2.5 py-1.5 text-xs font-bold text-slate-600 uppercase">
+              <th :colspan="canWrite ? 6 : 5" class="px-2.5 py-1.5 text-xs font-bold text-slate-600 uppercase">
                 {{ group }} · {{ list.length }} compétiteur{{ plural(list.length) }}
               </th>
             </tr>
@@ -607,43 +609,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           </ul>
         </div>
       </template>
-    </div>
-
-    <!-- Statistiques, juste avant la gestion des inscriptions (même rang flex : l'ordre du DOM les départage) -->
-    <div :class="wide ? 'order-2' : 'mt-4'">
-      <div class="mb-3 grid grid-cols-4 gap-2 text-center lg:gap-2.5">
-        <div v-for="k in KPIS" :key="k.id" class="rounded-xl border border-slate-200 bg-white px-1 py-2 shadow-sm lg:px-3 lg:py-2.5">
-          <div :class="['text-xl font-extrabold', k.color]" :data-testid="`kpi-${k.id}`">{{ k.value }}</div>
-          <div class="text-[11px] font-semibold text-slate-500 lg:uppercase">{{ k.label }}</div>
-        </div>
-      </div>
-
-      <!-- Graphiques de répartition (catégorie et discipline) -->
-      <CompetitionCharts :competition="c" :rows="rows" />
-    </div>
-
-    <div
-      v-if="canWrite"
-      :class="['rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm', wide ? 'order-2 mb-3' : 'mt-4']"
-      data-testid="add-members"
-    >
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <b class="text-[13.5px]">Gérer les inscriptions</b>
-        <div class="flex flex-wrap gap-2">
-          <UiButton variant="muted" small data-testid="load-group" @click="loadGroup">🧗 Charger le groupe « Compétition »</UiButton>
-          <UiButton
-            v-if="canWrite"
-            variant="danger"
-            small
-            data-testid="remove-not-invited"
-            :disabled="!notInvited.length || writer.busy.value"
-            title="Retirer de cette compétition tous les athlètes jamais invités (ils restent dans la base du club)"
-            @click="removeNotInvited"
-          >
-            🗑️ Retirer tous les compétiteurs non invités ({{ notInvited.length }})
-          </UiButton>
-        </div>
-      </div>
     </div>
 
     <UiDialog v-model:open="editing" :title="`✏️ Modifier : ${c.nom}`" wide data-testid="edit-dialog">

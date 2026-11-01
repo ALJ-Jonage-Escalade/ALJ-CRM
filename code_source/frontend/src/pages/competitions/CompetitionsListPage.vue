@@ -6,6 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
 import { dialogs } from "../../composables/dialogs";
+import { useMediaQuery } from "../../composables/media";
 import { CLIENT_KEY, type Schemas } from "../../lib/client";
 import { plural } from "../../lib/text";
 import { createCompetitionsApi } from "../../services/competitions";
@@ -16,7 +17,6 @@ import { COMPETITIONS_KEY } from "./context";
 import CompetitionCalendar from "./list/CompetitionCalendar.vue";
 import CompetitionCards from "./list/CompetitionCards.vue";
 import CompetitionFilters from "./list/CompetitionFilters.vue";
-import CompetitionStats from "./list/CompetitionStats.vue";
 import CompetitionTable from "./list/CompetitionTable.vue";
 import { useCompetitionFilters, type ViewMode } from "./list/filters";
 import ViewSwitcher from "./list/ViewSwitcher.vue";
@@ -34,7 +34,6 @@ const {
   when,
   selectedSeason,
   seasons,
-  seasonCompetitions,
   current,
   archived: archivedCompetitions,
   calendar: calendarCompetitions,
@@ -52,6 +51,19 @@ watch(selectedId, (id) => {
   }
 });
 const selected = computed(() => all.value.find((c) => String(c.id) === selectedId.value));
+/* Side by side (Tailwind's md), the first competition of the list opens by itself instead of an empty detail; not on a
+   phone, where the detail would hide the list */
+const sideBySide = useMediaQuery("(min-width: 768px)");
+watch(
+  [selectedId, current, viewMode, sideBySide],
+  () => {
+    const first = current.value[0];
+    if (!selectedId.value && first && viewMode.value === "cards" && sideBySide.value) {
+      void router.replace({ query: { ...route.query, id: String(first.id) } });
+    }
+  },
+  { immediate: true },
+);
 const rows = computed(() =>
   selected.value
     ? participantRows(
@@ -235,10 +247,8 @@ const listLine = computed(() => {
     <div
       v-else-if="viewMode === 'cards'"
       class="order-1 flex min-w-0 flex-col gap-3 md:order-2 md:col-start-2 md:row-start-1"
-      data-testid="stats-no-selection"
+      data-testid="no-selection"
     >
-      <CompetitionStats :competitions="seasonCompetitions" :today="today" />
-
       <div class="hidden rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-slate-500 md:block">
         <p class="m-0 text-sm font-medium">
           {{
