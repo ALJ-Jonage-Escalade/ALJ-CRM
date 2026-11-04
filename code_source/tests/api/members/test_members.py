@@ -77,6 +77,30 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         leo = self.client.get("/api/members").json()["members"][0]
         self.assertEqual((leo["phone"], leo["badge_rouge"], leo["tarif_name"], leo["status_norm"]), ("06 11 22 33 44", "Oui", "Loisir", "Validé"))
 
+    def test_update_modifies_all_fields_including_identity_and_emergency(self):
+        r = self.update({
+            "last_name": "BERNARD",
+            "first_name": "Léonard",
+            "birth_date": "2011-06-15",
+            "amount": 135.5,
+            "emergency1_name": "DUPONT Pierre",
+            "emergency1_phone": "06 01 02 03 04",
+            "emergency2_name": "DUPONT Marie",
+            "emergency2_phone": "06 05 06 07 08",
+            "photo_auth": "Non",
+        })
+        self.assertEqual(r.status_code, 200, r.text)
+        updated = self.client.get("/api/members").json()["members"][0]
+        self.assertEqual(updated["last_name"], "BERNARD")
+        self.assertEqual(updated["first_name"], "Léonard")
+        self.assertEqual(updated["birth_date"], "2011-06-15")
+        self.assertEqual(updated["amount"], 135.5)
+        self.assertEqual(updated["emergency1_name"], "Dupont Pierre")
+        self.assertEqual(updated["emergency1_phone"], "06 01 02 03 04")
+        self.assertEqual(updated["emergency2_name"], "Dupont Marie")
+        self.assertEqual(updated["emergency2_phone"], "06 05 06 07 08")
+        self.assertEqual(updated["photo_auth"], "Non")
+
     def test_update_refusals(self):
         bad_email = self.update({"email_primary": "pas-une-adresse"})
         self.assertEqual(bad_email.status_code, 422)

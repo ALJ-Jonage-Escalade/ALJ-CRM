@@ -71,54 +71,49 @@ const attrs = (name: DraftField) => ({
   "aria-describedby": errors.value[name] ? `member-${name}-error` : undefined,
 });
 
-const TEXT_FIELDS: { name: DraftField; label: string; type?: string; placeholder?: string; wide?: boolean; adding?: boolean }[] = [
+const TEXT_FIELDS: { name: DraftField; label: string; type?: string; placeholder?: string }[] = [
   { name: "email_primary", label: "✉️ E-mail principal", type: "email", placeholder: "nom@example.com" },
   { name: "email_secondary", label: "✉️ E-mail secondaire", type: "email", placeholder: "deuxieme@example.com" },
   { name: "phone", label: "📞 Téléphone", type: "tel", placeholder: "06 12 34 56 78" },
   { name: "zip_code", label: "Code postal", placeholder: "69330" },
   { name: "city", label: "Ville", placeholder: "Jonage" },
-  { name: "emergency1_name", label: "Contact d'urgence (nom, prénom)", placeholder: "DUPONT Pierre", adding: true },
-  { name: "emergency1_phone", label: "Téléphone d'urgence", type: "tel", placeholder: "06 98 76 54 32", adding: true },
 ];
-const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.adding));
 </script>
 
 <template>
   <form ref="root" novalidate class="flex flex-col gap-3" data-testid="member-form" @submit.prevent="submit">
-    <template v-if="adding">
-      <div :class="section">👤 Identité</div>
-      <div class="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label for="member-last_name" :class="label">Nom de famille *</label>
-          <input
-            v-model="draft.last_name"
-            v-bind="attrs('last_name')"
-            type="text"
-            placeholder="DUPONT"
-            autocomplete="off"
-            :class="[fieldClass('last_name'), 'uppercase']"
-          />
-          <p v-if="errors.last_name" id="member-last_name-error" class="mt-1 text-xs text-red-600">{{ errors.last_name }}</p>
-        </div>
-        <div>
-          <label for="member-first_name" :class="label">Prénom *</label>
-          <input
-            v-model="draft.first_name"
-            v-bind="attrs('first_name')"
-            type="text"
-            placeholder="Jean"
-            autocomplete="off"
-            :class="fieldClass('first_name')"
-          />
-          <p v-if="errors.first_name" id="member-first_name-error" class="mt-1 text-xs text-red-600">{{ errors.first_name }}</p>
-        </div>
-        <div>
-          <label for="member-birth_date" :class="label">Date de naissance *</label>
-          <input v-model="draft.birth_date" v-bind="attrs('birth_date')" type="date" :class="fieldClass('birth_date')" />
-          <p v-if="errors.birth_date" id="member-birth_date-error" class="mt-1 text-xs text-red-600">{{ errors.birth_date }}</p>
-        </div>
+    <div :class="section">👤 Identité</div>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div>
+        <label for="member-last_name" :class="label">Nom de famille *</label>
+        <input
+          v-model="draft.last_name"
+          v-bind="attrs('last_name')"
+          type="text"
+          placeholder="DUPONT"
+          autocomplete="off"
+          :class="[fieldClass('last_name'), 'uppercase']"
+        />
+        <p v-if="errors.last_name" id="member-last_name-error" class="mt-1 text-xs text-red-600">{{ errors.last_name }}</p>
       </div>
-    </template>
+      <div>
+        <label for="member-first_name" :class="label">Prénom *</label>
+        <input
+          v-model="draft.first_name"
+          v-bind="attrs('first_name')"
+          type="text"
+          placeholder="Jean"
+          autocomplete="off"
+          :class="fieldClass('first_name')"
+        />
+        <p v-if="errors.first_name" id="member-first_name-error" class="mt-1 text-xs text-red-600">{{ errors.first_name }}</p>
+      </div>
+      <div>
+        <label for="member-birth_date" :class="label">Date de naissance {{ adding ? "*" : "" }}</label>
+        <input v-model="draft.birth_date" v-bind="attrs('birth_date')" type="date" :class="fieldClass('birth_date')" />
+        <p v-if="errors.birth_date" id="member-birth_date-error" class="mt-1 text-xs text-red-600">{{ errors.birth_date }}</p>
+      </div>
+    </div>
 
     <div :class="section">📋 Inscription</div>
     <div class="grid gap-3 sm:grid-cols-2">
@@ -128,7 +123,7 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
           <option v-for="[value, text] in statuses" :key="value" :value="value">{{ text }}</option>
         </select>
       </div>
-      <div v-if="adding">
+      <div>
         <label for="member-amount" :class="label">Montant payé (€)</label>
         <input v-model="draft.amount" v-bind="attrs('amount')" type="text" inputmode="decimal" :class="fieldClass('amount')" />
         <p v-if="errors.amount" id="member-amount-error" class="mt-1 text-xs text-red-600">{{ errors.amount }}</p>
@@ -203,6 +198,13 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
           <option value="Oui">Oui</option>
         </select>
       </div>
+      <div>
+        <label for="member-photo_auth" :class="label">📷 Droit à l'image</label>
+        <select v-model="draft.photo_auth" v-bind="attrs('photo_auth')" :class="fieldClass('photo_auth')">
+          <option value="Oui">Oui</option>
+          <option value="Non">Non</option>
+        </select>
+      </div>
     </div>
 
     <div :class="section">📞 Coordonnées</div>
@@ -212,7 +214,7 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
       <textarea v-model="draft.address" v-bind="attrs('address')" rows="2" placeholder="12 rue de la Paix" :class="fieldClass('address')" />
     </div>
     <div class="grid gap-3 sm:grid-cols-2">
-      <div v-for="f in textFields" :key="f.name">
+      <div v-for="f in TEXT_FIELDS" :key="f.name">
         <label :for="`member-${f.name}`" :class="label">{{ f.label }}</label>
         <input
           v-model="draft[f.name]"
@@ -222,6 +224,56 @@ const textFields = computed(() => TEXT_FIELDS.filter((f) => !f.adding || props.a
           :class="fieldClass(f.name)"
         />
         <p v-if="errors[f.name]" :id="`member-${f.name}-error`" class="mt-1 text-xs text-red-600">{{ errors[f.name] }}</p>
+      </div>
+    </div>
+
+    <div :class="section">🚨 Contacts d'urgence</div>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div>
+        <label for="member-emergency1_name" :class="label">Contact d'urgence 1 (nom, prénom)</label>
+        <input
+          v-model="draft.emergency1_name"
+          v-bind="attrs('emergency1_name')"
+          type="text"
+          placeholder="DUPONT Pierre"
+          :class="fieldClass('emergency1_name')"
+        />
+      </div>
+      <div>
+        <label for="member-emergency1_phone" :class="label">Téléphone d'urgence 1</label>
+        <input
+          v-model="draft.emergency1_phone"
+          v-bind="attrs('emergency1_phone')"
+          type="tel"
+          placeholder="06 98 76 54 32"
+          :class="fieldClass('emergency1_phone')"
+        />
+        <p v-if="errors.emergency1_phone" id="member-emergency1_phone-error" class="mt-1 text-xs text-red-600">
+          {{ errors.emergency1_phone }}
+        </p>
+      </div>
+      <div>
+        <label for="member-emergency2_name" :class="label">Contact d'urgence 2 (nom, prénom)</label>
+        <input
+          v-model="draft.emergency2_name"
+          v-bind="attrs('emergency2_name')"
+          type="text"
+          placeholder="DUPONT Marie"
+          :class="fieldClass('emergency2_name')"
+        />
+      </div>
+      <div>
+        <label for="member-emergency2_phone" :class="label">Téléphone d'urgence 2</label>
+        <input
+          v-model="draft.emergency2_phone"
+          v-bind="attrs('emergency2_phone')"
+          type="tel"
+          placeholder="06 11 22 33 44"
+          :class="fieldClass('emergency2_phone')"
+        />
+        <p v-if="errors.emergency2_phone" id="member-emergency2_phone-error" class="mt-1 text-xs text-red-600">
+          {{ errors.emergency2_phone }}
+        </p>
       </div>
     </div>
 

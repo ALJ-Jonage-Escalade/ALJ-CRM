@@ -42,6 +42,10 @@ def update_member_api(data: MemberUpdate) -> Union[MemberUpdated, JSONResponse]:
         return error(500, internal_error(e, "update_member_api"))
     if not success:
         return error(400, err)
+
+    from infrastructure.firestore.cloud_database import CloudDatabase
+    if CloudDatabase.is_enabled():
+        CloudDatabase.after_write()
     return MemberUpdated(status="success", message="Fiche adhérent mise à jour avec succès.")
 
 

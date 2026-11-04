@@ -73,13 +73,7 @@ const rows = computed(() => recordRows(props.member));
         <UiButton variant="muted" small data-testid="record-attestation" title="Attestation de paiement (PDF)" @click="emit('attestation')">
           📄 Attestation
         </UiButton>
-        <UiButton
-          variant="muted"
-          small
-          data-testid="record-edit"
-          title="Modifier le créneau, les badges et les coordonnées"
-          @click="emit('edit')"
-        >
+        <UiButton variant="muted" small data-testid="record-edit" title="Modifier la fiche adhérent" @click="emit('edit')">
           ✏️ Modifier
         </UiButton>
       </template>

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import datetime
 import os
+import sqlite3
 from typing import Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 
 from domain.constants import CORRECTIVE_MAP
 from domain.members.sex import parse_sex
+from domain.utils import normalize_name
 from infrastructure.sqlite import schema_v2
 from infrastructure.sqlite.connection import DB_WRITE_ERROR, SqliteDatabase
 
@@ -277,6 +279,12 @@ class MemberRepository:
                 rec["champ_Personne à prévenir en cas d'urgence - NOM  et PRENOM en majuscule"] = str(fields.get("emergency1_name") or "").strip()
             if "emergency1_phone" in fields:
                 rec["champ_Personne à prévenir en cas d'urgence - Téléphone"] = str(fields.get("emergency1_phone") or "").strip()
+            if "emergency2_name" in fields:
+                rec["champ_Parent 2  à prévenir en cas d'urgence - NOM ET PRENOM (en majuscule)"] = str(fields.get("emergency2_name") or "").strip()
+            if "emergency2_phone" in fields:
+                rec["champ_Parent 2 - Numéro de téléphone portable"] = str(fields.get("emergency2_phone") or "").strip()
+            if "photo_auth" in fields:
+                rec["champ_Autorisation d'utilisation de l'image (photos, vidéos)"] = str(fields.get("photo_auth") or "Oui").strip()
             comment = fields.get("commentaires_correctif") if "commentaires_correctif" in fields else fields.get("commentaire")
             if comment is not None:
                 rec["commentaires_correctif"] = str(comment).strip()
@@ -451,10 +459,26 @@ class MemberRepository:
 
             # 1. Mise à jour de la table users
             user_updates = {}
+            if "last_name" in fields:
+                ln = str(fields["last_name"] or "").strip().upper()
+                if ln:
+                    user_updates["last_name"] = ln
+                    user_updates["last_name_key"] = normalize_name(ln).upper()
+            if "first_name" in fields:
+                fn = str(fields["first_name"] or "").strip()
+                if fn:
+                    user_updates["first_name"] = fn
+                    user_updates["first_name_key"] = normalize_name(fn).lower()
+            if "birth_date" in fields:
+                raw_dob = str(fields["birth_date"] or "").strip()
+                user_updates["birth_date"] = schema_v2.parse_iso_date(raw_dob) if raw_dob else ""
+                user_updates["birth_date_raw"] = raw_dob
             if "badge_rouge" in fields:
                 user_updates["badge_rouge"] = str(fields["badge_rouge"] or "Non").strip()
             if "autonomie_bloc" in fields:
                 user_updates["autonomie_bloc"] = str(fields["autonomie_bloc"] or "Non").strip()
+            if "photo_auth" in fields:
+                user_updates["photo_auth"] = str(fields["photo_auth"] or "Oui").strip()
             if "email_primary" in fields:
                 user_updates["email_primary"] = str(fields["email_primary"] or "").strip()
             if "email_secondary" in fields:
@@ -472,6 +496,14 @@ class MemberRepository:
                 user_updates["zip_code"] = str(fields["zip_code"] or "").strip()
             if "city" in fields:
                 user_updates["city"] = str(fields["city"] or "").strip()
+            if "emergency1_name" in fields:
+                user_updates["emergency1_name"] = str(fields["emergency1_name"] or "").strip()
+            if "emergency1_phone" in fields:
+                user_updates["emergency1_phone"] = str(fields["emergency1_phone"] or "").strip()
+            if "emergency2_name" in fields:
+                user_updates["emergency2_name"] = str(fields["emergency2_name"] or "").strip()
+            if "emergency2_phone" in fields:
+                user_updates["emergency2_phone"] = str(fields["emergency2_phone"] or "").strip()
 
             if user_updates and resolved_uid is not None:
                 sets = [f'"{col}" = ?' for col in user_updates.keys()]
@@ -479,7 +511,7 @@ class MemberRepository:
                 params = list(user_updates.values()) + [now_iso, int(resolved_uid)]
                 cursor.execute(f'UPDATE users SET {", ".join(sets)} WHERE id = ?', params)  # noqa: S608 - colonnes de la liste fixe ci-dessus
 
-            # 2. Mise à jour de la table purchases (créneau / tarif)
+            # 2. Mise à jour de la table purchases (créneau / tarif, montant)
             if "tarif_name" in fields:
                 new_tarif = str(fields["tarif_name"] or "").strip()
                 if new_tarif:
@@ -501,6 +533,27 @@ class MemberRepository:
                             SET tarif_name = ?, updated_at = ?, is_modified = 'Oui'
                             WHERE user_id = ?
                         """, (new_tarif, now_iso, int(resolved_uid)))
+
+            if "amount" in fields and fields["amount"] is not None:
+                new_amount = float(fields["amount"])
+                if purchase_id:
+                    cursor.execute("""
+                        UPDATE purchases
+                        SET amount = ?, updated_at = ?, is_modified = 'Oui'
+                        WHERE id = ?
+                    """, (new_amount, now_iso, int(purchase_id)))
+                elif order_ref and resolved_uid:
+                    cursor.execute("""
+                        UPDATE purchases
+                        SET amount = ?, updated_at = ?, is_modified = 'Oui'
+                        WHERE user_id = ? AND order_id IN (SELECT id FROM orders WHERE order_ref = ?)
+                    """, (new_amount, now_iso, int(resolved_uid), str(order_ref).strip()))
+                elif resolved_uid:
+                    cursor.execute("""
+                        UPDATE purchases
+                        SET amount = ?, updated_at = ?, is_modified = 'Oui'
+                        WHERE user_id = ?
+                    """, (new_amount, now_iso, int(resolved_uid)))
 
             # 3. Mise à jour du statut de l'adhésion (purchases & orders)
             if "status" in fields:
@@ -572,6 +625,10 @@ class MemberRepository:
             conn.commit()
             print(f"[SQLITE] Adhérent #{resolved_uid} mis à jour avec succès : {list(fields.keys())}")
             return True, ""
+        except sqlite3.IntegrityError as e:
+            print(f"❌ [SQLITE] Erreur d'intégrité lors de la mise à jour de l'adhérent : {e}")
+            conn.rollback()
+            return False, "Un autre adhérent avec les mêmes nom, prénom et date de naissance existe déjà."
         except Exception as e:
             print(f"❌ [SQLITE] Erreur lors de la mise à jour de l'adhérent : {e}")
             conn.rollback()

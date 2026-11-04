@@ -2967,8 +2967,16 @@ export interface components {
          * @description Fields of a member record to change; a field left out is kept (only the given ones are written).
          */
         MemberChanges: {
+            /** Last Name */
+            last_name?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Birth Date */
+            birth_date?: string | null;
             /** Status */
             status?: ("Validé" | "Traité" | "En cours" | "Terminé" | "Annulé") | null;
+            /** Amount */
+            amount?: number | null;
             /** Licence Ffme */
             licence_ffme?: string | null;
             /** @description Sent as null to clear it */
@@ -2977,6 +2985,8 @@ export interface components {
             badge_rouge?: ("Oui" | "Non") | null;
             /** Autonomie Bloc */
             autonomie_bloc?: ("Oui" | "Non") | null;
+            /** Photo Auth */
+            photo_auth?: ("Oui" | "Non") | null;
             /** Email Primary */
             email_primary?: string | null;
             /** Email Secondary */
@@ -2989,6 +2999,14 @@ export interface components {
             zip_code?: string | null;
             /** City */
             city?: string | null;
+            /** Emergency1 Name */
+            emergency1_name?: string | null;
+            /** Emergency1 Phone */
+            emergency1_phone?: string | null;
+            /** Emergency2 Name */
+            emergency2_name?: string | null;
+            /** Emergency2 Phone */
+            emergency2_phone?: string | null;
             /** Tarif Name */
             tarif_name?: string | null;
             /** Commentaires Correctif */
@@ -3110,6 +3128,12 @@ export interface components {
              */
             autonomie_bloc?: "Oui" | "Non";
             /**
+             * Photo Auth
+             * @default Oui
+             * @enum {string}
+             */
+            photo_auth?: "Oui" | "Non";
+            /**
              * Email Primary
              * @default
              */
@@ -3149,6 +3173,16 @@ export interface components {
              * @default
              */
             emergency1_phone?: string;
+            /**
+             * Emergency2 Name
+             * @default
+             */
+            emergency2_name?: string;
+            /**
+             * Emergency2 Phone
+             * @default
+             */
+            emergency2_phone?: string;
             /**
              * Commentaires Correctif
              * @default

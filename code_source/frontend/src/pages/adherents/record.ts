@@ -100,7 +100,7 @@ export const STATUS_CHOICES = [
   ["Annulé", "🔴 Annulé"],
 ] as const;
 
-/** Values of the form, as typed. Identity, birth, amount and emergency contact are only asked when adding. */
+/** Values of the form, as typed. All fields can be edited or filled when adding. */
 export interface MemberDraft {
   last_name: string;
   first_name: string;
@@ -114,6 +114,7 @@ export interface MemberDraft {
   licence_ffme: string;
   badge_rouge: "Oui" | "Non";
   autonomie_bloc: "Oui" | "Non";
+  photo_auth: "Oui" | "Non";
   email_primary: string;
   email_secondary: string;
   phone: string;
@@ -122,6 +123,8 @@ export interface MemberDraft {
   city: string;
   emergency1_name: string;
   emergency1_phone: string;
+  emergency2_name: string;
+  emergency2_phone: string;
   commentaires_correctif: string;
 }
 
@@ -135,22 +138,25 @@ export function draftOf(m?: Member, firstTarif = ""): MemberDraft {
   return {
     last_name: m?.last_name ?? "",
     first_name: m?.first_name ?? "",
-    birth_date: "",
+    birth_date: m?.birth_date ?? "",
     sex: m?.sex ?? "",
     status: m?.status_norm || "Validé",
-    amount: "0.00",
+    amount: m ? (m.amount != null ? String(m.amount) : "") : "0.00",
     tarif_name: m ? m.tarif_name : firstTarif,
     licence_ffme: m?.licence_ffme ?? "",
     badge_rouge: m && yes(m.badge_rouge) ? "Oui" : "Non",
     autonomie_bloc: m && yes(m.autonomie_bloc) ? "Oui" : "Non",
+    photo_auth: m ? (yes(m.photo_auth) ? "Oui" : "Non") : "Oui",
     email_primary: m?.email_primary ?? "",
     email_secondary: m?.email_secondary ?? "",
     phone: m?.phone ?? "",
     address: m?.address ?? "",
     zip_code: m?.zip_code ?? "",
     city: m?.city ?? "",
-    emergency1_name: "",
-    emergency1_phone: "",
+    emergency1_name: m?.emergency1_name ?? "",
+    emergency1_phone: m?.emergency1_phone ?? "",
+    emergency2_name: m?.emergency2_name ?? "",
+    emergency2_phone: m?.emergency2_phone ?? "",
     commentaires_correctif: m?.commentaires_correctif ?? "",
   };
 }
@@ -174,25 +180,26 @@ function validBirthDate(value: string, today: Date): boolean {
 /** Problems of the form, by field (empty when it can be sent). adding: the add form, which asks more. */
 export function draftErrors(d: MemberDraft, adding: boolean, today: Date = new Date()): DraftErrors {
   const errors: DraftErrors = {};
-  if (adding) {
-    if (!d.last_name.trim()) {
-      errors.last_name = "Le nom est obligatoire.";
-    }
-    if (!d.first_name.trim()) {
-      errors.first_name = "Le prénom est obligatoire.";
-    }
-    if (!d.birth_date) {
-      errors.birth_date = "La date de naissance est obligatoire.";
-    } else if (!validBirthDate(d.birth_date, today)) {
-      errors.birth_date = "Date de naissance invalide.";
-    }
-    const amount = Number(d.amount.replace(",", "."));
-    if (d.amount.trim() && (!Number.isFinite(amount) || amount < 0)) {
-      errors.amount = "Montant invalide (nombre positif).";
-    }
-    if (d.emergency1_phone.trim() && !looksLikePhone(d.emergency1_phone.trim())) {
-      errors.emergency1_phone = "Numéro de téléphone invalide.";
-    }
+  if (!d.last_name.trim()) {
+    errors.last_name = "Le nom est obligatoire.";
+  }
+  if (!d.first_name.trim()) {
+    errors.first_name = "Le prénom est obligatoire.";
+  }
+  if (adding && !d.birth_date) {
+    errors.birth_date = "La date de naissance est obligatoire.";
+  } else if (d.birth_date && !validBirthDate(d.birth_date, today)) {
+    errors.birth_date = "Date de naissance invalide.";
+  }
+  const amount = Number(d.amount.replace(",", "."));
+  if (d.amount.trim() && (!Number.isFinite(amount) || amount < 0)) {
+    errors.amount = "Montant invalide (nombre positif).";
+  }
+  if (d.emergency1_phone.trim() && !looksLikePhone(d.emergency1_phone.trim())) {
+    errors.emergency1_phone = "Numéro de téléphone invalide.";
+  }
+  if (d.emergency2_phone.trim() && !looksLikePhone(d.emergency2_phone.trim())) {
+    errors.emergency2_phone = "Numéro de téléphone invalide.";
   }
   if (!d.tarif_name.trim()) {
     errors.tarif_name = "Choisissez un groupe (tarif).";
@@ -221,6 +228,7 @@ export function newMemberOf(d: MemberDraft): NewMember {
     licence_ffme: d.licence_ffme.trim(),
     badge_rouge: d.badge_rouge,
     autonomie_bloc: d.autonomie_bloc,
+    photo_auth: d.photo_auth,
     email_primary: d.email_primary.trim(),
     email_secondary: d.email_secondary.trim(),
     phone: d.phone.trim(),
@@ -229,6 +237,8 @@ export function newMemberOf(d: MemberDraft): NewMember {
     city: d.city.trim(),
     emergency1_name: d.emergency1_name.trim(),
     emergency1_phone: d.emergency1_phone.trim(),
+    emergency2_name: d.emergency2_name.trim(),
+    emergency2_phone: d.emergency2_phone.trim(),
     commentaires_correctif: d.commentaires_correctif.trim(),
   };
 }
@@ -240,32 +250,47 @@ export interface Changes {
 }
 
 const EDITED: [keyof MemberChanges & DraftField, string][] = [
+  ["last_name", "Nom"],
+  ["first_name", "Prénom"],
+  ["birth_date", "Date de naissance"],
   ["status", "Statut"],
   ["licence_ffme", "Licence FFME"],
   ["badge_rouge", "Badge rouge"],
   ["autonomie_bloc", "Autonomie bloc"],
+  ["photo_auth", "Droit à l'image"],
   ["email_primary", "E-mail principal"],
   ["email_secondary", "E-mail secondaire"],
   ["phone", "Téléphone"],
   ["address", "Adresse"],
   ["zip_code", "Code postal"],
   ["city", "Ville"],
+  ["emergency1_name", "Urgence 1 (nom)"],
+  ["emergency1_phone", "Urgence 1 (tél)"],
+  ["emergency2_name", "Urgence 2 (nom)"],
+  ["emergency2_phone", "Urgence 2 (tél)"],
   ["tarif_name", "Créneau / Tarif"],
 ];
 
 /** What the edit form changes on the member (only those fields are sent). */
 export function changesOf(m: Member, d: MemberDraft): Changes {
   const before = draftOf(m);
-  const fields: Record<string, string | null> = {};
+  const fields: MemberChanges = {};
   const lines: string[] = [];
   for (const [field, label] of EDITED) {
     const was = before[field].trim();
-    const now = d[field].trim();
+    const now = field === "last_name" ? d.last_name.trim().toUpperCase() : d[field].trim();
     if (now === was) {
       continue;
     }
-    fields[field] = now;
+    (fields as Record<string, string | number | null>)[field] = now;
     lines.push(`${label} : ${was || "vide"} ➔ ${now || "vide"}`);
+  }
+  const amountBefore = m.amount != null ? m.amount : null;
+  const amountTrimmed = d.amount.trim();
+  const amountNow = amountTrimmed !== "" ? Number(amountTrimmed.replace(",", ".")) : null;
+  if (amountNow !== null && Number.isFinite(amountNow) && amountNow !== amountBefore) {
+    fields.amount = amountNow;
+    lines.push(`Montant : ${amountBefore != null ? `${amountBefore} €` : "vide"} ➔ ${amountNow} €`);
   }
   const sexWas = m.sex ?? null;
   const sexNow = d.sex || null;

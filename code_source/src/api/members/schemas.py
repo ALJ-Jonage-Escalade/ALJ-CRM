@@ -114,17 +114,26 @@ def _email_or_empty(value: Optional[str]) -> Optional[str]:
 
 class MemberChanges(RequestBody):
     """Fields of a member record to change; a field left out is kept (only the given ones are written)."""
+    last_name: Optional[str] = Field(default=None, min_length=1)
+    first_name: Optional[str] = Field(default=None, min_length=1)
+    birth_date: Optional[str] = Field(default=None, pattern=r"^(\d{4}-\d{2}-\d{2})?$")
     status: Optional[MemberStatus] = None
+    amount: Optional[float] = Field(default=None, ge=0)
     licence_ffme: Optional[str] = None
     sex: Optional[Sex] = Field(default=None, description="Sent as null to clear it")
     badge_rouge: Optional[YesNo] = None
     autonomie_bloc: Optional[YesNo] = None
+    photo_auth: Optional[YesNo] = None
     email_primary: Optional[str] = None
     email_secondary: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
     zip_code: Optional[str] = None
     city: Optional[str] = None
+    emergency1_name: Optional[str] = None
+    emergency1_phone: Optional[str] = None
+    emergency2_name: Optional[str] = None
+    emergency2_phone: Optional[str] = None
     tarif_name: Optional[str] = Field(default=None, min_length=1)
     commentaires_correctif: Optional[str] = None
 
@@ -156,6 +165,7 @@ class NewMember(RequestBody):
     licence_ffme: str = ""
     badge_rouge: YesNo = "Non"
     autonomie_bloc: YesNo = "Non"
+    photo_auth: YesNo = "Oui"
     email_primary: str = ""
     email_secondary: str = ""
     phone: str = ""
@@ -164,6 +174,8 @@ class NewMember(RequestBody):
     city: str = ""
     emergency1_name: str = ""
     emergency1_phone: str = ""
+    emergency2_name: str = ""
+    emergency2_phone: str = ""
     commentaires_correctif: str = ""
 
     check_emails = field_validator("email_primary", "email_secondary")(_email_or_empty)

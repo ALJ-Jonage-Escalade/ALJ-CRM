@@ -7003,6 +7003,42 @@
       },
       "MemberChanges": {
         "properties": {
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          },
           "status": {
             "anyOf": [
               {
@@ -7020,6 +7056,18 @@
               }
             ],
             "title": "Status"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
           },
           "licence_ffme": {
             "anyOf": [
@@ -7072,6 +7120,21 @@
               }
             ],
             "title": "Autonomie Bloc"
+          },
+          "photo_auth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Oui",
+                  "Non"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Auth"
           },
           "email_primary": {
             "anyOf": [
@@ -7138,6 +7201,50 @@
               }
             ],
             "title": "City"
+          },
+          "emergency1_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency1 Name"
+          },
+          "emergency1_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency1 Phone"
+          },
+          "emergency2_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency2 Name"
+          },
+          "emergency2_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency2 Phone"
           },
           "tarif_name": {
             "anyOf": [
@@ -7386,6 +7493,15 @@
             "title": "Autonomie Bloc",
             "default": "Non"
           },
+          "photo_auth": {
+            "type": "string",
+            "enum": [
+              "Oui",
+              "Non"
+            ],
+            "title": "Photo Auth",
+            "default": "Oui"
+          },
           "email_primary": {
             "type": "string",
             "title": "Email Primary",
@@ -7424,6 +7540,16 @@
           "emergency1_phone": {
             "type": "string",
             "title": "Emergency1 Phone",
+            "default": ""
+          },
+          "emergency2_name": {
+            "type": "string",
+            "title": "Emergency2 Name",
+            "default": ""
+          },
+          "emergency2_phone": {
+            "type": "string",
+            "title": "Emergency2 Phone",
             "default": ""
           },
           "commentaires_correctif": {

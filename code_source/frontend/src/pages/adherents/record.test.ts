@@ -67,6 +67,54 @@ describe("edit and add", () => {
     });
   });
 
+  it("modifies identity, amount and emergency contacts when changed", () => {
+    const m = member({
+      last_name: "DUPONT",
+      first_name: "Jean",
+      birth_date: "2010-01-01",
+      amount: 120,
+      emergency1_name: "DUPONT Pierre",
+      emergency1_phone: "06 01 02 03 04",
+      photo_auth: "Oui",
+    });
+    const d = {
+      ...draftOf(m),
+      last_name: "martin",
+      first_name: "Jeanne",
+      birth_date: "2010-02-02",
+      amount: "150.50",
+      emergency1_name: "MARTIN Paul",
+      emergency1_phone: "06 99 88 77 66",
+      emergency2_name: "MARTIN Claire",
+      emergency2_phone: "06 11 22 33 44",
+      photo_auth: "Non" as const,
+    };
+    expect(changesOf(m, d)).toEqual({
+      fields: {
+        last_name: "MARTIN",
+        first_name: "Jeanne",
+        birth_date: "2010-02-02",
+        amount: 150.5,
+        emergency1_name: "MARTIN Paul",
+        emergency1_phone: "06 99 88 77 66",
+        emergency2_name: "MARTIN Claire",
+        emergency2_phone: "06 11 22 33 44",
+        photo_auth: "Non",
+      },
+      lines: [
+        "Nom : DUPONT ➔ MARTIN",
+        "Prénom : Jean ➔ Jeanne",
+        "Date de naissance : 2010-01-01 ➔ 2010-02-02",
+        "Droit à l'image : Oui ➔ Non",
+        "Urgence 1 (nom) : DUPONT Pierre ➔ MARTIN Paul",
+        "Urgence 1 (tél) : 06 01 02 03 04 ➔ 06 99 88 77 66",
+        "Urgence 2 (nom) : vide ➔ MARTIN Claire",
+        "Urgence 2 (tél) : vide ➔ 06 11 22 33 44",
+        "Montant : 120 € ➔ 150.5 €",
+      ],
+    });
+  });
+
   it("sends the sex as an FFME code, null to clear it", () => {
     const femaleMember = member({ sex: "F" });
     expect(changesOf(femaleMember, draftOf(femaleMember))).toEqual({ fields: {}, lines: [] });
