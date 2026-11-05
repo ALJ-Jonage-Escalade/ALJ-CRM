@@ -1,0 +1,115 @@
+name: Dependabot uv sync
+
+# Dependabot's uv PRs can leave uv.lock and the exported requirements*.txt out of step, which fails Tests.
+# This job brings them back in line with the versions listed in the PR, then pushes the result to its branch.
+#
+# Required: a Dependabot secret (Settings > Secrets and variables > Dependabot) named DEPENDABOT_PUSH_TOKEN, holding
+# a fine-grained token limited to this repository with Contents: read and write. Pushes made with GITHUB_TOKEN would
+# not start the Tests workflow again.
+#
+# The token is exposed to the push step only, and no step runs the code of an updated package: `uv lock --no-build`
+# never runs a build backend, and the export script comes from the default branch.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - code_source/pyproject.toml
+      - code_source/uv.lock
+      - code_source/requirements-docker.txt
+      - code_source/requirements-dev.txt
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: dependabot-uv-sync-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    # github.actor also stops the job from running again on its own push
+    if: >-
+      github.actor == 'dependabot[bot]'
+      && github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'dependabot/uv/')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Read the updated dependencies
+      id: metadata
+      uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+    - name: Checkout the default branch (trusted export script)
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.event.repository.default_branch }}
+        path: trusted
+        persist-credentials: false
+
+    - name: Checkout the Dependabot branch
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.head_ref }}
+        path: pr
+        persist-credentials: false
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version-file: trusted/code_source/.python-version
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      with:
+        version: "0.13.1"
+        enable-cache: false
+
+    - name: Update uv.lock to the versions of the PR
+      working-directory: pr/code_source
+      env:
+        UPDATED_DEPENDENCIES: ${{ steps.metadata.outputs.updated-dependencies-json }}
+        UV_PYTHON_PREFERENCE: only-system # use the interpreter installed above
+      run: |
+        # Empty when the branch already has a non-Dependabot commit (re-run after a sync): nothing to redo
+        if [ -z "$UPDATED_DEPENDENCIES" ] || [ "$UPDATED_DEPENDENCIES" = "[]" ]; then
+          echo "::notice::No Dependabot metadata for this PR: uv.lock left as is"
+          exit 0
+        fi
+        upgrade_args=()
+        while IFS= read -r pinned_package; do
+          if ! [[ "$pinned_package" =~ ^[A-Za-z0-9._-]+==[A-Za-z0-9.!+_-]+$ ]]; then
+            echo "::error::Unexpected package specification: $pinned_package"
+            exit 1
+          fi
+          upgrade_args+=(--upgrade-package "$pinned_package")
+        done < <(jq -r '.[] | select((.newVersion // "") != "") | "\(.dependencyName)==\(.newVersion)"' <<< "$UPDATED_DEPENDENCIES")
+        uv lock --no-build "${upgrade_args[@]}"
+
+    - name: Export the requirements files
+      working-directory: pr/code_source
+      run: |
+        cp "$GITHUB_WORKSPACE/trusted/code_source/dev/export_requirements.py" dev/export_requirements.py
+        python dev/export_requirements.py
+
+    - name: Commit and push the synced files
+      working-directory: pr
+      env:
+        HEAD_REF: ${{ github.head_ref }}
+        PUSH_TOKEN: ${{ secrets.DEPENDABOT_PUSH_TOKEN }}
+      run: |
+        synced_files=(code_source/uv.lock code_source/requirements-docker.txt code_source/requirements-dev.txt)
+        if git diff --quiet -- "${synced_files[@]}"; then
+          echo "Already in sync"
+          exit 0
+        fi
+        if [ -z "$PUSH_TOKEN" ]; then
+          echo "::error::Missing Dependabot secret DEPENDABOT_PUSH_TOKEN (see the top of this workflow)"
+          exit 1
+        fi
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -- "${synced_files[@]}"
+        # [dependabot skip]: Dependabot keeps rebasing the PR and drops this commit, the job then runs again
+        git commit -m "chore(deps): sync uv.lock and requirements [dependabot skip]"
+        git push "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${HEAD_REF}"
