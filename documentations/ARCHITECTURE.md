@@ -201,7 +201,9 @@ source .venv/bin/activate
 
 Les dépendances sont déclarées dans `pyproject.toml` et verrouillées dans `uv.lock` (versions exactes, identiques en
 CI, en dev et dans l'image Docker). Les `requirements*.txt` en sont des exports générés
-(`python dev/export_requirements.py`) pour les installations avec pip (tests e2e).
+(`python dev/export_requirements.py`) pour les installations avec pip (tests e2e). Sur les PR Python de Dependabot,
+regroupées en une seule PR par semaine, `.github/workflows/dependabot-uv-sync.yml` les met à jour avec `uv.lock`
+(nécessite le secret Dependabot `DEPENDABOT_PUSH_TOKEN`).
 
 La version de Python est définie dans `../code_source/.python-version` (version complète, ex. `3.14.8`), lue par
 la CI (`setup-python`) et uv. Seul le `FROM python:<version>-slim` du `Dockerfile` la répète : un test
