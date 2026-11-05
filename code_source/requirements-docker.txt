@@ -63,7 +63,7 @@ pydantic==2.14.1
     # via fastapi
 pydantic-core==2.50.1
     # via pydantic
-pydyf==0.12.1
+pydyf==0.13.0
     # via weasyprint
 pyjwt==2.15.1
     # via alj-escalade-manager
