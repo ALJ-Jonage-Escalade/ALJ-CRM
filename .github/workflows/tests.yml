@@ -143,9 +143,25 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v7
 
+    - name: Restore e2e stack images
+      # Building them takes a minute. Tests run on main too (deploy-cloud-run.yml), so its cache serves every PR.
+      id: e2e-images
+      uses: actions/cache@v6
+      with:
+        path: ~/e2e-images.tar
+        key: e2e-images-${{ runner.os }}-${{ hashFiles('code_source/dev/emulator/Dockerfile', 'code_source/e2e/docker-compose.yml') }}
+
+    - name: Load e2e stack images from the cache
+      if: steps.e2e-images.outputs.cache-hit == 'true'
+      run: docker load --input ~/e2e-images.tar
+
     - name: Prepare e2e stack images (Firebase emulator + Mailpit)
       # Built/pulled up front so that a failure shows here; the tests start the stack themselves.
-      run: docker compose -f e2e/docker-compose.yml build && docker compose -f e2e/docker-compose.yml pull mailpit
+      if: steps.e2e-images.outputs.cache-hit != 'true'
+      run: |
+        docker compose -f e2e/docker-compose.yml build
+        docker compose -f e2e/docker-compose.yml pull mailpit
+        docker save --output ~/e2e-images.tar $(docker compose -f e2e/docker-compose.yml config --images)
 
     - name: Set up Python
       uses: actions/setup-python@v7
@@ -185,21 +201,30 @@ jobs:
       run: python -m ruff check e2e --output-format=github
 
     - name: Run e2e tests (pytest + Playwright)
+      id: e2e-tests
       # Below the job's 30 min: a hung run fails here, so the logs and artifacts below are still uploaded
       timeout-minutes: 20
       env:
-        E2E_KEEP_STACK: '1' # kept for the logs below, removed by the last step
-      # No --video: "retain-on-failure" still records every test, which overloads the 4-vCPU runner
-      # shared by 4 workers (timeouts). The trace has a screenshot and DOM snapshot of every step.
-      # -n 2 (instead of 4 locally): the 4-vCPU runner also hosts the server, the emulator and the PDF
-      # rendering; 4 browsers on top of them slowed responses past the test timeouts.
+        E2E_KEEP_STACK: '1' # kept for the re-run and the logs below, removed by the last step
+      # No tracing here: it records every test, about 20 % slower. The next step traces the failures.
       # -vv (addopts has -q): names each test as it ends ([gw0] PASSED ...), so a worker that dies points to the test it was running.
       # --max-worker-restart=0: a dead worker stops the run with "worker gwN crashed while running <test>"; restarting
       # it left xdist waiting until the step timeout (worker "node down: Not properly terminated").
       run: >
-        python -m pytest -c e2e/pytest.ini e2e -n 2 -vv --max-worker-restart=0
-        --output e2e-results --tracing retain-on-failure
-        --screenshot only-on-failure
+        python -m pytest -c e2e/pytest.ini e2e -vv --max-worker-restart=0
+        --output e2e-results --screenshot only-on-failure
+
+    - name: Re-run failed e2e tests with tracing
+      # Diagnosis only: the job stays red even if they pass this time (flaky), and their traces are kept either way.
+      # --last-failed-no-failures none: nothing to re-run when the run above was killed before saving its failures.
+      if: failure() && steps.e2e-tests.outcome == 'failure'
+      timeout-minutes: 10
+      env:
+        E2E_KEEP_STACK: '1'
+      run: >
+        python -m pytest -c e2e/pytest.ini e2e -vv --max-worker-restart=0
+        --last-failed --last-failed-no-failures none
+        --output e2e-results/rerun --tracing on --screenshot only-on-failure
 
     - name: e2e stack logs
       if: failure() || cancelled()

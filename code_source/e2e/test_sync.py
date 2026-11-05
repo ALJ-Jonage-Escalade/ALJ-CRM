@@ -1,20 +1,32 @@
 """Two coaches on two phones: a change made on one shows up on the other without reloading.
 
-The screen polls the API every 20 s, hence the generous timeout."""
+The screen polls the API every 20 s: the second phone's clock is faked, so that the tests jump to the next poll
+instead of waiting for it."""
 import pytest
 from playwright.sync_api import expect
 
-from helpers.data import unique_name
+from helpers.data import eventually, unique_name
 from helpers.competitions import competition_card, open_competition, open_screen, participant_card
 
-pytestmark = pytest.mark.slow
-SYNC_TIMEOUT = 30_000
+POLL_INTERVAL_MS = 20_000   # frontend/src/lib/sync.ts
+POLL_ANSWER_TIMEOUT = 1_000
 
 
 @pytest.fixture
 def second_phone(new_context, playwright):
     device = {k: v for k, v in playwright.devices["Pixel 7"].items() if k != "default_browser_type"}
-    return new_context(**device).new_page()
+    phone = new_context(**device).new_page()
+    phone.clock.install()
+    return phone
+
+
+def _after_next_poll(phone, check) -> None:
+    """Jumps to the next poll until `check` passes: a poll can run before the first phone's write reaches Firestore
+    (the pages update optimistically), the following one then brings the change."""
+    def jump_and_check():
+        phone.clock.fast_forward(POLL_INTERVAL_MS)
+        check()
+    eventually(jump_and_check, timeout=15)
 
 
 def test_new_competition_reaches_other_phone(mobile_page, second_phone):
@@ -25,7 +37,8 @@ def test_new_competition_reaches_other_phone(mobile_page, second_phone):
     first.get_by_test_id("cf-date").fill("2027-10-02")
     first.get_by_test_id("cf-save").click()
     expect(first.get_by_test_id("detail-name")).to_have_text(nom)
-    expect(competition_card(second, nom)).to_be_visible(timeout=SYNC_TIMEOUT)
+    expect(competition_card(second, nom)).to_have_count(0)
+    _after_next_poll(second_phone, lambda: expect(competition_card(second, nom)).to_be_visible(timeout=POLL_ANSWER_TIMEOUT))
 
 
 def test_selection_reaches_other_phone(mobile_page, second_phone, test_data):
@@ -35,6 +48,9 @@ def test_selection_reaches_other_phone(mobile_page, second_phone, test_data):
     first, second = open_screen(mobile_page), open_screen(second_phone)
     open_competition(first, nom)
     open_competition(second, nom)
+    selected = second.get_by_test_id("filter-selected")
     participant_card(first, member).get_by_test_id("participe-switch").click()
-    expect(second.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (1)", timeout=SYNC_TIMEOUT)
+    expect(participant_card(first, member).get_by_test_id("participe-switch")).to_be_checked()
+    expect(selected).to_have_text("✅ Participe : Oui (0)")
+    _after_next_poll(second_phone, lambda: expect(selected).to_have_text("✅ Participe : Oui (1)", timeout=POLL_ANSWER_TIMEOUT))
     expect(participant_card(second, member).get_by_test_id("participe-switch")).to_be_checked()
