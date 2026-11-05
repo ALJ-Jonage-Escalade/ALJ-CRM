@@ -3,6 +3,7 @@ import os
 import re
 from urllib.parse import quote
 
+from infrastructure.mail.senders import CLUB_CONTACT_EMAIL
 from paths import CODE_ROOT
 
 ASSETS_SOCIAL_DIR = os.path.join(CODE_ROOT, "src", "assets", "social")
@@ -13,7 +14,6 @@ INSTAGRAM_CID = "alj_instagram_logo"
 FACEBOOK_CID = "alj_facebook_logo"
 
 CLUB_NAME = "Amicale Laïque de Jonage"
-CLUB_EMAIL = "amicalelaique.jonage@gmail.com"
 CLUB_WEBSITE_LABEL = "alj-escalade.fr"
 CLUB_WEBSITE_URL = "https://alj-escalade.fr"
 INSTAGRAM_URL = "https://www.instagram.com/aljescalade/"
@@ -33,7 +33,7 @@ def build_signature_plain() -> str:
     return (
         "---\n"
         f"{CLUB_NAME}\n"
-        f"{CLUB_EMAIL}\n"
+        f"{CLUB_CONTACT_EMAIL}\n"
         f"{CLUB_WEBSITE_LABEL}\n"
         "Suivez nous sur les réseaux !\n"
         f"Instagram : {INSTAGRAM_URL}\n"
@@ -73,7 +73,7 @@ def build_signature_html(image_src_mode: str = "cid") -> str:
     )
     return template.format(
         club=CLUB_NAME,
-        email=CLUB_EMAIL,
+        email=CLUB_CONTACT_EMAIL,
         site=CLUB_WEBSITE_LABEL,
         site_url=CLUB_WEBSITE_URL,
         ig_url=INSTAGRAM_URL,

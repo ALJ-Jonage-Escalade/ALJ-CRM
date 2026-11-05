@@ -2333,7 +2333,7 @@ export interface components {
         };
         /**
          * EmailTemplates
-         * @description default_sender_*: used by the server when a template's sender is empty.
+         * @description default_sender_*: used by the server when a template's sender is empty. club_contact_email: shown in the e-mail signature.
          */
         EmailTemplates: {
             /**
@@ -2349,6 +2349,8 @@ export interface components {
             default_sender_name: string;
             /** Sender Suggestions */
             sender_suggestions: string[];
+            /** Club Contact Email */
+            club_contact_email: string;
         };
         /**
          * FfmeFile

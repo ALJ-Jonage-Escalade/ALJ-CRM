@@ -321,7 +321,7 @@ describe("AdherentsPage", () => {
       ...ANSWERS,
       "GET /api/members": () =>
         ++polls > 1 ? json({ ...ACTIVE, members: [aaron, ...ACTIVE.members] }, 200, '"m2"') : json(ACTIVE, 200, '"m1"'),
-      "GET /api/email-templates": () => json({ status: "success", templates: [] }),
+      "GET /api/email-templates": () => json({ status: "success", templates: [], club_contact_email: "club@alj.example" }),
     };
     const { inBody, router, names } = await render("coach", answers);
     await flushPromises();
@@ -344,7 +344,10 @@ describe("AdherentsPage", () => {
   });
 
   it("opens the record's actions in a dialog over the panel, and closes it on cancel", async () => {
-    const answers: Record<string, Answer> = { ...ANSWERS, "GET /api/email-templates": () => json({ status: "success", templates: [] }) };
+    const answers: Record<string, Answer> = {
+      ...ANSWERS,
+      "GET /api/email-templates": () => json({ status: "success", templates: [], club_contact_email: "club@alj.example" }),
+    };
     const { inBody } = await render("coach", answers);
     await flushPromises();
     expect(inBody("record-dialog")).toBeNull();
@@ -470,6 +473,7 @@ describe("AdherentsPage", () => {
         json({
           status: "success",
           templates: [{ name: "Rappel", subject: "Rappel {first_name}", body: "Bonjour {first_name}", sender_email: "", sender_name: "" }],
+          club_contact_email: "club@alj.example",
         }),
       "POST /api/send-email": () => json({ status: "success", sent_count: 1 }),
     };
@@ -486,6 +490,7 @@ describe("AdherentsPage", () => {
     select.dispatchEvent(new Event("change"));
     await flushPromises();
     expect(inBody("email-preview")!.textContent).toContain("Sujet : Rappel Léa");
+    expect(inBody("email-preview")!.textContent).toContain("club@alj.example");
     inBody("email-send")!.click();
     await flushPromises();
     expect(writes()[0]).toEqual(expect.objectContaining({ path: "/api/send-email" }));
@@ -508,7 +513,7 @@ describe("AdherentsPage", () => {
     const answers: Record<string, Answer> = {
       ...ANSWERS,
       "GET /api/members": () => json(paid, 200, '"paid"'),
-      "GET /api/email-templates": () => json({ status: "success", templates: [] }),
+      "GET /api/email-templates": () => json({ status: "success", templates: [], club_contact_email: "club@alj.example" }),
       "POST /api/attestations/preview": () =>
         new Response(new Blob(["%PDF"]), { status: 200, headers: { "Content-Type": "application/pdf" } }),
       "POST /api/attestations/send": () => json({ status: "success", message: "ok", email_sent_date: "22/10/2026", filename: "a.pdf" }),
@@ -531,7 +536,10 @@ describe("AdherentsPage", () => {
   });
 
   it("refuses a certificate for a membership without amount", async () => {
-    const answers: Record<string, Answer> = { ...ANSWERS, "GET /api/email-templates": () => json({ status: "success", templates: [] }) };
+    const answers: Record<string, Answer> = {
+      ...ANSWERS,
+      "GET /api/email-templates": () => json({ status: "success", templates: [], club_contact_email: "club@alj.example" }),
+    };
     const { inBody, writes } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027");
     await flushPromises();
     inBody("record-attestation")!.click();

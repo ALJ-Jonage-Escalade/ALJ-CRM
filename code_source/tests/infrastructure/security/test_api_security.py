@@ -182,7 +182,6 @@ class TestRoles(unittest.TestCase):
         """Roles live in the access list, never in code (GDPR): no personal mailbox in the app's sources."""
         personal = re.compile(r"[a-z0-9_.+-]+@(?:gmail|googlemail|orange|wanadoo|free|sfr|laposte|hotmail|outlook|live|yahoo"
                               r"|icloud|me|aol|gmx|protonmail|neuf|bbox)\.[a-z.]+")
-        club_mailbox = "amicalelaique.jonage@gmail.com"  # the club's own address (e-mail footer)
         sources = []
         for root in (os.path.join(_code_root, "src"), os.path.join(_code_root, "frontend", "src")):
             sources += [os.path.join(d, n) for d, _, names in os.walk(root) for n in names
@@ -192,7 +191,7 @@ class TestRoles(unittest.TestCase):
         for path in sources:
             with open(path, encoding="utf-8") as f:
                 found += [f"{os.path.relpath(path, _code_root)}: {email}"
-                          for email in personal.findall(f.read().lower()) if email != club_mailbox]
+                          for email in personal.findall(f.read().lower())]
         self.assertEqual(found, [])
 
 

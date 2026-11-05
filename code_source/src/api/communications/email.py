@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from api.communications.schemas import EmailDispatch, EmailStatus, EmailTemplate, EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate
 from api.responses import error, error_responses, internal_error
 from infrastructure.mail.dispatch import EmailDispatchService
-from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
+from infrastructure.mail.senders import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
 from infrastructure.security.secret_store import SecretStore
 
 router = APIRouter()
@@ -29,6 +29,7 @@ def get_email_templates() -> EmailTemplates | JSONResponse:
             default_sender_email=DEFAULT_SENDER_EMAIL,
             default_sender_name=DEFAULT_SENDER_NAME,
             sender_suggestions=list(SENDER_SUGGESTIONS),
+            club_contact_email=CLUB_CONTACT_EMAIL,
         )
     except Exception as e:
         return error(500, internal_error(e, "get_email_templates"))
