@@ -13,6 +13,9 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     groups:
+      # Versions liées (@vitest/coverage-v8 exige la même version exacte de vitest), majeures comprises
+      vitest:
+        patterns: ["vitest", "@vitest/coverage-v8"]
       # Une seule PR pour les mises à jour mineures et correctives de la semaine
       npm-minor-patch:
         update-types: ["minor", "patch"]

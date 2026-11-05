@@ -53,3 +53,4 @@ installer/
 
 # Application Vue : dépendances installées et compilée par Cloud Build (Dockerfile)
 node_modules/
+frontend/coverage/
