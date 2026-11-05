@@ -11,13 +11,19 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.mail.html_body import _link_html, _restore_links, text_to_html
+from infrastructure.mail.html_body import _link_html, _restore_links, build_signature_html, build_signature_plain, text_to_html
 
 
 def _restore_links_regex(escaped: str) -> str:
     """Former implementation, kept as the reference for _restore_links."""
     return re.sub(r'&lt;a href="([^"]*)"&gt;(.*?)&lt;/a&gt;',
                   lambda m: _link_html(m.group(1), m.group(2)), escaped, flags=re.S)
+
+
+class TestSignature(unittest.TestCase):
+    def test_signatures_show_the_official_contact_address(self):
+        self.assertIn("contact@alj-escalade.fr", build_signature_plain())
+        self.assertIn('href="mailto:contact@alj-escalade.fr"', build_signature_html())
 
 
 class TestTextToHtml(unittest.TestCase):

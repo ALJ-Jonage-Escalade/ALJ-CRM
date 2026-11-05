@@ -268,6 +268,7 @@ function closeAdd(): void {
 
 // Email templates, for the e-mail (coaches and admins) and the certificate (admins), loaded once
 const templates = ref<Template[]>([]);
+const clubContactEmail = ref("");
 let templatesLoaded = false;
 async function loadTemplates(): Promise<void> {
   if (templatesLoaded) {
@@ -275,7 +276,9 @@ async function loadTemplates(): Promise<void> {
   }
   templatesLoaded = true;
   try {
-    templates.value = (await communicationsApi.emailTemplates()).templates;
+    const answer = await communicationsApi.emailTemplates();
+    templates.value = answer.templates;
+    clubContactEmail.value = answer.club_contact_email;
   } catch (e) {
     templatesLoaded = false;
     console.warn("Modèles d'e-mails :", e);
@@ -675,6 +678,7 @@ const linkButton =
         v-if="mode === 'email'"
         :member="record"
         :templates="templates"
+        :club-contact-email="clubContactEmail"
         @sent="sent"
         @failed="(m) => toast.show(m, 9000)"
         @cancel="mode = 'none'"

@@ -8,6 +8,7 @@ import csv
 from paths import ROOT_DIR
 from domain.members.sex import parse_sex
 from domain.members.view import is_cancelled
+from infrastructure.mail.senders import CLUB_CONTACT_EMAIL
 
 logger = logging.getLogger("alj")
 
@@ -207,7 +208,7 @@ def generate_ffme_csv(participants_data, output_path=None, include_termine=False
         if not email:
             email = str(p.get("payer_email", "")).strip().lower()[:100]
         if not email and not lic_num:
-            email = "contact@amicale-laique-jonage.fr"
+            email = CLUB_CONTACT_EMAIL
             
         email2 = str(p.get("email_secondary", "")).strip().lower()[:100]
         

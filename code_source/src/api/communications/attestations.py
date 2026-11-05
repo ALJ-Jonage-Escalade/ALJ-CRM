@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, Response
 
 from api.communications.schemas import AttestationRequest, AttestationSend, AttestationSent
 from api.responses import error, error_responses, internal_error
-from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from infrastructure.mail.senders import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from services.documents import Doc
 from services.members.members import MemberService
 
@@ -42,7 +42,7 @@ def preview_attestation_api(data: AttestationRequest) -> Response:
     if problem:
         return error(400, problem)
     try:
-        pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name")))
+        pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name"), club_email=CLUB_CONTACT_EMAIL))
     except Exception as e:
         return error(500, internal_error(e, "preview_attestation_api"))
     return Response(content=pdf_bytes, media_type="application/pdf",
@@ -73,7 +73,7 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
     from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
     from infrastructure.mail.repository import EmailRepository
 
-    pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name")))
+    pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name"), club_email=CLUB_CONTACT_EMAIL))
     filename_pdf = _filename(member)
 
     tmpl = EmailDispatchService.get_template_by_name(data.template_name or "Attestation échéance")

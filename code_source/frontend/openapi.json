@@ -5755,6 +5755,10 @@
             },
             "type": "array",
             "title": "Sender Suggestions"
+          },
+          "club_contact_email": {
+            "type": "string",
+            "title": "Club Contact Email"
           }
         },
         "type": "object",
@@ -5763,10 +5767,11 @@
           "templates",
           "default_sender_email",
           "default_sender_name",
-          "sender_suggestions"
+          "sender_suggestions",
+          "club_contact_email"
         ],
         "title": "EmailTemplates",
-        "description": "default_sender_*: used by the server when a template's sender is empty."
+        "description": "default_sender_*: used by the server when a template's sender is empty. club_contact_email: shown in the e-mail signature."
       },
       "FfmeFile": {
         "properties": {

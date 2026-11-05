@@ -22,6 +22,7 @@ from domain.attestation.document import (  # noqa: E402
 )
 
 INJECTION = '<a rel="attachment" href="file:///etc/hostname">x</a>'
+CLUB_EMAIL = "club@alj.example"
 
 
 def _weasyprint_available() -> bool:
@@ -51,28 +52,33 @@ class TestAttestationEscaping(unittest.TestCase):
     def test_member_and_request_values_are_escaped(self):
         member = {"first_name": INJECTION, "last_name": INJECTION, "payer": f"{INJECTION} {INJECTION}",
                   "amount": 150}
-        html = build_attestation(member, season=INJECTION, date_jour=INJECTION)
+        html = build_attestation(member, season=INJECTION, date_jour=INJECTION, club_email=CLUB_EMAIL)
         self.assertNotIn('rel="attachment"', html.lower())
         self.assertNotIn("<a ", html.lower())
         self.assertIn("&lt;", html)
 
     def test_regular_names_unchanged(self):
         html = build_attestation({"first_name": "Hermione", "last_name": "Granger", "amount": 150},
-                                 season="2026-2027", date_jour="1 September 2026")
+                                 season="2026-2027", date_jour="1 September 2026", club_email=CLUB_EMAIL)
         self.assertIn("Hermione", html)
         self.assertIn("GRANGER", html)
         self.assertIn("150,00", html)
 
+    def test_footer_shows_the_club_email(self):
+        html = build_attestation({"first_name": "Hermione", "last_name": "Granger", "amount": 150}, club_email=CLUB_EMAIL)
+        self.assertIn(f"Email : {CLUB_EMAIL} |", html)
+        self.assertNotIn("{Email club}", html)
+
     def test_fallback_renderer_shows_plain_text(self):
         html = build_attestation({"first_name": "Seamus", "last_name": "O'Flaherty & Co", "amount": 150},
-                                 season="2026-2027", date_jour="1 September 2026")
+                                 season="2026-2027", date_jour="1 September 2026", club_email=CLUB_EMAIL)
         pdf = _render_minimal_pdf_with_pydyf(html)
         self.assertTrue(_pdf_contains(pdf, b"O'FLAHERTY & CO"))
         self.assertFalse(_pdf_contains(pdf, b"&amp;"))
 
     def test_fallback_renderer_links_page_resources(self):
         html = build_attestation({"first_name": "Harry", "last_name": "Potter", "amount": 150},
-                                 season="2026-2027", date_jour="1 September 2026")
+                                 season="2026-2027", date_jour="1 September 2026", club_email=CLUB_EMAIL)
         pdf = _render_minimal_pdf_with_pydyf(html)
         self.assertNotIn(b"None", pdf)
         self.assertRegex(pdf, rb"/Contents \d+ 0 R")
@@ -92,7 +98,7 @@ class TestAttestationRendering(unittest.TestCase):
 
     def test_embedded_images_still_rendered(self):
         html = build_attestation({"first_name": "Harry", "last_name": "Potter", "amount": 150},
-                                 season="2026-2027")
+                                 season="2026-2027", club_email=CLUB_EMAIL)
         if "data:image" not in html:
             self.skipTest("no logo or signature image available")
         pdf = render_attestation_pdf(html)

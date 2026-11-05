@@ -8,10 +8,10 @@ import { CLIENT_KEY, errorText } from "../../lib/client";
 import { createCommunicationsApi } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
-import { renderFor, SIGNATURE_TEXT, type Template } from "./record";
+import { renderFor, signatureText, type Template } from "./record";
 import { dialogs } from "../../composables/dialogs";
 
-const props = defineProps<{ member: Member; templates: readonly Template[] }>();
+const props = defineProps<{ member: Member; templates: readonly Template[]; clubContactEmail: string }>();
 const emit = defineEmits<{ sent: [message: string]; failed: [message: string]; cancel: [] }>();
 const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 
@@ -35,7 +35,7 @@ function useTemplate(): void {
 
 const preview = computed(
   () =>
-    `Sujet : ${renderFor(subject.value, props.member)}\n\n${renderFor(body.value, props.member)}${signature.value ? `\n\n---\n${SIGNATURE_TEXT}` : ""}`,
+    `Sujet : ${renderFor(subject.value, props.member)}\n\n${renderFor(body.value, props.member)}${signature.value ? `\n\n---\n${signatureText(props.clubContactEmail)}` : ""}`,
 );
 
 async function send(): Promise<void> {

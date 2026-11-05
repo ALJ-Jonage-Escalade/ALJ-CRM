@@ -21,12 +21,13 @@ class EmailTemplate(BaseModel):
 
 
 class EmailTemplates(BaseModel):
-    """default_sender_*: used by the server when a template's sender is empty."""
+    """default_sender_*: used by the server when a template's sender is empty. club_contact_email: shown in the e-mail signature."""
     status: Literal["success"]
     templates: List[EmailTemplate]
     default_sender_email: str
     default_sender_name: str
     sender_suggestions: List[str]
+    club_contact_email: str
 
 
 class EmailTemplateUpdate(RequestBody):

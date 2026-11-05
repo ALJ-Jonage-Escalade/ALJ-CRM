@@ -1,7 +1,7 @@
 """Module de génération des attestations de paiement (HTML & PDF).
 
 Fournit :
-- build_attestation(member, season, date_jour) -> code HTML autonome ;
+- build_attestation(member, season, date_jour, club_email) -> code HTML autonome ;
 - render_attestation_pdf(html) -> octets du fichier PDF (WeasyPrint en mémoire) ;
 - get_safe_pdf_filename(last_name, first_name, order_ref) -> nom de fichier PDF sécurisé.
 """
@@ -113,7 +113,9 @@ def attestation_error(member: Any) -> Optional[str]:  # Any: dict or member obje
 def build_attestation(
     member: Any,
     season: Optional[str] = None,
-    date_jour: Optional[str] = None
+    date_jour: Optional[str] = None,
+    *,
+    club_email: str,
 ) -> str:
     """Génère le code HTML complet et autonome d'une attestation de paiement.
 
@@ -187,6 +189,7 @@ def build_attestation(
         "{Prénom adhérent}": user_first,
         "{Montant}": amount_str,
         "{Saison}": season,
+        "{Email club}": club_email,
     }
     for placeholder, value in values.items():
         html = html.replace(placeholder, _html.escape(str(value)))

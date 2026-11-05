@@ -367,7 +367,10 @@ export function renderFor(text: string, m: Member): string {
   return text.replace(/\{([^{}]+)\}/g, (whole, name: string) => values[name.toLowerCase()] ?? whole);
 }
 
-export const SIGNATURE_TEXT = "ALJ Escalade — Section de l'Amicale Laïque de Jonage\ncontact@alj-escalade.fr";
+/** Signature shown in the preview; the address comes from the server (empty if the templates could not be loaded, e.g. offline). */
+export function signatureText(clubContactEmail: string): string {
+  return `ALJ Escalade — Section de l'Amicale Laïque de Jonage\n${clubContactEmail}`.trim();
+}
 
 /** Default template of the certificate e-mail, when the club has none named « échéance » (the server picks the sender). */
 export const DEFAULT_ATTESTATION_TEMPLATE: Template = {

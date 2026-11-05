@@ -100,22 +100,23 @@ class TestBureauFiles(unittest.TestCase):
     def test_build_attestation_pure_function_rules(self):
         """build_attestation respecte les règles de montant, d'annulation, de signature et de payeur."""
         from domain.attestation.document import build_attestation, get_safe_pdf_filename, render_attestation_pdf
+        club = "club@alj.example"
 
         # 1. Validation montant manquant ou nul
         with self.assertRaises(ValueError):
-            build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": 0})
+            build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": 0}, club_email=club)
         with self.assertRaises(ValueError):
-            build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": -10})
+            build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": -10}, club_email=club)
 
         # 2. Validation commande annulée
         with self.assertRaises(ValueError):
-            build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": 150, "status": "Annulé"})
+            build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": 150, "status": "Annulé"}, club_email=club)
         with self.assertRaises(ValueError):
-            build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": 150, "status": "Refunded"})
+            build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": 150, "status": "Refunded"}, club_email=club)
 
         # 3. Payeur par défaut = adhérent
         m = {"first_name": "alex", "last_name": "martin", "amount": 195, "season_name": "2026-2027"}
-        html = build_attestation(m, season="2026-2027", date_jour="14 juillet 2026")
+        html = build_attestation(m, season="2026-2027", date_jour="14 juillet 2026", club_email=club)
         self.assertIn("MARTIN", html)
         self.assertIn("Alex", html)
         self.assertIn("195,00", html)
@@ -583,6 +584,7 @@ class TestBureauFiles(unittest.TestCase):
         self.assertEqual(listed["default_sender_email"], "inscription@alj-escalade.fr")
         self.assertEqual(listed["default_sender_name"], "Amicale Laïque Jonage - Inscriptions")
         self.assertIn("contact@alj-escalade.fr", listed["sender_suggestions"])
+        self.assertEqual(listed["club_contact_email"], "contact@alj-escalade.fr")
 
     def test_whatsapp_template_endpoints(self):
         """GET et POST /api/whatsapp-template enregistrent et lisent le texte WhatsApp."""

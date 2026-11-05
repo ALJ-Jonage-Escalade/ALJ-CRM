@@ -11,6 +11,7 @@ import {
   newMemberOf,
   recordRows,
   renderFor,
+  signatureText,
   sameName,
   tarifChoices,
   withDateTag,
@@ -193,6 +194,11 @@ describe("edit and add", () => {
 });
 
 describe("e-mail and certificate", () => {
+  it("signs with the club's address from the server, or the name alone when it is unknown", () => {
+    expect(signatureText("club@alj.example")).toBe("ALJ Escalade — Section de l'Amicale Laïque de Jonage\nclub@alj.example");
+    expect(signatureText("")).toBe("ALJ Escalade — Section de l'Amicale Laïque de Jonage");
+  });
+
   const m = member({ first_name: "LÉA-MARIE", last_name: "dupont", licence_ffme: "123456", amount: 180, season_name: "2026-2027" });
 
   it("replaces the variables, names case-insensitive, unknown ones kept", () => {
