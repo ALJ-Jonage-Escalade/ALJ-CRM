@@ -109,5 +109,5 @@ def test_server_directory_has_no_cache_in_dev_mode(monkeypatch: pytest.MonkeyPat
     for env, cache in (("dev", 0), ("prod", role_directory.CACHE_SECONDS)):
         monkeypatch.setenv("ALJ_ENV", env)
         role_directory.install(None)
-        assert role_directory.current()._cache_seconds == cache
+        assert role_directory.current().cache.cache_seconds == cache
     role_directory.install(None)

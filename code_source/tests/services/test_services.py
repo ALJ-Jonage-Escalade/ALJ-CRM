@@ -49,4 +49,6 @@ class TestCompetitionService(FirestoreRepoTestCase):
         with patch.object(Repo, "delete_competition", side_effect=FirestoreError("down")):
             with self.assertRaises(StorageUnavailable):
                 Service.delete_competition(1)
-        self.assertIsNone(competition_store._competitions_cache["docs"])
+        with patch.object(Repo, "list_competition_docs", return_value=[]) as read:
+            Service.list_competitions()
+        read.assert_called_once()

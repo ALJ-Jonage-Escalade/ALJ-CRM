@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 import pytest
 
 from infrastructure.helloasso.api import HelloAssoApiError
-from infrastructure.helloasso.form_activities import ActivityCache, with_activities
+from infrastructure.helloasso.form_activities import CACHE_SECONDS, ActivityCache, with_activities
 
 COMPETITION = {"activityType": "Compétition", "activityTypeId": 3}
 
@@ -41,14 +41,14 @@ FORMS = [{"formSlug": "comp", "formType": "Event"}, {"formSlug": "adhesion", "fo
 
 def test_reads_only_event_forms_without_activity() -> None:
     details = FakeDetails()
-    forms, unread = with_activities(FORMS, "token", fetch=details, cache=ActivityCache(clock=FakeClock()))
+    forms, unread = with_activities(FORMS, "token", fetch=details, cache=ActivityCache(CACHE_SECONDS, FakeClock()))
     assert (details.reads, unread) == (["comp"], 0)
     assert forms == [{"formSlug": "comp", "formType": "Event", **COMPETITION}, FORMS[1], FORMS[2]]
 
 
 def test_cached_until_expiry() -> None:
     clock, details = FakeClock(), FakeDetails()
-    cache = ActivityCache(cache_seconds=60, clock=clock)
+    cache = ActivityCache(60, clock)
     with_activities(FORMS, "token", fetch=details, cache=cache)
     clock.now += 59
     forms, _ = with_activities(FORMS, "token", fetch=details, cache=cache)
@@ -60,7 +60,7 @@ def test_cached_until_expiry() -> None:
 
 
 def test_failed_read_counted_and_not_cached() -> None:
-    cache = ActivityCache(clock=FakeClock())
+    cache = ActivityCache(CACHE_SECONDS, FakeClock())
     forms, unread = with_activities(FORMS, "token", fetch=FakeDetails(failing=("comp",)), cache=cache)
     assert (unread, forms[0]) == (1, FORMS[0])
     details = FakeDetails()
@@ -70,7 +70,7 @@ def test_failed_read_counted_and_not_cached() -> None:
 
 @pytest.mark.parametrize("cache_seconds", [0, -1])
 def test_no_cache_keeps_nothing(cache_seconds: int) -> None:
-    details, cache = FakeDetails(), ActivityCache(cache_seconds=cache_seconds, clock=FakeClock())
+    details, cache = FakeDetails(), ActivityCache(cache_seconds, FakeClock())
     with_activities(FORMS, "token", fetch=details, cache=cache)
     with_activities(FORMS, "token", fetch=details, cache=cache)
     assert details.reads == ["comp", "comp"]
@@ -78,12 +78,12 @@ def test_no_cache_keeps_nothing(cache_seconds: int) -> None:
 
 def test_unexpected_details_give_no_activity() -> None:
     forms, unread = with_activities(FORMS[:1], "token", fetch=lambda *_: {"activityTypeId": "3"},
-                                    cache=ActivityCache(clock=FakeClock()))
+                                    cache=ActivityCache(CACHE_SECONDS, FakeClock()))
     assert (unread, forms[0]["activityType"], forms[0]["activityTypeId"]) == (0, None, None)
 
 
 def test_invalidate_reads_again() -> None:
-    details, cache = FakeDetails(), ActivityCache(clock=FakeClock())
+    details, cache = FakeDetails(), ActivityCache(CACHE_SECONDS, FakeClock())
     with_activities(FORMS, "token", fetch=details, cache=cache)
     cache.invalidate()
     with_activities(FORMS, "token", fetch=details, cache=cache)

@@ -10,7 +10,7 @@ import re
 import sys
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 _tests_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _code_root = os.path.dirname(_tests_dir)
@@ -77,12 +77,11 @@ def make_token(email=ADMIN, key=KEY, kid=KID, aud=PROJECT,
 class _CertsMixin:
     def setUp(self):
         list_accounts()
-        self._saved = dict(api_auth._certs_cache)
-        api_auth._certs_cache["keys"] = {KID: CERT_PEM}
-        api_auth._certs_cache["expires"] = time.time() + 3600
+        api_auth._certs_cache.invalidate()
+        api_auth._certs_cache.get_or_load_expiring(api_auth._CERTS_KEY, lambda: ({KID: CERT_PEM}, 3600))
 
     def tearDown(self):
-        api_auth._certs_cache.update(self._saved)
+        api_auth._certs_cache.invalidate()
 
 
 class TestRoles(unittest.TestCase):
@@ -254,9 +253,39 @@ class TestTokenVerification(_CertsMixin, unittest.TestCase):
         self.assertRejected(hs)                                                # algorithme HS256
 
     def test_unknown_kid_refetches(self):
-        with patch.object(api_auth, "_fetch_certs", return_value={KID: CERT_PEM}) as fetch:
+        with patch.object(api_auth, "_fetch_certs", return_value=({KID: CERT_PEM}, 3600)) as fetch:
             self.assertRejected(make_token(kid="inconnu"))
             fetch.assert_called_once()
+
+    def test_unknown_kid_refused_as_unavailable_when_google_is_down(self):
+        with patch.object(api_auth, "_fetch_certs", side_effect=OSError("down")), \
+                patch.object(api_auth, "_last_known_certs", {KID: CERT_PEM}):
+            with self.assertRaises(api_auth.AuthError) as ctx:
+                api_auth.verify_firebase_token(make_token(kid="inconnu"))
+        self.assertEqual(ctx.exception.status_code, 503)
+
+    def test_expired_keys_still_used_when_google_is_down(self):
+        api_auth._certs_cache.invalidate()
+        with patch.object(api_auth, "_fetch_certs", side_effect=OSError("down")), \
+                patch.object(api_auth, "_last_known_certs", {KID: CERT_PEM}):
+            self.assertEqual(api_auth.verify_firebase_token(make_token())["sub"], "uid-123")
+
+    def test_keys_kept_for_the_max_age_of_the_answer(self):
+        api_auth._certs_cache.invalidate()
+        answer = MagicMock(headers={"Cache-Control": "public, max-age=120"})
+        answer.json.return_value = {KID: CERT_PEM}
+        saved_clock = api_auth._certs_cache.clock
+        self.addCleanup(setattr, api_auth._certs_cache, "clock", saved_clock)
+        api_auth._certs_cache.clock = lambda: 1000.0
+        with patch.object(api_auth.requests, "get", return_value=answer) as get, \
+                patch.object(api_auth, "_last_known_certs", {}):
+            api_auth._public_key_for(KID)
+            api_auth._certs_cache.clock = lambda: 1119.0
+            api_auth._public_key_for(KID)
+            self.assertEqual(get.call_count, 1)
+            api_auth._certs_cache.clock = lambda: 1120.0
+            api_auth._public_key_for(KID)
+            self.assertEqual(get.call_count, 2)
 
 
 class TestMeRoute(_CertsMixin, unittest.TestCase):

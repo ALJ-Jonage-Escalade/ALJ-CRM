@@ -1,5 +1,6 @@
 """Routes of src/api/competitions/members.py over the in-memory Firestore (auth off, local server)."""
 
+import time
 from unittest.mock import patch
 
 from support.api_case import ApiTestCase
@@ -48,7 +49,10 @@ class TestCompetitionMembers(ApiTestCase):
     def test_failed_refresh_keeps_the_last_copy(self):
         self.seed_adherent(1)
         self.client.get("/api/competition-members")
-        Repo._adherents_cache_at = 0.0  # copy expired
-        with patch.object(FirestoreClient, "list_documents", side_effect=FirestoreError("down")):
+        now = time.monotonic()
+        with patch.object(Repo._adherents_cache, "clock", lambda: now + 3600), \
+                patch.object(FirestoreClient, "list_documents", side_effect=FirestoreError("down")) as read:  # copy expired
             r = self.client.get("/api/competition-members")
-        self.assertEqual((r.status_code, [m["id"] for m in r.json()]), (200, [1]))
+            self.assertEqual((r.status_code, [m["id"] for m in r.json()]), (200, [1]))
+            self.client.get("/api/competition-members")
+            read.assert_called_once()  # the copy counts as read: Firestore is not asked again on every request

@@ -1,10 +1,12 @@
+import math
 import os
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
 
 from infrastructure import runtime_env
+from infrastructure.timed_cache import TimedCache
 
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
@@ -14,12 +16,14 @@ CLIENT_SECRET = os.getenv("HELLOASSO_CLIENT_SECRET")
 ORG_SLUG = os.getenv("HELLOASSO_ORG_SLUG")
 # Délai max d'une requête HelloAsso (connexion + lecture), en secondes
 REQUEST_TIMEOUT_SECONDS = 30
+# The token is dropped this long before HelloAsso expires it: it must stay valid for the calls of the running request
+TOKEN_EXPIRY_MARGIN_SECONDS = 60
+_OAUTH_KEY = "oauth"
+_token_cache: TimedCache[str, Optional[str]] = TimedCache(math.inf)  # kept for the `expires_in` of the token
 
-def get_access_token():
-    """Récupère un jeton d'accès OAuth2 auprès de HelloAsso."""
-    if not CLIENT_ID or not CLIENT_SECRET:
-        return None
-        
+
+def _request_access_token() -> Tuple[Optional[str], float]:
+    """A new OAuth2 token and how long to keep it (0, so not kept, without a usable `expires_in` or token)."""
     url = runtime_env.helloasso_oauth_url()
     data = {
         "client_id": CLIENT_ID,
@@ -28,13 +32,35 @@ def get_access_token():
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     
+    response = requests.post(url, data=data, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
+    response.raise_for_status()
+    body = response.json()
+    token = body.get("access_token")
+    expires_in = body.get("expires_in")
+    if not token or not isinstance(expires_in, (int, float)):
+        return token, 0
+    return token, expires_in - TOKEN_EXPIRY_MARGIN_SECONDS
+
+
+def get_access_token():
+    """Jeton d'accès OAuth2 HelloAsso, réutilisé jusqu'à peu avant son expiration (None si indisponible).
+    Dev mode: a new one every time (no cache, as the access roles)."""
+    if not CLIENT_ID or not CLIENT_SECRET:
+        return None
     try:
-        response = requests.post(url, data=data, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
-        response.raise_for_status()
-        return response.json().get("access_token")
+        if runtime_env.is_dev():
+            return _request_access_token()[0]
+        return _token_cache.get_or_load_expiring(_OAUTH_KEY, _request_access_token)
     except requests.exceptions.RequestException as e:
         print(f"Erreur d'authentification: {e}")
         return None
+
+
+def _drop_token_if_refused(response: requests.Response) -> None:
+    """A 401 means the kept token is no longer valid (revoked, credentials changed): the next call asks for a new one."""
+    if response.status_code == 401:
+        _token_cache.invalidate()
+
 
 def fetch_all_pages(url, headers, params=None):
     """Gère la pagination de l'API HelloAsso pour récupérer toutes les données."""
@@ -57,6 +83,7 @@ def fetch_all_pages(url, headers, params=None):
         try:
             print(f" -> Requête page {page_count}...")
             response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
+            _drop_token_if_refused(response)
             response.raise_for_status()
             data = response.json()
             
@@ -146,6 +173,7 @@ def _get_resource(path, params=None):
                                 params=params or {}, timeout=15)
     except requests.exceptions.RequestException as e:
         raise HelloAssoApiError(f"API HelloAsso injoignable : {e}")
+    _drop_token_if_refused(response)
     if response.status_code in (400, 403, 404):
         return None  # identifiant inexistant ou n'appartenant pas à l'organisation
     if response.status_code >= 300:
@@ -169,8 +197,7 @@ def get_payment(payment_id):
 
 
 def require_access_token() -> str:
-    """Jeton d'accès OAuth2, ou HelloAssoApiError (identifiants absents, authentification refusée).
-    À réutiliser pour les appels d'une même requête : get_access_token() en redemande un à chaque appel (#82)."""
+    """Jeton d'accès OAuth2, ou HelloAssoApiError (identifiants absents, authentification refusée)."""
     if not credentials_configured():
         raise HelloAssoApiError("Identifiants API HelloAsso non configurés")
     token = get_access_token()
@@ -184,7 +211,7 @@ def list_forms(form_types: Iterable[str], states: Iterable[str], token: str | No
 
     Contrairement à get_campaigns(), lève HelloAssoApiError (identifiants absents, réseau, erreur
     HTTP) au lieu de renvoyer une liste vide ou partielle : la page Paramètres affiche l'erreur.
-    `token` : jeton déjà obtenu (require_access_token), sinon un nouveau est demandé."""
+    `token` : jeton déjà obtenu (require_access_token), sinon il est demandé ici."""
     token = token or require_access_token()
     url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms"
     params = {"formTypes": list(form_types), "states": list(states), "pageSize": 100}
@@ -195,6 +222,7 @@ def list_forms(form_types: Iterable[str], states: Iterable[str], token: str | No
                                     timeout=REQUEST_TIMEOUT_SECONDS)
         except requests.exceptions.RequestException as e:
             raise HelloAssoApiError(f"API HelloAsso injoignable : {e}")
+        _drop_token_if_refused(response)
         if response.status_code >= 300:
             raise HelloAssoApiError(f"API HelloAsso : HTTP {response.status_code}")
         body = response.json()
@@ -214,6 +242,7 @@ def get_public_form(form_type: str, form_slug: str, token: str) -> Dict[str, Any
         response = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=REQUEST_TIMEOUT_SECONDS)
     except requests.exceptions.RequestException as e:
         raise HelloAssoApiError(f"API HelloAsso injoignable : {e}")
+    _drop_token_if_refused(response)
     if response.status_code >= 300:
         raise HelloAssoApiError(f"API HelloAsso : HTTP {response.status_code}")
     body = response.json()
@@ -238,6 +267,7 @@ def fetch_form_items(form_type: str, slug: str) -> list:
             response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
         except requests.exceptions.RequestException as e:
             raise HelloAssoApiError(f"API HelloAsso injoignable : {type(e).__name__}") from e
+        _drop_token_if_refused(response)
         if response.status_code == 404:
             raise HelloAssoApiError(f"Campagne HelloAsso introuvable : {form_type}/{slug}.", "helloasso_campaign_not_found")
         if response.status_code >= 300:
