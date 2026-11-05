@@ -37,7 +37,7 @@ class TestHelloAssoCampaigns(ApiTestCase):
             patcher = patch.object(route.helloasso_api, name, return_value=value)
             patcher.start()
             self.addCleanup(patcher.stop)
-        form_activities.install(form_activities.ActivityCache())
+        form_activities.install(form_activities.ActivityCache(form_activities.CACHE_SECONDS))
         self.addCleanup(form_activities.install, None)
         listing = patch.object(route.helloasso_api, "list_forms", **behaviour)
         mock = listing.start()

@@ -4,20 +4,18 @@ The forms list (`GET /organizations/{org}/forms`) does not give it: it is read f
 (`/forms/Event/{slug}/public`), a few calls in parallel, and kept in memory per form for CACHE_SECONDS. A form's
 activity practically never changes, and a new form is not cached yet, so it is read at once. A failed read is not
 cached: the next page load tries again. Dev mode: no cache (as the access roles).
-
-Cache of this feature only, until the server has a shared one (issue #82).
 """
 
 from __future__ import annotations
 
 import logging
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypedDict
 
 from infrastructure import runtime_env
 from infrastructure.helloasso import api as helloasso_api
+from infrastructure.timed_cache import TimedCache
 
 logger = logging.getLogger("alj")
 
@@ -25,7 +23,6 @@ CACHE_SECONDS = 24 * 3600
 # Details read at the same time (a handful of Event forms; stays polite with HelloAsso)
 MAX_PARALLEL_READS = 4
 
-Clock = Callable[[], float]
 FormKey = Tuple[str, str]  # (form type, slug)
 # Any: HelloAsso JSON (FormPublicModel)
 FetchDetails = Callable[[str, str, str], Dict[str, Any]]
@@ -36,36 +33,7 @@ class Activity(TypedDict):
     activityTypeId: Optional[int]
 
 
-class ActivityCache:
-    """Activity of each form, at most `cache_seconds` old (0: nothing kept)."""
-
-    def __init__(self, cache_seconds: float = CACHE_SECONDS, clock: Clock = time.monotonic) -> None:
-        self._cache_seconds = cache_seconds
-        self._clock = clock
-        self._lock = threading.Lock()
-        self._entries: Dict[FormKey, Tuple[float, Activity]] = {}
-
-    def get(self, key: FormKey) -> Optional[Activity]:
-        with self._lock:
-            entry = self._entries.get(key)
-            if entry is None:
-                return None
-            saved_at, activity = entry
-            if self._clock() - saved_at >= self._cache_seconds:
-                del self._entries[key]
-                return None
-            return activity
-
-    def put(self, key: FormKey, activity: Activity) -> None:
-        if self._cache_seconds <= 0:
-            return
-        with self._lock:
-            self._entries[key] = (self._clock(), activity)
-
-    def invalidate(self) -> None:
-        with self._lock:
-            self._entries.clear()
-
+ActivityCache = TimedCache[FormKey, Activity]
 
 _current: Optional[ActivityCache] = None
 _current_lock = threading.Lock()
@@ -103,31 +71,23 @@ def with_activities(forms: List[Dict[str, Any]], token: str,  # Any: HelloAsso J
     details could not be read (left without activity). A form that already has `activityTypeId` is kept as is."""
     fetch = fetch or helloasso_api.get_public_form
     cache = cache or current()
-    keys = {_key(form) for form in forms
-            if form.get("formType") == "Event" and form.get("formSlug") and form.get("activityTypeId") is None}
+    keys = sorted({_key(form) for form in forms
+                   if form.get("formType") == "Event" and form.get("formSlug") and form.get("activityTypeId") is None})
     activities: Dict[FormKey, Activity] = {}
-    to_read: List[FormKey] = []
-    for key in sorted(keys):
-        cached = cache.get(key)
-        if cached is None:
-            to_read.append(key)
-        else:
-            activities[key] = cached
 
     def read(key: FormKey) -> Optional[Activity]:
         try:
-            return _activity_of(fetch(key[0], key[1], token))
+            return cache.get_or_load(key, lambda: _activity_of(fetch(key[0], key[1], token)))
         except Exception as e:  # HelloAssoApiError or an unexpected answer: this form only, counted as unread
             logger.warning("Activité du formulaire HelloAsso %s/%s illisible : %s", key[0], key[1], e)
             return None
 
     failed = 0
-    if to_read:
+    if keys:
         with ThreadPoolExecutor(max_workers=MAX_PARALLEL_READS) as pool:
-            for key, activity in zip(to_read, pool.map(read, to_read), strict=True):
+            for key, activity in zip(keys, pool.map(read, keys), strict=True):
                 if activity is None:
                     failed += 1
                 else:
                     activities[key] = activity
-                    cache.put(key, activity)
     return [{**form, **activities[_key(form)]} if _key(form) in activities else form for form in forms], failed

@@ -26,11 +26,11 @@ Activation
 from __future__ import annotations
 
 import hmac
+import math
 import os
 import re
-import threading
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import requests
 
@@ -39,6 +39,7 @@ from infrastructure.security import role_directory
 from infrastructure.security.role_directory import AccessUnavailable, normalized_email
 from infrastructure.security.roles import Role
 from infrastructure.security.secret_store import SecretStore
+from infrastructure.timed_cache import TimedCache
 
 DEFAULT_PROJECT_ID = "smart-amplifier-510811-n6"
 FIREBASE_CERTS_URL = (
@@ -181,33 +182,35 @@ def has_role(claims: Dict[str, Any], needed: Role) -> bool:
 # ---------------------------------------------------------------------------
 # Vérification du jeton d'identité Firebase
 # ---------------------------------------------------------------------------
-_certs_lock = threading.Lock()
-_certs_cache: Dict[str, Any] = {"keys": {}, "expires": 0.0}
+_CERTS_KEY = "firebase"
+_certs_cache: TimedCache[str, Dict[str, str]] = TimedCache(math.inf)  # kept for the max-age of Google's answer
+_last_known_certs: Dict[str, str] = {}  # still used when Google can't be reached after they expire
 
 
-def _fetch_certs() -> Dict[str, str]:
+def _fetch_certs() -> Tuple[Dict[str, str], float]:
+    global _last_known_certs
     resp = requests.get(FIREBASE_CERTS_URL, timeout=10)
     resp.raise_for_status()
     max_age = 3600
     m = re.search(r"max-age=(\d+)", resp.headers.get("Cache-Control", ""))
     if m:
         max_age = int(m.group(1))
-    _certs_cache["keys"] = resp.json()
-    _certs_cache["expires"] = time.time() + max_age
-    return _certs_cache["keys"]
+    _last_known_certs = resp.json()
+    return _last_known_certs, max_age
 
 
 def _public_key_for(kid: str):
     from cryptography.x509 import load_pem_x509_certificate
 
-    with _certs_lock:
-        keys = _certs_cache["keys"]
-        if time.time() >= _certs_cache["expires"] or kid not in keys:
-            try:
-                keys = _fetch_certs()
-            except Exception as e:  # réseau indisponible
-                if kid not in keys:
-                    raise AuthError(503, f"Clés de vérification Google indisponibles : {e}")
+    try:
+        keys = _certs_cache.get_or_load_expiring(_CERTS_KEY, _fetch_certs)
+        if kid not in keys:  # keys rotated by Google since the last read
+            _certs_cache.invalidate()
+            keys = _certs_cache.get_or_load_expiring(_CERTS_KEY, _fetch_certs)
+    except Exception as e:  # réseau indisponible
+        keys = _last_known_certs
+        if kid not in keys:
+            raise AuthError(503, f"Clés de vérification Google indisponibles : {e}")
     pem = keys.get(kid)
     if not pem:
         raise AuthError(401, "Jeton signé par une clé inconnue")

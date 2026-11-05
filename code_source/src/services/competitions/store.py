@@ -12,12 +12,11 @@ from __future__ import annotations
 import functools
 import logging
 import os
-import threading
-import time
 from typing import Callable, List, ParamSpec, TypeVar
 
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from infrastructure.firestore.client import FirestoreConflictError, FirestoreError
+from infrastructure.timed_cache import TimedCache
 from services.documents import Doc
 from services.errors import Conflict, NotFound, StorageUnavailable
 
@@ -29,21 +28,16 @@ R = TypeVar("R")
 # webhook, other instance) show up after CACHE_SECONDS (0 in the e2e tests, whose fixtures
 # write straight to Firestore).
 CACHE_SECONDS = float(os.environ.get("ALJ_COMPETITIONS_CACHE_SECONDS", "5"))
-_cache_lock = threading.Lock()
-_competitions_cache: dict = {"at": 0.0, "docs": None}  # {"at": time, "docs": List[Doc] or None}
+_CACHE_KEY = "competitions"
+_competitions_cache: TimedCache[str, List[Doc]] = TimedCache(CACHE_SECONDS)
 
 
 def cached_competitions(load: Callable[[], List[Doc]]) -> List[Doc]:
-    with _cache_lock:
-        if _competitions_cache["docs"] is None or time.time() - _competitions_cache["at"] > CACHE_SECONDS:
-            _competitions_cache["docs"] = load()
-            _competitions_cache["at"] = time.time()
-        return _competitions_cache["docs"]
+    return _competitions_cache.get_or_load(_CACHE_KEY, load)
 
 
 def invalidate_cache() -> None:
-    with _cache_lock:
-        _competitions_cache["docs"] = None
+    _competitions_cache.invalidate()
 
 
 def storage(fn: Callable[P, R]) -> Callable[P, R]:

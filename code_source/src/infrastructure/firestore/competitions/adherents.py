@@ -1,5 +1,4 @@
 """`adherents` directory: snapshot of the members of database.db, read through a short cache."""
-import time
 import json
 from typing import Dict, Any, List, Optional, Sequence, Tuple
 
@@ -11,16 +10,19 @@ from domain.utils import normalize_string
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions.base import CompetitionStoreBase
 from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.timed_cache import TimedCache
 from domain.members.purchase_priority import purchase_priority_score
 
-_ADHERENTS_CACHE_TTL = 30.0
+_ADHERENTS_CACHE_SECONDS = 30.0
+_ADHERENTS_CACHE_KEY = "adherents"
 
 
 class AdherentsMixin(CompetitionStoreBase):
     """Member directory: sync from the main database, cached reads, search."""
 
-    _adherents_cache: Optional[List[Dict[str, Any]]] = None
-    _adherents_cache_at: float = 0.0
+    _adherents_cache: TimedCache[str, List[Dict[str, Any]]] = TimedCache(_ADHERENTS_CACHE_SECONDS)
+    # Last directory read: served again for a cache time when a refresh fails (_read_adherents)
+    _adherents_last_read: Optional[List[Dict[str, Any]]] = None
     # The outdated directory was already sent for rewriting by this process (_heal_outdated_directory)
     _directory_heal_requested: bool = False
 
@@ -190,28 +192,30 @@ class AdherentsMixin(CompetitionStoreBase):
 
     @classmethod
     def _invalidate_adherents_cache(cls):
-        cls._adherents_cache = None
-        cls._adherents_cache_at = 0.0
+        cls._adherents_cache.invalidate()
+        cls._adherents_last_read = None
 
     @classmethod
     def _adherents_raw(cls) -> List[Dict[str, Any]]:
-        """The `adherents` directory, cached _ADHERENTS_CACHE_TTL seconds. A failed read keeps
-        serving the last copy; with none yet, FirestoreError is raised (never an empty
-        directory: it would look like a club without members, and is not cached)."""
-        now = time.time()
-        if cls._adherents_cache is None or (now - cls._adherents_cache_at) > _ADHERENTS_CACHE_TTL:
-            try:
-                cls._adherents_cache = FirestoreClient.list_documents(cls.COLLECTION_ADHERENTS)
-            except Exception as e:
-                print(f"⚠️ [FIRESTORE] Lecture de l'annuaire adhérents impossible : {e}")
-                if cls._adherents_cache is None:
-                    if isinstance(e, FirestoreError):
-                        raise
-                    raise FirestoreError(f"Lecture de l'annuaire adhérents impossible : {e}") from e
-            else:
-                cls._heal_outdated_directory(cls._adherents_cache)
-            cls._adherents_cache_at = now
-        return cls._adherents_cache
+        """The `adherents` directory, cached _ADHERENTS_CACHE_SECONDS seconds."""
+        return cls._adherents_cache.get_or_load(_ADHERENTS_CACHE_KEY, cls._read_adherents)
+
+    @classmethod
+    def _read_adherents(cls) -> List[Dict[str, Any]]:
+        """Reads the directory. A failed read keeps serving the last copy; with none yet, FirestoreError is raised
+        (never an empty directory: it would look like a club without members, and is not cached)."""
+        try:
+            docs = FirestoreClient.list_documents(cls.COLLECTION_ADHERENTS)
+        except Exception as e:
+            print(f"⚠️ [FIRESTORE] Lecture de l'annuaire adhérents impossible : {e}")
+            if cls._adherents_last_read is not None:
+                return cls._adherents_last_read
+            if isinstance(e, FirestoreError):
+                raise
+            raise FirestoreError(f"Lecture de l'annuaire adhérents impossible : {e}") from e
+        cls._heal_outdated_directory(docs)
+        cls._adherents_last_read = docs
+        return docs
 
     @classmethod
     def _heal_outdated_directory(cls, docs: List[Dict[str, Any]]) -> None:

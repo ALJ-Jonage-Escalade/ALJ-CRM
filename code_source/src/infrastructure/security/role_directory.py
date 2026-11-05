@@ -24,10 +24,12 @@ from typing import Callable, Dict, Optional
 from infrastructure import runtime_env
 from infrastructure.firestore.access_store import AccessStore, FirestoreAccessStore, RoleEntry
 from infrastructure.security.roles import Role, role_named
+from infrastructure.timed_cache import TimedCache
 
 logger = logging.getLogger("alj")
 
 CACHE_SECONDS = 60
+_CACHE_KEY = "access_roles"
 
 Clock = Callable[[], datetime.datetime]
 
@@ -70,25 +72,19 @@ class RoleDirectory:
         self.store = store
         self.clock = clock
         self.bootstrap_email = normalized_email(bootstrap_email)
-        self._cache_seconds = cache_seconds
-        self._lock = threading.Lock()
-        self._entries: Optional[Dict[str, RoleEntry]] = None
-        self._loaded_at: Optional[datetime.datetime] = None
+        self.cache: TimedCache[str, Dict[str, RoleEntry]] = TimedCache(cache_seconds, clock=lambda: self.clock().timestamp())
 
     def entries(self) -> Dict[str, RoleEntry]:
         """The access list by e-mail, at most CACHE_SECONDS old; AccessUnavailable when it cannot be read."""
-        with self._lock:
-            now = self.clock()
-            fresh = self._loaded_at is not None and (now - self._loaded_at).total_seconds() < self._cache_seconds
-            if self._entries is None or not fresh:
-                try:
-                    listed = self.store.list_roles()
-                except Exception as e:  # Firestore down, token refused…: no stale list served past the cache time
-                    logger.warning("Liste des accès illisible : %s", e)
-                    raise AccessUnavailable("Liste des accès illisible") from e
-                self._entries = {normalized_email(entry["email"]): entry for entry in listed}
-                self._loaded_at = now
-            return self._entries
+        return self.cache.get_or_load(_CACHE_KEY, self._read_entries)
+
+    def _read_entries(self) -> Dict[str, RoleEntry]:
+        try:
+            listed = self.store.list_roles()
+        except Exception as e:  # Firestore down, token refused…: no stale list served past the cache time
+            logger.warning("Liste des accès illisible : %s", e)
+            raise AccessUnavailable("Liste des accès illisible") from e
+        return {normalized_email(entry["email"]): entry for entry in listed}
 
     def role_of(self, email: str) -> Optional[Role]:
         """Role of this address, or None when it has no access."""
@@ -115,9 +111,7 @@ class RoleDirectory:
 
     def invalidate(self) -> None:
         """Drops the cached list: the next question reads it again."""
-        with self._lock:
-            self._entries = None
-            self._loaded_at = None
+        self.cache.invalidate()
 
 
 _current: Optional[RoleDirectory] = None
