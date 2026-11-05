@@ -59,7 +59,7 @@ pillow==13.0.0
     #   weasyprint
 pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi
-pydantic==2.14.1
+pydantic==2.14.2
     # via fastapi
 pydantic-core==2.50.1
     # via pydantic
