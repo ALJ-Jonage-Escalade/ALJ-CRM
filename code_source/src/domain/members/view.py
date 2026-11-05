@@ -21,12 +21,22 @@ STATUS_MAP = {
     "processed": "Traité", "validated": "Validé", "validé": "Validé", "valide": "Validé",
     "terminé": "Terminé", "termine": "Terminé", "annulé": "Annulé", "annule": "Annulé",
     "canceled": "Annulé", "en cours": "En cours",
+    # A refund on HelloAsso counts as a cancellation (the club keeps no refunded registration)
+    "refunded": "Annulé", "refunding": "Annulé",
 }
+# Words of a cancelled or refunded registration's status, raw (HelloAsso) or French
+_CANCELLED_WORDS = ("annul", "cancel", "refund", "rembours")
 
 
 def normalize_status(status: object) -> str:
     raw = str(status or "").strip()
     return STATUS_MAP.get(raw.lower(), raw)
+
+
+def is_cancelled(status: object) -> bool:
+    """A cancelled or refunded registration, which every list and export leaves out."""
+    lowered = str(status or "").strip().lower()
+    return any(word in lowered for word in _CANCELLED_WORDS)
 
 
 _FIRST_NAME_WORD = re.compile(r"(^|[\s\-'’])([a-zà-öø-ÿ])", re.IGNORECASE)

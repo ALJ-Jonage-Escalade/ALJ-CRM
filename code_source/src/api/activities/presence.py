@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse, Response
 
 from api.activities.schemas import PresenceAutonomous, PresenceConfig, PresenceCourse, PresenceDates, PresenceExportRequest
 from api.responses import error, error_responses, internal_error
+from domain.members.view import is_cancelled
 
 router = APIRouter()
 
@@ -53,7 +54,7 @@ def get_presence_config() -> Union[PresenceConfig, JSONResponse]:
         counted_keys = set()
         for p in raw_data:
             tarif = str(p.get("tarif_name") or "").strip()
-            if tarif not in aut_tarifs or "annul" in str(p.get("status") or "").lower():
+            if tarif not in aut_tarifs or is_cancelled(p.get("status")):
                 continue
             dob = _dob_of(p)
             ikey = (str(p.get("first_name") or "").strip().lower(), str(p.get("last_name") or "").strip().lower(), dob.isoformat() if dob else "")
@@ -73,7 +74,7 @@ def get_presence_config() -> Union[PresenceConfig, JSONResponse]:
         added_minors = 0
         added_seen = set()
         for p in raw_data:
-            if "annul" in str(p.get("status") or "").lower():
+            if is_cancelled(p.get("status")):
                 continue
             if not (str(p.get("parental_auth_autonomous") or "").strip() == "Oui" or str(p.get("parental_auth_family") or "").strip() == "Oui"):
                 continue
@@ -96,7 +97,7 @@ def get_presence_config() -> Union[PresenceConfig, JSONResponse]:
             count = 0
             c_seen = set()
             for p in raw_data:
-                if "annul" in str(p.get("status") or "").lower():
+                if is_cancelled(p.get("status")):
                     continue
                 if str(p.get("tarif_name") or "").strip() in c_tarifs:
                     dob = _dob_of(p)

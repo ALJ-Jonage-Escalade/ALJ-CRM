@@ -1637,7 +1637,7 @@
     "/api/dashboard": {
       "get": {
         "summary": "Get Dashboard Data",
-        "description": "Route principale renvoyant toutes les données formatées pour le frontend.",
+        "description": "Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import\ndes adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.",
         "operationId": "get_dashboard_data_api_dashboard_get",
         "parameters": [
           {
@@ -1666,6 +1666,160 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/memberships/preview": {
+      "post": {
+        "summary": "Preview Membership Import",
+        "description": "Reads the membership campaign on HelloAsso and sorts its registrations for the active season. Writes nothing.",
+        "operationId": "preview_membership_import_api_helloasso_memberships_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/MembershipPreviewRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/memberships/import": {
+      "post": {
+        "summary": "Import Memberships",
+        "description": "Reads HelloAsso again and applies the admin's decisions to the recomputed plan, recorded in the history.\nSends no e-mail.",
+        "operationId": "import_memberships_api_helloasso_memberships_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/memberships/last-sync": {
+      "get": {
+        "summary": "Last Membership Sync",
+        "description": "When the latest import ran, and who ran it.",
+        "operationId": "last_membership_sync_api_helloasso_memberships_last_sync_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipLastSync"
                 }
               }
             }
@@ -4415,6 +4569,44 @@
         ],
         "title": "BatchReport"
       },
+      "BucketCounts": {
+        "properties": {
+          "already_imported": {
+            "type": "integer",
+            "title": "Already Imported"
+          },
+          "new": {
+            "type": "integer",
+            "title": "New"
+          },
+          "renewal": {
+            "type": "integer",
+            "title": "Renewal"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "to_review": {
+            "type": "integer",
+            "title": "To Review"
+          },
+          "blocked": {
+            "type": "integer",
+            "title": "Blocked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "already_imported",
+          "new",
+          "renewal",
+          "updated",
+          "to_review",
+          "blocked"
+        ],
+        "title": "BucketCounts"
+      },
       "CloudDbStatus": {
         "properties": {
           "status": {
@@ -6563,6 +6755,78 @@
         ],
         "title": "HelloAssoSyncStats"
       },
+      "ImportCounts": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "renewed": {
+            "type": "integer",
+            "title": "Renewed"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "attached": {
+            "type": "integer",
+            "title": "Attached"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "renewed",
+          "updated",
+          "attached",
+          "skipped"
+        ],
+        "title": "ImportCounts"
+      },
+      "ImportedMember": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "purchase_id": {
+            "type": "integer",
+            "title": "Purchase Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "tarif_name": {
+            "type": "string",
+            "title": "Tarif Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "user_id",
+          "purchase_id",
+          "last_name",
+          "first_name",
+          "tarif_name"
+        ],
+        "title": "ImportedMember",
+        "description": "A member the import wrote, for the link to their record (attached: the member chosen, not the HelloAsso name)."
+      },
       "ItemIgnore": {
         "properties": {
           "ignore": {
@@ -7470,6 +7734,491 @@
           "message"
         ],
         "title": "MemberUpdated"
+      },
+      "MembershipCandidate": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "last_name",
+          "first_name",
+          "birth_date",
+          "licence"
+        ],
+        "title": "MembershipCandidate",
+        "description": "A member a registration to review may be (choice \"link:<user_id>\"), or an imported one is attached to."
+      },
+      "MembershipChange": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "status",
+              "tarif_name",
+              "amount"
+            ],
+            "title": "Field"
+          },
+          "crm": {
+            "type": "string",
+            "title": "Crm"
+          },
+          "before": {
+            "type": "string",
+            "title": "Before"
+          },
+          "after": {
+            "type": "string",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "crm",
+          "before",
+          "after"
+        ],
+        "title": "MembershipChange",
+        "description": "A value HelloAsso changed since the last import: in the CRM now (crm), as HelloAsso gave it last time (before),\nas HelloAsso gives it now (after). Amounts in euros, two decimals."
+      },
+      "MembershipDecision": {
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "already_imported",
+              "new",
+              "renewal",
+              "updated",
+              "to_review",
+              "blocked"
+            ],
+            "title": "Bucket"
+          },
+          "choice": {
+            "type": "string",
+            "title": "Choice"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Comment",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bucket",
+          "choice"
+        ],
+        "title": "MembershipDecision",
+        "description": "The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>\n(rows to review), attach:<member id> (new, renewal and to-review rows: given by hand to any member, `comment`\nrequired). bucket: the bucket the preview showed the row in (a row that changed since is refused)."
+      },
+      "MembershipImportRequest": {
+        "properties": {
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          },
+          "decisions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MembershipDecision"
+            },
+            "type": "object",
+            "title": "Decisions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "season",
+          "decisions"
+        ],
+        "title": "MembershipImportRequest",
+        "description": "decisions: by HelloAsso item id; a row without decision is skipped. campaign: the one of the preview."
+      },
+      "MembershipImportResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "history_id": {
+            "type": "string",
+            "title": "History Id"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ImportCounts"
+          },
+          "created": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedMember"
+            },
+            "type": "array",
+            "title": "Created"
+          },
+          "renewed": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedMember"
+            },
+            "type": "array",
+            "title": "Renewed"
+          },
+          "updated": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedMember"
+            },
+            "type": "array",
+            "title": "Updated"
+          },
+          "attached": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedMember"
+            },
+            "type": "array",
+            "title": "Attached"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "season",
+          "history_id",
+          "counts",
+          "created",
+          "renewed",
+          "updated",
+          "attached"
+        ],
+        "title": "MembershipImportResult",
+        "description": "history_id: the import's entry in the history."
+      },
+      "MembershipLastImport": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "campaign": {
+            "type": "string",
+            "title": "Campaign"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "author",
+          "season",
+          "campaign"
+        ],
+        "title": "MembershipLastImport",
+        "description": "at: ISO date (UTC); author: e-mail of the admin who ran it."
+      },
+      "MembershipLastSync": {
+        "properties": {
+          "last_sync": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MembershipLastImport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "last_sync"
+        ],
+        "title": "MembershipLastSync",
+        "description": "The latest import, null before the first one."
+      },
+      "MembershipMember": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence"
+          },
+          "membership": {
+            "type": "string",
+            "enum": [
+              "none",
+              "manual",
+              "several_manual",
+              "helloasso"
+            ],
+            "title": "Membership"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "last_name",
+          "first_name",
+          "birth_date",
+          "licence",
+          "membership"
+        ],
+        "title": "MembershipMember",
+        "description": "A member of the base a registration can be attached to by hand (choice \"attach:<user_id>\"). membership: theirs\nthis season — none, manual (taken over by the attach), several_manual or helloasso (the attach is refused)."
+      },
+      "MembershipPreview": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "campaign": {
+            "type": "string",
+            "title": "Campaign"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/BucketCounts"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipMember"
+            },
+            "type": "array",
+            "title": "Members"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "season",
+          "campaign",
+          "blocked_reason",
+          "counts",
+          "rows",
+          "members"
+        ],
+        "title": "MembershipPreview",
+        "description": "blocked_reason: the whole campaign is refused (another season), every row is then blocked. members: every member\nof the base (any season), for the attach by hand."
+      },
+      "MembershipPreviewRequest": {
+        "properties": {
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MembershipPreviewRequest",
+        "description": "campaign: slug of the membership form to read for this sync only (never saved); null or blank: the active one\n(Paramètres › Campagnes)."
+      },
+      "MembershipRow": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "already_imported",
+              "new",
+              "renewal",
+              "updated",
+              "to_review",
+              "blocked"
+            ],
+            "title": "Bucket"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "order_ref": {
+            "type": "string",
+            "title": "Order Ref"
+          },
+          "order_date": {
+            "type": "string",
+            "title": "Order Date"
+          },
+          "payment_date": {
+            "type": "string",
+            "title": "Payment Date"
+          },
+          "refund_date": {
+            "type": "string",
+            "title": "Refund Date"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence"
+          },
+          "tarif_name": {
+            "type": "string",
+            "title": "Tarif Name"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "can_create": {
+            "type": "boolean",
+            "title": "Can Create"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "attached_to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MembershipCandidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "bucket",
+          "reason",
+          "order_ref",
+          "order_date",
+          "payment_date",
+          "refund_date",
+          "last_name",
+          "first_name",
+          "birth_date",
+          "licence",
+          "tarif_name",
+          "amount",
+          "status",
+          "candidates",
+          "can_create",
+          "changes"
+        ],
+        "title": "MembershipRow",
+        "description": "One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and\nwhether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),\n\"\" when missing: order_date the registration, payment_date the first payment, refund_date the refund (status\nRefunded / Refunding)."
       },
       "NewMember": {
         "properties": {

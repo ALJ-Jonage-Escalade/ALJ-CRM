@@ -73,6 +73,97 @@ const PREVIEW = {
   ],
 };
 
+const MEMBERSHIP_PREVIEW = {
+  status: "success",
+  season: "2026-2027",
+  campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+  blocked_reason: null,
+  counts: { already_imported: 0, new: 1, renewal: 0, updated: 0, to_review: 0, blocked: 1 },
+  rows: [
+    {
+      item_id: 1,
+      bucket: "new",
+      reason: "Personne inconnue du club : nouvel adhérent.",
+      order_ref: "501",
+      order_date: "2026-09-01T10:00:00+02:00",
+      payment_date: "2026-09-01T10:05:00+02:00",
+      refund_date: "",
+      last_name: "WEASLEY",
+      first_name: "Ginny",
+      birth_date: "2013-08-11",
+      licence: "",
+      tarif_name: "Loisir collège",
+      amount: 150,
+      status: "Processed",
+      candidates: [],
+      can_create: true,
+      changes: [],
+    },
+    {
+      item_id: 2,
+      bucket: "blocked",
+      reason: "Date de naissance manquante ou illisible.",
+      order_ref: "502",
+      order_date: "2026-09-01T10:00:00+02:00",
+      payment_date: "2026-09-01T10:05:00+02:00",
+      refund_date: "",
+      last_name: "LOVEGOOD",
+      first_name: "Luna",
+      birth_date: "",
+      licence: "",
+      tarif_name: "Adultes autonomes",
+      amount: 120,
+      status: "Processed",
+      candidates: [],
+      can_create: false,
+      changes: [],
+    },
+  ],
+  members: [] as unknown[],
+};
+const REVIEW_ROW = {
+  ...MEMBERSHIP_PREVIEW.rows[0]!,
+  item_id: 3,
+  bucket: "to_review",
+  reason: "Même nom et prénom qu'un adhérent, mais date de naissance différente.",
+  last_name: "GRANGER",
+  first_name: "Hermione",
+  birth_date: "2013-09-19",
+  candidates: [{ user_id: 4, last_name: "GRANGER", first_name: "Hermione", birth_date: "2012-09-19", licence: "123456" }],
+  can_create: true,
+};
+
+function membershipForm(slug: string, title: string, state: string, active = false) {
+  return {
+    form_type: "Membership",
+    slug,
+    title,
+    private_title: "",
+    state,
+    activity_type: "",
+    url: "",
+    start_date: null,
+    end_date: null,
+    created_at: null,
+    active,
+    warning: null,
+  };
+}
+const MEMBERSHIP_CAMPAIGNS = {
+  error: null,
+  warning: null,
+  others: [],
+  competitions: { active: null, configured: false, campaigns: [] },
+  membership: {
+    active: { form_type: "Membership", slug: "adhesion-escalade-2026-2027-amicale-laique-escalade-2" },
+    configured: true,
+    campaigns: [
+      membershipForm("adhesion-escalade-2026-2027-amicale-laique-escalade-2", "Adhésions 2026-2027", "Public", true),
+      membershipForm("adhesions-bis-2026-2027", "Adhésions de janvier", "Draft"),
+    ],
+  },
+};
+
 type Answer = (body: unknown, url: URL) => Response;
 const ANSWERS: Record<string, Answer> = {
   "GET /api/seasons": () => json({ seasons: ["2026-2027", "2025-2026"], active: "2026-2027" }),
@@ -81,6 +172,20 @@ const ANSWERS: Record<string, Answer> = {
   "GET /api/presence/config": () => json(CONFIG),
   "POST /api/presence/export": () => file("Feuilles.xlsx"),
   "GET /api/ffme/stats": () => json(STATS),
+  "POST /api/helloasso/memberships/preview": () => json(MEMBERSHIP_PREVIEW),
+  "GET /api/helloasso/memberships/last-sync": () => json({ last_sync: null }),
+  "GET /api/helloasso/campaigns": () => json(MEMBERSHIP_CAMPAIGNS),
+  "POST /api/helloasso/memberships/import": () =>
+    json({
+      status: "success",
+      season: "2026-2027",
+      history_id: "2026-10-31T09:15:00+00:00-abcd1234",
+      counts: { created: 1, renewed: 1, updated: 0, attached: 0, skipped: 1 },
+      created: [{ item_id: 1, user_id: 7, purchase_id: 12, last_name: "WEASLEY", first_name: "Ginny", tarif_name: "Loisir collège" }],
+      renewed: [{ item_id: 3, user_id: 4, purchase_id: 13, last_name: "GRANGER", first_name: "Hermione", tarif_name: "Compétition" }],
+      updated: [],
+      attached: [],
+    }),
   "GET /api/ffme/export": () => file("import_ffme_20261022.csv"),
   "POST /api/ffme/preview": () => json(PREVIEW),
   "POST /api/ffme/import": () =>
@@ -263,6 +368,525 @@ describe("OutilsPage", () => {
     expect(document.getElementById("refused-page")!.textContent).toContain("Import FFME est réservée aux administrateurs");
     expect(coach.byId("sub-side-map")!.getAttribute("aria-current")).toBe("page");
     expect(document.querySelector("h1")!.textContent).toBe("Outils");
+  });
+
+  it("previews the HelloAsso membership campaign: campaign, counters and rows per bucket", async () => {
+    const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
+    expect(sent("POST", "/api/helloasso/memberships/preview")).toHaveLength(0);
+
+    byId("ha-import-preview")!.click();
+    await flushPromises();
+
+    expect(sent("POST", "/api/helloasso/memberships/preview")).toHaveLength(1);
+    expect(byId("ha-import-campaign")!.textContent).toContain("adhesion-escalade-2026-2027-amicale-laique-escalade-2");
+    expect(byId("ha-import-campaign")!.textContent).toContain("2026-2027");
+    expect(byId("ha-count-new")!.textContent).toContain("1");
+    expect(byId("ha-count-blocked")!.textContent).toContain("1");
+    expect(byId("ha-count-renewal")!.textContent).toContain("0");
+    expect(all("ha-row-new").map((row) => row.textContent)).toEqual([expect.stringContaining("WEASLEY Ginny")]);
+    expect(byId("ha-row-blocked")!.textContent).toContain("Date de naissance manquante ou illisible.");
+    expect(all("ha-licence").map((cell) => cell.textContent)).toEqual(["—", "—"]);
+    expect(all("ha-birth-date").map((cell) => cell.textContent)).toEqual(["11/08/2013", "—"]);
+    expect(byId("ha-section-renewal")).toBeNull();
+  });
+
+  it("lists the club's membership campaigns, the active one selected, and previews and imports the one picked for this sync", async () => {
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+    const select = byId<HTMLSelectElement>("ha-import-campaign-select")!;
+    expect(select.value).toBe("adhesion-escalade-2026-2027-amicale-laique-escalade-2");
+    expect([...select.options].map((option) => option.textContent.trim())).toEqual([
+      "Adhésions 2026-2027 (campagne active)",
+      "Adhésions de janvier (brouillon)",
+    ]);
+    byId("ha-import-preview")!.click();
+    await flushPromises();
+    expect(byId("ha-import-result")).not.toBeNull();
+
+    select.value = "adhesions-bis-2026-2027";
+    select.dispatchEvent(new Event("change"));
+    await flushPromises();
+    expect(byId("ha-import-result")).toBeNull();
+    byId("ha-import-preview")!.click();
+    await flushPromises();
+    byId("ha-import-apply")!.click();
+    await flushPromises();
+
+    expect(sent("POST", "/api/helloasso/memberships/preview").map((call) => call.body)).toEqual([
+      { campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2" },
+      { campaign: "adhesions-bis-2026-2027" },
+    ]);
+    expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toMatchObject({ campaign: "adhesions-bis-2026-2027" });
+  });
+
+  it("previews the active HelloAsso campaign when the campaign list can't be read", async () => {
+    const campaigns = ANSWERS["GET /api/helloasso/campaigns"]!;
+    ANSWERS["GET /api/helloasso/campaigns"] = () => json({ code: "storage_unavailable", message: "Firestore injoignable" }, 503);
+    try {
+      const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      expect(byId("ha-import-campaign-select")).toBeNull();
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      expect(sent("POST", "/api/helloasso/memberships/preview").at(-1)!.body).toEqual({ campaign: null });
+    } finally {
+      ANSWERS["GET /api/helloasso/campaigns"] = campaigns;
+    }
+  });
+
+  it("shows each HelloAsso status as an icon, its meaning in the tooltip", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const statuses = ["Processed", "Registered", "Canceled", "Refunded", "Refunding", "Unknown", "Strange"];
+    const rows = statuses.map((status, index) => ({ ...MEMBERSHIP_PREVIEW.rows[0]!, item_id: 10 + index, status }));
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows });
+    try {
+      const { byId, all } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+
+      const icons = all("ha-status").map((icon) => [icon.textContent.trim(), icon.getAttribute("title")]);
+      expect(icons).toEqual([
+        ["✅", "Payée (Processed)"],
+        ["📝", "Enregistrée sans paiement en ligne (Registered)"],
+        ["🚫", "Annulée (Canceled)"],
+        ["↩️", "Remboursée (Refunded)"],
+        ["⏳", "Remboursement en cours (Refunding)"],
+        ["❔", "Statut inconnu (Unknown)"],
+        ["❔", "Statut inconnu (Strange)"],
+      ]);
+      expect(all("ha-status").every((icon) => icon.getAttribute("aria-label") === icon.getAttribute("title"))).toBe(true);
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("shows the FFME licence given on HelloAsso", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const licensed = { ...MEMBERSHIP_PREVIEW.rows[0]!, licence: "123456" };
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [licensed] });
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+
+      expect(byId("ha-row-new")!.querySelector("[data-testid=ha-licence]")!.textContent).toBe("123456");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("filters each HelloAsso table by its own search box, accents and case ignored, the checked rows kept", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const ginny = MEMBERSHIP_PREVIEW.rows[0]!;
+    const rows = [
+      ginny,
+      { ...ginny, item_id: 20, last_name: "DAYRE", first_name: "Staël", licence: "654321" },
+      { ...ginny, item_id: 21, last_name: "WEASLEY", first_name: "Ron", tarif_name: "Adultes autonomes" },
+      MEMBERSHIP_PREVIEW.rows[1]!,
+    ];
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows });
+    try {
+      const { byId, all } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      const search = async (bucket: string, text: string) => {
+        const input = byId("ha-section-" + bucket)!.querySelector<HTMLInputElement>("[data-testid=ha-search]")!;
+        input.value = text;
+        input.dispatchEvent(new Event("input"));
+        await flushPromises();
+      };
+      const names = (bucket: string) => all(`ha-row-${bucket}`).map((row) => row.querySelector("td:nth-child(2)")!.textContent.trim());
+
+      await search("new", "stael");
+      expect(names("new")).toEqual(["DAYRE Staël"]);
+      expect(names("blocked")).toEqual(["LOVEGOOD Luna"]);
+
+      await search("new", "autonomes");
+      expect(names("new")).toEqual(["WEASLEY Ron"]);
+      await search("new", "654321");
+      expect(names("new")).toEqual(["DAYRE Staël"]);
+
+      await search("new", "Dumbledore");
+      expect(names("new")).toEqual([]);
+      expect(byId("ha-section-new")!.querySelector("[data-testid=ha-search-empty]")).not.toBeNull();
+      // Hidden rows stay selected
+      expect(byId("ha-import-selected")!.textContent).toContain("3 inscription(s)");
+
+      await search("new", "");
+      expect(names("new")).toHaveLength(3);
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("shows when each HelloAsso registration was made, the latest first", async () => {
+    const earlier = {
+      ...MEMBERSHIP_PREVIEW.rows[0]!,
+      item_id: 3,
+      first_name: "Ron",
+      order_date: "2026-08-20T09:00:00+02:00",
+      payment_date: "",
+    };
+    const later = {
+      ...MEMBERSHIP_PREVIEW.rows[0]!,
+      item_id: 4,
+      first_name: "Fred",
+      order_date: "2026-09-12T18:30:00+02:00",
+      payment_date: "2026-09-15T08:00:00+02:00",
+    };
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [earlier, later] });
+    try {
+      const { byId, all } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+
+      expect(all("ha-row-new").map((row) => row.querySelector("[data-testid=ha-order-date]")?.textContent)).toEqual([
+        "12/09/2026",
+        "20/08/2026",
+      ]);
+      expect(all("ha-row-new").map((row) => row.querySelector("[data-testid=ha-payment-date]")?.textContent)).toEqual(["15/09/2026", "—"]);
+      expect(all("ha-row-new")[0]!.textContent).toContain("WEASLEY Fred");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("imports the checked HelloAsso rows once confirmed, then lists the created members with a link to their record", async () => {
+    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(false);
+    const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
+    byId("ha-import-preview")!.click();
+    await flushPromises();
+    const [checkbox] = all("ha-check").map((box) => box as HTMLInputElement);
+    expect(checkbox!.checked).toBe(true);
+
+    byId("ha-import-apply")!.click();
+    await flushPromises();
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(sent("POST", "/api/helloasso/memberships/import")).toHaveLength(0);
+
+    confirm.mockResolvedValue(true);
+    byId("ha-import-apply")!.click();
+    await flushPromises();
+    expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
+      season: "2026-2027",
+      campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+      decisions: { 1: { bucket: "new", choice: "import" } },
+    });
+    expect(byId("ha-import-done")!.textContent).toContain("1 adhérent créé");
+    const link = byId<HTMLAnchorElement>("ha-created")!.querySelector("a")!;
+    expect(link.textContent).toContain("WEASLEY Ginny");
+    expect(link.getAttribute("href")).toBe("/bureau/adherents?id=7&saison=2026-2027&achat=12");
+    expect(byId("ha-import-done")!.textContent).toContain("1 renouvellement");
+    const renewed = byId<HTMLAnchorElement>("ha-renewed")!.querySelector("a")!;
+    expect(renewed.textContent).toContain("GRANGER Hermione");
+    expect(renewed.getAttribute("href")).toBe("/bureau/adherents?id=4&saison=2026-2027&achat=13");
+    expect(byId("ha-import-result")).toBeNull();
+  });
+
+  it("asks for a choice on each HelloAsso row to review, which checks the row; unchecking keeps the choice", async () => {
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () =>
+      json({
+        ...MEMBERSHIP_PREVIEW,
+        rows: [...MEMBERSHIP_PREVIEW.rows, REVIEW_ROW],
+        counts: { ...MEMBERSHIP_PREVIEW.counts, to_review: 1 },
+      });
+    try {
+      const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      const select = byId<HTMLSelectElement>("ha-review-choice")!;
+      const check = byId("ha-row-to_review")!.querySelector<HTMLInputElement>("[data-testid=ha-check]")!;
+      expect(select.value).toBe("");
+      expect([...select.options].map((option) => option.textContent.trim())).toEqual([
+        "— Choisir… —",
+        "Rattacher à GRANGER Hermione (né(e) le 19/09/2012, licence 123456)",
+        "Créer un nouvel adhérent",
+        "Rattacher à un autre adhérent…",
+      ]);
+      expect([check.checked, check.disabled]).toEqual([false, true]);
+      expect(byId("ha-row-to_review")!.textContent).toContain("date de naissance différente");
+
+      select.value = "link:4";
+      select.dispatchEvent(new Event("change"));
+      await flushPromises();
+      expect([check.checked, check.disabled]).toEqual([true, false]);
+      expect(byId("ha-import-selected")!.textContent).toContain("2");
+
+      check.click();
+      await flushPromises();
+      expect(byId("ha-import-selected")!.textContent).toContain("1");
+      expect(select.value).toBe("link:4");
+      check.click();
+      await flushPromises();
+      byId("ha-import-apply")!.click();
+      await flushPromises();
+      expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
+        season: "2026-2027",
+        campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+        decisions: { 1: { bucket: "new", choice: "import" }, 3: { bucket: "to_review", choice: "link:4" } },
+      });
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("attaches a HelloAsso registration to another member, with a required comment", async () => {
+    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const imported = ANSWERS["POST /api/helloasso/memberships/import"]!;
+    const molly = { ...MEMBERSHIP_PREVIEW.rows[0]!, first_name: "Molly", birth_date: "1950-10-30" };
+    const members = [
+      { user_id: 9, last_name: "POTTER", first_name: "Harry", birth_date: "2013-07-31", licence: "", membership: "helloasso" },
+      { user_id: 7, last_name: "WEASLEY", first_name: "Ginny", birth_date: "2013-08-11", licence: "123456", membership: "manual" },
+    ];
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [molly], members });
+    ANSWERS["POST /api/helloasso/memberships/import"] = () =>
+      json({
+        status: "success",
+        season: "2026-2027",
+        history_id: "h1",
+        counts: { created: 0, renewed: 0, updated: 0, attached: 1, skipped: 0 },
+        created: [],
+        renewed: [],
+        updated: [],
+        attached: [{ item_id: 1, user_id: 7, purchase_id: 12, last_name: "WEASLEY", first_name: "Ginny", tarif_name: "Loisir collège" }],
+      });
+    try {
+      const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      const type = async (id: string, text: string) => {
+        const field = byId<HTMLInputElement>(id)!;
+        field.value = text;
+        field.dispatchEvent(new Event("input"));
+        await flushPromises();
+      };
+      const apply = byId<HTMLButtonElement>("ha-import-apply")!;
+
+      byId("ha-attach-open")!.click();
+      await flushPromises();
+      expect(byId("ha-row-problem")!.textContent).toContain("Choisissez l'adhérent");
+      expect(byId("ha-import-selected")!.textContent).toContain("0");
+      expect(apply.disabled).toBe(true);
+
+      await type("ha-attach-search", "potter");
+      const [harry] = all("ha-attach-option").map((option) => option as HTMLButtonElement);
+      expect(harry!.textContent).toContain("déjà une adhésion HelloAsso");
+      expect(harry!.disabled).toBe(true);
+
+      await type("ha-attach-search", "ginny");
+      const [ginny] = all("ha-attach-option");
+      expect(ginny!.textContent).toContain("WEASLEY Ginny");
+      ginny!.click();
+      await flushPromises();
+      expect(byId("ha-attach-chosen")!.textContent).toContain("reprend son adhésion manuelle");
+      expect(byId("ha-row-problem")!.textContent).toContain("Commentaire requis");
+      expect(apply.disabled).toBe(true);
+
+      await type("ha-attach-comment", "Inscrite par sa mère");
+      expect(byId("ha-row-problem")).toBeNull();
+      expect(byId("ha-import-selected")!.textContent).toContain("1");
+      apply.click();
+      await flushPromises();
+
+      expect(confirm.mock.calls[0]![0].message).toContain("🔗 WEASLEY Molly (commande 501) → WEASLEY Ginny, né(e) le 11/08/2013");
+      expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
+        season: "2026-2027",
+        campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+        decisions: { 1: { bucket: "new", choice: "attach:7", comment: "Inscrite par sa mère" } },
+      });
+      expect(byId("ha-import-done")!.textContent).toContain("1 inscription rattachée");
+      expect(byId("ha-attached")!.querySelector("a")!.getAttribute("href")).toBe("/bureau/adherents?id=7&saison=2026-2027&achat=12");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+      ANSWERS["POST /api/helloasso/memberships/import"] = imported;
+    }
+  });
+
+  it("cancels an attach, and refuses a member chosen for two registrations", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const ginny = { user_id: 7, last_name: "WEASLEY", first_name: "Ginny", birth_date: "2013-08-11", licence: "", membership: "none" };
+    const rows = [
+      { ...MEMBERSHIP_PREVIEW.rows[0]!, first_name: "Molly" },
+      { ...MEMBERSHIP_PREVIEW.rows[0]!, item_id: 4, first_name: "Arthur" },
+    ];
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows, members: [ginny] });
+    try {
+      const { byId, all } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      const attachTo = async (index: number) => {
+        all("ha-attach-open")[index]!.click();
+        await flushPromises();
+        const search = all("ha-attach-search").at(-1) as HTMLInputElement;
+        search.value = "weasley";
+        search.dispatchEvent(new Event("input"));
+        await flushPromises();
+        all("ha-attach-option")[0]!.click();
+        await flushPromises();
+        const comment = all("ha-attach-comment").at(-1) as HTMLTextAreaElement;
+        comment.value = "Parent";
+        comment.dispatchEvent(new Event("input"));
+        await flushPromises();
+      };
+
+      await attachTo(0);
+      await attachTo(0);
+      expect(byId("ha-row-problem")!.textContent).toContain("déjà choisi(e) pour une autre inscription");
+      expect(byId<HTMLButtonElement>("ha-import-apply")!.disabled).toBe(true);
+
+      byId("ha-attach-cancel")!.click();
+      await flushPromises();
+      expect(byId("ha-row-problem")).toBeNull();
+      expect(all("ha-check").map((box) => (box as HTMLInputElement).checked)).toEqual([true, true]);
+      expect(byId("ha-import-selected")!.textContent).toContain("2");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("names the member an imported HelloAsso registration was attached to", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const ginny = { user_id: 7, last_name: "WEASLEY", first_name: "Ginny", birth_date: "2013-08-11", licence: "" };
+    const imported = { ...MEMBERSHIP_PREVIEW.rows[0]!, bucket: "already_imported", first_name: "Molly", attached_to: ginny };
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [imported] });
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+
+      const person = byId("ha-row-already_imported")!.querySelector("[data-testid=ha-person]")!;
+      expect(person.textContent.replace(/\s+/g, " ").trim()).toBe("WEASLEY Molly → WEASLEY Ginny");
+      expect(person.querySelector("a")!.getAttribute("href")).toBe("/bureau/adherents?id=7&saison=2026-2027");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("shows the changes made on HelloAsso, and asks before overwriting a value also changed in the CRM", async () => {
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const changed = {
+      ...MEMBERSHIP_PREVIEW.rows[0]!,
+      item_id: 4,
+      bucket: "updated",
+      status: "Refunded",
+      refund_date: "2026-10-14T09:30:00+02:00",
+      changes: [{ field: "status", crm: "Processed", before: "Processed", after: "Refunded" }],
+    };
+    const conflict = {
+      ...MEMBERSHIP_PREVIEW.rows[0]!,
+      item_id: 5,
+      bucket: "to_review",
+      last_name: "LOVEGOOD",
+      changes: [
+        { field: "amount", crm: "120.00", before: "150.00", after: "0.00" },
+        { field: "status", crm: "Canceled", before: "Processed", after: "Strange" },
+      ],
+    };
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows: [changed, conflict] });
+    try {
+      const { byId, all, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      expect(byId("ha-row-updated")!.textContent).toContain("Statut : Payée → Remboursée");
+      expect(byId("ha-refund-date")!.textContent).toBe("Remboursé le 14/10/2026");
+      expect(byId("ha-row-to_review")!.textContent).toContain("Montant : CRM 120.00 · HelloAsso 0.00 (avant 150.00)");
+      expect(byId("ha-row-to_review")!.textContent).toContain("Statut : CRM Annulée · HelloAsso Strange (avant Payée)");
+      expect(byId("ha-review-choice")).toBeNull();
+      const checks = all("ha-check").map((box) => box as HTMLInputElement);
+      expect(checks.map((box) => box.checked)).toEqual([true, false]);
+
+      checks[1]!.click();
+      await flushPromises();
+      byId("ha-import-apply")!.click();
+      await flushPromises();
+      expect(sent("POST", "/api/helloasso/memberships/import").at(-1)!.body).toEqual({
+        season: "2026-2027",
+        campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+        decisions: { 4: { bucket: "updated", choice: "import" }, 5: { bucket: "to_review", choice: "import" } },
+      });
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("shows when the HelloAsso import last ran and who ran it", async () => {
+    const lastSync = ANSWERS["GET /api/helloasso/memberships/last-sync"]!;
+    try {
+      const first = await render("admin", "/bureau/outils/helloasso-import");
+      expect(first.byId("ha-last-sync")!.textContent).toContain("Aucune synchronisation");
+      first.wrapper.unmount();
+      document.body.innerHTML = "";
+
+      ANSWERS["GET /api/helloasso/memberships/last-sync"] = () =>
+        json({
+          last_sync: { at: "2026-10-31T09:15:00+00:00", author: "albus.dumbledore@alj-escalade.fr", season: "2026-2027", campaign: "x" },
+        });
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      expect(byId("ha-last-sync")!.textContent).toMatch(/Dernière synchro : 31\/10\/2026 \d\d:15, par albus.dumbledore@alj-escalade.fr/);
+    } finally {
+      ANSWERS["GET /api/helloasso/memberships/last-sync"] = lastSync;
+    }
+  });
+
+  it("blocks the HelloAsso preview of a campaign of another season, with the reason", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const reason = "La campagne « adhesion-escalade-2025-2026 » ne correspond pas à la saison active 2026-2027 : import bloqué.";
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, blocked_reason: reason });
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      expect(byId("ha-import-blocked")!.textContent).toContain(reason);
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("shows the HelloAsso error on the card", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () =>
+      json(
+        {
+          status: "error",
+          message: "Identifiants de l'API HelloAsso non configurés sur le serveur.",
+          code: "helloasso_credentials_missing",
+        },
+        502,
+      );
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      expect(byId("ha-import-error")!.textContent).toContain("Identifiants de l'API HelloAsso non configurés");
+      expect(byId("ha-import-campaign")).toBeNull();
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+    }
+  });
+
+  it("disables the HelloAsso import offline, with an explanation", async () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+    expect(byId<HTMLButtonElement>("ha-import-preview")!.disabled).toBe(true);
+    expect(byId("ha-import-offline")!.textContent).toContain("hors ligne");
+
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+    window.dispatchEvent(new Event("online"));
+    await flushPromises();
+    expect(byId<HTMLButtonElement>("ha-import-preview")!.disabled).toBe(false);
+    expect(byId("ha-import-offline")).toBeNull();
+    expect(sent("POST", "/api/helloasso/memberships/preview")).toHaveLength(0);
+  });
+
+  it("keeps the HelloAsso import away from coaches", async () => {
+    const coach = await render("coach", "/bureau/outils/helloasso-import");
+    expect(coach.router.currentRoute.value.fullPath).toBe("/bureau/outils?reserve=helloasso-import");
+    expect(coach.byId("sub-side-helloasso-import")).toBeNull();
+    expect(coach.byId("ha-import-preview")).toBeNull();
   });
 
   it("opens the former tab address on its sub-page", async () => {

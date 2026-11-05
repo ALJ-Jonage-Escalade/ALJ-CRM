@@ -1,4 +1,5 @@
-"""Membership campaign of /api/dashboard: Firestore setting, then CAMPAIGN_SLUG, then the seasonal default."""
+"""Membership campaign of /api/dashboard and of the members import: Firestore setting, then CAMPAIGN_SLUG, then the
+seasonal default."""
 
 from __future__ import annotations
 
@@ -9,19 +10,26 @@ import pytest
 from api.members import dashboard
 from infrastructure.firestore.app_settings import HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.client import FirestoreError
+from services.members import helloasso_import
+from services.members.helloasso_import import MembershipImportService
 from support.fake_firestore import FirestoreRepoTestCase
 
 
 class TestTargetSlug(FirestoreRepoTestCase):
 
     def target_slug(self, env_value: str = "") -> str:
-        with patch.object(dashboard.SecretStore, "get_secret", return_value=env_value), \
-                patch.object(dashboard, "get_active_season", return_value="2026-2027"):
+        with patch.object(helloasso_import.SecretStore, "get_secret", return_value=env_value), \
+                patch.object(MembershipImportService, "active_season", return_value="2026-2027"):
             return dashboard.get_target_slug()
 
     def test_setting_wins_over_env_variable(self) -> None:
         AppSettingsRepository.save(HELLOASSO_MEMBERSHIP_CAMPAIGN, "Membership:adhesion-2026")
         self.assertEqual(self.target_slug("adhesion-env"), "adhesion-2026")
+
+    def test_the_import_reads_the_same_campaign(self) -> None:
+        AppSettingsRepository.save(HELLOASSO_MEMBERSHIP_CAMPAIGN, "Membership:adhesion-2026")
+        with patch.object(helloasso_import.SecretStore, "get_secret", return_value="adhesion-env"):
+            self.assertEqual(MembershipImportService.campaign().slug, "adhesion-2026")
 
     def test_env_variable_when_no_setting(self) -> None:
         self.assertEqual(self.target_slug("adhesion-env"), "adhesion-env")
@@ -42,5 +50,5 @@ class TestTargetSlug(FirestoreRepoTestCase):
     ("https://www.helloasso.com/associations/club/inconnu/adhesion-2026", "adhesion-2026"),
 ])
 def test_get_target_slug_value_formats(value: str, slug: str) -> None:
-    with patch.object(dashboard, "_chosen_membership_campaign", return_value=value):
+    with patch.object(MembershipImportService, "campaign_reference", return_value=value):
         assert dashboard.get_target_slug() == slug

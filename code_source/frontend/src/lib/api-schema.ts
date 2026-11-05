@@ -511,9 +511,71 @@ export interface paths {
         };
         /**
          * Get Dashboard Data
-         * @description Route principale renvoyant toutes les données formatées pour le frontend.
+         * @description Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
+         *     des adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.
          */
         get: operations["get_dashboard_data_api_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/helloasso/memberships/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Membership Import
+         * @description Reads the membership campaign on HelloAsso and sorts its registrations for the active season. Writes nothing.
+         */
+        post: operations["preview_membership_import_api_helloasso_memberships_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/helloasso/memberships/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Memberships
+         * @description Reads HelloAsso again and applies the admin's decisions to the recomputed plan, recorded in the history.
+         *     Sends no e-mail.
+         */
+        post: operations["import_memberships_api_helloasso_memberships_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/helloasso/memberships/last-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Last Membership Sync
+         * @description When the latest import ran, and who ran it.
+         */
+        get: operations["last_membership_sync_api_helloasso_memberships_last_sync_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1643,6 +1705,21 @@ export interface components {
             notification_email: string;
             /** Details */
             details: components["schemas"]["BatchCompetition"][];
+        };
+        /** BucketCounts */
+        BucketCounts: {
+            /** Already Imported */
+            already_imported: number;
+            /** New */
+            new: number;
+            /** Renewal */
+            renewal: number;
+            /** Updated */
+            updated: number;
+            /** To Review */
+            to_review: number;
+            /** Blocked */
+            blocked: number;
         };
         /** CloudDbStatus */
         CloudDbStatus: {
@@ -2783,6 +2860,37 @@ export interface components {
             /** Nb Unlinked */
             nb_unlinked: number;
         };
+        /** ImportCounts */
+        ImportCounts: {
+            /** Created */
+            created: number;
+            /** Renewed */
+            renewed: number;
+            /** Updated */
+            updated: number;
+            /** Attached */
+            attached: number;
+            /** Skipped */
+            skipped: number;
+        };
+        /**
+         * ImportedMember
+         * @description A member the import wrote, for the link to their record (attached: the member chosen, not the HelloAsso name).
+         */
+        ImportedMember: {
+            /** Item Id */
+            item_id: number;
+            /** User Id */
+            user_id: number;
+            /** Purchase Id */
+            purchase_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Tarif Name */
+            tarif_name: string;
+        };
         /** ItemIgnore */
         ItemIgnore: {
             /** Ignore */
@@ -3084,6 +3192,220 @@ export interface components {
             status: "success";
             /** Message */
             message: string;
+        };
+        /**
+         * MembershipCandidate
+         * @description A member a registration to review may be (choice "link:<user_id>"), or an imported one is attached to.
+         */
+        MembershipCandidate: {
+            /** User Id */
+            user_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Birth Date */
+            birth_date: string;
+            /** Licence */
+            licence: string;
+        };
+        /**
+         * MembershipChange
+         * @description A value HelloAsso changed since the last import: in the CRM now (crm), as HelloAsso gave it last time (before),
+         *     as HelloAsso gives it now (after). Amounts in euros, two decimals.
+         */
+        MembershipChange: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "status" | "tarif_name" | "amount";
+            /** Crm */
+            crm: string;
+            /** Before */
+            before: string;
+            /** After */
+            after: string;
+        };
+        /**
+         * MembershipDecision
+         * @description The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>
+         *     (rows to review), attach:<member id> (new, renewal and to-review rows: given by hand to any member, `comment`
+         *     required). bucket: the bucket the preview showed the row in (a row that changed since is refused).
+         */
+        MembershipDecision: {
+            /**
+             * Bucket
+             * @enum {string}
+             */
+            bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
+            /** Choice */
+            choice: string;
+            /**
+             * Comment
+             * @default
+             */
+            comment?: string;
+        };
+        /**
+         * MembershipImportRequest
+         * @description decisions: by HelloAsso item id; a row without decision is skipped. campaign: the one of the preview.
+         */
+        MembershipImportRequest: {
+            /** Season */
+            season: string;
+            /** Campaign */
+            campaign?: string | null;
+            /** Decisions */
+            decisions: {
+                [key: string]: components["schemas"]["MembershipDecision"];
+            };
+        };
+        /**
+         * MembershipImportResult
+         * @description history_id: the import's entry in the history.
+         */
+        MembershipImportResult: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Season */
+            season: string;
+            /** History Id */
+            history_id: string;
+            counts: components["schemas"]["ImportCounts"];
+            /** Created */
+            created: components["schemas"]["ImportedMember"][];
+            /** Renewed */
+            renewed: components["schemas"]["ImportedMember"][];
+            /** Updated */
+            updated: components["schemas"]["ImportedMember"][];
+            /** Attached */
+            attached: components["schemas"]["ImportedMember"][];
+        };
+        /**
+         * MembershipLastImport
+         * @description at: ISO date (UTC); author: e-mail of the admin who ran it.
+         */
+        MembershipLastImport: {
+            /** At */
+            at: string;
+            /** Author */
+            author: string;
+            /** Season */
+            season: string;
+            /** Campaign */
+            campaign: string;
+        };
+        /**
+         * MembershipLastSync
+         * @description The latest import, null before the first one.
+         */
+        MembershipLastSync: {
+            last_sync: components["schemas"]["MembershipLastImport"] | null;
+        };
+        /**
+         * MembershipMember
+         * @description A member of the base a registration can be attached to by hand (choice "attach:<user_id>"). membership: theirs
+         *     this season — none, manual (taken over by the attach), several_manual or helloasso (the attach is refused).
+         */
+        MembershipMember: {
+            /** User Id */
+            user_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Birth Date */
+            birth_date: string;
+            /** Licence */
+            licence: string;
+            /**
+             * Membership
+             * @enum {string}
+             */
+            membership: "none" | "manual" | "several_manual" | "helloasso";
+        };
+        /**
+         * MembershipPreview
+         * @description blocked_reason: the whole campaign is refused (another season), every row is then blocked. members: every member
+         *     of the base (any season), for the attach by hand.
+         */
+        MembershipPreview: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Season */
+            season: string;
+            /** Campaign */
+            campaign: string;
+            /** Blocked Reason */
+            blocked_reason: string | null;
+            counts: components["schemas"]["BucketCounts"];
+            /** Rows */
+            rows: components["schemas"]["MembershipRow"][];
+            /** Members */
+            members: components["schemas"]["MembershipMember"][];
+        };
+        /**
+         * MembershipPreviewRequest
+         * @description campaign: slug of the membership form to read for this sync only (never saved); null or blank: the active one
+         *     (Paramètres › Campagnes).
+         */
+        MembershipPreviewRequest: {
+            /** Campaign */
+            campaign?: string | null;
+        };
+        /**
+         * MembershipRow
+         * @description One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
+         *     whether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),
+         *     "" when missing: order_date the registration, payment_date the first payment, refund_date the refund (status
+         *     Refunded / Refunding).
+         */
+        MembershipRow: {
+            /** Item Id */
+            item_id: number;
+            /**
+             * Bucket
+             * @enum {string}
+             */
+            bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
+            /** Reason */
+            reason: string;
+            /** Order Ref */
+            order_ref: string;
+            /** Order Date */
+            order_date: string;
+            /** Payment Date */
+            payment_date: string;
+            /** Refund Date */
+            refund_date: string;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Birth Date */
+            birth_date: string;
+            /** Licence */
+            licence: string;
+            /** Tarif Name */
+            tarif_name: string;
+            /** Amount */
+            amount: number;
+            /** Status */
+            status: string;
+            /** Candidates */
+            candidates: components["schemas"]["MembershipCandidate"][];
+            /** Can Create */
+            can_create: boolean;
+            /** Changes */
+            changes: components["schemas"]["MembershipChange"][];
+            attached_to?: components["schemas"]["MembershipCandidate"] | null;
         };
         /**
          * NewMember
@@ -4940,6 +5262,137 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_membership_import_api_helloasso_memberships_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MembershipPreviewRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    import_memberships_api_helloasso_memberships_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembershipImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipImportResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    last_membership_sync_api_helloasso_memberships_last_sync_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipLastSync"];
                 };
             };
         };

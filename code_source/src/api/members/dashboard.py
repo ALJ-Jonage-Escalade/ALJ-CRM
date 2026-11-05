@@ -2,65 +2,43 @@
 
 from __future__ import annotations
 
-import logging
-
 from fastapi import APIRouter, BackgroundTasks
 
-from domain.competitions.matching import parse_campaign_identifier
-from domain.constants import get_active_season
-from infrastructure.firestore.app_settings import HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository
-from infrastructure.firestore.client import FirestoreError
+from domain.members.helloasso_membership import map_membership_items, parse_membership_campaign
 from infrastructure.geocoding import geocode_missing_addresses
-from infrastructure.helloasso.api import get_campaigns, get_items
-from infrastructure.security.secret_store import SecretStore
+from infrastructure.helloasso import api as helloasso_api
 from infrastructure.sqlite.geocache import GeocacheRepository
-
-logger = logging.getLogger("alj")
+from services.members.helloasso_import import MembershipImportService
 
 router = APIRouter()
 
 
-def _chosen_membership_campaign() -> str:
-    """Campaign chosen in Paramètres › Campagne HelloAsso, or "" (not chosen, Firestore unreadable)."""
-    try:
-        return (AppSettingsRepository.get(HELLOASSO_MEMBERSHIP_CAMPAIGN) or "").strip()
-    except FirestoreError as e:
-        logger.warning("Membership campaign setting unreadable, falling back to CAMPAIGN_SLUG: %s", e)
-        return ""
-
-
 def get_target_slug() -> str:
-    """Slug de la campagne d'adhésion, lu à chaque appel (un changement s'applique sans redémarrage).
-
-    Ordre : réglage Firestore HELLOASSO_MEMBERSHIP_CAMPAIGN, puis variable CAMPAIGN_SLUG, puis le slug
-    par défaut de la saison (ces deux derniers sont un repli temporaire)."""
-    ref = _chosen_membership_campaign() or (SecretStore.get_secret("CAMPAIGN_SLUG") or "").strip()
-    if not ref:
-        return f"adhesion-escalade-{get_active_season()}-amicale-laique-escalade-2"
+    """Slug of the membership campaign, the import's (MembershipImportService.campaign_reference). A reference that
+    cannot be read gives its last URL segment, as before."""
+    reference = MembershipImportService.campaign_reference()
     try:
-        return parse_campaign_identifier(ref)["slug"]
+        return parse_membership_campaign(reference).slug
     except ValueError:
-        # Unrecognised URL: its last segment, as before
-        return [segment for segment in ref.split("/") if segment.strip()][-1]
+        return [segment for segment in reference.split("/") if segment.strip()][-1]
 
 
 @router.get("/api/dashboard")
 def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: bool = False):
-    """Route principale renvoyant toutes les données formatées pour le frontend."""
+    """Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
+    des adhésions (get_target_slug) et les inscriptions sont lues par le même mapper."""
     print("-> Interrogation de l'API HelloAsso...")
-    
-    campaigns = get_campaigns()
+
+    campaigns = helloasso_api.get_campaigns()
     target_slug = get_target_slug()
     target_camp = next((c for c in campaigns if c.get('formSlug') == target_slug), None)
-    
+
     if not target_camp:
         return {"error": "Campagne introuvable"}
-        
+
     c_type = target_camp.get('formType')
-    items = get_items(c_type, target_slug)
-    
-    inscrits = [i for i in items if i.get('type') in ('Registration', 'Membership')]
-    
+    records = map_membership_items(helloasso_api.get_items(c_type, target_slug))
+
     participants = []
     tariffs_count = {}
     map_data_dict = {}
@@ -69,73 +47,12 @@ def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: 
     geocache = GeocacheRepository.get_geocache()
     missing_addresses = set()
 
-    for item in inscrits:
-        flat_item = {
-            "order_ref": item.get("order", {}).get("id"),
-            "order_date": item.get("order", {}).get("date"),
-            "status": item.get("state"),
-            "tarif_name": item.get("name") or "".strip(),
-            "amount": item.get("amount", 0) / 100,
-            "user_firstName": item.get("user", {}).get("firstName") or "",
-            "user_lastName": item.get("user", {}).get("lastName") or "",
-            "payer_firstName": item.get("payer", {}).get("firstName") or "",
-            "payer_lastName": item.get("payer", {}).get("lastName") or "",
-            "payer_email": item.get("payer", {}).get("email") or "",
-        }
-        
-        # Parse HelloAsso checkout options for insurance selections
-        options = item.get("options", [])
-        flat_item["opt_Assurance Base"] = "Non"
-        flat_item["opt_Montant Assurance Base"] = 0.0
-        flat_item["opt_Assurance Base +"] = "Non"
-        flat_item["opt_Montant Assurance Base +"] = 0.0
-        flat_item["opt_Assurance Base ++"] = "Non"
-        flat_item["opt_Montant Assurance Base ++"] = 0.0
-        flat_item["opt_Assurance Option ski de piste"] = "Non"
-        flat_item["opt_Montant Assurance Option ski de piste"] = 0.0
-        flat_item["opt_Assurance Option VTT"] = "Non"
-        flat_item["opt_Montant Assurance Option VTT"] = 0.0
-        flat_item["opt_Assurance Option Trail"] = "Non"
-        flat_item["opt_Montant Assurance Option Trail"] = 0.0
-        
-        for opt in options:
-            opt_name = opt.get("name") or "".strip()
-            opt_amount = opt.get("amount", 0) / 100
-            if "Assurance Base ++" in opt_name:
-                flat_item["opt_Assurance Base ++"] = "Oui"
-                flat_item["opt_Montant Assurance Base ++"] = opt_amount
-            elif "Assurance Base +" in opt_name:
-                flat_item["opt_Assurance Base +"] = "Oui"
-                flat_item["opt_Montant Assurance Base +"] = opt_amount
-            elif "Assurance Base" in opt_name:
-                flat_item["opt_Assurance Base"] = "Oui"
-                flat_item["opt_Montant Assurance Base"] = opt_amount
-            elif "ski de piste" in opt_name.lower():
-                flat_item["opt_Assurance Option ski de piste"] = "Oui"
-                flat_item["opt_Montant Assurance Option ski de piste"] = opt_amount
-            elif "vtt" in opt_name.lower():
-                flat_item["opt_Assurance Option VTT"] = "Oui"
-                flat_item["opt_Montant Assurance Option VTT"] = opt_amount
-            elif "trail" in opt_name.lower():
-                flat_item["opt_Assurance Option Trail"] = "Oui"
-                flat_item["opt_Montant Assurance Option Trail"] = opt_amount
-        
-        custom_fields = item.get("customFields", [])
-        city = ""
-        zip_code = ""
-        address = ""
-        
-        for field in custom_fields:
-            name = field.get("name") or ""
-            val = field.get("answer", field.get("value") or "")
-            flat_item[f"champ_{name}"] = val
-            
-            if name.lower() == "ville":
-                city = val.strip().upper()
-            elif name.lower() == "code postal":
-                zip_code = val.strip()
-            elif "adresse" in name.lower() and "rue" in name.lower():
-                address = val.strip()
+    for record in records:
+        flat_item = record.legacy_fields()
+        fields = {name.lower(): value.strip() for name, value in record.custom_fields.items()}
+        city = fields.get("ville", "").upper()
+        zip_code = fields.get("code postal", "")
+        address = next((value for name, value in fields.items() if "adresse" in name and "rue" in name), "")
 
         flat_item["city"] = city
         flat_item["address"] = address

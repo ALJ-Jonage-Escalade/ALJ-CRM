@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse, Response
 from api.ffme.schemas import FfmeFile, FfmeImportRequest, FfmeImportResult, FfmeLicensee, FfmeMatchStats, FfmeMember, FfmePreview, FfmeStats
 from api.responses import error, error_responses, internal_error
 from domain.members.sex import parse_sex
+from domain.members.view import is_cancelled
 
 router = APIRouter()
 
@@ -80,7 +81,7 @@ def get_ffme_stats_api(season: Optional[str] = None) -> Union[FfmeStats, JSONRes
             is_manual = "ajout manuel" in commentaires
 
             # 1. Ignoré (liste d'attente, montant nul non manuel, annulé)
-            if "attente" in tarif_name or (amount == 0.0 and not is_manual) or "annul" in status or "cancel" in status:
+            if "attente" in tarif_name or (amount == 0.0 and not is_manual) or is_cancelled(status):
                 ignored_count += 1
                 continue
 

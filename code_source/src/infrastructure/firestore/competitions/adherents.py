@@ -11,7 +11,7 @@ from domain.utils import normalize_string
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions.base import CompetitionStoreBase
 from infrastructure.sqlite.connection import SqliteDatabase
-from infrastructure.sqlite.schema_v2 import purchase_priority_score
+from domain.members.purchase_priority import purchase_priority_score
 
 _ADHERENTS_CACHE_TTL = 30.0
 

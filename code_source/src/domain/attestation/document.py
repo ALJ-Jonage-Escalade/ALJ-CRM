@@ -14,6 +14,7 @@ import os
 import re
 from typing import Any, Optional
 
+from domain.members.view import is_cancelled
 from paths import CODE_ROOT, ROOT_DIR, find_doc_template
 
 
@@ -91,8 +92,7 @@ def attestation_error(member: Any) -> Optional[str]:  # Any: dict or member obje
     Routes call it before build_attestation so the message shown to the user is a plain
     string, never the text of an exception.
     """
-    status = str(_member_field(member, "status_norm", "status") or "").strip().lower()
-    if "annul" in status or "cancel" in status:
+    if is_cancelled(_member_field(member, "status_norm", "status")):
         return "Impossible de générer une attestation pour une commande annulée."
 
     amount_raw = _member_field(member, "amount")

@@ -103,3 +103,9 @@ def test_pivot_records_failure_is_a_generic_error(client):
 
 def test_pivot_records_need_the_coach_role():
     assert required_role("GET", "/api/reports/pivot-records") == Role.COACH
+
+
+def test_pivot_counts_a_refund_as_a_cancellation(client):
+    record = _get(client, [_row(status="Refunded")])[0].json()["records"][0]
+
+    assert record["Statut"] == "Annulé"

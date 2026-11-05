@@ -13,7 +13,7 @@ from api.reports.schemas import PivotRecord, PivotRecords
 from api.responses import error, error_responses, internal_error
 from domain.members.age_rules import age_at, get_season_start_date, parse_birth_date
 from domain.members.sex import parse_sex
-from domain.members.view import fmt_first_name, fmt_last_name
+from domain.members.view import fmt_first_name, fmt_last_name, is_cancelled
 from domain.utils import clean_city_name
 from infrastructure.sqlite.members import MemberRepository
 
@@ -21,7 +21,6 @@ router = APIRouter()
 
 # HelloAsso and manual statuses merged into the three labels of the table
 _VALIDATED = ("processed", "validated", "validé", "enregistré", "registered", "terminé", "termine", "traité", "traite")
-_CANCELLED = ("canceled", "cancelled", "annulé", "annule")
 _REFUSED = ("refused", "refusé", "refuse")
 
 # (upper bound excluded, label), in order; the labels sort in this order too
@@ -35,7 +34,7 @@ def status_label(status: Any) -> str:  # Any: a cell of the SQLite view
     lowered = raw.lower()
     if lowered in _VALIDATED:
         return "Validé"
-    if lowered in _CANCELLED:
+    if is_cancelled(lowered):
         return "Annulé"
     if lowered in _REFUSED:
         return "Refusé"

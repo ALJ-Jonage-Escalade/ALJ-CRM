@@ -6,9 +6,10 @@ import urllib.request
 FAKE_PORT = 8095
 FAKE_URL = f"http://localhost:{FAKE_PORT}"
 ORG_SLUG = "alj-e2e"
-# Competition registrations form (app setting HELLOASSO_ANNUAL_CAMPAIGN) and membership form (CAMPAIGN_SLUG)
+# Competition registrations form (app setting HELLOASSO_ANNUAL_CAMPAIGN) and membership form (CAMPAIGN_SLUG; it names
+# the seed's active season, which the members import requires)
 COMPETITION_FORM = "competitions-e2e"
-MEMBERSHIP_FORM = "adhesion-e2e"
+MEMBERSHIP_FORM = "adhesion-e2e-2026-2027"
 WEBHOOK_TOKEN = "e2e-webhook-token"
 
 SERVER_ENV = {
@@ -53,6 +54,20 @@ def item(first_name: str, last_name: str, amount_eur: float, licence: str = "", 
         "payments": [{"id": item_id, "amount": int(round(amount_eur * 100)), "state": "Authorized",
                       "date": "2026-10-01T10:00:00+02:00"}],
     }
+
+
+def membership_item(first_name: str, last_name: str, birth_date: str, tariff: str = "Adultes autonomes",
+                    amount_eur: float = 150, licence: str = "") -> dict:
+    """A registration of the membership form, with the custom fields the members import reads (birth date dd/mm/yyyy)."""
+    registration = item(first_name, last_name, amount_eur, licence=licence, form_slug=MEMBERSHIP_FORM, item_type="Membership",
+                        name=tariff)
+    registration["order"]["formType"] = "Membership"
+    registration["customFields"] += [
+        {"name": "Date de naissance de l'adhérent", "type": "Date", "answer": birth_date},
+        {"name": "Sexe", "type": "ChoiceList", "answer": "Femme"},
+        {"name": "Ville", "type": "TextInput", "answer": "Jonage"},
+    ]
+    return registration
 
 
 class FakeHelloAsso:

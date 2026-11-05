@@ -75,6 +75,14 @@ explicit_package_bases = true
 follow_imports = "silent"
 # Fichiers migrés récemment (le reste du code sert de baseline progressive) :
 files = [
+    "src/domain/members/helloasso_membership.py",
+    "src/domain/members/membership_import.py",
+    "src/domain/members/purchase_priority.py",
+    "src/services/members/helloasso_import.py",
+    "src/api/members/helloasso_import.py",
+    "src/api/members/helloasso_import_schemas.py",
+    "src/infrastructure/sqlite/membership_import.py",
+    "src/infrastructure/firestore/membership_import_history.py",
     "src/infrastructure/sqlite/schema_v2.py",
     "src/domain/constants.py",
     "src/api/__init__.py",

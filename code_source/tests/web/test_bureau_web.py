@@ -110,6 +110,8 @@ class TestBureauFiles(unittest.TestCase):
         # 2. Validation commande annulée
         with self.assertRaises(ValueError):
             build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": 150, "status": "Annulé"})
+        with self.assertRaises(ValueError):
+            build_attestation({"first_name": "Jean", "last_name": "Dupont", "amount": 150, "status": "Refunded"})
 
         # 3. Payeur par défaut = adhérent
         m = {"first_name": "alex", "last_name": "martin", "amount": 195, "season_name": "2026-2027"}
@@ -637,7 +639,7 @@ class TestBureauAccess(unittest.TestCase):
                      "/bureau/competitions/bilan", "/bureau/competitions/coachs", "/competitions/helloasso",
                      "/competitions/bilan", "/competitions/coachs", "/bureau/outils/pivot", "/bureau/outils/stats",
                      "/bureau/outils/presence", "/bureau/outils/ffme", "/bureau/outils/ffme-import",
-                     "/bureau/parametres/campagnes"):
+                     "/bureau/outils/helloasso-import", "/bureau/parametres/campagnes"):
             self.assertEqual(self.client.get(path).status_code, 200, path)
         self.assertEqual(self.client.get("/bureau/inconnue").status_code, 404)
         self.assertEqual(self.client.get("/bureau/competitions/inconnue").status_code, 404)

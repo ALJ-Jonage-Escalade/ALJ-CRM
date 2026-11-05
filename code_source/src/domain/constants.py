@@ -10,7 +10,7 @@ load_dotenv(os.path.join(ROOT_DIR, ".env"), override=True)
 
 # Saison active par défaut
 DEFAULT_SEASON = "2026-2027"
-APP_VERSION = "2.34.3"
+APP_VERSION = "2.43.2"
 
 # Tarifs permanents disponibles hors créneau de cours (ex: licence seule)
 DEFAULT_EXTRA_TARIFS = ["Licence sèche"]
@@ -29,21 +29,6 @@ def is_valid_season(season: str) -> bool:
     """Saison au format 'AAAA-AAAA' (ex : '2026-2027'), seul format accepté depuis une requête
     (la valeur finit dans des noms de fichiers et des en-têtes HTTP)."""
     return bool(re.fullmatch(r"\d{4}-\d{4}", season))
-
-def get_drive_temp_filename() -> str:
-    """Génère le nom de fichier Excel temporaire pour la saison active."""
-    season = get_active_season()
-    return f"Adhésions escalade-{season}-amicale-laique-de-jonage-DRIVE_TEMP.xlsx"
-
-def get_corrective_files_pattern() -> str:
-    """Génère le motif de recherche (glob) pour les fichiers d'adhésion de la saison active."""
-    season = get_active_season()
-    return f"Adhésions escalade-{season}-amicale-laique-de-jonage*.xlsx"
-
-def get_save_filename_template(timestamp: str) -> str:
-    """Génère le nom de fichier final pour la sauvegarde après synchronisation."""
-    season = get_active_season()
-    return f"Adhésions escalade-{season}-amicale-laique-de-jonage-{timestamp}.xlsx"
 
 # Palette visuelle officielle Qt (Hexadécimal et QColor compatible)
 COLOR_PRIMARY = "#163A5F"        # Bleu profond principal

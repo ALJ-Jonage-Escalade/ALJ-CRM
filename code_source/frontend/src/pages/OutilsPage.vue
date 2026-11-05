@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /* Outils (coaches and admins): members map, pivot table, competition statistics, attendance sheets, FFME CSV export
-   and, for admins, import of the MyFFME licensee list. Layout of the sub-pages (router.ts, one per tool, linked from
-   Adhérents for the FFME ones): loads the seasons they share and reloads the open one. A sub-page is loaded when first
-   opened and kept while switching (route meta.keepAlive). Online only. */
+   and, for admins, imports of the MyFFME licensee list and of the HelloAsso membership campaign. Layout of the
+   sub-pages (router.ts, one per tool, linked from Adhérents for the FFME ones): loads the seasons they share and
+   reloads the open one. A sub-page is loaded when first opened and kept while switching (route meta.keepAlive).
+   Online only. */
 import { computed, inject, onMounted, provide, ref } from "vue";
 import { RouterView, useRoute } from "vue-router";
 import AppShell from "../components/AppShell.vue";
@@ -47,6 +48,7 @@ const REFRESHED: Record<string, string> = {
   presence: "🔄 Effectifs et créneaux réactualisés.",
   ffme: "🔄 Statistiques FFME réactualisées.",
   "ffme-import": "🔄 Formulaire d'import FFME réinitialisé.",
+  "helloasso-import": "🔄 Import HelloAsso réinitialisé.",
 };
 const openPage = ref<ReloadablePage | null>(null);
 

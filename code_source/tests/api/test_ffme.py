@@ -65,6 +65,7 @@ class TestFfmeRoutes(MemberDbTestCase):
     def test_stats_and_csv_export(self):
         self.seed("1", "Léo", "MARTIN", "Adultes autonomes")
         self.seed("2", "Max", "PETIT", "Adultes autonomes", **{"champ_Date de naissance de l'adhérent": ""})
+        self.seed("3", "Zoé", "REMBOURSEE", "Adultes autonomes", status="Refunded")
         stats = self.client.get("/api/ffme/stats", params={"season": "2026-2027"}).json()
         self.assertEqual((stats["status"], stats["season"]), ("success", "2026-2027"))
         self.assertEqual((stats["estimated_total"], stats["new_licences_count"], stats["renewals_count"]), (1, 1, 0))
@@ -77,6 +78,7 @@ class TestFfmeRoutes(MemberDbTestCase):
         self.assertTrue(text.startswith("numero de licence;nom;prenom"))
         self.assertIn("MARTIN", text)
         self.assertNotIn("PETIT", text)
+        self.assertNotIn("REMBOURSEE", text)
 
     def test_csv_export_member_without_sex(self):
         # A first licence needs the sex (never guessed): left out and reported; a renewal is sent with it empty
