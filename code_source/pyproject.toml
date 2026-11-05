@@ -20,10 +20,10 @@ dependencies = [
 # Génération des attestations PDF sur Cloud Run (nécessite Pango côté système).
 web = ["weasyprint==70.0"]
 dev = [
-    "pytest==9.1.1",
+    "pytest==9.2.0",
     "pytest-timeout==2.4.0",
-    "ruff==0.17.1",
-    "mypy==2.3.1",
+    "ruff==0.17.3",
+    "mypy==2.4.1",
     "httpx==0.28.1",
     # Fake data for the development environment (dev/seed)
     "Faker==40.39.0",
