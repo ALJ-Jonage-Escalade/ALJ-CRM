@@ -127,13 +127,16 @@ def test_course_attendance_sheets(page, tmp_path):
     text = " ".join(str(c) for ws in workbook.worksheets for row in ws.iter_rows(values_only=True) for c in row if c)
     assert all(course["groupe"] in text for course in courses)
 
-    # One file per course, in a ZIP archive
+    # One file per course, in a ZIP archive: two courses are enough, each file costs a full workbook
     page.get_by_test_id("courses-zip").check()
+    page.get_by_test_id("courses-none").click()
+    page.get_by_test_id("course").nth(0).check()
+    page.get_by_test_id("course").nth(1).check()
     with page.expect_download() as info:
         page.get_by_test_id("download-courses").click()
     with zipfile.ZipFile(_saved(info.value, tmp_path)) as archive:
         names = archive.namelist()
-    assert len(names) == len(courses) and all(n.endswith(".xlsx") for n in names)
+    assert len(names) == 2 and all(n.endswith(".xlsx") for n in names)
 
 
 def test_autonomous_attendance_sheet(page, tmp_path):
