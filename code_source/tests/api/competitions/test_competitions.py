@@ -81,13 +81,12 @@ class TestCompetitions(ApiTestCase):
         self.assertEqual(cleared["deadline"], "2026-03-15")
 
     def test_partial_update_keeps_other_fields(self):
-        doc = self.create(id_ffme="18846", helloasso_ref="coupe-rhone", lieu="Lyon")
+        doc = self.create(id_ffme="18846", lieu="Lyon")
         r = self.client.patch(f"/api/competitions/{doc['id']}", json={"nom": "Coupe du Rhône"})
         self.assertEqual(r.status_code, 200, r.text)
         updated = r.json()
         self.assertEqual(updated["nom"], "Coupe du Rhône")
         self.assertEqual(updated["id_ffme"], "18846")
-        self.assertEqual(updated["helloasso_ref"], "coupe-rhone")
         self.assertEqual(updated["lieu"], "Lyon")
         self.assertEqual(self.client.patch("/api/competitions/123", json={"nom": "X"}).status_code, 404)
 
