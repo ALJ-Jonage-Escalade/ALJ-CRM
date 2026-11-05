@@ -12,7 +12,8 @@ const open = defineModel<boolean>("open", { required: true });
 
 <template>
   <DialogRoot v-model:open="open">
-    <DialogPortal>
+    <!-- Only while open: each opening joins the end of <body>, above the dialog it opens from (they share one z-index) -->
+    <DialogPortal v-if="open">
       <DialogOverlay class="fixed inset-0 z-40 bg-slate-900/50" />
       <DialogContent
         :class="[
