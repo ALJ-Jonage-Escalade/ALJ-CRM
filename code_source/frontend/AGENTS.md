@@ -9,7 +9,7 @@ All commands run from `code_source/frontend/`, Node version from `.nvmrc`.
 - install: `npm ci` (add a dependency: `npm install --save-exact <pkg>`, MIT or equivalent license only, decision D5)
 - dev: `npm run dev` → http://localhost:5173/bureau/, next to `uv run dev/run_server.sh` in `code_source/` (Vite proxies
   the API and the PWA files to :8080)
-- all checks (as CI): `npm run check:api && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`
+- all checks (as CI): `npm run check:api && npm run lint && npm run format:check && npm run typecheck && npm run test:coverage && npm run build`
 - typecheck: `npm run typecheck` (vue-tsc, also checks `.vue` files; not `npx tsc`)
 - format: `npm run format` before committing (Prettier, width 140, enforced in CI)
 - lint: `npm run lint` (zero warnings); `npm run lint -- --fix` fixes most issues, missing braces included
@@ -59,6 +59,8 @@ All commands run from `code_source/frontend/`, Node version from `.nvmrc`.
 ## Tests
 
 - Vitest + Vue Test Utils, jsdom; `src/**/*.test.ts` next to the module tested
+- Coverage: `npm run test:coverage` prints a summary and writes the report to `coverage/index.html` (git-ignored); no
+  threshold, low coverage does not fail the run. `npm test` is faster, without coverage
 - Fake the services by providing them (`CLIENT_KEY`, `API_KEY`, `AUTH_KEY`...) rather than with `vi.mock()`
 - Select elements by `data-testid`, not by CSS classes or text layout
 - Use `flushPromises()` after an action that triggers API calls

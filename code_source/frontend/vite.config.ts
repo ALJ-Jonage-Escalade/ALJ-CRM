@@ -50,5 +50,11 @@ export default defineConfig(({ command }) => ({
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.ts"],
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,vue}"],
+      exclude: ["src/**/*.test.ts", "src/lib/api-schema.ts", "src/main.ts"],
+      reporter: ["text-summary", "html"], // terminal summary + browsable report in coverage/
+    },
   },
 }));

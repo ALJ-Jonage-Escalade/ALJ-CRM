@@ -53,3 +53,4 @@ scripts_temporaires/
 
 # Application Vue : dépendances installées et compilée dans l'image (étape « frontend » du Dockerfile)
 node_modules/
+frontend/coverage/

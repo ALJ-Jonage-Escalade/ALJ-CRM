@@ -50,3 +50,4 @@ desktop.ini
 
 # npm (only code_source/frontend/ has a package)
 node_modules/
+code_source/frontend/coverage/

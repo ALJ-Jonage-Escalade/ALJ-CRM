@@ -7,7 +7,7 @@ import skipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 // Official Vue preset (same shape as `npm create vue`), type-aware rules; formatting is left to Prettier
 export default defineConfigWithVueTs(
   { name: "app/files-to-lint", files: ["**/*.{ts,mts,vue}"] },
-  globalIgnores(["dist/", "src/lib/api-schema.ts"]),
+  globalIgnores(["coverage/", "dist/", "src/lib/api-schema.ts"]),
   pluginVue.configs["flat/recommended"],
   vueTsConfigs.recommendedTypeChecked,
   { ...pluginVitest.configs.recommended, files: ["src/**/*.test.ts"] },
