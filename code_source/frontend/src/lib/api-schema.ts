@@ -1887,11 +1887,6 @@ export interface components {
             /** Coach Ids */
             coach_ids?: number[];
             /**
-             * Helloasso Ref
-             * @default
-             */
-            helloasso_ref?: string;
-            /**
              * Url Resultats
              * @default
              */
@@ -2119,8 +2114,6 @@ export interface components {
             statut?: string | null;
             /** Coach Ids */
             coach_ids?: number[] | null;
-            /** Helloasso Ref */
-            helloasso_ref?: string | null;
             /** Url Resultats */
             url_resultats?: string | null;
             /** Whatsapp Link */

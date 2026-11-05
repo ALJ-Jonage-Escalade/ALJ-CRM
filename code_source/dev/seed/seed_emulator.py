@@ -323,23 +323,18 @@ def seed_competitions(coach_ids):
     today = datetime.date.today()
     # id_ffme: the competition number members type on the HelloAsso form (automatic links)
     specs = [
-        ("Diagon Alley Bouldering Cup", "1203", today - datetime.timedelta(days=35), 12.0, STATUT_CLOSE, "",
-         snape, None),
-        ("Hogwarts Lead Open", "1457", today + datetime.timedelta(days=12), 15.0, STATUT_EN_COURS,
-         "hogwarts-lead-open-dev", snape, mcgonagall),
-        ("Regional Championship U15-U19", "1622", today + datetime.timedelta(days=40), 20.0, STATUT_EN_PREPARATION,
-         "", snape, flitwick),
-        ("Hogsmeade Friendly Contest", "", today + datetime.timedelta(days=75), 8.0, STATUT_EN_PREPARATION,
-         "", mcgonagall, None),
+        ("Diagon Alley Bouldering Cup", "1203", today - datetime.timedelta(days=35), 12.0, STATUT_CLOSE, snape, None),
+        ("Hogwarts Lead Open", "1457", today + datetime.timedelta(days=12), 15.0, STATUT_EN_COURS, snape, mcgonagall),
+        ("Regional Championship U15-U19", "1622", today + datetime.timedelta(days=40), 20.0, STATUT_EN_PREPARATION, snape, flitwick),
+        ("Hogsmeade Friendly Contest", "", today + datetime.timedelta(days=75), 8.0, STATUT_EN_PREPARATION, mcgonagall, None),
     ]
     competitors = [a["id"] for a in Repo.list_adherents(competition_only=True, statuses=["Terminé"])]
     rng = random.Random(SEED)
     base_id = int(datetime.datetime(today.year, today.month, today.day).timestamp() * 1000)
     competitions = []
-    for i, (name, number, date, price, status, ha_ref, coach1, coach2) in enumerate(specs):
+    for i, (name, number, date, price, status, coach1, coach2) in enumerate(specs):
         comp = Competition(id=base_id + i, id_ffme=number, nom=name, date_competition=date.isoformat(), prix=price,
-                           statut=status, helloasso_ref=ha_ref,
-                           coach_ids=[c for c in (coach1, coach2) if c is not None])
+                           statut=status, coach_ids=[c for c in (coach1, coach2) if c is not None])
         comp.id = Repo.save_competition(comp)
         competitions.append(comp)
         for member_id in rng.sample(competitors, k=min(len(competitors), rng.randint(4, 9))):

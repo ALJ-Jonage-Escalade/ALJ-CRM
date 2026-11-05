@@ -112,7 +112,6 @@ class Competition:
     deadline: str = ""               # date limite d'inscription ISO, saisie à la main ; vide = 7j avant le début (default_deadline)
     prix: float = 0.0                # tarif d'inscription en euros
     statut: str = STATUT_EN_PREPARATION
-    helloasso_ref: str = ""          # slug ou URL de la campagne HelloAsso dédiée
     created_at: str = ""
     updated_at: str = ""
     coach_ids: List[int] = field(default_factory=list)  # ordered, no length limit
@@ -133,7 +132,6 @@ class Competition:
             "deadline": self.deadline,
             "prix": self.prix,
             "statut": self.statut,
-            "helloasso_ref": self.helloasso_ref,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "coach_ids": list(self.coach_ids),
@@ -153,7 +151,6 @@ class Competition:
             deadline=str(row.get("deadline") or "").strip(),
             prix=float(row.get("prix") or 0.0),
             statut=str(row.get("statut") or STATUT_EN_PREPARATION),
-            helloasso_ref=str(row.get("helloasso_ref") or ""),
             created_at=str(row.get("created_at") or ""),
             updated_at=str(row.get("updated_at") or ""),
             coach_ids=coach_ids_of(row),

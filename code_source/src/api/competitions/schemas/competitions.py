@@ -39,7 +39,6 @@ class CompetitionCreate(RequestBody):
     prix: float = Field(0.0, ge=0)
     statut: str = STATUT_EN_PREPARATION
     coach_ids: List[int] = Field(default_factory=list)
-    helloasso_ref: str = ""
     url_resultats: str = ""  # MyCompet results page, also found by the fetch-results route
     whatsapp_link: str = ""
     # Pass-through fields of the bureau page, stored without validation (plan appendix B)
@@ -61,7 +60,6 @@ class CompetitionUpdate(RequestBody):
     prix: Optional[float] = Field(None, ge=0)
     statut: Optional[str] = None
     coach_ids: Optional[List[int]] = None
-    helloasso_ref: Optional[str] = None
     url_resultats: Optional[str] = None
     whatsapp_link: Optional[str] = None
     lieu: Optional[str] = None

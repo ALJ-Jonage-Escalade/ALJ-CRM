@@ -4891,11 +4891,6 @@
             "type": "array",
             "title": "Coach Ids"
           },
-          "helloasso_ref": {
-            "type": "string",
-            "title": "Helloasso Ref",
-            "default": ""
-          },
           "url_resultats": {
             "type": "string",
             "title": "Url Resultats",
@@ -5310,17 +5305,6 @@
               }
             ],
             "title": "Coach Ids"
-          },
-          "helloasso_ref": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Helloasso Ref"
           },
           "url_resultats": {
             "anyOf": [
