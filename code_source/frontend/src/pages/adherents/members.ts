@@ -213,7 +213,7 @@ export type FilteredMember = Pick<
   Member,
   "last_name" | "first_name" | "tarif_name" | "licence_ffme" | "email_primary" | "phone" | "city" | "status_norm"
 > &
-  Partial<Pick<Member, "commentaires_correctif">>;
+  Partial<Pick<Member, "commentaires_correctif" | "hid_proxkey_comment">>;
 
 /** The search finds names (both orders), tariff, licence, e-mail, phone (4 digits at least, any spacing), city, comment. */
 export function matchesSearch(m: FilteredMember, search: string): boolean {
@@ -236,7 +236,8 @@ export function matchesSearch(m: FilteredMember, search: string): boolean {
     m.phone,
     m.city,
     m.commentaires_correctif,
-  ].some((field) => normKey(field).includes(q));
+    m.hid_proxkey_comment,
+  ].some((field) => field && normKey(field).includes(q));
 }
 
 /** A member without a tariff is always listed (as on the former page). */
@@ -284,13 +285,16 @@ export const statusColor = (status: string): BadgeColor => STATUS_COLOR[status] 
 const yes = (v: string) => ["oui", "x", "true", "1"].includes(v.trim().toLowerCase());
 
 export interface Diplome {
-  type: "badge_rouge" | "autonomie_bloc" | "passeport_orange";
+  type: "badge_rouge" | "autonomie_bloc" | "passeport_orange" | "hid_proxkey";
   label: string;
   icon: string;
 }
 
-/** Badges of the Diplôme column: red badge, bouldering autonomy, orange passport. */
-export function diplomes(m: Pick<Member, "badge_rouge" | "autonomie_bloc" | "raw_passports" | "passeport_orange">): Diplome[] {
+/** Badges of the Diplôme column: red badge, bouldering autonomy, orange passport, HID ProxKey. */
+export function diplomes(
+  m: Pick<Member, "badge_rouge" | "autonomie_bloc" | "raw_passports" | "passeport_orange"> &
+    Partial<Pick<Member, "hid_proxkey" | "hid_proxkey_date" | "hid_proxkey_comment">>,
+): Diplome[] {
   const items: Diplome[] = [];
   if (yes(m.badge_rouge)) {
     items.push({ type: "badge_rouge", label: "Badge rouge diff", icon: "🔴" });
@@ -302,12 +306,18 @@ export function diplomes(m: Pick<Member, "badge_rouge" | "autonomie_bloc" | "raw
   if (passports.includes("orange") || m.passeport_orange.toLowerCase() === "oui") {
     items.push({ type: "passeport_orange", label: "Passeport orange", icon: "🟠" });
   }
+  if (m.hid_proxkey && yes(m.hid_proxkey)) {
+    const detail = [m.hid_proxkey_date && `reçue le ${formatDayText(m.hid_proxkey_date)}`, m.hid_proxkey_comment]
+      .filter(Boolean)
+      .join(" - ");
+    items.push({ type: "hid_proxkey", label: `Clé HID ProxKey${detail ? ` (${detail})` : ""}`, icon: "🔑" });
+  }
   return items;
 }
 
-/** Sort weight of the Diplôme column: red badge 4, autonomy 2, orange passport 1. */
+/** Sort weight of the Diplôme column: HID ProxKey 8, red badge 4, autonomy 2, orange passport 1. */
 export function diplomeWeight(m: Member): number {
-  const weights = { badge_rouge: 4, autonomie_bloc: 2, passeport_orange: 1 };
+  const weights = { hid_proxkey: 8, badge_rouge: 4, autonomie_bloc: 2, passeport_orange: 1 };
   return diplomes(m).reduce((sum, d) => sum + weights[d.type], 0);
 }
 
@@ -385,6 +395,9 @@ const CSV_HEADERS = [
   "E-mail payeur",
   "Réf Commande",
   "Date commande",
+  "Clé HID ProxKey",
+  "Date réception clé HID",
+  "Commentaire clé HID",
 ];
 
 /** Rows of the CSV export of the list shown (same columns as the former page), for lib/csv.ts. */
@@ -417,6 +430,9 @@ export function csvRows(members: readonly Member[]): Cell[][] {
       m.payer_email,
       m.order_ref,
       formatDayText(m.order_date),
+      m.hid_proxkey,
+      formatDayText(m.hid_proxkey_date),
+      m.hid_proxkey_comment,
     ]),
   ];
 }

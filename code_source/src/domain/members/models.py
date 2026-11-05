@@ -58,6 +58,9 @@ class Member:
     member_id: str = ""
     badge_rouge: str = "Non"
     autonomie_bloc: str = "Non"
+    hid_proxkey: str = "Non"
+    hid_proxkey_date: str = ""
+    hid_proxkey_comment: str = ""
     raw_passports: str = ""
     raw_diplomas: str = ""
     parental_auth_autonomous: str = "Non"  # Nouveau !
@@ -168,6 +171,9 @@ class Member:
             email_sent_date=str(data.get("email_sent_date") or "").strip(),
             badge_rouge=str(data.get("badge_rouge") or "Non").strip(),
             autonomie_bloc=str(data.get("autonomie_bloc") or "Non").strip(),
+            hid_proxkey=str(data.get("hid_proxkey") or "Non").strip(),
+            hid_proxkey_date=str(data.get("hid_proxkey_date") or "").strip(),
+            hid_proxkey_comment=str(data.get("hid_proxkey_comment") or "").strip(),
             raw_passports=str(data.get("raw_passports") or "").strip(),
             raw_diplomas=str(data.get("raw_diplomas") or "").strip(),
             parental_auth_autonomous=str(data.get("parental_auth_autonomous") or "Non").strip(),

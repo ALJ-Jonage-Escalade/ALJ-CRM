@@ -88,6 +88,9 @@ class TestMemberRecordRoutes(MemberDbTestCase):
             "emergency2_name": "DUPONT Marie",
             "emergency2_phone": "06 05 06 07 08",
             "photo_auth": "Non",
+            "hid_proxkey": "Oui",
+            "hid_proxkey_date": "2024-09-12",
+            "hid_proxkey_comment": "Caution 20€ remise",
         })
         self.assertEqual(r.status_code, 200, r.text)
         updated = self.client.get("/api/members").json()["members"][0]
@@ -100,6 +103,9 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         self.assertEqual(updated["emergency2_name"], "Dupont Marie")
         self.assertEqual(updated["emergency2_phone"], "06 05 06 07 08")
         self.assertEqual(updated["photo_auth"], "Non")
+        self.assertEqual(updated["hid_proxkey"], "Oui")
+        self.assertEqual(updated["hid_proxkey_date"], "2024-09-12")
+        self.assertEqual(updated["hid_proxkey_comment"], "Caution 20€ remise")
 
     def test_update_refusals(self):
         bad_email = self.update({"email_primary": "pas-une-adresse"})

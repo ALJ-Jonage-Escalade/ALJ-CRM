@@ -2929,6 +2929,12 @@ export interface components {
             badge_rouge: string;
             /** Autonomie Bloc */
             autonomie_bloc: string;
+            /** Hid Proxkey */
+            hid_proxkey: string;
+            /** Hid Proxkey Date */
+            hid_proxkey_date: string;
+            /** Hid Proxkey Comment */
+            hid_proxkey_comment: string;
             /** Passeport Orange */
             passeport_orange: string;
             /** Raw Passports */
@@ -2987,6 +2993,12 @@ export interface components {
             autonomie_bloc?: ("Oui" | "Non") | null;
             /** Photo Auth */
             photo_auth?: ("Oui" | "Non") | null;
+            /** Hid Proxkey */
+            hid_proxkey?: ("Oui" | "Non") | null;
+            /** Hid Proxkey Date */
+            hid_proxkey_date?: string | null;
+            /** Hid Proxkey Comment */
+            hid_proxkey_comment?: string | null;
             /** Email Primary */
             email_primary?: string | null;
             /** Email Secondary */
@@ -3133,6 +3145,22 @@ export interface components {
              * @enum {string}
              */
             photo_auth?: "Oui" | "Non";
+            /**
+             * Hid Proxkey
+             * @default Non
+             * @enum {string}
+             */
+            hid_proxkey?: "Oui" | "Non";
+            /**
+             * Hid Proxkey Date
+             * @default
+             */
+            hid_proxkey_date?: string;
+            /**
+             * Hid Proxkey Comment
+             * @default
+             */
+            hid_proxkey_comment?: string;
             /**
              * Email Primary
              * @default

@@ -214,6 +214,11 @@ class SqliteDatabase:
         # donnée, stockée au niveau de l'achat (purchases).
         _add_missing_column(conn, cursor, "purchases", "document_sante", "TEXT DEFAULT ''")
 
+        # Clé d'accès salle d'escalade (HID ProxKey) : information associée à la personne (users).
+        _add_missing_column(conn, cursor, "users", "hid_proxkey", "TEXT DEFAULT 'Non'")
+        _add_missing_column(conn, cursor, "users", "hid_proxkey_date", "TEXT DEFAULT ''")
+        _add_missing_column(conn, cursor, "users", "hid_proxkey_comment", "TEXT DEFAULT ''")
+
         _ensure_email_templates(conn, cursor)
 
         # Table de réglages clé/valeur, plus écrite par l'application (les réglages sont dans la

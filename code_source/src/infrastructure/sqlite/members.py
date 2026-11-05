@@ -91,6 +91,7 @@ class MemberRepository:
                u.address, u.zip_code, u.city, u.phone, u.email_primary, u.email_secondary,
                u.emergency1_name, u.emergency1_phone, u.emergency2_name, u.emergency2_phone,
                u.licence_ffme, u.health_commitment, u.photo_auth, u.badge_rouge, u.autonomie_bloc,
+               u.hid_proxkey, u.hid_proxkey_date, u.hid_proxkey_comment,
                u.raw_passports, u.raw_diplomas,
                o.payer_first_name, o.payer_last_name, o.payer_email, o.order_ref, o.order_date,
                p.tarif_name, p.amount, p.status, p.document_sante, p.email_sent_date,
@@ -285,6 +286,13 @@ class MemberRepository:
                 rec["champ_Parent 2 - Numéro de téléphone portable"] = str(fields.get("emergency2_phone") or "").strip()
             if "photo_auth" in fields:
                 rec["champ_Autorisation d'utilisation de l'image (photos, vidéos)"] = str(fields.get("photo_auth") or "Oui").strip()
+            if "hid_proxkey" in fields:
+                val = fields.get("hid_proxkey")
+                rec["hid_proxkey"] = "Oui" if (val is True or str(val or "").strip().lower() in ("oui", "true", "1", "yes")) else "Non"
+            if "hid_proxkey_date" in fields:
+                rec["hid_proxkey_date"] = str(fields.get("hid_proxkey_date") or "").strip()
+            if "hid_proxkey_comment" in fields:
+                rec["hid_proxkey_comment"] = str(fields.get("hid_proxkey_comment") or "").strip()
             comment = fields.get("commentaires_correctif") if "commentaires_correctif" in fields else fields.get("commentaire")
             if comment is not None:
                 rec["commentaires_correctif"] = str(comment).strip()
@@ -504,6 +512,17 @@ class MemberRepository:
                 user_updates["emergency2_name"] = str(fields["emergency2_name"] or "").strip()
             if "emergency2_phone" in fields:
                 user_updates["emergency2_phone"] = str(fields["emergency2_phone"] or "").strip()
+            if "hid_proxkey" in fields:
+                val = fields["hid_proxkey"]
+                if isinstance(val, bool):
+                    user_updates["hid_proxkey"] = "Oui" if val else "Non"
+                else:
+                    norm = str(val or "Non").strip().lower()
+                    user_updates["hid_proxkey"] = "Oui" if norm in ("oui", "true", "1", "yes") else "Non"
+            if "hid_proxkey_date" in fields:
+                user_updates["hid_proxkey_date"] = str(fields["hid_proxkey_date"] or "").strip()
+            if "hid_proxkey_comment" in fields:
+                user_updates["hid_proxkey_comment"] = str(fields["hid_proxkey_comment"] or "").strip()
 
             if user_updates and resolved_uid is not None:
                 sets = [f'"{col}" = ?' for col in user_updates.keys()]

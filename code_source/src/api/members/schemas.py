@@ -59,6 +59,9 @@ class Member(BaseModel):
     photo_auth: str
     badge_rouge: str
     autonomie_bloc: str
+    hid_proxkey: str
+    hid_proxkey_date: str
+    hid_proxkey_comment: str
     passeport_orange: str
     raw_passports: str
     raw_diplomas: str
@@ -124,6 +127,9 @@ class MemberChanges(RequestBody):
     badge_rouge: Optional[YesNo] = None
     autonomie_bloc: Optional[YesNo] = None
     photo_auth: Optional[YesNo] = None
+    hid_proxkey: Optional[YesNo] = None
+    hid_proxkey_date: Optional[str] = None
+    hid_proxkey_comment: Optional[str] = None
     email_primary: Optional[str] = None
     email_secondary: Optional[str] = None
     phone: Optional[str] = None
@@ -166,6 +172,9 @@ class NewMember(RequestBody):
     badge_rouge: YesNo = "Non"
     autonomie_bloc: YesNo = "Non"
     photo_auth: YesNo = "Oui"
+    hid_proxkey: YesNo = "Non"
+    hid_proxkey_date: str = ""
+    hid_proxkey_comment: str = ""
     email_primary: str = ""
     email_secondary: str = ""
     phone: str = ""

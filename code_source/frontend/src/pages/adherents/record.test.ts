@@ -40,6 +40,25 @@ describe("record", () => {
     expect(recordRows(member({ first_name: "Léa", last_name: "DUPONT", payer: "Léa DUPONT" }))).toEqual([]);
   });
 
+  it("displays HID ProxKey in record rows when held or commented", () => {
+    const active = recordRows(
+      member({
+        hid_proxkey: "Oui",
+        hid_proxkey_date: "2024-09-12",
+        hid_proxkey_comment: "Caution 20€ remise",
+      }),
+    );
+    expect(active.find((r) => r.label === "Clé HID ProxKey")?.value).toBe("Possède la clé · du 12/09/2024 · Caution 20€ remise");
+
+    const returned = recordRows(
+      member({
+        hid_proxkey: "Non",
+        hid_proxkey_comment: "Clé rendue le 05/11/2025",
+      }),
+    );
+    expect(returned.find((r) => r.label === "Clé HID ProxKey")?.value).toBe("Pas de clé · Clé rendue le 05/11/2025");
+  });
+
   it("offers the slots' tariffs, the members' ones and the licence alone", () => {
     const choices = tarifChoices(
       [{ groupe: "Loisir adultes", tarifs: ["Adulte loisir"], categorie_age: "", type: "" }],
@@ -76,6 +95,9 @@ describe("edit and add", () => {
       emergency1_name: "DUPONT Pierre",
       emergency1_phone: "06 01 02 03 04",
       photo_auth: "Oui",
+      hid_proxkey: "Non",
+      hid_proxkey_date: "",
+      hid_proxkey_comment: "",
     });
     const d = {
       ...draftOf(m),
@@ -88,6 +110,9 @@ describe("edit and add", () => {
       emergency2_name: "MARTIN Claire",
       emergency2_phone: "06 11 22 33 44",
       photo_auth: "Non" as const,
+      hid_proxkey: "Oui" as const,
+      hid_proxkey_date: "2025-11-05",
+      hid_proxkey_comment: "Clé remise",
     };
     expect(changesOf(m, d)).toEqual({
       fields: {
@@ -100,12 +125,18 @@ describe("edit and add", () => {
         emergency2_name: "MARTIN Claire",
         emergency2_phone: "06 11 22 33 44",
         photo_auth: "Non",
+        hid_proxkey: "Oui",
+        hid_proxkey_date: "2025-11-05",
+        hid_proxkey_comment: "Clé remise",
       },
       lines: [
         "Nom : DUPONT ➔ MARTIN",
         "Prénom : Jean ➔ Jeanne",
         "Date de naissance : 2010-01-01 ➔ 2010-02-02",
         "Droit à l'image : Oui ➔ Non",
+        "Clé HID ProxKey : Non ➔ Oui",
+        "Date clé HID ProxKey : vide ➔ 2025-11-05",
+        "Commentaire clé HID ProxKey : vide ➔ Clé remise",
         "Urgence 1 (nom) : DUPONT Pierre ➔ MARTIN Paul",
         "Urgence 1 (tél) : 06 01 02 03 04 ➔ 06 99 88 77 66",
         "Urgence 2 (nom) : vide ➔ MARTIN Claire",

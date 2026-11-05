@@ -207,6 +207,31 @@ const TEXT_FIELDS: { name: DraftField; label: string; type?: string; placeholder
       </div>
     </div>
 
+    <div :class="section">🔑 Clé d'accès salle (HID ProxKey)</div>
+    <div class="grid gap-3 sm:grid-cols-3">
+      <div>
+        <label for="member-hid_proxkey" :class="label">Clé HID ProxKey</label>
+        <select v-model="draft.hid_proxkey" v-bind="attrs('hid_proxkey')" :class="fieldClass('hid_proxkey')">
+          <option value="Non">Non (pas de clé)</option>
+          <option value="Oui">Oui (a la clé)</option>
+        </select>
+      </div>
+      <div>
+        <label for="member-hid_proxkey_date" :class="label">Date de réception</label>
+        <input v-model="draft.hid_proxkey_date" v-bind="attrs('hid_proxkey_date')" type="date" :class="fieldClass('hid_proxkey_date')" />
+      </div>
+      <div>
+        <label for="member-hid_proxkey_comment" :class="label">Commentaire lié à la clé</label>
+        <input
+          v-model="draft.hid_proxkey_comment"
+          v-bind="attrs('hid_proxkey_comment')"
+          type="text"
+          placeholder="Ex: Clé rendue le 05/11/2025"
+          :class="fieldClass('hid_proxkey_comment')"
+        />
+      </div>
+    </div>
+
     <div :class="section">📞 Coordonnées</div>
     <div>
       <label for="member-address" :class="label">📍 Adresse (n° et rue)</label>
