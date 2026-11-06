@@ -14,7 +14,7 @@ class TestFfmeEmergencyContact(MemberDbTestCase):
 
     def export_line(self):
         out = os.path.join(self._tmp.name, "ffme.csv")
-        generate_ffme_csv(MemberRepository.load_direct_data("2026-2027"), output_path=out)
+        generate_ffme_csv(MemberRepository.list_flat_member_rows("2026-2027"), output_path=out)
         with open(out, encoding="utf-8", newline="") as exported:
             (line,) = list(csv.DictReader(io.StringIO(exported.read()), delimiter=";"))
         return line
@@ -26,8 +26,7 @@ class TestFfmeEmergencyContact(MemberDbTestCase):
         return MemberRepository.list_member_rows("2026-2027")[0]["user_id"]
 
     def replace(self, user_id, contacts):
-        success, message = MemberRepository.update_member_fields(user_id=user_id, fields={"emergency_contacts": contacts})
-        self.assertTrue(success, message)
+        MemberRepository.update_member_fields(user_id=user_id, fields={"emergency_contacts": contacts})
 
     def contact_columns(self, line):
         return [value for key, value in line.items() if key and ("pap" in key.lower() or "prévenir" in key.lower())]

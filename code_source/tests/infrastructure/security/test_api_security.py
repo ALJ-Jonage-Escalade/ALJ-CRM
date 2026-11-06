@@ -162,6 +162,9 @@ class TestRoles(unittest.TestCase):
                          "/api/admin/access/requests/a@b.c/grant", "/api/admin/access/history"):
                 self.assertEqual(r(method, path), Role.ADMIN, f"{method} {path}")
         self.assertEqual(r("GET", "/api/administration"), Role.COACH)  # not under /api/admin/
+        # Emergency contacts are written through the member routes: admins only
+        self.assertEqual(r("POST", "/api/members/update"), Role.ADMIN)
+        self.assertEqual(r("POST", "/api/members/create"), Role.ADMIN)
 
     def test_helloasso_campaign_choice_requires_admin(self):
         """Coaches see the campaigns (Compétitions › HelloAsso), only admins choose the active one."""

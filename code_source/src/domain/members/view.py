@@ -203,7 +203,7 @@ def build_members(rows: Iterable[Dict[str, Any]], planning: Iterable[Dict[str, A
 
 # What a coach's phone keeps offline about a competitor: contacts only,
 # no health, address or e-mail.
-COMPETITOR_FIELDS = ("last_name", "first_name", "phone", "creneau_groupe", "emergency1_name",
+COMPETITOR_FIELDS = ("last_name", "first_name", "phone", "creneau_groupe", "emergency_contacts", "emergency1_name",
                      "emergency1_phone", "emergency2_name", "emergency2_phone")
 
 

@@ -68,6 +68,7 @@ class TestMemberWriteRoutes(unittest.TestCase):
                     "address": "15 rue des Alpes",
                     "zip_code": "69330",
                     "city": "Jonage",
+                    "emergency_contacts": [{"name": "VALENTIN Marc", "phone": "06 99 88 77 66"}],
                     "commentaires_correctif": "Inscription manuelle web bureau"
                 }
             }
@@ -92,6 +93,9 @@ class TestMemberWriteRoutes(unittest.TestCase):
             self.assertEqual(u["address"], "15 rue des Alpes")
             self.assertEqual(u["zip_code"], "69330")
             self.assertEqual(u["city"], "Jonage")
+
+            contact = conn.execute("SELECT name, phone FROM emergency_contacts WHERE user_id = ?", (u["id"],)).fetchone()
+            self.assertEqual(tuple(contact), ("VALENTIN Marc", "06 99 88 77 66"))
 
             p = conn.execute("SELECT * FROM purchases WHERE user_id = ?", (u["id"],)).fetchone()
             self.assertIsNotNone(p)

@@ -2238,13 +2238,30 @@ export interface components {
             phone: string;
             /** Creneau Groupe */
             creneau_groupe: string;
-            /** Emergency1 Name */
+            /**
+             * Emergency Contacts
+             * @description In order, the first one is the main one
+             */
+            emergency_contacts: components["schemas"]["EmergencyContact"][];
+            /**
+             * Emergency1 Name
+             * @description Deprecated: first contact, for tabs of the previous build until release B
+             */
             emergency1_name: string;
-            /** Emergency1 Phone */
+            /**
+             * Emergency1 Phone
+             * @description Deprecated: first contact, for tabs of the previous build until release B
+             */
             emergency1_phone: string;
-            /** Emergency2 Name */
+            /**
+             * Emergency2 Name
+             * @description Deprecated: second contact, for tabs of the previous build until release B
+             */
             emergency2_name: string;
-            /** Emergency2 Phone */
+            /**
+             * Emergency2 Phone
+             * @description Deprecated: second contact, for tabs of the previous build until release B
+             */
             emergency2_phone: string;
         };
         /**
@@ -3547,14 +3564,11 @@ export interface components {
             zip_code?: string | null;
             /** City */
             city?: string | null;
-            /** Emergency1 Name */
-            emergency1_name?: string | null;
-            /** Emergency1 Phone */
-            emergency1_phone?: string | null;
-            /** Emergency2 Name */
-            emergency2_name?: string | null;
-            /** Emergency2 Phone */
-            emergency2_phone?: string | null;
+            /**
+             * Emergency Contacts
+             * @description Replaces the whole list, in this order; [] removes every contact
+             */
+            emergency_contacts?: components["schemas"]["EmergencyContact"][] | null;
             /** Tarif Name */
             tarif_name?: string | null;
             /** Commentaires Correctif */
@@ -3930,25 +3944,10 @@ export interface components {
              */
             city?: string;
             /**
-             * Emergency1 Name
-             * @default
+             * Emergency Contacts
+             * @description In order, the first one is the main one
              */
-            emergency1_name?: string;
-            /**
-             * Emergency1 Phone
-             * @default
-             */
-            emergency1_phone?: string;
-            /**
-             * Emergency2 Name
-             * @default
-             */
-            emergency2_name?: string;
-            /**
-             * Emergency2 Phone
-             * @default
-             */
-            emergency2_phone?: string;
+            emergency_contacts?: components["schemas"]["EmergencyContact"][];
             /**
              * Commentaires Correctif
              * @default

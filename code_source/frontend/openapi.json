@@ -6363,21 +6363,33 @@
             "type": "string",
             "title": "Creneau Groupe"
           },
+          "emergency_contacts": {
+            "items": {
+              "$ref": "#/components/schemas/EmergencyContact"
+            },
+            "type": "array",
+            "title": "Emergency Contacts",
+            "description": "In order, the first one is the main one"
+          },
           "emergency1_name": {
             "type": "string",
-            "title": "Emergency1 Name"
+            "title": "Emergency1 Name",
+            "description": "Deprecated: first contact, for tabs of the previous build until release B"
           },
           "emergency1_phone": {
             "type": "string",
-            "title": "Emergency1 Phone"
+            "title": "Emergency1 Phone",
+            "description": "Deprecated: first contact, for tabs of the previous build until release B"
           },
           "emergency2_name": {
             "type": "string",
-            "title": "Emergency2 Name"
+            "title": "Emergency2 Name",
+            "description": "Deprecated: second contact, for tabs of the previous build until release B"
           },
           "emergency2_phone": {
             "type": "string",
-            "title": "Emergency2 Phone"
+            "title": "Emergency2 Phone",
+            "description": "Deprecated: second contact, for tabs of the previous build until release B"
           }
         },
         "type": "object",
@@ -6387,6 +6399,7 @@
           "first_name",
           "phone",
           "creneau_groupe",
+          "emergency_contacts",
           "emergency1_name",
           "emergency1_phone",
           "emergency2_name",
@@ -9008,49 +9021,20 @@
             ],
             "title": "City"
           },
-          "emergency1_name": {
+          "emergency_contacts": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "$ref": "#/components/schemas/EmergencyContact"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Emergency1 Name"
-          },
-          "emergency1_phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Emergency1 Phone"
-          },
-          "emergency2_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Emergency2 Name"
-          },
-          "emergency2_phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Emergency2 Phone"
+            "title": "Emergency Contacts",
+            "description": "Replaces the whole list, in this order; [] removes every contact"
           },
           "tarif_name": {
             "anyOf": [
@@ -9829,25 +9813,13 @@
             "title": "City",
             "default": ""
           },
-          "emergency1_name": {
-            "type": "string",
-            "title": "Emergency1 Name",
-            "default": ""
-          },
-          "emergency1_phone": {
-            "type": "string",
-            "title": "Emergency1 Phone",
-            "default": ""
-          },
-          "emergency2_name": {
-            "type": "string",
-            "title": "Emergency2 Name",
-            "default": ""
-          },
-          "emergency2_phone": {
-            "type": "string",
-            "title": "Emergency2 Phone",
-            "default": ""
+          "emergency_contacts": {
+            "items": {
+              "$ref": "#/components/schemas/EmergencyContact"
+            },
+            "type": "array",
+            "title": "Emergency Contacts",
+            "description": "In order, the first one is the main one"
           },
           "commentaires_correctif": {
             "type": "string",
