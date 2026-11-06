@@ -56,6 +56,8 @@ class TestFFMEGoldenMaster(unittest.TestCase):
             dst.close()
             src.close()
 
+            self._copy_contact_columns_to_table(tmp_db)
+
             # 2. Chargement via le chemin applicatif réel, sur la copie uniquement
             ancien_path = SqliteDatabase.get_db_path()
             SqliteDatabase.set_db_path(tmp_db)
@@ -84,6 +86,29 @@ class TestFFMEGoldenMaster(unittest.TestCase):
             )
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+    @staticmethod
+    def _copy_contact_columns_to_table(path):
+        """A snapshot taken before plans/emergency-contacts.md holds the contacts in the users columns only:
+        they are copied the way scripts/migrate_emergency_contacts.py does, on the copy of the base."""
+        from domain.members.emergency_contacts import missing_contacts
+        from infrastructure.sqlite import schema_v2
+
+        conn = sqlite3.connect(path)
+        try:
+            schema_v2.ensure_v2_schema(conn.cursor())
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+            if "emergency1_name" not in columns or conn.execute("SELECT 1 FROM emergency_contacts LIMIT 1").fetchone():
+                return
+            for user_id, name1, phone1, name2, phone2 in conn.execute(
+                    "SELECT id, emergency1_name, emergency1_phone, emergency2_name, emergency2_phone FROM users").fetchall():
+                incoming = [{"name": name1, "phone": phone1}, {"name": name2, "phone": phone2}]
+                for position, contact in enumerate(missing_contacts([], incoming)):
+                    conn.execute("INSERT INTO emergency_contacts (user_id, name, phone, position) VALUES (?, ?, ?, ?)",
+                                 (user_id, contact.name, contact.phone, position))
+            conn.commit()
+        finally:
+            conn.close()
 
     @staticmethod
     def _diagnostic(genere, reference):
