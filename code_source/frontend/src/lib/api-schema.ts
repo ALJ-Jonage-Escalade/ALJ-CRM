@@ -2532,6 +2532,22 @@ export interface components {
             club_contact_email: string;
         };
         /**
+         * EmergencyContact
+         * @description Someone to call for a member. Blank rows are dropped when saved: a row holds a name, a phone or both.
+         */
+        EmergencyContact: {
+            /**
+             * Name
+             * @default
+             */
+            name?: string;
+            /**
+             * Phone
+             * @default
+             */
+            phone?: string;
+        };
+        /**
          * FfmeFile
          * @description The licensee list exported from MyFFME (.xlsx), base64 encoded.
          */
@@ -3425,13 +3441,30 @@ export interface components {
             email_secondary: string;
             /** Licence Ffme */
             licence_ffme: string;
-            /** Emergency1 Name */
+            /**
+             * Emergency Contacts
+             * @description In order, the first one is the main one
+             */
+            emergency_contacts: components["schemas"]["EmergencyContact"][];
+            /**
+             * Emergency1 Name
+             * @description Deprecated: first contact, for tabs of the previous build until release B
+             */
             emergency1_name: string;
-            /** Emergency1 Phone */
+            /**
+             * Emergency1 Phone
+             * @description Deprecated: first contact, for tabs of the previous build until release B
+             */
             emergency1_phone: string;
-            /** Emergency2 Name */
+            /**
+             * Emergency2 Name
+             * @description Deprecated: second contact, for tabs of the previous build until release B
+             */
             emergency2_name: string;
-            /** Emergency2 Phone */
+            /**
+             * Emergency2 Phone
+             * @description Deprecated: second contact, for tabs of the previous build until release B
+             */
             emergency2_phone: string;
             /** Health Commitment */
             health_commitment: string;

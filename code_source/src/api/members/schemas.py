@@ -39,6 +39,12 @@ class MemberKey(BaseModel):
     given_on: str
 
 
+class EmergencyContact(RequestBody):
+    """Someone to call for a member. Blank rows are dropped when saved: a row holds a name, a phone or both."""
+    name: str = ""
+    phone: str = ""
+
+
 class Member(BaseModel):
     """One member of a season (one purchase), as domain/members/view.py member_row() builds it.
     Names, city and phones are already formatted; status_norm is the French status label."""
@@ -57,10 +63,11 @@ class Member(BaseModel):
     email_primary: str
     email_secondary: str
     licence_ffme: str
-    emergency1_name: str
-    emergency1_phone: str
-    emergency2_name: str
-    emergency2_phone: str
+    emergency_contacts: List[EmergencyContact] = Field(description="In order, the first one is the main one")
+    emergency1_name: str = Field(description="Deprecated: first contact, for tabs of the previous build until release B")
+    emergency1_phone: str = Field(description="Deprecated: first contact, for tabs of the previous build until release B")
+    emergency2_name: str = Field(description="Deprecated: second contact, for tabs of the previous build until release B")
+    emergency2_phone: str = Field(description="Deprecated: second contact, for tabs of the previous build until release B")
     health_commitment: str
     document_sante: str
     photo_auth: str

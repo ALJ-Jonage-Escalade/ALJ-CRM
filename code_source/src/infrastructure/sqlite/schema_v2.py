@@ -15,6 +15,7 @@ import logging
 import sqlite3
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple, Union
 
+from domain.members.emergency_contacts import HELLOASSO_CONTACT_FIELDS, EmergencyContact, missing_contacts
 from domain.members.purchase_priority import purchase_priority_score, status_score
 from domain.members.sex import parse_sex
 from domain.members.view import normalize_status
@@ -124,10 +125,6 @@ USER_FIELD_MAP = {
     "champ_Téléphone ": "phone",
     "champ_Adresse mail pour la réception des informations du club": "email_primary",
     "champ_Deuxième adresse mail pour la réception des informations du club": "email_secondary",
-    "champ_Personne à prévenir en cas d'urgence - NOM  et PRENOM en majuscule": "emergency1_name",
-    "champ_Personne à prévenir en cas d'urgence - Téléphone": "emergency1_phone",
-    "champ_Parent 2  à prévenir en cas d'urgence - NOM ET PRENOM (en majuscule)": "emergency2_name",
-    "champ_Parent 2 - Numéro de téléphone portable": "emergency2_phone",
     "champ_Numéro de Licence FFME (6 chiffres)": "licence_ffme",
     "badge_rouge": "badge_rouge",
     "autonomie_bloc": "autonomie_bloc",
@@ -263,9 +260,23 @@ def resolve_season_id(cur: sqlite3.Cursor, season_name: str) -> int:
     return _inserted_id(cur)
 
 
+def add_missing_emergency_contacts(cur: sqlite3.Cursor, user_id: int, rec: MemberRecord, now_iso: str) -> None:
+    """Adds the contacts of a record the member does not have yet, after theirs: rows already there are never changed
+    (plans/emergency-contacts.md, D2). `rec` holds the two contacts of a form, or a list under `emergency_contacts`."""
+    incoming = list(_get(rec, "emergency_contacts") or [])
+    incoming += [{"name": _get(rec, name_key), "phone": _get(rec, phone_key)} for name_key, phone_key in HELLOASSO_CONTACT_FIELDS]
+    rows = cur.execute("SELECT name, phone, position FROM emergency_contacts WHERE user_id = ?", (user_id,)).fetchall()
+    next_position = max((row[2] for row in rows), default=-1) + 1
+    existing = [EmergencyContact(row[0] or "", row[1] or "") for row in rows]
+    for offset, contact in enumerate(missing_contacts(existing, incoming)):
+        cur.execute("INSERT INTO emergency_contacts (user_id, name, phone, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (user_id, contact.name, contact.phone, next_position + offset, now_iso, now_iso))
+
+
 def fill_blank_user_fields(cur: sqlite3.Cursor, user_id: int, rec: MemberRecord, now_iso: str,
                            field_map: Mapping[str, str]) -> None:
     """Copies the fields of `rec` into the user's columns that are still blank: a value of the base is never overwritten."""
+    add_missing_emergency_contacts(cur, user_id, rec, now_iso)
     dyn = _dynamic_field_values(rec)
     for src_col, dst_col in field_map.items():
         new_val = clean_legacy_text(_get(rec, src_col))
@@ -344,6 +355,7 @@ def upsert_user_v2(cur: sqlite3.Cursor, rec: MemberRecord, now_iso: str,
         user_id = row["id"] if isinstance(row, sqlite3.Row) else row[0]
         return user_id, False
     cur.execute("UPDATE users SET created_at=?, updated_at=? WHERE id=?", (now_iso, now_iso, user_id))
+    add_missing_emergency_contacts(cur, user_id, rec, now_iso)
     return user_id, True
 
 
@@ -540,10 +552,8 @@ SELECT
     u.phone AS "phone",
     u.email_primary AS "email_primary",
     u.email_secondary AS "email_secondary",
-    u.emergency1_name AS "emergency1_name",
-    u.emergency1_phone AS "emergency1_phone",
-    u.emergency2_name AS "emergency2_name",
-    u.emergency2_phone AS "emergency2_phone",
+    COALESCE((SELECT ec.name FROM emergency_contacts ec WHERE ec.user_id = u.id ORDER BY ec.position, ec.id LIMIT 1), '') AS "emergency1_name",
+    COALESCE((SELECT ec.phone FROM emergency_contacts ec WHERE ec.user_id = u.id ORDER BY ec.position, ec.id LIMIT 1), '') AS "emergency1_phone",
     p.is_tribe AS "is_tribe",
     u.licence_ffme AS "licence_ffme",
     u.photo_auth AS "photo_auth",

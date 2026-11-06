@@ -89,16 +89,12 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         self.assertIsNone(members["Max"]["key"])
         self.assertNotIn("hid_proxkey", members["Léo"])
 
-    def test_update_modifies_all_fields_including_identity_and_emergency(self):
+    def test_update_modifies_all_fields_including_identity(self):
         r = self.update({
             "last_name": "BERNARD",
             "first_name": "Léonard",
             "birth_date": "2011-06-15",
             "amount": 135.5,
-            "emergency1_name": "DUPONT Pierre",
-            "emergency1_phone": "06 01 02 03 04",
-            "emergency2_name": "DUPONT Marie",
-            "emergency2_phone": "06 05 06 07 08",
             "photo_auth": "Non",
         })
         self.assertEqual(r.status_code, 200, r.text)
@@ -107,10 +103,6 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         self.assertEqual(updated["first_name"], "Léonard")
         self.assertEqual(updated["birth_date"], "2011-06-15")
         self.assertEqual(updated["amount"], 135.5)
-        self.assertEqual(updated["emergency1_name"], "Dupont Pierre")
-        self.assertEqual(updated["emergency1_phone"], "06 01 02 03 04")
-        self.assertEqual(updated["emergency2_name"], "Dupont Marie")
-        self.assertEqual(updated["emergency2_phone"], "06 05 06 07 08")
         self.assertEqual(updated["photo_auth"], "Non")
 
     def test_update_refusals(self):

@@ -8,6 +8,7 @@ import sqlite3
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 from domain.errors import InvalidRequest
+from domain.members.emergency_contacts import clean_contacts
 from domain.members.sex import parse_sex
 from domain.utils import normalize_name
 from infrastructure.sqlite import schema_v2
@@ -37,6 +38,22 @@ MemberRow = Dict[str, Any]
 MemberRecord = Mapping[str, Any]
 
 
+def replace_emergency_contacts(cur: sqlite3.Cursor, user_id: int, contacts: Iterable[Mapping[str, object]], now_iso: str) -> None:
+    """Makes the member's contacts exactly `contacts`, in that order: rows are reused by position, and those that do
+    not change are not rewritten, so the sync only sends what changed."""
+    wanted = clean_contacts(contacts)
+    rows = cur.execute("SELECT id, name, phone, position FROM emergency_contacts WHERE user_id = ? ORDER BY position, id", (user_id,)).fetchall()
+    for position, contact in enumerate(wanted):
+        if position >= len(rows):
+            cur.execute("INSERT INTO emergency_contacts (user_id, name, phone, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (user_id, contact.name, contact.phone, position, now_iso, now_iso))
+        elif tuple(rows[position])[1:] != (contact.name, contact.phone, position):
+            cur.execute("UPDATE emergency_contacts SET name = ?, phone = ?, position = ?, updated_at = ? WHERE id = ?",
+                        (contact.name, contact.phone, position, now_iso, rows[position][0]))
+    for surplus in rows[len(wanted):]:
+        cur.execute("DELETE FROM emergency_contacts WHERE id = ?", (surplus[0],))
+
+
 class MemberRepository:
     @classmethod
     def list_flat_member_rows(cls, season: Optional[str]) -> List[MemberRow]:
@@ -60,13 +77,14 @@ class MemberRepository:
         SELECT u.id AS user_id, p.id AS purchase_id,
                u.last_name, u.first_name, u.birth_date, u.sex,
                u.address, u.zip_code, u.city, u.phone, u.email_primary, u.email_secondary,
-               u.emergency1_name, u.emergency1_phone, u.emergency2_name, u.emergency2_phone,
                u.licence_ffme, u.health_commitment, u.photo_auth, u.badge_rouge, u.autonomie_bloc,
                u.raw_passports, u.raw_diplomas,
                o.payer_first_name, o.payer_last_name, o.payer_email, o.order_ref, o.order_date,
                p.tarif_name, p.amount, p.status, p.document_sante, p.email_sent_date,
                p.commentaires_correctif,
                s.name AS season_name
+    """
+    _MEMBER_ROWS_FROM = """
         FROM purchases p
         JOIN users u ON u.id = p.user_id
         JOIN orders o ON o.id = p.order_id
@@ -78,7 +96,15 @@ class MemberRepository:
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
-            return [dict(r) for r in conn.execute(f"{cls._MEMBER_ROWS_SQL} WHERE {where}", params).fetchall()]
+            rows = [dict(r) for r in conn.execute(f"{cls._MEMBER_ROWS_SQL} {cls._MEMBER_ROWS_FROM} WHERE {where}", params).fetchall()]
+            contacts_by_user: Dict[int, List[Dict[str, str]]] = {}
+            for contact in conn.execute(
+                    f"SELECT user_id, name, phone FROM emergency_contacts WHERE user_id IN (SELECT p.user_id {cls._MEMBER_ROWS_FROM} WHERE {where}) "  # noqa: S608 - fragments SQL littéraux du code, valeurs en paramètres
+                    "ORDER BY user_id, position, id", params).fetchall():
+                contacts_by_user.setdefault(contact["user_id"], []).append({"name": contact["name"] or "", "phone": contact["phone"] or ""})
+            for row in rows:
+                row["emergency_contacts"] = contacts_by_user.get(row["user_id"], [])
+            return rows
         finally:
             conn.close()
 
@@ -165,14 +191,8 @@ class MemberRepository:
                 rec["badge_rouge"] = str(fields.get("badge_rouge") or "Non").strip()
             if "autonomie_bloc" in fields:
                 rec["autonomie_bloc"] = str(fields.get("autonomie_bloc") or "Non").strip()
-            if "emergency1_name" in fields:
-                rec["champ_Personne à prévenir en cas d'urgence - NOM  et PRENOM en majuscule"] = str(fields.get("emergency1_name") or "").strip()
-            if "emergency1_phone" in fields:
-                rec["champ_Personne à prévenir en cas d'urgence - Téléphone"] = str(fields.get("emergency1_phone") or "").strip()
-            if "emergency2_name" in fields:
-                rec["champ_Parent 2  à prévenir en cas d'urgence - NOM ET PRENOM (en majuscule)"] = str(fields.get("emergency2_name") or "").strip()
-            if "emergency2_phone" in fields:
-                rec["champ_Parent 2 - Numéro de téléphone portable"] = str(fields.get("emergency2_phone") or "").strip()
+            if "emergency_contacts" in fields:
+                rec["emergency_contacts"] = fields["emergency_contacts"] or []
             if "photo_auth" in fields:
                 rec["champ_Autorisation d'utilisation de l'image (photos, vidéos)"] = str(fields.get("photo_auth") or "Oui").strip()
             comment = fields.get("commentaires_correctif") if "commentaires_correctif" in fields else fields.get("commentaire")
@@ -326,6 +346,9 @@ class MemberRepository:
                 params = list(user_updates.values()) + [now_iso, int(resolved_uid)]
                 cursor.execute(f'UPDATE users SET {", ".join(sets)} WHERE id = ?', params)  # noqa: S608 - columns from _user_column_updates' fixed lists
 
+            if fields.get("emergency_contacts") is not None and resolved_uid is not None:
+                replace_emergency_contacts(cursor, int(resolved_uid), fields["emergency_contacts"], now_iso)
+
             purchase_updates = _purchase_column_updates(fields)
             if purchase_updates:
                 _update_purchases(cursor, purchase_updates, purchase_id, order_ref, resolved_uid, now_iso)
@@ -359,7 +382,6 @@ class MemberRepository:
 # Member fields written as trimmed text, and the yes/no fields with their default
 _USER_TEXT_FIELDS = (
     "email_primary", "email_secondary", "phone", "licence_ffme", "address", "zip_code", "city",
-    "emergency1_name", "emergency1_phone", "emergency2_name", "emergency2_phone",
 )
 _USER_YES_NO_DEFAULTS = {"badge_rouge": "Non", "autonomie_bloc": "Non", "photo_auth": "Oui"}
 

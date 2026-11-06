@@ -39,6 +39,20 @@ class TestSyncAdherentsFromMain(MemberDbTestCase, FirestoreRepoTestCase):
         member_directory.rebuild_member_directory("2026-2027")
         self.assertEqual(len(member_directory.adherents_raw()), 3)
 
+    def test_sync_copies_the_first_emergency_contact(self):
+        conn = SqliteDatabase.get_connection()
+        try:
+            conn.execute("INSERT INTO emergency_contacts (user_id, name, phone, position) "
+                         "SELECT id, 'Deuxième', '0622222222', 1 FROM users WHERE last_name = 'DUPONT'")
+            conn.execute("INSERT INTO emergency_contacts (user_id, name, phone, position) "
+                         "SELECT id, 'Principal', '0611111111', 0 FROM users WHERE last_name = 'DUPONT'")
+            conn.commit()
+        finally:
+            conn.close()
+        member_directory.rebuild_member_directory("2026-2027")
+        dupont = [a for a in member_directory.list_members() if a["nom"] == "DUPONT"][0]
+        self.assertEqual((dupont["emergency_name"], dupont["emergency_phone"]), ("Principal", "0611111111"))
+
     def test_sync_keeps_the_highest_priority_purchase(self):
         """Two purchases of the season (two orders): the confirmed licence wins over a later cancelled one,
         and the tariff comes from the same purchase."""

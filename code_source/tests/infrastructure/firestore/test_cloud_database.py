@@ -11,8 +11,9 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.firestore.cloud_sync.bootstrap import build_cache, create_schema, import_database  # noqa: E402
-from infrastructure.firestore.cloud_sync.cache import connect, pending_count  # noqa: E402
+from infrastructure.firestore.cloud_database import CloudDatabase  # noqa: E402
+from infrastructure.firestore.cloud_sync.bootstrap import build_cache, cache_is_valid, create_schema, import_database  # noqa: E402
+from infrastructure.firestore.cloud_sync.cache import connect, pending_count, set_state  # noqa: E402
 from infrastructure.firestore.client import FirestoreConflictError  # noqa: E402
 from infrastructure.firestore.cloud_sync.common import collection_for, ts_key  # noqa: E402
 from infrastructure.firestore.cloud_sync.sync import flush, pull  # noqa: E402
@@ -239,6 +240,12 @@ class CloudDatabaseTest(unittest.TestCase):
         self.sync(self.b)
         self.assertIsNone(self.row(self.b, "SELECT id FROM emergency_contacts WHERE id = 1"))
 
+    def test_contact_edit_alone_asks_for_a_new_directory(self):
+        CloudDatabase._projection_dirty = False
+        self.addCleanup(setattr, CloudDatabase, "_projection_dirty", False)
+        CloudDatabase._after_sync({"tables": ["emergency_contacts"]})
+        self.assertTrue(CloudDatabase._projection_dirty)
+
     def test_renumbered_member_keeps_their_emergency_contacts(self):
         for path, name in ((self.a, "PETIT"), (self.b, "GRAND")):
             self.write(path, "INSERT INTO users (last_name, first_name, last_name_key, first_name_key) "
@@ -255,11 +262,11 @@ class CloudDatabaseTest(unittest.TestCase):
             self.assertEqual(pairs, [("GRAND", "Contact de GRAND"), ("PETIT", "Contact de PETIT")])
 
     def test_cache_of_the_previous_format_is_rebuilt(self):
-        conn = cdb.connect(self.a)
-        cdb.set_state(conn, "format", "2")
+        conn = connect(self.a)
+        set_state(conn, "format", "2")
         conn.commit()
         conn.close()
-        self.assertFalse(cdb.cache_is_valid(self.a, self.store.project_id))
+        self.assertFalse(cache_is_valid(self.a, self.store.project_id))
 
     def test_same_new_id_on_two_posts_is_renumbered(self):
         for p, name in ((self.a, "PETIT"), (self.b, "GRAND")):

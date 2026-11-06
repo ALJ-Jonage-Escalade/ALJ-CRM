@@ -28,11 +28,6 @@ def clean_contacts(rows: Iterable[Mapping[str, object]]) -> list[EmergencyContac
     return [contact for contact in contacts if contact.name or contact.phone]
 
 
-def helloasso_contacts(record: Mapping[str, object]) -> list[EmergencyContact]:
-    """The contacts filled in a HelloAsso or Excel record."""
-    return clean_contacts({"name": record.get(name_key), "phone": record.get(phone_key)} for name_key, phone_key in HELLOASSO_CONTACT_FIELDS)
-
-
 def _phone_digits(phone: str) -> str:
     return re.sub(r"[^0-9]", "", fmt_phone(phone))
 

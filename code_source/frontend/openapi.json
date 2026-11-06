@@ -6855,6 +6855,24 @@
         "title": "EmailTemplates",
         "description": "default_sender_*: used by the server when a template's sender is empty. club_contact_email: shown in the e-mail signature."
       },
+      "EmergencyContact": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EmergencyContact",
+        "description": "Someone to call for a member. Blank rows are dropped when saved: a row holds a name, a phone or both."
+      },
       "FfmeFile": {
         "properties": {
           "filename": {
@@ -8612,21 +8630,33 @@
             "type": "string",
             "title": "Licence Ffme"
           },
+          "emergency_contacts": {
+            "items": {
+              "$ref": "#/components/schemas/EmergencyContact"
+            },
+            "type": "array",
+            "title": "Emergency Contacts",
+            "description": "In order, the first one is the main one"
+          },
           "emergency1_name": {
             "type": "string",
-            "title": "Emergency1 Name"
+            "title": "Emergency1 Name",
+            "description": "Deprecated: first contact, for tabs of the previous build until release B"
           },
           "emergency1_phone": {
             "type": "string",
-            "title": "Emergency1 Phone"
+            "title": "Emergency1 Phone",
+            "description": "Deprecated: first contact, for tabs of the previous build until release B"
           },
           "emergency2_name": {
             "type": "string",
-            "title": "Emergency2 Name"
+            "title": "Emergency2 Name",
+            "description": "Deprecated: second contact, for tabs of the previous build until release B"
           },
           "emergency2_phone": {
             "type": "string",
-            "title": "Emergency2 Phone"
+            "title": "Emergency2 Phone",
+            "description": "Deprecated: second contact, for tabs of the previous build until release B"
           },
           "health_commitment": {
             "type": "string",
@@ -8747,6 +8777,7 @@
           "email_primary",
           "email_secondary",
           "licence_ffme",
+          "emergency_contacts",
           "emergency1_name",
           "emergency1_phone",
           "emergency2_name",

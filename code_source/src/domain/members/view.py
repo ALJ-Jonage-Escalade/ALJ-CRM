@@ -141,6 +141,19 @@ def slot_groups(planning: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return sorted(by_name.values(), key=lambda g: normalize_string(g["groupe"]))
 
 
+def _emergency_fields(row: Dict[str, Any]) -> Dict[str, Any]:
+    """The member's contacts, formatted, and the flat fields of the first two, still read by tabs of the
+    previous build until release B (plans/emergency-contacts.md, D9)."""
+    contacts = [{"name": fmt_first_name(contact.get("name")), "phone": fmt_phone(contact.get("phone"))}
+                for contact in row.get("emergency_contacts") or []]
+    flat: Dict[str, str] = {}
+    for number, position in ((1, 0), (2, 1)):
+        contact = contacts[position] if position < len(contacts) else {"name": "", "phone": ""}
+        flat[f"emergency{number}_name"] = contact["name"]
+        flat[f"emergency{number}_phone"] = contact["phone"]
+    return {"emergency_contacts": contacts, **flat}
+
+
 def member_row(row: Dict[str, Any], slots: Dict[str, Dict[str, str]],
                ref_date: datetime.date) -> Dict[str, Any]:
     """One member of a season (one purchase) as the pages use it."""
@@ -161,10 +174,7 @@ def member_row(row: Dict[str, Any], slots: Dict[str, Dict[str, str]],
         "first_name": fmt_first_name(row.get("first_name")),
         "city": fmt_city(row.get("city")),
         "phone": fmt_phone(row.get("phone")),
-        "emergency1_name": fmt_first_name(row.get("emergency1_name")),
-        "emergency1_phone": fmt_phone(row.get("emergency1_phone")),
-        "emergency2_name": fmt_first_name(row.get("emergency2_name")),
-        "emergency2_phone": fmt_phone(row.get("emergency2_phone")),
+        **_emergency_fields(row),
         "passeport_orange": "",  # read by getMemberDiplomes; no such column in the database
         "user_id": row.get("user_id"),
         "purchase_id": row.get("purchase_id"),
