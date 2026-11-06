@@ -307,6 +307,13 @@ def build_sqlite(path, fake, rng, coach_names):
     previous = [member_record(fake, rng, p, PREVIOUS_SEASON, i) for i, p in enumerate(returning, start=1)]
     MemberRepository.upsert_members(previous, PREVIOUS_SEASON)
     MemberRepository.upsert_members(current, SEASON)
+    # A member with more contacts than the HelloAsso form can give
+    last_member = MemberRepository.list_member_rows(SEASON)[-1]
+    MemberRepository.update_member_fields(user_id=last_member["user_id"], fields={"emergency_contacts": [
+        {"name": "Molly WEASLEY", "phone": "07 00 00 00 01"},
+        {"name": "Arthur WEASLEY", "phone": "07 00 00 00 02"},
+        {"name": "Bill WEASLEY", "phone": "07 00 00 00 03"},
+    ]})
     # Own random stream: the rest of the seed data stays the same
     fill_geocache(random.Random(SEED))  # noqa: S311 - reproducible fake coordinates, not security
 

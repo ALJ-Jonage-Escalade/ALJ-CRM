@@ -32,6 +32,9 @@ REFERENCES = {
     "orders": [("purchases", "order_id")],
     "purchases": [("purchase_options", "purchase_id")],
 }
+# Fields kept on a deleted document, besides its key: a tombstone of a contact says whose it was, and nothing about the
+# contact, so scripts/migrate_emergency_contacts.py does not bring back contacts an admin has removed.
+TOMBSTONE_FIELDS = {"emergency_contacts": ("user_id",)}
 
 
 def collection_for(table: str) -> str:

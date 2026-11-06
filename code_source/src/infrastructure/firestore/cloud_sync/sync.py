@@ -25,6 +25,7 @@ from infrastructure.firestore.cloud_sync.common import (
     COMMIT_CHUNK,
     PULL_MARGIN_SECONDS,
     REFERENCES,
+    TOMBSTONE_FIELDS,
     _same,
     collection_for,
     doc_id_for,
@@ -150,7 +151,8 @@ def _build_write(conn, table: str, pk: List[str], pk_str: str, author: str
     if row is None:
         if base is None:
             return None
-        write.update(fields={c: v for c, v in zip(pk, vals, strict=False)}, mask=None, deleted=True,
+        kept = {c: base[c] for c in TOMBSTONE_FIELDS.get(table, ()) if c in base}
+        write.update(fields={**kept, **dict(zip(pk, vals, strict=False))}, mask=None, deleted=True,
                      precondition={"updateTime": base_ut} if base_ut else None)
         return write, None
     if base is None:

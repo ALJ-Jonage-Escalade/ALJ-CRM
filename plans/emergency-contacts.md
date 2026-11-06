@@ -52,6 +52,8 @@ An old tab that saves a member gets a 422, because `RequestBody` forbids unknown
   - add the table to `TRACKED_TABLES`
   - add `("emergency_contacts", "user_id")` to `REFERENCES["users"]`; **without it, a renumbered member leaves their contacts on another member's id**
   - bump `CACHE_FORMAT` to `"3"`, so caches are rebuilt from Firestore
+  - a tombstone of this table keeps `user_id` (`TOMBSTONE_FIELDS`, no name or phone): tombstones otherwise hold only their key, and the
+    migration needs to know whose contacts were removed (phase 7)
 - The `users` columns stay in this release, unread and unwritten, so a rollback finds them
 - Tests: a renumbered user keeps their contacts (`renumber_row`); a contact created, edited and deleted syncs, tombstone included
 

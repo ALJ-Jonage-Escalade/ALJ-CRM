@@ -237,6 +237,8 @@ class CloudDatabaseTest(unittest.TestCase):
         self.write(self.a, "DELETE FROM emergency_contacts WHERE id = 1")
         self.sync(self.a)
         self.assertTrue(self.store.docs[("crm_emergency_contacts", "1")]["deleted"])
+        # The tombstone says whose contact it was (the migration skips that member) and nothing about the contact
+        self.assertEqual(self.store.docs[("crm_emergency_contacts", "1")]["fields"], {"id": 1, "user_id": 1})
         self.sync(self.b)
         self.assertIsNone(self.row(self.b, "SELECT id FROM emergency_contacts WHERE id = 1"))
 
