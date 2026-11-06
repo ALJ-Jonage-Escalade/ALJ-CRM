@@ -140,6 +140,19 @@ class TestFfmeRoutes(MemberDbTestCase):
         self.assertEqual(self._user("PETIT")["licence_ffme"], "998877")
         self.assertEqual(self._statuses("PETIT"), [("Terminé", "Certificat médical")])
 
+    def test_import_succeeds_when_the_backup_folder_cannot_be_created(self):
+        self.seed("1", "Léo", "MARTIN", "Cours ados")
+        content = _xlsx([{"Nom": "MARTIN", "Prénom": "Léo", "N° de licence": "112233"}])
+        # A regular file as ROOT_DIR makes os.makedirs fail on every OS, like « / » on Cloud Run
+        unwritable_root = os.path.join(self._tmp.name, "not_a_folder")
+        open(unwritable_root, "w").close()
+
+        with patch("infrastructure.sqlite.connection.ROOT_DIR", unwritable_root):
+            response = self.client.post("/api/ffme/import", json={"filename": "ffme.xlsx", "content_base64": content})
+
+        self.assertEqual((response.status_code, response.json()["updated_count"]), (200, 1))
+        self.assertEqual(self._user("MARTIN")["licence_ffme"], "112233")
+
     def test_import_refusals(self):
         no_header = _xlsx([])
         wb = openpyxl.Workbook()
