@@ -57,6 +57,16 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE INDEX IF NOT EXISTS idx_users_names ON users(last_name_key, first_name_key);
 
+CREATE TABLE IF NOT EXISTS emergency_contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    name TEXT DEFAULT '',
+    phone TEXT DEFAULT '',
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT, updated_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_emergency_contacts_user ON emergency_contacts(user_id, position);
+
 CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_ref TEXT UNIQUE NOT NULL,

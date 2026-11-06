@@ -221,6 +221,46 @@ class CloudDatabaseTest(unittest.TestCase):
         self.assertIsNone(self.row(self.b, "SELECT id FROM purchases WHERE id = 101"))
         self.assertEqual(self.row(self.b, "SELECT user_id FROM purchases WHERE id = 200")[0], 2)
 
+    def test_emergency_contact_syncs_when_created_edited_and_deleted(self):
+        self.write(self.a, "INSERT INTO emergency_contacts (id, user_id, name, phone, position) VALUES (1, 1, 'Marie', '0601020304', 0)")
+        self.sync(self.a)
+        self.assertEqual(self.store.docs[("crm_emergency_contacts", "1")]["fields"]["user_id"], 1)
+        self.sync(self.b)
+        self.assertEqual(self.row(self.b, "SELECT name, phone, position FROM emergency_contacts WHERE id = 1"), ("Marie", "0601020304", 0))
+
+        self.write(self.b, "UPDATE emergency_contacts SET phone = '0611111111' WHERE id = 1")
+        self.sync(self.b)
+        self.sync(self.a)
+        self.assertEqual(self.row(self.a, "SELECT phone FROM emergency_contacts WHERE id = 1"), ("0611111111",))
+
+        self.write(self.a, "DELETE FROM emergency_contacts WHERE id = 1")
+        self.sync(self.a)
+        self.assertTrue(self.store.docs[("crm_emergency_contacts", "1")]["deleted"])
+        self.sync(self.b)
+        self.assertIsNone(self.row(self.b, "SELECT id FROM emergency_contacts WHERE id = 1"))
+
+    def test_renumbered_member_keeps_their_emergency_contacts(self):
+        for path, name in ((self.a, "PETIT"), (self.b, "GRAND")):
+            self.write(path, "INSERT INTO users (last_name, first_name, last_name_key, first_name_key) "
+                             f"VALUES ('{name}', 'Max', '{name}', 'MAX')")
+            self.write(path, "INSERT INTO emergency_contacts (user_id, name, position) "
+                             f"SELECT id, 'Contact de {name}', 0 FROM users WHERE last_name = '{name}'")
+        self.sync(self.a)
+        rep = self.sync(self.b)
+        self.assertTrue(rep.get("renumbered"))
+        self.sync(self.a)
+        for path in (self.a, self.b):
+            pairs = sqlite3.connect(path).execute(
+                "SELECT u.last_name, c.name FROM emergency_contacts c JOIN users u ON u.id = c.user_id ORDER BY 1").fetchall()
+            self.assertEqual(pairs, [("GRAND", "Contact de GRAND"), ("PETIT", "Contact de PETIT")])
+
+    def test_cache_of_the_previous_format_is_rebuilt(self):
+        conn = cdb.connect(self.a)
+        cdb.set_state(conn, "format", "2")
+        conn.commit()
+        conn.close()
+        self.assertFalse(cdb.cache_is_valid(self.a, self.store.project_id))
+
     def test_same_new_id_on_two_posts_is_renumbered(self):
         for p, name in ((self.a, "PETIT"), (self.b, "GRAND")):
             self.write(p, "INSERT INTO users (last_name, first_name, last_name_key, first_name_key) "
