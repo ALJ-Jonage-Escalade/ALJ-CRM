@@ -280,29 +280,38 @@ class SqliteDatabase:
 
     @classmethod
     def create_db_backup(cls) -> None:
-        """Crée une sauvegarde de sécurité horodatée de la base de données dans archive/db avec rétention de 10 jours."""
+        """Crée une sauvegarde de sécurité horodatée de la base de données dans archive/db avec rétention de 10 jours.
+
+        Sans objet avec Firestore : le cache SQLite en est reconstruit, et sur Cloud Run ROOT_DIR (« / ») n'est
+        pas inscriptible. La sauvegarde reste facultative : son échec ne doit jamais bloquer l'opération en cours.
+        """
+        from infrastructure.firestore.cloud_database import CloudDatabase
+
+        if CloudDatabase.is_enabled():
+            return
+
         db_path = cls.get_db_path()
         if not os.path.exists(db_path):
             return
 
-        backup_dir = os.path.join(ROOT_DIR, "archive", "db")
-        os.makedirs(backup_dir, exist_ok=True)
-
-        # Éviter de sur-sauvegarder si la base n'a pas changé ou si la dernière sauvegarde a moins de 5 secondes
-        backups = glob.glob(os.path.join(backup_dir, "database_backup_*.db"))
-        if backups:
-            backups.sort(key=os.path.getmtime, reverse=True)
-            latest_backup = backups[0]
-            # Si la base de données n'a pas été modifiée depuis le dernier backup, on ignore la sauvegarde
-            if os.path.getmtime(db_path) <= os.path.getmtime(latest_backup):
-                return
-            if time.time() - os.path.getmtime(latest_backup) < 5:
-                return
-
-        now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = os.path.join(backup_dir, f"database_backup_{now_str}.db")
-
         try:
+            backup_dir = os.path.join(ROOT_DIR, "archive", "db")
+            os.makedirs(backup_dir, exist_ok=True)
+
+            # Éviter de sur-sauvegarder si la base n'a pas changé ou si la dernière sauvegarde a moins de 5 secondes
+            backups = glob.glob(os.path.join(backup_dir, "database_backup_*.db"))
+            if backups:
+                backups.sort(key=os.path.getmtime, reverse=True)
+                latest_backup = backups[0]
+                # Si la base de données n'a pas été modifiée depuis le dernier backup, on ignore la sauvegarde
+                if os.path.getmtime(db_path) <= os.path.getmtime(latest_backup):
+                    return
+                if time.time() - os.path.getmtime(latest_backup) < 5:
+                    return
+
+            now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"database_backup_{now_str}.db")
+
             # API backup SQLite : snapshot cohérent (inclut le journal WAL), contrairement
             # à une copie fichier brute qui peut capturer un état incohérent.
             src_conn = cls.get_connection()
