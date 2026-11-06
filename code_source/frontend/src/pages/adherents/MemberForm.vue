@@ -1,13 +1,24 @@
 <script setup lang="ts">
 /* Edit or add form of a member record (admins). Checked when submitted (draftErrors): each problem is shown under
    its field and the first invalid field gets the focus; the form emits save only when every field is valid.
-   adding: identity, birth date, amount and emergency contact are asked too. The tariff the member already has stays
+   adding: identity, birth date and amount are asked too. The tariff the member already has stays
    among the choices. */
 import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { SEX_LABELS, SEX_NOT_GIVEN, type Sex } from "../../lib/sex";
-import { draftErrors, STATUS_CHOICES, withDateTag, type DraftErrors, type DraftField, type MemberDraft, type TarifChoice } from "./record";
+import {
+  contactPhoneField,
+  draftErrors,
+  newContactRow,
+  STATUS_CHOICES,
+  withDateTag,
+  type DraftErrors,
+  type DraftField,
+  type MemberDraft,
+  type TarifChoice,
+  type TextField,
+} from "./record";
 
 const draft = defineModel<MemberDraft>({ required: true });
 const props = defineProps<{ adding: boolean; tarifs: readonly TarifChoice[]; saving?: boolean; today?: Date }>();
@@ -54,14 +65,51 @@ async function submit(): Promise<void> {
   root.value?.querySelector<HTMLElement>(`[data-field="${first}"]`)?.focus();
 }
 
+function focusInContact(key: number, ...testIds: string[]): void {
+  const row = root.value?.querySelector(`[data-contact-key="${key}"]`);
+  for (const testId of testIds) {
+    const element = row?.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
+    if (element) {
+      element.focus();
+      return;
+    }
+  }
+}
+
+async function addContact(): Promise<void> {
+  const row = newContactRow();
+  draft.value.emergency_contacts.push(row);
+  await nextTick();
+  focusInContact(row.key, "contact-name");
+}
+
+/** Moves a row one place; the focus stays on the button pressed, or on the other arrow when that one is gone. */
+async function moveContact(index: number, step: -1 | 1): Promise<void> {
+  const rows = draft.value.emergency_contacts;
+  const [row] = rows.splice(index, 1);
+  if (!row) {
+    return;
+  }
+  rows.splice(index + step, 0, row);
+  await nextTick();
+  const pressed = step < 0 ? "contact-up" : "contact-down";
+  focusInContact(row.key, pressed, step < 0 ? "contact-down" : "contact-up");
+}
+
+async function removeContact(index: number): Promise<void> {
+  draft.value.emergency_contacts.splice(index, 1);
+  await nextTick();
+  root.value?.querySelector<HTMLElement>('[data-testid="contact-add"]')?.focus();
+}
+
 function addDate(): void {
   draft.value.commentaires_correctif = withDateTag(draft.value.commentaires_correctif, props.today);
 }
 
 const label = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
-const fieldClass = (name: DraftField) => [
+const fieldClass = (name: DraftField, showError = true) => [
   "w-full rounded-lg border bg-white px-2.5 py-2 text-[13px]",
-  errors.value[name] ? "border-red-500 bg-red-50" : "border-slate-300",
+  showError && errors.value[name] ? "border-red-500 bg-red-50" : "border-slate-300",
 ];
 const section = "mt-1 text-xs font-bold text-slate-700";
 const attrs = (name: DraftField) => ({
@@ -72,7 +120,7 @@ const attrs = (name: DraftField) => ({
   "aria-describedby": errors.value[name] ? `member-${name}-error` : undefined,
 });
 
-const TEXT_FIELDS: { name: DraftField; label: string; type?: string; placeholder?: string }[] = [
+const TEXT_FIELDS: { name: TextField; label: string; type?: string; placeholder?: string }[] = [
   { name: "email_primary", label: "✉️ E-mail principal", type: "email", placeholder: "nom@example.com" },
   { name: "email_secondary", label: "✉️ E-mail secondaire", type: "email", placeholder: "deuxieme@example.com" },
   { name: "phone", label: "📞 Téléphone", type: "tel", placeholder: "06 12 34 56 78" },
@@ -229,52 +277,85 @@ const TEXT_FIELDS: { name: DraftField; label: string; type?: string; placeholder
     </div>
 
     <div :class="section">🚨 Contacts d'urgence</div>
-    <div class="grid gap-3 sm:grid-cols-2">
-      <div>
-        <label for="member-emergency1_name" :class="label">Contact d'urgence 1 (nom, prénom)</label>
-        <input
-          v-model="draft.emergency1_name"
-          v-bind="attrs('emergency1_name')"
-          type="text"
-          placeholder="DUPONT Pierre"
-          :class="fieldClass('emergency1_name')"
-        />
+    <div class="flex flex-col gap-3" data-testid="contact-list">
+      <div
+        v-for="(contact, index) in draft.emergency_contacts"
+        :key="contact.key"
+        :data-contact-key="contact.key"
+        data-testid="contact-row"
+        class="rounded-lg border border-slate-200 bg-slate-50 p-2.5"
+      >
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <span data-testid="contact-label" class="text-xs font-bold text-slate-700">
+            {{ index === 0 ? "Principal" : `Contact ${index + 1}` }}
+          </span>
+          <div class="flex gap-1">
+            <UiButton
+              v-if="index > 0"
+              variant="muted"
+              small
+              data-testid="contact-up"
+              :aria-label="`Monter le contact ${index + 1}`"
+              @click="moveContact(index, -1)"
+            >
+              ↑
+            </UiButton>
+            <UiButton
+              v-if="index < draft.emergency_contacts.length - 1"
+              variant="muted"
+              small
+              data-testid="contact-down"
+              :aria-label="`Descendre le contact ${index + 1}`"
+              @click="moveContact(index, 1)"
+            >
+              ↓
+            </UiButton>
+            <UiButton
+              variant="danger"
+              small
+              data-testid="contact-remove"
+              :aria-label="`Supprimer le contact ${index + 1}`"
+              @click="removeContact(index)"
+            >
+              🗑
+            </UiButton>
+          </div>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label :for="`member-contact_name_${contact.key}`" :class="label">Nom, prénom</label>
+            <input
+              :id="`member-contact_name_${contact.key}`"
+              v-model="contact.name"
+              data-testid="contact-name"
+              type="text"
+              placeholder="DUPONT Pierre"
+              :class="fieldClass(contactPhoneField(contact.key), false)"
+            />
+          </div>
+          <div>
+            <label :for="`member-${contactPhoneField(contact.key)}`" :class="label">Téléphone</label>
+            <input
+              v-model="contact.phone"
+              v-bind="attrs(contactPhoneField(contact.key))"
+              data-testid="contact-phone"
+              type="tel"
+              placeholder="06 98 76 54 32"
+              :class="fieldClass(contactPhoneField(contact.key))"
+            />
+            <p
+              v-if="errors[contactPhoneField(contact.key)]"
+              :id="`member-${contactPhoneField(contact.key)}-error`"
+              class="mt-1 text-xs text-red-600"
+            >
+              {{ errors[contactPhoneField(contact.key)] }}
+            </p>
+          </div>
+        </div>
       </div>
+      <p v-if="!draft.emergency_contacts.length" class="text-xs text-slate-500" data-testid="contact-none">Aucun contact d'urgence.</p>
       <div>
-        <label for="member-emergency1_phone" :class="label">Téléphone d'urgence 1</label>
-        <input
-          v-model="draft.emergency1_phone"
-          v-bind="attrs('emergency1_phone')"
-          type="tel"
-          placeholder="06 98 76 54 32"
-          :class="fieldClass('emergency1_phone')"
-        />
-        <p v-if="errors.emergency1_phone" id="member-emergency1_phone-error" class="mt-1 text-xs text-red-600">
-          {{ errors.emergency1_phone }}
-        </p>
-      </div>
-      <div>
-        <label for="member-emergency2_name" :class="label">Contact d'urgence 2 (nom, prénom)</label>
-        <input
-          v-model="draft.emergency2_name"
-          v-bind="attrs('emergency2_name')"
-          type="text"
-          placeholder="DUPONT Marie"
-          :class="fieldClass('emergency2_name')"
-        />
-      </div>
-      <div>
-        <label for="member-emergency2_phone" :class="label">Téléphone d'urgence 2</label>
-        <input
-          v-model="draft.emergency2_phone"
-          v-bind="attrs('emergency2_phone')"
-          type="tel"
-          placeholder="06 11 22 33 44"
-          :class="fieldClass('emergency2_phone')"
-        />
-        <p v-if="errors.emergency2_phone" id="member-emergency2_phone-error" class="mt-1 text-xs text-red-600">
-          {{ errors.emergency2_phone }}
-        </p>
+        <UiButton variant="muted" small data-testid="contact-add" @click="addContact">➕ Ajouter un contact</UiButton>
       </div>
     </div>
 

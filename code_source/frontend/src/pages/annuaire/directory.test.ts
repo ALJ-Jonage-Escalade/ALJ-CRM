@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { member } from "../adherents/members.fixture";
-import { detailRows, emergencyMatches, emergencyRows, seasonCounts, toDirectory } from "./directory";
+import { detailRows, emergencyMatches, emergencyRows, seasonCounts, toDirectory, type DirectoryMember } from "./directory";
 
 const LEA = member({
   user_id: 1,
@@ -12,8 +12,7 @@ const LEA = member({
   address: "1 rue A",
   zip_code: "69330",
   city: "Jonage",
-  emergency1_name: "Paul Dupont",
-  emergency1_phone: "06 00 00 00 01",
+  emergency_contacts: [{ name: "Paul Dupont", phone: "06 00 00 00 01" }],
   health_commitment: "Oui",
   document_sante: "Certificat",
   amount: 180,
@@ -23,6 +22,41 @@ const LEA = member({
   commentaires_correctif: "à vérifier",
 });
 
+describe("any number of emergency contacts", () => {
+  const three = member({
+    emergency_contacts: [
+      { name: "A", phone: "01" },
+      { name: "", phone: "02" },
+      { name: "C", phone: "" },
+    ],
+  });
+
+  it("gives one line and one phone row per contact", () => {
+    expect(detailRows(three).map((r) => [r.label, r.value])).toEqual([
+      ["🚨 Urgence 1", "A · 01"],
+      ["🚨 Urgence 2", "02"],
+      ["🚨 Urgence 3", "C"],
+    ]);
+    expect(emergencyRows(three)).toEqual([
+      { label: "🚨 Urgence 1", name: "A", phone: "01" },
+      { label: "🚨 Urgence 2", name: "", phone: "02" },
+      { label: "🚨 Urgence 3", name: "C", phone: "" },
+    ]);
+  });
+
+  it("still reads a directory saved on the device before the list existed", () => {
+    const saved: DirectoryMember = {
+      ...member({ emergency1_name: "Ancien", emergency1_phone: "01", emergency2_phone: "02" }),
+      emergency_contacts: null,
+    };
+    expect(emergencyRows(saved).map((r) => [r.label, r.name, r.phone])).toEqual([
+      ["🚨 Urgence 1", "Ancien", "01"],
+      ["🚨 Urgence 2", "", "02"],
+    ]);
+    expect(detailRows(saved).map((r) => r.value)).toEqual(["Ancien · 01", "02"]);
+  });
+});
+
 describe("toDirectory", () => {
   it("keeps contacts and emergency contacts, no health nor payment data", () => {
     const d = toDirectory({ season: "2026-2027", creneaux: [], members: [LEA] });
@@ -30,7 +64,7 @@ describe("toDirectory", () => {
     expect(kept).toMatchObject({
       last_name: "DUPONT",
       phone: "06 12 34 56 78",
-      emergency1_phone: "06 00 00 00 01",
+      emergency_contacts: [{ name: "Paul Dupont", phone: "06 00 00 00 01" }],
       payer_email: "paul@example.org",
     });
     for (const field of [

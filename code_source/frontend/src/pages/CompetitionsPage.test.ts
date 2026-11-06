@@ -44,6 +44,7 @@ const CONTACTS = [
     first_name: "Zoé",
     phone: "06 22 22 22 22",
     creneau_groupe: "Compét. U14",
+    emergency_contacts: [{ name: "Paul", phone: "06 01 01 01 01" }],
     emergency1_name: "Paul",
     emergency1_phone: "06 01 01 01 01",
     emergency2_name: "",

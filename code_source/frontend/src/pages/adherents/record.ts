@@ -4,6 +4,7 @@
 import type { EmailTemplate } from "../../services/communications";
 import type { Schemas } from "../../lib/client";
 import { looksLikeEmail } from "../../lib/email";
+import { emergencyContactsOf } from "../../lib/emergencyContacts";
 import { formatDate, formatDayText } from "../../lib/format";
 import { SEX_LABELS, sexLabel, type Sex } from "../../lib/sex";
 import { normKey } from "../../lib/text";
@@ -43,8 +44,7 @@ export function recordRows(member: Member): RecordRow[] {
   add("✉️", "E-mail principal", member.email_primary);
   add("✉️", "E-mail secondaire", member.email_secondary);
   add("🪪", "Licence FFME", member.licence_ffme);
-  add("🚨", "Urgence 1", join(" · ", member.emergency1_name, member.emergency1_phone));
-  add("🚨", "Urgence 2", join(" · ", member.emergency2_name, member.emergency2_phone));
+  emergencyContactsOf(member).forEach((contact, index) => add("🚨", `Urgence ${index + 1}`, join(" · ", contact.name, contact.phone)));
   add(
     "🩺",
     "Santé & Engagement",
@@ -134,6 +134,21 @@ export const STATUS_CHOICES = [
   ["Annulé", "🔴 Annulé"],
 ] as const satisfies readonly (readonly [MemberStatus, string])[];
 
+/** A row of the contact list as typed. key: local identity of the row, so moving it keeps its inputs and focus. */
+export interface ContactRow {
+  key: number;
+  name: string;
+  phone: string;
+}
+
+let lastContactKey = 0;
+
+/** A blank row of the contact list. */
+export function newContactRow(name = "", phone = ""): ContactRow {
+  lastContactKey += 1;
+  return { key: lastContactKey, name, phone };
+}
+
 /** Values of the form, as typed. All fields can be edited or filled when adding. */
 export interface MemberDraft {
   last_name: string;
@@ -155,18 +170,20 @@ export interface MemberDraft {
   address: string;
   zip_code: string;
   city: string;
-  emergency1_name: string;
-  emergency1_phone: string;
-  emergency2_name: string;
-  emergency2_phone: string;
+  /** In order, the first one is the main one; blank rows are not sent. */
+  emergency_contacts: ContactRow[];
   commentaires_correctif: string;
 }
 
-export type DraftField = keyof MemberDraft;
+export type TextField = Exclude<keyof MemberDraft, "emergency_contacts">;
+/** A field that can get an error: a text field, or the phone of a contact row. */
+export type DraftField = TextField | `contact_phone_${number}`;
+export const contactPhoneField = (key: number): DraftField => `contact_phone_${key}`;
 export type DraftErrors = Partial<Record<DraftField, string>>;
 
 /** The form of an existing member, or of a new one (first tariff chosen, as before). */
 export function draftOf(member?: Member, firstTarif = ""): MemberDraft {
+  const contacts = member ? emergencyContactsOf(member) : [];
   return {
     last_name: member?.last_name ?? "",
     first_name: member?.first_name ?? "",
@@ -185,10 +202,7 @@ export function draftOf(member?: Member, firstTarif = ""): MemberDraft {
     address: member?.address ?? "",
     zip_code: member?.zip_code ?? "",
     city: member?.city ?? "",
-    emergency1_name: member?.emergency1_name ?? "",
-    emergency1_phone: member?.emergency1_phone ?? "",
-    emergency2_name: member?.emergency2_name ?? "",
-    emergency2_phone: member?.emergency2_phone ?? "",
+    emergency_contacts: contacts.length ? contacts.map((contact) => newContactRow(contact.name, contact.phone)) : [newContactRow()],
     commentaires_correctif: member?.commentaires_correctif ?? "",
   };
 }
@@ -209,8 +223,8 @@ function validBirthDate(value: string, today: Date): boolean {
   return d.getMonth() === +m[2]! - 1 && d.getDate() === +m[3]! && d <= today && +m[1]! >= 1900;
 }
 
-const PHONE_FIELDS = ["phone", "emergency1_phone", "emergency2_phone"] as const satisfies readonly DraftField[];
-const EMAIL_FIELDS = ["email_primary", "email_secondary"] as const satisfies readonly DraftField[];
+const PHONE_FIELDS = ["phone"] as const satisfies readonly TextField[];
+const EMAIL_FIELDS = ["email_primary", "email_secondary"] as const satisfies readonly TextField[];
 
 /** Problems of the form, by field (empty when it can be sent). adding: the add form, which asks more. amountBefore:
     the amount the edit form opened with (the server keeps an amount once set: it cannot be emptied). */
@@ -233,6 +247,11 @@ export function draftErrors(draft: MemberDraft, adding: boolean, today: Date = n
   } else if (!adding && amountBefore.trim() && !draft.amount.trim()) {
     errors.amount = "Le montant ne peut pas être vidé : indiquez 0 si rien n'a été réglé.";
   }
+  for (const contact of draft.emergency_contacts) {
+    if (contact.phone.trim() && !looksLikePhone(contact.phone.trim())) {
+      errors[contactPhoneField(contact.key)] = "Numéro de téléphone invalide.";
+    }
+  }
   if (!draft.tarif_name.trim()) {
     errors.tarif_name = "Choisissez un groupe (tarif).";
   }
@@ -247,6 +266,11 @@ export function draftErrors(draft: MemberDraft, adding: boolean, today: Date = n
     }
   }
   return errors;
+}
+
+/** The rows to send: trimmed, without their local key, blank ones left out. */
+function contactsToSend(rows: readonly ContactRow[]): Schemas["EmergencyContact"][] {
+  return rows.map((row) => ({ name: row.name.trim(), phone: row.phone.trim() })).filter((row) => row.name || row.phone);
 }
 
 /** The new member sent to /api/members/create. */
@@ -270,10 +294,7 @@ export function newMemberOf(draft: MemberDraft): NewMember {
     address: draft.address.trim(),
     zip_code: draft.zip_code.trim(),
     city: draft.city.trim(),
-    emergency1_name: draft.emergency1_name.trim(),
-    emergency1_phone: draft.emergency1_phone.trim(),
-    emergency2_name: draft.emergency2_name.trim(),
-    emergency2_phone: draft.emergency2_phone.trim(),
+    emergency_contacts: contactsToSend(draft.emergency_contacts),
     commentaires_correctif: draft.commentaires_correctif.trim(),
   };
 }
@@ -284,7 +305,7 @@ export interface Changes {
   lines: string[];
 }
 
-const EDITED: [keyof MemberChanges & DraftField, string][] = [
+const EDITED: [keyof MemberChanges & TextField, string][] = [
   ["last_name", "Nom"],
   ["first_name", "Prénom"],
   ["birth_date", "Date de naissance"],
@@ -299,12 +320,11 @@ const EDITED: [keyof MemberChanges & DraftField, string][] = [
   ["address", "Adresse"],
   ["zip_code", "Code postal"],
   ["city", "Ville"],
-  ["emergency1_name", "Urgence 1 (nom)"],
-  ["emergency1_phone", "Urgence 1 (tél)"],
-  ["emergency2_name", "Urgence 2 (nom)"],
-  ["emergency2_phone", "Urgence 2 (tél)"],
   ["tarif_name", "Créneau / Tarif"],
 ];
+
+const contactsLine = (contacts: readonly Schemas["EmergencyContact"][]): string =>
+  contacts.map((contact) => [contact.name, contact.phone].filter(Boolean).join(" · ")).join(" ; ") || "vide";
 
 /** What the edit form changes on the member (only those fields are sent). */
 export function changesOf(member: Member, draft: MemberDraft): Changes {
@@ -319,6 +339,12 @@ export function changesOf(member: Member, draft: MemberDraft): Changes {
     }
     (fields as Record<string, string | number | null>)[field] = now;
     lines.push(`${label} : ${was || "vide"} ➔ ${now || "vide"}`);
+  }
+  const contactsWas = contactsToSend(before.emergency_contacts);
+  const contactsNow = contactsToSend(draft.emergency_contacts);
+  if (JSON.stringify(contactsNow) !== JSON.stringify(contactsWas)) {
+    fields.emergency_contacts = contactsNow;
+    lines.push(`Contacts d'urgence : ${contactsLine(contactsWas)} ➔ ${contactsLine(contactsNow)}`);
   }
   const amountBefore = member.amount != null ? member.amount : null;
   const amountTrimmed = draft.amount.trim();

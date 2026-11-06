@@ -167,6 +167,27 @@ describe("CSV export", () => {
     expect(rows[1]![24]).toBe("01/09/2026");
     expect(csvName("2026-2027")).toBe("adherents_2026-2027.csv");
   });
+
+  it("adds columns for a third contact, none being lost", () => {
+    const contact = (name: string) => ({ name, phone: `06 ${name}` });
+    const rows = csvRows([
+      member({ last_name: "A", emergency_contacts: [contact("1"), contact("2"), contact("3")] }),
+      member({ last_name: "B", emergency_contacts: [contact("4")] }),
+    ]);
+    const firstContact = rows[0]!.indexOf("Urgence 1 - Nom");
+    expect(rows[0]!.slice(firstContact, firstContact + 7)).toEqual([
+      "Urgence 1 - Nom",
+      "Urgence 1 - Tél",
+      "Urgence 2 - Nom",
+      "Urgence 2 - Tél",
+      "Urgence 3 - Nom",
+      "Urgence 3 - Tél",
+      "Payeur",
+    ]);
+    expect(rows[1]!.slice(firstContact, firstContact + 6)).toEqual(["1", "06 1", "2", "06 2", "3", "06 3"]);
+    expect(rows[2]!.slice(firstContact, firstContact + 6)).toEqual(["4", "06 4", "", "", "", ""]);
+    expect(rows[1]).toHaveLength(rows[0]!.length);
+  });
 });
 
 describe("saved filters", () => {

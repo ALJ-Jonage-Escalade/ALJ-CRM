@@ -3,6 +3,7 @@
 import type { BadgeColor } from "../../components/ui/palette";
 import type { Cell } from "../../lib/csv";
 import type { ApiRead, Schemas } from "../../lib/client";
+import { emergencyContactsOf, type EmergencyContactRow, type EmergencyContactSource } from "../../lib/emergencyContacts";
 import { formatDayText } from "../../lib/format";
 import { normKey, plural } from "../../lib/text";
 import { ARCHIVED } from "../../services/competitions";
@@ -11,6 +12,8 @@ import type { MemberStatus } from "../../services/members";
 export type Competition = Schemas["Competition"];
 export type Participant = Schemas["CompetitionParticipant"];
 export type CompetitorContact = Schemas["CompetitorContact"];
+/** A competitor entry as found on a device: copies saved before the list existed have no `emergency_contacts`. */
+export type SavedCompetitorContact = Omit<CompetitorContact, "emergency_contacts"> & EmergencyContactSource;
 export type Coach = Schemas["Coach"];
 /** What the screen keeps of the member directory (GET /api/competition-members limited to COMPETITOR_STATUSES, online only): the current tariff and
     slot group to group the participants, the names, licence and e-mail to add one or write to them. */
@@ -181,16 +184,24 @@ export function rankingText(participant: Participant): string {
 }
 
 export interface ContactCard {
-  role: "athlete" | "emergency1" | "emergency2";
+  role: "athlete" | "emergency";
   title: string;
   name: string;
   phone: string;
   email: string;
 }
 
-/** The 3 contact cards of an athlete: the athlete (with the e-mail of the member list), emergency contacts 1 and 2
-    (name and phone only: no e-mail is kept offline about a competitor's contacts). */
-export function athleteContactCards(participant: Participant, member?: MemberSlot, contact?: CompetitorContact): ContactCard[] {
+/** Who to call for a participant: the competitor entry's contacts when the device has one, else the copy made when
+    the member was added. */
+function emergencyOf(participant: Participant, contact?: SavedCompetitorContact): EmergencyContactRow[] {
+  return emergencyContactsOf(contact ?? { emergency1_name: participant.urgence_nom, emergency1_phone: participant.urgence_tel });
+}
+
+/** The contact cards of an athlete: the athlete (with the e-mail of the member list), then one card per emergency
+    contact, or an empty one to show there is none (name and phone only: no e-mail is kept offline about a competitor's
+    contacts). */
+export function athleteContactCards(participant: Participant, member?: MemberSlot, contact?: SavedCompetitorContact): ContactCard[] {
+  const emergency = emergencyOf(participant, contact);
   return [
     {
       role: "athlete",
@@ -199,20 +210,15 @@ export function athleteContactCards(participant: Participant, member?: MemberSlo
       phone: contact?.phone || participant.phone || "",
       email: member?.email || participant.email || "",
     },
-    {
-      role: "emergency1",
-      title: "🚨 Contact d'urgence 1",
-      name: contact?.emergency1_name || participant.urgence_nom || "",
-      phone: contact?.emergency1_phone || participant.urgence_tel || "",
-      email: "",
-    },
-    {
-      role: "emergency2",
-      title: "🚨 Contact d'urgence 2",
-      name: contact?.emergency2_name ?? "",
-      phone: contact?.emergency2_phone ?? "",
-      email: "",
-    },
+    ...(emergency.length
+      ? emergency.map((person, index): ContactCard => ({
+          role: "emergency",
+          title: `🚨 Contact d'urgence ${index + 1}`,
+          name: person.name,
+          phone: person.phone,
+          email: "",
+        }))
+      : [{ role: "emergency", title: "🚨 Contact d'urgence", name: "", phone: "", email: "" } satisfies ContactCard]),
   ];
 }
 
@@ -236,7 +242,7 @@ export type PendingValue = (adherentId: number | null | undefined, flag: "select
 export function participantRows(
   competition: Competition,
   members: readonly MemberSlot[],
-  contacts: readonly CompetitorContact[],
+  contacts: readonly SavedCompetitorContact[],
   pending: PendingValue = () => undefined,
 ): Row[] {
   const memberOf = new Map(members.map((m) => [m.id, m]));
@@ -245,12 +251,6 @@ export function participantRows(
     const member = p.adherent_id != null ? memberOf.get(p.adherent_id) : undefined;
     const contact = p.adherent_id != null ? contactOf.get(p.adherent_id) : undefined;
     const tarif = member?.tarif || p.tarif || "";
-    const emergency = contact
-      ? [
-          { name: contact.emergency1_name, phone: contact.emergency1_phone },
-          { name: contact.emergency2_name, phone: contact.emergency2_phone },
-        ]
-      : [{ name: p.urgence_nom ?? "", phone: p.urgence_tel ?? "" }];
     const selectionne = pending(p.adherent_id, "selectionne");
     const present = pending(p.adherent_id, "present");
     return {
@@ -262,7 +262,7 @@ export function participantRows(
       phone: contact?.phone || p.phone || "",
       email: member?.email || member?.email_secondaire || p.email || "",
       group: member?.creneau_groupe || contact?.creneau_groupe || tarif || UNIDENTIFIED,
-      emergency: emergency.filter((e) => e.phone),
+      emergency: emergencyOf(p, contact).filter((e) => e.phone),
       contacts: athleteContactCards(p, member, contact),
     };
   });

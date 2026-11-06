@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* Modal displaying the complete contact card of an athlete in a competition: the athlete themselves, emergency contact 1 and emergency contact 2. */
+/* Modal displaying the complete contact card of an athlete in a competition: the athlete themselves, then each emergency contact. */
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialog from "../../../components/ui/UiDialog.vue";
@@ -45,7 +45,7 @@ const emit = defineEmits<{
       <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div
           v-for="c in athlete.contacts"
-          :key="c.role"
+          :key="c.title"
           data-testid="contact-card"
           class="flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 shadow-sm"
         >

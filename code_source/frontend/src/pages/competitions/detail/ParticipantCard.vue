@@ -107,8 +107,8 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
           📞 {{ row.phone }}
         </a>
         <a
-          v-for="e in row.emergency"
-          :key="e.phone"
+          v-for="(e, position) in row.emergency"
+          :key="position"
           :href="telHref(e.phone)"
           title="Contact d'urgence"
           data-testid="emergency-link"
