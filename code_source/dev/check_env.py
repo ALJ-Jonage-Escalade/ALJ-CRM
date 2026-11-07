@@ -37,11 +37,11 @@ def problems() -> list:
     if smtp_host.lower() not in LOCAL_SMTP_HOSTS:
         found.append(f"SMTP_HOST={smtp_host or '(empty)'}: dev mode only sends to the local Mailpit.")
 
-    # Fake HelloAsso of the e2e tests: an override may only point to this machine
-    for name in ("HELLOASSO_API_BASE_URL", "HELLOASSO_OAUTH_URL"):
+    # Fake HelloAsso and MyCompet of the e2e tests: an override may only point to this machine
+    for name in ("HELLOASSO_API_BASE_URL", "HELLOASSO_OAUTH_URL", "MYCOMPET_BASE_URL", "FFME_ARCHIVES_URL"):
         url = (os.environ.get(name) or "").strip()
         if url and (urlparse(url).hostname or "").lower() not in LOCAL_SMTP_HOSTS:
-            found.append(f"{name}={url}: only a local fake HelloAsso is allowed in dev mode.")
+            found.append(f"{name}={url}: only a local fake is allowed in dev mode.")
     return found
 
 

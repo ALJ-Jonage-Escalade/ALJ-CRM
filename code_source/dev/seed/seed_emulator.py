@@ -327,6 +327,9 @@ def seed_competitions(coach_ids):
         ("Hogwarts Lead Open", "1457", today + datetime.timedelta(days=12), 15.0, STATUT_EN_COURS, snape, mcgonagall),
         ("Regional Championship U15-U19", "1622", today + datetime.timedelta(days=40), 20.0, STATUT_EN_PREPARATION, snape, flitwick),
         ("Hogsmeade Friendly Contest", "", today + datetime.timedelta(days=75), 8.0, STATUT_EN_PREPARATION, mcgonagall, None),
+        # Ended within the results batch window (30 days), unlike the 35-day-old cup: dev/seed/mycompet_state.py
+        # publishes its results on the fake MyCompet
+        ("Gringotts Bouldering Open", "1688", today - datetime.timedelta(days=5), 12.0, STATUT_CLOSE, flitwick, None),
     ]
     competitors = [a["id"] for a in Repo.list_adherents(competition_only=True, statuses=["Terminé"])]
     rng = random.Random(SEED)

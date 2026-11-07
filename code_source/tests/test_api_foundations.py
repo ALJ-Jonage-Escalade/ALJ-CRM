@@ -19,6 +19,7 @@ from api.admin import access
 from api.auth import me
 from api.competitions import coaches, competitions, helloasso_items, participants
 from api.competitions import members as competition_members
+from api.competitions import results
 from api.integrations import helloasso_campaigns
 from api.members import members, seasons
 from api.responses import json_with_etag
@@ -54,18 +55,20 @@ class TestSqliteCacheScope(unittest.TestCase):
         f = server.uses_sqlite_cache
         for path in ("/api/competitions", "/api/competitions/12/participants", "/api/coaches",
                      "/api/coaches/3", "/api/competition-members", "/api/helloasso/items",
-                     "/api/helloasso/items/9/link", "/health", "/bureau/"):
+                     "/api/helloasso/items/9/link", "/health", "/bureau/",
+                     # MyCompet results batch: Firestore only (Cloud Scheduler deadline)
+                     "/api/competitions/cron/fetch-results", "/api/competitions/12/fetch-results",
+                     "/api/settings/competitions-results"):
             self.assertFalse(f(path), path)
         for path in ("/api/members", "/api/email-templates", "/api/helloasso/sync",
                      "/api/competitions-x", "/api/reports/map-points", "/api/reports/pivot-records",
-                     # cache-backed routes under the Firestore prefixes (results batch, check-all-paid)
-                     "/api/competitions/cron/fetch-results", "/api/competitions/12/check-all-paid",
-                     "/api/competitions/12/fetch-results"):
+                     # cache-backed route under the Firestore prefixes
+                     "/api/competitions/12/check-all-paid"):
             self.assertTrue(f(path), path)
 
     def test_every_firestore_router_route_skips_cache(self):
         routes = api_routes(competitions.router, participants.router, coaches.router,
-                            competition_members.router, helloasso_items.router, me.router, access.router,
+                            competition_members.router, helloasso_items.router, results.router, me.router, access.router,
                             helloasso_campaigns.router)
         self.assertGreater(len(routes), 15)
         for r in routes:
@@ -75,14 +78,13 @@ class TestSqliteCacheScope(unittest.TestCase):
 
     def test_every_other_api_route_uses_cache(self):
         """Outside the Firestore-only routers, every /api/ route reads the SQLite cache (app
-        settings, members…), whatever its prefix: the results batch and check-all-paid live
-        under /api/competitions in routers that must not join the Firestore-only list."""
+        settings, members…), whatever its prefix: check-all-paid lives under /api/competitions in a
+        router that must not join the Firestore-only list."""
         firestore_only = set(map(id, api_routes(competitions.router, participants.router, coaches.router,
-                                                competition_members.router, helloasso_items.router, me.router, access.router,
-                                                helloasso_campaigns.router)))
+                                                competition_members.router, helloasso_items.router, results.router,
+                                                me.router, access.router, helloasso_campaigns.router)))
         routes = [r for r in app_routes(server.app.routes)
                   if id(r) not in firestore_only and r.path.startswith("/api/")]
-        self.assertIn("/api/competitions/cron/fetch-results", [r.path for r in routes])
         self.assertIn("/api/competitions/{comp_id}/check-all-paid", [r.path for r in routes])
         for r in routes:
             self.assertTrue(server.uses_sqlite_cache(concrete(r.path)), r.path)
@@ -122,14 +124,23 @@ class TestSqliteCacheScope(unittest.TestCase):
             after.assert_called_once()
         return r
 
-    def test_results_cron_runs_on_refreshed_cache(self):
-        """The cron reads the notification address and writes last_run/status in the SQLite cache."""
+    def test_results_cron_skips_cache_refresh(self):
+        """Cloud Scheduler's call must not wait for a SQLite cache rebuild (cold start, 180 s deadline)."""
         report = {"status": "success", "executed_at": "2026-10-22T07:00:00", "competitions_checked": 0,
-                  "competitions_updated": 0, "email_sent": False, "notification_email": "n@example.org", "details": []}
-        r = self._assert_cache_around(
-            "POST", "/api/competitions/cron/fetch-results",
-            "services.competitions.results_batch.CompetitionResultsBatchService.run_daily_batch",
-            report)
+                  "competitions_updated": 0, "competitions_remaining": 0, "partial": False, "window_days": 30,
+                  "email_sent": False, "notification_email": "n@example.org", "details": []}
+        client = TestClient(server.app)
+        with patch.dict(os.environ, SERVER_MODE), \
+                patch.object(server.CloudDatabase, "is_enabled", return_value=True), \
+                patch.object(server.CloudDatabase, "ensure_fresh") as fresh, \
+                patch.object(server.CloudDatabase, "after_write") as after, \
+                patch("services.competitions.results_batch.CompetitionResultsBatchService.run_daily_batch",
+                      return_value=report) as job:
+            r = client.post("/api/competitions/cron/fetch-results")
+            self.assertEqual(r.status_code, 200, r.text)
+            job.assert_called_once()
+            fresh.assert_not_called()
+            after.assert_not_called()
         self.assertEqual(r.json(), report)
 
     def test_check_all_paid_runs_on_refreshed_cache(self):

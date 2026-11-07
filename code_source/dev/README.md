@@ -71,6 +71,21 @@ jamais ajouté en mode dev.
     {"formSlug": "soiree-club-2026", "formType": "Event", "state": "Public", "title": "Soirée du club",
      "activityType": "Fête", "activityTypeId": 1, "startDate": "2026-12-12T19:00:00+01:00"}]}'
   ```
+- **Résultats MyCompet** : le batch des résultats (bouton de la page Paramètres) et « Trouver les résultats » lisent
+  le vrai site MyCompet et les archives FFME. Pour essayer sans eux, un faux MyCompet local
+  (`e2e/fakes/mycompet_fake.py`, port `8096`) sert des pages anonymisées
+  (`tests/support/mycompet/results_template.html`) avec les participants du seed :
+  ```bash
+  uv run uvicorn mycompet_fake:app --app-dir e2e/fakes --port 8096      # autre terminal
+  export MYCOMPET_BASE_URL=http://localhost:8096 FFME_ARCHIVES_URL=http://localhost:8096/archives
+  uv run python dev/seed/mycompet_state.py                              # publie les résultats des épreuves passées
+  uv run dev/run_server.sh                                              # mêmes variables exportées
+  ```
+  Le seed contient une épreuve terminée il y a 5 jours (dans la fenêtre de 30 jours du batch) et une il y a 35 jours
+  (hors fenêtre, sauf « Lancer la détection maintenant », qui force). Variables ignorées hors mode dev.
+  Le gabarit se régénère depuis une vraie page enregistrée **hors du dépôt** (`scripts_temporaires/`, données
+  personnelles) : `uv run python dev/make_mycompet_fixture.py <page.html>` remplace chaque grimpeur par une identité
+  inventée ; `tests/infrastructure/mycompet/test_fake_pages.py` le vérifie. Relire le fichier avant de le committer.
 - **Service worker** : en cas de page figée après un changement, « Mettre à jour » sur le badge
   de version ou désenregistrer le SW (DevTools → Application).
 
@@ -97,7 +112,7 @@ python -m pytest -c e2e/pytest.ini e2e -m smoke      # rapide ; sans -m : toute 
   `xdist_group` (`pytestmark`), exécutés l'un après l'autre sur un même processus. Mailpit n'est vidé qu'une fois par
   exécution : chercher ses e-mails par destinataire **et** sujet (`unique_name`).
 - Ports de la pile e2e : Firestore `18081`, Auth `19099`, Mailpit `18025` (SMTP `11025`) ; serveur de test
-  `8090` (`E2E_PORT`), faux HelloAsso `8095`. La pile de dev (`8081`, `9099`, `8025`) et `run_server.sh` (`8080`)
+  `8090` (`E2E_PORT`), faux HelloAsso `8095`, faux MyCompet `8096`. La pile de dev (`8081`, `9099`, `8025`) et `run_server.sh` (`8080`)
   peuvent rester lancés. Docker est requis.
 - `E2E_KEEP_STACK=1` garde la pile e2e après l'exécution (itérations rapides, ou lecture des journaux :
   `docker compose -f e2e/docker-compose.yml logs`) ; la suite la réensemence à chaque exécution. La supprimer ensuite
@@ -121,6 +136,8 @@ python -m pytest -c e2e/pytest.ini e2e -m smoke      # rapide ; sans -m : toute 
 - HelloAsso : fixture `fake_helloasso` (faux serveur sur le port `8095`, `e2e/helpers/helloasso.py`) ; chaque test
   y charge ses propres paiements (`fake_helloasso.set([item(...)])`), le webhook est appelé avec
   `HELLOASSO_WEBHOOK_TOKEN`.
+- MyCompet : fixture `fake_mycompet` (faux serveur sur le port `8096`, `e2e/helpers/mycompet.py`) ; chaque test y
+  publie ses pages de résultats (`fake_mycompet.set([...])`), groupe xdist `mycompet`.
 - Bugs connus : tests marqués `xfail(strict=True)` avec la référence du bug (ex. A6 de
   `documentations/plan_api_only_front.md`). Ils échouent (XPASS) dès que le bug est corrigé : retirer alors le marqueur.
 - Déboguer : `-n 0 --headed --slowmo 300`, ou `--tracing retain-on-failure` puis

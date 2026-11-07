@@ -42,7 +42,7 @@ describe("Paramètres view", () => {
   });
 
   it("reports a results batch", () => {
-    const comp = (nom: string, status: "found" | "pending", athletes: number) => ({
+    const comp = (nom: string, status: Schemas["BatchCompetition"]["status"], athletes: number) => ({
       id: nom,
       nom,
       date: "",
@@ -56,6 +56,9 @@ describe("Paramètres view", () => {
       executed_at: "",
       competitions_checked: 2,
       competitions_updated: 1,
+      competitions_remaining: 0,
+      partial: false,
+      window_days: 30,
       email_sent: true,
       notification_email: "n@x.fr",
       details: [comp("Open de Lyon", "found", 3), comp("Coupe", "pending", 0)],
@@ -69,6 +72,17 @@ describe("Paramètres view", () => {
       "⏳ Coupe : pas encore de résultats publiés",
     ]);
     expect(batchReport({ ...report, email_sent: false }, AT)[3]).toBe("• E-mail récapitulatif expédié : Erreur envoi");
+    const later = {
+      ...report,
+      partial: true,
+      competitions_remaining: 4,
+      details: [comp("Open", "needs_url", 0), comp("Bloc", "error", 0)],
+    };
+    expect(batchReport(later, AT).slice(4)).toEqual([
+      "⏱️ Temps imparti écoulé : 4 compétition(s) reportée(s) au prochain passage",
+      "✍️ Open : une page de même nom existe, mais pas à cette date : URL à saisir sur la fiche",
+      "⚠️ Bloc : page MyCompet illisible pour le moment",
+    ]);
     expect(batchReport({ ...report, email_sent: false, competitions_updated: 0 }, AT)[3]).toBe(
       "• E-mail récapitulatif expédié : Non (aucun nouveau résultat)",
     );

@@ -78,7 +78,7 @@ class _CertsMixin:
     def setUp(self):
         list_accounts()
         api_auth._certs_cache.invalidate()
-        api_auth._certs_cache.get_or_load_expiring(api_auth._CERTS_KEY, lambda: ({KID: CERT_PEM}, 3600))
+        api_auth._certs_cache.get_or_load_expiring(api_auth.FIREBASE_CERTS_URL, lambda: ({KID: CERT_PEM}, 3600))
 
     def tearDown(self):
         api_auth._certs_cache.invalidate()
@@ -258,7 +258,7 @@ class TestTokenVerification(_CertsMixin, unittest.TestCase):
 
     def test_unknown_kid_refused_as_unavailable_when_google_is_down(self):
         with patch.object(api_auth, "_fetch_certs", side_effect=OSError("down")), \
-                patch.object(api_auth, "_last_known_certs", {KID: CERT_PEM}):
+                patch.object(api_auth, "_last_known_certs", {api_auth.FIREBASE_CERTS_URL: {KID: CERT_PEM}}):
             with self.assertRaises(api_auth.AuthError) as ctx:
                 api_auth.verify_firebase_token(make_token(kid="inconnu"))
         self.assertEqual(ctx.exception.status_code, 503)
@@ -266,7 +266,7 @@ class TestTokenVerification(_CertsMixin, unittest.TestCase):
     def test_expired_keys_still_used_when_google_is_down(self):
         api_auth._certs_cache.invalidate()
         with patch.object(api_auth, "_fetch_certs", side_effect=OSError("down")), \
-                patch.object(api_auth, "_last_known_certs", {KID: CERT_PEM}):
+                patch.object(api_auth, "_last_known_certs", {api_auth.FIREBASE_CERTS_URL: {KID: CERT_PEM}}):
             self.assertEqual(api_auth.verify_firebase_token(make_token())["sub"], "uid-123")
 
     def test_keys_kept_for_the_max_age_of_the_answer(self):

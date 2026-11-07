@@ -316,7 +316,9 @@ export interface paths {
          * Api Cron Fetch Competition Results
          * @description Exécute le batch de récupération des résultats MyCompet FFME pour les compétitions passées
          *     et envoie un e-mail de synthèse si des résultats sont découverts.
-         *     Conçu pour être appelé par Google Cloud Scheduler (ex: tous les jours à 07h00) ou manuellement.
+         *     Called by Cloud Scheduler every day at 07:00 (its OIDC token, see api_auth.SCHEDULER_PATHS) or by an admin.
+         *     `force` (every competition ended in the last year, results or not) and `email` (another recipient): admin only.
+         *     503: the competitions could not be read, nothing was done (Cloud Scheduler shows the run as failed).
          */
         post: operations["api_cron_fetch_competition_results_api_competitions_cron_fetch_results_post"];
         delete?: never;
@@ -362,7 +364,7 @@ export interface paths {
         put?: never;
         /**
          * Update Competitions Results Settings Api
-         * @description Met à jour les adresses e-mail de notification des résultats.
+         * @description Met à jour les adresses e-mail de notification des résultats (et la fenêtre de recherche, si fournie).
          */
         post: operations["update_competitions_results_settings_api_api_settings_competitions_results_post"];
         delete?: never;
@@ -1684,7 +1686,7 @@ export interface components {
              * @default pending
              * @enum {string}
              */
-            status: "found" | "pending";
+            status: "found" | "pending" | "needs_url" | "error";
         };
         /** BatchReport */
         BatchReport: {
@@ -1699,6 +1701,21 @@ export interface components {
             competitions_checked: number;
             /** Competitions Updated */
             competitions_updated: number;
+            /**
+             * Competitions Remaining
+             * @default 0
+             */
+            competitions_remaining: number;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
+            /**
+             * Window Days
+             * @default 0
+             */
+            window_days: number;
             /** Email Sent */
             email_sent: boolean;
             /** Notification Email */
@@ -3854,6 +3871,8 @@ export interface components {
             last_status: string;
             /** Cron Schedule */
             cron_schedule: string;
+            /** Window Days */
+            window_days: number;
         };
         /** ResultsSettingsSaved */
         ResultsSettingsSaved: {
@@ -3864,6 +3883,8 @@ export interface components {
             status: "success";
             /** Notification Email */
             notification_email: string;
+            /** Window Days */
+            window_days: number;
             /** Saved */
             saved: boolean;
         };
@@ -3874,6 +3895,8 @@ export interface components {
              * @default
              */
             notification_email?: string;
+            /** Window Days */
+            window_days?: number | null;
         };
         /**
          * SeasonTarifs
@@ -4849,6 +4872,15 @@ export interface operations {
                     "application/json": components["schemas"]["BatchReport"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4856,6 +4888,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

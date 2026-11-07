@@ -8,7 +8,6 @@ import os
 import sys
 import unittest
 import datetime
-from unittest.mock import patch
 
 # Injection du chemin src
 _tests_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,7 +18,8 @@ if _src_dir not in sys.path:
 
 from services.competitions.results_batch import (
     CompetitionResultsBatchService,
-    DEFAULT_NOTIFICATION_EMAIL
+    DEFAULT_NOTIFICATION_EMAIL,
+    apply_rankings,
 )
 from support.fake_firestore import use_fake_firestore
 
@@ -143,36 +143,15 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
         self.assertIn("https://mycompet.ffme.fr/resultat/resultat_13660", html)
         self.assertTrue("batch quotidien ALJ Escalade" in html)
 
-    @patch("services.competitions.results_batch.EmailRepository.send_email")
-    def test_run_daily_batch_sends_email_when_results_found(self, mock_send_email):
-        """Le batch quotidien envoie un e-mail dès que des résultats sont découverts."""
-        mock_send_email.return_value = True
 
-        test_comp = {
-            "id": 999,
-            "nom": "Test Batch Comp",
-            "date_competition": "2026-10-10",
-            "lieu": "Jonage",
-            "participants": [
-                {"adherent_id": 1, "nom": "MARTIN", "prenom": "Alice", "num_licence": "654321"}
-            ],
-            "resultats_synced_at": ""
-        }
-
-        # Mock list_pending_competitions et sync_results_for_competition
-        with patch.object(CompetitionResultsBatchService, "list_pending_competitions", return_value=[test_comp]):
-            with patch.object(
-                CompetitionResultsBatchService,
-                "sync_results_for_competition",
-                return_value=(1, [{"nom": "MARTIN", "prenom": "Alice", "classement": "1", "resultat_ffme": "1er / 20"}], "https://mycompet.test")
-            ):
-                res = CompetitionResultsBatchService.run_daily_batch(force=True)
-
-                self.assertEqual(res["status"], "success")
-                self.assertEqual(res["competitions_checked"], 1)
-                self.assertEqual(res["competitions_updated"], 1)
-                self.assertTrue(res["email_sent"])
-                mock_send_email.assert_called_once()
+def test_apply_rankings_matches_name_without_accents_or_hyphens():
+    participants = [{"nom": "Lefèvre", "prenom": "Zoé-Anne", "num_licence": ""}, {"nom": "Autre", "prenom": "Grimpeur"}]
+    scraped = [{"nom": "LEFEVRE", "prenom": "Zoe Anne", "licence": "", "classement": "3", "total_categorie": 12,
+                "categorie": "U13 Femme"}]
+    athletes = apply_rankings(participants, scraped, "2026-10-26T07:00:00")
+    assert [a["classement"] for a in athletes] == ["3"]
+    assert participants[0]["resultat_ffme"] == "3 / 12"
+    assert "classement" not in participants[1]
 
 
 if __name__ == "__main__":

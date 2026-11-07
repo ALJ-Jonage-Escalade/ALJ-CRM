@@ -47,6 +47,17 @@ FIREBASE_CERTS_URL = (
     "securetoken@system.gserviceaccount.com"
 )
 
+# Cloud Scheduler (job batch-resultats-competitions) calls the results batch with a Google OIDC token of its own
+# service account, whose audience is the service URL: see documentations/guide_deploiement_cloud_run_helloasso.md.
+# ALJ_SCHEDULER_SERVICE_ACCOUNT / ALJ_SCHEDULER_AUDIENCES (comma-separated) override the defaults.
+SCHEDULER_PATHS = frozenset({"/api/competitions/cron/fetch-results"})
+DEFAULT_SCHEDULER_SERVICE_ACCOUNT = "alj-results-scheduler@smart-amplifier-510811-n6.iam.gserviceaccount.com"
+DEFAULT_SCHEDULER_AUDIENCE = "https://alj-escalade-api-bdxfydatoa-ew.a.run.app"
+GOOGLE_OIDC_CERTS_URL = "https://www.googleapis.com/oauth2/v1/certs"
+GOOGLE_OIDC_ISSUERS = ("https://accounts.google.com", "accounts.google.com")
+# Set in the claims of a request authenticated as the scheduler (no user role)
+SCHEDULER_CLAIM = "alj_scheduler"
+
 # ---------------------------------------------------------------------------
 # Roles: the only judge of access rights (firestore.rules refuses every client). They come from the
 # access list (Administration › Accès, Firestore collection access_roles): never an address in the code.
@@ -72,7 +83,6 @@ PUBLIC_PATHS = frozenset({
     "/favicon.ico",
     "/api/web-version",
     "/webhooks/helloasso",
-    "/api/competitions/cron/fetch-results",
     "/api/auth/google/login",
     "/api/auth/google/callback",
     "/api/auth/google/status",
@@ -153,6 +163,8 @@ def required_role(method: str, path: str) -> Optional[Role]:
         return Role.ADMIN  # imports et modifications FFME réservés aux administrateurs
     if path == "/api/auth/google/update-token" and method not in ("GET", "HEAD"):
         return Role.ADMIN  # mise à jour manuelle des identifiants Google réservée aux administrateurs
+    if path in SCHEDULER_PATHS:
+        return Role.ADMIN  # results batch: an admin, or the Cloud Scheduler token (authorize_request)
     if path == "/api/cloud-db/sync" and method not in ("GET", "HEAD"):
         return Role.ADMIN  # reconstruction du cache SQLite (coûteuse) réservée aux administrateurs
     return Role.COACH
@@ -182,33 +194,36 @@ def has_role(claims: Dict[str, Any], needed: Role) -> bool:
 # ---------------------------------------------------------------------------
 # Vérification du jeton d'identité Firebase
 # ---------------------------------------------------------------------------
-_CERTS_KEY = "firebase"
-_certs_cache: TimedCache[str, Dict[str, str]] = TimedCache(math.inf)  # kept for the max-age of Google's answer
-_last_known_certs: Dict[str, str] = {}  # still used when Google can't be reached after they expire
+# One entry per URL of Google keys (Firebase, OIDC of Cloud Scheduler), kept for the max-age of Google's answer
+_certs_cache: TimedCache[str, Dict[str, str]] = TimedCache(math.inf)
+_last_known_certs: Dict[str, Dict[str, str]] = {}  # per URL, still used when Google can't be reached after they expire
 
 
-def _fetch_certs() -> Tuple[Dict[str, str], float]:
-    global _last_known_certs
-    resp = requests.get(FIREBASE_CERTS_URL, timeout=10)
+def _fetch_certs(url: str = FIREBASE_CERTS_URL) -> Tuple[Dict[str, str], float]:
+    resp = requests.get(url, timeout=10)
     resp.raise_for_status()
     max_age = 3600
     m = re.search(r"max-age=(\d+)", resp.headers.get("Cache-Control", ""))
     if m:
         max_age = int(m.group(1))
-    _last_known_certs = resp.json()
-    return _last_known_certs, max_age
+    keys = resp.json()
+    _last_known_certs[url] = keys
+    return keys, max_age
 
 
-def _public_key_for(kid: str):
+def _public_key_for(kid: str, url: str = FIREBASE_CERTS_URL):
     from cryptography.x509 import load_pem_x509_certificate
 
+    def load() -> Tuple[Dict[str, str], float]:
+        return _fetch_certs(url)
+
     try:
-        keys = _certs_cache.get_or_load_expiring(_CERTS_KEY, _fetch_certs)
+        keys = _certs_cache.get_or_load_expiring(url, load)
         if kid not in keys:  # keys rotated by Google since the last read
-            _certs_cache.invalidate()
-            keys = _certs_cache.get_or_load_expiring(_CERTS_KEY, _fetch_certs)
+            _certs_cache.invalidate(url)
+            keys = _certs_cache.get_or_load_expiring(url, load)
     except Exception as e:  # réseau indisponible
-        keys = _last_known_certs
+        keys = _last_known_certs.get(url, {})
         if kid not in keys:
             raise AuthError(503, f"Clés de vérification Google indisponibles : {e}")
     pem = keys.get(kid)
@@ -255,6 +270,63 @@ def verify_firebase_token(token: str) -> Dict[str, Any]:
     return claims
 
 
+def scheduler_service_account() -> str:
+    return (os.environ.get("ALJ_SCHEDULER_SERVICE_ACCOUNT") or DEFAULT_SCHEDULER_SERVICE_ACCOUNT).strip().lower()
+
+
+def scheduler_audiences() -> list[str]:
+    raw = os.environ.get("ALJ_SCHEDULER_AUDIENCES") or DEFAULT_SCHEDULER_AUDIENCE
+    return [a.strip().rstrip("/") for a in raw.split(",") if a.strip()]
+
+
+def _is_google_oidc_token(token: str) -> bool:
+    """A Google-signed OIDC token (Cloud Scheduler), as opposed to a Firebase ID token: told apart by its issuer,
+    read unverified only to choose the verification (verify_scheduler_token checks everything)."""
+    import jwt  # PyJWT
+
+    try:
+        # Unverified read of the issuer only, to pick the keys; the token is then fully verified
+        unverified = jwt.decode(token, options={"verify_signature": False})  # nosemgrep: python.jwt.security.unverified-jwt-decode.unverified-jwt-decode
+    except jwt.PyJWTError:
+        return False
+    return unverified.get("iss") in GOOGLE_OIDC_ISSUERS
+
+
+def verify_scheduler_token(token: str) -> Dict[str, Any]:
+    """Verifies a Google OIDC token of the Cloud Scheduler service account (signature, audience = service URL,
+    issuer, expiry, verified e-mail). Returns its claims with SCHEDULER_CLAIM set; AuthError otherwise."""
+    import jwt  # PyJWT
+
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.PyJWTError:
+        raise AuthError(401, "Jeton d'authentification illisible")
+    if header.get("alg") != "RS256" or not header.get("kid"):
+        raise AuthError(401, "Jeton d'authentification invalide (algorithme)")
+    try:
+        claims = jwt.decode(
+            token,
+            _public_key_for(header["kid"], GOOGLE_OIDC_CERTS_URL),
+            algorithms=["RS256"],
+            audience=scheduler_audiences(),
+            issuer=list(GOOGLE_OIDC_ISSUERS),
+            leeway=60,
+            options={"require": ["exp", "iat", "aud", "iss", "sub"]},
+        )
+    except jwt.ExpiredSignatureError:
+        raise AuthError(401, "Jeton Cloud Scheduler expiré")
+    except jwt.PyJWTError as e:
+        raise AuthError(401, f"Jeton Cloud Scheduler invalide ({e.__class__.__name__})")
+    email = str(claims.get("email") or "").strip().lower()
+    if claims.get("email_verified") is not True or not constant_time_equals(email, scheduler_service_account()):
+        raise AuthError(403, "Accès refusé : ce compte de service n'est pas celui de la tâche planifiée")
+    return {**claims, SCHEDULER_CLAIM: True}
+
+
+def is_scheduler(claims: Optional[Dict[str, Any]]) -> bool:
+    return bool(claims and claims.get(SCHEDULER_CLAIM) is True)
+
+
 def emulator_claims(authorization: Optional[str]) -> Optional[Dict[str, Any]]:
     """Claims of a Firebase Auth emulator token, read without verification (unsigned by design).
 
@@ -298,6 +370,8 @@ def authorize_request(method: str, path: str, authorization: Optional[str]) -> O
     token = bearer_token(authorization)
     if not token:
         raise AuthError(401, "Authentification requise : connectez-vous avec votre compte Google")
+    if path in SCHEDULER_PATHS and _is_google_oidc_token(token):
+        return verify_scheduler_token(token)
     claims = verify_firebase_token(token)
     try:
         allowed = has_role(claims, role)

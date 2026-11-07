@@ -48,8 +48,13 @@ export function createCompetitionsApi(client: ApiClient) {
 
     // ------------------------------------------------------------ MyCompet results of every competition (Paramètres)
     resultsSettings: () => unwrap(client.GET("/api/settings/competitions-results")),
-    saveResultsSettings: (notificationEmail: string) =>
-      unwrap(client.POST("/api/settings/competitions-results", { body: { notification_email: notificationEmail } })),
+    /** windowDays: search window of the daily batch (days since the competition ended), unchanged when omitted. */
+    saveResultsSettings: (notificationEmail: string, windowDays?: number) =>
+      unwrap(
+        client.POST("/api/settings/competitions-results", {
+          body: { notification_email: notificationEmail, ...(windowDays === undefined ? {} : { window_days: windowDays }) },
+        }),
+      ),
     /** The daily batch run now, results already fetched included. */
     fetchAllResults: () => unwrap(client.POST("/api/competitions/cron/fetch-results", { params: { query: { force: true } } })),
 

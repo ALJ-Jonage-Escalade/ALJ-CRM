@@ -124,6 +124,9 @@ const results = ref<Schemas["ResultsSettings"] | null>(null);
 const email = ref("");
 let editingEmail = false; // a reload does not overwrite what the admin is typing
 const savingEmail = ref(false);
+const windowDays = ref(30);
+let editingWindow = false;
+const savingWindow = ref(false);
 const running = ref(false);
 const batchResult = ref<Report | null>(null);
 
@@ -146,6 +149,9 @@ async function loadResults(): Promise<void> {
     results.value = await competitionsApi.resultsSettings();
     if (!editingEmail) {
       email.value = results.value.notification_email;
+    }
+    if (!editingWindow) {
+      windowDays.value = results.value.window_days;
     }
   } catch (e) {
     console.warn("Paramètres du batch des résultats :", e);
@@ -188,6 +194,25 @@ async function saveEmail(): Promise<void> {
     toast.show(`❌ Échec : ${errorText(e)}`);
   } finally {
     savingEmail.value = false;
+  }
+}
+
+async function saveWindow(): Promise<void> {
+  const days = Number(windowDays.value);
+  if (!Number.isInteger(days) || days < 1 || days > 365 || !results.value) {
+    toast.show("❌ Saisissez un nombre de jours entre 1 et 365.");
+    return;
+  }
+  savingWindow.value = true;
+  try {
+    await competitionsApi.saveResultsSettings(results.value.notification_email, days);
+    toast.show(`✅ Le batch cherchera les compétitions terminées depuis ${days} jour(s) au plus.`);
+    editingWindow = false;
+    await loadResults();
+  } catch (e) {
+    toast.show(`❌ Échec : ${errorText(e)}`);
+  } finally {
+    savingWindow.value = false;
   }
 }
 
@@ -378,6 +403,26 @@ onMounted(() => {
               <span class="mt-1 block text-[11px] text-slate-500">Séparez plusieurs adresses par des virgules ou points-virgules</span>
             </div>
             <UiButton type="submit" variant="muted" small :busy="savingEmail && 'Enregistrement…'" data-testid="results-email-save">
+              Enregistrer
+            </UiButton>
+          </div>
+        </form>
+        <form class="rounded-lg border border-slate-200 bg-slate-50 p-3" novalidate @submit.prevent="saveWindow">
+          <label for="results-window" class="mb-1.5 block text-[11.5px] font-semibold text-slate-500 uppercase">
+            Compétitions terminées depuis (jours)
+          </label>
+          <div class="flex items-center gap-2">
+            <input
+              id="results-window"
+              v-model.number="windowDays"
+              type="number"
+              min="1"
+              max="365"
+              data-testid="results-window"
+              class="w-20 min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[13px]"
+              @focus="editingWindow = true"
+            />
+            <UiButton type="submit" variant="muted" small :busy="savingWindow && 'Enregistrement…'" data-testid="results-window-save">
               Enregistrer
             </UiButton>
           </div>

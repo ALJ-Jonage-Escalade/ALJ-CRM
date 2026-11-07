@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import BrowserContext, expect
 
-from helpers import data as test_data_helpers, helloasso
+from helpers import data as test_data_helpers, helloasso, mycompet
 from helpers.auth import login_as as _login_as
 from helpers.data import TestData
 from helpers.mailpit import Mailpit
@@ -186,5 +186,14 @@ def fake_helloasso() -> helloasso.FakeHelloAsso:
     """Empty fake HelloAsso: each test loads the forms and items it needs (fake.set(items)). One state for
     the whole server: its tests share the « helloasso » xdist_group."""
     fake = helloasso.FakeHelloAsso()
+    fake.clear()
+    return fake
+
+
+@pytest.fixture
+def fake_mycompet() -> mycompet.FakeMyCompet:
+    """Empty fake MyCompet / FFME archive: each test loads the results pages it needs. One state for the whole
+    server: its tests share the « mycompet » xdist_group."""
+    fake = mycompet.FakeMyCompet()
     fake.clear()
     return fake

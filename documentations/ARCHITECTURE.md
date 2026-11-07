@@ -136,11 +136,12 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
 | `ffme/` | `ffme` | `/api/ffme/stats`, `/export` (CSV), `/preview`, `/import` |
 | `integrations/` | `helloasso`, `google_auth`, `cloud_db` | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync` · `/api/auth/google/*` · `/api/cloud-db/status`, `/sync` |
 
-- **Cache SQLite** : les routeurs `competitions`, `participants`, `coaches`, `members` (compétitions) et `helloasso_items`
-  ne lisent que Firestore et sautent le rafraîchissement du cache (`FIRESTORE_ONLY_PATHS`). Une route qui lit ou écrit le
-  cache va dans un autre routeur, même sous `/api/competitions` (`results`, `payments`).
+- **Cache SQLite** : les routeurs `competitions`, `participants`, `coaches`, `members` (compétitions), `helloasso_items`
+  et `results` (résultats MyCompet : l'appel de Cloud Scheduler n'attend pas une reconstruction du cache) ne lisent que
+  Firestore et sautent le rafraîchissement du cache (`FIRESTORE_ONLY_PATHS`). Une route qui lit ou écrit le cache va
+  dans un autre routeur, même sous `/api/competitions` (`payments`).
 - **URL appelées de l'extérieur, à ne pas changer** : Cloud Scheduler (job `batch-resultats-competitions`,
-  `POST /api/competitions/cron/fetch-results` chaque jour à 07h00 — à déclarer avant `/{id}/fetch-results`), webhook
+  `POST /api/competitions/cron/fetch-results` chaque jour à 07h00, jeton OIDC — à déclarer avant `/{id}/fetch-results`), webhook
   HelloAsso, retours OAuth Google (console Google Cloud), `/health` (déploiement). `tests/test_route_inventory.py`
   fige la liste complète des routes.
 
@@ -277,7 +278,7 @@ La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[too
 
 **Déploiement web** : `../code_source/scripts/deploy_cloud_run.sh` (ou `.bat`) → `gcloud run deploy alj-escalade-api --source . --memory 1Gi --min-instances 0 --max-instances 2 --session-affinity --timeout 300 --allow-unauthenticated` (l'auth est applicative). Règles Firestore : `firebase deploy --only firestore:rules` (`firebase.json`), manuel et **séparé** du déploiement de l'application : refus total des clients, à déployer au moins une semaine après la version web qui ne lit plus Firestore (ordre et retour arrière : plan `plan_api_only_front.md`, S1). Guide : `guide_deploiement_cloud_run_helloasso.md`.
 
-**Tâche planifiée** : la tâche Cloud Scheduler `batch-resultats-competitions` (07:00, Europe/Paris) appelle `POST /api/competitions/cron/fetch-results`. Elle a été créée à la main dans GCP (hors dépôt).
+**Tâche planifiée** : la tâche Cloud Scheduler `batch-resultats-competitions` (07:00, Europe/Paris) appelle `POST /api/competitions/cron/fetch-results` avec un jeton OIDC de son compte de service (vérifié par `api_auth`, la route n'est pas publique). Création / mise à jour : `code_source/scripts/setup_cloud_scheduler.sh` ; détails : `guide_deploiement_cloud_run_helloasso.md`, « Tâche planifiée Cloud Scheduler ».
 
 **Plus de release desktop** : ne plus pousser de tag `v*`. Les anciens postes installés interrogent encore `releases/latest` ; une nouvelle release sans le client lourd casserait leur mise à jour automatique.
 

@@ -11,6 +11,7 @@ from domain.competitions.models import (
     PAIEMENT_STATUTS_ANNULES,
     statut_paiement_apres_bascule,
 )
+from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore.competitions.adherents import AdherentsMixin
 
 # Collé pour l'ancien appelant (web) : état de paiement par défaut d'un nouveau
@@ -133,6 +134,27 @@ class ParticipantsMixin(AdherentsMixin):
             doc.update(cls._save_parts(doc, new_parts))  # participants, counters, updated_at
             return doc
         return cls._with_retries(f"Épreuve #{competition_id}", attempt)
+
+    @classmethod
+    def record_results(cls, competition_id: int | str, apply_rankings: Callable[[List[Dict[str, Any]]], int],
+                       fields: Dict[str, Any]) -> int:
+        """Writes MyCompet rankings: `apply_rankings(parts)` sets the ranking fields of the participants it matches
+        (it must leave the other fields alone) and returns how many; `fields` (results URL, sync time) are written
+        with them. Read just before writing, under the optimistic lock (replayed on conflict), so an edit made
+        meanwhile on the web is kept. Returns the matched count (0: nothing written, or no such competition)."""
+        def attempt() -> int:
+            doc = cls._load_comp_doc(competition_id)
+            if not doc:
+                return 0
+            parts = [dict(p) for p in (doc.get("participants") or [])]
+            matched = apply_rankings(parts)
+            if matched:
+                FirestoreClient.update_fields(
+                    cls.COLLECTION_COMPETITIONS, doc.get("_doc_id") or str(doc.get("id")), {"participants": parts, **fields},
+                    expected_update_time=doc.get("_update_time"),
+                )
+            return matched
+        return cls._with_retries(f"Résultats de l'épreuve #{competition_id}", attempt)
 
     @classmethod
     def _update_participant(cls, competition_id: int, adherent_id: int, change,

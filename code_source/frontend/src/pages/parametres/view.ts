@@ -109,10 +109,14 @@ export function batchReport(b: Schemas["BatchReport"], now?: Date): string[] {
     `• Compétitions passées vérifiées : ${b.competitions_checked}`,
     `• Résultats officiels trouvés : ${b.competitions_updated}`,
     `• E-mail récapitulatif expédié : ${email}`,
-    ...b.details.map((c) =>
-      c.status === "found"
-        ? `🏆 ${c.nom} : ${c.athletes.length} athlète(s) classé(s) pour le club`
-        : `⏳ ${c.nom} : pas encore de résultats publiés`,
-    ),
+    ...(b.partial ? [`⏱️ Temps imparti écoulé : ${b.competitions_remaining} compétition(s) reportée(s) au prochain passage`] : []),
+    ...b.details.map((c) => DETAIL_LINES[c.status](c)),
   ];
 }
+
+const DETAIL_LINES: Record<Schemas["BatchCompetition"]["status"], (c: Schemas["BatchCompetition"]) => string> = {
+  found: (c) => `🏆 ${c.nom} : ${c.athletes.length} athlète(s) classé(s) pour le club`,
+  pending: (c) => `⏳ ${c.nom} : pas encore de résultats publiés`,
+  needs_url: (c) => `✍️ ${c.nom} : une page de même nom existe, mais pas à cette date : URL à saisir sur la fiche`,
+  error: (c) => `⚠️ ${c.nom} : page MyCompet illisible pour le moment`,
+};
