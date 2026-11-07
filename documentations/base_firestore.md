@@ -29,8 +29,6 @@ Les collections `adherents` et `planning` (annuaire lu par la PWA et le webhook)
   « Télécharger » / synchronisation HelloAsso.
 - Hors connexion : l'application travaille sur la copie locale ; les modifications
   partent au retour du réseau (pied de page : « ⏳ N modification(s) à envoyer »).
-- Une copie du cache est encore déposée sur Google Drive (`GOOGLE_DRIVE_DB_ID`), en
-  lecture seule (sauvegarde) ; l'annuaire web ne l'utilise plus.
 
 ## Annuaire web (application Vue, `frontend/src/pages/DirectoryPage.vue`, URL `/index`)
 

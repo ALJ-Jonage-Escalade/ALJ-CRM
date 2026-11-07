@@ -24,7 +24,7 @@ logger = logging.getLogger("alj")
 P = ParamSpec("P")
 R = TypeVar("R")
 
-# Writes through the services drop the cache at once; writes made elsewhere (desktop app,
+# Writes through the services drop the cache at once; writes made elsewhere (results batch,
 # webhook, other instance) show up after CACHE_SECONDS (0 in the e2e tests, whose fixtures
 # write straight to Firestore).
 CACHE_SECONDS = float(os.environ.get("ALJ_COMPETITIONS_CACHE_SECONDS", "5"))

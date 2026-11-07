@@ -33,7 +33,7 @@ The plan file is updated with any decisions taken during a review. Nothing is co
 | 1 | Done (approved) | See « Phase 1 — as built » below. |
 | 2 | Done (approved) | See « Phase 2 — as built » below. |
 | 3 | Done (approved) | Code only; nothing deployed. See « Phase 3 — as built » below for the deploy order. |
-| 4 | Done (approved) | C1 done; C2 step A done (step B waits for every club PC to run the new desktop version). See « Phase 4 — as built » below. |
+| 4 | Done (approved) | C1 done; C2 step A done, step B partly done (writes stopped; cleanup script left). See « Phase 4 — as built » below. |
 | 5a | Done (approved) | Offline storage on the phone, read-only: IndexedDB store, competitions + coaches + competitor contacts (O1, O2 decided 2026-10-18), 30 days (O4). See « Phase 5a — as built ». |
 | 5b | Done, awaiting review | Offline queue of « Participe », refused when the participant changed meanwhile (decided 2026-10-18). See « Phase 5b — as built ». |
 
@@ -351,7 +351,7 @@ Consequences:
 - If it saves the competition, it rewrites `coach_ids` from those three slots, and the other coaches are dropped.
 - Old v22 phone pages are unaffected: they will lose Firestore access at the rules lockdown anyway.
 
-**C2 step B (later, not started).** Once every club PC runs a desktop version with C2:
+**C2 step B (steps 1 and 3 partly done, 2026-11-07, desloppify batch 2: the desktop app is gone).** Writes no longer fill `coach1_id..coach3_id` nor the stored `coaches`; `_legacy_coach_fields` and `_refresh_coach_names` are deleted. `coach_ids_of` reads the slots only for a document without a `coach_ids` field, so stale slots never come back. Left: the one-off cleanup script (step 2), then removing the fallback and `LEGACY_COACH_SLOTS`. The original plan:
 1. Stop writing `coach1_id..coach3_id` and the stored `coaches`. Delete `_legacy_coach_fields` and `_refresh_coach_names`; a rename then rewrites no competition, which fixes A10 for renames.
 2. A one-off script removes the old fields from existing documents (readers accept both shapes, so the order doesn't matter).
 3. Remove the slot fallback in `coach_ids_of`, and `LEGACY_COACH_SLOTS`.

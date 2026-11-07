@@ -99,8 +99,7 @@ def dev_environment(data_dir: Path, **overrides: str) -> dict:
     """Environment of the dev subprocesses (seed, server): dev/dev.env pointed at the e2e stack,
     with a private SQLite cache.
 
-    PYTEST_* variables are dropped: with PYTEST_CURRENT_TEST set, the server would fall back
-    to MEMBER_BACKEND=drive."""
+    PYTEST_* variables are dropped: the server runs as outside pytest, replicating its cache to the emulator."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("PYTEST_")}
     env.update(read_env_file(DEV_ENV_FILE))
     env.update(STACK_ENV)

@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import datetime
-import os
 import sqlite3
 from typing import Dict, Iterable, List, Optional, Tuple
 
-import pandas as pd
 
-from domain.constants import CORRECTIVE_MAP
 from domain.members.sex import parse_sex
 from domain.utils import normalize_name
 from infrastructure.sqlite import schema_v2
@@ -22,8 +19,8 @@ EXTRA_COLUMNS = {
     "autonomie_bloc": "TEXT DEFAULT 'Non'",
     "raw_passports": "TEXT DEFAULT ''",
     "raw_diplomas": "TEXT DEFAULT ''",
-    "parental_auth_autonomous": "TEXT DEFAULT 'Non'", # Nouveau !
-    "parental_auth_family": "TEXT DEFAULT 'Non'",     # Nouveau !
+    "parental_auth_autonomous": "TEXT DEFAULT 'Non'",
+    "parental_auth_family": "TEXT DEFAULT 'Non'",
 }
 
 
@@ -50,7 +47,7 @@ class MemberRepository:
 
     @classmethod
     def _load_data_from_compat_view(cls, conn, season_filter: str) -> list:
-        """Phase 2 — Chargement via v_adherents_legacy (schéma cible v2). Mêmes clés que le chemin legacy."""
+        """Chargement via la vue v_adherents_legacy (schéma v2), aux clés plates historiques."""
         cursor = conn.cursor()
         if season_filter in ("Tous", "Toutes les saisons", "Toutes les saisons confondues"):
             cursor.execute('SELECT * FROM v_adherents_legacy ORDER BY "id" DESC')
@@ -75,15 +72,7 @@ class MemberRepository:
             participants_data.append(row_dict)
         return participants_data
 
-    @classmethod
-    def get_members(cls, season_filter: str = "2026-2027") -> list:
-        """
-        Phase 4 — Lecture typée canonique : retourne des objets Member construits
-        depuis la lecture bilingue (vue de compatibilité + Member.from_dict).
-        API recommandée pour les nouveaux consommateurs.
-        """
-        from domain.members.models import Member
-        return [Member.from_dict(row) for row in cls.load_direct_data(season_filter=season_filter)]
+
     # One row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), the fields of the web member pages
     _MEMBER_ROWS_SQL = """
         SELECT u.id AS user_id, p.id AS purchase_id,
@@ -126,47 +115,10 @@ class MemberRepository:
         if not ids:
             return []
         return cls._query_member_rows(f"u.id IN ({', '.join('?' * len(ids))})", ids)
-    @classmethod
-    def export_to_excel(cls, file_path: str) -> bool:
-        """
-        Phase 9 — Exporte les adhérents de la saison active vers un fichier Excel,
-        via Member.to_dict() (adaptateur vers le format colonnes historique).
-        """
-        SqliteDatabase.setup_database()
-        members = cls.get_members(season_filter="2026-2027")
-
-        excel_rows = []
-        for m in members:
-            d = m.to_dict()
-            excel_row = {}
-            # Reconstituer toutes les colonnes d'origine de CORRECTIVE_MAP
-            for excel_col, cache_key in CORRECTIVE_MAP.items():
-                excel_row[excel_col] = d.get(cache_key, "")
-
-            # Ajouter les colonnes supplémentaires indispensables
-            for col_key in EXTRA_COLUMNS.keys():
-                excel_row[col_key] = d.get(col_key, "")
-
-            excel_rows.append(excel_row)
-
-        try:
-            df = pd.DataFrame(excel_rows)
-            # S'assurer que le dossier parent existe
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            from exports.spreadsheet_safety import safe_to_excel
-            safe_to_excel(df, file_path, index=False)  # member data must never become a formula
-            print(f"💾 [SQLITE] Base de données exportée avec succès vers Excel : {file_path}")
-            return True
-        except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors de l'exportation de la base de données vers Excel : {e}")
-            return False
 
     @classmethod
     def upsert_members(cls, members: list, season_name: str = "2026-2027") -> int:
-        """
-        Phase 5 - Insere ou met a jour un lot d'adherents dans le schema v2
-        (users / orders / purchases / purchase_options).
-        """
+        """Insère ou met à jour un lot d'adhérents dans le schéma v2 (users / orders / purchases / purchase_options)."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         inserted_count = 0
@@ -184,48 +136,6 @@ class MemberRepository:
             conn.close()
         return inserted_count
 
-    @classmethod
-    def update_member_in_db(cls, original_order_ref: str, original_last_name: str, original_first_name: str, updated_fields: dict, comment_text: str):
-        """
-        Phase 5 - Met a jour un adherent dans le schema v2 :
-        champs personnels -> users, champs de saison -> purchases (avec options).
-        """
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
-        try:
-            from domain.utils import normalize_name
-            cursor.execute("""
-                SELECT p.user_id FROM purchases p
-                JOIN orders o ON o.id = p.order_id
-                WHERE o.order_ref = ?
-            """, (original_order_ref.strip(),))
-            rows = cursor.fetchall()
-            user_id = None
-            if rows:
-                t_last = normalize_name(original_last_name)
-                t_first = normalize_name(original_first_name)
-                for r in rows:
-                    u = cursor.execute("SELECT last_name, first_name FROM users WHERE id=?", (r["user_id"],)).fetchone()
-                    if u and normalize_name(u["last_name"]) == t_last and normalize_name(u["first_name"]) == t_first:
-                        user_id = r["user_id"]
-                        break
-                if user_id is None:
-                    # Fallback famille : premier utilisateur de la commande
-                    user_id = rows[0]["user_id"]
-            if user_id is None:
-                conn.close()
-                return False, f"Aucun adherent correspondant trouve pour {original_last_name} {original_first_name}."
-            schema_v2.apply_member_update(cursor, user_id, original_order_ref, updated_fields, comment_text)
-            conn.commit()
-            print(f"[SQLITE] Adherent {original_last_name} {original_first_name} mis a jour avec succes (v2).")
-            return True, ""
-        except Exception as e:
-            print(f"[SQLITE] Erreur lors de la mise a jour de l'adherent : {e}")
-            conn.rollback()
-            return False, DB_WRITE_ERROR
-        finally:
-            conn.close()
 
     @classmethod
     def add_manual_member(cls, fields: dict, season_name: str = "2026-2027") -> tuple:
@@ -350,35 +260,10 @@ class MemberRepository:
         finally:
             conn.close()
 
-    @classmethod
-    def correct_member_address(cls, first_name: str, last_name: str, address: str, zip_code: str,
-                               city: str, geocode: Optional[Tuple[str, float, float]] = None):
-        """Overwrite a member's address (matched by name) and optionally cache its
-        (full_address, lat, lon) geocode, in a single transaction."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
-            conn.execute(
-                "UPDATE users SET address = ?, zip_code = ?, city = ? "
-                "WHERE UPPER(TRIM(first_name)) = UPPER(TRIM(?)) "
-                "AND UPPER(TRIM(last_name)) = UPPER(TRIM(?))",
-                (address, zip_code, city, first_name, last_name),
-            )
-            if geocode:
-                conn.execute("""
-                    INSERT INTO geocache (address, lat, lon) VALUES (?, ?, ?)
-                    ON CONFLICT(address) DO UPDATE SET lat = excluded.lat, lon = excluded.lon
-                """, geocode)
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
 
     @classmethod
     def update_email_sent_date(cls, order_ref: str, last_name: str, first_name: str, date_str: str, purchase_id: Optional[int] = None) -> bool:
-        """Phase 5 - Met a jour la date d'envoi d'e-mail sur les achats v2 de la commande."""
+        """Met à jour la date d'envoi d'e-mail sur les achats v2 de la commande."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         cursor = conn.cursor()

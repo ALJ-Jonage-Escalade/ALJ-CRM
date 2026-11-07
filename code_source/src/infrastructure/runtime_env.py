@@ -5,8 +5,8 @@ Single source of truth for everything that differs between the two modes on the 
 side (URL, token, project) and for the configuration sent to the browser. E-mails are not
 involved: in dev, the application's SMTP settings point to Mailpit (dev/dev.env).
 
-- ``ALJ_ENV`` unset or ``prod``: unchanged production behaviour (Cloud Run, desktop
-  client, local server without emulator).
+- ``ALJ_ENV`` unset or ``prod``: production behaviour (Cloud Run, or a local server without
+  emulator).
 - ``ALJ_ENV=dev``: everything goes through the Firebase emulator (Auth + Firestore) of the
   ``demo-alj`` project. A ``demo-*`` project does not exist in production: even when
   misconfigured, no call can reach the real data. See ``code_source/dev/``.

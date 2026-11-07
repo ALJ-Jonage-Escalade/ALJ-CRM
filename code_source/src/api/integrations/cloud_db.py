@@ -59,9 +59,9 @@ def sync_cloud_db_api(force: bool = Query(False)) -> CloudDbSync | JSONResponse:
     try:
         from infrastructure.firestore.cloud_database import CloudDatabase
         if not CloudDatabase.is_enabled():
-            return CloudDbSync(status="skipped", message="Mode Firestore non activé (MEMBER_BACKEND != firestore).")
+            return CloudDbSync(status="skipped", message="Réplication Firestore désactivée sur ce serveur (ALJ_CACHE_REPLICATION=off).")
 
-        report = CloudDatabase.sync(full=force, force_pull_all=force)
+        report = CloudDatabase.sync(full=force)
         if not isinstance(report, dict):
             report = {}
         # Only the counters reach the page: the error texts (Firestore, SQLite) stay in the log

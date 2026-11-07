@@ -2,8 +2,8 @@ rules_version = '2';
 
 // No client access: the web pages use Firebase only to sign in, and every read and
 // write goes through the API (Cloud Run), which checks roles in api_auth.py.
-// The server (service account) and the desktop app (club OAuth token) reach Firestore
-// through IAM, which these rules do not apply to.
+// The server (service account, or the club OAuth token locally) reaches Firestore through
+// IAM, which these rules do not apply to.
 // See documentations/plan_api_only_front.md (phase 3) for the deploy order and the rollback.
 service cloud.firestore {
   match /databases/{database}/documents {

@@ -1,12 +1,12 @@
 """
-Migration de database.db (SQLite) vers Firestore (collections crm_<table>).
+Migration de database.db (SQLite) vers Firestore (collections crm_<table>). Outil manuel, lancé depuis code_source/ :
 
-    python infrastructure/sqlite/migrations/migrate_sqlite_to_firestore.py chemin/database.db --dry-run
-    python infrastructure/sqlite/migrations/migrate_sqlite_to_firestore.py chemin/database.db --apply [--force]
-    python infrastructure/sqlite/migrations/migrate_sqlite_to_firestore.py chemin/database.db --verify
+    uv run python scripts/migrate_sqlite_to_firestore.py chemin/database.db --dry-run
+    uv run python scripts/migrate_sqlite_to_firestore.py chemin/database.db --apply [--force]
+    uv run python scripts/migrate_sqlite_to_firestore.py chemin/database.db --verify
 
-- La base source est d'abord copiée puis mise au schéma courant de l'application
-  (comme au démarrage de l'appli) ; l'original n'est jamais modifié.
+- La base source (schéma v2) est d'abord copiée puis mise au schéma courant de l'application
+  (comme au démarrage de l'appli) ; l'original n'est jamais modifié. Une base v1 est refusée.
 - --apply écrit un document par ligne (ID = clé primaire) : ré-exécutable sans
   doublon. Refuse d'écrire si les collections contiennent déjà des données
   (sauf --force).
@@ -24,7 +24,9 @@ import sqlite3
 import sys
 import tempfile
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))  # src/
+SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+if SRC not in sys.path:
+    sys.path.insert(0, SRC)
 
 from infrastructure.firestore import cloud_database as cdb  # noqa: E402
 from infrastructure.sqlite.connection import SqliteDatabase  # noqa: E402
@@ -38,12 +40,7 @@ def normalized_copy(src: str, workdir: str) -> str:
     s.backup(d)
     d.close()
     s.close()
-    saved = SqliteDatabase.get_db_path()
-    try:
-        SqliteDatabase.set_db_path(dst)
-        SqliteDatabase.setup_database(force=True)
-    finally:
-        SqliteDatabase.set_db_path(saved)
+    SqliteDatabase.apply_schema(dst)
     return dst
 
 

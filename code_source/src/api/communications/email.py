@@ -144,7 +144,7 @@ def get_email_status() -> EmailStatus:
 def send_email_api(request: Request, data: Dict[str, Any] = Body(...)) -> EmailDispatch | JSONResponse:  # Any: bodies of several pages
     """Déclenche l'envoi d'e-mails sécurisé via Gmail API ou SMTP avec injection de variables."""
     from infrastructure.security.api_auth import Role, has_role
-    claims = getattr(request.state, "user", None)  # None: token check off (local desktop server)
+    claims = getattr(request.state, "user", None)  # None: token check off (local dev server)
     reason = EmailDispatchService.unauthorized_send_reason(
         data.get("recipients"), data.get("sender_email"),
         is_admin=claims is None or has_role(claims, Role.ADMIN))

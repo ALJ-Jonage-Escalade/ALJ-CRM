@@ -237,7 +237,6 @@ class HelloAssoWebhookService:
         items : articles déjà vérifiés auprès de l'API HelloAsso (prioritaires sur
         le contenu du payload, qui ne sert alors qu'à connaître le type d'événement).
         """
-        CompetitionRepository.setup_database()
         if items is None:
             event_type, raw_items = cls.extract_items_from_payload(payload)
         else:
@@ -295,7 +294,6 @@ class HelloAssoWebhookService:
             payer_name = sm.get("payeur") or ""
             licence = sm.get("licence") or ""
             comp_field = sm.get("competition") or ""
-            etat = sm.get("etat") or ""
 
             # Sauvegarder l'article dans la table miroir helloasso_items
             nom_p, _, prenom_p = payer_name.partition(" ")

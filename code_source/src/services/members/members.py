@@ -28,7 +28,7 @@ class MemberService:
         name = (season or "").strip() or seasons["active"]
         if name not in seasons["seasons"]:
             raise NotFound(f"Saison inconnue : {name}.")
-        planning = PlanningRepository.load_planning_data(log_debug=False)
+        planning = PlanningRepository.load_planning_data()
         rows = MemberRepository.list_member_rows(name)
         return {
             "season": name,
@@ -59,5 +59,5 @@ class MemberService:
         order = [seasons["active"]] + [s for s in seasons["seasons"] if s != seasons["active"]]
         rank = {s: i for i, s in enumerate(order)}
         rows = sorted(MemberRepository.list_member_rows_of_users(ids), key=lambda r: rank.get(r["season_name"], len(rank)))
-        planning = PlanningRepository.load_planning_data(log_debug=False)
+        planning = PlanningRepository.load_planning_data()
         return member_view.competitor_contacts(rows, planning, seasons["active"])

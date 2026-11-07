@@ -1,4 +1,4 @@
-"""Coaches CRUD; the names copied into the competitions are kept for older desktop builds."""
+"""Coaches CRUD; the competitions store coach ids only (names are resolved when read)."""
 from typing import Dict, Any, Optional
 
 from domain.competitions.models import coach_ids_of
@@ -7,7 +7,7 @@ from infrastructure.firestore.competitions.base import CompetitionStoreBase
 
 
 class CoachesMixin(CompetitionStoreBase):
-    """`coaches` collection; deleting or renaming a coach patches their competitions."""
+    """`coaches` collection; deleting a coach removes it from their competitions."""
 
     # ------------------------------------------------------------------
     # CRUD Coachs
@@ -33,29 +33,14 @@ class CoachesMixin(CompetitionStoreBase):
         ret_id = coach_id or cls._new_id()
         FirestoreClient.upsert_document(cls.COLLECTION_COACHES, str(ret_id),
                                         {"id": ret_id, "nom": nom, "updated_at": cls._now_iso()})
-        if coach_id:
-            cls._refresh_coach_names(ret_id, nom)
         return ret_id
 
     @classmethod
     def delete_coach(cls, coach_id: int) -> bool:
         existed = FirestoreClient.delete_document(cls.COLLECTION_COACHES, str(coach_id))
-        coaches = cls._coaches_map()
-
-        def patch(ids):
-            new_ids = [cid for cid in ids if cid != coach_id]
-            return {"coach_ids": new_ids, **cls._legacy_coach_fields(new_ids, coaches)}
-        cls._patch_competitions_of_coach(coach_id, patch, "Retrait du coach")
-        return existed
-
-    @classmethod
-    def _refresh_coach_names(cls, coach_id: int, nom: str):
-        """Only for the stored `coaches` copy read by older desktop builds: the API resolves
-        names when it reads. Remove with plan C2 step B (fixes A10 for renames)."""
-        coaches = {**cls._coaches_map(), coach_id: nom}
         cls._patch_competitions_of_coach(
-            coach_id, lambda ids: {"coaches": cls._coach_names(ids, coaches)},
-            "Mise à jour du nom du coach")
+            coach_id, lambda ids: {"coach_ids": [cid for cid in ids if cid != coach_id]}, "Retrait du coach")
+        return existed
 
     @classmethod
     def _patch_competitions_of_coach(cls, coach_id: int, make_patch, what: str):

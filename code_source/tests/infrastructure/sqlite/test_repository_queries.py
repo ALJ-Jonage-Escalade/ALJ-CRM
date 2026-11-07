@@ -9,7 +9,6 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from infrastructure.sqlite.connection import SqliteDatabase
-from infrastructure.sqlite.geocache import GeocacheRepository
 from infrastructure.sqlite.members import MemberRepository
 from infrastructure.sqlite.seasons import SeasonRepository
 
@@ -82,18 +81,6 @@ class TestRepositoryQueries(unittest.TestCase):
         self.assertIsInstance(users[leo], dict)
         self.assertEqual(MemberRepository.get_users_by_ids([]), {})
 
-    def test_correct_member_address_updates_user_and_geocache(self):
-        self._seed("1", "Léo", "MARTIN", "Loisir", "a@test.com")
-        MemberRepository.correct_member_address(
-            " léo", "martin ", "1 rue de la Paix", "75001", "Paris",
-            ("1 rue de la Paix, 75001, PARIS, France", 48.86, 2.33),
-        )
-        conn = SqliteDatabase.get_connection()
-        row = conn.execute("SELECT address, zip_code, city FROM users WHERE id = ?",
-                           (self._user_id("Léo"),)).fetchone()
-        conn.close()
-        self.assertEqual(tuple(row), ("1 rue de la Paix", "75001", "Paris"))
-        self.assertEqual(GeocacheRepository.get_geocache()["1 rue de la Paix, 75001, PARIS, France"], [48.86, 2.33])
 
     def test_check_readable(self):
         self.assertIsNone(SqliteDatabase.check_readable())

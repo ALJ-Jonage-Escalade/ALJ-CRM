@@ -1,5 +1,5 @@
 """
-Client REST Google Cloud Firestore (API v1) pour l'application de bureau.
+Client REST Google Cloud Firestore (API v1) du serveur.
 
 Fournit les opérations document (get / list / upsert / update partiel / delete)
 et les écritures par lot (commit) utilisées par le référentiel des compétitions.

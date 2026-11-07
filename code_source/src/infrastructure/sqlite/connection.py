@@ -126,7 +126,6 @@ def _ensure_email_templates(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
 class SqliteDatabase:
     """Chemin, connexions et schéma de la base SQLite locale des adhérents."""
     _db_path = os.path.join(DATA_ROOT, "database.db")
-    _db_path_overridden = False  # True dès que set_db_path() est appelé (tests, snapshot)
     _database_setup_done = False
 
     @classmethod
@@ -136,12 +135,12 @@ class SqliteDatabase:
     @classmethod
     def set_db_path(cls, path: str) -> None:
         cls._db_path = path
-        cls._db_path_overridden = True
         cls._database_setup_done = False
 
     @classmethod
-    def get_connection(cls) -> sqlite3.Connection:
-        conn = sqlite3.connect(cls._db_path, timeout=30.0)
+    def get_connection(cls, path: Optional[str] = None) -> sqlite3.Connection:
+        """Connection to the application's database, or to the file at `path`."""
+        conn = sqlite3.connect(path or cls._db_path, timeout=30.0)
         conn.row_factory = sqlite3.Row
         try:
             conn.execute("PRAGMA journal_mode=WAL")
@@ -154,15 +153,21 @@ class SqliteDatabase:
 
     @classmethod
     def setup_database(cls, force: bool = False) -> None:
-        """Initialise la base de données et crée les tables requises."""
+        """Initialise la base de données de l'application (une fois par processus, sauf `force`)."""
         if not force and cls._database_setup_done:
             return
-        print(f"🔧 [SQLITE] Initialisation de la BDD à l'emplacement : {cls._db_path}")
-        conn = cls.get_connection()
+        cls.apply_schema(cls._db_path)
+        cls._database_setup_done = True
+
+    @classmethod
+    def apply_schema(cls, path: str) -> None:
+        """Creates or upgrades the tables of the SQLite file at `path` (the cache, a new cache being built, a copy),
+        without changing the file the application uses."""
+        print(f"🔧 [SQLITE] Initialisation de la BDD à l'emplacement : {path}")
+        conn = cls.get_connection(path)
         cursor = conn.cursor()
 
-        # Phase 5 — schéma v2 natif : users / orders / purchases / purchase_options
-        # (les tables legacy adherents / adherents_seasons ne sont plus créées)
+        # Schéma v2 : users / orders / purchases / purchase_options (plus de tables legacy adherents*)
         schema_v2.ensure_v2_schema(cursor)
 
         # Création des tables de saisons
@@ -237,20 +242,14 @@ class SqliteDatabase:
         );
         """)
 
-        # Phase 0/5 — Gestion de la version du schéma (PRAGMA user_version)
+        # Schema version (PRAGMA user_version): 0 for a new file, tagged v2 here
         cursor.execute("PRAGMA user_version")
         current_version = cursor.fetchone()[0]
         if current_version == 1:
-            # Ancienne base legacy (v1) : auto-migration vers v2 au démarrage.
-            # Le drapeau est posé avant l'appel pour éviter toute récursion (migrate
-            # appelle setup_database lui-même).
-            cls._database_setup_done = True
-            conn.commit()
             conn.close()
-            print("🔁 [SQLITE] Base legacy (v1) détectée : lancement de la migration v2...")
-            from infrastructure.sqlite.migrations import migrate_schema_v2
-            migrate_schema_v2.migrate(skip_excel=False)
-            return
+            # The cache is rebuilt from Firestore at the current schema: a v1 file is a stray copy
+            raise RuntimeError(f"Base SQLite au schéma v1 non prise en charge ({path}) : supprimez ce fichier, "
+                               "le cache est reconstruit depuis Firestore.")
         if current_version == 0:
             cursor.execute(f"PRAGMA user_version = {schema_v2.SCHEMA_TARGET_VERSION}")
             print(f"🔖 [SQLITE] Base neuve taguée en version {schema_v2.SCHEMA_TARGET_VERSION} (schéma v2 natif).")
@@ -261,7 +260,6 @@ class SqliteDatabase:
         conn.commit()
         conn.close()
         print("✅ [SQLITE] Initialisation et vérification du schéma d'adhérents accomplies.")
-        cls._database_setup_done = True
 
     @classmethod
     def check_readable(cls) -> Optional[str]:

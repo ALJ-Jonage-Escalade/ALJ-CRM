@@ -4,11 +4,10 @@ Schéma cible v2 (users / orders / purchases / purchase_options) — module part
 Source unique de vérité pour :
 - le DDL des tables v2 (migration et écritures applicatives),
 - les normalisations (statuts, dates, textes legacy NULL/'' ),
-- la table de priorité des statuts (centralisée, anciennement dupliquée dans
-  sqlite_repository.py et exports/membership_excel.py),
+- la table de priorité des statuts,
 - les upserts users / orders / purchases / purchase_options.
 
-Importé par infrastructure.sqlite.members (écritures miroir phase 3) et migrate_schema_v2.
+Importé par infrastructure.sqlite.members et infrastructure.sqlite.connection.
 Aucune dépendance à infrastructure.sqlite.connection pour éviter toute importation circulaire.
 """
 import datetime
@@ -162,40 +161,6 @@ OPTION_PAIRS = [
     ("Assurance Option Trail", "opt_Assurance Option Trail", "opt_Montant Assurance Option Trail"),
 ]
 
-# Clés IHM (update_member_in_db) -> noms d'options v2
-IHM_TO_OPTIONS = {
-    "opt_assurance_base": "Assurance Base",
-    "opt_assurance_base_plus": "Assurance Base +",
-    "opt_assurance_base_plus_plus": "Assurance Base ++",
-    "opt_assurance_ski": "Assurance Option ski de piste",
-    "opt_assurance_vtt": "Assurance Option VTT",
-    "opt_assurance_trail": "Assurance Option Trail",
-}
-
-# Clés IHM -> colonnes users (miroir des correctifs manuels)
-IHM_TO_USERS = {
-    "user_last_name": "last_name",
-    "user_first_name": "first_name",
-    "primary_email": "email_primary",
-    "secondary_email": "email_secondary",
-    "phone": "phone",
-    "city": "city",
-    "emergency_contact_name_1": "emergency1_name",
-    "emergency_contact_phone_1": "emergency1_phone",
-    "licence_ffme": "licence_ffme",
-    "photo_auth": "photo_auth",
-    "health_q_auth": "health_commitment",
-    "badge_rouge": "badge_rouge",
-    "autonomie_bloc": "autonomie_bloc",
-    "hid_proxkey": "hid_proxkey",
-    "hid_proxkey_date": "hid_proxkey_date",
-    "hid_proxkey_comment": "hid_proxkey_comment",
-    "raw_passports": "raw_passports",
-    "raw_diplomas": "raw_diplomas",
-    "parental_auth_autonomous": "parental_auth_autonomous",
-    "parental_auth_family": "parental_auth_family",
-}
-
 
 def clean_legacy_text(val):
     """
@@ -249,8 +214,7 @@ def _get(rec, key):
 
 
 def build_user_field_map(cur=None):
-    """Map legacy->users (phase 1 : validation PRAGMA ; phase 5 : map statique, la table
-    legacy pouvant ne plus exister)."""
+    """Map legacy->users (map statique : la table legacy n'existe plus)."""
     return dict(USER_FIELD_MAP)
 
 
@@ -524,11 +488,8 @@ def insert_options_v2(cur, purchase_id, rec):
 
 
 def sync_members_to_v2(cur, members, season_name=SEASON_ACTIVE):
-    """
-    Phase 3 — Écriture applicative des adhésions dans le schéma v2.
-    Appelé par MemberRepository.upsert_members en miroir du flux legacy (même transaction).
-    Écrit désormais les payeurs (payer_*) perdus par l'ancien upsert.
-    """
+    """Écrit un lot d'adhésions dans le schéma v2, payeurs (payer_*) compris.
+    Appelé par MemberRepository.upsert_members (même transaction)."""
     ensure_v2_schema(cur)
     now_iso = datetime.datetime.now().isoformat(timespec="seconds")
     season_id = resolve_season_id(cur, season_name)
@@ -556,104 +517,9 @@ def sync_members_to_v2(cur, members, season_name=SEASON_ACTIVE):
     return stats
 
 
-def _resolve_user_id(cur, adherent_id=None, last_name="", first_name=""):
-    """Résout un user v2 : d'abord par legacy_adherent_id, sinon par identité normalisée.
-    Le fallback identité est indispensable : les users créés par la synchronisation
-    (upsert_members) n'ont pas encore de legacy_adherent_id au moment du miroir."""
-    if adherent_id is not None:
-        cur.execute("SELECT id FROM users WHERE legacy_adherent_id=?", (adherent_id,))
-        row = cur.fetchone()
-        if row:
-            return row["id"] if isinstance(row, sqlite3.Row) else row[0]
-    k_last = normalize_name(str(last_name or "")).upper()
-    k_first = normalize_name(str(first_name or "")).lower()
-    cur.execute("SELECT id FROM users WHERE last_name_key=? AND first_name_key=?", (k_last, k_first))
-    row = cur.fetchone()
-    if row:
-        return row["id"] if isinstance(row, sqlite3.Row) else row[0]
-    return None
 
 
-def apply_member_update(cur, user_id, order_ref, updated_fields, comment_text):
-    """
-    Phase 5 — Applique les correctifs manuels d'un adhérent dans le schéma v2 :
-    champs personnels -> users, champs de saison -> purchases, bascule des options.
-    """
-    now_iso = datetime.datetime.now().isoformat(timespec="seconds")
-
-    # Champs personnels -> users
-    for ihm_key, users_col in IHM_TO_USERS.items():
-        if ihm_key in updated_fields:
-            cur.execute(f'UPDATE users SET "{users_col}"=?, updated_at=? WHERE id=?',  # noqa: S608 - users_col issu de IHM_TO_USERS
-                        (updated_fields[ihm_key], now_iso, user_id))
-    if "user_last_name" in updated_fields:
-        cur.execute("UPDATE users SET last_name=?, last_name_key=? WHERE id=?",
-                    (str(updated_fields["user_last_name"]),
-                     normalize_name(str(updated_fields["user_last_name"])).upper(), user_id))
-    if "user_first_name" in updated_fields:
-        cur.execute("UPDATE users SET first_name=?, first_name_key=? WHERE id=?",
-                    (str(updated_fields["user_first_name"]),
-                     normalize_name(str(updated_fields["user_first_name"])).lower(), user_id))
-    if "birth_date" in updated_fields:
-        raw = str(updated_fields["birth_date"] or "")
-        cur.execute("UPDATE users SET birth_date=?, birth_date_raw=? WHERE id=?",
-                    (parse_iso_date(raw), raw, user_id))
-
-    # Champs de saison -> purchases
-    sets = ["is_modified=?", "commentaires_correctif=?", "updated_at=?"]
-    params = ["Oui", clean_legacy_text(comment_text) or "", now_iso]
-    if "status" in updated_fields:
-        sets += ["status=?", "status_normalized=?"]
-        params += [str(updated_fields["status"]), normalize_status(updated_fields["status"])]
-    cur.execute(
-        f'UPDATE purchases SET {", ".join(sets)} '  # noqa: S608 - fragments SET littéraux du code
-        f'WHERE user_id=? AND order_id IN (SELECT id FROM orders WHERE order_ref=?)',
-        params + [user_id, str(order_ref or "").strip()],
-    )
-
-    # Bascule des options d'assurance
-    cur.execute(
-        "SELECT id FROM purchases WHERE user_id=? AND order_id IN (SELECT id FROM orders WHERE order_ref=?)",
-        (user_id, str(order_ref or "").strip()),
-    )
-    prow = cur.fetchone()
-    if prow:
-        purchase_id = prow["id"] if isinstance(prow, sqlite3.Row) else prow[0]
-        for ihm_key, opt_name in IHM_TO_OPTIONS.items():
-            if ihm_key not in updated_fields:
-                continue
-            if is_true(updated_fields[ihm_key]):
-                cur.execute("INSERT OR IGNORE INTO purchase_options (purchase_id, option_name, amount) "
-                            "VALUES (?, ?, 0.0)", (purchase_id, opt_name))
-            else:
-                cur.execute("DELETE FROM purchase_options WHERE purchase_id=? AND option_name=?",
-                            (purchase_id, opt_name))
-
-
-def mirror_email_sent_date(cur, order_ref, date_str):
-    """Phase 3 — Miroir de la date d'envoi d'email sur les achats v2 de la commande."""
-    cur.execute(
-        "UPDATE purchases SET email_sent_date=? WHERE order_id IN (SELECT id FROM orders WHERE order_ref=?)",
-        (date_str, str(order_ref or "").strip()),
-    )
-
-
-def mirror_adherent_personal(cur, adherent_id, **fields):
-    """Phase 3 — Miroir générique de mises à jour adherents -> users (merges FFME/autonomes)."""
-    cols = []
-    params = []
-    for col, val in fields.items():
-        cols.append(f'"{col}"=?')
-        params.append(val)
-    if not cols:
-        return
-    cols.append("updated_at=?")
-    params.append(datetime.datetime.now().isoformat(timespec="seconds"))
-    params.append(adherent_id)
-    cur.execute(f'UPDATE users SET {", ".join(cols)} WHERE legacy_adherent_id=?', params)  # noqa: S608 - colonnes = arguments nommés passés par le code
-
-
-# Phase 2 — Vue de compatibilité : reproduit le format plat legacy (colonnes champ_* / opt_*)
+# Vue de compatibilité : reproduit le format plat legacy (colonnes champ_* / opt_*)
 # à partir du schéma cible users / orders / purchases / purchase_options.
 # Stratégie strangler : le code existant lit cette vue sans modification.
 # Les options d'assurance sont exposées au niveau user (achat porteur de la saison active),

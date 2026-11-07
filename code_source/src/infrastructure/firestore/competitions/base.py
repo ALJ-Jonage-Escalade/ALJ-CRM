@@ -125,20 +125,11 @@ class CompetitionStoreBase:
         return [coaches[cid] for cid in coach_ids if cid is not None and cid in coaches]
 
     @classmethod
-    def _legacy_coach_fields(cls, coach_ids: List[int], coaches: Dict[int, str]) -> Dict[str, Any]:
-        """Copies of `coach_ids` kept for desktop builds older than plan C2, which read
-        `coach1_id..coach3_id` (first three coaches) and the stored `coaches` names.
-        Remove with plan C2 step B, once every club PC runs the new version."""
-        ids = list(coach_ids)[:len(LEGACY_COACH_SLOTS)]
-        ids += [None] * (len(LEGACY_COACH_SLOTS) - len(ids))
-        return {**dict(zip(LEGACY_COACH_SLOTS, ids, strict=True)), "coaches": cls._coach_names(coach_ids, coaches)}
-
-    @classmethod
     def _api_doc(cls, doc: Dict[str, Any], coaches: Dict[int, str]) -> Dict[str, Any]:
         """Document for the web pages: `coach_ids` normalized (legacy slots read too) and
         `coaches` resolved from the coaches collection, never the stored copy. Only a deadline set by
         hand is stored: the default one (1 week before the start) follows the start date."""
-        out = cls._clean_doc(doc)
+        out = {k: v for k, v in cls._clean_doc(doc).items() if k not in LEGACY_COACH_SLOTS}
         out["deadline"] = str(doc.get("deadline") or "").strip() or default_deadline(str(doc.get("date_competition") or ""))
         out["coach_ids"] = coach_ids_of(doc)
         out["coaches"] = cls._coach_names(out["coach_ids"], coaches)
@@ -167,8 +158,7 @@ class CompetitionStoreBase:
         return Competition.from_row(row)
 
     @classmethod
-    def _build_comp_doc(cls, doc: Optional[Dict[str, Any]], comp: Competition,
-                        coaches: Dict[int, str]) -> Dict[str, Any]:
+    def _build_comp_doc(cls, doc: Optional[Dict[str, Any]], comp: Competition) -> Dict[str, Any]:
         """Document complet prêt à être écrit (participants préservés)."""
         parts = (doc or {}).get("participants") or []
         now = cls._now_iso()
@@ -185,7 +175,6 @@ class CompetitionStoreBase:
             "resultats_synced_at": comp.resultats_synced_at or "",
             "whatsapp_link": comp.whatsapp_link or "",
             "coach_ids": list(comp.coach_ids),
-            **cls._legacy_coach_fields(comp.coach_ids, coaches),
             "participants": parts,
             "created_at": (doc or {}).get("created_at") or now,
             "updated_at": now,
@@ -228,16 +217,3 @@ class CompetitionStoreBase:
         except Exception:
             return {}
         return {d.get("id"): str(d.get("nom") or "") for d in docs if d.get("id") is not None}
-
-    # ------------------------------------------------------------------
-    # Compatibilité avec l'ancien référentiel SQLite
-    # ------------------------------------------------------------------
-    @classmethod
-    def setup_database(cls, force: bool = False):
-        """Aucune action : les collections Firestore existent par nature."""
-        return None
-
-    @classmethod
-    def get_db_path(cls) -> str:
-        """Ancienne API (SQLite) : conservée pour compatibilité, inutilisée."""
-        return ""

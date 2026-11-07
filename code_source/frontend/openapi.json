@@ -6290,10 +6290,6 @@
             ],
             "title": "User Email"
           },
-          "backend": {
-            "type": "string",
-            "title": "Backend"
-          },
           "db_accessible": {
             "type": "boolean",
             "title": "Db Accessible"
@@ -6311,7 +6307,6 @@
           "client_id_configured",
           "refresh_token_present",
           "user_email",
-          "backend",
           "db_accessible",
           "error"
         ],

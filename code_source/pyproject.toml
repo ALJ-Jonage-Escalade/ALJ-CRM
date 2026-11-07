@@ -53,7 +53,6 @@ ignore = [
     "B007",  # variables de boucle inutilisées (patterns UI existants)
     "B023",  # closures de boucle volontaires (event loops synchrones, callbacks par itération)
     "E701",  # style historique : instruction simple après deux-points
-    "F841",  # variables locales assignées non relues (récupération de boutons Qt, styles)
     "E402",  # imports après configuration sys.path (structure des entry points du projet)
 ]
 

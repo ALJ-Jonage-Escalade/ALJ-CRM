@@ -19,7 +19,8 @@ class TestCoaches(ApiTestCase):
 
         self.assertEqual(self.client.delete(f"/api/coaches/{coach}").status_code, 200)
         doc = Repo.get_competition_doc(comp)
-        self.assertEqual((doc["coach_ids"], doc["coach1_id"], doc["coaches"]), ([], None, []))
+        self.assertEqual((doc["coach_ids"], doc["coaches"]), ([], []))
+        self.assertNotIn("coach1_id", doc)
         self.assertEqual(self.client.delete(f"/api/coaches/{coach}").status_code, 404)
         self.assertEqual(self.client.put("/api/coaches/1", json={"nom": "X"}).status_code, 404)
         self.assertEqual(self.client.post("/api/coaches", json={"nom": ""}).status_code, 422)

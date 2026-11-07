@@ -30,15 +30,8 @@ from infrastructure.firestore.cloud_sync.common import (
 
 def create_schema(path: str):
     """Crée une base vide au schéma de l'application (SqliteDatabase)."""
-    from infrastructure.sqlite.connection import SqliteDatabase as R
-    saved = (R._db_path, R._db_path_overridden, R._database_setup_done)
-    try:
-        R._db_path = path
-        R._db_path_overridden = True
-        R._database_setup_done = False
-        R.setup_database(force=True)
-    finally:
-        R._db_path, R._db_path_overridden, R._database_setup_done = saved
+    from infrastructure.sqlite.connection import SqliteDatabase
+    SqliteDatabase.apply_schema(path)  # the application keeps its own file meanwhile
 
 
 def _remove_db_files(path: str):
