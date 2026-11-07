@@ -118,5 +118,5 @@ const DETAIL_LINES: Record<Schemas["BatchCompetition"]["status"], (c: Schemas["B
   found: (c) => `🏆 ${c.nom} : ${c.athletes.length} athlète(s) classé(s) pour le club`,
   pending: (c) => `⏳ ${c.nom} : pas encore de résultats publiés`,
   needs_url: (c) => `✍️ ${c.nom} : une page de même nom existe, mais pas à cette date : URL à saisir sur la fiche`,
-  error: (c) => `⚠️ ${c.nom} : page MyCompet illisible pour le moment`,
+  error: (c) => `⚠️ ${c.nom} : résultats illisibles ou non enregistrés pour le moment (nouvel essai au prochain passage)`,
 };

@@ -13,7 +13,6 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from infrastructure.helloasso.webhook import HelloAssoWebhookService
-import asyncio
 from api.integrations.helloasso import webhook_helloasso
 
 
@@ -63,6 +62,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
     @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.refresh_helloasso_payment")
     @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.set_item_link")
     @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.sync_helloasso_mirror")
+    @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.known_helloasso_item_ids", new=lambda: set())
     @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.list_helloasso_links", return_value={})
     @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.list_adherents")
     @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.list_competitions")
@@ -128,7 +128,8 @@ class TestHelloAssoWebhookService(unittest.TestCase):
              patch(f"{Repo}.sync_helloasso_mirror") as mirror, \
              patch(f"{Repo}.list_competitions", return_value=[]), \
              patch(f"{Repo}.list_adherents", return_value=[]), \
-             patch(f"{Repo}.list_helloasso_links", return_value={}):
+             patch(f"{Repo}.list_helloasso_links", return_value={}), \
+             patch(f"{Repo}.known_helloasso_item_ids", return_value=set()):
             report = HelloAssoWebhookService.process_webhook({"eventType": "Order"}, items=[tshirt])
             self.assertEqual(report["status"], "ignored")
             self.assertEqual(report["other_forms"], ["vetements-club-al-jonage-2026-2027"])
@@ -151,9 +152,24 @@ class TestHelloAssoWebhookService(unittest.TestCase):
             "data": {}
         }
         with patch("infrastructure.helloasso.api.credentials_configured", return_value=False), \
+             patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=""), \
              patch.dict(os.environ, {"ALJ_API_AUTH": "off"}):
-            resp = asyncio.run(webhook_helloasso(payload))
+            resp = webhook_helloasso(payload, token=None)
         self.assertEqual(resp["status"], "ignored")
+
+    def test_webhook_failures_are_never_answered_200(self):
+        """A failure HelloAsso must see: 503 when Firestore (settings included) is unreadable, 500 otherwise."""
+        from infrastructure.firestore.client import FirestoreError
+        payload = {"eventType": "Order", "data": {"items": [{"id": 1, "amount": 100}]}}
+        cases = ((FirestoreError("settings unreadable"), 503), (KeyError("unexpected"), 500))
+        for failure, status in cases:
+            with self.subTest(failure=type(failure).__name__), \
+                 patch("infrastructure.helloasso.api.credentials_configured", return_value=False), \
+                 patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", side_effect=failure), \
+                 patch.dict(os.environ, {"ALJ_API_AUTH": "off"}):
+                resp = webhook_helloasso(payload, token=None)
+            self.assertEqual(resp.status_code, status)
+            self.assertNotIn(str(failure), resp.body.decode())
 
     def test_check_and_notify_all_paid_success(self):
         """Vérifie l'envoi d'e-mail récapitulatif lorsque tous les compétiteurs ont réglé."""

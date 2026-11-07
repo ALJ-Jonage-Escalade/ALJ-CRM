@@ -327,7 +327,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/competitions/{comp_id}/fetch-results": {
+    "/api/competitions/{competition_id}/fetch-results": {
         parameters: {
             query?: never;
             header?: never;
@@ -338,11 +338,11 @@ export interface paths {
         put?: never;
         /**
          * Api Fetch Competition Results
-         * @description Récupère les résultats officiels depuis MyCompet FFME pour une compétition donnée,
-         *     extrait les compétiteurs de l'Amicale Laïque de Jonage et met à jour leurs classements.
-         *     404 `needs_url`: the results page was not found automatically, the coach gives its address or number.
+         * @description Fetches a competition's MyCompet results and writes the club's rankings (coaches).
+         *     404 `needs_url`: the results page was not found automatically, the coach gives its address or number;
+         *     502: MyCompet failed; 503: Firestore failed (nothing reported as saved).
          */
-        post: operations["api_fetch_competition_results_api_competitions__comp_id__fetch_results_post"];
+        post: operations["api_fetch_competition_results_api_competitions__competition_id__fetch_results_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -515,6 +515,7 @@ export interface paths {
          * Get Dashboard Data
          * @description Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
          *     des adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.
+         *     404: campaign unknown to HelloAsso; 502: HelloAsso could not be read completely (never a partial dashboard).
          */
         get: operations["get_dashboard_data_api_dashboard_get"];
         put?: never;
@@ -1038,7 +1039,9 @@ export interface paths {
         put?: never;
         /**
          * Sync Helloasso Api
-         * @description Synchronise la campagne annuelle HelloAsso vers Firestore.
+         * @description Reads the competitions' HelloAsso campaign and links its payments (mirror, automatic links, participants).
+         *     400: no campaign chosen; 502: HelloAsso could not be read completely, nothing is written (a partial read would
+         *     unlink the payments it missed); 503: Firestore unavailable.
          */
         post: operations["sync_helloasso_api_api_helloasso_sync_post"];
         delete?: never;
@@ -1108,13 +1111,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        get?: never;
+        put?: never;
         /**
          * Google Auth Login
-         * @description Initie le flux d'autorisation OAuth2 Google pour renouveler le refresh token.
+         * @description Starts the Google OAuth2 flow that replaces the club's refresh token (admins): answers Google's consent URL,
+         *     with a signed state naming the admin, that the page then opens.
          */
-        get: operations["google_auth_login_api_auth_google_login_get"];
-        put?: never;
-        post?: never;
+        post: operations["google_auth_login_api_auth_google_login_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2577,6 +2581,30 @@ export interface components {
             gmail: components["schemas"]["ServiceCheck"];
         };
         /**
+         * GoogleLoginStart
+         * @description return_to: page of this site to come back to after Google's consent screen.
+         */
+        GoogleLoginStart: {
+            /**
+             * Return To
+             * @default /bureau/parametres
+             */
+            return_to?: string;
+        };
+        /**
+         * GoogleLoginUrl
+         * @description url: Google's consent page, to open in the browser; it carries a signed state valid for 10 minutes.
+         */
+        GoogleLoginUrl: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Url */
+            url: string;
+        };
+        /**
          * GoogleStatus
          * @description connected: the token works; expired: a token is stored but Google refuses it; disconnected: no token.
          */
@@ -2844,20 +2872,15 @@ export interface components {
         };
         /**
          * HelloAssoSync
-         * @description error: no campaign configured or HelloAsso unreachable (HTTP 200, as the former pages expect).
+         * @description The campaign was read completely and its payments linked (failures are HTTP errors, see the route).
          */
         HelloAssoSync: {
             /**
              * Status
-             * @enum {string}
+             * @constant
              */
-            status: "success" | "error";
-            /**
-             * Message
-             * @default
-             */
-            message?: string;
-            stats?: components["schemas"]["HelloAssoSyncStats"] | null;
+            status: "success";
+            stats: components["schemas"]["HelloAssoSyncStats"];
         };
         /** HelloAssoSyncStats */
         HelloAssoSyncStats: {
@@ -3838,6 +3861,23 @@ export interface components {
              * @default true
              */
             same_sheet?: boolean;
+        };
+        /**
+         * ResultsFetchRequest
+         * @description url: MyCompet results page or number given by the coach ("": the stored one, else a search); club: name
+         *     searched in the results.
+         */
+        ResultsFetchRequest: {
+            /**
+             * Url
+             * @default
+             */
+            url?: string;
+            /**
+             * Club
+             * @default JONAGE
+             */
+            club?: string;
         };
         /**
          * ResultsFetched
@@ -4901,20 +4941,18 @@ export interface operations {
             };
         };
     };
-    api_fetch_competition_results_api_competitions__comp_id__fetch_results_post: {
+    api_fetch_competition_results_api_competitions__competition_id__fetch_results_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                comp_id: string;
+                competition_id: number;
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["ResultsFetchRequest"];
             };
         };
         responses: {
@@ -4947,6 +4985,15 @@ export interface operations {
             };
             /** @description Bad Gateway */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5291,6 +5338,15 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -5298,6 +5354,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -6539,6 +6604,33 @@ export interface operations {
                     "application/json": components["schemas"]["HelloAssoSync"];
                 };
             };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
         };
     };
     list_campaigns_api_helloasso_campaigns_get: {
@@ -6643,17 +6735,18 @@ export interface operations {
             };
         };
     };
-    google_auth_login_api_auth_google_login_get: {
+    google_auth_login_api_auth_google_login_post: {
         parameters: {
-            query?: {
-                return_to?: string | null;
-                redirect_uri?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoogleLoginStart"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -6661,7 +6754,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["GoogleLoginUrl"];
                 };
             };
             /** @description Validation Error */
@@ -6671,6 +6764,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -6770,6 +6872,15 @@ export interface operations {
             };
             /** @description Bad Gateway */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

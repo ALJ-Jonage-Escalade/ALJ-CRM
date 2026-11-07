@@ -1,7 +1,9 @@
 import logging
 import os
 import requests
-from infrastructure.security.secret_store import SecretStore
+from typing import Dict
+
+from infrastructure.security.secret_store import SecretPersistenceError, SecretStore
 
 logger = logging.getLogger("alj")
 
@@ -104,7 +106,7 @@ class GoogleDriveClient:
         """Récupère un access token d'API Google à partir du refresh token.
 
         Si le jeton stocké est révoqué ('invalid_grant' : nouvelle autorisation OAuth2
-        réalisée sans mise à jour du trousseau Windows), retente avec les identifiants
+        réalisée sans mise à jour des valeurs enregistrées), retente avec les identifiants
         des fichiers .env puis répare automatiquement le SecretStore avec le jeton valide.
         """
         candidates = cls._iter_credential_candidates(env_paths=env_paths)
@@ -128,20 +130,20 @@ class GoogleDriveClient:
 
             if response.status_code == 200:
                 resp_json = response.json()
+                repaired: Dict[str, str] = {}
                 new_refresh = resp_json.get("refresh_token")
-                if new_refresh and new_refresh != refresh_token:
-                    SecretStore.set_secret("GMAIL_REFRESH_TOKEN", new_refresh)
                 if idx > 0:
-                    # Auto-réparation : le candidat de repli fonctionne, le stockage sécurisé
-                    # (keyring) contenait donc un refresh token révoqué -> on le remet à jour.
-                    print("🔧 [DRIVE] Refresh token révoqué détecté dans le stockage sécurisé : réparation automatique depuis le fichier .env...")
-                    for key, value in (
-                        ("GMAIL_CLIENT_ID", client_id),
-                        ("GMAIL_CLIENT_SECRET", client_secret),
-                        ("GMAIL_REFRESH_TOKEN", refresh_token),
-                    ):
-                        SecretStore.set_secret(key, value)
-                    print("✅ [DRIVE] Identifiants Google réparés : le token valide est de nouveau actif.")
+                    # Self-repair: the stored token is revoked but this fallback .env works (OAuth renewed
+                    # without updating the stored values): store the working credentials
+                    logger.warning("[DRIVE] Refresh token stocké révoqué : réparation depuis le fichier .env")
+                    repaired = {"GMAIL_CLIENT_ID": client_id, "GMAIL_CLIENT_SECRET": client_secret, "GMAIL_REFRESH_TOKEN": refresh_token}
+                if new_refresh and new_refresh != refresh_token:
+                    repaired["GMAIL_REFRESH_TOKEN"] = new_refresh
+                if repaired:
+                    try:
+                        SecretStore.set_secrets(repaired)
+                    except SecretPersistenceError:  # the access token works now; the next call retries the repair
+                        logger.warning("[DRIVE] Identifiants Google valides mais non enregistrés", exc_info=True)
                 return resp_json.get("access_token", "")
 
             last_error = f"{response.status_code} - {response.text}"

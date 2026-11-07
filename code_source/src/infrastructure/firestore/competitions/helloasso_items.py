@@ -3,7 +3,7 @@ and the payments those links carry over to the participants."""
 import json
 import logging
 import re
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from domain.competitions.models import (
     PAIEMENT_EN_ATTENTE,
@@ -49,6 +49,11 @@ class HelloAssoItemsMixin(ParticipantsMixin):
                 continue
             items[iid] = d
         return items
+
+    @classmethod
+    def known_helloasso_item_ids(cls) -> Set[int]:
+        """Identifiers of the HelloAsso items already in the mirror."""
+        return set(cls._items_map())
 
     @classmethod
     def sync_helloasso_mirror(cls, summarized: list, raw_items: list,

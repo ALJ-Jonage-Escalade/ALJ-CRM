@@ -14,8 +14,17 @@ if _src_dir not in sys.path:
 
 from fastapi.testclient import TestClient
 from server import app
+from infrastructure.security.secret_store import SecretPersistenceError
 
 XSS = '"><img src=x onerror=alert(1)>'
+CLIENT_SECRET = "mock_sec"
+
+
+def signed_state(**payload):
+    """State as POST /api/auth/google/login makes it, signed with the mocked client secret."""
+    import time
+    from api.integrations.google_auth import _sign_state
+    return _sign_state({"ts": time.time(), **payload}, CLIENT_SECRET)
 
 
 class TestGoogleAuthWeb(unittest.TestCase):
@@ -82,16 +91,61 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertEqual(data["user_email"], "test@alj-escalade.fr")
 
     @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
-    def test_login_redirects_to_google(self, mock_creds):
-        mock_creds.return_value = ("client_id_test.apps.googleusercontent.com", "secret_test")
-        resp = self.client.get("/api/auth/google/login?return_to=/bureau/outils", follow_redirects=False)
-        self.assertEqual(resp.status_code, 302)
-        location = resp.headers.get("location", "")
+    def test_login_answers_google_url_with_signed_state(self, mock_creds):
+        import urllib.parse
+        from api.integrations.google_auth import _read_state
+        mock_creds.return_value = ("client_id_test.apps.googleusercontent.com", CLIENT_SECRET)
+        resp = self.client.post("/api/auth/google/login", json={"return_to": "/bureau/outils"})
+        self.assertEqual(resp.status_code, 200)
+        location = resp.json()["url"]
         self.assertTrue(location.startswith("https://accounts.google.com/o/oauth2/auth"))
         self.assertIn("client_id_test", location)
         self.assertIn("access_type=offline", location)
         self.assertIn("prompt=consent", location)
-        self.assertIn("state=", location)
+        state = urllib.parse.parse_qs(urllib.parse.urlparse(location).query)["state"][0]
+        self.assertEqual(_read_state(state, CLIENT_SECRET)["return_to"], "/bureau/outils")
+        self.assertIsNone(_read_state(state, "another secret"))
+
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials", return_value=(None, None))
+    def test_login_without_client_credentials(self, mock_creds):
+        self.assertEqual(self.client.post("/api/auth/google/login", json={}).status_code, 503)
+
+    def test_state_signature_and_expiry(self):
+        from api.integrations.google_auth import STATE_MAX_AGE, _read_state, _sign_state
+        state = _sign_state({"ts": 1000.0, "return_to": "/bureau"}, CLIENT_SECRET)
+        self.assertEqual(_read_state(state, CLIENT_SECRET, now=1000.0 + STATE_MAX_AGE)["return_to"], "/bureau")
+        self.assertIsNone(_read_state(state, CLIENT_SECRET, now=1001.0 + STATE_MAX_AGE))  # expired
+        body, _, signature = state.rpartition(".")
+        forged = base64.urlsafe_b64encode(json.dumps({"ts": 1000.0, "return_to": "/x"}).encode()).decode()
+        for value in (None, "", body, f"{forged}.{signature}", f"{body}.{'0' * 64}", "not.base64!"):
+            with self.subTest(state=value):
+                self.assertIsNone(_read_state(value, CLIENT_SECRET, now=1000.0))
+
+    @patch("requests.post")
+    @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials", return_value=("mock_cid", CLIENT_SECRET))
+    def test_callback_refuses_unsigned_state(self, mock_creds, mock_set_secret, mock_post):
+        """A flow not started by an admin here (old unsigned state, forged one): no code exchange, nothing stored."""
+        unsigned = base64.urlsafe_b64encode(json.dumps({"return_to": "/bureau"}).encode()).decode()
+        for state in (None, unsigned, signed_state(return_to="/bureau") + "0"):
+            with self.subTest(state=state):
+                params = {"code": "c"} | ({"state": state} if state else {})
+                resp = self.client.get("/api/auth/google/callback", params=params)
+                self.assertEqual(resp.status_code, 400)
+                self.assertIn("invalide ou expiré", resp.text)
+        mock_post.assert_not_called()
+        mock_set_secret.assert_not_called()
+
+    @patch("requests.post")
+    @patch("infrastructure.security.secret_store.SecretStore.get_secret", return_value="stored_refresh_token")
+    @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials", return_value=("mock_cid", CLIENT_SECRET))
+    def test_callback_without_refresh_token_never_shows_the_stored_one(self, mock_creds, mock_set_secret, mock_get_secret, mock_post):
+        mock_post.return_value = MagicMock(status_code=200, json=lambda: {"access_token": "a"})
+        resp = self.client.get("/api/auth/google/callback", params={"code": "c", "state": signed_state()})
+        self.assertIn("pas renvoyé de Refresh Token", resp.text)
+        self.assertNotIn("stored_refresh_token", resp.text)
+        mock_set_secret.assert_not_called()
 
     def test_callback_with_error(self):
         resp = self.client.get("/api/auth/google/callback?error=access_denied")
@@ -107,17 +161,17 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertIn("&lt;img", resp.text)
 
     @patch("requests.post", side_effect=ConnectionError("proxy 10.0.0.12:3128 refused"))
-    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials", return_value=("cid", "sec"))
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials", return_value=("cid", CLIENT_SECRET))
     def test_callback_network_error_is_generic(self, mock_creds, mock_post):
-        resp = self.client.get("/api/auth/google/callback?code=mock_code")
+        resp = self.client.get("/api/auth/google/callback", params={"code": "mock_code", "state": signed_state()})
         self.assertIn("Échec de la communication avec Google", resp.text)
         self.assertNotIn("10.0.0.12", resp.text)
 
     @patch("infrastructure.firestore.cloud_database.CloudDatabase.is_enabled", return_value=False)
     @patch("requests.post")
     @patch("requests.get")
-    @patch("infrastructure.security.secret_store.SecretStore.set_secret")
-    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials", return_value=("mock_cid", "mock_sec"))
+    @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials", return_value=("mock_cid", CLIENT_SECRET))
     def test_callback_rejects_foreign_return_to(self, mock_creds, mock_set_secret, mock_get, mock_post, mock_enabled):
         mock_post.return_value = MagicMock(status_code=200, json=lambda: {"access_token": "a", "refresh_token": "r"})
         mock_get.return_value = MagicMock(status_code=200, json=lambda: {"email": XSS})
@@ -130,8 +184,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
         }
         for return_to, js_literal in cases.items():
             with self.subTest(return_to=return_to):
-                state = base64.urlsafe_b64encode(json.dumps({"return_to": return_to}).encode()).decode()
-                html = self.client.get(f"/api/auth/google/callback?code=c&state={state}").text
+                html = self.client.get("/api/auth/google/callback", params={"code": "c", "state": signed_state(return_to=return_to)}).text
                 self.assertIn("Connexion Google Réussie", html)
                 self.assertIn(f"window.location.href = {js_literal};", html)
                 self.assertNotIn("evil.example", html)
@@ -159,13 +212,25 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Code d'autorisation manquant", resp.text)
 
+    @patch("requests.post")
+    @patch("infrastructure.security.secret_store.SecretStore.set_secrets",
+                  side_effect=SecretPersistenceError("Firestore down"))
+    @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials", return_value=("mock_cid", CLIENT_SECRET))
+    def test_callback_reports_credentials_it_could_not_save(self, mock_creds, mock_set_secrets, mock_post):
+        mock_post.return_value = MagicMock(status_code=200, json=lambda: {"access_token": "a", "refresh_token": "r"})
+        with patch("requests.get", return_value=MagicMock(status_code=500)):
+            resp = self.client.get("/api/auth/google/callback", params={"code": "c", "state": signed_state()})
+        self.assertEqual(resp.status_code, 503)
+        self.assertIn("non enregistrés", resp.text)
+        self.assertNotIn("Réussie", resp.text)
+
     @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync")
     @patch("requests.post")
     @patch("requests.get")
-    @patch("infrastructure.security.secret_store.SecretStore.set_secret")
+    @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
     @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
     def test_callback_success(self, mock_creds, mock_set_secret, mock_get, mock_post, mock_sync):
-        mock_creds.return_value = ("mock_cid", "mock_sec")
+        mock_creds.return_value = ("mock_cid", CLIENT_SECRET)
 
         post_mock = MagicMock()
         post_mock.status_code = 200
@@ -180,17 +245,21 @@ class TestGoogleAuthWeb(unittest.TestCase):
         get_mock.json.return_value = {"email": "club@alj-escalade.fr"}
         mock_get.return_value = get_mock
 
-        # Préparer un state encodé
-        state_data = {"redirect_uri": "http://testserver/api/auth/google/callback", "return_to": "/bureau/outils"}
-        state = base64.urlsafe_b64encode(json.dumps(state_data).encode()).decode()
+        state = signed_state(redirect_uri="http://testserver/api/auth/google/callback", return_to="/bureau/outils",
+                             admin="albus.dumbledore@alj-escalade.fr")
 
-        resp = self.client.get(f"/api/auth/google/callback?code=mock_code&state={state}")
+        with self.assertLogs("alj", "INFO") as logs:
+            resp = self.client.get("/api/auth/google/callback", params={"code": "mock_code", "state": state})
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Connexion Google Réussie", resp.text)
         self.assertIn("club@alj-escalade.fr", resp.text)
+        self.assertNotIn("new_refresh_token_456", resp.text)  # the token never reaches a page
+        self.assertTrue(any("albus.dumbledore@alj-escalade.fr" in line for line in logs.output))
+        self.assertEqual(mock_post.call_args.kwargs["data"]["redirect_uri"], "http://testserver/api/auth/google/callback")
 
         # Vérifier que le nouveau refresh token et l'email ont été stockés
-        calls = {call[0][0]: call[0][1] for call in mock_set_secret.call_args_list}
+        mock_set_secret.assert_called_once()  # one write: never a mix of old and new credentials
+        calls = mock_set_secret.call_args.args[0]
         self.assertEqual(calls.get("GMAIL_REFRESH_TOKEN"), "new_refresh_token_456")
         self.assertEqual(calls.get("GMAIL_USER_EMAIL"), "club@alj-escalade.fr")
 
@@ -217,7 +286,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
     @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync")
     @patch("requests.post")
     @patch("requests.get")
-    @patch("infrastructure.security.secret_store.SecretStore.set_secret")
+    @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
     @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
     def test_update_token_success(self, mock_creds, mock_set_secret, mock_get, mock_post, mock_sync):
         mock_creds.return_value = ("cid", "sec")

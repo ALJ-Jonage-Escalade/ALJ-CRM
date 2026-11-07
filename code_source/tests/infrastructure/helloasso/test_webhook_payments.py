@@ -63,6 +63,22 @@ class TestWebhookPayments(ApiTestCase):
         self.receive(payment_item(7778, 10000, 500))
         self.assertEqual(self.payment(), (True, "paye", 20.0, ["10000", "9999"]))
 
+    def test_redelivered_payment_keeps_the_cancellation(self):
+        """HelloAsso redelivers a notification already received: the coach's later cancellation is kept."""
+        self.receive(payment_item(7777, 9999, 1500))
+        Repo.mark_cancelled(self.comp, 101, "annule_reporte")
+        before = self.payment()
+        self.receive(payment_item(7777, 9999, 1500))
+        self.assertEqual(self.payment(), before)
+        self.assertEqual(before[:2], (False, "annule_reporte"))
+
+    def test_redelivered_payment_lists_a_member_removed_meanwhile(self):
+        """A known item whose member is no longer listed: listed again, selected and paid (nothing to undo)."""
+        self.receive(payment_item(7777, 9999, 1500))
+        Repo.remove_participant(self.comp, 101)
+        self.receive(payment_item(7777, 9999, 1500))
+        self.assertEqual(self.payment(), (True, "paye", 15.0, ["9999"]))
+
     def test_item_missing_from_the_mirror_records_its_own_amount(self):
         """Mirror write failed: the item cannot be added up with the others, its amount is kept."""
         with patch(f"{REPO}.sync_helloasso_mirror", side_effect=RuntimeError("Firestore indisponible")):

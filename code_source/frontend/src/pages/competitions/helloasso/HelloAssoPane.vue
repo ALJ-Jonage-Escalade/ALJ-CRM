@@ -89,7 +89,7 @@ async function sync(): Promise<void> {
   try {
     const answer = await writer.run(() => integrationsApi.syncHelloAsso());
     if (answer) {
-      writer.toast(syncMessage(answer), answer.status === "success" ? 5000 : 9000);
+      writer.toast(syncMessage(answer), 5000);
     }
     emit("changed");
   } finally {

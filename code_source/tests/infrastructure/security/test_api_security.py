@@ -384,6 +384,16 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
         self.assertEqual(self.client.post("/api/send-email", json={}).status_code, 401)
         self.assertEqual(self.client.post("/api/helloasso/sync").status_code, 401)
 
+    def test_google_credentials_routes(self):
+        """Replacing the club's Google credentials is for admins; its status is for staff, never public."""
+        coach = {"Authorization": f"Bearer {make_token(email=COACH)}"}
+        self.assertEqual(self.client.post("/api/auth/google/login", json={}).status_code, 401)
+        self.assertEqual(self.client.post("/api/auth/google/login", json={}, headers=coach).status_code, 403)
+        self.assertEqual(self.get("/api/auth/google/status").status_code, 401)
+        self.assertEqual(self.get("/api/auth/google/status", make_token(email=READONLY)).status_code, 403)
+        # Google's redirect comes without the user's token: reachable, but refused without a signed state
+        self.assertNotIn(self.get("/api/auth/google/callback?code=c").status_code, (401, 403))
+
     def test_readonly_role_end_to_end(self):
         """Readonly can read competitions, and nothing else."""
         readonly = make_token(email=READONLY)
@@ -498,6 +508,7 @@ class TestWebhookVerification(unittest.TestCase):
     def test_process_webhook_uses_verified_items(self):
         """Avec des articles vérifiés, le contenu du payload n'est pas utilisé."""
         with patch.object(HelloAssoWebhookService, "extract_items_from_payload") as extract, \
+             patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=""), \
              patch("infrastructure.helloasso.webhook.CompetitionRepository") as repo:
             repo.list_competitions.return_value = []
             repo.list_adherents.return_value = []

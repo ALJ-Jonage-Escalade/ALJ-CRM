@@ -44,6 +44,11 @@ class CompetitionsMixin(AdherentsMixin):
         return docs
 
     @classmethod
+    def get_stored_competition_doc(cls, competition_id: int) -> Optional[Dict[str, Any]]:
+        """The competition's document as stored (no API shaping), None when unknown: for workflows reading its fields."""
+        return cls._load_comp_doc(competition_id)
+
+    @classmethod
     def get_competition_doc(cls, competition_id: int) -> Optional[Dict[str, Any]]:
         doc = cls._load_comp_doc(competition_id)
         return cls.competition_api_doc(doc) if doc else None

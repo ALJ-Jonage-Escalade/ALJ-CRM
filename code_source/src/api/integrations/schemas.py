@@ -56,6 +56,17 @@ class GoogleTokenUpdated(BaseModel):
     user_email: str
 
 
+class GoogleLoginStart(RequestBody):
+    """return_to: page of this site to come back to after Google's consent screen."""
+    return_to: str = "/bureau/parametres"
+
+
+class GoogleLoginUrl(BaseModel):
+    """url: Google's consent page, to open in the browser; it carries a signed state valid for 10 minutes."""
+    status: Literal["success"]
+    url: str
+
+
 class CloudDbStatus(BaseModel):
     status: Literal["success"]
     enabled: bool

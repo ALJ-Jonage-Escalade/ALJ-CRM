@@ -1207,30 +1207,28 @@
         }
       }
     },
-    "/api/competitions/{comp_id}/fetch-results": {
+    "/api/competitions/{competition_id}/fetch-results": {
       "post": {
         "summary": "Api Fetch Competition Results",
-        "description": "Récupère les résultats officiels depuis MyCompet FFME pour une compétition donnée,\nextrait les compétiteurs de l'Amicale Laïque de Jonage et met à jour leurs classements.\n404 `needs_url`: the results page was not found automatically, the coach gives its address or number.",
-        "operationId": "api_fetch_competition_results_api_competitions__comp_id__fetch_results_post",
+        "description": "Fetches a competition's MyCompet results and writes the club's rankings (coaches).\n404 `needs_url`: the results page was not found automatically, the coach gives its address or number;\n502: MyCompet failed; 503: Firestore failed (nothing reported as saved).",
+        "operationId": "api_fetch_competition_results_api_competitions__competition_id__fetch_results_post",
         "parameters": [
           {
-            "name": "comp_id",
+            "name": "competition_id",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "title": "Comp Id"
+              "type": "integer",
+              "title": "Competition Id"
             }
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true,
-                "default": {},
-                "title": "Payload"
+                "$ref": "#/components/schemas/ResultsFetchRequest"
               }
             }
           }
@@ -1265,6 +1263,16 @@
               }
             },
             "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -1657,7 +1665,7 @@
     "/api/dashboard": {
       "get": {
         "summary": "Get Dashboard Data",
-        "description": "Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import\ndes adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.",
+        "description": "Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import\ndes adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.\n404: campaign unknown to HelloAsso; 502: HelloAsso could not be read completely (never a partial dashboard).",
         "operationId": "get_dashboard_data_api_dashboard_get",
         "parameters": [
           {
@@ -1679,6 +1687,26 @@
                 "schema": {}
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Gateway"
           },
           "422": {
             "description": "Validation Error",
@@ -3141,7 +3169,7 @@
     "/api/helloasso/sync": {
       "post": {
         "summary": "Sync Helloasso Api",
-        "description": "Synchronise la campagne annuelle HelloAsso vers Firestore.",
+        "description": "Reads the competitions' HelloAsso campaign and links its payments (mirror, automatic links, participants).\n400: no campaign chosen; 502: HelloAsso could not be read completely, nothing is written (a partial read would\nunlink the payments it missed); 503: Firestore unavailable.",
         "operationId": "sync_helloasso_api_api_helloasso_sync_post",
         "responses": {
           "200": {
@@ -3150,6 +3178,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HelloAssoSync"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
                 }
               }
             }
@@ -3278,51 +3336,38 @@
       }
     },
     "/api/auth/google/login": {
-      "get": {
+      "post": {
         "summary": "Google Auth Login",
-        "description": "Initie le flux d'autorisation OAuth2 Google pour renouveler le refresh token.",
-        "operationId": "google_auth_login_api_auth_google_login_get",
-        "parameters": [
-          {
-            "name": "return_to",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": "/bureau/parametres",
-              "title": "Return To"
+        "description": "Starts the Google OAuth2 flow that replaces the club's refresh token (admins): answers Google's consent URL,\nwith a signed state naming the admin, that the page then opens.",
+        "operationId": "google_auth_login_api_auth_google_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginStart"
+              }
             }
           },
-          {
-            "name": "redirect_uri",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Redirect Uri"
-            }
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleLoginUrl"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -3475,6 +3520,16 @@
           },
           "502": {
             "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -6164,6 +6219,39 @@
         ],
         "title": "GoogleChecks"
       },
+      "GoogleLoginStart": {
+        "properties": {
+          "return_to": {
+            "type": "string",
+            "title": "Return To",
+            "default": "/bureau/parametres"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GoogleLoginStart",
+        "description": "return_to: page of this site to come back to after Google's consent screen."
+      },
+      "GoogleLoginUrl": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "url"
+        ],
+        "title": "GoogleLoginUrl",
+        "description": "url: Google's consent page, to open in the browser; it carries a signed state valid for 10 minutes."
+      },
       "GoogleStatus": {
         "properties": {
           "status": {
@@ -6722,34 +6810,20 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "success",
-              "error"
-            ],
+            "const": "success",
             "title": "Status"
           },
-          "message": {
-            "type": "string",
-            "title": "Message",
-            "default": ""
-          },
           "stats": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HelloAssoSyncStats"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/HelloAssoSyncStats"
           }
         },
         "type": "object",
         "required": [
-          "status"
+          "status",
+          "stats"
         ],
         "title": "HelloAssoSync",
-        "description": "error: no campaign configured or HelloAsso unreachable (HTTP 200, as the former pages expect)."
+        "description": "The campaign was read completely and its payments linked (failures are HTTP errors, see the route)."
       },
       "HelloAssoSyncStats": {
         "properties": {
@@ -8973,6 +9047,24 @@
         "type": "object",
         "title": "PresenceExportRequest",
         "description": "Attendance sheets to generate. season: the active one when empty; dates: dd/mm/yyyy, the season's when empty.\ncours only: selected_groups (all the courses when empty) and same_sheet (one workbook, else a ZIP of one file per course)."
+      },
+      "ResultsFetchRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": ""
+          },
+          "club": {
+            "type": "string",
+            "title": "Club",
+            "default": "JONAGE"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ResultsFetchRequest",
+        "description": "url: MyCompet results page or number given by the coach (\"\": the stored one, else a search); club: name\nsearched in the results."
       },
       "ResultsFetched": {
         "properties": {

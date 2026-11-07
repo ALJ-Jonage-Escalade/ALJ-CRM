@@ -81,7 +81,7 @@ describe("Paramètres view", () => {
     expect(batchReport(later, AT).slice(4)).toEqual([
       "⏱️ Temps imparti écoulé : 4 compétition(s) reportée(s) au prochain passage",
       "✍️ Open : une page de même nom existe, mais pas à cette date : URL à saisir sur la fiche",
-      "⚠️ Bloc : page MyCompet illisible pour le moment",
+      "⚠️ Bloc : résultats illisibles ou non enregistrés pour le moment (nouvel essai au prochain passage)",
     ]);
     expect(batchReport({ ...report, email_sent: false, competitions_updated: 0 }, AT)[3]).toBe(
       "• E-mail récapitulatif expédié : Non (aucun nouveau résultat)",

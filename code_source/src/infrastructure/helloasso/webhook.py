@@ -23,6 +23,7 @@ Sécurité (le contenu d'une notification n'est jamais cru sur parole) :
 
 import datetime
 import html
+import logging
 from typing import Dict, Any, List, Optional
 
 from infrastructure.helloasso import api as helloasso_api
@@ -38,6 +39,8 @@ from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN
 from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as CompetitionRepository,
 )
+
+logger = logging.getLogger("alj")
 
 # Type helper pour tuple (défini AVANT la classe : les annotations sont évaluées
 # à l'import en Python <= 3.13, une définition en fin de fichier lèverait NameError)
@@ -185,15 +188,18 @@ class HelloAssoWebhookService:
 
     @classmethod
     def competition_form_slug(cls) -> str:
-        """Slug du formulaire HelloAsso des compétitions (réglage HELLOASSO_ANNUAL_CAMPAIGN)."""
+        """Slug du formulaire HelloAsso des compétitions (réglage HELLOASSO_COMPETITION_CAMPAIGN), "" sans réglage.
+        A settings read failure is raised: answered as "no setting", it would let every other HelloAsso sale
+        into the payment mirror."""
+        from domain.competitions.matching import parse_campaign_identifier
+        ref = AppSettingsRepository.get(HELLOASSO_COMPETITION_CAMPAIGN)
+        if not isinstance(ref, str) or not ref.strip():
+            return ""
         try:
-            from domain.competitions.matching import parse_campaign_identifier
-            ref = AppSettingsRepository.get(HELLOASSO_COMPETITION_CAMPAIGN)
-            if not isinstance(ref, str) or not ref.strip():
-                return ""
             return parse_campaign_identifier(ref)["slug"]
-        except Exception as e:
-            print(f"⚠️ [WEBHOOK_HELLOASSO] Formulaire de compétition introuvable : {e}")
+        except ValueError:
+            logger.warning("[WEBHOOK_HELLOASSO] Réglage %s inexploitable (%r) : aucun filtre de formulaire",
+                           HELLOASSO_COMPETITION_CAMPAIGN, ref)
             return ""
 
     @classmethod
@@ -264,6 +270,8 @@ class HelloAssoWebhookService:
         competitions = [c.to_dict() for c in CompetitionRepository.list_competitions()]
         adherents = CompetitionRepository.list_adherents()
         existing_links = CompetitionRepository.list_helloasso_links()
+        # Items already received: HelloAsso redelivers notifications, which must not undo a coach's cancellation
+        known_items = {str(iid) for iid in CompetitionRepository.known_helloasso_item_ids()}
 
         # 3. Exécuter le matching automatique
         computed_links = auto_link_items(
@@ -334,15 +342,18 @@ class HelloAssoWebhookService:
                         )
                     updated = record_payment()
 
-                    # Si le participant n'était pas encore enregistré pour cette compétition,
-                    # l'ajouter comme participant sélectionné et payé
+                    # Nothing written: the member is not listed yet, or the coach cancelled them. A new
+                    # payment lists them (selected and paid) and reactivates a cancellation; a redelivered
+                    # notification of an item already received only lists a member who is missing.
                     if not updated:
-                        CompetitionRepository.add_participant(
+                        added = CompetitionRepository.add_participant_doc(
                             competition_id=cid,
                             adherent_id=aid,
-                            selectionne=True
+                            selectionne=True,
+                            reactivate_cancelled=str(id_item) not in known_items,
                         )
-                        record_payment()
+                        if added is not None:
+                            record_payment()
 
                     affected_competition_ids.add(cid)
 

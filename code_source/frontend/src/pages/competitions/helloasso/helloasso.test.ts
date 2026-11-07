@@ -99,7 +99,6 @@ describe("helloasso", () => {
     expect(syncMessage({ status: "success", stats: { nb_items: 3, nb_auto: 1, nb_manual: 0, nb_applied: 1, nb_unlinked: 2 } })).toBe(
       "✅ Synchro terminée : 3 article(s), 1 auto, 2 en attente.",
     );
-    expect(syncMessage({ status: "error", message: "Aucune campagne" })).toBe("❌ Aucune campagne");
   });
 
   it("walks a linking pass through the payments still pending, in the order shown", () => {

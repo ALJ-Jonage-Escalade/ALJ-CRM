@@ -201,6 +201,27 @@ class TestDailyBatch(BatchTestCase):
         self.assertEqual([d["status"] for d in report["details"]], ["error", "found"])
         self.assertNotIn("url_resultats", self.stored(901))
 
+    def test_one_failing_save_does_not_stop_the_others(self):
+        """Firestore refuses one competition's write: reported as an error, the others are still searched."""
+        from unittest.mock import patch
+        from infrastructure.firestore.client import FirestoreError
+        from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
+        self.competition(911, "Open de bloc de Valbrume", ended_days_ago=2)
+        self.competition(912, "Coupe de difficulté Brumevent", ended_days_ago=4)
+        self.published(99911, "Open de bloc de Valbrume", ended_days_ago=2)
+        self.published(99912, "Coupe de difficulté Brumevent", ended_days_ago=4)
+        real = CompetitionFirestoreRepository.record_results.__func__
+
+        def record_results(cls, competition_id, *args, **kwargs):
+            if str(competition_id) == "911":
+                raise FirestoreError("HTTP 500")
+            return real(cls, competition_id, *args, **kwargs)
+        with patch.object(CompetitionFirestoreRepository, "record_results", classmethod(record_results)):
+            report = self.run_batch()
+
+        self.assertEqual([d["status"] for d in report["details"]], ["error", "found"])
+        self.assertEqual(report["competitions_updated"], 1)
+
     def test_archive_down_still_processes_hand_entered_urls(self):
         self.competition(1001, "Open de bloc de Valbrume", ended_days_ago=2)
         self.competition(1002, "Championnat du club", ended_days_ago=3, url_resultats=results_url(99902))

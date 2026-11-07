@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks
 
+from api.responses import error, error_responses
 from domain.members.helloasso_membership import map_membership_items, parse_membership_campaign
 from infrastructure.geocoding import geocode_missing_addresses
 from infrastructure.helloasso import api as helloasso_api
@@ -23,21 +24,21 @@ def get_target_slug() -> str:
         return [segment for segment in reference.split("/") if segment.strip()][-1]
 
 
-@router.get("/api/dashboard")
+@router.get("/api/dashboard", responses=error_responses(404, 502))
 def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: bool = False):
     """Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
-    des adhésions (get_target_slug) et les inscriptions sont lues par le même mapper."""
-    print("-> Interrogation de l'API HelloAsso...")
-
-    campaigns = helloasso_api.get_campaigns()
+    des adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.
+    404: campaign unknown to HelloAsso; 502: HelloAsso could not be read completely (never a partial dashboard)."""
     target_slug = get_target_slug()
-    target_camp = next((c for c in campaigns if c.get('formSlug') == target_slug), None)
-
-    if not target_camp:
-        return {"error": "Campagne introuvable"}
-
-    c_type = target_camp.get('formType')
-    records = map_membership_items(helloasso_api.get_items(c_type, target_slug))
+    try:
+        campaigns = helloasso_api.get_campaigns()
+        target_camp = next((c for c in campaigns if c.get('formSlug') == target_slug), None)
+        if not target_camp:
+            return error(404, f"Campagne HelloAsso introuvable : {target_slug}.", "helloasso_campaign_not_found")
+        c_type = target_camp.get('formType')
+        records = map_membership_items(helloasso_api.fetch_form_items(c_type, target_slug))
+    except helloasso_api.HelloAssoApiError as e:
+        return error(502, e.message, e.code)
 
     participants = []
     tariffs_count = {}

@@ -19,7 +19,7 @@ _DETAIL_ONLY = ("activityType", "activityTypeId")
 
 
 def _page(data: list) -> dict:
-    # No continuation token: infrastructure.helloasso.api.fetch_all_pages stops after this page
+    # No continuation token: the paginated readers of infrastructure.helloasso.api stop after this page
     return {"data": data, "pagination": {"pageSize": 100, "totalCount": len(data), "pageIndex": 1}}
 
 
