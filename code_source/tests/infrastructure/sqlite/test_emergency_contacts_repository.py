@@ -1,5 +1,7 @@
 """Emergency contacts in the member database: import, replacement, reads (plans/emergency-contacts.md, D2, D4)."""
 
+import datetime
+
 from support.member_db import MemberDbTestCase
 
 from domain.members.emergency_contacts import HELLOASSO_CONTACT_FIELDS
@@ -97,6 +99,21 @@ class TestReplace(ContactsCase):
         self.assertEqual(stamps[0], "avant")
         self.assertNotEqual(stamps[1], "avant")
 
+    def test_saving_one_row_as_the_form_shows_it_leaves_the_others_as_stored(self):
+        user_id = self.seed_leo()
+        self.replace(user_id, [{"name": "DUPONT PIERRE", "phone": "+351912345678"}, {"name": "MARIE", "phone": "0601020304"}])
+        self.execute("UPDATE emergency_contacts SET updated_at = 'avant'")
+        self.replace(user_id, [{"name": "Dupont Pierre", "phone": "35 19 12 34 56 78"}, {"name": "Marie", "phone": "06 99 99 99 99"}])
+        self.assertEqual(self.rows(user_id), [("DUPONT PIERRE", "+351912345678", 0), ("Marie", "06 99 99 99 99", 1)])
+        stamps = [r[0] for r in self.execute("SELECT updated_at FROM emergency_contacts ORDER BY position")]
+        self.assertEqual(stamps[0], "avant")
+
+    def test_reorder_as_the_form_shows_it_keeps_the_stored_values(self):
+        user_id = self.seed_leo()
+        self.replace(user_id, [{"name": "DUPONT PIERRE", "phone": "+351912345678"}, {"name": "MARIE", "phone": "0601020304"}])
+        self.replace(user_id, [{"name": "Marie", "phone": "06 01 02 03 04"}, {"name": "Dupont Pierre", "phone": "35 19 12 34 56 78"}])
+        self.assertEqual(self.rows(user_id), [("MARIE", "0601020304", 0), ("DUPONT PIERRE", "+351912345678", 1)])
+
     def test_contacts_of_another_member_are_untouched(self):
         leo = self.seed_leo(**{FIRST_NAME_KEY: "CLAIRE"})
         self.seed("2", "Zoé", "DURAND", "Loisir", **{FIRST_NAME_KEY: "ANNA"})
@@ -165,5 +182,4 @@ class TestView(ContactsCase):
 
 
 def _ref_date():
-    import datetime
     return datetime.date(2026, 9, 1)

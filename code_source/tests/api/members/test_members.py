@@ -142,10 +142,10 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         self.assertEqual(created.status_code, 422)
 
     def test_create_saves_the_contact_list(self):
-        r = self.client.post("/api/members/create", json={"fields": {
+        response = self.client.post("/api/members/create", json={"fields": {
             "last_name": "AAA", "first_name": "Jean", "birth_date": "2010-02-01", "tarif_name": "Loisir",
             "emergency_contacts": [{"name": "A", "phone": "0601020301"}, {"name": "B", "phone": "0601020302"}, {"name": "C", "phone": "0601020303"}]}})
-        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(response.status_code, 200, response.text)
         created = [m for m in self.client.get("/api/members").json()["members"] if m["last_name"] == "AAA"][0]
         self.assertEqual([c["name"] for c in created["emergency_contacts"]], ["A", "B", "C"])
 

@@ -255,11 +255,11 @@ class CloudDatabaseTest(unittest.TestCase):
             self.write(path, "INSERT INTO emergency_contacts (user_id, name, position) "
                              f"SELECT id, 'Contact de {name}', 0 FROM users WHERE last_name = '{name}'")
         self.sync(self.a)
-        rep = self.sync(self.b)
-        self.assertTrue(rep.get("renumbered"))
+        report = self.sync(self.b)
+        self.assertTrue(report.get("renumbered"))
         self.sync(self.a)
         for path in (self.a, self.b):
-            pairs = sqlite3.connect(path).execute(
+            pairs =sqlite3.connect(path).execute(
                 "SELECT u.last_name, c.name FROM emergency_contacts c JOIN users u ON u.id = c.user_id ORDER BY 1").fetchall()
             self.assertEqual(pairs, [("GRAND", "Contact de GRAND"), ("PETIT", "Contact de PETIT")])
 

@@ -151,19 +151,19 @@ describe("edit and add", () => {
     });
 
     it("sends nothing when the list does not change, a blank row included", () => {
-      const m = member({ emergency_contacts: three });
-      const d = draftOf(m);
-      d.emergency_contacts.push(newContactRow());
-      expect(changesOf(m, d)).toEqual({ fields: {}, lines: [] });
+      const withContacts = member({ emergency_contacts: three });
+      const draft = draftOf(withContacts);
+      draft.emergency_contacts.push(newContactRow());
+      expect(changesOf(withContacts, draft)).toEqual({ fields: {}, lines: [] });
       const none = member({});
       expect(changesOf(none, draftOf(none))).toEqual({ fields: {}, lines: [] });
     });
 
     it("sends the whole list on a reorder, without its local keys", () => {
-      const m = member({ emergency_contacts: three.slice(0, 2) });
-      const d = draftOf(m);
-      d.emergency_contacts.reverse();
-      expect(changesOf(m, d)).toEqual({
+      const withContacts = member({ emergency_contacts: three.slice(0, 2) });
+      const draft = draftOf(withContacts);
+      draft.emergency_contacts.reverse();
+      expect(changesOf(withContacts, draft)).toEqual({
         fields: {
           emergency_contacts: [
             { name: "Paul", phone: "" },
@@ -175,33 +175,33 @@ describe("edit and add", () => {
     });
 
     it("sends an empty list when every contact is removed", () => {
-      const m = member({ emergency_contacts: three.slice(0, 1) });
-      expect(changesOf(m, { ...draftOf(m), emergency_contacts: [] })).toEqual({
+      const withContact = member({ emergency_contacts: three.slice(0, 1) });
+      expect(changesOf(withContact, { ...draftOf(withContact), emergency_contacts: [] })).toEqual({
         fields: { emergency_contacts: [] },
         lines: ["Contacts d'urgence : Marie · 06 01 01 01 01 ➔ vide"],
       });
     });
 
     it("a new member takes the filled rows, trimmed", () => {
-      const d = draftOf(undefined, "Adulte loisir");
-      d.emergency_contacts = [
+      const draft = draftOf(undefined, "Adulte loisir");
+      draft.emergency_contacts = [
         { key: 1, name: " Marie ", phone: " 06 01 01 01 01 " },
         { key: 2, name: "", phone: "  " },
         { key: 3, name: "Paul", phone: "" },
       ];
-      expect(newMemberOf(d).emergency_contacts).toEqual([
+      expect(newMemberOf(draft).emergency_contacts).toEqual([
         { name: "Marie", phone: "06 01 01 01 01" },
         { name: "Paul", phone: "" },
       ]);
     });
 
     it("reports an invalid phone on its own row", () => {
-      const d = draftOf(undefined, "Adulte loisir");
-      d.emergency_contacts = [
+      const draft = draftOf(undefined, "Adulte loisir");
+      draft.emergency_contacts = [
         { key: 7, name: "Marie", phone: "06 01 01 01 01" },
         { key: 8, name: "Paul", phone: "12" },
       ];
-      const errors = draftErrors(d, false);
+      const errors = draftErrors(draft, false);
       expect(errors[contactPhoneField(8)]).toBe("Numéro de téléphone invalide.");
       expect(errors[contactPhoneField(7)]).toBeUndefined();
     });

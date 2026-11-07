@@ -117,7 +117,8 @@ ALJ-CRM/                         ← racine du dépôt
 Schéma v2 (SQLite, répliqué en Firestore sous `crm_<table>`) :
 
 `users` (identité stable inter-saisons) → `orders` (commande HelloAsso) → `purchases` (une inscription par saison)
-→ `purchase_options` (assurances) ; + `seasons`, `planning` (créneaux/groupes avec bornes de naissance),
+→ `purchase_options` (assurances) ; `emergency_contacts` (liste ordonnée par `users`, le premier est le principal) ;
++ `seasons`, `planning` (créneaux/groupes avec bornes de naissance),
 `geocache`, `email_templates`, `app_settings`.
 
 Autres collections Firestore : `competitions/{id}` (participants **embarqués**), `coaches`, `adherents` et

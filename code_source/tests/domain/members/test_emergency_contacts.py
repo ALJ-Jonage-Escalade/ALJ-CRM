@@ -3,7 +3,25 @@ from __future__ import annotations
 
 import pytest
 
-from domain.members.emergency_contacts import EmergencyContact, clean_contacts, missing_contacts, same_contact
+from domain.members.emergency_contacts import EmergencyContact, clean_contacts, keep_stored_values, missing_contacts, same_contact
+
+
+def test_keep_stored_values_when_only_the_formatting_differs() -> None:
+    stored = [EmergencyContact("DUPONT PIERRE", "+351912345678"), EmergencyContact("MARIE", "0601020304")]
+    submitted = [EmergencyContact("Marie", "06 01 02 03 04"), EmergencyContact("Dupont Pierre", "35 19 12 34 56 78")]
+    assert keep_stored_values(submitted, stored) == [stored[1], stored[0]]
+
+
+def test_keep_stored_values_takes_what_was_really_edited() -> None:
+    stored = [EmergencyContact("MARIE", "0601020304")]
+    edited = [EmergencyContact("Marie", "06 99 99 99 99")]
+    assert keep_stored_values(edited, stored) == edited
+
+
+def test_keep_stored_values_uses_each_stored_contact_once() -> None:
+    stored = [EmergencyContact("MARIE", "")]
+    submitted = [EmergencyContact("Marie", ""), EmergencyContact("Marie", "")]
+    assert keep_stored_values(submitted, stored) == [stored[0], submitted[1]]
 
 
 def test_clean_contacts_strips_values_and_keeps_order() -> None:

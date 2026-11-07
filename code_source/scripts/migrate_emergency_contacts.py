@@ -37,6 +37,7 @@ from infrastructure.firestore.client import FirestoreConflictError  # noqa: E402
 from infrastructure.firestore.cloud_sync.common import COMMIT_CHUNK, collection_for  # noqa: E402
 from infrastructure.firestore.cloud_sync.rest_store import RestStore  # noqa: E402
 
+# Any in this script: fields and ids as read from Firestore documents, which RestStore does not type
 CONTACTS = collection_for("emergency_contacts")
 MAX_ATTEMPTS = 5
 

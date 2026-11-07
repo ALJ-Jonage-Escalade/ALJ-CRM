@@ -275,7 +275,8 @@ def add_missing_emergency_contacts(cur: sqlite3.Cursor, user_id: int, rec: Membe
 
 def fill_blank_user_fields(cur: sqlite3.Cursor, user_id: int, rec: MemberRecord, now_iso: str,
                            field_map: Mapping[str, str]) -> None:
-    """Copies the fields of `rec` into the user's columns that are still blank: a value of the base is never overwritten."""
+    """Copies the fields of `rec` into the user's columns that are still blank: a value of the base is never overwritten.
+    The contacts of `rec` the member does not have yet are added."""
     add_missing_emergency_contacts(cur, user_id, rec, now_iso)
     dyn = _dynamic_field_values(rec)
     for src_col, dst_col in field_map.items():

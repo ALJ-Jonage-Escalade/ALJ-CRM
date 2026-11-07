@@ -6,7 +6,7 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
-from domain.members.view import fmt_phone
+from domain.members.view import fmt_first_name, fmt_phone
 from domain.utils import normalize_name
 
 # Keys of the two contacts in a HelloAsso or Excel record: (name, phone)
@@ -26,6 +26,22 @@ def clean_contacts(rows: Iterable[Mapping[str, object]]) -> list[EmergencyContac
     """Rows as contacts, in the same order: values stripped, fully blank rows dropped."""
     contacts = [EmergencyContact(str(row.get("name") or "").strip(), str(row.get("phone") or "").strip()) for row in rows]
     return [contact for contact in contacts if contact.name or contact.phone]
+
+
+def keep_stored_values(submitted: Iterable[EmergencyContact], stored: Iterable[EmergencyContact]) -> list[EmergencyContact]:
+    """The submitted contacts, each one that looks the same as a stored contact once formatted taking its stored values.
+    The form shows and sends formatted values: saving one row must not rewrite the others ("+351912345678" would lose its +)."""
+    def shown(contact: EmergencyContact) -> tuple[str, str]:
+        return fmt_first_name(contact.name), fmt_phone(contact.phone)
+
+    unmatched = list(stored)
+    kept: list[EmergencyContact] = []
+    for contact in submitted:
+        match = next((other for other in unmatched if shown(other) == shown(contact)), None)
+        if match is not None:
+            unmatched.remove(match)
+        kept.append(match or contact)
+    return kept
 
 
 def _phone_digits(phone: str) -> str:

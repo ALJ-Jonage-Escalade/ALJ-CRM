@@ -8,7 +8,7 @@ import sqlite3
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 from domain.errors import InvalidRequest
-from domain.members.emergency_contacts import clean_contacts
+from domain.members.emergency_contacts import EmergencyContact, clean_contacts, keep_stored_values
 from domain.members.sex import parse_sex
 from domain.utils import normalize_name
 from infrastructure.sqlite import schema_v2
@@ -40,9 +40,9 @@ MemberRecord = Mapping[str, Any]
 
 def replace_emergency_contacts(cur: sqlite3.Cursor, user_id: int, contacts: Iterable[Mapping[str, object]], now_iso: str) -> None:
     """Makes the member's contacts exactly `contacts`, in that order: rows are reused by position, and those that do
-    not change are not rewritten, so the sync only sends what changed."""
-    wanted = clean_contacts(contacts)
+    not change are not rewritten, so the sync only sends what changed. A contact sent as the form shows it keeps its stored values."""
     rows = cur.execute("SELECT id, name, phone, position FROM emergency_contacts WHERE user_id = ? ORDER BY position, id", (user_id,)).fetchall()
+    wanted = keep_stored_values(clean_contacts(contacts), [EmergencyContact(row[1] or "", row[2] or "") for row in rows])
     for position, contact in enumerate(wanted):
         if position >= len(rows):
             cur.execute("INSERT INTO emergency_contacts (user_id, name, phone, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -73,7 +73,7 @@ class MemberRepository:
 
 
     # One row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), the fields of the web member pages
-    _MEMBER_ROWS_SQL = """
+    _MEMBER_ROWS_SELECT = """
         SELECT u.id AS user_id, p.id AS purchase_id,
                u.last_name, u.first_name, u.birth_date, u.sex,
                u.address, u.zip_code, u.city, u.phone, u.email_primary, u.email_secondary,
@@ -96,7 +96,7 @@ class MemberRepository:
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
-            rows = [dict(r) for r in conn.execute(f"{cls._MEMBER_ROWS_SQL} {cls._MEMBER_ROWS_FROM} WHERE {where}", params).fetchall()]
+            rows = [dict(r) for r in conn.execute(f"{cls._MEMBER_ROWS_SELECT} {cls._MEMBER_ROWS_FROM} WHERE {where}", params).fetchall()]
             contacts_by_user: Dict[int, List[Dict[str, str]]] = {}
             for contact in conn.execute(
                     f"SELECT user_id, name, phone FROM emergency_contacts WHERE user_id IN (SELECT p.user_id {cls._MEMBER_ROWS_FROM} WHERE {where}) "  # noqa: S608 - fragments SQL littéraux du code, valeurs en paramètres

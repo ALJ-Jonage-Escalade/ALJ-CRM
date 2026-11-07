@@ -286,8 +286,12 @@ describe("participants", () => {
       emergency2_name: "",
       emergency2_phone: "",
     };
-    const c = { id: 1, nom: "Coupe", participants: [{ adherent_id: 2, nom: "X", prenom: "Y", urgence_nom: "Copie", urgence_tel: "0600" }] };
-    const row = participantRows(c, [], [three])[0]!;
+    const competition = {
+      id: 1,
+      nom: "Coupe",
+      participants: [{ adherent_id: 2, nom: "X", prenom: "Y", urgence_nom: "Copie", urgence_tel: "0600" }],
+    };
+    const row = participantRows(competition, [], [three])[0]!;
     expect(row.emergency).toEqual([
       { name: "A", phone: "01" },
       { name: "C", phone: "03" },
@@ -307,15 +311,19 @@ describe("participants", () => {
       emergency2_name: "Autre",
       emergency2_phone: "02",
     };
-    expect(participantRows(c, [], [saved])[0]!.emergency).toEqual([
+    expect(participantRows(competition, [], [saved])[0]!.emergency).toEqual([
       { name: "Ancien", phone: "01" },
       { name: "Autre", phone: "02" },
     ]);
   });
 
   it("uses the copy made when the member was added only without a competitor entry", () => {
-    const c = { id: 1, nom: "Coupe", participants: [{ adherent_id: 2, nom: "X", prenom: "Y", urgence_nom: "Copie", urgence_tel: "0600" }] };
-    expect(participantRows(c, [], [])[0]!.contacts[1]).toMatchObject({ name: "Copie", phone: "0600" });
+    const competition = {
+      id: 1,
+      nom: "Coupe",
+      participants: [{ adherent_id: 2, nom: "X", prenom: "Y", urgence_nom: "Copie", urgence_tel: "0600" }],
+    };
+    expect(participantRows(competition, [], [])[0]!.contacts[1]).toMatchObject({ name: "Copie", phone: "0600" });
     const emptied: CompetitorContact = {
       adherent_id: 2,
       last_name: "",
@@ -328,7 +336,7 @@ describe("participants", () => {
       emergency2_name: "",
       emergency2_phone: "",
     };
-    expect(participantRows(c, [], [emptied])[0]!.emergency).toEqual([]);
+    expect(participantRows(competition, [], [emptied])[0]!.emergency).toEqual([]);
   });
 
   it("handles empty or partial contacts gracefully", () => {

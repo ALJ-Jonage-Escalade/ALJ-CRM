@@ -1,11 +1,11 @@
 /* Member list of Adhérents: slot / tariff filters, search, status, sorting and CSV export (port of the former
    web/shared/alj-filters.js and alj-members.js).
    The members come formatted by the server (GET /api/members, domain/members/view.py). */
-import { emergencyContactsOf } from "../../lib/emergencyContacts";
 import type { BadgeColor } from "../../components/ui/palette";
 import { localStorageOrNone } from "../../lib/localStorage";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
+import { emergencyContactsOf } from "../../lib/emergencyContacts";
 import { formatDayText } from "../../lib/format";
 import { SEX_LABELS } from "../../lib/sex";
 import { normKey, plural } from "../../lib/text";

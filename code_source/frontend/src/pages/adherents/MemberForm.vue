@@ -107,10 +107,8 @@ function addDate(): void {
 }
 
 const label = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
-const fieldClass = (name: DraftField, showError = true) => [
-  "w-full rounded-lg border bg-white px-2.5 py-2 text-[13px]",
-  showError && errors.value[name] ? "border-red-500 bg-red-50" : "border-slate-300",
-];
+const fieldBase = "w-full rounded-lg border bg-white px-2.5 py-2 text-[13px]";
+const fieldClass = (name: DraftField) => [fieldBase, errors.value[name] ? "border-red-500 bg-red-50" : "border-slate-300"];
 const section = "mt-1 text-xs font-bold text-slate-700";
 const attrs = (name: DraftField) => ({
   id: `member-${name}`,
@@ -330,7 +328,7 @@ const TEXT_FIELDS: { name: TextField; label: string; type?: string; placeholder?
               data-testid="contact-name"
               type="text"
               placeholder="DUPONT Pierre"
-              :class="fieldClass(contactPhoneField(contact.key), false)"
+              :class="[fieldBase, 'border-slate-300']"
             />
           </div>
           <div>
