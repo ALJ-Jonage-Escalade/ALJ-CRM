@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from typing import Any, Dict, Literal, Optional, Union
 
 from fastapi import Request
@@ -11,6 +12,8 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from services.errors import Conflict, InvalidRequest, NotFound, ServiceError, StorageUnavailable, UpstreamUnavailable
+
+logger = logging.getLogger("alj")
 
 # Member and competition data must not be kept in the browser's HTTP cache (personal data),
 # so responses are never stored: the page keeps the last body in memory and sends
@@ -70,7 +73,7 @@ GENERIC_ERROR = "Erreur interne du serveur (détails dans les journaux)."
 def internal_error(e: Exception, where: str) -> str:
     """Logs the exception server-side; the client only gets a generic message
     (no paths, SQL or third-party details, notably on the public webhook)."""
-    print(f"❌ [{where}] {type(e).__name__}: {e}")
+    logger.error("[%s] %s: %s", where, type(e).__name__, e, exc_info=e)
     return GENERIC_ERROR
 
 

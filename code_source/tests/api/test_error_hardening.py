@@ -86,8 +86,9 @@ def test_repository_write_error_is_generic() -> None:
 
 
 def test_mycompet_scraping_error_is_generic(client: TestClient) -> None:
-    with patch("infrastructure.mycompet.scraper.fetch_and_parse_mycompet_results", side_effect=RuntimeError(SECRET_DETAIL)), \
-            patch("infrastructure.firestore.client.FirestoreClient.get_document", return_value=None):
-        resp = client.post("/api/competitions/c1/fetch-results", json={"url": "https://mycompet.ffme.fr/resultat/resultat_1"})
+    with patch("services.competitions.results_batch.fetch_and_parse_mycompet_results", side_effect=RuntimeError(SECRET_DETAIL)), \
+            patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.get_stored_competition_doc",
+                  return_value={"id": 1, "nom": "Open"}):
+        resp = client.post("/api/competitions/1/fetch-results", json={"url": "https://mycompet.ffme.fr/resultat/resultat_1"})
     assert resp.status_code == 502
     assert SECRET_DETAIL not in resp.text

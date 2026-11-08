@@ -255,9 +255,7 @@ export function suggestedMember(it: HelloAssoItem, members: readonly MemberSlot[
 }
 
 export function syncMessage(answer: Schemas["HelloAssoSync"]): string {
-  if (answer.status !== "success") {
-    return `❌ ${answer.message || "Erreur lors de la synchronisation."}`;
-  }
-  const st = answer.stats;
-  return `✅ Synchro terminée : ${st?.nb_items ?? 0} article(s), ${st?.nb_auto ?? 0} auto, ${st?.nb_unlinked ?? 0} en attente.`;
+  // A failure (no campaign, HelloAsso unreachable) is an HTTP error: shown by the writer, never reaches here
+  const stats = answer.stats;
+  return `✅ Synchro terminée : ${stats.nb_items} article(s), ${stats.nb_auto} auto, ${stats.nb_unlinked} en attente.`;
 }

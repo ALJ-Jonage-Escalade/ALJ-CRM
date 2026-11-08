@@ -1,4 +1,4 @@
-"""Tests de l'auto-réparation du refresh token Google (keyring périmé vs .env frais)."""
+"""Tests de l'auto-réparation du refresh token Google (jeton enregistré périmé vs .env frais)."""
 import os
 import sys
 import unittest
@@ -63,7 +63,7 @@ class TestDriveTokenRepair(unittest.TestCase):
         """Le token du SecretStore fonctionne : aucun appel de réparation, un seul appel HTTP."""
         with mock.patch.object(SecretStore, "get_secret", side_effect=lambda k: dict(
                 zip(("GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"), NEW_CREDS, strict=True)).get(k, "")), \
-             mock.patch.object(SecretStore, "set_secret") as mock_set, \
+             mock.patch.object(SecretStore, "set_secrets") as mock_set, \
              mock.patch("infrastructure.google.drive.requests.post",
                         return_value=_fake_response(200, {"access_token": "TOKEN_OK"})) as mock_post:
             token = GoogleDriveClient.get_access_token(env_paths=[self.env_path])
@@ -72,7 +72,7 @@ class TestDriveTokenRepair(unittest.TestCase):
         mock_set.assert_not_called()
 
     def test_revoked_stored_token_self_heals_from_env(self):
-        """Régression du bug 'invalid_grant' : le keyring contient l'ancien token révoqué,
+        """Régression du bug 'invalid_grant' : le SecretStore contient l'ancien token révoqué,
         le .env contient le nouveau token (assistant OAuth2). Le client doit retenter
         avec le .env puis réparer le SecretStore."""
         responses = [
@@ -81,13 +81,14 @@ class TestDriveTokenRepair(unittest.TestCase):
         ]
         with mock.patch.object(SecretStore, "get_secret", side_effect=lambda k: dict(
                 zip(("GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"), OLD_CREDS, strict=True)).get(k, "")), \
-             mock.patch.object(SecretStore, "set_secret") as mock_set, \
+             mock.patch.object(SecretStore, "set_secrets") as mock_set, \
              mock.patch("infrastructure.google.drive.requests.post", side_effect=responses) as mock_post:
             token = GoogleDriveClient.get_access_token(env_paths=[self.env_path])
         self.assertEqual(token, "TOKEN_NEW")
         self.assertEqual(mock_post.call_count, 2)
-        # Le trousseau doit être réparé avec les identifiants valides du .env
-        repaired = {call.args[0]: call.args[1] for call in mock_set.call_args_list}
+        # Le SecretStore doit être réparé, en une écriture, avec les identifiants valides du .env
+        mock_set.assert_called_once()
+        repaired = mock_set.call_args.args[0]
         self.assertEqual(repaired["GMAIL_REFRESH_TOKEN"], NEW_CREDS[2])
         self.assertEqual(repaired["GMAIL_CLIENT_ID"], NEW_CREDS[0])
 

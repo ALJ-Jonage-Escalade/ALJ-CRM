@@ -84,6 +84,52 @@ class TestHeaders(unittest.TestCase):
         self.assertIsNone(msg["Reply-To"])
 
 
+class TestSmtpEncryption(unittest.TestCase):
+    """The SMTP password and the members' e-mails never travel unencrypted, except to Mailpit in dev."""
+
+    SECRETS = {"SMTP_HOST": "smtp.example.com", "SMTP_PORT": "587", "SMTP_USER": "u", "SMTP_PASSWORD": "p",
+               "SMTP_FROM_EMAIL": "office@example.com"}
+
+    def _send(self, smtp, dev=False):
+        from infrastructure.mail.repository import EmailRepository
+        with patch("infrastructure.mail.repository.SecretStore.get_secret", side_effect=lambda k: self.SECRETS.get(k, "")), \
+             patch("smtplib.SMTP", return_value=smtp), patch.object(EmailRepository, "log_audit"), \
+             patch("infrastructure.mail.repository.runtime_env.is_dev", return_value=dev):
+            return EmailRepository.send_email(to_email="harry.potter@hogwarts.example", subject="s", body="b")
+
+    def test_starttls_used_when_offered(self):
+        smtp = MagicMock()
+        smtp.has_extn.return_value = True
+        self.assertTrue(self._send(smtp))
+        smtp.starttls.assert_called_once()
+        smtp.login.assert_called_once()
+
+    def test_starttls_failure_is_raised_before_login(self):
+        import smtplib
+        smtp = MagicMock()
+        smtp.has_extn.return_value = True
+        smtp.starttls.side_effect = smtplib.SMTPException("handshake failed")
+        with self.assertRaises(smtplib.SMTPException):
+            self._send(smtp)
+        smtp.login.assert_not_called()
+        smtp.sendmail.assert_not_called()
+
+    def test_server_without_starttls_refused_in_production(self):
+        import smtplib
+        smtp = MagicMock()
+        smtp.has_extn.return_value = False
+        with self.assertRaises(smtplib.SMTPNotSupportedError):
+            self._send(smtp)
+        smtp.login.assert_not_called()
+
+    def test_server_without_starttls_allowed_in_dev(self):
+        smtp = MagicMock()
+        smtp.has_extn.return_value = False
+        self.assertTrue(self._send(smtp, dev=True))
+        smtp.starttls.assert_not_called()
+        smtp.sendmail.assert_called_once()
+
+
 class TestSendPermissions(unittest.TestCase):
     """A coach may only write to known members/payers; nobody may send as a foreign address."""
 

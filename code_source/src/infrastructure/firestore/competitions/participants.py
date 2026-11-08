@@ -137,20 +137,22 @@ class ParticipantsMixin(AdherentsMixin):
 
     @classmethod
     def record_results(cls, competition_id: int | str, apply_rankings: Callable[[List[Dict[str, Any]]], int],
-                       fields: Dict[str, Any]) -> int:
+                       fields: Dict[str, Any], save_fields_without_match: bool = False) -> int:
         """Writes MyCompet rankings: `apply_rankings(parts)` sets the ranking fields of the participants it matches
         (it must leave the other fields alone) and returns how many; `fields` (results URL, sync time) are written
-        with them. Read just before writing, under the optimistic lock (replayed on conflict), so an edit made
-        meanwhile on the web is kept. Returns the matched count (0: nothing written, or no such competition)."""
+        with them, or alone when nobody matched and `save_fields_without_match`. Read just before writing, under the
+        optimistic lock (replayed on conflict), so an edit made meanwhile on the web is kept. Returns the matched
+        count (0: no ranking written, or no such competition)."""
         def attempt() -> int:
             doc = cls._load_comp_doc(competition_id)
             if not doc:
                 return 0
             parts = [dict(p) for p in (doc.get("participants") or [])]
             matched = apply_rankings(parts)
-            if matched:
+            if matched or save_fields_without_match:
                 FirestoreClient.update_fields(
-                    cls.COLLECTION_COMPETITIONS, doc.get("_doc_id") or str(doc.get("id")), {"participants": parts, **fields},
+                    cls.COLLECTION_COMPETITIONS, doc.get("_doc_id") or str(doc.get("id")),
+                    {"participants": parts, **fields} if matched else dict(fields),
                     expected_update_time=doc.get("_update_time"),
                 )
             return matched
@@ -193,20 +195,27 @@ class ParticipantsMixin(AdherentsMixin):
     # competition, or member not listed where that applies); see competition_api_doc.
     @classmethod
     def add_participant_doc(cls, competition_id: int, adherent_id: int,
-                            selectionne: bool = True) -> Optional[Dict[str, Any]]:
+                            selectionne: bool = True, reactivate_cancelled: bool = True) -> Optional[Dict[str, Any]]:
+        """Lists the member (idempotent). `selectionne`: also selects them, which reactivates a cancelled row as paid
+        (the money is already there) unless `reactivate_cancelled` is False: then a cancelled row is left as it is."""
         def change(p):
-            if selectionne:
-                p["selectionne"] = True
-                if (p.get("statut_paiement") or "") in PAIEMENT_STATUTS_ANNULES:
-                    p["statut_paiement"] = PAIEMENT_PAYE   # réactivation : l'argent est déjà là
+            if not selectionne:
+                return None
+            cancelled = (p.get("statut_paiement") or "") in PAIEMENT_STATUTS_ANNULES
+            if cancelled and not reactivate_cancelled:
+                return False
+            p["selectionne"] = True
+            if cancelled:
+                p["statut_paiement"] = PAIEMENT_PAYE   # réactivation : l'argent est déjà là
+            return None
         return cls._update_participant(competition_id, adherent_id, change, add_missing=selectionne)
 
     @classmethod
     def add_participant(cls, competition_id: int, adherent_id: int,
-                        selectionne: bool = True) -> int:
+                        selectionne: bool = True, reactivate_cancelled: bool = True) -> int:
         """Ajoute un adhérent à une compétition (idempotent) ; retourne l'identifiant
-        de la ligne participant (existante ou nouvelle)."""
-        doc = cls.add_participant_doc(competition_id, adherent_id, selectionne)
+        de la ligne participant (existante ou nouvelle). See add_participant_doc."""
+        doc = cls.add_participant_doc(competition_id, adherent_id, selectionne, reactivate_cancelled)
         if doc is None:
             return 0
         for p in doc.get("participants") or []:

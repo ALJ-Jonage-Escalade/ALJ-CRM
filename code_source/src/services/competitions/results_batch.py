@@ -39,9 +39,12 @@ from infrastructure.mycompet.scraper import (
     ArchiveEntry,
     fetch_and_parse_mycompet_results,
     fetch_ffme_archive_entries,
+    find_mycompet_result_url,
     find_result_url_in_archives,
     normalize_result_url,
 )
+from services.competitions.store import invalidate_cache
+from services.errors import NotFound, StorageUnavailable, UpstreamUnavailable
 
 DEFAULT_NOTIFICATION_EMAIL = "david.lopez@alj-jonage.fr"
 SETTING_NOTIFICATION_EMAIL = "RESULTATS_NOTIFICATION_EMAIL"
@@ -74,6 +77,13 @@ class ClubAthlete(TypedDict):
     total_categorie: int
     resultat_ffme: str
     performance: str
+
+
+class ResultsFetch(TypedDict):
+    """Results fetched for one competition on a coach's request."""
+    url: str
+    total_scraped: int
+    matched_count: int
 
 
 class CompetitionOutcome(TypedDict):
@@ -309,10 +319,56 @@ class CompetitionResultsBatchService:
             athletes[:] = apply_rankings(parts, scraped, now_iso)  # replayed on a write conflict: keep the last one
             return len(athletes)
 
-        matched = CompetitionFirestoreRepository.record_results(
-            comp["id"], rank, {"url_resultats": canonical_url, "resultats_synced_at": now_iso})
+        try:
+            matched = CompetitionFirestoreRepository.record_results(
+                comp["id"], rank, {"url_resultats": canonical_url, "resultats_synced_at": now_iso})
+        except FirestoreError:  # this competition only: the others are still searched, the next run retries it
+            logger.error("[BATCH_RESULTATS] Enregistrement des résultats de « %s » impossible", nom, exc_info=True)
+            return CompetitionOutcome(status="error", matched_count=0, athletes=[], url=canonical_url)
         return CompetitionOutcome(status="found" if matched else "pending", matched_count=matched, athletes=athletes,
                                   url=canonical_url)
+
+    @classmethod
+    def fetch_results_for(cls, competition_id: int, url: str = "", club_keyword: str = "JONAGE") -> ResultsFetch:
+        """Fetches a competition's MyCompet results on a coach's request and writes the rankings of the club's
+        athletes. `url`: page or number given by the coach; else the one stored, else a search in the FFME archive.
+        NotFound (code needs_url when no page is found: the coach gives it), UpstreamUnavailable (MyCompet),
+        StorageUnavailable (Firestore)."""
+        try:
+            comp = CompetitionFirestoreRepository.get_stored_competition_doc(competition_id)
+        except FirestoreError as e:
+            raise StorageUnavailable("Lecture de la compétition impossible (détails dans les journaux).") from e
+        if not comp:
+            raise NotFound(f"Compétition #{competition_id} introuvable.")
+
+        url = url.strip() or str(comp.get("url_resultats") or comp.get("id_resultat_ffme") or "").strip()
+        if not url:
+            url = find_mycompet_result_url(str(comp.get("nom") or ""), str(comp.get("date_competition") or ""),
+                                           str(comp.get("lieu") or ""), str(comp.get("id_ffme") or ""),
+                                           str(comp.get("date_fin") or ""))
+        if not url:
+            raise NotFound("Résultats introuvables automatiquement sur MyCompet. Veuillez renseigner l'URL ou le numéro de "
+                           "résultat (ex: https://mycompet.ffme.fr/resultat/resultat_13660 ou 13660).", "needs_url")
+
+        try:
+            scraped = fetch_and_parse_mycompet_results(url, club_keyword)
+        except (requests.RequestException, RuntimeError, ValueError) as e:
+            logger.warning("[MYCOMPET] Échec de la récupération des résultats (%s) : %s", url, e, exc_info=True)
+            raise UpstreamUnavailable("Erreur lors de la récupération des résultats MyCompet (détails dans les journaux).") from e
+
+        now_iso = datetime.datetime.now().isoformat()
+        canonical_url = normalize_result_url(url)
+        try:
+            # The URL is kept even when nobody matched: the coach gave it, the next try starts from it
+            matched = CompetitionFirestoreRepository.record_results(
+                competition_id, lambda parts: len(apply_rankings(parts, scraped, now_iso)),
+                {"url_resultats": canonical_url, "resultats_synced_at": now_iso}, save_fields_without_match=True)
+        except FirestoreError as e:
+            logger.error("[MYCOMPET] Enregistrement des résultats de #%s impossible", competition_id, exc_info=True)
+            raise StorageUnavailable("Résultats trouvés, mais leur enregistrement a échoué : réessayez (détails dans les journaux).") from e
+        finally:
+            invalidate_cache()  # results visible on the next poll of the competition pages
+        return ResultsFetch(url=canonical_url, total_scraped=len(scraped), matched_count=matched)
 
     @classmethod
     def build_results_email_html(cls, comp_results_list: List[Dict[str, Any]],
@@ -614,6 +670,8 @@ class CompetitionResultsBatchService:
                 if not comp.get(FIELD_NEEDS_URL_NOTIFIED):  # asked once, not every morning
                     needs_url.append(item)
                     needs_url_comps.append(comp)
+            elif outcome["status"] == "error":
+                logger.warning("[BATCH_RESULTATS] « %s » : résultats illisibles ou non enregistrés, nouvel essai au prochain passage", nom)
             else:
                 print(f"ℹ️ [BATCH_RESULTATS] Aucun résultat officiel disponible pour le moment pour « {nom} ».")
 
@@ -638,6 +696,9 @@ class CompetitionResultsBatchService:
         to_enter = sum(1 for d in details if d["status"] == "needs_url")
         if to_enter:
             status_msg += f", {to_enter} URL à saisir"
+        failed = sum(1 for d in details if d["status"] == "error")
+        if failed:
+            status_msg += f", {failed} en erreur"
         if remaining:
             status_msg += f", {remaining} reportée(s) au prochain passage"
         if email_sent:

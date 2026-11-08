@@ -645,8 +645,8 @@ Kept for reference; the decision is « Phase 5b — as built ».
 | A13 | `alj-members.js` vs repo `_read_planning_groups` (342) | Tariff → group tie-break: JS takes the first row, Python the last. | **Resolved in phase 2**: first row by id everywhere (`domain.member_view.tarif_slots`). |
 | A14 | `src/server.py:1803` | `/api/auth/google/test` calls `ensure_fresh(max_age_seconds=10)`, but the parameter is `max_age`: TypeError (caught), so `database.ok` is always false. The test mocks it away. | **Fixed on main** (89c9394: `ensure_fresh` accepts `max_age_seconds`, the call uses `max_age`). |
 | A15 | `/api/auth/google/callback`, `update-token`; `secret_store.py:42-92` | On Cloud Run the refresh token is saved to the instance's `.env`/environment only: lost on restart, not shared between instances. | **Still present.** |
-| A16 | `src/server.py:1582,1625` | `return_to` and `error` are put into HTML/JS unescaped (open redirect / reflected injection); OAuth `state` is unsigned and not checked. **Security, prioritize.** | **Still present.** |
-| A17 | `/api/auth/google/status` (public) | Exposes the connected account's e-mail without authentication. | **Still present.** |
+| A16 | `src/server.py:1582,1625` | `return_to` and `error` are put into HTML/JS unescaped (open redirect / reflected injection); OAuth `state` is unsigned and not checked. **Security, prioritize.** | **Resolved**: values escaped, `return_to` limited to a local path; `POST /api/auth/google/login` is admin-only and signs the state (HMAC, 10 min), the callback refuses any other. |
+| A17 | `/api/auth/google/status` (public) | Exposes the connected account's e-mail without authentication. | **Resolved**: no longer public (coach role). |
 | A18 | `web/bureau/competitions.html:797-828` Bilan | Assumes every payment equals `prix`. | **Still present** (client-side computation unchanged). |
 | A19 | GET `/api/planning` (server.py:912) | Appends to `../planning_sync_debug.log` on every call. | **Still present.** |
 | A20 | `/api/members/update` | Unknown keys in `fields` are silently ignored but echoed back as if applied. | **Still present.** |

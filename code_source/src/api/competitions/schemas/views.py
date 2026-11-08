@@ -143,10 +143,9 @@ class HelloAssoSyncStats(BaseModel):
 
 
 class HelloAssoSync(BaseModel):
-    """error: no campaign configured or HelloAsso unreachable (HTTP 200, as the former pages expect)."""
-    status: Literal["success", "error"]
-    message: str = ""
-    stats: Optional[HelloAssoSyncStats] = None
+    """The campaign was read completely and its payments linked (failures are HTTP errors, see the route)."""
+    status: Literal["success"]
+    stats: HelloAssoSyncStats
 
 
 class ResultsFetched(BaseModel):

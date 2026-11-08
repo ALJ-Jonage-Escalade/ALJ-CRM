@@ -91,6 +91,35 @@ describe("ParametresGeneralPage", () => {
     expect(byId("results-last-run").text()).toBe("Jamais exécuté");
   });
 
+  it("renews the Google connection through the signed login request", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const { byId, calls } = render({
+      ...ANSWERS,
+      "POST /api/auth/google/login": () => json({ status: "success", url: "https://accounts.google.com/o/oauth2/auth?state=s" }),
+    });
+    await flushPromises();
+    await byId("google-renew").trigger("click");
+    await flushPromises();
+    const login = calls.find((c) => c.path === "/api/auth/google/login");
+    expect(login?.method).toBe("POST");
+    expect(JSON.parse(login?.body ?? "{}")).toEqual({ return_to: "/bureau/parametres" });
+    expect(open).toHaveBeenCalledWith("https://accounts.google.com/o/oauth2/auth?state=s", "_self");
+  });
+
+  it("stays on the page when the Google renewal cannot start", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const { byId, wrapper } = render({
+      ...ANSWERS,
+      "POST /api/auth/google/login": () => json({ status: "error", message: "Aucun identifiant client Google" }, 503),
+    });
+    await flushPromises();
+    await byId("google-renew").trigger("click");
+    await flushPromises();
+    expect(open).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain("Aucun identifiant client Google");
+    expect(byId("google-renew").attributes("disabled")).toBeUndefined();
+  });
+
   it("shows a status the server could not give", async () => {
     const { byId } = render({ ...ANSWERS, "GET /api/cloud-db/status": () => json({ status: "error", message: "Erreur interne" }, 500) });
     await flushPromises();

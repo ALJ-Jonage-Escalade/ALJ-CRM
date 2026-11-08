@@ -23,6 +23,13 @@ class ResultsSettingsUpdate(RequestBody):
     window_days: Optional[int] = None  # None: unchanged
 
 
+class ResultsFetchRequest(RequestBody):
+    """url: MyCompet results page or number given by the coach ("": the stored one, else a search); club: name
+    searched in the results."""
+    url: str = ""
+    club: str = "JONAGE"
+
+
 class ResultsSettingsSaved(BaseModel):
     status: Literal["success"]
     notification_email: str

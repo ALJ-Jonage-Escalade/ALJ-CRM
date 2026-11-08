@@ -6,29 +6,36 @@ The callback URL is registered in the Google Cloud console (see README): keep
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import html
 import json
 import logging
 import time
+import urllib.parse
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
-from api.integrations.schemas import GoogleChecks, GoogleStatus, GoogleTest, GoogleTokenUpdate, GoogleTokenUpdated, ServiceCheck
+from api.integrations.schemas import (
+    GoogleChecks, GoogleLoginStart, GoogleLoginUrl, GoogleStatus, GoogleTest, GoogleTokenUpdate, GoogleTokenUpdated, ServiceCheck,
+)
 from api.responses import error, error_responses, internal_error
-from infrastructure.security.secret_store import SecretStore
+from infrastructure.security.secret_store import SecretPersistenceError, SecretStore
 
 logger = logging.getLogger("alj")
 
 router = APIRouter()
 
 DEFAULT_RETURN_TO = "/bureau/parametres"
+STATE_MAX_AGE = 600  # seconds between the admin's click and Google's redirect
 
 
 def _safe_return_to(value: Optional[str]) -> str:
-    """Page to come back to after the OAuth flow: a path on this site only. The state that
-    carries it is not signed, so anything else (another host, javascript:…) is replaced."""
+    """Page to come back to after the OAuth flow: a path on this site only; anything else (another host,
+    javascript:…) is replaced."""
     value = str(value or "").strip()
     if value.startswith("/") and not value.startswith("//") and "\\" not in value:
         return value
@@ -92,39 +99,59 @@ def get_google_auth_status() -> GoogleStatus:
     )
 
 
-@router.get("/api/auth/google/login")
-def google_auth_login(request: Request, return_to: Optional[str] = DEFAULT_RETURN_TO, redirect_uri: Optional[str] = None):
-    """Initie le flux d'autorisation OAuth2 Google pour renouveler le refresh token."""
-    import base64
-    import urllib.parse
+def _callback_url(request: Request) -> str:
+    """This server's OAuth callback, as the browser sees it (behind Cloud Run's proxy)."""
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme).split(",")[0].strip()
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc).split(",")[0].strip()
+    # A URL handed to Google and kept in the signed state, not an HTTP response body
+    return f"{proto}://{host}/api/auth/google/callback"  # nosemgrep: python.flask.security.audit.directly-returned-format-string.directly-returned-format-string
+
+
+def _sign_state(payload: Dict[str, Any], key: str) -> str:  # Any: JSON values
+    """OAuth state: base64 JSON + HMAC-SHA256 with the OAuth client secret, which only this server knows, so the
+    callback can tell a flow an admin started here from a forged one (on any Cloud Run instance)."""
+    body = base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
+    signature = hmac.new(key.encode("utf-8"), body.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"{body}.{signature}"
+
+
+def _read_state(state: Optional[str], key: str, now: Optional[float] = None) -> Optional[Dict[str, Any]]:  # Any: JSON values
+    """Payload of a state made by _sign_state, or None when it is missing, forged, altered or older than STATE_MAX_AGE."""
+    body, _, signature = str(state or "").rpartition(".")
+    if not body or not signature:
+        return None
+    expected = hmac.new(key.encode("utf-8"), body.encode("ascii", "replace"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        return None
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(body.encode("ascii")).decode("utf-8"))
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    age = (time.time() if now is None else now) - float(payload.get("ts") or 0)
+    return payload if 0 <= age <= STATE_MAX_AGE else None
+
+
+@router.post("/api/auth/google/login", response_model=GoogleLoginUrl, responses=error_responses(503))
+def google_auth_login(request: Request, data: GoogleLoginStart) -> GoogleLoginUrl | JSONResponse:
+    """Starts the Google OAuth2 flow that replaces the club's refresh token (admins): answers Google's consent URL,
+    with a signed state naming the admin, that the page then opens."""
     from infrastructure.google.drive import GoogleDriveClient
-    
-    client_id, _ = GoogleDriveClient.get_client_credentials(prefer_web=True)
-    if not client_id:
-        return HTMLResponse(
-            "<h2>❌ Erreur de configuration Google OAuth2</h2>"
-            "<p>Aucun identifiant client Google (GMAIL_CLIENT_ID ou client_secret_*.json) n'a été trouvé sur le serveur.</p>"
-            "<p><a href='/bureau/parametres'>Retour aux paramètres</a></p>",
-            status_code=500
-        )
 
-    # Détecter dynamiquement la redirect_uri
-    if not redirect_uri:
-        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-        if "," in proto:
-            proto = proto.split(",")[0].strip()
-        host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
-        if "," in host:
-            host = host.split(",")[0].strip()
-        redirect_uri = f"{proto}://{host}/api/auth/google/callback"
+    client_id, client_secret = GoogleDriveClient.get_client_credentials(prefer_web=True)
+    if not client_id or not client_secret:
+        return error(503, "Aucun identifiant client Google (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET ou client_secret_*.json) "
+                          "n'est configuré sur le serveur.")
 
-    # Construire le state
-    state_payload = {
+    redirect_uri = _callback_url(request)
+    claims = getattr(request.state, "user", None) or {}  # None: token check off (local server)
+    state = _sign_state({
         "redirect_uri": redirect_uri,
-        "return_to": _safe_return_to(return_to),
+        "return_to": _safe_return_to(data.return_to),
+        "admin": str(claims.get("email") or ""),
         "ts": time.time(),
-    }
-    state = base64.urlsafe_b64encode(json.dumps(state_payload).encode("utf-8")).decode("utf-8")
+    }, client_secret)
 
     scopes = [
         "https://www.googleapis.com/auth/gmail.send",
@@ -143,8 +170,7 @@ def google_auth_login(request: Request, return_to: Optional[str] = DEFAULT_RETUR
         "prompt": "consent",
         "state": state,
     }
-    auth_url = f"https://accounts.google.com/o/oauth2/auth?{urllib.parse.urlencode(params)}"
-    return RedirectResponse(auth_url, status_code=302)
+    return GoogleLoginUrl(status="success", url=f"https://accounts.google.com/o/oauth2/auth?{urllib.parse.urlencode(params)}")
 
 
 @router.get("/api/auth/google/callback", response_class=HTMLResponse)
@@ -155,7 +181,6 @@ def google_auth_callback(
     error: Optional[str] = Query(None)
 ):
     """Réceptionne le code d'autorisation OAuth2 de Google, échange contre le refresh_token et enregistre les identifiants."""
-    import base64
     import requests
     from infrastructure.google.drive import GoogleDriveClient
     from infrastructure.firestore.cloud_database import CloudDatabase
@@ -220,27 +245,6 @@ def google_auth_callback(
             <p><a href="/bureau/parametres" class="btn">Retour aux paramètres</a></p>"""
         )
 
-    # Récupérer return_to et redirect_uri depuis le state
-    return_to = DEFAULT_RETURN_TO
-    redirect_uri = ""
-    if state:
-        try:
-            raw_state = base64.urlsafe_b64decode(state.encode("utf-8")).decode("utf-8")
-            state_data = json.loads(raw_state)
-            return_to = _safe_return_to(state_data.get("return_to"))
-            redirect_uri = state_data.get("redirect_uri", "")
-        except Exception:
-            logger.warning("Paramètre state OAuth illisible, valeurs par défaut utilisées", exc_info=True)
-
-    if not redirect_uri:
-        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-        if "," in proto:
-            proto = proto.split(",")[0].strip()
-        host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
-        if "," in host:
-            host = host.split(",")[0].strip()
-        redirect_uri = f"{proto}://{host}/api/auth/google/callback"
-
     client_id, client_secret = GoogleDriveClient.get_client_credentials(prefer_web=True)
     if not client_id or not client_secret:
         return _render_page(
@@ -250,6 +254,21 @@ def google_auth_callback(
             <p>Impossible d'échanger le code : le client_secret est manquant sur le serveur.</p>
             <p><a href="/bureau/parametres" class="btn">Retour aux paramètres</a></p>"""
         )
+
+    # Only a flow started by an admin on this server (POST /api/auth/google/login), less than 10 minutes ago
+    state_data = _read_state(state, client_secret)
+    if state_data is None:
+        logger.warning("Rappel OAuth Google refusé : paramètre state absent, falsifié ou expiré")
+        return HTMLResponse(_render_page(
+            "Lien expiré",
+            """<h2>❌ Lien de connexion invalide ou expiré</h2>
+            <div class="badge badge-error">Demande non reconnue</div>
+            <p>Relancez « Renouveler la connexion Google » depuis la page Paramètres (administrateurs).</p>
+            <p><a href="/bureau/parametres" class="btn">Retour aux paramètres</a></p>"""
+        ), status_code=400)
+    return_to = _safe_return_to(state_data.get("return_to"))
+    redirect_uri = str(state_data.get("redirect_uri") or "") or _callback_url(request)
+    admin_email = str(state_data.get("admin") or "")
 
     token_url = "https://oauth2.googleapis.com/token"  # noqa: S105 - URL of the token endpoint, not a secret
     token_params = {
@@ -290,9 +309,6 @@ def google_auth_callback(
     access_token = tokens.get("access_token")
 
     if not refresh_token:
-        refresh_token = SecretStore.get_secret("GMAIL_REFRESH_TOKEN")
-
-    if not refresh_token:
         return _render_page(
             "Refresh Token absent",
             """<h2>⚠️ Google n'a pas renvoyé de Refresh Token</h2>
@@ -315,12 +331,20 @@ def google_auth_callback(
         except Exception:
             logger.warning("Lecture de l'e-mail du compte Google impossible (userinfo)", exc_info=True)
 
-    # Sauvegarder dans SecretStore
-    SecretStore.set_secret("GMAIL_CLIENT_ID", client_id)
-    SecretStore.set_secret("GMAIL_CLIENT_SECRET", client_secret)
-    SecretStore.set_secret("GMAIL_REFRESH_TOKEN", refresh_token)
-    if user_email:
-        SecretStore.set_secret("GMAIL_USER_EMAIL", user_email)
+    try:
+        SecretStore.set_secrets(_credentials(client_id, client_secret, refresh_token, user_email))
+    except SecretPersistenceError as e:
+        internal_error(e, "google_auth_callback save")
+        return HTMLResponse(_render_page(
+            "Enregistrement impossible",
+            """<h2>❌ Identifiants Google non enregistrés</h2>
+            <div class="badge badge-error">Firestore injoignable</div>
+            <p>Google a validé la connexion, mais le serveur n'a pas pu l'enregistrer : relancez la connexion
+            dans quelques minutes (détails dans les journaux).</p>
+            <p><a href="/bureau/parametres" class="btn">Retour aux paramètres</a></p>"""
+        ), status_code=503)
+    logger.info("Identifiants Google du club remplacés par OAuth : compte %s, par l'administrateur %s",
+                user_email or "?", admin_email or "? (contrôle des jetons désactivé)")
 
     # Déclencher la synchronisation immédiate de la BDD
     sync_ok = True
@@ -342,11 +366,6 @@ def google_auth_callback(
         <div class="badge badge-success">Accès BDD & Gmail rétabli</div>
         <p>{email_display}</p>
         <p>{sync_display}</p>
-        <details style="margin:16px 0; text-align:left; font-size:12px; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px; padding:10px 12px;">
-            <summary style="cursor:pointer; font-weight:600; color:#334155;">🔑 Nouveau Refresh Token (pour Cloud Run)</summary>
-            <p style="margin:6px 0 4px; color:#64748B; font-size:11.5px;">Le jeton a été synchronisé. Vous pouvez également copier cette valeur dans Cloud Run (GMAIL_REFRESH_TOKEN) :</p>
-            <input type="text" readonly value="{html.escape(refresh_token)}" style="width:100%; box-sizing:border-box; padding:6px 8px; font-family:monospace; font-size:11px; background:#FFF; border:1px solid #CBD5E1; border-radius:4px;" onclick="this.select();">
-        </details>
         <p style="font-size:13px; color:#64748B;">Redirection automatique vers le bureau dans quelques secondes…</p>
         <p><a href="{html.escape(return_to)}" class="btn">Retourner au bureau immédiatement</a></p>""",
         return_url=return_to,
@@ -429,11 +448,19 @@ def test_google_auth() -> GoogleTest:
     return GoogleTest(status="success" if all_ok else "warning", all_ok=all_ok, results=_checks(results))
 
 
+def _credentials(client_id: str, client_secret: str, refresh_token: str, user_email: str) -> Dict[str, str]:
+    """The Google OAuth secrets to save together; the account's address only when Google gave it."""
+    values = {"GMAIL_CLIENT_ID": client_id, "GMAIL_CLIENT_SECRET": client_secret, "GMAIL_REFRESH_TOKEN": refresh_token}
+    if user_email:
+        values["GMAIL_USER_EMAIL"] = user_email
+    return values
+
+
 def _checks(results: Dict[str, Dict[str, Any]]) -> GoogleChecks:  # Any: {"ok": bool, "message": str}
     return GoogleChecks(**{name: ServiceCheck(**check) for name, check in results.items()})
 
 
-@router.post("/api/auth/google/update-token", response_model=GoogleTokenUpdated, responses=error_responses(400, 502))
+@router.post("/api/auth/google/update-token", response_model=GoogleTokenUpdated, responses=error_responses(400, 502, 503))
 def update_google_token(data: GoogleTokenUpdate) -> GoogleTokenUpdated | JSONResponse:
     """Permet à un administrateur de renseigner ou forcer un refresh token manuellement."""
     import requests
@@ -481,11 +508,10 @@ def update_google_token(data: GoogleTokenUpdate) -> GoogleTokenUpdated | JSONRes
         except Exception:
             logger.warning("Lecture de l'e-mail du compte Google impossible (userinfo)", exc_info=True)
 
-    SecretStore.set_secret("GMAIL_CLIENT_ID", final_cid)
-    SecretStore.set_secret("GMAIL_CLIENT_SECRET", final_sec)
-    SecretStore.set_secret("GMAIL_REFRESH_TOKEN", refresh_token)
-    if user_email:
-        SecretStore.set_secret("GMAIL_USER_EMAIL", user_email)
+    try:
+        SecretStore.set_secrets(_credentials(final_cid, final_sec, refresh_token, user_email))
+    except SecretPersistenceError as e:
+        return error(503, f"Jeton valide, mais non enregistré : {internal_error(e, 'update_google_token')}")
 
     if CloudDatabase.is_enabled():
         try:

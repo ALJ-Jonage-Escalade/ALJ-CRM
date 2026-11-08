@@ -142,7 +142,28 @@ watchEffect(() => {
 
 // Club Google token (Gmail, Drive) expired or revoked: warned on every page, checked once per user
 const googleExpired = ref(false);
-const renewUrl = `/api/auth/google/login?return_to=${encodeURIComponent(location.pathname)}`;
+const renewing = ref(false);
+const renewError = ref("");
+// Renewing replaces the club's credentials: admins only (the server signs the request, then Google's page opens)
+async function renewGoogle(): Promise<void> {
+  renewing.value = true;
+  renewError.value = "";
+  try {
+    const res = await api("/api/auth/google/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ return_to: location.pathname }),
+    });
+    const body = res.ok ? ((await res.json()) as { url?: unknown }) : null;
+    if (typeof body?.url !== "string") {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    window.open(body.url, "_self"); // same tab: Google comes back to this site
+  } catch {
+    renewing.value = false;
+    renewError.value = "❌ Impossible d'ouvrir la page de connexion Google (réseau ou droits) : réessayez en ligne.";
+  }
+}
 watch(
   () => (staff.value && state.value.status === "signedIn" ? state.value.user.uid : null),
   async (uid) => {
@@ -309,7 +330,18 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
           <b>Accès Google & BDD suspendus :</b>
           le jeton de connexion Google du club a expiré ou a été révoqué.
         </span>
-        <a :href="renewUrl" class="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-bold text-white no-underline">🔄 Renouveler l'accès</a>
+        <UiButton
+          v-if="role === 'admin'"
+          variant="danger"
+          small
+          :busy="renewing && 'Ouverture…'"
+          data-testid="google-renew"
+          @click="renewGoogle"
+        >
+          🔄 Renouveler l'accès
+        </UiButton>
+        <span v-else class="text-xs font-semibold">Prévenez un administrateur pour renouveler l'accès.</span>
+        <span v-if="renewError" role="alert" data-testid="google-renew-error" class="w-full text-xs font-semibold">{{ renewError }}</span>
       </div>
 
       <p

@@ -83,9 +83,7 @@ PUBLIC_PATHS = frozenset({
     "/favicon.ico",
     "/api/web-version",
     "/webhooks/helloasso",
-    "/api/auth/google/login",
-    "/api/auth/google/callback",
-    "/api/auth/google/status",
+    "/api/auth/google/callback",  # Google's redirect, without the user's token: protected by the signed state
 })
 # Pages et fichiers de l'application web (logo, anciennes adresses) : publics, données protégées.
 PUBLIC_PREFIXES = ("/annuaire", "/bureau", "/spa")
@@ -161,8 +159,8 @@ def required_role(method: str, path: str) -> Optional[Role]:
         return Role.ADMIN  # import des adhésions HelloAsso (aperçu, import, historique) réservé aux administrateurs
     if path.startswith("/api/ffme") and method not in ("GET", "HEAD"):
         return Role.ADMIN  # imports et modifications FFME réservés aux administrateurs
-    if path == "/api/auth/google/update-token" and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # mise à jour manuelle des identifiants Google réservée aux administrateurs
+    if path in ("/api/auth/google/update-token", "/api/auth/google/login") and method not in ("GET", "HEAD"):
+        return Role.ADMIN  # remplacement des identifiants Google du club (manuel ou OAuth) réservé aux administrateurs
     if path in SCHEDULER_PATHS:
         return Role.ADMIN  # results batch: an admin, or the Cloud Scheduler token (authorize_request)
     if path == "/api/cloud-db/sync" and method not in ("GET", "HEAD"):

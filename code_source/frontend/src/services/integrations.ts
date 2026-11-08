@@ -10,6 +10,8 @@ export function createIntegrationsApi(client: ApiClient) {
   return {
     // ------------------------------------------------------------ Google account
     googleStatus: () => unwrap(client.GET("/api/auth/google/status")),
+    /** Google's consent page that renews the club's token (admins), coming back to returnTo (a path of this site). */
+    googleLoginUrl: (returnTo: string) => unwrap(client.POST("/api/auth/google/login", { body: { return_to: returnTo } })),
     testGoogle: () => unwrap(client.POST("/api/auth/google/test")),
     updateGoogleToken: (refreshToken: string) =>
       unwrap(client.POST("/api/auth/google/update-token", { body: { refresh_token: refreshToken } })),

@@ -29,6 +29,6 @@ services:
       - "127.0.0.1:8025:8025"   # web UI to read the captured e-mails
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: "1"       # the application always calls login(): any credentials accepted
-      MP_SMTP_AUTH_ALLOW_INSECURE: "1"   # … without TLS (STARTTLS not offered, the application carries on)
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"   # … without TLS (STARTTLS not offered: accepted in dev only, refused in production)
       MP_MAX_MESSAGES: "500"
       MP_VERBOSE: "true"                 # logs every received message (docker compose logs -f mailpit)

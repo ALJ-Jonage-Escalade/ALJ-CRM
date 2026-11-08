@@ -1,7 +1,7 @@
 """
 Rapprochement HelloAsso <-> participants d'une compétition (logique pure, testable).
 
-Entrées : items bruts de l'API HelloAsso v5 (infrastructure.helloasso.api.get_items) et les
+Entrées : items bruts de l'API HelloAsso v5 (infrastructure.helloasso.api.fetch_form_items) et les
 participants d'une compétition (CompetitionRepository.list_participants).
 Sorties : mises à jour de statut de paiement + rapport d'anomalies.
 

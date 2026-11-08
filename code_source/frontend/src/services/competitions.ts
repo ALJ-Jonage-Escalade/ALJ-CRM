@@ -40,8 +40,8 @@ export function createCompetitionsApi(client: ApiClient) {
     /** url "": the server looks for the competition's page on MyCompet itself. */
     fetchResults: (competitionId: number, url: string) =>
       unwrap(
-        client.POST("/api/competitions/{comp_id}/fetch-results", {
-          params: { path: { comp_id: String(competitionId) } },
+        client.POST("/api/competitions/{competition_id}/fetch-results", {
+          params: { path: { competition_id: competitionId } },
           body: { url, club: RESULTS_CLUB },
         }),
       ),

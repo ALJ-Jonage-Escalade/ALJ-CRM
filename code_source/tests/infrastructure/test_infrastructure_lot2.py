@@ -111,8 +111,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         test_key = "ALJ_TEST_SECRET_KEY"
         test_value = "SecrEtValue-12345!"
         
-        success = SecretStore.set_secret(test_key, test_value)
-        self.assertTrue(success)
+        SecretStore.set_secret(test_key, test_value)
         
         retrieved = SecretStore.get_secret(test_key)
         self.assertEqual(retrieved, test_value)

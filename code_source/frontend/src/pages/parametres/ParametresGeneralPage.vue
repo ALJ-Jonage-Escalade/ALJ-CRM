@@ -34,7 +34,6 @@ const client = inject(CLIENT_KEY)!;
 const integrationsApi = createIntegrationsApi(client);
 const competitionsApi = createCompetitionsApi(client);
 const toast = useToast();
-const RENEW_URL = "/api/auth/google/login?return_to=/bureau/parametres";
 
 /** Lines of an action's report; error: shown in red. */
 interface Report {
@@ -48,6 +47,19 @@ const googleInfo = ref<Schemas["GoogleStatus"] | null>(null);
 const checks = ref<CheckLine[] | null>(null);
 const checksError = ref("");
 const testing = ref(false);
+const renewing = ref(false);
+
+/** Opens Google's consent page; the server signs the request, so it needs a signed-in admin and the network. */
+async function renewGoogle(): Promise<void> {
+  renewing.value = true;
+  try {
+    const { url } = await integrationsApi.googleLoginUrl("/bureau/parametres");
+    window.open(url, "_self"); // same tab: Google comes back to this site
+  } catch (e) {
+    toast.show(`❌ Impossible de lancer la connexion Google : ${errorText(e)}`, 7000);
+    renewing.value = false;
+  }
+}
 
 async function loadGoogle(): Promise<void> {
   google.value = CHECKING;
@@ -293,12 +305,9 @@ onMounted(() => {
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <a
-            :href="RENEW_URL"
-            class="inline-flex items-center rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white no-underline hover:bg-accent-dark"
-          >
+          <UiButton :busy="renewing && 'Ouverture de Google…'" data-testid="google-renew" @click="renewGoogle">
             🔄 Renouveler la connexion Google
-          </a>
+          </UiButton>
           <UiButton variant="muted" :busy="testing && 'Test en cours…'" data-testid="google-test" @click="testGoogle">
             🔍 Tester l'accès
           </UiButton>

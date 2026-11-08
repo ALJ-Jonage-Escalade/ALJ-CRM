@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from paths import DATA_ROOT
+from infrastructure import runtime_env
 from infrastructure.security.secret_store import SecretStore
 from domain.utils import sanitize_email_header
 
@@ -197,13 +198,15 @@ class EmailRepository:
                 else:
                     server = smtplib.SMTP(smtp_host, port, timeout=15)
                     server.ehlo()
-                    # Toujours activer starttls si disponible sur le serveur
-                    try:
-                        server.starttls()
+                    if server.has_extn("starttls"):
+                        server.starttls()  # a failure is raised: never fall back to cleartext once offered
                         server.ehlo()
-                    except Exception:
-                        logger.warning("STARTTLS indisponible sur %s, envoi sans chiffrement", smtp_host, exc_info=True)
-                
+                    elif runtime_env.is_dev():
+                        logger.info("STARTTLS non proposé par %s (Mailpit en dev) : envoi sans chiffrement", smtp_host)
+                    else:
+                        # The password and the members' e-mails must never travel unencrypted
+                        raise smtplib.SMTPNotSupportedError(f"STARTTLS non proposé par {smtp_host} : envoi refusé sans chiffrement")
+
                 server.login(smtp_user, smtp_password)
                 # Diviser les e-mails en liste pour assurer l'envoi SMTP multipart.
                 # L'enveloppe SMTP reste le compte authentifié (contrainte des serveurs),

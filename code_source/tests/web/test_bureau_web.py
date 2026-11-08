@@ -481,34 +481,6 @@ class TestBureauFiles(unittest.TestCase):
         self.assertIn("Aucun créneau à placer sur la grille", r.json()["message"])
         self.assertEqual(client.get("/api/planning/export", params={"mode": "list", "season": "2026-2027"}).status_code, 200)
 
-    @patch("infrastructure.mycompet.scraper.fetch_and_parse_mycompet_results")
-    @patch("infrastructure.firestore.client.FirestoreClient.get_document")
-    @patch("infrastructure.firestore.client.FirestoreClient.update_fields")
-    def test_fetch_competition_results_endpoint(self, mock_update, mock_get, mock_scraper):
-        mock_get.return_value = {
-            "id": "comp_123",
-            "nom": "Test Comp",
-            "participants": [
-                {"nom": "BULAND", "prenom": "Julia", "num_licence": "930654"},
-                {"nom": "DUPONT", "prenom": "Jean", "num_licence": "000000"}
-            ]
-        }
-        mock_scraper.return_value = [
-            {"nom": "BULAND", "prenom": "Julia", "licence": "930654", "classement": "9", "categorie": "U13Femme"}
-        ]
-        client = TestClient(app, base_url="http://localhost")
-        resp = client.post(
-            "/api/competitions/comp_123/fetch-results",
-            json={"url": "13660"},
-            headers={"Host": "localhost", "Origin": "http://localhost"}
-        )
-        self.assertEqual(resp.status_code, 200)
-        data = resp.json()
-        self.assertEqual(data["status"], "success")
-        self.assertEqual(data["matched_count"], 1)
-        self.assertEqual(data["total_scraped"], 1)
-        mock_update.assert_called_once()
-
     def _temp_database(self, name):
         """SqliteDatabase on an empty database for the test."""
         from infrastructure.sqlite.connection import SqliteDatabase

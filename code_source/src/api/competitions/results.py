@@ -7,14 +7,15 @@ in another router.
 
 from __future__ import annotations
 
-import datetime
-from typing import Any, Dict, Optional
+from typing import Optional
 
-from fastapi import APIRouter, Body, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from api.competitions.schemas.results import BatchReport, ResultsSettings, ResultsSettingsSaved, ResultsSettingsUpdate
+from api.competitions.schemas.results import (
+    BatchReport, ResultsFetchRequest, ResultsSettings, ResultsSettingsSaved, ResultsSettingsUpdate,
+)
 from api.competitions.schemas.views import ResultsFetched
 from api.responses import error, error_responses
 
@@ -22,9 +23,8 @@ from api.responses import error, error_responses
 router = APIRouter()
 
 
-
 # Batch quotidien de récupération des résultats MyCompet FFME & Notifications.
-# Stays registered before /{comp_id}/fetch-results, which would capture "cron": Cloud Scheduler
+# Stays registered before /{competition_id}/fetch-results, which would take "cron" for an id: Cloud Scheduler
 # (job batch-resultats-competitions) calls POST /api/competitions/cron/fetch-results every day.
 @router.post("/api/competitions/cron/fetch-results", response_model=BatchReport, responses=error_responses(403, 503))
 async def api_cron_fetch_competition_results(
@@ -55,71 +55,15 @@ async def api_cron_fetch_competition_results(
         invalidate_cache()  # the batch writes competition documents directly
 
 
-@router.post("/api/competitions/{comp_id}/fetch-results", response_model=ResultsFetched, responses=error_responses(404, 502))
-async def api_fetch_competition_results(comp_id: str, payload: Dict[str, Any] = Body(default={})) -> ResultsFetched | JSONResponse:  # Any: {url, club}
-    """
-    Récupère les résultats officiels depuis MyCompet FFME pour une compétition donnée,
-    extrait les compétiteurs de l'Amicale Laïque de Jonage et met à jour leurs classements.
-    404 `needs_url`: the results page was not found automatically, the coach gives its address or number.
-    """
-    from infrastructure.mycompet.scraper import fetch_and_parse_mycompet_results, normalize_result_url, find_mycompet_result_url
-    from infrastructure.firestore.client import FirestoreClient, FirestoreError
-
-    url = (payload.get("url") or payload.get("result_id") or "").strip()
-
-    comp_doc = None
-    try:
-        comp_doc = FirestoreClient.get_document("competitions", comp_id)
-    except Exception as e:
-        print(f"⚠️ [MYCOMPET] Impossible de lire la compétition {comp_id} sur Firestore : {e}")
-
-    if not url and comp_doc:
-        url = comp_doc.get("url_resultats") or comp_doc.get("id_resultat_ffme") or ""
-
-    # Détection automatique transparente si aucune URL n'est renseignée
-    if not url and comp_doc:
-        nom = comp_doc.get("nom") or ""
-        date = comp_doc.get("date_competition") or ""
-        lieu = comp_doc.get("lieu") or ""
-        id_ffme = comp_doc.get("id_ffme") or ""
-        date_fin = comp_doc.get("date_fin") or ""
-        auto_url = await run_in_threadpool(find_mycompet_result_url, nom, date, lieu, str(id_ffme), date_fin)
-        if auto_url:
-            url = auto_url
-
-    if not url:
-        return error(404, "Résultats introuvables automatiquement sur MyCompet. Veuillez renseigner l'URL ou le numéro de "
-                          "résultat (ex: https://mycompet.ffme.fr/resultat/resultat_13660 ou 13660).", "needs_url")
-
-    try:
-        club_kw = payload.get("club") or "JONAGE"
-        scraped_results = await run_in_threadpool(fetch_and_parse_mycompet_results, url, club_kw)
-    except Exception as e:
-        print(f"❌ [MYCOMPET] Erreur scraping MyCompet ({url}) : {type(e).__name__}: {e}")
-        return error(502, "Erreur lors de la récupération des résultats MyCompet (détails dans les journaux).")
-
-    now_iso = datetime.datetime.now().isoformat()
-    canonical_url = normalize_result_url(url)
-    matched_count = 0
-    if comp_doc:
-        from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
-        from services.competitions.results_batch import apply_rankings
-        fields = {"url_resultats": canonical_url, "resultats_synced_at": now_iso}
-        try:
-            # Re-read and written under the optimistic lock: an edit made meanwhile on the web is kept
-            matched_count = await run_in_threadpool(
-                CompetitionFirestoreRepository.record_results, comp_doc.get("id") or comp_id,
-                lambda parts: len(apply_rankings(parts, scraped_results, now_iso)), fields)
-            if not matched_count:  # keep the URL the coach gave, for the next try
-                await run_in_threadpool(FirestoreClient.update_fields, CompetitionFirestoreRepository.COLLECTION_COMPETITIONS,
-                                        comp_doc.get("_doc_id") or comp_id, fields)
-        except FirestoreError as e:
-            print(f"⚠️ [MYCOMPET] Erreur mise à jour Firestore : {e}")
-        finally:
-            from services.competitions.store import invalidate_cache
-            invalidate_cache()  # results visible on the next poll of the competition pages
-
-    return ResultsFetched(status="success", url=canonical_url, total_scraped=len(scraped_results), matched_count=matched_count)
+@router.post("/api/competitions/{competition_id}/fetch-results", response_model=ResultsFetched,
+             responses=error_responses(404, 502, 503))
+def api_fetch_competition_results(competition_id: int, data: ResultsFetchRequest) -> ResultsFetched:
+    """Fetches a competition's MyCompet results and writes the club's rankings (coaches).
+    404 `needs_url`: the results page was not found automatically, the coach gives its address or number;
+    502: MyCompet failed; 503: Firestore failed (nothing reported as saved)."""
+    from services.competitions.results_batch import CompetitionResultsBatchService
+    fetched = CompetitionResultsBatchService.fetch_results_for(competition_id, data.url, data.club or "JONAGE")
+    return ResultsFetched(status="success", **fetched)
 
 
 @router.get("/api/settings/competitions-results", response_model=ResultsSettings)

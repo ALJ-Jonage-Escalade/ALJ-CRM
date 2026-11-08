@@ -164,6 +164,38 @@ describe("AppShell", () => {
     expect(wrapper.find("#google-auth-warning").isVisible()).toBe(true);
   });
 
+  it("lets an admin renew the expired Google token through the signed login request", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const { wrapper, api } = render({ status: "signedIn", user: USER, role: "admin" }, "expired");
+    await flushPromises();
+    vi.mocked(api).mockResolvedValueOnce(new Response(JSON.stringify({ status: "success", url: "https://accounts.google.com/x" })));
+    await wrapper.find('[data-testid="google-renew"]').trigger("click");
+    await flushPromises();
+    expect(api).toHaveBeenLastCalledWith("/api/auth/google/login", expect.objectContaining({ method: "POST" }));
+    expect(open).toHaveBeenCalledWith("https://accounts.google.com/x", "_self");
+    open.mockRestore();
+  });
+
+  it("shows why the renewal could not start, without leaving the page", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const { wrapper, api } = render({ status: "signedIn", user: USER, role: "admin" }, "expired");
+    await flushPromises();
+    vi.mocked(api).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await wrapper.find('[data-testid="google-renew"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-testid="google-renew-error"]').exists()).toBe(true);
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it("tells a coach to ask an admin to renew the Google token", async () => {
+    const { wrapper } = render({ status: "signedIn", user: USER, role: "coach" }, "expired");
+    await flushPromises();
+    expect(wrapper.find("#google-auth-warning").isVisible()).toBe(true);
+    expect(wrapper.find('[data-testid="google-renew"]').exists()).toBe(false);
+    expect(wrapper.find("#google-auth-warning").text()).toContain("Prévenez un administrateur");
+  });
+
   it("marks the current page in the navigation", () => {
     const { wrapper } = render({ status: "error", user: USER, message: "Serveur injoignable", offline: true });
     expect(wrapper.find('nav a[data-page="accueil"]').attributes("aria-current")).toBe("page");

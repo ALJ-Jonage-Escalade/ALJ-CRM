@@ -62,87 +62,9 @@ def _drop_token_if_refused(response: requests.Response) -> None:
         _token_cache.invalidate()
 
 
-def fetch_all_pages(url, headers, params=None):
-    """Gère la pagination de l'API HelloAsso pour récupérer toutes les données."""
-    if params is None:
-        params = {}
-        
-    # L'API HelloAsso utilise pageSize=100 maximum généralement, mettons une taille correcte
-    params['pageSize'] = 100
-    
-    results = []
-    continuation_token = None
-    page_count = 1
-    
-    print(f"Début de la récupération : {url}")
-    
-    while True:
-        if continuation_token:
-            params['continuationToken'] = continuation_token
-            
-        try:
-            print(f" -> Requête page {page_count}...")
-            response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
-            _drop_token_if_refused(response)
-            response.raise_for_status()
-            data = response.json()
-            
-            page_data = data.get("data", [])
-            
-            # Condition de sortie PRIMORDIALE : si la page est vide, on a fini.
-            if not page_data:
-                print(" -> Fin : plus aucune donnée sur cette page.")
-                break
-                
-            results.extend(page_data)
-            
-            pagination = data.get("pagination", {})
-            new_token = pagination.get("continuationToken")
-            
-            # S'il n'y a plus de token, ou s'il est identique au précédent (boucle infinie)
-            if not new_token or new_token == continuation_token:
-                print(" -> Fin : plus de token de continuation.")
-                break
-                
-            continuation_token = new_token
-            page_count += 1
-                
-        except requests.exceptions.RequestException as e:
-            print(f"Erreur lors de la requête paginée: {e}")
-            break
-            
-    print(f"Récupération terminée. Total éléments: {len(results)}")
-    return results
-
-def get_campaigns():
-    """Récupère la liste complète des campagnes (formulaires) de l'organisation."""
-    token = get_access_token()
-    if not token:
-        return []
-        
-    url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms"
-    headers = {"Authorization": f"Bearer {token}"}
-    return fetch_all_pages(url, headers)
-
-def get_payments(campaign_type, campaign_slug):
-    """Récupère tous les paiements associés à une campagne spécifique."""
-    token = get_access_token()
-    if not token:
-        return []
-        
-    url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms/{campaign_type}/{campaign_slug}/payments"
-    headers = {"Authorization": f"Bearer {token}"}
-    return fetch_all_pages(url, headers)
-
-def get_items(campaign_type, campaign_slug):
-    """Récupère tous les articles (inscrits/participants) d'une campagne spécifique."""
-    token = get_access_token()
-    if not token:
-        return []
-        
-    url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms/{campaign_type}/{campaign_slug}/items"
-    headers = {"Authorization": f"Bearer {token}"}
-    return fetch_all_pages(url, headers, params={"withDetails": "true"})
+def get_campaigns() -> List[Dict[str, Any]]:  # Any: HelloAsso JSON
+    """Every form (campaign) of the organisation, every page; HelloAssoApiError when they can't all be read."""
+    return list_forms((), ())
 
 
 # ---------------------------------------------------------------------------
@@ -209,8 +131,8 @@ def require_access_token() -> str:
 def list_forms(form_types: Iterable[str], states: Iterable[str], token: str | None = None) -> List[Dict[str, Any]]:  # Any: HelloAsso JSON
     """Formulaires (campagnes) de l'organisation filtrés par type et état, toutes les pages lues.
 
-    Contrairement à get_campaigns(), lève HelloAssoApiError (identifiants absents, réseau, erreur
-    HTTP) au lieu de renvoyer une liste vide ou partielle : la page Paramètres affiche l'erreur.
+    Lève HelloAssoApiError (identifiants absents, réseau, erreur HTTP) au lieu de renvoyer une
+    liste vide ou partielle : la page Paramètres affiche l'erreur. Sans filtre : tous les formulaires.
     `token` : jeton déjà obtenu (require_access_token), sinon il est demandé ici."""
     token = token or require_access_token()
     url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms"
@@ -250,8 +172,8 @@ def get_public_form(form_type: str, form_slug: str, token: str) -> Dict[str, Any
 
 
 def fetch_form_items(form_type: str, slug: str) -> list:
-    """Every item (with custom fields) of a form, every page. Unlike get_items, a failure is raised
-    (HelloAssoApiError), never answered as an empty campaign: the members import must not mistake it."""
+    """Every item (with custom fields) of a form, every page. A failure is raised (HelloAssoApiError), never
+    answered as an empty or partial campaign: the members import and the payments sync must not mistake it."""
     if not credentials_configured():
         raise HelloAssoApiError("Identifiants de l'API HelloAsso non configurés sur le serveur.",
                                 "helloasso_credentials_missing")
