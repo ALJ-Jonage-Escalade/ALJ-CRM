@@ -618,7 +618,6 @@ class TestBureauAccess(unittest.TestCase):
         self.assertEqual(self.client.get("/bureau/inconnue").status_code, 404)
         self.assertEqual(self.client.get("/bureau/competitions/inconnue").status_code, 404)
         self.assertEqual(self.client.get("/api/email-status").status_code, 401)
-        self.assertEqual(self.client.get("/api/dashboard").status_code, 401)
 
     def test_portal_content_types(self):
         self.assertIn("text/html", self.client.get("/bureau/").headers["content-type"])

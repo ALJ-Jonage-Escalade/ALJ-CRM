@@ -504,28 +504,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Dashboard Data
-         * @description Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
-         *     des adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.
-         *     404: campaign unknown to HelloAsso; 502: HelloAsso could not be read completely (never a partial dashboard).
-         */
-        get: operations["get_dashboard_data_api_dashboard_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/helloasso/memberships/preview": {
         parameters: {
             query?: never;
@@ -5854,44 +5832,6 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
-    get_dashboard_data_api_dashboard_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Bad Gateway */
-            502: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -243,17 +243,3 @@ def test_desktop_sync_filters_and_link(page, test_data, setup):
         assert (participant["statut_paiement"], participant["montant_paye"]) == ("paye", 15)
         assert participant["commande_helloasso"] == str(setup["unknown_payer"]["order"]["id"])
     eventually(paid)
-
-
-def test_membership_dashboard(page, fake_helloasso):
-    """/api/dashboard (membership campaign, CAMPAIGN_SLUG) — no page uses it on the web yet."""
-    members = [item("Luna", "Lovegood", 180, form_slug=helloasso.MEMBERSHIP_FORM, item_type="Membership",
-                    name="Adulte loisir"),
-               item("Cho", "Chang", 150, form_slug=helloasso.MEMBERSHIP_FORM, item_type="Membership",
-                    name="Jeune compétition")]
-    fake_helloasso.set(members)
-    data = page.request.get("/api/dashboard").json()
-    assert data["campaign"]["formSlug"] == helloasso.MEMBERSHIP_FORM
-    assert data["total_inscrits"] == 2
-    assert sorted(t["name"] for t in data["tariffs"]) == ["Adulte loisir", "Jeune compétition"]
-    assert {p["amount"] for p in data["participants"]} == {180, 150}

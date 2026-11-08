@@ -2084,43 +2084,6 @@
         }
       }
     },
-    "/api/dashboard": {
-      "get": {
-        "summary": "Get Dashboard Data",
-        "description": "Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import\ndes adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.\n404: campaign unknown to HelloAsso; 502: HelloAsso could not be read completely (never a partial dashboard).",
-        "operationId": "get_dashboard_data_api_dashboard_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Bad Gateway",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/helloasso/memberships/preview": {
       "post": {
         "summary": "Preview Membership Import",

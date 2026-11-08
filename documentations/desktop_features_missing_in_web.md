@@ -18,7 +18,7 @@
 | Google Contacts sync (labels per group, address choice) | Gmail contacts | `infrastructure/google/contacts.py`, `infrastructure/google/gmail_auth.py`, `pages/gmail_contact.py` | No | Would need the Contacts scope on the web OAuth client. |
 | WhatsApp QR code per slot | Groups | `pages/groups.py` | Partly: `infrastructure/qrcodes/` | The WhatsApp invitation text exists (`/api/whatsapp-template`), but there is no QR generation in the UI. |
 | Address quality: list of unrecognised addresses, suggested correction, manual geocoding | Reports | `pages/reports.py` | Partly: `server.geocode_missing_addresses` (background) | The web has the map (Outils), but no correction screen. |
-| Dashboard (statistics, recent activity) | Dashboard | `pages/dashboard.py`, `components/qt_charts.py` | Yes: `GET /api/dashboard` (no web caller) | `/bureau/` is a link portal; the pivot table (Outils page) covers part of the statistics. |
+| Dashboard (statistics, recent activity) | Dashboard | `pages/dashboard.py`, `components/qt_charts.py` | No: `GET /api/dashboard` (never called by any page) deleted (2026-11-08, desloppify batch 3) | `/bureau/` is a link portal; the pivot table (Outils page) covers part of the statistics. |
 | Word (.docx) attestations, batch generation into a folder | Documents | `exports/attestation_word.py`, `doc/template/ATTESTATION DE PAIEMENT_adulte.docx` | No | The web generates and sends PDF attestations one member at a time (`/api/attestations/preview`, `/send`); no batch download. |
 | Built-in help centre (input files, sync cycle) | Help | `pages/help.py` | No | |
 

@@ -52,7 +52,7 @@ jamais ajouté en mode dev.
   Relancer le seed repart de zéro (et vide le cache `data-dev/` du serveur).
 - **Règles** : l'émulateur applique le vrai `firestore.rules` (monté en lecture seule) : refus de tout client.
   Le serveur passe par le jeton administrateur de l'émulateur (`owner`), qui joue le rôle d'IAM.
-- **HelloAsso** : `/api/dashboard` et la synchro HelloAsso appellent l'API HelloAsso réelle (lecture)
+- **HelloAsso** : la synchro et l'import des adhésions HelloAsso appellent l'API HelloAsso réelle (lecture)
   si des identifiants sont configurés ; sans eux, ces écrans sont en erreur. En mode dev uniquement,
   `HELLOASSO_API_BASE_URL` / `HELLOASSO_OAUTH_URL` les redirigent vers un faux HelloAsso local
   (`e2e/fakes/helloasso_fake.py`, utilisé par les tests e2e) ; `check_env.py` refuse toute autre adresse.

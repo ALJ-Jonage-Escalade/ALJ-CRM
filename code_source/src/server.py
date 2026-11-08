@@ -112,7 +112,7 @@ from api.activities import planning, presence
 from api.admin import access
 from api.auth import me
 from api.communications import attestations, email, whatsapp
-from api.members import dashboard, helloasso_import, members, seasons
+from api.members import helloasso_import, members, seasons
 from api.ffme import ffme
 from api.integrations import cloud_db, google_auth, helloasso, helloasso_campaigns
 from api.reports import map as members_map, pivot
@@ -120,7 +120,7 @@ from api.web import health, pages, pwa
 from api.responses import service_error_handler
 from domain.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
-             results, payments, members, seasons, dashboard, helloasso_import, email, whatsapp, attestations,
+             results, payments, members, seasons, helloasso_import, email, whatsapp, attestations,
              planning, presence, members_map, pivot, ffme,
              helloasso, helloasso_campaigns, google_auth, cloud_db, me, access,
              pages, pwa, health):
