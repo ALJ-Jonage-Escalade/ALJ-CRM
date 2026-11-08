@@ -10,7 +10,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 from domain.members.sex import parse_sex
 from domain.utils import normalize_name
 from infrastructure.sqlite import schema_v2
-from infrastructure.sqlite.connection import DB_WRITE_ERROR, SqliteDatabase
+from infrastructure.sqlite.connection import SqliteDatabase
 
 EXTRA_COLUMNS = {
     "is_modified": "TEXT DEFAULT 'Non'",
@@ -39,9 +39,6 @@ class MemberRepository:
         conn = SqliteDatabase.get_connection()
         try:
             return cls._load_data_from_compat_view(conn, season_filter)
-        except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors du chargement des données : {e}")
-            return []
         finally:
             conn.close()
 
@@ -118,10 +115,10 @@ class MemberRepository:
 
     @classmethod
     def upsert_members(cls, members: list, season_name: str = "2026-2027") -> int:
-        """Insère ou met à jour un lot d'adhérents dans le schéma v2 (users / orders / purchases / purchase_options)."""
+        """Insère ou met à jour un lot d'adhérents dans le schéma v2 (users / orders / purchases / purchase_options).
+        Returns the number of purchases written; a database failure is rolled back and raised."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
-        inserted_count = 0
         try:
             cursor = conn.cursor()
             stats = schema_v2.sync_members_to_v2(cursor, members, season_name)
@@ -129,22 +126,23 @@ class MemberRepository:
             conn.commit()
             print(f"[SQLITE] Synchro reussie : {inserted_count} adhesions enregistrees/mises a jour "
                   f"pour la saison {season_name}. (v2: {stats})")
-        except Exception as e:
-            print(f"[SQLITE] Erreur lors de l'upsert des adherents : {e}")
+        except Exception:
             conn.rollback()
+            raise
         finally:
             conn.close()
         return inserted_count
 
 
     @classmethod
-    def add_manual_member(cls, fields: dict, season_name: str = "2026-2027") -> tuple:
+    def add_manual_member(cls, fields: dict, season_name: str = "2026-2027") -> Tuple[bool, str]:
         """
         Ajoute manuellement un adhérent dans le schéma v2 (users + orders + purchases),
         en synthétisant une commande « MANUEL-... » équivalente à une inscription HelloAsso.
         Champs attendus : last_name, first_name, birth_date ('JJ/MM/AAAA' ou ISO), sex,
         phone, email_primary, address, zip_code, city, tarif_name, status, amount.
-        Retourne (True, order_ref) ou (False, message d'erreur).
+        Retourne (True, order_ref) ou (False, message) quand une inscription prioritaire existe déjà ;
+        une erreur de base de données est annulée (rollback) et propagée.
         """
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
@@ -219,10 +217,9 @@ class MemberRepository:
             print(f"[SQLITE] Adhérent manuel ajouté : {rec['user_lastName']} {rec['user_firstName']} "
                   f"({order_ref}, saison {season_name}).")
             return True, order_ref
-        except Exception as e:
-            print(f"[SQLITE] Erreur lors de l'ajout manuel de l'adherent : {e}")
+        except Exception:
             conn.rollback()
-            return False, DB_WRITE_ERROR
+            raise
         finally:
             conn.close()
 
@@ -263,7 +260,8 @@ class MemberRepository:
 
     @classmethod
     def update_email_sent_date(cls, order_ref: str, last_name: str, first_name: str, date_str: str, purchase_id: Optional[int] = None) -> bool:
-        """Met à jour la date d'envoi d'e-mail sur les achats v2 de la commande."""
+        """Met à jour la date d'envoi d'e-mail sur les achats v2 de la commande.
+        False when no purchase matches; a database failure is rolled back and raised."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         cursor = conn.cursor()
@@ -303,10 +301,9 @@ class MemberRepository:
                 return True
             print(f"[SQLITE] Aucun achat trouve pour la commande {order_ref} (achat #{purchase_id})")
             return False
-        except Exception as e:
-            print(f"[SQLITE] Erreur lors de la mise a jour de la date d'envoi d'e-mail : {e}")
+        except Exception:
             conn.rollback()
-            return False
+            raise
         finally:
             conn.close()
 
@@ -322,7 +319,8 @@ class MemberRepository:
         Met à jour de manière ciblée les informations d'un adhérent :
         - Table users : badge_rouge, autonomie_bloc, email_primary, email_secondary, phone, sex…
         - Table purchases : tarif_name.
-        Retourne (succès: bool, message: str).
+        Retourne (succès: bool, message: str) ; (False, message) pour un doublon d'adhérent, une autre erreur
+        de base de données est annulée (rollback) et propagée.
         """
         if not fields:
             return False, "Aucun champ à mettre à jour."
@@ -529,13 +527,11 @@ class MemberRepository:
             conn.commit()
             print(f"[SQLITE] Adhérent #{resolved_uid} mis à jour avec succès : {list(fields.keys())}")
             return True, ""
-        except sqlite3.IntegrityError as e:
-            print(f"❌ [SQLITE] Erreur d'intégrité lors de la mise à jour de l'adhérent : {e}")
+        except sqlite3.IntegrityError:
             conn.rollback()
             return False, "Un autre adhérent avec les mêmes nom, prénom et date de naissance existe déjà."
-        except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors de la mise à jour de l'adhérent : {e}")
+        except Exception:
             conn.rollback()
-            return False, DB_WRITE_ERROR
+            raise
         finally:
             conn.close()

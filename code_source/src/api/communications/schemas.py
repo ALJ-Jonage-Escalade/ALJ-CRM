@@ -86,7 +86,7 @@ class AttestationSend(AttestationRequest):
 class AttestationSent(BaseModel):
     status: Literal["success"]
     message: str
-    email_sent_date: str
+    email_sent_date: Optional[str]  # None when the e-mail went out but the date could not be saved
     filename: str
 
 

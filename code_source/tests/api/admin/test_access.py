@@ -34,7 +34,7 @@ def clock() -> FakeClock:
 @pytest.fixture
 def sent() -> MagicMock:
     """The invitation e-mails: EmailRepository.send_email, faked."""
-    return MagicMock(return_value=True)
+    return MagicMock(return_value=None)
 
 
 @pytest.fixture

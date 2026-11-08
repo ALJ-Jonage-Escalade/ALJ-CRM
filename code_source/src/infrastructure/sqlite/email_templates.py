@@ -22,19 +22,17 @@ class EmailTemplateRepository:
             cursor.execute("SELECT name, subject, body, sender_email, sender_name FROM email_templates ORDER BY name ASC")
             rows = cursor.fetchall()
             return [dict(r) for r in rows]
-        except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors de la récupération des templates d'emails : {e}")
-            return []
         finally:
             conn.close()
 
     @classmethod
-    def save_email_template(cls, name: str, subject: str, body: str, sender_email: str = "", sender_name: str = "", old_name: Optional[str] = None) -> bool:
+    def save_email_template(cls, name: str, subject: str, body: str, sender_email: str = "", sender_name: str = "", old_name: Optional[str] = None) -> None:
         """
         Enregistre ou met à jour un template d'email dans la BDD
         (avec son adresse et son nom d'affichage d'expédition).
         Si old_name est fourni et différent de name, le template existant est renommé.
         Une adresse / un nom vide retombe sur les valeurs par défaut du club.
+        A database failure is rolled back and raised.
         """
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
@@ -53,7 +51,7 @@ class EmailTemplateRepository:
                 """, (new_name, subject.strip(), body.strip(), sender, sname, clean_old))
                 if cursor.rowcount > 0:
                     conn.commit()
-                    return True
+                    return
 
             cursor.execute("""
                 INSERT INTO email_templates (name, subject, body, sender_email, sender_name)
@@ -62,17 +60,17 @@ class EmailTemplateRepository:
                     sender_email = excluded.sender_email, sender_name = excluded.sender_name
             """, (new_name, subject.strip(), body.strip(), sender, sname))
             conn.commit()
-            return True
-        except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors de l'enregistrement du template d'email '{name}' : {e}")
-            return False
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
     @classmethod
     def delete_email_template(cls, name: str) -> bool:
         """
-        Supprime un template d'email de la BDD.
+        Supprime un template d'email de la BDD : False when no template has this name.
+        A database failure is rolled back and raised.
         """
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
@@ -81,8 +79,8 @@ class EmailTemplateRepository:
             cursor.execute("DELETE FROM email_templates WHERE name = ?", (name.strip(),))
             conn.commit()
             return cursor.rowcount > 0
-        except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors de la suppression du template d'email '{name}' : {e}")
-            return False
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()

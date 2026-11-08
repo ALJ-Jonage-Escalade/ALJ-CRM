@@ -328,28 +328,14 @@ def generate_presence_sheets(selected_groups, participants_data, start_date_str=
         print(f"[ERREUR PRESENCE] Le fichier modèle est introuvable au chemin : {template_path}")
         return False, f"Modèle introuvable : {template_path}"
         
-    # Charger le planning directement depuis SQLite
-    try:
-        from infrastructure.sqlite.planning import PlanningRepository
-        planning_data = PlanningRepository.load_planning_data()
-        print(f"[PRESENCE] {len(planning_data)} créneaux de cours chargés depuis la BDD SQLite.")
-    except Exception as pe:
-        print(f"[ATTENTION PRESENCE] Impossible de charger le planning depuis SQLite, repli vide : {pe}")
-        planning_data = []
+    # Charger le planning directement depuis SQLite (an unreadable planning fails the export, not an empty one)
+    from infrastructure.sqlite.planning import PlanningRepository
+    planning_data = PlanningRepository.load_planning_data()
+    print(f"[PRESENCE] {len(planning_data)} créneaux de cours chargés depuis la BDD SQLite.")
             
-    # Parser les dates facultatives de début et fin
-    start_date = None
-    end_date = None
-    if start_date_str and start_date_str.strip():
-        try:
-            start_date = datetime.datetime.strptime(start_date_str.strip(), "%d/%m/%Y").date()
-        except ValueError:
-            pass
-    if end_date_str and end_date_str.strip():
-        try:
-            end_date = datetime.datetime.strptime(end_date_str.strip(), "%d/%m/%Y").date()
-        except ValueError:
-            pass
+    # Optional start and end dates, dd/mm/yyyy (checked by the route: a bad date raises ValueError here)
+    start_date = datetime.datetime.strptime(start_date_str.strip(), "%d/%m/%Y").date() if (start_date_str or "").strip() else None
+    end_date = datetime.datetime.strptime(end_date_str.strip(), "%d/%m/%Y").date() if (end_date_str or "").strip() else None
             
     # Plus besoin de charger tarif_mapping.json car les correspondances sont stockées directement dans la BDD SQLite
     tarif_mapping = {}

@@ -29,7 +29,7 @@ SUBJECT = "Invitation au bureau de la section escalade ALJ"
 ROLE_LABELS = {"admin": "administrateur", "coach": "coach", "readonly": "lecture seule"}
 
 # Sends one e-mail: EmailRepository.send_email (keyword arguments), a fake in the tests
-Sender = Callable[..., bool]
+Sender = Callable[..., None]  # EmailRepository.send_email: raises MailError on failure
 
 
 class Invitation(TypedDict):
@@ -98,9 +98,8 @@ def send_invitation(rules: AccessRules, entry: RoleEntry, author: str, page_url:
     send = send or EmailRepository.send_email
     try:
         text, html = invitation_email(entry, inviter_name(rules, author), app_link(page_url))
-        if not send(to_email=entry["email"], subject=SUBJECT, body=text, html_body=html,
-                    from_email=DEFAULT_SENDER_EMAIL, from_name=DEFAULT_SENDER_NAME):
-            raise RuntimeError("l'envoi a échoué")
+        send(to_email=entry["email"], subject=SUBJECT, body=text, html_body=html,
+             from_email=DEFAULT_SENDER_EMAIL, from_name=DEFAULT_SENDER_NAME)
         return Invitation(entry=rules.mark_invitation_sent(entry["email"]), email_sent=True, email_error=None)
     except Exception as e:  # mailer down, bad configuration, store error after sending: the invitation stays
         logger.warning("Invitation de %s : e-mail non envoyé", entry["email"], exc_info=True)

@@ -15,19 +15,19 @@ from api.competitions.schemas.participants import (
 )
 from api.competitions.schemas.views import Competition, GroupLoaded
 from api.members.schemas import MemberStatus
-from api.responses import document_responses
+from api.responses import STORAGE_ERRORS, document_responses
 from services.documents import Doc
 from services.competitions.participants import ParticipantService as Service
 
 router = APIRouter(prefix="/api/competitions/{competition_id}")
 
 
-@router.post("/participants", response_model=None, responses=document_responses(Competition, 404))
+@router.post("/participants", response_model=None, responses=document_responses(Competition, 404, *STORAGE_ERRORS))
 def add_participant(competition_id: int, body: ParticipantAdd) -> Doc:
     return Service.add_participant(competition_id, body.adherent_id, body.selectionne)
 
 
-@router.patch("/participants/{adherent_id}", response_model=None, responses=document_responses(Competition, 404, 409))
+@router.patch("/participants/{adherent_id}", response_model=None, responses=document_responses(Competition, 404, 409, *STORAGE_ERRORS))
 def update_participant(competition_id: int, adherent_id: int, body: ParticipantUpdate) -> Doc:
     """409 `already_paid` when unselecting a participant who paid: the page then asks the
     coach whether the money is lost or carried over (cancel route). With `unchanged_since`
@@ -36,22 +36,22 @@ def update_participant(competition_id: int, adherent_id: int, body: ParticipantU
                                       present=body.present, unchanged_since=body.unchanged_since)
 
 
-@router.post("/participants/{adherent_id}/manual-payment", response_model=None, responses=document_responses(Competition, 404))
+@router.post("/participants/{adherent_id}/manual-payment", response_model=None, responses=document_responses(Competition, 404, *STORAGE_ERRORS))
 def record_manual_payment(competition_id: int, adherent_id: int, body: ManualPayment) -> Doc:
     return Service.record_manual_payment(competition_id, adherent_id, body.montant)
 
 
-@router.post("/participants/{adherent_id}/cancel", response_model=None, responses=document_responses(Competition, 404))
+@router.post("/participants/{adherent_id}/cancel", response_model=None, responses=document_responses(Competition, 404, *STORAGE_ERRORS))
 def cancel_participant(competition_id: int, adherent_id: int, body: ParticipantCancel) -> Doc:
     return Service.cancel_participant(competition_id, adherent_id, CANCEL_MODES[body.mode], body.note)
 
 
-@router.delete("/participants/{adherent_id}", response_model=None, responses=document_responses(Competition, 404))
+@router.delete("/participants/{adherent_id}", response_model=None, responses=document_responses(Competition, 404, *STORAGE_ERRORS))
 def remove_participant(competition_id: int, adherent_id: int) -> Doc:
     return Service.remove_participant(competition_id, adherent_id)
 
 
-@router.post("/load-group", response_model=None, responses=document_responses(GroupLoaded, 404))
+@router.post("/load-group", response_model=None, responses=document_responses(GroupLoaded, 404, *STORAGE_ERRORS))
 def load_competition_group(
     competition_id: int,
     status: Optional[List[MemberStatus]] = Query(None, description="Only the members at one of these statuses (repeatable)"),

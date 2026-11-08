@@ -179,7 +179,8 @@ class CompetitionResultsBatchService:
         clean = ", ".join(valid)
 
         try:
-            return AppSettingsRepository.save(SETTING_NOTIFICATION_EMAIL, clean)
+            AppSettingsRepository.save(SETTING_NOTIFICATION_EMAIL, clean)
+            return True
         except FirestoreError as e:
             print(f"⚠️ [BATCH_RESULTATS] Enregistrement de l'e-mail de notification impossible : {e}")
             return False
@@ -203,7 +204,8 @@ class CompetitionResultsBatchService:
         if not 1 <= int(days) <= 365:
             raise ValueError("Fenêtre de recherche invalide : entre 1 et 365 jours.")
         try:
-            return AppSettingsRepository.save(SETTING_BATCH_WINDOW_DAYS, str(int(days)))
+            AppSettingsRepository.save(SETTING_BATCH_WINDOW_DAYS, str(int(days)))
+            return True
         except FirestoreError:
             logger.warning("Enregistrement du réglage %s impossible", SETTING_BATCH_WINDOW_DAYS, exc_info=True)
             return False

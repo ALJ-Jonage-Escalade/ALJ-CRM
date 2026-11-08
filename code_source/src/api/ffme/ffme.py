@@ -228,8 +228,7 @@ def apply_ffme_import_api(data: FfmeImportRequest) -> Union[FfmeImportResult, JS
     if not updates:
         message = (stats.get("errors") or ["Aucune mise à jour à appliquer (aucun rapprochement trouvé)."])[0]
         return error(400, message)
-    if not FfmeImportRepository.apply_ffme_matches(updates, season_name=season):
-        return error(500, "Échec de l'écriture des associations en base de données.")
+    FfmeImportRepository.apply_ffme_matches(updates, season_name=season)
     from infrastructure.firestore.cloud_database import CloudDatabase
     if CloudDatabase.is_enabled():
         CloudDatabase.after_write()

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Union
+import datetime
+from typing import Optional, Union
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, Response
@@ -19,7 +20,6 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 @router.get("/api/presence/config", response_model=PresenceConfig, responses=error_responses(500))
 def get_presence_config() -> Union[PresenceConfig, JSONResponse]:
     """Renvoie les groupes disponibles (autonomes et cours) et leurs statistiques pour l'IHM."""
-    import datetime
     from infrastructure.sqlite.members import MemberRepository
     from infrastructure.sqlite.planning import PlanningRepository
     from domain.members.planning_groups import is_autonome_creneau
@@ -122,6 +122,11 @@ def get_presence_config() -> Union[PresenceConfig, JSONResponse]:
     )
 
 
+def _session_day(text: str) -> Optional[datetime.date]:
+    """A dd/mm/yyyy date of the export request; None when empty, ValueError when malformed."""
+    return datetime.datetime.strptime(text.strip(), "%d/%m/%Y").date() if text.strip() else None
+
+
 @router.post("/api/presence/export", response_class=Response,
              responses={200: {"content": {XLSX: {}, "application/zip": {}}, "description": "Classeur Excel, ou archive ZIP d'un classeur par cours"},
                         **error_responses(400, 500)})
@@ -141,6 +146,12 @@ def export_presence_api(data: PresenceExportRequest) -> Response:
     season = data.season or get_active_season()
     if not is_valid_season(season):
         return error(400, "Saison invalide (format attendu : AAAA-AAAA).")
+    try:
+        first_day, last_day = _session_day(data.start_date), _session_day(data.end_date)
+    except ValueError:
+        return error(400, "Date invalide (format attendu : JJ/MM/AAAA).")
+    if first_day and last_day and first_day > last_day:
+        return error(400, "La date de début doit précéder la date de fin.")
     raw_data = MemberRepository.load_direct_data(season_filter=season)
     creneaux = PlanningRepository.load_creneaux_groups()
 

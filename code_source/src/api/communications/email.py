@@ -54,7 +54,7 @@ def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved | J
         if any(_same_name(other, data.name) for other in others):
             return error(409, f"Un modèle nommé « {data.name} » existe déjà.", "duplicate_name")
 
-    ok = EmailTemplateRepository.save_email_template(
+    EmailTemplateRepository.save_email_template(
         name=data.name,
         subject=data.subject,
         body=data.body,
@@ -62,8 +62,6 @@ def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved | J
         sender_name=data.sender_name,
         old_name=data.old_name or None,
     )
-    if not ok:
-        return error(500, f"Impossible d'enregistrer le modèle '{data.name}'.")
 
     return EmailTemplateSaved(
         status="success",
@@ -87,8 +85,7 @@ def delete_email_template_api(template_name: str) -> EmailTemplateDeleted | JSON
     if not clean_name:
         return error(400, "Nom de modèle invalide.")
 
-    ok = EmailTemplateRepository.delete_email_template(clean_name)
-    if not ok:
+    if not EmailTemplateRepository.delete_email_template(clean_name):
         return error(404, f"Modèle '{clean_name}' introuvable ou déjà supprimé.")
 
     return EmailTemplateDeleted(status="success", message=f"Modèle '{clean_name}' supprimé avec succès.")

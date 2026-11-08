@@ -108,19 +108,26 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
     except MailError as e:
         return error(502, f"Échec d'envoi de l'e-mail : {internal_error(e, 'send_attestation_api')}")
 
-    # Date the certificate was sent, in SQLite (replicated to Firestore after the request, server.py)
+    # Date the certificate was sent, in SQLite (replicated to Firestore after the request, server.py).
+    # The e-mail is already gone: a failure here must not answer an error (the office would send it again)
     now_str = datetime.datetime.now().strftime("%d/%m/%Y")
     try:
         from infrastructure.sqlite.members import MemberRepository
-        MemberRepository.update_email_sent_date(
+        recorded = MemberRepository.update_email_sent_date(
             order_ref=str(member.get("order_ref") or "").strip(),
             last_name=str(member.get("last_name") or "").strip(),
             first_name=str(member.get("first_name") or "").strip(),
             date_str=now_str,
             purchase_id=int(member["purchase_id"]),
         )
-    except Exception:
+    except Exception:  # the e-mail was sent: report the unsaved date instead of failing the request
         logger.exception("Attestation: sent date not recorded in SQLite")
+        recorded = False
+    else:
+        if not recorded:
+            logger.error("Attestation: no purchase matched to record the sent date (purchase #%s)", member.get("purchase_id"))
 
-    return AttestationSent(status="success", message=f"Attestation envoyée avec succès à {data.to_email}.",
-                           email_sent_date=now_str, filename=filename_pdf)
+    message = f"Attestation envoyée avec succès à {data.to_email}."
+    if not recorded:
+        message += " La date d'envoi n'a pas pu être enregistrée sur la fiche."
+    return AttestationSent(status="success", message=message, email_sent_date=now_str if recorded else None, filename=filename_pdf)

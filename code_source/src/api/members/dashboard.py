@@ -25,7 +25,7 @@ def get_target_slug() -> str:
 
 
 @router.get("/api/dashboard", responses=error_responses(404, 502))
-def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: bool = False):
+def get_dashboard_data(background_tasks: BackgroundTasks):
     """Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
     des adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.
     404: campaign unknown to HelloAsso; 502: HelloAsso could not be read completely (never a partial dashboard)."""
@@ -116,8 +116,8 @@ def get_dashboard_data(background_tasks: BackgroundTasks = None, force_refresh: 
             map_data_dict[addr_key]["members"].append(f"{flat_item['user_firstName']} {flat_item['user_lastName']} ({t_name})")
             map_data_dict[addr_key]["groups"].add(t_name)
 
-    # S'il y a des adresses manquantes et un gestionnaire de tâches de fond, lancer le géocodage
-    if missing_addresses and background_tasks:
+    # Geocode the missing addresses after the answer
+    if missing_addresses:
         background_tasks.add_task(geocode_missing_addresses, list(missing_addresses))
 
     # Convertir le set des groupes en liste pour la sérialisation JSON

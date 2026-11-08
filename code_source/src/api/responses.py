@@ -47,6 +47,11 @@ class ApiErrorBody(BaseModel):
     code: Optional[str] = None
 
 
+# Statuses a route over a @write or @storage service can answer (services/competitions/store.py): 409 when another
+# device changed the data meanwhile, 503 when Firestore is unavailable
+STORAGE_ERRORS = (409, 503)
+
+
 def error_responses(*statuses: int) -> Dict[Union[int, str], Dict[str, Any]]:  # Any: FastAPI's `responses` format
     """`responses=` of a route answering error() with these statuses (documented in the OpenAPI contract)."""
     return {status: {"model": ApiErrorBody} for status in statuses}

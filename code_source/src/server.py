@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from typing import List
@@ -50,6 +51,10 @@ from infrastructure.firestore.cloud_database import CloudDatabase
 # under /api/competitions (check-all-paid) use the cache.
 FIRESTORE_ONLY_PATHS: List[re.Pattern[str]] = []
 
+# Set on a write's answer when it was saved in the SQLite cache but could not be sent to Firestore yet
+REPLICATION_PENDING_HEADER = "X-Replication-Pending"
+logger = logging.getLogger("alj")
+
 
 def uses_sqlite_cache(path: str) -> bool:
     """True for the data routes served from the SQLite cache of the crm_* collections."""
@@ -69,7 +74,11 @@ async def cloud_db_middleware(request, call_next):
         await run_in_threadpool(CloudDatabase.ensure_fresh, 30)
     response = await call_next(request)
     if relevant and request.method not in ("GET", "HEAD", "OPTIONS") and CloudDatabase.is_enabled():
-        await run_in_threadpool(CloudDatabase.after_write)
+        if not await run_in_threadpool(CloudDatabase.after_write):
+            # Saved in the server's cache but not in Firestore yet (retried by the next sync). Not an error status:
+            # the write did happen, and a retried send-email or member creation would be done twice
+            logger.error("[CLOUD_DB] %s %s: write kept pending, Firestore replication failed", request.method, request.url.path)
+            response.headers[REPLICATION_PENDING_HEADER] = "1"
     return response
 
 

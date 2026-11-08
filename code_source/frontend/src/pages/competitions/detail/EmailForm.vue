@@ -110,14 +110,11 @@ async function send(): Promise<void> {
   sending.value = true;
   try {
     const result = await communicationsApi.sendEmail(sendBody(props.competition, reachable.value, subject.value, body.value));
-    if (result.status === "error") {
-      problem.value = `❌ Échec d'envoi : ${result.message || result.details?.[0]?.error || "erreur d'envoi."}`;
-    } else {
-      emit(
-        "sent",
-        `✅ ${result.sent_count} e-mail(s) envoyé(s) avec succès${result.errors_count ? `, ${result.errors_count} en échec` : ""}.`,
-      );
-    }
+    // A refused request (400) or a sending where every e-mail failed (502) is thrown by unwrap(), caught below
+    emit(
+      "sent",
+      `✅ ${result.sent_count} e-mail(s) envoyé(s) avec succès${result.errors_count ? `, ${result.errors_count} en échec` : ""}.`,
+    );
   } catch (e) {
     problem.value = `❌ Échec d'envoi : ${errorText(e)}`;
   } finally {

@@ -240,8 +240,7 @@ class CloudDatabaseTest(unittest.TestCase):
 
     def test_repository_write_path_is_tracked(self):
         SqliteDatabase.set_db_path(self.a)
-        ok = EmailTemplateRepository.save_email_template("Bienvenue", "Bienvenue au club", "Bonjour {first_name}")
-        self.assertTrue(ok)
+        EmailTemplateRepository.save_email_template("Bienvenue", "Bienvenue au club", "Bonjour {first_name}")
         self.sync(self.a)
         docs = [d for (c, _), d in self.store.docs.items() if c == "crm_email_templates"]
         self.assertIn("Bienvenue au club", [d["fields"].get("subject") for d in docs])

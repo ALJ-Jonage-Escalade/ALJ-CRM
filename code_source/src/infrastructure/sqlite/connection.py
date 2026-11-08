@@ -17,10 +17,6 @@ from paths import DATA_ROOT, ROOT_DIR
 from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.sqlite import schema_v2
 
-# Message renvoyé à l'appelant (et au navigateur) quand une écriture échoue : le détail de
-# l'exception (SQL, chemins) reste dans le journal
-DB_WRITE_ERROR = "Erreur d'enregistrement en base de données (détails dans le journal de l'application)."
-
 _DEFAULT_EMAIL_TEMPLATES = [
     ("Attestation standard", "Attestation de paiement escalade - Amicale Laïque de Jonage",
      "Bonjour {first_name},\n\nNous avons le plaisir de vous transmettre en pièce jointe l'attestation de paiement pour votre adhésion ou celle de votre enfant à la section escalade de l'Amicale Laïque de Jonage pour la saison.\n\nSportivement,\nL'équipe ALJ Escalade",

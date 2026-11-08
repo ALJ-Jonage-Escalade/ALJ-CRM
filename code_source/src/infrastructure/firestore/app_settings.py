@@ -55,10 +55,10 @@ class AppSettingsRepository:
         return str(value)
 
     @classmethod
-    def save(cls, key: str, value: Optional[str]) -> bool:
+    def save(cls, key: str, value: Optional[str]) -> None:
+        """Writes the setting; a Firestore failure raises FirestoreError."""
         FirestoreClient.upsert_document(COLLECTION, str(key), {
             "key": key,
             "value": str(value or ""),
             "updated_at": datetime.datetime.now().isoformat(timespec="seconds"),
         })
-        return True
