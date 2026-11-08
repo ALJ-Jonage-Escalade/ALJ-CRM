@@ -1,18 +1,11 @@
-import os
-import sys
+"""domain/validators.py: amounts and e-mail addresses typed in the forms."""
+
 import unittest
 
-# Ajustement du chemin pour importer les modules depuis 'src'
-_test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
 from domain.validators import validate_amount, validate_email
-from domain.constants import get_active_season
 
-class TestDomainLot1(unittest.TestCase):
 
+class TestValidators(unittest.TestCase):
 
     def test_validate_amount(self):
         """Vérifie la robustesse du validateur de montant financier."""
@@ -36,11 +29,6 @@ class TestDomainLot1(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_email("invalide_email_sans_at")
 
-    def test_get_active_season(self):
-        """Vérifie la configuration dynamique des saisons."""
-        season = get_active_season()
-        self.assertIsInstance(season, str)
-        self.assertGreater(len(season), 0)
 
 if __name__ == "__main__":
     unittest.main()

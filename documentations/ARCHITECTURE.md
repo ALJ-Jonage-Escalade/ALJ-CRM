@@ -221,7 +221,7 @@ regroupées en une seule PR par semaine, `.github/workflows/dependabot-uv-sync.y
 
 La version de Python est définie dans `../code_source/.python-version` (version complète, ex. `3.14.8`), lue par
 la CI (`setup-python`) et uv. Seul le `FROM python:<version>-slim` du `Dockerfile` la répète : un test
-(`tests/test_cloud_run_lot4.py`) vérifie que les deux concordent. Pour changer de version, modifier ces **deux
+(`tests/test_deployment_artifacts.py`) vérifie que les deux concordent. Pour changer de version, modifier ces **deux
 fichiers** (vérifier d'abord que les roues existent : `pip download --only-binary=:all: --python-version X.Y …`).
 
 ### 7.2 Mode dev sur l'émulateur Firebase (recommandé)

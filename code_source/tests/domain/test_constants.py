@@ -1,4 +1,4 @@
-"""domain.constants.resolve_season: the one reading of a request's `season`."""
+"""domain/constants.py: the active season and resolve_season, the one reading of a request's `season`."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from domain.constants import resolve_season
+from domain.constants import DEFAULT_SEASON, get_active_season, resolve_season
 from domain.errors import InvalidRequest
 
 
@@ -24,3 +24,10 @@ def test_resolve_season_keeps_a_season_name() -> None:
 def test_resolve_season_refuses_other_values(season: str) -> None:
     with pytest.raises(InvalidRequest):
         resolve_season(season)
+
+
+def test_get_active_season_from_the_environment() -> None:
+    with patch.dict("os.environ", {"ACTIVE_SEASON": " 2027-2028 "}):
+        assert get_active_season() == "2027-2028"
+    with patch.dict("os.environ", {"ACTIVE_SEASON": ""}):
+        assert get_active_season() == DEFAULT_SEASON

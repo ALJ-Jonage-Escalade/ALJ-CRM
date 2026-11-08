@@ -132,6 +132,29 @@ class TestSmtpEncryption(unittest.TestCase):
         smtp.sendmail.assert_called_once()
 
 
+class TestSmtpAttachment(unittest.TestCase):
+    """Over SMTP too, the PDF made in memory reaches the message, with an ASCII file name, to every recipient."""
+
+    SECRETS = {"SMTP_HOST": "smtp.example.com", "SMTP_PORT": "587", "SMTP_USER": "u", "SMTP_PASSWORD": "p",
+               "SMTP_FROM_EMAIL": "office@example.com"}
+
+    def test_pdf_attachment_and_recipients(self):
+        from infrastructure.mail.sender import EmailSender
+        smtp = MagicMock()
+        smtp.has_extn.return_value = True
+        with patch("infrastructure.mail.sender.SecretStore.get_secret", side_effect=lambda k: self.SECRETS.get(k, "")), \
+             patch("smtplib.SMTP", return_value=smtp), patch.object(EmailSender, "log_audit"):
+            EmailSender.send_email(to_email="harry.potter@hogwarts.example, lily.potter@hogwarts.example", subject="Attestation",
+                                   body="Bonjour", attachment_bytes=b"%PDF-1.7", attachment_filename="Attestation Élève.pdf")
+        sender, recipients, text = smtp.sendmail.call_args.args
+        self.assertEqual(sender, "office@example.com")
+        self.assertEqual(recipients, ["harry.potter@hogwarts.example", "lily.potter@hogwarts.example"])
+        attachment = next(part for part in message_from_string(text).walk() if part.get_content_disposition() == "attachment")
+        self.assertEqual(attachment.get_filename(), "Attestation Eleve.pdf")
+        self.assertEqual(attachment.get_content_type(), "application/pdf")
+        self.assertEqual(attachment.get_payload(decode=True), b"%PDF-1.7")
+
+
 class TestGmailDelivery(unittest.TestCase):
     """With the club's OAuth account configured, e-mails go through the Gmail API, attachments included."""
 

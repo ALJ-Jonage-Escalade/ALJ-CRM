@@ -1,37 +1,25 @@
+"""MemberRepository writes into the v2 schema: CRUD, returning members across seasons, status priority."""
+
 import os
-import sys
+import tempfile
 import unittest
-import json
 
-# Ajustement du chemin pour importer les modules depuis 'src'
-_test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-from infrastructure.security.secret_store import SecretStore
-from infrastructure.mail.sender import EmailSender
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.members import MemberRepository
 
-class TestInfrastructureLot2(unittest.TestCase):
 
+class TestMemberRepositoryWrites(unittest.TestCase):
     def setUp(self):
         # Sauvegarder le chemin de la BDD d'origine
         self.original_db_path = SqliteDatabase.get_db_path()
-        # Configurer un chemin temporaire pour les tests
-        self.test_db_path = os.path.join(_test_dir, "test_database.db")
+        self._tmp = tempfile.TemporaryDirectory()
+        self.test_db_path = os.path.join(self._tmp.name, "test_database.db")
         SqliteDatabase.set_db_path(self.test_db_path)
-        
+
     def tearDown(self):
         # Restaurer la BDD d'origine
         SqliteDatabase.set_db_path(self.original_db_path)
-        # Supprimer le fichier de test s'il existe
-        if os.path.exists(self.test_db_path):
-            try:
-                os.remove(self.test_db_path)
-            except OSError:
-                pass
+        self._tmp.cleanup()
 
     def test_sqlite_repository_crud(self):
         """Vérifie le cycle de vie complet des données (CRUD) avec MemberRepository."""
@@ -73,61 +61,6 @@ class TestInfrastructureLot2(unittest.TestCase):
         self.assertEqual(loaded[0]["last_name"], "DUPONT")
         self.assertEqual(loaded[0]["first_name"], "Jean")
         self.assertEqual(loaded[0]["amount"], 150.0)
-
-    def test_secret_store_set_get(self):
-        """Vérifie le stockage et la récupération de secrets via SecretStore."""
-        test_key = "ALJ_TEST_SECRET_KEY"
-        test_value = "SecrEtValue-12345!"
-        
-        SecretStore.set_secret(test_key, test_value)
-        
-        retrieved = SecretStore.get_secret(test_key)
-        self.assertEqual(retrieved, test_value)
-        
-        # Nettoyage de la clé temporaire du .env s'il a été écrit
-        env_path = os.path.join(os.path.dirname(_test_dir), ".env")
-        if os.path.exists(env_path):
-            try:
-                with open(env_path, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-                new_lines = [line for line in lines if not line.startswith(f"{test_key}=")]
-                with open(env_path, "w", encoding="utf-8") as f:
-                    f.writelines(new_lines)
-            except OSError:
-                pass
-
-    def test_email_repository_audit_logging(self):
-        """Vérifie que la journalisation d'audit des e-mails fonctionne correctement."""
-        test_dest = "audit_test@escalade.fr"
-        test_subj = "Test Audit Subject"
-        
-        # Supprimer le journal temporairement pour le test ou vérifier l'ajout
-        if os.path.exists(EmailSender.audit_file_path()):
-            try:
-                os.remove(EmailSender.audit_file_path())
-            except OSError:
-                pass
-                
-        EmailSender.log_audit(test_dest, test_subj, "SUCCESS")
-        
-        self.assertTrue(os.path.exists(EmailSender.audit_file_path()))
-        
-        with open(EmailSender.audit_file_path(), "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            
-        self.assertTrue(len(lines) > 0)
-        last_log = json.loads(lines[-1].strip())
-        self.assertEqual(last_log["to"], test_dest)
-        self.assertEqual(last_log["subject"], test_subj)
-        self.assertEqual(last_log["status"], "SUCCESS")
-        
-        # Nettoyage
-        try:
-            os.remove(EmailSender.audit_file_path())
-        except OSError:
-            pass
-
-
 
     def test_already_member_detection(self):
         """Vérifie la détection automatique de la réinscription d'un adhérent (déjà adhérent dans une autre saison)."""
@@ -181,7 +114,6 @@ class TestInfrastructureLot2(unittest.TestCase):
         # Carlos était déjà adhérent dans l'autre saison ; Ines est complètement nouvelle
         self.assertGreater(int(carlos["already_member"] or 0), 0)
         self.assertEqual(int(ines["already_member"] or 0), 0)
-
 
     def test_upsert_members_status_priority(self):
         """Vérifie que upsert_members préserve les statuts prioritaires (Processed > Canceled)."""
@@ -259,6 +191,3 @@ class TestInfrastructureLot2(unittest.TestCase):
         match = next(m for m in loaded if m["last_name"] == "CLAPET_TEST2")
         self.assertEqual(match["status"], "Processed")
         self.assertEqual(match["order_ref"], "ORD-ACTIVE-888")
-
-if __name__ == "__main__":
-    unittest.main()
