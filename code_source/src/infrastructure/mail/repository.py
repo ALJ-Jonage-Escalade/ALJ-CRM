@@ -22,8 +22,9 @@ import requests
 
 from domain.utils import sanitize_email_header
 from infrastructure import runtime_env
+from infrastructure.google.drive import GoogleDriveClient
 from infrastructure.security.secret_store import SecretStore
-from paths import DATA_ROOT
+from paths import data_root
 
 logger = logging.getLogger("alj")
 
@@ -85,8 +86,10 @@ def build_message(to_email: str, subject: str, body: str, sender: str, sender_na
 class EmailRepository:
     """Delivery of the messages and the audit log of the sends."""
 
-    # Journal d'audit dans data/ : persistant, survit aux mises à jour de l'application
-    AUDIT_FILE_PATH = os.path.join(DATA_ROOT, "email_audit.log")
+    @staticmethod
+    def audit_file_path() -> str:
+        """The audit log, in data_root(): kept across application updates."""
+        return os.path.join(data_root(), "email_audit.log")
 
     @classmethod
     def log_audit(cls, to_email: str, subject: str, status: str, error_message: str = "") -> None:
@@ -98,11 +101,12 @@ class EmailRepository:
             "status": status,
             "error": error_message,
         }
+        audit_path = cls.audit_file_path()
         try:
-            with open(cls.AUDIT_FILE_PATH, "a", encoding="utf-8") as f:
+            with open(audit_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except OSError:
-            logger.warning("Journal d'audit des e-mails non écrit (%s)", cls.AUDIT_FILE_PATH, exc_info=True)
+            logger.warning("Journal d'audit des e-mails non écrit (%s)", audit_path, exc_info=True)
 
     @classmethod
     def send_email(cls, to_email: str, subject: str, body: str, html_body: Optional[str] = None,
@@ -136,7 +140,6 @@ class EmailRepository:
     @staticmethod
     def _send_with_gmail(msg: MIMEMultipart, gmail_user: str) -> None:
         """Gmail REST API (HTTPS) with the club's OAuth account."""
-        from infrastructure.google.drive import GoogleDriveClient
         response = requests.post(
             f"https://gmail.googleapis.com/gmail/v1/users/{gmail_user}/messages/send",
             headers={"Authorization": f"Bearer {GoogleDriveClient.get_access_token()}", "Content-Type": "application/json"},

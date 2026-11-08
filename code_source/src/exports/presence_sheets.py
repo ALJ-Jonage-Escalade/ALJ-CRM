@@ -30,7 +30,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from domain.members.presence_rules import MemberRow, authorized_minors, member_identity_key, members_with_tarifs
 from exports.spreadsheet_safety import neutralize_formulas, template_formulas
 from infrastructure.qrcodes import find_group_qrcode, get_group_qrcode
-from paths import find_doc_template
+from paths import template_path
 
 logger = logging.getLogger("alj")
 
@@ -624,8 +624,8 @@ def _set_single_table_print(ws: Worksheet, extent: TableExtent) -> None:
     ws.print_title_rows = f"{extent.header_row}:{extent.header_row}"
 
 
-def _load_template(template_path: str) -> tuple[Workbook, frozenset[tuple[str, str]]]:
-    workbook = openpyxl.load_workbook(template_path)
+def _load_template(template_file: str) -> tuple[Workbook, frozenset[tuple[str, str]]]:
+    workbook = openpyxl.load_workbook(template_file)
     return workbook, template_formulas(workbook)   # member data must never become a formula
 
 
@@ -655,9 +655,9 @@ def generate_presence_sheets(
     `group_tarifs` maps a group to its HelloAsso tariffs (planning page); `show_health_col` adds a « Santé »
     column (✗ in red while the FFME health document is pending); `same_sheet` ("cours" only) stacks every table
     in one sheet. Raises FileNotFoundError when the template is missing."""
-    template_path = find_doc_template(TEMPLATE_NAME)
-    if not os.path.exists(template_path):
-        raise FileNotFoundError(f"Presence sheet template not found: {template_path}")
+    template_file = template_path(TEMPLATE_NAME)
+    if not os.path.exists(template_file):
+        raise FileNotFoundError(f"Presence sheet template not found: {template_file}")
     layout = SheetLayout.for_variant(variant, show_health_col)
     groups = sheet_groups(selected_groups, members, variant, group_tarifs or {}, today or datetime.date.today())
     if not groups:
@@ -668,7 +668,7 @@ def generate_presence_sheets(
         return write_group_table(ws, top, group, slot, layout, session_dates(slot.days, first_day, last_day), planning)
 
     if same_sheet and variant == "cours":
-        workbook, keep_formulas = _load_template(template_path)
+        workbook, keep_formulas = _load_template(template_file)
         ws = workbook.active
         top, last_column, print_bottom = 0, 0, 0
         for index, group in enumerate(groups):
@@ -685,7 +685,7 @@ def generate_presence_sheets(
 
     files = []
     for group in groups:
-        workbook, keep_formulas = _load_template(template_path)
+        workbook, keep_formulas = _load_template(template_file)
         _set_single_table_print(workbook.active, table(workbook.active, 0, group))
         files.append(PresenceFile(f"Feuille_Presence_{clean_filename(group.name)}.xlsx", _workbook_bytes(workbook, keep_formulas)))
     logger.info("Presence sheets: %d file(s) generated", len(files))

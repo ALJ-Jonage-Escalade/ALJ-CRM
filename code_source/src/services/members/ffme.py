@@ -20,6 +20,8 @@ from domain.members.sex import parse_sex
 from domain.members.view import is_cancelled
 from domain.utils import normalize_name
 from exports.membership_excel import clean_digits_only, ffme_csv_bytes, parse_date_to_datetime
+from infrastructure.firestore.cloud_database import CloudDatabase
+from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.ffme_import import FfmeImportRepository, FfmeMatch, MemberForMatching
 from infrastructure.sqlite.members import MemberRepository
 
@@ -232,6 +234,8 @@ def apply_import(season: str, excel_content: Optional[bytes], manual_matches: Li
     updates.extend(manual_matches)
     if not updates:
         raise InvalidRequest((stats["errors"] or [NOTHING_TO_APPLY])[0])
+    if not CloudDatabase.is_enabled():  # a local database of its own: keep a copy before the import changes it
+        SqliteDatabase.create_db_backup()
     FfmeImportRepository.apply_ffme_matches(updates, season_name=season)
     return len(updates), stats
 

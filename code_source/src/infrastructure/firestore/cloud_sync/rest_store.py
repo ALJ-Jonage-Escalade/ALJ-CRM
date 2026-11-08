@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional
 import requests
 
 from infrastructure import runtime_env
+from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore.cloud_sync.common import (
     BY_FIELD,
     DEFAULT_PROJECT_ID,
@@ -32,7 +33,6 @@ class RestStore:
             self._project_id = runtime_env.project_id_override()
         if not self._project_id:
             try:
-                from infrastructure.firestore.client import FirestoreClient
                 self._project_id = FirestoreClient.get_project_id()
             except Exception:
                 self._project_id = DEFAULT_PROJECT_ID
@@ -47,7 +47,6 @@ class RestStore:
         env_tok = os.environ.get("ALJ_FIRESTORE_ACCESS_TOKEN", "").strip()
         if env_tok:
             return env_tok
-        from infrastructure.firestore.client import FirestoreClient
         return FirestoreClient.get_access_token()
 
     @property

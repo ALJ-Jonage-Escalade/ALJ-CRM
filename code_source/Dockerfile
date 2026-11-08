@@ -57,7 +57,6 @@ RUN pip install --no-cache-dir uv==0.13.1 && \
 COPY src/ ./src/
 COPY web/ ./web/
 COPY --from=frontend /build/frontend/dist ./frontend/dist/
-COPY doc/ ./doc/
 COPY VERSION ./VERSION
 
 # 4. Création d'un utilisateur non-root pour la sécurité et attribution des droits

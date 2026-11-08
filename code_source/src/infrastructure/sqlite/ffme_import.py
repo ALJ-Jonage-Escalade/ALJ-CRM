@@ -53,7 +53,6 @@ class FfmeImportRepository:
         """
         if not updates:
             return
-        SqliteDatabase.create_db_backup()
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         cursor = conn.cursor()

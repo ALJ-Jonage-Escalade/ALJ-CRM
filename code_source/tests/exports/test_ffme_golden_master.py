@@ -40,9 +40,9 @@ class TestFFMEGoldenMaster(unittest.TestCase):
         from infrastructure.sqlite.connection import SqliteDatabase
         from infrastructure.sqlite.members import MemberRepository
         from exports.membership_excel import generate_ffme_csv
-        from paths import DATA_ROOT
+        from paths import data_root
 
-        db_live = os.path.join(DATA_ROOT, "database.db")
+        db_live = os.path.join(data_root(), "database.db")
         self.assertTrue(os.path.exists(db_live), "database.db introuvable dans data/ (cache local)")
 
         tmpdir = tempfile.mkdtemp(prefix="alj_golden_test_")

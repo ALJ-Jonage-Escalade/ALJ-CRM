@@ -97,8 +97,8 @@ class TestDevMode(unittest.TestCase):
 
     def test_helloasso_redirected_to_fake(self):
         from infrastructure.helloasso import api as helloasso_api
-        with _env(**DEV_ENV, **FAKE_HELLOASSO), \
-                patch.object(helloasso_api, "CLIENT_ID", "id"), patch.object(helloasso_api, "CLIENT_SECRET", "secret"), \
+        credentials = {"HELLOASSO_CLIENT_ID": "id", "HELLOASSO_CLIENT_SECRET": "secret"}  # the fake's, not real ones
+        with _env(**DEV_ENV, **FAKE_HELLOASSO, **credentials), \
                 patch.object(helloasso_api.requests, "post") as post, patch.object(helloasso_api.requests, "get") as get:
             post.return_value.json.return_value = {"access_token": "t"}
             get.return_value.status_code = 200

@@ -27,12 +27,13 @@ class FakeClock:
 
 
 @pytest.fixture
-def clock() -> Iterator[FakeClock]:
+def clock(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeClock]:
     """Credentials set and an empty token cache on a settable clock."""
     fake_clock = FakeClock()
     api._token_cache.invalidate()
-    with patch.object(api, "CLIENT_ID", "id"), patch.object(api, "CLIENT_SECRET", "secret"), \
-            patch.object(api._token_cache, "clock", fake_clock):
+    monkeypatch.setenv("HELLOASSO_CLIENT_ID", "id")
+    monkeypatch.setenv("HELLOASSO_CLIENT_SECRET", "secret")
+    with patch.object(api._token_cache, "clock", fake_clock):
         yield fake_clock
     api._token_cache.invalidate()
 
@@ -74,8 +75,9 @@ def test_answer_without_token_gives_none_and_is_not_kept(clock: FakeClock) -> No
         assert api.get_access_token() == "token"
 
 
-def test_no_credentials_no_token() -> None:
-    with patch.object(api, "CLIENT_ID", None), patch.object(api.requests, "post") as post:
+def test_no_credentials_no_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HELLOASSO_CLIENT_ID", raising=False)
+    with patch.object(api.requests, "post") as post:
         assert api.get_access_token() is None
     post.assert_not_called()
 

@@ -77,6 +77,8 @@ from infrastructure.firestore.cloud_sync.common import (  # noqa: F401
 )
 from infrastructure.firestore.cloud_sync.rest_store import RestStore
 from infrastructure.firestore.cloud_sync.sync import apply_remote_docs, flush, pull, renumber_row  # noqa: F401
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
+from infrastructure.sqlite.connection import SqliteDatabase
 
 logger = logging.getLogger("alj")
 
@@ -93,7 +95,6 @@ class CloudDatabase:
     _last_sync = 0.0
     _last_pull = 0.0
     _projection_dirty = False
-    _last_projection = 0.0
 
     @staticmethod
     def is_enabled() -> bool:
@@ -109,7 +110,6 @@ class CloudDatabase:
 
     @staticmethod
     def db_path() -> str:
-        from infrastructure.sqlite.connection import SqliteDatabase
         return SqliteDatabase.get_db_path()
 
     @staticmethod
@@ -132,9 +132,7 @@ class CloudDatabase:
                         progress("Chargement complet de la base depuis Firestore…")
                     backup_dir = os.path.join(os.path.dirname(path), "backups")
                     report = build_cache(path, store, backup_dir=backup_dir)
-                    from infrastructure.sqlite.connection import SqliteDatabase
-                    SqliteDatabase._database_setup_done = False
-                    SqliteDatabase.setup_database()
+                    SqliteDatabase.setup_database(force=True)
                     report["full"] = True
                 conn = connect(path)
                 try:
@@ -191,21 +189,16 @@ class CloudDatabase:
                   f"reçus={report.get('pulled', 0)} conflits={report.get('conflicts', 0)}")
 
     @classmethod
-    def mark_projection_dirty(cls) -> None:
-        """The `adherents` directory is rewritten by the next background tick (e.g. written before a field existed)."""
-        cls._projection_dirty = True
-
-    @classmethod
     def refresh_projection(cls, force: bool = False):
-        """Met à jour l'annuaire `adherents` / `planning` lu par la PWA et le webhook."""
-        if not (cls._projection_dirty or force):
+        """Rewrites the `adherents` / `planning` directory read by the competition pages and the webhook, when a sync
+        touched members or the planning, or when the directory reported itself outdated (written before a field
+        existed, CompetitionFirestoreRepository.directory_outdated)."""
+        if not (cls._projection_dirty or CompetitionFirestoreRepository.directory_outdated() or force):
             return
         try:
-            from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
             rep = CompetitionFirestoreRepository.sync_adherents_from_main()
             if not rep.get("errors"):
                 cls._projection_dirty = False
-            cls._last_projection = time.time()
         except Exception as e:
             print(f"⚠️ [CLOUD_DB] Mise à jour de l'annuaire Firestore impossible : {e}")
 
@@ -221,22 +214,6 @@ class CloudDatabase:
             except Exception:
                 logger.warning("Comptage des modifications en attente impossible", exc_info=True)
         return {"pending": pending, "last_error": cls._last_error, "last_sync": cls._last_sync}
-
-    @classmethod
-    def background_tick(cls, pull_every: int = 120, projection_every: int = 180):
-        if not cls.is_enabled() or not cache_is_valid(cls.db_path(), cls.store().project_id):
-            return
-        try:
-            if time.time() - cls._last_pull >= pull_every:
-                cls.sync()
-            else:
-                cls.flush_only()
-            if cls._projection_dirty and time.time() - cls._last_projection >= projection_every:
-                cls.refresh_projection()
-        except Exception as e:
-            print(f"⚠️ [CLOUD_DB] Synchronisation d'arrière-plan : {e}")
-
-
 
     @classmethod
     def cache_ready(cls) -> bool:

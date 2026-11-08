@@ -15,10 +15,17 @@ involved: in dev, the application's SMTP settings point to Mailpit (dev/dev.env)
   So can MyCompet and the FFME results archive (``MYCOMPET_BASE_URL`` / ``FFME_ARCHIVES_URL``,
   fake in ``e2e/fakes/mycompet_fake.py``).
 
-Environment variables are read again on every call (tests, reload).
+Environment variables are read again on every call (tests, reload). The .env files are loaded once, by the entry
+points (server.py, dev scripts), through load_env_files().
 """
+from __future__ import annotations
+
 import os
 from typing import Any, Dict, Optional
+
+from dotenv import load_dotenv
+
+from paths import CODE_ROOT, ROOT_DIR
 
 PROD_FIRESTORE_BASE_URL = "https://firestore.googleapis.com/v1"
 PROD_HELLOASSO_API_URL = "https://api.helloasso.com/v5"
@@ -29,6 +36,24 @@ DEV_PROJECT_ID = "demo-alj"
 EMULATOR_ADMIN_TOKEN = "owner"  # noqa: S105 - public emulator admin token (bypasses the security rules), only sent to the emulator
 
 DEFAULT_PUBLIC_AUTH_EMULATOR = "http://localhost:9099"
+
+
+def load_env_files() -> None:
+    """Loads code_source/.env (the process environment wins), then the repository's .env, which overrides both.
+    Called once by each entry point, never at import."""
+    load_dotenv(os.path.join(CODE_ROOT, ".env"))
+    load_dotenv(os.path.join(ROOT_DIR, ".env"), override=True)
+
+
+def local_env_file() -> str:
+    """The .env a local server reads last, where it saves a renewed secret (see load_env_files)."""
+    root_env = os.path.join(ROOT_DIR, ".env")
+    return root_env if os.path.exists(root_env) else os.path.join(CODE_ROOT, ".env")
+
+
+def is_cloud_run() -> bool:
+    """Running on Cloud Run: the platform sets K_SERVICE (and K_CONFIGURATION)."""
+    return bool(os.environ.get("K_SERVICE") or os.environ.get("K_CONFIGURATION"))
 
 
 def env() -> str:
@@ -50,7 +75,7 @@ def validate() -> None:
     """Reject an inconsistent dev mode (fail-closed). Called at server startup."""
     if not is_dev():
         return
-    if os.environ.get("K_SERVICE"):
+    if is_cloud_run():
         raise RuntimeError("ALJ_ENV=dev is forbidden on Cloud Run (K_SERVICE is set).")
     missing = [k for k in ("FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST")
                if not (os.environ.get(k) or "").strip()]

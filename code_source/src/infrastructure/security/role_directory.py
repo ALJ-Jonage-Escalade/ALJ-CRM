@@ -24,6 +24,7 @@ from typing import Callable, Dict, Optional
 from infrastructure import runtime_env
 from infrastructure.firestore.access_store import AccessStore, FirestoreAccessStore, RoleEntry
 from infrastructure.security.roles import Role, role_named
+from infrastructure.security.secret_store import SecretStore
 from infrastructure.timed_cache import TimedCache
 
 logger = logging.getLogger("alj")
@@ -123,7 +124,6 @@ def current() -> RoleDirectory:
     global _current
     with _current_lock:
         if _current is None:
-            from infrastructure.security.secret_store import SecretStore
             # Dev mode: no cache, a seed or an edit in the emulator UI applies at once (the emulator is local and cheap)
             _current = RoleDirectory(FirestoreAccessStore(), bootstrap_email=SecretStore.get_secret("BOOTSTRAP_ADMIN_EMAIL"),
                                      cache_seconds=0 if runtime_env.is_dev() else CACHE_SECONDS)

@@ -147,10 +147,7 @@ class MemberRepository:
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
-            import datetime as _dt
-            from infrastructure.sqlite.schema_v2 import DOB_COLUMN
-
-            now = _dt.datetime.now()
+            now = datetime.datetime.now()
             order_ref = f"MANUEL-{now.strftime('%Y%m%d-%H%M%S')}"
             payer_email = str(fields.get("email_primary") or "").strip()
 
@@ -162,7 +159,7 @@ class MemberRepository:
                 "amount": float(fields.get("amount") or 0.0),
                 "user_lastName": str(fields.get("last_name") or "").strip(),
                 "user_firstName": str(fields.get("first_name") or "").strip(),
-                DOB_COLUMN: str(fields.get("birth_date") or "").strip(),
+                schema_v2.DOB_COLUMN: str(fields.get("birth_date") or "").strip(),
                 "champ_Sexe": str(fields.get("sex") or "").strip(),
                 "champ_Téléphone ": str(fields.get("phone") or "").strip(),
                 "champ_Adresse mail pour la réception des informations du club": payer_email,

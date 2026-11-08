@@ -9,7 +9,6 @@ Authentification :
 - Sur le poste de bureau : jeton OAuth2 du club (GoogleDriveClient), dont le
   consentement inclut déjà le scope Firestore `https://www.googleapis.com/auth/datastore`.
 """
-import os
 import datetime
 from typing import Dict, Any, List, Optional
 
@@ -135,7 +134,7 @@ class FirestoreClient:
         emulator_tok = runtime_env.emulator_token()
         if emulator_tok:
             return emulator_tok
-        if os.environ.get("K_SERVICE") or os.environ.get("K_CONFIGURATION"):
+        if runtime_env.is_cloud_run():
             try:
                 url = ("http://metadata.google.internal/computeMetadata/v1/instance/"
                        "service-accounts/default/token")

@@ -1,8 +1,8 @@
 """
 Dev mode safeguard, run by dev/run_server.sh before the server.
 
-Checks the EFFECTIVE configuration as the application will see it: `SecretStore` is
-imported as the server does, so the .env files are loaded too (including `<repo>/.env`
+Checks the EFFECTIVE configuration as the application will see it: the .env files are
+loaded as the server loads them (runtime_env.load_env_files, including `<repo>/.env`
 with override=True, which could override dev/dev.env). Refuses to start if an e-mail
 could really be sent (Gmail API enabled or SMTP other than the local Mailpit) or if the
 Firebase emulator is not configured.
@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src")))
 
 from infrastructure import runtime_env  # noqa: E402
-from infrastructure.security.secret_store import SecretStore  # noqa: E402  (loads the .env files like the application)
+from infrastructure.security.secret_store import SecretStore  # noqa: E402
 
 LOCAL_SMTP_HOSTS = {"localhost", "127.0.0.1", "::1"}  # also the allowed fake HelloAsso hosts
 
@@ -46,6 +46,7 @@ def problems() -> list:
 
 
 def main() -> int:
+    runtime_env.load_env_files()
     found = problems()
     if found:
         print("❌ Dev configuration rejected:", file=sys.stderr)

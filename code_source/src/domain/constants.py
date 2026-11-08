@@ -1,11 +1,7 @@
+from __future__ import annotations
+
 import os
 import re
-from dotenv import load_dotenv
-from paths import CODE_ROOT, ROOT_DIR
-
-# Charger le .env de code_source/, surchargé par celui de la racine du dépôt s'il existe
-load_dotenv(os.path.join(CODE_ROOT, ".env"))
-load_dotenv(os.path.join(ROOT_DIR, ".env"), override=True)
 
 # Saison active par défaut
 DEFAULT_SEASON = "2026-2027"

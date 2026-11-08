@@ -99,7 +99,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_build_attestation_pure_function_rules(self):
         """build_attestation respecte les règles de montant, d'annulation, de signature et de payeur."""
-        from domain.attestation.document import build_attestation, get_safe_pdf_filename, render_attestation_pdf
+        from exports.attestation import build_attestation, get_safe_pdf_filename, render_attestation_pdf
         club = "club@alj.example"
 
         # 1. Validation montant manquant ou nul

@@ -13,6 +13,12 @@ from fastapi.responses import JSONResponse, Response
 from api.communications.schemas import AttestationRequest, AttestationSend, AttestationSent
 from api.responses import error, error_responses, internal_error
 from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.utils import apply_template_variables
+from exports.attestation import attestation_error, build_attestation, get_safe_pdf_filename, render_attestation_pdf
+from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
+from infrastructure.mail.repository import EmailRepository, MailError
+from infrastructure.sqlite.members import MemberRepository
+from services.communications.email_dispatch import EmailDispatchService
 from services.documents import Doc
 from services.members.members import MemberService
 
@@ -23,7 +29,6 @@ _PDF = {200: {"content": {"application/pdf": {}}, "description": "The certificat
 
 
 def _filename(member: Doc) -> str:
-    from domain.attestation.document import get_safe_pdf_filename
     return get_safe_pdf_filename(member.get("last_name") or "ADHERENT", member.get("first_name") or "", member.get("order_ref"))
 
 
@@ -37,7 +42,6 @@ def _content_disposition(filename: str) -> str:
 def preview_attestation_api(data: AttestationRequest) -> Response:
     """Génère l'aperçu PDF d'une attestation de paiement (retourne application/pdf)."""
     member = MemberService.find_member(data.season, data.purchase_id)  # 404: service error handler
-    from domain.attestation.document import attestation_error, build_attestation, render_attestation_pdf
     problem = attestation_error(member)
     if problem:
         return error(400, problem)
@@ -53,7 +57,6 @@ def send_attestation_api(data: AttestationSend) -> AttestationSent | JSONRespons
     if not to_email or "@" not in to_email:
         return error(400, "Adresse e-mail du destinataire invalide ou manquante.")
     member = MemberService.find_member(data.season, data.purchase_id)
-    from domain.attestation.document import attestation_error
     problem = attestation_error(member)
     if problem:
         return error(400, problem)
@@ -61,12 +64,6 @@ def send_attestation_api(data: AttestationSend) -> AttestationSent | JSONRespons
 
 
 def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
-    from domain.attestation.document import build_attestation, render_attestation_pdf
-    from domain.utils import apply_template_variables
-    from services.communications.email_dispatch import EmailDispatchService
-    from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
-    from infrastructure.mail.repository import EmailRepository, MailError
-
     pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name"), club_email=CLUB_CONTACT_EMAIL))
     filename_pdf = _filename(member)
 
@@ -112,7 +109,6 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
     # The e-mail is already gone: a failure here must not answer an error (the office would send it again)
     now_str = datetime.datetime.now().strftime("%d/%m/%Y")
     try:
-        from infrastructure.sqlite.members import MemberRepository
         recorded = MemberRepository.update_email_sent_date(
             order_ref=str(member.get("order_ref") or "").strip(),
             last_name=str(member.get("last_name") or "").strip(),

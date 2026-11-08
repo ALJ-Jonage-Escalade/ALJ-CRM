@@ -1,5 +1,5 @@
 # Ignorés lors de l'envoi du code source vers Cloud Build (gcloud run deploy --source .)
-# Envoyer uniquement le nécessaire : Dockerfile + pyproject.toml + uv.lock + src/ + web/ + frontend/ + doc/ + VERSION
+# Envoyer uniquement le nécessaire : Dockerfile + pyproject.toml + uv.lock + src/ + web/ + frontend/ + VERSION
 
 # Environnements virtuels et caches Python
 venv/
@@ -32,15 +32,14 @@ dist/
 archive/
 attestation/
 exports/
-# ...but not the code packages with the same names (src/exports, src/domain/attestation)
+# ...but not the code package with the same name (src/exports)
 !src/exports/
-!src/domain/attestation/
 import/
 scripts_temporaires/
 *.spec
 *.xlsx
-# ...except the Excel templates read at runtime (presence sheets, courses)
-!doc/template/*.xlsx
+# ...except the Excel templates read at runtime (presence sheets)
+!src/assets/templates/*.xlsx
 
 # Git, tests, outils
 .git/
