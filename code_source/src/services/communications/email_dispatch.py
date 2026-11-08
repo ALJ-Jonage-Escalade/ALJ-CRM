@@ -17,7 +17,8 @@ from typing import Any, Dict, List, Optional
 from domain.club_emails import CLUB_SENDER_DOMAIN
 from domain.competitions.models import Competition, default_deadline
 from domain.errors import InvalidRequest, UpstreamUnavailable
-from domain.utils import apply_template_variables, format_montant, format_periode, normalize_name
+from domain.email_personalization import apply_template_variables
+from domain.utils import format_montant, format_periode, normalize_name
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as CompetitionRepository
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
 from infrastructure.mail.repository import EmailRepository, MailError

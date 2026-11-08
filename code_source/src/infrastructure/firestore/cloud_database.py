@@ -34,49 +34,11 @@ import threading
 import time
 from typing import Any, Callable, Dict, Optional
 
-# Re-exported: callers and tests use `cloud_database.<name>` as the public API of the package.
-from infrastructure.firestore.cloud_sync.bootstrap import (  # noqa: F401
-    build_cache,
-    cache_is_valid,
-    create_schema,
-    export_rows,
-    import_database,
-)
-from infrastructure.firestore.cloud_sync.cache import (  # noqa: F401
-    connect,
-    get_state,
-    install_tracking,
-    pending_count,
-    set_state,
-    table_columns,
-    table_exists,
-    table_pk,
-    tracked_tables,
-)
-from infrastructure.firestore.cloud_sync.common import (  # noqa: F401
-    BY_FIELD,
-    CACHE_FORMAT,
-    COLLECTION_PREFIX,
-    COMMIT_CHUNK,
-    DEFAULT_PROJECT_ID,
-    DEL_FIELD,
-    META_FIELDS,
-    MOD_FIELD,
-    PULL_MARGIN_SECONDS,
-    REFERENCES,
-    TRACKED_TABLES,
-    CloudConflictError,
-    CloudSyncError,
-    collection_for,
-    decode_value,
-    doc_id_for,
-    encode_value,
-    quote_field_path,
-    ts_key,
-    ts_minus,
-)
+from infrastructure.firestore.cloud_sync.bootstrap import build_cache, cache_is_valid
+from infrastructure.firestore.cloud_sync.cache import connect, get_state, install_tracking, pending_count
+from infrastructure.firestore.cloud_sync.common import CACHE_FORMAT
 from infrastructure.firestore.cloud_sync.rest_store import RestStore
-from infrastructure.firestore.cloud_sync.sync import apply_remote_docs, flush, pull, renumber_row  # noqa: F401
+from infrastructure.firestore.cloud_sync.sync import flush, pull
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
 from infrastructure.sqlite.connection import SqliteDatabase
 

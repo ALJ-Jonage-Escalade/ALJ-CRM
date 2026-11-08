@@ -22,7 +22,7 @@ if _src_dir not in sys.path:
 from fastapi.testclient import TestClient
 
 from infrastructure import runtime_env
-from infrastructure.firestore.cloud_database import RestStore
+from infrastructure.firestore.cloud_sync.rest_store import RestStore
 from infrastructure.firestore.client import FirestoreClient
 
 DEV_ENV = {

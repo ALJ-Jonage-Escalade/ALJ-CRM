@@ -20,13 +20,17 @@ from typing import List, Optional, Sequence, Tuple
 
 import requests
 
-from domain.utils import sanitize_email_header
 from infrastructure import runtime_env
 from infrastructure.google.drive import GoogleDriveClient
 from infrastructure.security.secret_store import SecretStore
 from paths import data_root
 
 logger = logging.getLogger("alj")
+
+
+def sanitize_email_header(value: object) -> str:
+    """E-mail header value without line breaks (header injection from member data)."""
+    return " ".join(str(value or "").splitlines()).strip()
 
 SEND_TIMEOUT_SECONDS = 15
 

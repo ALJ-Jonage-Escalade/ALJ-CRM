@@ -26,48 +26,25 @@ EXTRA_COLUMNS = {
 
 class MemberRepository:
     @classmethod
-    def load_direct_data(cls, season_filter: str = "2026-2027") -> list:
-        """
-        Charge les données d'adhérents depuis la vue de compatibilité (schéma v2)
-        pour une saison spécifique ou un filtre comparatif.
-        """
-        # Résolution pour la rétrocompatibilité (si un chemin de fichier Excel .xlsx est passé)
-        if isinstance(season_filter, str) and (season_filter.endswith(".xlsx") or "\\" in season_filter or "/" in season_filter):
-            season_filter = "2026-2027" # Par défaut
-
+    def load_direct_data(cls, season: Optional[str]) -> list:
+        """Purchases of `season` (None: every season) from the compatibility view v_adherents_legacy, with its flat
+        historical keys, newest first."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
-            return cls._load_data_from_compat_view(conn, season_filter)
+            if season is None:
+                rows = conn.execute('SELECT * FROM v_adherents_legacy ORDER BY "id" DESC').fetchall()
+            else:
+                rows = conn.execute('SELECT * FROM v_adherents_legacy WHERE season_name = ? ORDER BY "id" DESC',
+                                    (season,)).fetchall()
         finally:
             conn.close()
-
-    @classmethod
-    def _load_data_from_compat_view(cls, conn, season_filter: str) -> list:
-        """Chargement via la vue v_adherents_legacy (schéma v2), aux clés plates historiques."""
-        cursor = conn.cursor()
-        if season_filter in ("Tous", "Toutes les saisons", "Toutes les saisons confondues"):
-            cursor.execute('SELECT * FROM v_adherents_legacy ORDER BY "id" DESC')
-        elif season_filter in ("Non réinscrits", "Anciens (25-26) non réinscrits en 26-27", "Anciens non réinscrits (Présents en 25/26 mais pas en 26/27)"):
-            cursor.execute("""
-                SELECT * FROM v_adherents_legacy
-                WHERE season_name = '2025-2026'
-                  AND "user_id" NOT IN (
-                      SELECT "user_id" FROM v_adherents_legacy WHERE season_name = '2026-2027'
-                  )
-                ORDER BY "id" DESC
-            """)
-        else:
-            cursor.execute('SELECT * FROM v_adherents_legacy WHERE season_name = ? ORDER BY "id" DESC', (season_filter,))
-
-        rows = cursor.fetchall()
-        participants_data = []
+        members = []
         for row in rows:
-            row_dict = dict(row)
-            # Supprimer le champ d'identifiant interne (comme le chemin legacy)
-            row_dict.pop("id", None)
-            participants_data.append(row_dict)
-        return participants_data
+            member = dict(row)
+            member.pop("id", None)  # the view's internal row id
+            members.append(member)
+        return members
 
 
     # One row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), the fields of the web member pages

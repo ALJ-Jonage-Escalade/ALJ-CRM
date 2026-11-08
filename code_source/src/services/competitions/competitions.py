@@ -11,7 +11,10 @@ import datetime
 from typing import Any, Dict, List
 
 from domain.competitions.models import Competition
+from exports.competitors_excel import export_competitors_excel
+from exports.competitors_pdf import export_competitors_pdf
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.mycompet.scraper import scrape_competition_info_by_id
 from services.competitions.store import cached_competitions, competition_not_found, require_competition, storage, write
 from services.documents import Doc
 
@@ -71,20 +74,17 @@ class CompetitionService:
     @staticmethod
     def lookup_ffme(id_ffme: str) -> Dict[str, Any]:
         """Scrape MyCompet for competition metadata by its FFME ID."""
-        from infrastructure.mycompet.scraper import scrape_competition_info_by_id
         return scrape_competition_info_by_id(id_ffme)
 
     @staticmethod
     @storage
     def export_excel(competition_id: int) -> bytes:
         comp = require_competition(competition_id)
-        from exports.competitors_excel import export_competitors_excel
         return export_competitors_excel(comp)
 
     @staticmethod
     @storage
     def export_pdf(competition_id: int) -> bytes:
         comp = require_competition(competition_id)
-        from exports.competitors_pdf import export_competitors_pdf
         return export_competitors_pdf(comp)
 

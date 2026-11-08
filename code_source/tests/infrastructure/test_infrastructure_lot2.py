@@ -68,7 +68,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         self.assertEqual(inserted, 1)
         
         # 3. Chargement des membres (Read)
-        loaded = MemberRepository.load_direct_data()
+        loaded = MemberRepository.load_direct_data("2026-2027")
         self.assertEqual(len(loaded), 1)
         self.assertEqual(loaded[0]["last_name"], "DUPONT")
         self.assertEqual(loaded[0]["first_name"], "Jean")

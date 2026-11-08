@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, Response
 from api.communications.schemas import AttestationRequest, AttestationSend, AttestationSent
 from api.responses import error, error_responses, internal_error
 from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
-from domain.utils import apply_template_variables
+from domain.email_personalization import apply_template_variables, template_recipient
 from exports.attestation import attestation_error, build_attestation, get_safe_pdf_filename, render_attestation_pdf
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
 from infrastructure.mail.repository import EmailRepository, MailError
@@ -75,8 +75,9 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
         "Sportivement,\n"
         "L'équipe ALJ Escalade"
     )
-    subject = apply_template_variables(raw_subject, member)
-    body = apply_template_variables(raw_body, member)
+    recipient = template_recipient(member)
+    subject = apply_template_variables(raw_subject, recipient)
+    body = apply_template_variables(raw_body, recipient)
 
     sender_email = (tmpl.get("sender_email") if tmpl else None) or DEFAULT_SENDER_EMAIL
     if not EmailDispatchService.is_allowed_sender(sender_email):
@@ -85,7 +86,7 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
 
     # HTML built from the template, then personalised with escaped values
     html_body = apply_template_variables(
-        build_email_html(raw_body, add_signature=True, image_src_mode="cid"), member, escape_html=True
+        build_email_html(raw_body, add_signature=True, image_src_mode="cid"), recipient, escape_html=True
     ) if data.add_signature else None
     plain_body = body + ("\n\n" + build_signature_plain() if data.add_signature else "")
     inline_images = get_inline_images() if data.add_signature else []

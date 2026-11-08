@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from domain.errors import Conflict, InvalidRequest, NotFound, ServiceError, StorageUnavailable, UpstreamUnavailable
+from infrastructure.firestore.client import FirestoreError
 
 logger = logging.getLogger("alj")
 
@@ -106,7 +107,6 @@ async def unhandled_error_middleware(request: Request, call_next: Callable[[Requ
     """Innermost middleware: an exception no route handled gets the API's error shape (not Starlette's plain text),
     503 when Firestore failed, else 500; logged with its traceback, never shown. Being a middleware, its answer still
     goes through the other ones (security headers, replication of what was written)."""
-    from infrastructure.firestore.client import FirestoreError
     try:
         return await call_next(request)
     except FirestoreError as e:

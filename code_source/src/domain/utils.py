@@ -1,14 +1,7 @@
-import html as _html
-import re
 import unicodedata
-from typing import Any
 from urllib.parse import urlparse
+
 import pandas as pd
-
-
-def sanitize_email_header(value: Any) -> str:
-    """E-mail header value without line breaks (header injection from member data)."""
-    return " ".join(str(value or "").splitlines()).strip()
 
 
 def is_helloasso_url(value: str) -> bool:
@@ -87,93 +80,3 @@ def clean_city_name(city_raw) -> str:
     c = c.replace(" D ", " D'").replace(" D' ", " D'")
     c = c.title()
     return " ".join(c.split())
-
-
-def apply_template_variables(text: str, member: Any, competition_context: dict = None,
-                             escape_html: bool = False) -> str:
-    """Remplace les variables de personnalisation {…} d'un sujet ou corps d'e-mail.
-
-    Gère indifféremment un objet (ex: Member, SimpleNamespace) ou un dictionnaire :
-    - {Prénom}/{Nom}/{first_name}/{last_name} : nom et prénom du destinataire ;
-    - {num_licence} : licence FFME du destinataire ;
-    - variables compétition : {no_competition}, {name_competition}, {montant_competition},
-      {date_competition}, {whatapp_Id}, {bloc_whatsapp} (laissées telles quelles si absentes du contexte).
-
-    escape_html=True: values are HTML-escaped, for a template already converted to HTML
-    (member data comes from the public HelloAsso form and must never add markup).
-    """
-    if text is None:
-        return ""
-    ctx = competition_context or {}
-    out = str(text)
-
-    if isinstance(member, dict):
-        first = str(member.get("user_first_name") or member.get("first_name") or member.get("prenom") or "").strip().title()
-        last = str(member.get("user_last_name") or member.get("last_name") or member.get("nom") or "").strip().upper()
-        licence = str(member.get("licence_ffme") or member.get("num_licence") or "").strip()
-        tarif = str(member.get("tarif_name") or member.get("tarif") or "").strip()
-        season = str(member.get("season_name") or member.get("season") or "").strip()
-    else:
-        first = str(getattr(member, "user_first_name", getattr(member, "first_name", getattr(member, "prenom", ""))) or "").strip().title()
-        last = str(getattr(member, "user_last_name", getattr(member, "last_name", getattr(member, "nom", ""))) or "").strip().upper()
-        licence = str(getattr(member, "licence_ffme", getattr(member, "num_licence", "")) or "").strip()
-        tarif = str(getattr(member, "tarif_name", getattr(member, "tarif", "")) or "").strip()
-        season = str(getattr(member, "season_name", getattr(member, "season", "")) or "").strip()
-
-    enc = _html.escape if escape_html else (lambda v: v)
-    out = out.replace("{Prénom}", enc(first))
-    out = out.replace("{Nom}", enc(last))
-    out = out.replace("{first_name}", enc(first))
-    out = out.replace("{last_name}", enc(last))
-    out = out.replace("{prenom}", enc(first))
-    out = out.replace("{nom}", enc(last))
-    out = out.replace("{num_licence}", enc(licence))
-    if tarif:
-        out = out.replace("{tarif}", enc(tarif))
-    if season:
-        out = out.replace("{season}", enc(season))
-
-    for key in (
-        "no_competition",
-        "name_competition",
-        "competition_nom",
-        "montant_competition",
-        "date_competition",
-        "competition_date",
-        "competition_deadline",
-        "deadline",
-        "lieu",
-        "competition_lieu",
-    ):
-        val = str(ctx.get(key) or "").strip()
-        if val:
-            out = out.replace("{" + key + "}", enc(val))
-            out = out.replace("{" + key.title() + "}", enc(val))
-
-    wa_val = str(
-        ctx.get("whatapp_Id")
-        or ctx.get("whatsapp_link")
-        or ctx.get("whatsapp_id")
-        or ctx.get("whatapp_id")
-        or ctx.get("whatsappLink")
-        or ""
-    ).strip()
-
-    if wa_val:
-        bloc_wa = enc(f"Voici le lien du groupe WhatApp dédié à cette compétition : {wa_val}")
-        for b_key in ("bloc_whatsapp", "bloc_whatapp", "whatsapp_bloc"):
-            out = out.replace("{" + b_key + "}", bloc_wa)
-        for wa_key in ("whatapp_Id", "whatsapp_id", "whatapp_id", "whatsapp_Id", "whatsapp_link", "whatapp_link"):
-            out = out.replace("{" + wa_key + "}", enc(wa_val))
-    elif competition_context is not None:
-        for b_key in ("bloc_whatsapp", "bloc_whatapp", "whatsapp_bloc"):
-            out = out.replace("{" + b_key + "}", "")
-        # Masquer la ligne dédiée au lien WhatsApp lorsqu'aucun lien n'est configuré
-        out = re.sub(
-            r"(?m)^[^\n]*\{(?:whatapp_Id|whatsapp_id|whatapp_id|whatsapp_Id|whatsapp_link|whatapp_link)\}[^\n]*\r?\n?",
-            "",
-            out,
-        )
-        out = re.sub(r"\n{3,}", "\n\n", out)
-    return out
-

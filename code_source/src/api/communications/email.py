@@ -14,6 +14,8 @@ from api.responses import error, error_responses
 from services.communications.email_dispatch import EmailDispatchService
 from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
 from infrastructure.security.secret_store import SecretStore
+from infrastructure.security.api_auth import Role, has_role
+from infrastructure.sqlite.email_templates import EmailTemplateRepository
 
 router = APIRouter()
 
@@ -41,7 +43,6 @@ def _same_name(a: str, b: str) -> bool:
 @router.post("/api/email-templates", response_model=EmailTemplateSaved, responses=error_responses(400, 409, 500))
 def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved | JSONResponse:
     """Crée ou met à jour un modèle d'e-mail dans la BDD SQLite (synchronisé avec Firestore)."""
-    from infrastructure.sqlite.email_templates import EmailTemplateRepository
     if not data.name:
         return error(400, "Le nom du modèle est obligatoire.")
     if not data.subject:
@@ -79,7 +80,6 @@ def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved | J
 @router.delete("/api/email-templates/{template_name}", response_model=EmailTemplateDeleted, responses=error_responses(400, 404, 500))
 def delete_email_template_api(template_name: str) -> EmailTemplateDeleted | JSONResponse:
     """Supprime un modèle d'e-mail par son nom."""
-    from infrastructure.sqlite.email_templates import EmailTemplateRepository
     import urllib.parse
     clean_name = urllib.parse.unquote(template_name).strip()
     if not clean_name:
@@ -131,7 +131,6 @@ def get_email_status() -> EmailStatus:
 def send_email_api(request: Request, data: EmailSendRequest) -> EmailDispatch | JSONResponse:
     """Envoie un e-mail personnalisé à chaque destinataire (Gmail API ou SMTP), avec les variables remplacées.
     400: nothing to send (empty subject or body, no valid recipient); 502: every e-mail failed."""
-    from infrastructure.security.api_auth import Role, has_role
     claims = getattr(request.state, "user", None)  # None: token check off (local dev server)
     recipients = [recipient.model_dump() for recipient in data.recipients]
     reason = EmailDispatchService.unauthorized_send_reason(

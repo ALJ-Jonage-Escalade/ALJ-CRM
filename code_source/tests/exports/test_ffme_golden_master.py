@@ -60,7 +60,7 @@ class TestFFMEGoldenMaster(unittest.TestCase):
             ancien_path = SqliteDatabase.get_db_path()
             SqliteDatabase.set_db_path(tmp_db)
             try:
-                raw_data = MemberRepository.load_direct_data(season_filter="2026-2027")
+                raw_data = MemberRepository.load_direct_data("2026-2027")
             finally:
                 SqliteDatabase.set_db_path(ancien_path)
             self.assertTrue(raw_data, "Aucune donnée chargée depuis la copie de la base")

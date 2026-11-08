@@ -1113,7 +1113,7 @@ export interface paths {
         };
         /**
          * Google Auth Callback
-         * @description Réceptionne le code d'autorisation OAuth2 de Google, échange contre le refresh_token et enregistre les identifiants.
+         * @description Google's redirect after the consent: exchanges the code for a refresh token and saves the club's credentials.
          */
         get: operations["google_auth_callback_api_auth_google_callback_get"];
         put?: never;
