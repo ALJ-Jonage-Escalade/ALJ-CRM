@@ -92,8 +92,7 @@ class CompetitionStoreBase:
         kept: Dict[str, Dict[str, Any]] = {}
         for d in docs:
             if d.get("id") is None:
-                key = d.get("_doc_id")
-                kept.setdefault(key, d)
+                kept.setdefault(str(d.get("_doc_id") or ""), d)
                 continue
             key = str(d.get("id"))
             current = kept.get(key)
@@ -219,4 +218,4 @@ class CompetitionStoreBase:
             docs = FirestoreClient.list_documents(cls.COLLECTION_COACHES)
         except Exception:
             return {}
-        return {d.get("id"): str(d.get("nom") or "") for d in docs if d.get("id") is not None}
+        return {d["id"]: str(d.get("nom") or "") for d in docs if d.get("id") is not None}

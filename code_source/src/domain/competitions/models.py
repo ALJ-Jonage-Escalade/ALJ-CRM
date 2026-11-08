@@ -6,12 +6,30 @@ les services, le serveur web et les tests unitaires.
 """
 import datetime
 from dataclasses import dataclass, field
-from typing import Any, List, Mapping
+from enum import StrEnum
+from typing import Any, List, Mapping, Optional
 
-# Statuts possibles d'une compétition (cycle de vie)
-STATUT_EN_PREPARATION = "en_preparation"
-STATUT_EN_COURS = "en_cours"
-STATUT_CLOSE = "close"
+class CompetitionStatus(StrEnum):
+    """Life cycle of a competition (stored as its value)."""
+    EN_PREPARATION = "en_preparation"
+    EN_COURS = "en_cours"
+    CLOSE = "close"
+
+
+class PaymentStatus(StrEnum):
+    """Payment status of a participant (stored as its value). A paid participant who cancels is never refunded:
+    "perdu" keeps the money, "reporte" keeps it as a credit shown in the season's balance for the next event."""
+    NON_INVITE = "non_invite"
+    EN_ATTENTE = "en_attente"
+    PAYE = "paye"
+    ANNULE_PERDU = "annule_perdu"
+    ANNULE_REPORTE = "annule_reporte"
+
+
+# Module-level names kept for the many callers; a StrEnum member compares and serialises as its text
+STATUT_EN_PREPARATION = CompetitionStatus.EN_PREPARATION
+STATUT_EN_COURS = CompetitionStatus.EN_COURS
+STATUT_CLOSE = CompetitionStatus.CLOSE
 STATUTS_COMPETITION = (STATUT_EN_PREPARATION, STATUT_EN_COURS, STATUT_CLOSE)
 
 # Coach slots of documents written before plan cleanup C2 (no `coach_ids` field): still read, never written.
@@ -36,28 +54,23 @@ def coach_ids_of(row: Mapping[str, Any]) -> List[int]:
     return ids
 
 
-LIBELLES_STATUT_COMPETITION = {
+LIBELLES_STATUT_COMPETITION: dict[str, str] = {
     STATUT_EN_PREPARATION: "En préparation",
     STATUT_EN_COURS: "En cours",
     STATUT_CLOSE: "Archivée",
 }
 
-# Statuts de paiement d'un participant
-PAIEMENT_NON_INVITE = "non_invite"
-PAIEMENT_EN_ATTENTE = "en_attente"
-PAIEMENT_PAYE = "paye"
-# Annulation d'un participant ayant payé : jamais de remboursement.
-# - perdu : l'argent est encaissé définitivement (pas de crédit) ;
-# - report : l'argent reste comptabilisé -> crédit visible au bilan de la saison,
-#   qui compensera la prochaine épreuve de l'athlète.
-PAIEMENT_ANNULE_PERDU = "annule_perdu"
-PAIEMENT_ANNULE_REPORTE = "annule_reporte"
+PAIEMENT_NON_INVITE = PaymentStatus.NON_INVITE
+PAIEMENT_EN_ATTENTE = PaymentStatus.EN_ATTENTE
+PAIEMENT_PAYE = PaymentStatus.PAYE
+PAIEMENT_ANNULE_PERDU = PaymentStatus.ANNULE_PERDU
+PAIEMENT_ANNULE_REPORTE = PaymentStatus.ANNULE_REPORTE
 STATUTS_PAIEMENT = (
     PAIEMENT_NON_INVITE, PAIEMENT_EN_ATTENTE, PAIEMENT_PAYE,
     PAIEMENT_ANNULE_PERDU, PAIEMENT_ANNULE_REPORTE,
 )
 
-LIBELLES_STATUT_PAIEMENT = {
+LIBELLES_STATUT_PAIEMENT: dict[str, str] = {
     PAIEMENT_NON_INVITE: "Non invité",
     PAIEMENT_EN_ATTENTE: "En attente",
     PAIEMENT_PAYE: "Payé",
@@ -102,10 +115,17 @@ def default_deadline(date_competition: str) -> str:
     return (start - datetime.timedelta(days=7)).isoformat()
 
 
+def _optional_int(value: object) -> Optional[int]:
+    """A stored identifier as an int (Firestore may hold it as text), None when absent."""
+    if value is None or value == "":
+        return None
+    return int(value) if isinstance(value, (int, float)) else int(str(value))
+
+
 @dataclass
 class Competition:
-    """Une épreuve de la saison (document Firestore `competitions/{id}`)."""
-    id: int = None
+    """Une épreuve de la saison (document Firestore `competitions/{id}`). `id` is None until it is saved."""
+    id: Optional[int] = None
     id_ffme: str = ""
     nom: str = ""
     date_competition: str = ""       # date de début, ISO AAAA-MM-JJ
@@ -121,7 +141,7 @@ class Competition:
     whatsapp_link: str = ""          # Lien d'invitation au groupe WhatsApp de la compétition
     # Identifiant Firestore réel du document (peut différer de str(id) sur une
     # base héritée ; normalisé au premier chargement par le référentiel).
-    doc_id: str = None
+    doc_id: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -144,7 +164,7 @@ class Competition:
     @classmethod
     def from_row(cls, row: dict) -> "Competition":
         return cls(
-            id=row.get("id"),
+            id=_optional_int(row.get("id")),
             id_ffme=str(row.get("id_ffme") or ""),
             nom=str(row.get("nom") or ""),
             date_competition=str(row.get("date_competition") or ""),
@@ -164,10 +184,10 @@ class Competition:
 
 @dataclass
 class Participant:
-    """Lien entre un adhérent et une compétition (inscription + suivi du paiement)."""
-    id: int = None
-    competition_id: int = None
-    adherent_id: int = None
+    """Lien entre un adhérent et une compétition (inscription + suivi du paiement). Ids are None until saved."""
+    id: Optional[int] = None
+    competition_id: Optional[int] = None
+    adherent_id: Optional[int] = None
     # Champs dénormalisés (copie adhérent pour affichage et export autonome) :
     nom: str = ""
     prenom: str = ""
@@ -217,9 +237,9 @@ class Participant:
     def from_row(cls, row: dict) -> "Participant":
         sel = row.get("selectionne")
         return cls(
-            id=row.get("id"),
-            competition_id=row.get("competition_id"),
-            adherent_id=row.get("adherent_id"),
+            id=_optional_int(row.get("id")),
+            competition_id=_optional_int(row.get("competition_id")),
+            adherent_id=_optional_int(row.get("adherent_id")),
             nom=str(row.get("nom") or ""),
             prenom=str(row.get("prenom") or ""),
             num_licence=str(row.get("num_licence") or ""),

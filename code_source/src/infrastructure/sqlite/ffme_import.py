@@ -7,7 +7,7 @@ import logging
 from typing import List, Optional, Tuple, TypedDict
 
 from domain.constants import get_active_season
-from infrastructure.sqlite import schema_v2
+from domain.members.view import normalize_status
 from infrastructure.sqlite.connection import SqliteDatabase
 
 logger = logging.getLogger("alj")
@@ -73,7 +73,7 @@ class FfmeImportRepository:
                     -- the season asked for, the active one when it does not exist
                     WHERE season_id = (SELECT id FROM seasons WHERE name = ? OR is_active = 1 ORDER BY name = ? DESC LIMIT 1)
                 )
-            """, [(status, schema_v2.normalize_status(status), health_document, now, user_id, target_season, target_season)
+            """, [(status, normalize_status(status), health_document, now, user_id, target_season, target_season)
                   for status, _, _, _, health_document, user_id in updates])
             conn.commit()
         except Exception:

@@ -142,7 +142,7 @@ def list_forms(form_types: Iterable[str], states: Iterable[str], token: str | No
     `token` : jeton déjà obtenu (require_access_token), sinon il est demandé ici."""
     token = token or require_access_token()
     url = f"{runtime_env.helloasso_api_url()}/organizations/{org_slug()}/forms"
-    params = {"formTypes": list(form_types), "states": list(states), "pageSize": 100}
+    params: Dict[str, Any] = {"formTypes": list(form_types), "states": list(states), "pageSize": 100}  # Any: query values
     forms: List[Dict[str, Any]] = []
     while True:
         try:
@@ -188,7 +188,7 @@ def fetch_form_items(form_type: str, slug: str) -> list:
         raise HelloAssoApiError("Connexion à l'API HelloAsso refusée (jeton d'accès indisponible).")
     url = f"{runtime_env.helloasso_api_url()}/organizations/{org_slug()}/forms/{form_type}/{slug}/items"
     headers = {"Authorization": f"Bearer {token}"}
-    params = {"withDetails": "true", "pageSize": 100}
+    params: Dict[str, Any] = {"withDetails": "true", "pageSize": 100}  # Any: query values
     items: list = []
     while True:
         try:

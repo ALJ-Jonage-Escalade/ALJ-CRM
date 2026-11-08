@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import sqlite3
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 from domain.errors import InvalidRequest
 from domain.members.sex import parse_sex
@@ -31,9 +31,15 @@ EXTRA_COLUMNS = {
 }
 
 
+# A row of a member read: column -> value. Any: SQLite values (text, number or None) of many columns
+MemberRow = Dict[str, Any]
+# A flat member record to write (HelloAsso export keys, or the fields of a manual addition). Any: as above
+MemberRecord = Mapping[str, Any]
+
+
 class MemberRepository:
     @classmethod
-    def load_direct_data(cls, season: Optional[str]) -> list:
+    def load_direct_data(cls, season: Optional[str]) -> List[MemberRow]:
         """Purchases of `season` (None: every season) from the compatibility view v_adherents_legacy, with its flat
         historical keys, newest first."""
         SqliteDatabase.setup_database()
@@ -46,7 +52,7 @@ class MemberRepository:
                                     (season,)).fetchall()
         finally:
             conn.close()
-        members = []
+        members: List[MemberRow] = []
         for row in rows:
             member = dict(row)
             member.pop("id", None)  # the view's internal row id
@@ -74,7 +80,7 @@ class MemberRepository:
     """
 
     @classmethod
-    def _query_member_rows(cls, where: str, params: tuple) -> list:
+    def _query_member_rows(cls, where: str, params: tuple) -> List[MemberRow]:
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
@@ -83,14 +89,14 @@ class MemberRepository:
             conn.close()
 
     @classmethod
-    def list_member_rows(cls, season_name: str) -> list:
+    def list_member_rows(cls, season_name: str) -> List[MemberRow]:
         """One row per purchase of the season (users ⨝ orders ⨝ purchases), with the fields of
         the web member pages. Unlike v_adherents_legacy, carries `purchase_id` (needed by
         /api/members/update) and skips the insurance-option subqueries."""
         return cls._query_member_rows("s.name = ?", (season_name,))
 
     @classmethod
-    def list_member_rows_of_users(cls, user_ids: Iterable[int]) -> list:
+    def list_member_rows_of_users(cls, user_ids: Iterable[int]) -> List[MemberRow]:
         """Rows of list_member_rows for these users only, every season."""
         ids = tuple(user_ids)
         if not ids:
@@ -98,7 +104,7 @@ class MemberRepository:
         return cls._query_member_rows(f"u.id IN ({', '.join('?' * len(ids))})", ids)
 
     @classmethod
-    def upsert_members(cls, members: list, season_name: str) -> int:
+    def upsert_members(cls, members: List[MemberRecord], season_name: str) -> int:
         """Insère ou met à jour un lot d'adhérents dans le schéma v2 (users / orders / purchases / purchase_options).
         Returns the number of purchases written; a database failure is rolled back and raised."""
         SqliteDatabase.setup_database()
@@ -202,12 +208,12 @@ class MemberRepository:
             conn.close()
 
     @classmethod
-    def list_contact_emails(cls) -> set:
+    def list_contact_emails(cls) -> set[str]:
         """Every member and payer address in the database (lower-cased)."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
-            emails = set()
+            emails: set[str] = set()
             for sql in ("SELECT email_primary, email_secondary FROM users", "SELECT payer_email FROM orders"):
                 for row in conn.execute(sql).fetchall():
                     emails.update(str(v).strip().lower() for v in tuple(row) if v)

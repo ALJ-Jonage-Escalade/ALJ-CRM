@@ -17,6 +17,7 @@ encadrants_text / assign_lanes, puis export_planning_excel (openpyxl).
 import io
 import math
 import re
+from typing import Any
 
 from domain.utils import normalize_string
 from exports.spreadsheet_safety import neutralize_formulas
@@ -129,7 +130,7 @@ def export_planning_excel(planning_data, saison) -> bytes:
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
     # 1. Créneaux valides regroupés par jour
-    by_day = {day: [] for day in DAYS}
+    by_day: dict[str, list] = {day: [] for day in DAYS}
     for item in planning_data or []:
         span = parse_horaire(item.get("horaires"))
         jour = str(item.get("jour") or "").strip().capitalize()
@@ -288,7 +289,7 @@ def export_planning_list_excel(planning_data, saison) -> bytes:
                "Tarifs HelloAsso", "Catégorie d'âge", "Naissance min", "Naissance max"]
     day_index = {day: i for i, day in enumerate(DAYS)}
 
-    rows = []
+    rows: list[dict[str, Any]] = []  # Any: the cell values and the sort key
     for item in planning_data or []:
         jour = str(item.get("jour") or "").strip()
         span = parse_horaire(item.get("horaires"))

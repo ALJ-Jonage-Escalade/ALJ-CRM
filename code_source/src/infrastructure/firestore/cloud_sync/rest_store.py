@@ -78,9 +78,10 @@ class RestStore:
 
     def list_all(self, collection: str) -> List[Dict[str, Any]]:
         url = f"{self._base}/{collection}"
-        out, token = [], None
+        out: List[Dict[str, Any]] = []
+        token: Optional[str] = None
         while True:
-            params = {"pageSize": 300}
+            params: Dict[str, Any] = {"pageSize": 300}  # Any: query values
             if token:
                 params["pageToken"] = token
             resp = self._request("GET", url, params=params)

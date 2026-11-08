@@ -1721,6 +1721,11 @@ export interface components {
             /** Details */
             details: components["schemas"]["BatchCompetition"][];
         };
+        /**
+         * Bucket
+         * @enum {string}
+         */
+        Bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
         /** BucketCounts */
         BucketCounts: {
             /** Already Imported */
@@ -3399,11 +3404,7 @@ export interface components {
          *     required). bucket: the bucket the preview showed the row in (a row that changed since is refused).
          */
         MembershipDecision: {
-            /**
-             * Bucket
-             * @enum {string}
-             */
-            bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
+            bucket: components["schemas"]["Bucket"];
             /** Choice */
             choice: string;
             /**
@@ -3535,11 +3536,7 @@ export interface components {
         MembershipRow: {
             /** Item Id */
             item_id: number;
-            /**
-             * Bucket
-             * @enum {string}
-             */
-            bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
+            bucket: components["schemas"]["Bucket"];
             /** Reason */
             reason: string;
             /** Order Ref */

@@ -32,7 +32,7 @@ class CoachesMixin(CompetitionStoreBase):
         return cls._coach_dict(doc) if doc else None
 
     @classmethod
-    def save_coach(cls, nom: str, coach_id: int = None) -> int:
+    def save_coach(cls, nom: str, coach_id: Optional[int] = None) -> int:
         ret_id = coach_id or cls._new_id()
         FirestoreClient.upsert_document(cls.COLLECTION_COACHES, str(ret_id),
                                         {"id": ret_id, "nom": nom, "updated_at": cls._now_iso()})

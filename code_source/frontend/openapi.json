@@ -5108,6 +5108,18 @@
         ],
         "title": "BatchReport"
       },
+      "Bucket": {
+        "type": "string",
+        "enum": [
+          "already_imported",
+          "new",
+          "renewal",
+          "updated",
+          "to_review",
+          "blocked"
+        ],
+        "title": "Bucket"
+      },
       "BucketCounts": {
         "properties": {
           "already_imported": {
@@ -8561,16 +8573,7 @@
       "MembershipDecision": {
         "properties": {
           "bucket": {
-            "type": "string",
-            "enum": [
-              "already_imported",
-              "new",
-              "renewal",
-              "updated",
-              "to_review",
-              "blocked"
-            ],
-            "title": "Bucket"
+            "$ref": "#/components/schemas/Bucket"
           },
           "choice": {
             "type": "string",
@@ -8864,16 +8867,7 @@
             "title": "Item Id"
           },
           "bucket": {
-            "type": "string",
-            "enum": [
-              "already_imported",
-              "new",
-              "renewal",
-              "updated",
-              "to_review",
-              "blocked"
-            ],
-            "title": "Bucket"
+            "$ref": "#/components/schemas/Bucket"
           },
           "reason": {
             "type": "string",

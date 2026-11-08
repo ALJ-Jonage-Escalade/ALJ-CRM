@@ -57,7 +57,7 @@ class PlanningRepository:
         """Agrège le planning par groupe de créneau unique (un groupe peut posséder
         plusieurs créneaux horaires et plusieurs tarifs HelloAsso).
         Retourne une liste de dicts {groupe, tarifs, slots} triée par nom de groupe."""
-        creneaux = {}
+        creneaux: dict[str, dict] = {}
         order = []
         for item in cls.load_planning_data():
             g_name = str(item.get("groupe") or "").strip()

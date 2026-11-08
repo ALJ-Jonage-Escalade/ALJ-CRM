@@ -44,7 +44,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         items = {}
         for d in FirestoreClient.list_documents(cls.COLLECTION_ITEMS):
             try:
-                iid = int(d.get("id_item"))
+                iid = int(d.get("id_item") or "")  # missing: ValueError, skipped below
             except (TypeError, ValueError):
                 continue
             items[iid] = d
@@ -242,7 +242,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
             comp_id = doc.get("competition_id")
             adh_id = doc.get("adherent_id")
             comp_doc = comps.get(comp_id) if comp_id is not None else None
-            a_doc = adh.get(adh_id) or {}
+            a_doc = (adh.get(adh_id) if adh_id is not None else None) or {}
             rows.append({
                 "id_item": iid,
                 "order_id": doc.get("order_id"),

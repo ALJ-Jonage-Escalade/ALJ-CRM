@@ -1,7 +1,7 @@
 import logging
 import os
 import requests
-from typing import Dict, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from infrastructure.security.secret_store import SecretPersistenceError, SecretStore
 from paths import CODE_ROOT, ROOT_DIR
@@ -41,7 +41,7 @@ class GoogleDriveClient:
         return None
 
     @classmethod
-    def _iter_credential_candidates(cls, env_paths: list = None) -> list:
+    def _iter_credential_candidates(cls, env_paths: Optional[List[str]] = None) -> list:
         """Construit les candidats d'identifiants (client_id, client_secret, refresh_token) :
         1. Le SecretStore (Firestore sur Cloud Run, puis l'environnement),
         2. Les fichiers .env sur disque (fraîchement écrits par l'assistant OAuth2)."""
@@ -72,7 +72,7 @@ class GoogleDriveClient:
         return SecretStore.get_secret("GMAIL_CLIENT_ID"), SecretStore.get_secret("GMAIL_CLIENT_SECRET")
 
     @classmethod
-    def get_access_token(cls, env_paths: list = None) -> str:
+    def get_access_token(cls, env_paths: Optional[List[str]] = None) -> str:
         """Récupère un access token d'API Google à partir du refresh token.
 
         Si le jeton stocké est révoqué ('invalid_grant' : nouvelle autorisation OAuth2

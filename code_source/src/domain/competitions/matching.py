@@ -15,7 +15,9 @@ Un paiement sans ce n° (champ vide ou non conforme) n'est PAS marqué « Payé 
 automatiquement : il est retourné dans `manual_review` pour correction manuelle.
 """
 import re
+from typing import Optional
 
+from domain.competitions.models import PAIEMENT_PAYE
 from domain.utils import is_helloasso_url, normalize_name, normalize_string
 
 # États HelloAsso consideres comme un paiement valide
@@ -216,7 +218,7 @@ def match_adherent_by_name(payer: str, adherents: list):
 
 
 def auto_link_items(items: list, competitions: list, adherents: list,
-                    existing_links: dict = None) -> dict:
+                    existing_links: Optional[dict] = None) -> dict:
     """Calcule les liens automatiques article → (compétition, adhérent).
 
     - items : projection du miroir (summarize_items) ;
@@ -232,7 +234,7 @@ def auto_link_items(items: list, competitions: list, adherents: list,
     Retourne {id_item: {"competition_id": int, "adherent_id": int|None, "source": "auto"}}.
     """
     existing_links = existing_links or {}
-    by_licence = {}
+    by_licence: dict[str, dict] = {}
     for a in adherents or []:
         lic = re.sub(r"\D", "", str(a.get("num_licence") or ""))
         if lic:
@@ -240,7 +242,8 @@ def auto_link_items(items: list, competitions: list, adherents: list,
 
     # Correspondance champ saisi -> compétition : égalité exacte d'abord, puis
     # « contient » (du n° le plus long au plus court pour privilégier la précision).
-    comps_exact, comps_contains = {}, []
+    comps_exact: dict[str, dict] = {}
+    comps_contains: list = []
     for c in competitions or []:
         ref = normalize_string(c.get("id_ffme") or "")
         if not ref:
@@ -304,7 +307,7 @@ def _item_payer_name(item: dict) -> str:
     return f"{last} {first}".strip()
 
 
-def match_items_to_participants(items: list, participants: list, prix_attendu: float = None,
+def match_items_to_participants(items: list, participants: list, prix_attendu: Optional[float] = None,
                                 no_competition: str = "") -> dict:
     """Croise les articles HelloAsso avec les participants de la compétition.
 
@@ -334,7 +337,8 @@ def match_items_to_participants(items: list, participants: list, prix_attendu: f
         anomalies.append({"type": kind, "severite": severite, "titre": titre, "detail": detail})
 
     # Index des participants par licence puis par nom normalisé
-    by_licence, by_name = {}, {}
+    by_licence: dict[str, dict] = {}
+    by_name: dict[str, dict] = {}
     for p in participants:
         lic = re.sub(r"\D", "", str(p.get("num_licence") or ""))
         if lic:
@@ -343,7 +347,7 @@ def match_items_to_participants(items: list, participants: list, prix_attendu: f
         if key:
             by_name.setdefault(key, p)
 
-    seen_participants = {}
+    seen_participants: dict = {}
     nb_payes = 0
 
     for item in items or []:
@@ -453,12 +457,12 @@ def match_items_to_participants(items: list, participants: list, prix_attendu: f
     for p in participants:
         if not p.get("selectionne"):
             continue
-        if p.get("statut_paiement") == "paye" and p.get("adherent_id") not in seen_participants:
+        if p.get("statut_paiement") == PAIEMENT_PAYE and p.get("adherent_id") not in seen_participants:
             # Déjà marqué payé en base sans paiement détecté sur cette campagne : signaler
             anomaly("paiement_absent", "avertissement", "Payé en base sans paiement HelloAsso",
                     f"{p.get('nom')} {p.get('prenom')} est marqué « Payé » dans la base mais aucun "
                     f"paiement correspondant n'a été trouvé sur la campagne.")
-        elif p.get("statut_paiement") != "paye":
+        elif p.get("statut_paiement") != PAIEMENT_PAYE:
             nb_en_attente += 1
 
     return {
