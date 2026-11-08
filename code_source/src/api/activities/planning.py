@@ -8,12 +8,12 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, Response
 
 from api.activities.schemas import PlanningReplaced, PlanningSlot, PlanningSlotDeleted, PlanningSlotSaved, PlanningSlotUpdate
-from api.responses import error, error_responses
+from api.responses import XLSX, error, error_responses, file_download
+from domain.constants import get_active_season, is_valid_season
+from exports.planning_excel import export_planning_excel, export_planning_list_excel
 from infrastructure.sqlite.planning import PlanningRepository
 
 router = APIRouter()
-
-XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def _slot(row: Dict[str, Any]) -> PlanningSlot:  # Any: a row of the planning table
@@ -55,43 +55,17 @@ def delete_planning_item_api(item_id: int) -> PlanningSlotDeleted | JSONResponse
             responses={200: {"content": {XLSX: {}}, "description": "Classeur Excel"}, **error_responses(400, 500)})
 def export_planning_api(mode: Literal["grid", "list"] = Query("grid"), season: Optional[str] = Query(None)) -> Response:
     """Exporte le planning au format Excel (grille visuelle hebdomadaire ou liste tabulaire)."""
-    import os
-    import tempfile
-    import shutil
-    from exports.planning_excel import export_planning_excel, export_planning_list_excel
-    from domain.constants import get_active_season, is_valid_season
-
     target_season = season or get_active_season()
     if not is_valid_season(target_season):
         return error(400, "Saison invalide (format attendu : AAAA-AAAA).")
     planning_data = PlanningRepository.load_planning_data()
-
-    tmp_dir = tempfile.mkdtemp(prefix="alj_plan_export_")
-    out_path = os.path.join(tmp_dir, "planning.xlsx")
+    if mode == "list":
+        return file_download(export_planning_list_excel(planning_data, target_season), f"Planning_Liste_{target_season}.xlsx", XLSX)
     try:
-        if mode == "list":
-            filename = f"Planning_Liste_{target_season}.xlsx"
-            export_planning_list_excel(planning_data, target_season, out_path)
-        else:
-            filename = f"Planning_Grille_{target_season}.xlsx"
-            try:
-                export_planning_excel(planning_data, target_season, out_path)
-            except ValueError:  # no slot with a single day and readable hours
-                return error(400, "Aucun créneau à placer sur la grille : il faut un jour et des horaires lisibles.")
-
-        with open(out_path, "rb") as f:
-            content_bytes = f.read()
-
-        return Response(
-            content=content_bytes,
-            media_type=XLSX,
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Access-Control-Expose-Headers": "Content-Disposition"
-            }
-        )
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        content = export_planning_excel(planning_data, target_season)
+    except ValueError:  # no slot with a single day and readable hours
+        return error(400, "Aucun créneau à placer sur la grille : il faut un jour et des horaires lisibles.")
+    return file_download(content, f"Planning_Grille_{target_season}.xlsx", XLSX)
 
 
 @router.post("/api/planning", response_model=PlanningReplaced, responses=error_responses(500))
