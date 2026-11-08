@@ -998,7 +998,7 @@ export interface paths {
          *     Réconcilie en temps réel le paiement avec les participants de la compétition.
          *
          *     Authenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles
-         *     auprès de l'API HelloAsso (voir HelloAssoWebhookService.handle_notification).
+         *     auprès de l'API HelloAsso (voir HelloAssoWebhookService.verify_and_reconcile_notification).
          */
         post: operations["webhook_helloasso_webhooks_helloasso_post"];
         delete?: never;

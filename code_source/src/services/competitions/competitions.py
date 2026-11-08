@@ -1,6 +1,6 @@
 """Competitions: list, create, partial update, delete, archive.
 
-Over CompetitionFirestoreRepository (shared with the HelloAsso webhook and the MyCompet
+Over CompetitionRepository (shared with the HelloAsso webhook and the MyCompet
 results, so they all write with the same rules). Knows nothing about HTTP: failures are
 raised as domain.errors.
 """
@@ -13,7 +13,7 @@ from typing import Any, Dict, List
 from domain.competitions.models import Competition
 from exports.competitors_excel import export_competitors_excel
 from exports.competitors_pdf import export_competitors_pdf
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from infrastructure.mycompet.scraper import scrape_competition_info_by_id
 from services.competitions.store import cached_competitions, competition_not_found, require_competition, storage, write
 from services.documents import Doc
@@ -33,7 +33,7 @@ class CompetitionService:
     @staticmethod
     @storage
     def list_competitions() -> List[Doc]:
-        return cached_competitions(Repo.list_competition_docs)
+        return cached_competitions(CompetitionRepository.list_competition_docs)
 
     @staticmethod
     @write
@@ -41,7 +41,7 @@ class CompetitionService:
         """`fields`: validated body (api.competitions.schemas.competitions.CompetitionCreate)."""
         comp = Competition(**{k: fields[k] for k in COMPETITION_FIELDS if k in fields})
         comp.coach_ids = list(fields.get("coach_ids") or [])
-        new_id = Repo.save_competition(comp, _extra(fields))
+        new_id = CompetitionRepository.save_competition(comp, _extra(fields))
         return require_competition(new_id)
 
     @staticmethod
@@ -55,21 +55,21 @@ class CompetitionService:
                     setattr(comp, field, fields[field])
             if "coach_ids" in fields:
                 comp.coach_ids = list(fields["coach_ids"] or [])
-        if not Repo.update_competition(competition_id, change, _extra(fields)):
+        if not CompetitionRepository.update_competition(competition_id, change, _extra(fields)):
             raise competition_not_found()
         return require_competition(competition_id)
 
     @staticmethod
     @write
     def delete_competition(competition_id: int) -> None:
-        if not Repo.delete_competition(competition_id):
+        if not CompetitionRepository.delete_competition(competition_id):
             raise competition_not_found()
 
     @staticmethod
     @write
     def archive_past_competitions() -> List[int]:
         """Closes the competitions that are over; returns their ids."""
-        return Repo.archive_past_competitions(datetime.date.today().isoformat())
+        return CompetitionRepository.archive_past_competitions(datetime.date.today().isoformat())
 
     @staticmethod
     def lookup_ffme(id_ffme: str) -> Dict[str, Any]:

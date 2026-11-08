@@ -29,11 +29,11 @@ if _src_dir not in sys.path:
 
 
 from domain.utils import normalize_name
-from infrastructure.mail.repository import EmailRepository, MailError
+from infrastructure.mail.sender import EmailSender, MailError
 from domain.club_emails import DEFAULT_SENDER_EMAIL
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from infrastructure.mycompet.scraper import (
     ArchiveEntry,
     fetch_and_parse_mycompet_results,
@@ -263,7 +263,7 @@ class CompetitionResultsBatchService:
         window = window_days if window_days is not None else cls.get_window_days()
         oldest = today - datetime.timedelta(days=max(window, FORCED_WINDOW_DAYS) if force else window)
         try:
-            docs = CompetitionFirestoreRepository.list_competition_docs()
+            docs = CompetitionRepository.list_competition_docs()
         except FirestoreError as e:
             raise ResultsBatchError(f"Lecture des compétitions impossible : {e}") from e
 
@@ -321,7 +321,7 @@ class CompetitionResultsBatchService:
             return len(athletes)
 
         try:
-            matched = CompetitionFirestoreRepository.record_results(
+            matched = CompetitionRepository.record_results(
                 comp["id"], rank, {"url_resultats": canonical_url, "resultats_synced_at": now_iso})
         except FirestoreError:  # this competition only: the others are still searched, the next run retries it
             logger.error("[BATCH_RESULTATS] Enregistrement des résultats de « %s » impossible", nom, exc_info=True)
@@ -336,7 +336,7 @@ class CompetitionResultsBatchService:
         NotFound (code needs_url when no page is found: the coach gives it), UpstreamUnavailable (MyCompet),
         StorageUnavailable (Firestore)."""
         try:
-            comp = CompetitionFirestoreRepository.get_stored_competition_doc(competition_id)
+            comp = CompetitionRepository.get_stored_competition_doc(competition_id)
         except FirestoreError as e:
             raise StorageUnavailable("Lecture de la compétition impossible (détails dans les journaux).") from e
         if not comp:
@@ -361,7 +361,7 @@ class CompetitionResultsBatchService:
         canonical_url = normalize_result_url(url)
         try:
             # The URL is kept even when nobody matched: the coach gave it, the next try starts from it
-            matched = CompetitionFirestoreRepository.record_results(
+            matched = CompetitionRepository.record_results(
                 competition_id, lambda parts: len(apply_rankings(parts, scraped, now_iso)),
                 {"url_resultats": canonical_url, "resultats_synced_at": now_iso}, save_fields_without_match=True)
         except FirestoreError as e:
@@ -574,7 +574,7 @@ class CompetitionResultsBatchService:
         plain_body = "\n".join(lines)
 
         try:
-            EmailRepository.send_email(
+            EmailSender.send_email(
                 to_email=recipient,
                 subject=subject,
                 body=plain_body,
@@ -602,7 +602,7 @@ class CompetitionResultsBatchService:
     @classmethod
     def _mark_url_requested(cls, comp: Dict[str, Any], at: str) -> None:
         try:
-            FirestoreClient.update_fields(CompetitionFirestoreRepository.COLLECTION_COMPETITIONS,
+            FirestoreClient.update_fields(CompetitionRepository.COLLECTION_COMPETITIONS,
                                           comp.get("_doc_id") or str(comp["id"]), {FIELD_NEEDS_URL_NOTIFIED: at})
         except FirestoreError:
             logger.warning("[BATCH_RESULTATS] Mémorisation de la demande d'URL impossible (#%s)", comp.get("id"), exc_info=True)

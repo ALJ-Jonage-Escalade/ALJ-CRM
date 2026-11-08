@@ -125,7 +125,7 @@ def tarif_slots(planning: Iterable[Dict[str, Any]]) -> Dict[str, Dict[str, str]]
     return slots
 
 
-def creneaux(planning: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def slot_groups(planning: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Slot groups of the planning, each with the tariffs it covers, sorted by name."""
     by_name: Dict[str, Dict[str, Any]] = {}
     for row in _by_id(planning):

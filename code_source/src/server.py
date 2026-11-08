@@ -46,7 +46,7 @@ from infrastructure.firestore.cloud_database import CloudDatabase
 
 
 # Paths of the routes that only read/write Firestore collections (competitions, coaches,
-# projections, HelloAsso mirror) through CompetitionFirestoreRepository: they never touch the
+# projections, HelloAsso mirror) through CompetitionRepository: they never touch the
 # SQLite cache, so they must not wait for its refresh (a full rebuild after a cold start).
 # Filled from their routers once included (below). Exact routes, not path prefixes: other routes
 # under /api/competitions (check-all-paid) use the cache.

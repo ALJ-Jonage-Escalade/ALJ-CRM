@@ -10,12 +10,12 @@ from domain.competitions.models import (
     STATUT_CLOSE,
 )
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.firestore.competitions.adherents import AdherentsMixin
+from infrastructure.firestore.competitions.adherents import MemberDirectoryMixin
 
 logger = logging.getLogger("alj")
 
 
-class CompetitionsMixin(AdherentsMixin):
+class CompetitionsMixin(MemberDirectoryMixin):
     """Competition documents; the season report reads the member directory."""
 
     # ------------------------------------------------------------------

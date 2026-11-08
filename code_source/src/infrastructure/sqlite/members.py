@@ -98,7 +98,7 @@ class MemberRepository:
         conn = SqliteDatabase.get_connection()
         try:
             cursor = conn.cursor()
-            stats = schema_v2.sync_members_to_v2(cursor, members, season_name)
+            stats = schema_v2.write_members_to_v2(cursor, members, season_name)
             inserted_count = stats["purchases"]
             conn.commit()
             print(f"[SQLITE] Synchro reussie : {inserted_count} adhesions enregistrees/mises a jour "
@@ -180,7 +180,7 @@ class MemberRepository:
                 rec["commentaires_correctif"] = str(comment).strip()
 
             cursor = conn.cursor()
-            stats = schema_v2.sync_members_to_v2(cursor, [rec], season_name)
+            stats = schema_v2.write_members_to_v2(cursor, [rec], season_name)
             if not stats.get("purchases"):
                 conn.rollback()
                 msg = ("Une inscription plus prioritaire existe déjà pour cet adhérent "
@@ -382,7 +382,7 @@ def _user_column_updates(fields: Dict[str, object]) -> Dict[str, Optional[str]]:
         updates["first_name_key"] = normalize_name(first_name).lower()
     if "birth_date" in fields:
         raw_birth_date = str(fields["birth_date"] or "").strip()
-        updates["birth_date"] = schema_v2.parse_iso_date(raw_birth_date) if raw_birth_date else ""
+        updates["birth_date"] = schema_v2.legacy_date_to_iso(raw_birth_date) if raw_birth_date else ""
         updates["birth_date_raw"] = raw_birth_date
     for column, default in _USER_YES_NO_DEFAULTS.items():
         if column in fields:

@@ -8,7 +8,7 @@ from unittest.mock import patch
 from api.competitions.schemas.results import BatchReport
 from domain.errors import UpstreamUnavailable
 from infrastructure.firestore.client import FirestoreClient, FirestoreConflictError, FirestoreError
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from support.api_case import ApiTestCase
 
 SCRAPED = [{"nom": "BULAND", "prenom": "Julia", "licence": "930654", "classement": "9", "total_categorie": 20,
@@ -74,7 +74,7 @@ class TestFetchCompetitionResults(ApiTestCase):
             writes.append((doc_id, fields, expected_update_time))
         load = {"side_effect": doc} if isinstance(doc, Exception) else {"return_value": doc}
         scrape = {"side_effect": scraped} if isinstance(scraped, Exception) else {"return_value": scraped}
-        with patch.object(Repo, "_load_comp_doc", **load), \
+        with patch.object(CompetitionRepository, "_load_comp_doc", **load), \
              patch("services.competitions.results_batch.fetch_and_parse_mycompet_results", **scrape), \
              patch("services.competitions.results_batch.find_mycompet_result_url", return_value="") as search, \
              patch.object(FirestoreClient, "update_fields", side_effect=update_fields):

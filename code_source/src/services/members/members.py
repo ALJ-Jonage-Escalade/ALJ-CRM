@@ -34,7 +34,7 @@ class MemberService:
         return {
             "season": name,
             "members": member_view.build_members(rows, planning, name),
-            "creneaux": member_view.creneaux(planning),
+            "creneaux": member_view.slot_groups(planning),
         }
 
     @staticmethod

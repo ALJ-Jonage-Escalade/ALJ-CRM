@@ -171,7 +171,7 @@ class TestBureauFiles(unittest.TestCase):
             # The member, its amount and payer are read from the database: only the purchase is sent
             payload = AttestationSend(purchase_id=30, season="2026-2027", to_email="jean.dupont@example.com")
 
-            with patch("infrastructure.mail.repository.EmailRepository.send_email", return_value=True) as mock_send:
+            with patch("infrastructure.mail.sender.EmailSender.send_email", return_value=True) as mock_send:
                 res = send_attestation_api(payload)
 
             self.assertEqual(res.status, "success")

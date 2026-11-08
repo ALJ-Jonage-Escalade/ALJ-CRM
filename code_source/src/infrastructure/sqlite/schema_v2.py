@@ -183,7 +183,7 @@ def sex_code(raw: object, order_ref: object) -> str | None:
     return sex.value if sex else None
 
 
-def parse_iso_date(val):
+def legacy_date_to_iso(val):
     """Normalise une date legacy ('20/08/2012', '2012-08-20T00:00:00', ...) en ISO '2012-08-20'."""
     s = str(val or "").strip()
     if not s:
@@ -295,7 +295,7 @@ def upsert_user_v2(cur, rec, now_iso, field_map):
     last = str(_get(rec, "user_lastName") or "").strip()
     first = str(_get(rec, "user_firstName") or "").strip()
     dob_raw = str(_get(rec, DOB_COLUMN) or "").strip()
-    dob_iso = parse_iso_date(dob_raw)
+    dob_iso = legacy_date_to_iso(dob_raw)
     k_last = normalize_name(last).upper()
     k_first = normalize_name(first).lower()
 
@@ -392,10 +392,10 @@ def _has_better_sibling_purchase(cur, user_id, order_id, score):
           AND p.id != ?
     """, (user_id, order_id, order_id))
     for r in cur.fetchall():
-        ex_s = r["status"] if isinstance(r, sqlite3.Row) else r[0]
-        ex_t = r["tarif_name"] if isinstance(r, sqlite3.Row) else r[1]
-        ex_a = r["amount"] if isinstance(r, sqlite3.Row) else r[2]
-        if purchase_priority_score(ex_s, ex_t, ex_a) > score:
+        sibling_status = r["status"] if isinstance(r, sqlite3.Row) else r[0]
+        sibling_tarif = r["tarif_name"] if isinstance(r, sqlite3.Row) else r[1]
+        sibling_amount = r["amount"] if isinstance(r, sqlite3.Row) else r[2]
+        if purchase_priority_score(sibling_status, sibling_tarif, sibling_amount) > score:
             return True
     return False
 
@@ -487,7 +487,7 @@ def insert_options_v2(cur, purchase_id, rec):
     return added
 
 
-def sync_members_to_v2(cur, members, season_name=SEASON_ACTIVE):
+def write_members_to_v2(cur, members, season_name=SEASON_ACTIVE):
     """Écrit un lot d'adhésions dans le schéma v2, payeurs (payer_*) compris.
     Appelé par MemberRepository.upsert_members (même transaction)."""
     ensure_v2_schema(cur)

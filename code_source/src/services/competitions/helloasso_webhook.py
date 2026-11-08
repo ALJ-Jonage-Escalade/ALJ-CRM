@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 
 from domain.competitions.matching import auto_link_items, parse_campaign_identifier, summarize_items
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as CompetitionRepository
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from infrastructure.helloasso import api as helloasso_api
 from infrastructure.security.api_auth import auth_enforced, constant_time_equals
 from infrastructure.security.secret_store import SecretStore
@@ -153,7 +153,7 @@ class HelloAssoWebhookService:
             raise WebhookRejected(503, f"Vérification auprès de HelloAsso impossible : {e}")
 
     @classmethod
-    def handle_notification(cls, payload: Dict[str, Any], token: Optional[str] = None) -> Dict[str, Any]:
+    def verify_and_reconcile_notification(cls, payload: Dict[str, Any], token: Optional[str] = None) -> Dict[str, Any]:
         """Point d'entrée sécurisé du webhook (lève WebhookRejected en cas de refus)."""
         token_ok = cls.check_token(token)
         if token_ok is False:
@@ -161,12 +161,12 @@ class HelloAssoWebhookService:
 
         if helloasso_api.credentials_configured():
             items = cls.fetch_verified_items(payload)
-            report = cls.process_webhook(payload, items=items)
+            report = cls.reconcile_payment_items(payload, items=items)
             report["verified"] = "api"
             return report
 
         if token_ok or not auth_enforced():
-            report = cls.process_webhook(payload)
+            report = cls.reconcile_payment_items(payload)
             report["verified"] = "token" if token_ok else "none"
             return report
 
@@ -219,7 +219,7 @@ class HelloAssoWebhookService:
     # Traitement
     # ------------------------------------------------------------------
     @classmethod
-    def process_webhook(cls, payload: Dict[str, Any],
+    def reconcile_payment_items(cls, payload: Dict[str, Any],
                         items: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
         Traite une notification Webhook HelloAsso complète :
@@ -260,7 +260,7 @@ class HelloAssoWebhookService:
         computed_links = auto_link_items(
             items=summarized,
             competitions=[c.to_dict() for c in CompetitionRepository.list_competitions()],
-            adherents=CompetitionRepository.list_adherents(),
+            adherents=CompetitionRepository.list_members(),
             existing_links=CompetitionRepository.list_helloasso_links(),
         )
         # Items already received: HelloAsso redelivers notifications, which must not undo a coach's cancellation
@@ -309,7 +309,7 @@ class HelloAssoWebhookService:
 
         mirrored = False
         try:
-            CompetitionRepository.sync_helloasso_mirror(
+            CompetitionRepository.update_helloasso_mirror(
                 summarized=[item_summary], raw_items=[raw], campagne_slug=cls.item_form_slug(raw))
             mirrored = True
         except Exception:  # the payment is still recorded below, from this item's amount alone

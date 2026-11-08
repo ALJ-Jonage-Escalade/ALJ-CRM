@@ -13,8 +13,8 @@ from typing import List
 from domain.club_emails import DEFAULT_SENDER_EMAIL
 from domain.competitions.models import PAIEMENT_PAYE, Competition, Participant
 from infrastructure.firestore.app_settings import AppSettingsRepository
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as CompetitionRepository
-from infrastructure.mail.repository import EmailRepository, MailError
+from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.mail.sender import EmailSender, MailError
 from services.competitions.results_batch import CompetitionResultsBatchService
 
 logger = logging.getLogger("alj")
@@ -52,7 +52,7 @@ def check_and_notify_all_paid(competition_id: int) -> bool:
 
     competition_name = competition.nom or "Compétition"
     try:
-        EmailRepository.send_email(
+        EmailSender.send_email(
             to_email=recipient,
             subject=f"✅ [ALJ Compétitions] Tous les paiements validés : {competition_name}",
             body=build_all_paid_email_text(competition, selected),

@@ -10,7 +10,7 @@ from typing import Optional, Sequence, Tuple
 
 from domain.competitions.models import STATUT_CLOSE
 from infrastructure.firestore.competition_repository import (
-    CompetitionFirestoreRepository as Repo,
+    CompetitionRepository,
     ParticipantAlreadyPaid,
     ParticipantChanged,
 )
@@ -21,7 +21,7 @@ from domain.errors import Conflict, NotFound
 def _written(competition_id: int, doc: Optional[dict]) -> dict:
     """The competition as the write left it. `doc` None (nothing written): the competition is
     read, which also raises NotFound when it does not exist."""
-    return Repo.competition_api_doc(doc) if doc is not None else require_competition(competition_id)
+    return CompetitionRepository.competition_api_doc(doc) if doc is not None else require_competition(competition_id)
 
 
 def _require_open(competition_id: int) -> None:
@@ -43,7 +43,7 @@ class ParticipantService:
     @staticmethod
     @write
     def add_participant(competition_id: int, adherent_id: int, selectionne: bool) -> dict:
-        return _written(competition_id, Repo.add_participant_doc(competition_id, adherent_id, selectionne))
+        return _written(competition_id, CompetitionRepository.add_participant_doc(competition_id, adherent_id, selectionne))
 
     @staticmethod
     @write
@@ -65,10 +65,10 @@ class ParticipantService:
         doc = None
         try:
             if selectionne is not None:
-                doc = Repo.set_selection_doc(competition_id, adherent_id, selectionne, refuse_unselect_paid=True,
+                doc = CompetitionRepository.set_selection_doc(competition_id, adherent_id, selectionne, refuse_unselect_paid=True,
                                              unchanged_since=unchanged_since)
             if present is not None:
-                doc = Repo.set_present_doc(competition_id, adherent_id, present, unchanged_since=unchanged_since)
+                doc = CompetitionRepository.set_present_doc(competition_id, adherent_id, present, unchanged_since=unchanged_since)
                 if doc is None and not queued:
                     raise _participant_not_found(competition_id)
         except ParticipantAlreadyPaid as e:
@@ -85,33 +85,33 @@ class ParticipantService:
     @write
     def record_manual_payment(competition_id: int, adherent_id: int, montant: float) -> dict:
         """Cheque or cash: the participant becomes selected and paid."""
-        doc = Repo.record_manual_payment_doc(competition_id, adherent_id, montant)
+        doc = CompetitionRepository.record_manual_payment_doc(competition_id, adherent_id, montant)
         if doc is None:
             raise NotFound("Compétition ou compétiteur introuvable.")
-        return Repo.competition_api_doc(doc)
+        return CompetitionRepository.competition_api_doc(doc)
 
     @staticmethod
     @write
     def cancel_participant(competition_id: int, adherent_id: int, payment_status: str,
                            note: str) -> dict:
         """`payment_status`: PAIEMENT_ANNULE_PERDU or PAIEMENT_ANNULE_REPORTE."""
-        doc = Repo.mark_cancelled_doc(competition_id, adherent_id, payment_status, note)
+        doc = CompetitionRepository.mark_cancelled_doc(competition_id, adherent_id, payment_status, note)
         if doc is None:
             raise NotFound("Compétition ou compétiteur introuvable.")
-        return Repo.competition_api_doc(doc)
+        return CompetitionRepository.competition_api_doc(doc)
 
     @staticmethod
     @write
     def remove_participant(competition_id: int, adherent_id: int) -> dict:
-        doc = Repo.remove_participant_doc(competition_id, adherent_id)
+        doc = CompetitionRepository.remove_participant_doc(competition_id, adherent_id)
         if doc is None:
             raise NotFound("Compétition ou compétiteur introuvable.")
-        return Repo.competition_api_doc(doc)
+        return CompetitionRepository.competition_api_doc(doc)
 
     @staticmethod
     @write
     def load_competition_group(competition_id: int, statuses: Optional[Sequence[str]] = None) -> Tuple[int, dict]:
         """Adds every member of the « Compétition » tariff not already listed (not invited), only those at one of
         `statuses` when given. Returns (number added, competition)."""
-        added, doc = Repo.load_competition_group_doc(competition_id, statuses)
+        added, doc = CompetitionRepository.load_competition_group_doc(competition_id, statuses)
         return added, _written(competition_id, doc)

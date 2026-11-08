@@ -39,7 +39,7 @@ from infrastructure.firestore.cloud_sync.cache import connect, get_state, instal
 from infrastructure.firestore.cloud_sync.common import CACHE_FORMAT
 from infrastructure.firestore.cloud_sync.rest_store import RestStore
 from infrastructure.firestore.cloud_sync.sync import flush, pull
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from infrastructure.sqlite.connection import SqliteDatabase
 
 logger = logging.getLogger("alj")
@@ -75,7 +75,7 @@ class CloudDatabase:
         return SqliteDatabase.get_db_path()
 
     @staticmethod
-    def who() -> str:
+    def sync_author() -> str:
         try:
             return f"{os.environ.get('USERNAME') or os.environ.get('USER') or '?'}@{socket.gethostname()}"
         except Exception:
@@ -104,7 +104,7 @@ class CloudDatabase:
                     pull(conn, store, report)
                     if progress:
                         progress("Envoi des modifications locales…")
-                    flush(conn, store, cls.who(), report)
+                    flush(conn, store, cls.sync_author(), report)
                     try:
                         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
                     except sqlite3.DatabaseError:
@@ -132,7 +132,7 @@ class CloudDatabase:
             conn = connect(path)
             try:
                 if pending_count(conn):
-                    flush(conn, cls.store(), cls.who(), report)
+                    flush(conn, cls.store(), cls.sync_author(), report)
             except Exception as e:  # kept in _fs_changes: sent again by the next sync of this instance
                 cls._last_error = str(e)
                 report.setdefault("errors", []).append(str(e))
@@ -154,11 +154,11 @@ class CloudDatabase:
     def refresh_projection(cls, force: bool = False):
         """Rewrites the `adherents` / `planning` directory read by the competition pages and the webhook, when a sync
         touched members or the planning, or when the directory reported itself outdated (written before a field
-        existed, CompetitionFirestoreRepository.directory_outdated)."""
-        if not (cls._projection_dirty or CompetitionFirestoreRepository.directory_outdated() or force):
+        existed, CompetitionRepository.directory_outdated)."""
+        if not (cls._projection_dirty or CompetitionRepository.directory_outdated() or force):
             return
         try:
-            rep = CompetitionFirestoreRepository.sync_adherents_from_main()
+            rep = CompetitionRepository.rebuild_member_directory()
             if not rep.get("errors"):
                 cls._projection_dirty = False
         except Exception as e:

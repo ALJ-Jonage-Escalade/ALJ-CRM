@@ -17,7 +17,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from domain.competitions.models import LIBELLES_STATUT_PAIEMENT, PAIEMENT_NON_INVITE
-from domain.utils import format_montant
+from domain.utils import format_amount
 from exports.spreadsheet_safety import neutralize_formulas
 
 HEADER_BG = "1E3A8A"
@@ -57,7 +57,7 @@ def payment_label(participant: Dict[str, Any]) -> str:
     """« Payé (15,50 €) », « En attente », « Annulé — perdu »… (labels of the domain model)."""
     status = str(participant.get("statut_paiement") or PAIEMENT_NON_INVITE)
     label = LIBELLES_STATUT_PAIEMENT.get(status, status)
-    amount = format_montant(participant.get("montant_paye")) if participant.get("montant_paye") else ""
+    amount = format_amount(participant.get("montant_paye")) if participant.get("montant_paye") else ""
     return f"{label} ({amount} €)" if amount else label
 
 

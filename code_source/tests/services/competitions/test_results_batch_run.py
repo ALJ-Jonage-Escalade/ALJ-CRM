@@ -9,7 +9,7 @@ from unittest.mock import patch
 from domain.errors import UpstreamUnavailable
 
 from infrastructure.firestore.client import FirestoreError
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from services.competitions.results_batch import (
     FIELD_NEEDS_URL_NOTIFIED,
     SETTING_BATCH_WINDOW_DAYS,
@@ -35,7 +35,7 @@ class BatchTestCase(FirestoreRepoTestCase):
     def setUp(self):
         super().setUp()
         self.web = use_mycompet_stub(self)
-        send = patch("services.competitions.results_batch.EmailRepository.send_email", return_value=True)
+        send = patch("services.competitions.results_batch.EmailSender.send_email", return_value=True)
         self.send_email = send.start()
         self.addCleanup(send.stop)
 
@@ -207,18 +207,18 @@ class TestDailyBatch(BatchTestCase):
         """Firestore refuses one competition's write: reported as an error, the others are still searched."""
         from unittest.mock import patch
         from infrastructure.firestore.client import FirestoreError
-        from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
+        from infrastructure.firestore.competition_repository import CompetitionRepository
         self.competition(911, "Open de bloc de Valbrume", ended_days_ago=2)
         self.competition(912, "Coupe de difficulté Brumevent", ended_days_ago=4)
         self.published(99911, "Open de bloc de Valbrume", ended_days_ago=2)
         self.published(99912, "Coupe de difficulté Brumevent", ended_days_ago=4)
-        real = CompetitionFirestoreRepository.record_results.__func__
+        real = CompetitionRepository.record_results.__func__
 
         def record_results(cls, competition_id, *args, **kwargs):
             if str(competition_id) == "911":
                 raise FirestoreError("HTTP 500")
             return real(cls, competition_id, *args, **kwargs)
-        with patch.object(CompetitionFirestoreRepository, "record_results", classmethod(record_results)):
+        with patch.object(CompetitionRepository, "record_results", classmethod(record_results)):
             report = self.run_batch()
 
         self.assertEqual([d["status"] for d in report["details"]], ["error", "found"])
@@ -233,7 +233,7 @@ class TestDailyBatch(BatchTestCase):
         self.assertEqual([d["status"] for d in report["details"]], ["pending", "found"])
 
     def test_firestore_failure_is_raised_not_reported_as_success(self):
-        with patch.object(Repo, "list_competition_docs", side_effect=FirestoreError("down")):
+        with patch.object(CompetitionRepository, "list_competition_docs", side_effect=FirestoreError("down")):
             with self.assertRaises(ResultsBatchError):
                 self.run_batch()
         self.send_email.assert_not_called()

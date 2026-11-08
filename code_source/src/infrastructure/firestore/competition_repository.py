@@ -10,9 +10,7 @@ Firestore :
 - `adherents/{id}`           : instantané des adhérents (miroir de database.db) ;
 - `helloasso_items/{id_item}` : miroir des paiements HelloAsso + rattachements.
 
-L'API publique reproduit à l'identique celle de l'ancien
-`CompetitionRepository` (SQLite, supprimé depuis) afin que les pages et services
-existants fonctionnent sans changement. Toutes les méthodes sont des classmethods.
+The only competition store left (the SQLite one was removed). All methods are classmethods.
 
 Normalisation des identifiants : les documents hérités créés par la page web
 avaient un identifiant Firestore aléatoire. À la première lecture d'une épreuve,
@@ -32,7 +30,7 @@ from infrastructure.firestore.competitions.participants import (
 )
 
 __all__ = [
-    "CompetitionFirestoreRepository",
+    "CompetitionRepository",
     "DEFAULT_STATUT_NOUVEAU_PARTICIPANT",
     "ItemAlreadyLinked",
     "MANUAL_PAYMENT_REF",
@@ -43,7 +41,7 @@ __all__ = [
 ]
 
 
-class CompetitionFirestoreRepository(CompetitionsMixin, HelloAssoItemsMixin, CoachesMixin):
+class CompetitionRepository(CompetitionsMixin, HelloAssoItemsMixin, CoachesMixin):
     """CRUD des épreuves / participants / coachs / miroir HelloAsso sur Firestore.
 
     One class over the mixins of infrastructure.firestore.competitions (one per domain):

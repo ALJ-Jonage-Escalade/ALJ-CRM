@@ -397,7 +397,7 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
     def test_readonly_role_end_to_end(self):
         """Readonly can read competitions, and nothing else."""
         readonly = make_token(email=READONLY)
-        with patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.list_competition_docs", return_value=[]):
+        with patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_competition_docs", return_value=[]):
             self.assertEqual(self.get("/api/competitions", readonly).status_code, 200)
         self.assertEqual(self.get("/api/email-status", readonly).status_code, 403)
         r = self.client.post("/api/competitions", json={}, headers={"Authorization": f"Bearer {readonly}"})
@@ -456,7 +456,7 @@ class TestWebhookVerification(unittest.TestCase):
 
     def test_token_required_when_configured(self):
         with self.secrets("s3cret"), patch.object(helloasso_api, "credentials_configured", return_value=False), \
-             patch.object(HelloAssoWebhookService, "process_webhook", return_value={"status": "success"}) as proc:
+             patch.object(HelloAssoWebhookService, "reconcile_payment_items", return_value={"status": "success"}) as proc:
             r = self.client.post("/webhooks/helloasso", json={"eventType": "Order", "data": {}})
             self.assertEqual(r.status_code, 401)
             r = self.client.post("/webhooks/helloasso?token=faux", json={"eventType": "Order", "data": {}})
@@ -470,7 +470,7 @@ class TestWebhookVerification(unittest.TestCase):
     def test_production_refuses_unverifiable_notifications(self):
         with self.secrets(""), patch.dict(os.environ, {"ALJ_API_AUTH": "required"}), \
              patch.object(helloasso_api, "credentials_configured", return_value=False), \
-             patch.object(HelloAssoWebhookService, "process_webhook") as proc:
+             patch.object(HelloAssoWebhookService, "reconcile_payment_items") as proc:
             r = self.client.post("/webhooks/helloasso", json={"eventType": "Order", "data": {}})
             self.assertEqual(r.status_code, 503)
             proc.assert_not_called()
@@ -484,7 +484,7 @@ class TestWebhookVerification(unittest.TestCase):
         ]}}
         with self.secrets(""), patch.object(helloasso_api, "credentials_configured", return_value=True), \
              patch.object(helloasso_api, "get_item", side_effect=lambda i: VERIFIED_ITEM if i == 501 else None) as gi, \
-             patch.object(HelloAssoWebhookService, "process_webhook",
+             patch.object(HelloAssoWebhookService, "reconcile_payment_items",
                           side_effect=lambda p, items=None: {"status": "success", "items": items}) as proc:
             r = self.client.post("/webhooks/helloasso", json=forged)
             self.assertEqual(r.status_code, 200)
@@ -511,9 +511,9 @@ class TestWebhookVerification(unittest.TestCase):
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=""), \
              patch("services.competitions.helloasso_webhook.CompetitionRepository") as repo:
             repo.list_competitions.return_value = []
-            repo.list_adherents.return_value = []
+            repo.list_members.return_value = []
             repo.list_helloasso_links.return_value = {}
-            report = HelloAssoWebhookService.process_webhook({"eventType": "Order"}, items=[VERIFIED_ITEM])
+            report = HelloAssoWebhookService.reconcile_payment_items({"eventType": "Order"}, items=[VERIFIED_ITEM])
             extract.assert_not_called()
             self.assertEqual(report["processed_count"], 1)
             self.assertEqual(report["matched_count"], 0)

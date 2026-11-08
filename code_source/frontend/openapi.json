@@ -3474,7 +3474,7 @@
       },
       "post": {
         "summary": "Webhook Helloasso",
-        "description": "Point de terminaison Webhook pour les notifications HelloAsso (Payment & Order).\nRéconcilie en temps réel le paiement avec les participants de la compétition.\n\nAuthenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles\nauprès de l'API HelloAsso (voir HelloAssoWebhookService.handle_notification).",
+        "description": "Point de terminaison Webhook pour les notifications HelloAsso (Payment & Order).\nRéconcilie en temps réel le paiement avec les participants de la compétition.\n\nAuthenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles\nauprès de l'API HelloAsso (voir HelloAssoWebhookService.verify_and_reconcile_notification).",
         "operationId": "webhook_helloasso_webhooks_helloasso_post",
         "parameters": [
           {

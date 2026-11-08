@@ -34,7 +34,7 @@ describe("competition e-mail", () => {
         values,
       ),
     ).toBe(
-      "Léo MARTIN : Coupe n°EVT-9 du 14/03/2027 au 15/03/2027, deadline 07/03/2027, 15,50 €. Voici le lien du groupe WhatApp dédié à cette compétition : https://chat {inconnu}",
+      "Léo MARTIN : Coupe n°EVT-9 du 14/03/2027 au 15/03/2027, deadline 07/03/2027, 15,50 €. Voici le lien du groupe WhatsApp dédié à cette compétition : https://chat {inconnu}",
     );
     expect(values.competition_deadline).toBe("07/03/2027");
     expect(variables({ ...COMP, deadline: "2027-03-05" }, undefined).competition_deadline).toBe("05/03/2027");

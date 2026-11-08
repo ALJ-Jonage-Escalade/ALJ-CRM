@@ -3,15 +3,15 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../src")))
 from domain.competitions.models import Competition
-from domain.utils import format_periode
+from domain.utils import format_period
 
 
 def test_periode_un_jour_ou_deux():
-    assert format_periode("2026-03-12") == "12/03/2026"
-    assert format_periode("2026-03-12", "2026-03-12") == "12/03/2026"
-    assert format_periode("2026-03-12", "") == "12/03/2026"
-    assert format_periode("2026-03-12", "2026-03-13") == "12/03/2026 au 13/03/2026"
-    assert format_periode("", "2026-03-13") == ""
+    assert format_period("2026-03-12") == "12/03/2026"
+    assert format_period("2026-03-12", "2026-03-12") == "12/03/2026"
+    assert format_period("2026-03-12", "") == "12/03/2026"
+    assert format_period("2026-03-12", "2026-03-13") == "12/03/2026 au 13/03/2026"
+    assert format_period("", "2026-03-13") == ""
 
 
 def test_date_fin_modele_roundtrip_et_ancien_format():

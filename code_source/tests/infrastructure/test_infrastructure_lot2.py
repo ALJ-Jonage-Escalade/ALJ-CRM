@@ -10,7 +10,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from infrastructure.security.secret_store import SecretStore
-from infrastructure.mail.repository import EmailRepository
+from infrastructure.mail.sender import EmailSender
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.members import MemberRepository
 
@@ -102,17 +102,17 @@ class TestInfrastructureLot2(unittest.TestCase):
         test_subj = "Test Audit Subject"
         
         # Supprimer le journal temporairement pour le test ou vérifier l'ajout
-        if os.path.exists(EmailRepository.audit_file_path()):
+        if os.path.exists(EmailSender.audit_file_path()):
             try:
-                os.remove(EmailRepository.audit_file_path())
+                os.remove(EmailSender.audit_file_path())
             except OSError:
                 pass
                 
-        EmailRepository.log_audit(test_dest, test_subj, "SUCCESS")
+        EmailSender.log_audit(test_dest, test_subj, "SUCCESS")
         
-        self.assertTrue(os.path.exists(EmailRepository.audit_file_path()))
+        self.assertTrue(os.path.exists(EmailSender.audit_file_path()))
         
-        with open(EmailRepository.audit_file_path(), "r", encoding="utf-8") as f:
+        with open(EmailSender.audit_file_path(), "r", encoding="utf-8") as f:
             lines = f.readlines()
             
         self.assertTrue(len(lines) > 0)
@@ -123,7 +123,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         
         # Nettoyage
         try:
-            os.remove(EmailRepository.audit_file_path())
+            os.remove(EmailSender.audit_file_path())
         except OSError:
             pass
 

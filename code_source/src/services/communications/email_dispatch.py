@@ -18,10 +18,10 @@ from domain.club_emails import CLUB_SENDER_DOMAIN
 from domain.competitions.models import Competition, default_deadline
 from domain.errors import InvalidRequest, UpstreamUnavailable
 from domain.email_personalization import apply_template_variables
-from domain.utils import format_montant, format_periode, normalize_name
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as CompetitionRepository
+from domain.utils import format_amount, format_period, normalize_name
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
-from infrastructure.mail.repository import EmailRepository, MailError
+from infrastructure.mail.sender import EmailSender, MailError
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
@@ -48,7 +48,7 @@ class EmailDispatchService:
         """Every member and payer address known to the club database (lower-cased)."""
         emails = MemberRepository.list_contact_emails()
         try:
-            emails.update(str(a.get("email") or "").strip().lower() for a in CompetitionRepository.list_adherents())
+            emails.update(str(a.get("email") or "").strip().lower() for a in CompetitionRepository.list_members())
         except Exception as e:
             print(f"⚠️ [EMAIL_DISPATCH] Competition members unavailable for the recipient check: {e}")
         emails.discard("")
@@ -98,11 +98,11 @@ class EmailDispatchService:
             return {}
         comp = Competition.from_row(doc)
 
-        date_formatted = format_periode(comp.date_competition, comp.date_fin)
+        date_formatted = format_period(comp.date_competition, comp.date_fin)
         deadline = comp.deadline or default_deadline(comp.date_competition)
-        deadline_formatted = format_periode(deadline) if deadline else ""
-        wa_link = str(getattr(comp, "whatsapp_link", "") or "").strip()
-        bloc_wa = f"Voici le lien du groupe WhatApp dédié à cette compétition : {wa_link}" if wa_link else ""
+        deadline_formatted = format_period(deadline) if deadline else ""
+        whatsapp_link = str(getattr(comp, "whatsapp_link", "") or "").strip()
+        whatsapp_block = f"Voici le lien du groupe WhatsApp dédié à cette compétition : {whatsapp_link}" if whatsapp_link else ""
 
         lieu = str(doc.get("lieu") or "").strip()
         return {
@@ -111,16 +111,15 @@ class EmailDispatchService:
             "competition_nom": comp.nom,
             "no_competition": str(comp.id_ffme or ""),
             "name_competition": comp.nom,
-            "montant_competition": format_montant(comp.prix),
+            "montant_competition": format_amount(comp.prix),
             "date_competition": date_formatted,
             "competition_date": date_formatted,
             "competition_deadline": deadline_formatted,
             "deadline": deadline_formatted,
             "lieu": lieu,
             "competition_lieu": lieu,
-            "whatapp_Id": wa_link,
-            "whatsapp_link": wa_link,
-            "bloc_whatsapp": bloc_wa,
+            "whatsapp_link": whatsapp_link,
+            "bloc_whatsapp": whatsapp_block,
         }
 
     @classmethod
@@ -141,7 +140,7 @@ class EmailDispatchService:
             # Charger les profils depuis la base adhérents
             all_users = MemberRepository.get_users_by_ids(recipient_ids)
             # Charger les profils depuis la base compétitions en secours
-            comp_adh = {a["id"]: a for a in CompetitionRepository.list_adherents()}
+            comp_adh = {a["id"]: a for a in CompetitionRepository.list_members()}
 
             for uid in recipient_ids:
                 u_row = all_users.get(uid)
@@ -306,7 +305,7 @@ class EmailDispatchService:
                 dest, comp_ctx, escape_html=True)
 
             try:
-                EmailRepository.send_email(
+                EmailSender.send_email(
                     to_email=to_email,
                     subject=sub_rendered,
                     body=plain_body,

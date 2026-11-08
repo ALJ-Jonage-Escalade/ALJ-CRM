@@ -25,7 +25,7 @@ class TestEmailDispatchService(unittest.TestCase):
             "no_competition": "18866",
             "montant_competition": "18,00 €",
             "date_competition": "03/10/2026",
-            "whatapp_Id": "https://chat.whatsapp.com/testgroup"
+            "whatsapp_link": "https://chat.whatsapp.com/testgroup"
         }
         recipient = {
             "first_name": "Éden",
@@ -59,7 +59,7 @@ class TestEmailDispatchService(unittest.TestCase):
         }
         with patch("services.communications.email_dispatch.CompetitionRepository.get_competition_doc", return_value=fake_doc):
             ctx = EmailDispatchService.get_competition_context(12)
-            self.assertEqual(ctx["whatapp_Id"], "https://chat.whatsapp.com/abc")
+            self.assertNotIn("whatapp_Id", ctx)
             self.assertEqual(ctx["whatsapp_link"], "https://chat.whatsapp.com/abc")
             self.assertEqual(ctx["name_competition"], "Coupe Bugey")
 
@@ -71,7 +71,7 @@ class TestEmailDispatchService(unittest.TestCase):
             self.assertEqual(ctx["lieu"], "CUSSET")
             self.assertEqual(ctx["competition_lieu"], "CUSSET")
 
-    @patch("infrastructure.mail.repository.EmailRepository.send_email")
+    @patch("infrastructure.mail.sender.EmailSender.send_email")
     def test_dispatch_emails_success(self, mock_send):
         mock_send.return_value = True
 

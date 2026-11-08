@@ -16,7 +16,7 @@ from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT
 from domain.email_personalization import apply_template_variables, template_recipient
 from exports.attestation import attestation_error, build_attestation, get_safe_pdf_filename, render_attestation_pdf
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
-from infrastructure.mail.repository import EmailRepository, MailError
+from infrastructure.mail.sender import EmailSender, MailError
 from infrastructure.sqlite.members import MemberRepository
 from services.communications.email_dispatch import EmailDispatchService
 from services.documents import Doc
@@ -92,7 +92,7 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
     inline_images = get_inline_images() if data.add_signature else []
 
     try:
-        EmailRepository.send_email(
+        EmailSender.send_email(
             to_email=data.to_email,
             subject=subject,
             body=plain_body,

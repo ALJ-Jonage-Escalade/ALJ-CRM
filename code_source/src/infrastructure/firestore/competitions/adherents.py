@@ -17,7 +17,7 @@ _ADHERENTS_CACHE_SECONDS = 30.0
 _ADHERENTS_CACHE_KEY = "adherents"
 
 
-class AdherentsMixin(CompetitionStoreBase):
+class MemberDirectoryMixin(CompetitionStoreBase):
     """Member directory: sync from the main database, cached reads, search."""
 
     _adherents_cache: TimedCache[str, List[Dict[str, Any]]] = TimedCache(_ADHERENTS_CACHE_SECONDS)
@@ -32,7 +32,7 @@ class AdherentsMixin(CompetitionStoreBase):
     # Instantané des adhérents (source : database.db principale -> Firestore)
     # ------------------------------------------------------------------
     @classmethod
-    def sync_adherents_from_main(cls, season_filter: str = "") -> dict:
+    def rebuild_member_directory(cls, season_filter: str = "") -> dict:
         """Recalcule l'annuaire Firestore `adherents` depuis la base principale.
 
         Le miroir est intégralement réécrit (l'annuaire Firestore reflète
@@ -275,7 +275,7 @@ class AdherentsMixin(CompetitionStoreBase):
         return sex.value if sex else None
 
     @classmethod
-    def list_adherents(cls, search: str = "", competition_only: bool = False, statuses: Optional[Sequence[str]] = None) -> list:
+    def list_members(cls, search: str = "", competition_only: bool = False, statuses: Optional[Sequence[str]] = None) -> list:
         """Liste les adhérents de l'annuaire Firestore (recherche insensible aux accents).
         `statuses`: only the members at one of these membership statuses (« Terminé »…); None: every status."""
         q = normalize_string(search) if search else ""
