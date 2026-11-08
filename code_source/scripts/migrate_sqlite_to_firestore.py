@@ -28,6 +28,7 @@ SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
+from infrastructure import runtime_env  # noqa: E402
 from infrastructure.firestore.cloud_sync.bootstrap import build_cache, import_database  # noqa: E402
 from infrastructure.firestore.cloud_sync.cache import table_columns, table_pk, tracked_tables  # noqa: E402
 from infrastructure.firestore.cloud_sync.common import collection_for  # noqa: E402
@@ -147,4 +148,5 @@ def main():
 
 
 if __name__ == "__main__":
+    runtime_env.load_env_files()  # .env files as the server reads them (never at import: tests call main())
     sys.exit(main())

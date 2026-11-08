@@ -521,4 +521,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    runtime_env.load_env_files()  # .env files as the server reads them (never at import: tests call main())
     sys.exit(main())
