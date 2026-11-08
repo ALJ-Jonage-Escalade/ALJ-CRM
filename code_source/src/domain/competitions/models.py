@@ -1,8 +1,8 @@
 """
 Modèles métier du module de gestion des compétitions (base partagée Firestore).
 
-Ces modèles sont purs (aucune dépendance Qt / réseau) afin d'être réutilisables
-par l'application de bureau, le serveur web et les tests unitaires.
+Ces modèles sont purs (aucune dépendance réseau ni stockage) : réutilisables par
+les services, le serveur web et les tests unitaires.
 """
 import datetime
 from dataclasses import dataclass, field
@@ -14,16 +14,17 @@ STATUT_EN_COURS = "en_cours"
 STATUT_CLOSE = "close"
 STATUTS_COMPETITION = (STATUT_EN_PREPARATION, STATUT_EN_COURS, STATUT_CLOSE)
 
-# Coach slots written by versions before plan cleanup C2. Still read, so documents and
-# rows written by an older desktop build keep their coaches; still written to Firestore
-# for those builds until every club PC runs the new version (plan C2, step B).
+# Coach slots of documents written before plan cleanup C2 (no `coach_ids` field): still read, never written.
 LEGACY_COACH_SLOTS = ("coach1_id", "coach2_id", "coach3_id")
 
 
 def coach_ids_of(row: Mapping[str, Any]) -> List[int]:
-    """Ordered, distinct coach ids of a stored competition: `coach_ids`, or else the
-    legacy slots `coach1_id..coach3_id`."""
-    raw = row.get("coach_ids") or [row.get(slot) for slot in LEGACY_COACH_SLOTS]
+    """Ordered, distinct coach ids of a stored competition: `coach_ids`, or the legacy slots `coach1_id..coach3_id`
+    of a document written before it existed (an empty `coach_ids` means no coach: stale slots are ignored)."""
+    if row.get("coach_ids") is not None:
+        raw = row["coach_ids"]
+    else:
+        raw = [row.get(slot) for slot in LEGACY_COACH_SLOTS]
     ids: List[int] = []
     for cid in raw:
         try:

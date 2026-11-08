@@ -23,8 +23,8 @@ Mécanisme :
 - une suppression devient un document « tombe » (`_deleted: true`) pour être
   propagée aux autres postes.
 
-Le réglage `MEMBER_BACKEND` (`firestore` par défaut, `drive` pour revenir à
-l'ancien partage du fichier par Google Drive) permet un retour arrière.
+`ALJ_CACHE_REPLICATION=off` keeps the cache local (no Firestore replication): the tests, and a local
+server that must not touch Firestore's member data.
 """
 import logging
 import os
@@ -80,6 +80,8 @@ from infrastructure.firestore.cloud_sync.sync import apply_remote_docs, flush, p
 
 logger = logging.getLogger("alj")
 
+REPLICATION_ENV = "ALJ_CACHE_REPLICATION"
+
 
 class CloudDatabase:
     """Point d'entrée : synchronisation du cache `database.db` avec Firestore."""
@@ -92,25 +94,12 @@ class CloudDatabase:
     _last_pull = 0.0
     _projection_dirty = False
     _last_projection = 0.0
-    _bg_thread = None
-    _bg_stop = threading.Event()
 
     @staticmethod
-    def backend() -> str:
-        val = os.environ.get("MEMBER_BACKEND", "").strip().lower()
-        if not val:
-            try:
-                from infrastructure.security.secret_store import SecretStore
-                val = (SecretStore.get_secret("MEMBER_BACKEND") or "").strip().lower()
-            except Exception:
-                val = ""
-        if not val:
-            val = "drive" if os.environ.get("PYTEST_CURRENT_TEST") else "firestore"
-        return val
-
-    @classmethod
-    def is_enabled(cls) -> bool:
-        return cls.backend() == "firestore"
+    def is_enabled() -> bool:
+        """Whether the cache is replicated with Firestore: always, unless ALJ_CACHE_REPLICATION=off (tests, local
+        server kept away from Firestore's member data)."""
+        return os.environ.get(REPLICATION_ENV, "").strip().lower() != "off"
 
     @classmethod
     def store(cls):
@@ -131,18 +120,8 @@ class CloudDatabase:
             return "?"
 
     @classmethod
-    def is_db_path(cls, path: str) -> bool:
-        try:
-            return os.path.abspath(path) == os.path.abspath(cls.db_path())
-        except Exception:
-            return False
-
-    @classmethod
-    def sync(cls, full: bool = False, progress: Optional[Callable[[str], None]] = None,
-             force_pull_all: bool = False) -> Dict[str, Any]:
-        """Met le cache à jour : reconstruction si besoin, puis réception et envoi."""
-        if force_pull_all:
-            full = True
+    def sync(cls, full: bool = False, progress: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
+        """Met le cache à jour : reconstruction si besoin (toujours si `full`), puis réception et envoi."""
         with cls._lock:
             path = cls.db_path()
             store = cls.store()
@@ -156,15 +135,10 @@ class CloudDatabase:
                     from infrastructure.sqlite.connection import SqliteDatabase
                     SqliteDatabase._database_setup_done = False
                     SqliteDatabase.setup_database()
-                    conn = connect(path)
-                    try:
-                        install_tracking(conn)
-                    finally:
-                        conn.close()
                     report["full"] = True
                 conn = connect(path)
                 try:
-                    install_tracking(conn)
+                    install_tracking(conn)  # after a rebuild too: the triggers of the new file
                     if progress:
                         progress("Réception des modifications Firestore…")
                     pull(conn, store, report)
@@ -262,21 +236,7 @@ class CloudDatabase:
         except Exception as e:
             print(f"⚠️ [CLOUD_DB] Synchronisation d'arrière-plan : {e}")
 
-    @classmethod
-    def start_background(cls, interval: int = 15):
-        if cls._bg_thread and cls._bg_thread.is_alive():
-            return
-        cls._bg_stop.clear()
 
-        def loop():
-            while not cls._bg_stop.wait(interval):
-                cls.background_tick()
-        cls._bg_thread = threading.Thread(target=loop, name="cloud-db-sync", daemon=True)
-        cls._bg_thread.start()
-
-    @classmethod
-    def stop_background(cls):
-        cls._bg_stop.set()
 
     @classmethod
     def cache_ready(cls) -> bool:
@@ -294,11 +254,9 @@ class CloudDatabase:
             return False
 
     @classmethod
-    def ensure_fresh(cls, max_age: int = 30, max_age_seconds: Optional[int] = None) -> None:
+    def ensure_fresh(cls, max_age: int = 30) -> None:
         """Serveur (Cloud Run) : construit le cache au premier appel, puis récupère
         les modifications si la dernière réception date de plus de `max_age` s."""
-        if max_age_seconds is not None:
-            max_age = max_age_seconds
         if not cls.is_enabled():
             return
         if (not cache_is_valid(cls.db_path(), cls.store().project_id)

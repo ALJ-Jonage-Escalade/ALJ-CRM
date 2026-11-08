@@ -17,7 +17,6 @@ import {
   cacheFile,
   cacheStatus,
   CHECKING,
-  dbMode,
   googleChecks,
   googleStatus,
   lastRun,
@@ -317,9 +316,7 @@ onMounted(() => {
         <UiTile label="Compte Google du club">
           <span data-testid="google-account">{{ googleInfo ? googleInfo.user_email || "Non configuré" : "—" }}</span>
         </UiTile>
-        <UiTile label="Mode base de données">
-          <span data-testid="db-mode">{{ googleInfo ? dbMode(googleInfo) : "Firestore (Google Cloud)" }}</span>
-        </UiTile>
+        <UiTile label="Base de données"><span data-testid="db-mode">Firestore (Google Cloud)</span></UiTile>
         <UiTile label="Services associés"><span class="text-xs font-semibold">BDD, Google Drive & Gmail API</span></UiTile>
       </div>
       <div v-if="testing || checks || checksError" class="mt-3.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[12.5px]">

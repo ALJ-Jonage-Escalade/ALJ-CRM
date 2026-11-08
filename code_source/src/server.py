@@ -35,8 +35,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Admin Escalade API", lifespan=lifespan)
 
-# Access control (Firebase token + firestore.rules roles): enforced on Cloud Run and in the
-# Docker image (ALJ_API_AUTH=required), off for the desktop app's local server, which is
+# Access control (Firebase token + roles of the access list): enforced on Cloud Run and in the
+# Docker image (ALJ_API_AUTH=required), off for a local dev or test server (ALJ_API_AUTH=off), which is
 # protected by local_guard_middleware instead (loopback hosts, same-origin writes).
 import re
 from fastapi.routing import APIRoute
@@ -127,7 +127,7 @@ FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants
 app.add_exception_handler(ServiceError, service_error_handler)
 
 # No CORS: every page calls the API from its own origin. Allowing other origins would let any
-# website read the local (unauthenticated) desktop server.
+# website read a local (unauthenticated) dev server.
 
 if __name__ == "__main__":
     import uvicorn

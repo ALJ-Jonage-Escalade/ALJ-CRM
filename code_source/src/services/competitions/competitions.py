@@ -1,7 +1,7 @@
 """Competitions: list, create, partial update, delete, archive.
 
-Over CompetitionFirestoreRepository (shared with the desktop app and the HelloAsso
-webhook, so all three write with the same rules). Knows nothing about HTTP: failures are
+Over CompetitionFirestoreRepository (shared with the HelloAsso webhook and the MyCompet
+results, so they all write with the same rules). Knows nothing about HTTP: failures are
 raised as services.errors.
 """
 

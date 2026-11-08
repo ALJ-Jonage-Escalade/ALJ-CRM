@@ -1,11 +1,9 @@
 import logging
 import os
-import glob
 import pandas as pd
 import datetime
 import csv
 
-from paths import ROOT_DIR
 from domain.members.sex import parse_sex
 from domain.members.view import is_cancelled
 from infrastructure.mail.senders import CLUB_CONTACT_EMAIL
@@ -59,40 +57,15 @@ def clean_digits_only(val):
 
 
 
-def generate_ffme_csv(participants_data, output_path=None, include_termine=False):
+def generate_ffme_csv(participants_data, output_path: str, include_termine: bool = False):
     """
-    Génère le CSV d'import FFME.
-    Si output_path est fourni (tests de non-régression), écrit à cet emplacement exact
-    sans horodatage ni archivage. Sinon, comportement historique : fichier horodaté
-    dans exports/ffme/ avec archivage des anciens CSV.
+    Génère le CSV d'import FFME à `output_path` (format strict : séparateur « ; », dates jj/mm/aaaa).
     Si include_termine est True, inclut également les adhérents dont le statut est 'Terminé'.
     """
     print("\nGénération simultanée du fichier CSV FFME...")
-    if output_path:
-        csv_path = output_path
-        out_dir = os.path.dirname(os.path.abspath(csv_path))
-        os.makedirs(out_dir, exist_ok=True)
-    else:
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        csv_filename = f"import_ffme_{timestamp}.csv"
+    csv_path = output_path
+    os.makedirs(os.path.dirname(os.path.abspath(csv_path)), exist_ok=True)
 
-        root_dir = ROOT_DIR
-        ffme_dir = os.path.join(root_dir, "exports", "ffme")
-        os.makedirs(ffme_dir, exist_ok=True)
-        csv_path = os.path.join(ffme_dir, csv_filename)
-
-        # Archiver les anciens fichiers import_ffme
-        archive_dir = os.path.join(ffme_dir, "archive")
-        os.makedirs(archive_dir, exist_ok=True)
-        import shutil
-        for old_file in glob.glob(os.path.join(ffme_dir, "import_ffme_*.csv")):
-            if os.path.basename(old_file) != csv_filename:
-                try:
-                    shutil.move(old_file, os.path.join(archive_dir, os.path.basename(old_file)))
-                    print(f"📦 Ancien fichier CSV FFME archivé : {os.path.basename(old_file)}")
-                except Exception:
-                    logger.warning("Archivage de l'ancien CSV FFME impossible : %s", old_file, exc_info=True)
-    
     headers = [
         "numero de licence", "nom", "prenom", "date de naissance", "sexe", "nationalite",
         "adresse", "adresse complement", "code postal", "ville", "pays", "tel fixe", "tel mobile", 
@@ -106,9 +79,8 @@ def generate_ffme_csv(participants_data, output_path=None, include_termine=False
     ignored_members = []
 
     for p in participants_data:
-        # Phase 6 — Normalisation NULL : les valeurs None du schéma v2 (vue legacy) sont
-        # converties en chaîne vide AVANT traitement, supprimant les artefacts str(None)
-        # historiques ('NO' pays, 'none' courriel 2, 'NONE' pap, 'None' adresse/ville).
+        # Les valeurs None du schéma v2 (vue legacy) deviennent des chaînes vides AVANT traitement :
+        # sinon str(None) produirait 'NO' (pays), 'none' (courriel 2), 'NONE' (pap), 'None' (adresse, ville).
         p = {k: (v if v is not None else "") for k, v in p.items()}
 
         # Exclure les listes d'attente, montants nuls (sauf les ajouts manuels), commandes annulées/canceled ou déjà validées (terminé si non demandé)

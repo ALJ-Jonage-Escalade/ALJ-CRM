@@ -2,21 +2,15 @@
 
 from __future__ import annotations
 
-import datetime
 import json
-import os
 
-from paths import ROOT_DIR
 from infrastructure.sqlite.connection import SqliteDatabase
 
 
 class PlanningRepository:
     @classmethod
-    def load_planning_data(cls, log_debug: bool = True) -> list:
-        """Charge l'ensemble du planning de créneaux depuis SQLite.
-
-        log_debug=False évite l'écriture du journal de debug (appels fréquents IHM).
-        """
+    def load_planning_data(cls) -> list:
+        """Charge l'ensemble du planning de créneaux depuis SQLite."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         cursor = conn.cursor()
@@ -51,21 +45,6 @@ class PlanningRepository:
                 
                 planning_list.append(row_dict)
 
-            # Debug logging
-            if log_debug:
-                debug_log_path = os.path.join(ROOT_DIR, "planning_sync_debug.log")
-                try:
-                    with open(debug_log_path, "a", encoding="utf-8") as lf:
-                        lf.write(f"[{datetime.datetime.now()}] --- CHARGEMENT DU PLANNING ---\n")
-                        lf.write(f"  • CWD : {os.getcwd()}\n")
-                        lf.write(f"  • Chemin de la BDD : {SqliteDatabase.get_db_path()}\n")
-                        lf.write(f"  • Nb créneaux chargés : {len(planning_list)}\n")
-                        for s in planning_list:
-                            lf.write(f"    - ID: {s.get('id')} | Groupe: {s.get('groupe')} | Jour: {s.get('jour')} | Horaires: {s.get('horaires')}\n")
-                        lf.write("\n")
-                except Exception as le:
-                    print(f"⚠️ Erreur d'écriture du log debug : {le}")
-
             return planning_list
         except Exception as e:
             print(f"❌ [SQLITE] Erreur lors du chargement du planning : {e}")
@@ -80,7 +59,7 @@ class PlanningRepository:
         Retourne une liste de dicts {groupe, tarifs, slots} triée par nom de groupe."""
         creneaux = {}
         order = []
-        for item in cls.load_planning_data(log_debug=False):
+        for item in cls.load_planning_data():
             g_name = str(item.get("groupe") or "").strip()
             if not g_name:
                 continue
@@ -102,7 +81,7 @@ class PlanningRepository:
 
     @classmethod
     def save_planning_data(cls, planning_list: list):
-        """Enregistre le planning complet en SQLite et l'exporte sur planning.json pour rétrocompatibilité."""
+        """Remplace le planning complet dans SQLite (répliqué vers Firestore comme toute écriture du cache)."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         cursor = conn.cursor()
@@ -129,21 +108,6 @@ class PlanningRepository:
                 ))
             conn.commit()
             print("💾 [SQLITE] Planning enregistré avec succès dans SQLite.")
-            
-            # Debug logging
-            debug_log_path = os.path.join(ROOT_DIR, "planning_sync_debug.log")
-            try:
-                with open(debug_log_path, "a", encoding="utf-8") as lf:
-                    lf.write(f"[{datetime.datetime.now()}] --- ENREGISTREMENT DU PLANNING ---\n")
-                    lf.write(f"  • CWD : {os.getcwd()}\n")
-                    lf.write(f"  • Chemin de la BDD : {SqliteDatabase.get_db_path()}\n")
-                    lf.write(f"  • Nb créneaux reçus : {len(planning_list)}\n")
-                    for s in planning_list:
-                        lf.write(f"    - ID: {s.get('id')} | Groupe: {s.get('groupe')} | Jour: {s.get('jour')} | Horaires: {s.get('horaires')}\n")
-                    lf.write("\n")
-            except Exception as le:
-                print(f"⚠️ Erreur d'écriture du log debug : {le}")
-
         except Exception as e:
             print(f"❌ [SQLITE] Erreur lors de la sauvegarde du planning : {e}")
             conn.rollback()

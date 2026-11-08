@@ -166,13 +166,11 @@ def export_planning_excel(planning_data, saison, out_path):
     medium = Side(style="medium", color="404040")
     sep = Side(style="thin", color="595959")
     thick = Side(style="thick", color="000000")
-    block_border = Border(left=medium, right=medium, top=medium, bottom=medium)
     header_fill = PatternFill("solid", fgColor="D9E1F2")
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
     nb_steps = (GRID_END - GRID_START) // STEP
     first_grid_row = 3
-    last_grid_row = first_grid_row + nb_steps - 1
     col_left, col_right = 1, 2 + total_lanes
 
     # Bornes de colonnes par jour (pour les séparateurs verticaux marqués)

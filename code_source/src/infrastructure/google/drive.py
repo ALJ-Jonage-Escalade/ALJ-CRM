@@ -1,16 +1,15 @@
 import logging
 import os
 import requests
-from typing import Dict
+from typing import Dict, Tuple
 
 from infrastructure.security.secret_store import SecretPersistenceError, SecretStore
 
 logger = logging.getLogger("alj")
 
 class GoogleDriveClient:
-    """
-    Isole l'intégration avec Google Drive pour télécharger et verser des documents.
-    """
+    """The club's Google OAuth credentials (web client) and the access tokens made from them, for Gmail and
+    Firestore's REST API."""
 
     _ENV_KEY_MAP = {
         "GMAIL_CLIENT_ID": "client_id",
@@ -43,7 +42,7 @@ class GoogleDriveClient:
     @classmethod
     def _iter_credential_candidates(cls, env_paths: list = None) -> list:
         """Construit les candidats d'identifiants (client_id, client_secret, refresh_token) :
-        1. Le SecretStore (trousseau Windows prioritaire, puis .env chargé en mémoire),
+        1. Le SecretStore (Firestore sur Cloud Run, puis l'environnement),
         2. Les fichiers .env sur disque (fraîchement écrits par l'assistant OAuth2)."""
         if env_paths is None:
             from paths import CODE_ROOT, ROOT_DIR
@@ -68,38 +67,9 @@ class GoogleDriveClient:
         return candidates
 
     @classmethod
-    def get_client_credentials(cls, prefer_web: bool = False) -> tuple:
-        """Récupère client_id et client_secret depuis SecretStore ou les fichiers client_secret_*.json.
-
-        Sur Cloud Run ou si prefer_web=True, privilégie le client OAuth Web sur le client Desktop
-        (l'ancien client Desktop rejetant les redirections web HTTP/HTTPS avec redirect_uri_mismatch).
-        """
-        cid = SecretStore.get_secret("GMAIL_CLIENT_ID")
-        sec = SecretStore.get_secret("GMAIL_CLIENT_SECRET")
-
-        is_cloud_run = bool(os.environ.get("K_SERVICE") or os.environ.get("K_CONFIGURATION"))
-
-        if cid and sec:
-            if not (prefer_web or is_cloud_run) or "224808708472" not in cid:
-                return cid, sec
-
-        import glob
-        import json
-        from paths import CODE_ROOT, ROOT_DIR
-        for folder in (CODE_ROOT, ROOT_DIR):
-            for pattern in ("client_secret_*.json", "client_secret*.json"):
-                files = glob.glob(os.path.join(folder, pattern))
-                for fpath in files:
-                    try:
-                        with open(fpath, "r", encoding="utf-8") as f:
-                            data = json.load(f)
-                        key = "web" if ((prefer_web or is_cloud_run) and "web" in data) else ("installed" if "installed" in data else ("web" if "web" in data else None))
-                        if key and "client_id" in data[key] and "client_secret" in data[key]:
-                            return data[key]["client_id"], data[key]["client_secret"]
-                    except Exception:
-                        logger.warning("Fichier d'identifiants OAuth illisible : %s", fpath, exc_info=True)
-
-        return cid, sec
+    def get_client_credentials(cls) -> Tuple[str, str]:
+        """(client_id, client_secret) of the club's OAuth web client, "" when not configured."""
+        return SecretStore.get_secret("GMAIL_CLIENT_ID"), SecretStore.get_secret("GMAIL_CLIENT_SECRET")
 
     @classmethod
     def get_access_token(cls, env_paths: list = None) -> str:
@@ -149,186 +119,3 @@ class GoogleDriveClient:
             last_error = f"{response.status_code} - {response.text}"
 
         raise Exception(f"Échec de l'obtention du token Google : {last_error}")
-
-    @staticmethod
-    def _is_cloud_main_db(file_id: str, local_path: str) -> bool:
-        """Vrai si l'échange concerne database.db alors que la base principale
-        est dans Firestore (réglage MEMBER_BACKEND = firestore)."""
-        try:
-            from infrastructure.firestore.cloud_database import CloudDatabase
-            return bool(file_id) and CloudDatabase.is_enabled() and CloudDatabase.is_db_path(local_path)
-        except Exception:
-            return False
-
-    @classmethod
-    def download_file(cls, file_id: str, dest_path: str) -> bool:
-        """
-        Télécharge le contenu brut d'un fichier stocké sur Google Drive.
-        """
-        if not file_id:
-            return False
-        if cls._is_cloud_main_db(file_id, dest_path):
-            # Base principale dans Firestore : on met à jour le cache local
-            # au lieu de télécharger l'ancien fichier partagé.
-            from infrastructure.firestore.cloud_database import CloudDatabase
-            print("☁️ [DRIVE] database.db est maintenant dans Firestore : synchronisation du cache local.")
-            CloudDatabase.sync()
-            return not CloudDatabase._last_error
-            
-        try:
-            access_token = cls.get_access_token()
-            url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
-            headers = {"Authorization": f"Bearer {access_token}"}
-            
-            print(f"📥 [DRIVE] Téléchargement du fichier {file_id}...")
-            response = requests.get(url, headers=headers, timeout=30)
-            if response.status_code == 200:
-                with open(dest_path, "wb") as f:
-                    f.write(response.content)
-                print("✅ [DRIVE] Téléchargement réussi.")
-                return True
-            else:
-                print(f"❌ [DRIVE] Erreur lors du téléchargement : {response.status_code} - {response.text}")
-                return False
-        except Exception as e:
-            print(f"❌ [DRIVE] Exception lors du téléchargement : {e}")
-            return False
-
-    @classmethod
-    def upload_file(cls, file_id: str, src_path: str) -> bool:
-        """
-        Met à jour (écrase le contenu) d'un fichier existant sur Google Drive.
-        Conserve l'identifiant du fichier intact.
-        """
-        if not file_id or not os.path.exists(src_path):
-            return False
-        if cls._is_cloud_main_db(file_id, src_path):
-            # Base principale dans Firestore : envoyer d'abord les modifications
-            # locales. Le fichier déposé ensuite sur Drive n'est plus qu'un
-            # export en lecture (annuaire web index.html).
-            from infrastructure.firestore.cloud_database import CloudDatabase
-            CloudDatabase.sync()
-            if CloudDatabase._last_error:
-                return False
-            
-        try:
-            access_token = cls.get_access_token()
-            url = f"https://www.googleapis.com/upload/drive/v3/files/{file_id}?uploadType=media"
-            
-            # Détection dynamique du Content-Type
-            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            if src_path.endswith(".db") or src_path.endswith(".sqlite3"):
-                content_type = "application/x-sqlite3"
-                
-            headers = {
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": content_type
-            }
-            
-            print(f"📤 [DRIVE] Mise à jour du fichier {file_id} ({content_type})...")
-            with open(src_path, "rb") as f:
-                response = requests.patch(url, headers=headers, data=f, timeout=30)
-            if response.status_code == 200:
-                print("✅ [DRIVE] Mise à jour Google Drive réussie.")
-                return True
-            else:
-                print(f"❌ [DRIVE] Erreur lors du versement : {response.status_code} - {response.text}")
-                return False
-        except Exception as e:
-            print(f"❌ [DRIVE] Exception lors du versement : {e}")
-            return False
-
-    @classmethod
-    def create_file(cls, name: str, src_path: str) -> str:
-        """
-        Crée un nouveau fichier sur Google Drive et renvoie son ID unique.
-        """
-        if not os.path.exists(src_path):
-            return None
-            
-        try:
-            import json
-            access_token = cls.get_access_token()
-            url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
-            
-            mime_type = "application/octet-stream"
-            if src_path.endswith(".db") or src_path.endswith(".sqlite3"):
-                mime_type = "application/x-sqlite3"
-            elif src_path.endswith(".xlsx"):
-                mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                
-            metadata = {
-                "name": name,
-                "mimeType": mime_type
-            }
-            
-            headers = {
-                "Authorization": f"Bearer {access_token}"
-            }
-            
-            files = {
-                "metadata": ("metadata", json.dumps(metadata), "application/json"),
-                "file": (os.path.basename(src_path), open(src_path, "rb"), mime_type)
-            }
-            
-            print(f"📤 [DRIVE] Création d'un nouveau fichier '{name}' sur Google Drive...")
-            response = requests.post(url, headers=headers, files=files, timeout=30)
-            
-            if response.status_code == 200:
-                new_id = response.json().get("id", "")
-                print(f"✅ [DRIVE] Fichier créé avec succès. ID : {new_id}")
-                return new_id
-            else:
-                print(f"❌ [DRIVE] Échec de la création du fichier : {response.status_code} - {response.text}")
-                return None
-        except Exception as e:
-            print(f"❌ [DRIVE] Exception lors de la création du fichier : {e}")
-            return None
-
-    @classmethod
-    def get_file_name(cls, file_id: str) -> str:
-        """
-        Récupère le nom d'un fichier sur Google Drive à partir de son ID unique.
-        """
-        if not file_id:
-            return ""
-            
-        try:
-            access_token = cls.get_access_token()
-            url = f"https://www.googleapis.com/drive/v3/files/{file_id}"
-            headers = {"Authorization": f"Bearer {access_token}"}
-            
-            response = requests.get(url, headers=headers, timeout=10)
-            if response.status_code == 200:
-                return response.json().get("name", "")
-            else:
-                return ""
-        except Exception:
-            return ""
-
-    @classmethod
-    def get_file_modified_time(cls, file_id: str) -> str:
-        """
-        Récupère la date de dernière modification (modifiedTime) d'un fichier sur
-        Google Drive, convertie en heure locale au format 'JJ/MM/AAAA HH:MM'.
-        Retourne une chaîne vide si l'information est indisponible.
-        """
-        if not file_id:
-            return ""
-
-        try:
-            import datetime
-            access_token = cls.get_access_token()
-            url = f"https://www.googleapis.com/drive/v3/files/{file_id}"
-            headers = {"Authorization": f"Bearer {access_token}"}
-
-            response = requests.get(url, headers=headers, params={"fields": "modifiedTime"}, timeout=10)
-            if response.status_code == 200:
-                raw = response.json().get("modifiedTime", "")
-                if raw:
-                    # modifiedTime est en ISO 8601 UTC (ex : '2026-09-10T18:22:33.456Z')
-                    dt = datetime.datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone()
-                    return dt.strftime("%d/%m/%Y %H:%M")
-            return ""
-        except Exception:
-            return ""

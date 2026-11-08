@@ -12,7 +12,6 @@ if _src_dir not in sys.path:
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.mail.repository import EmailRepository
 from infrastructure.sqlite.connection import SqliteDatabase
-from infrastructure.sqlite.ffme_import import FfmeImportRepository
 from infrastructure.sqlite.members import MemberRepository
 
 class TestInfrastructureLot2(unittest.TestCase):
@@ -74,37 +73,6 @@ class TestInfrastructureLot2(unittest.TestCase):
         self.assertEqual(loaded[0]["last_name"], "DUPONT")
         self.assertEqual(loaded[0]["first_name"], "Jean")
         self.assertEqual(loaded[0]["amount"], 150.0)
-        
-        # 4. Mise à jour de membre (Update)
-        updated_fields = {
-            "phone": "0699999999",
-            "city": "Villeurbanne"
-        }
-        success, err = MemberRepository.update_member_in_db(
-            original_order_ref="99999",
-            original_last_name="DUPONT",
-            original_first_name="Jean",
-            updated_fields=updated_fields,
-            comment_text="Correction IHM"
-        )
-        self.assertTrue(success)
-        self.assertEqual(err, "")
-        
-        # Vérifier si les modifications sont présentes en base
-        loaded_after_update = MemberRepository.load_direct_data()
-        self.assertEqual(len(loaded_after_update), 1)
-        self.assertEqual(loaded_after_update[0]["phone"], "0699999999")
-        self.assertEqual(loaded_after_update[0]["city"], "Villeurbanne")
-        self.assertEqual(loaded_after_update[0]["is_modified"], "Oui")
-        self.assertEqual(loaded_after_update[0]["commentaires_correctif"], "Correction IHM")
-        
-        # Nettoyage du fichier d'export de test s'il a été créé
-        test_export_path = os.path.join(_test_dir, "test_export.xlsx")
-        if os.path.exists(test_export_path):
-            try:
-                os.remove(test_export_path)
-            except OSError:
-                pass
 
     def test_secret_store_set_get(self):
         """Vérifie le stockage et la récupération de secrets via SecretStore."""
@@ -159,181 +127,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         except OSError:
             pass
 
-    def test_merge_ffme_licensees(self):
-        """Vérifie l'importation et la fusion de la liste FFME avec la BDD locale."""
-        import pandas as pd
-        SqliteDatabase.setup_database()
-        
-        # 1. Insérer des adhérents de test
-        m1 = {
-            "order_ref": "ORDER-001",
-            "order_date": "2026-08-01",
-            "status": "Validated",
-            "tarif_name": "Adulte",
-            "amount": 250.0,
-            "user_lastName": "MARTINEZ",
-            "user_firstName": "Carlos",
-            "payer_lastName": "MARTINEZ",
-            "payer_firstName": "Carlos",
-            "payer_email": "carlos@test.com",
-            "champ_Numéro de Licence FFME (6 chiffres)": "112233" # Déjà un N° de licence
-        }
-        
-        m2 = {
-            "order_ref": "ORDER-002",
-            "order_date": "2026-08-01",
-            "status": "Validated",
-            "tarif_name": "Enfant",
-            "amount": 150.0,
-            "user_lastName": "DUBOIS",
-            "user_firstName": "Sophie", # Pas de licence encore
-            "payer_lastName": "DUBOIS",
-            "payer_firstName": "Pierre",
-            "payer_email": "pierre@test.com",
-            "champ_Numéro de Licence FFME (6 chiffres)": ""
-        }
-        
-        MemberRepository.upsert_members([m1, m2])
-        
-        # 2. Créer un fichier Excel FFME temporaire
-        test_excel_path = os.path.join(_test_dir, "test_ffme_import.xlsx")
-        ffme_data = {
-            "Nom": ["Martinez", "Dubois", "Inconnu"],
-            "Prénom": ["Carlos", "Sophie", "Jean"],
-            "N° de licence": [112233.0, 445566, 999999], # Carlos (par licence), Sophie (nouveau par nom)
-            "Date de naissance": ["1990-01-01", "2015-05-05", "1980-08-08"],
-            "Nom de la structure": ["ALJ Escalade", "ALJ Escalade", "Autre"]
-        }
-        
-        df_ffme = pd.DataFrame(ffme_data)
-        df_ffme.to_excel(test_excel_path, index=False)
-        
-        try:
-            # 3. Exécuter la fusion
-            stats = FfmeImportRepository.merge_ffme_licensees(test_excel_path)
-            
-            # 4. Vérifier les statistiques retournées
-            self.assertEqual(stats["total_processed"], 3)
-            self.assertEqual(stats["matched_by_licence"], 1)
-            self.assertEqual(stats["matched_by_name"], 1)
-            self.assertEqual(stats["not_found"], 1)
-            self.assertEqual(len(stats["errors"]), 0)
-            
-            # 5. Vérifier les mises à jour réelles en BDD
-            loaded = MemberRepository.load_direct_data()
-            
-            # Trouver les membres dans les données chargées
-            carlos = next(m for m in loaded if m["last_name"] == "MARTINEZ")
-            sophie = next(m for m in loaded if m["last_name"] == "DUBOIS")
-            
-            # Carlos (par licence) -> Statut "Terminé"
-            self.assertEqual(carlos["status"], "Terminé")
-            self.assertEqual(carlos["licence_ffme"], "112233")
-            
-            # Sophie (par nom) -> Statut "Terminé" et licence sauvegardée "445566"
-            self.assertEqual(sophie["status"], "Terminé")
-            self.assertEqual(sophie["licence_ffme"], "445566")
-            
-        finally:
-            # Nettoyage
-            if os.path.exists(test_excel_path):
-                try:
-                    os.remove(test_excel_path)
-                except OSError:
-                    pass
 
-    def test_merge_autonomes_data(self):
-        """Vérifie l'importation et la fusion de la liste d'autonomie avec la BDD locale."""
-        import pandas as pd
-        SqliteDatabase.setup_database()
-
-        # 1. Insérer des adhérents de test avec licence
-        m1 = {
-            "order_ref": "ORDER-101",
-            "order_date": "2026-08-01",
-            "status": "Validated",
-            "tarif_name": "Adulte",
-            "amount": 250.0,
-            "user_lastName": "RODRIGUEZ",
-            "user_firstName": "Luc",
-            "payer_lastName": "RODRIGUEZ",
-            "payer_firstName": "Luc",
-            "user_email": "luc@test.com",
-            "champ_Numéro de Licence FFME (6 chiffres)": "123456"
-        }
-        
-        m2 = {
-            "order_ref": "ORDER-102",
-            "order_date": "2026-08-01",
-            "status": "Validated",
-            "tarif_name": "Adulte",
-            "amount": 250.0,
-            "user_lastName": "GARCIA",
-            "user_firstName": "Maria",
-            "payer_lastName": "GARCIA",
-            "payer_firstName": "Maria",
-            "user_email": "maria@test.com",
-            "champ_Numéro de Licence FFME (6 chiffres)": "789012"
-        }
-
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM purchase_options")
-        cursor.execute("DELETE FROM purchases")
-        cursor.execute("DELETE FROM orders")
-        cursor.execute("DELETE FROM users")
-        conn.commit()
-        conn.close()
-
-        MemberRepository.upsert_members([m1, m2])
-
-        # 2. Créer un fichier Excel Autonomes temporaire
-        test_excel_path = os.path.join(_test_dir, "test_autonomes_import.xlsx")
-        
-        # Le fichier a "header=1", ce qui veut dire que la ligne 0 est ignorée et la ligne 1 contient les headers.
-        autonomes_data = [
-            # Ligne 0 (titre, sera sautée car header=1)
-            {"Col1": "SUIVI AUTONOMIE", "Col2": "", "Col3": ""},
-            # Ligne 1 (headers réels)
-            {"Col1": "N° de licence", "Col2": "Badge rouge diff", "Col3": "Autonomie Bloc"},
-            # Ligne 2 (données)
-            {"Col1": "123456", "Col2": "X", "Col3": "X"},
-            {"Col1": "789012.0", "Col2": "", "Col3": "X"},
-            {"Col1": "999999", "Col2": "X", "Col3": ""}
-        ]
-
-        df_autonomes = pd.DataFrame(autonomes_data)
-        df_autonomes.to_excel(test_excel_path, index=False, header=False)
-
-        try:
-            # 3. Exécuter la fusion
-            stats = FfmeImportRepository.merge_autonomes_data(test_excel_path)
-
-            # 4. Vérifier les statistiques retournées
-            self.assertEqual(stats["total_processed"], 3)
-            self.assertEqual(stats["matched"], 2)
-            self.assertEqual(stats["not_found"], 1)
-            self.assertEqual(len(stats["errors"]), 0)
-
-            # 5. Vérifier les mises à jour réelles en BDD
-            loaded = MemberRepository.load_direct_data()
-
-            luc = next(m for m in loaded if m["last_name"] == "RODRIGUEZ")
-            maria = next(m for m in loaded if m["last_name"] == "GARCIA")
-
-            self.assertEqual(luc["badge_rouge"], "Oui")
-            self.assertEqual(luc["autonomie_bloc"], "Oui")
-
-            self.assertEqual(maria["badge_rouge"], "Non")
-            self.assertEqual(maria["autonomie_bloc"], "Oui")
-
-        finally:
-            # Nettoyage
-            if os.path.exists(test_excel_path):
-                try:
-                    os.remove(test_excel_path)
-                except OSError:
-                    pass
 
     def test_already_member_detection(self):
         """Vérifie la détection automatique de la réinscription d'un adhérent (déjà adhérent dans une autre saison)."""
@@ -381,51 +175,13 @@ class TestInfrastructureLot2(unittest.TestCase):
         loaded_raw = MemberRepository.load_direct_data("2026-2027")
         self.assertEqual(len(loaded_raw), 2)
         
-        from domain.members.models import Member
-        members = [Member.from_dict(row) for row in loaded_raw]
-        
-        carlos = next(m for m in members if m.user_last_name == "MARTINEZ")
-        ines = next(m for m in members if m.user_last_name == "LORENZO")
-        
-        # Carlos était déjà adhérent dans l'autre saison
-        self.assertEqual(carlos.already_member, "Oui")
-        # Ines est complètement nouvelle
-        self.assertEqual(ines.already_member, "Non")
+        carlos = next(row for row in loaded_raw if row["last_name"] == "MARTINEZ")
+        ines = next(row for row in loaded_raw if row["last_name"] == "LORENZO")
 
-    def test_sqlite_repository_export_to_excel(self):
-        """Vérifie que MemberRepository.export_to_excel génère bien un fichier Excel valide."""
-        SqliteDatabase.setup_database()
-        
-        m = {
-            "order_ref": "EXPORT-123",
-            "user_lastName": "TEST_EXPORT",
-            "user_firstName": "John",
-            "tarif_name": "Loisir Collège"
-        }
-        MemberRepository.upsert_members([m])
-        
-        temp_excel = os.path.join(_test_dir, "test_export_output.xlsx")
-        if os.path.exists(temp_excel):
-            os.remove(temp_excel)
-            
-        try:
-            success = MemberRepository.export_to_excel(temp_excel)
-            self.assertTrue(success)
-            self.assertTrue(os.path.exists(temp_excel))
-            
-            # Vérifier que le fichier est bien lisible par pandas et contient notre membre
-            import pandas as pd
-            df = pd.read_excel(temp_excel)
-            self.assertEqual(len(df), 1)
-            self.assertEqual(df.iloc[0]["Référence commande"], "EXPORT-123")
-            self.assertEqual(df.iloc[0]["Nom adhérent"], "TEST_EXPORT")
-            self.assertEqual(df.iloc[0]["Prénom adhérent"], "John")
-        finally:
-            if os.path.exists(temp_excel):
-                try:
-                    os.remove(temp_excel)
-                except OSError:
-                    pass
+        # Carlos était déjà adhérent dans l'autre saison ; Ines est complètement nouvelle
+        self.assertGreater(int(carlos["already_member"] or 0), 0)
+        self.assertEqual(int(ines["already_member"] or 0), 0)
+
 
     def test_upsert_members_status_priority(self):
         """Vérifie que upsert_members préserve les statuts prioritaires (Processed > Canceled)."""

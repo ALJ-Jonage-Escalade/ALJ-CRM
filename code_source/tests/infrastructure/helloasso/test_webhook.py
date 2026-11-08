@@ -124,7 +124,6 @@ class TestHelloAssoWebhookService(unittest.TestCase):
                "regularisation-inscription-competiteurs-2026-2027")
         Repo = "infrastructure.firestore.competition_repository.CompetitionFirestoreRepository"
         with patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=url), \
-             patch(f"{Repo}.setup_database"), \
              patch(f"{Repo}.sync_helloasso_mirror") as mirror, \
              patch(f"{Repo}.list_competitions", return_value=[]), \
              patch(f"{Repo}.list_adherents", return_value=[]), \

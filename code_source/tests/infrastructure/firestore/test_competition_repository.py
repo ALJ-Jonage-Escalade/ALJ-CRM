@@ -72,9 +72,9 @@ class TestCompetitionsCrud(FirestoreRepoTestCase):
         comp_id = Repo.save_competition(Competition(nom="Épreuve", coach_ids=ids[::-1]))
         self.assertEqual(Repo.get_competition(comp_id).coach_ids, ids[::-1])  # no limit, order kept
         doc = self.fake.store["competitions"][str(comp_id)]
-        # Copies for desktop builds older than plan C2: first three slots and the names
-        self.assertEqual((doc["coach1_id"], doc["coach2_id"], doc["coach3_id"]), tuple(ids[::-1][:3]))
-        self.assertEqual(doc["coaches"], ["D", "C", "B", "A"])
+        # Ids only (plan C2 step B): neither the legacy slots nor a copy of the names
+        self.assertFalse({"coach1_id", "coach2_id", "coach3_id", "coaches"} & set(doc))
+        self.assertEqual(Repo.get_competition_doc(comp_id)["coaches"], ["D", "C", "B", "A"])  # resolved when read
 
     def test_legacy_coach_slots_read(self):
         """A document from an older version, with only coach1_id..coach3_id."""
@@ -86,6 +86,14 @@ class TestCompetitionsCrud(FirestoreRepoTestCase):
         doc = Repo.get_competition_doc(5)
         self.assertEqual((doc["coach_ids"], doc["coaches"]), ([b, a], ["B", "A"]))  # names resolved
         self.assertEqual([c.id for c in Repo.list_competitions_for_coach(a)], [5])
+        self.assertNotIn("coach1_id", doc)  # the API answer has coach_ids only
+
+    def test_empty_coach_ids_ignore_stale_legacy_slots(self):
+        """A document updated since plan C2 with every coach removed: its old slots must not bring them back."""
+        a = Repo.save_coach("A", coach_id=1)
+        self.fake.upsert_document("competitions", "6", {"id": 6, "nom": "Sans coach", "coach_ids": [], "coach1_id": a})
+        self.assertEqual(Repo.get_competition(6).coach_ids, [])
+        self.assertEqual(Repo.get_competition_doc(6)["coaches"], [])
 
     def test_legacy_doc_normalized_on_read(self):
         """Un document hérité (ID Firestore aléatoire) est recopié vers str(id)."""
@@ -233,14 +241,12 @@ class TestCoaches(FirestoreRepoTestCase):
         self.assertEqual([c.id for c in Repo.list_competitions_for_coach(9999)], [])
 
         Repo.save_coach("Adrien BERGERAT", coach_id=cid)
-        comp_doc = self.fake.store["competitions"][str(comp_id)]
-        self.assertIn("Adrien BERGERAT", comp_doc["coaches"])
+        self.assertEqual(Repo.get_competition_doc(comp_id)["coaches"], ["Adrien BERGERAT"])  # renamed, nothing copied
 
         self.assertTrue(Repo.delete_coach(cid))
         comp_doc = self.fake.store["competitions"][str(comp_id)]
         self.assertEqual(comp_doc["coach_ids"], [])
         self.assertEqual(Repo.get_competition(comp_id).coach_ids, [])
-        self.assertIsNone(comp_doc["coach1_id"])
 
 
 class TestHelloAssoMirror(FirestoreRepoTestCase):

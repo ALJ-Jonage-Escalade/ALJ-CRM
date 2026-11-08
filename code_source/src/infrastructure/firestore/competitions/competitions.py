@@ -104,7 +104,7 @@ class CompetitionsMixin(AdherentsMixin):
         existing = cls._load_comp_doc(comp.id) if comp.id else None
         if comp.id is None:
             comp.id = cls._new_id()
-        doc = cls._build_comp_doc(existing, comp, cls._coaches_map())
+        doc = cls._build_comp_doc(existing, comp)
         doc.update(extra or {})
         if existing and (existing.get("_doc_id") or str(comp.id)) == str(comp.id):
             FirestoreClient.update_fields(cls.COLLECTION_COMPETITIONS, str(comp.id), cls._info_fields(doc))
@@ -132,7 +132,7 @@ class CompetitionsMixin(AdherentsMixin):
                 return False
             comp = cls._comp_from_doc(existing)
             change(comp)
-            doc = cls._build_comp_doc(existing, comp, cls._coaches_map())
+            doc = cls._build_comp_doc(existing, comp)
             doc.update(extra or {})
             FirestoreClient.update_fields(cls.COLLECTION_COMPETITIONS, existing.get("_doc_id") or str(comp.id),
                                           cls._info_fields(doc), expected_update_time=existing.get("_update_time"))

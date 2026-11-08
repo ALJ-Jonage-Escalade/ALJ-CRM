@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-# Table de priorité des statuts — CENTRALISÉE (phase 3)
+# Table de priorité des statuts (seule définition)
 # "Terminé" = licence FFME confirmée : état le plus avancé du workflow, il ne doit
 # jamais être rétrogradé par une nouvelle synchro HelloAsso ("Validated"/"Validé").
 STATUS_PRIORITY = {

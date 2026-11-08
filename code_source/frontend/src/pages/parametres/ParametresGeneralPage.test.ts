@@ -21,7 +21,6 @@ const ANSWERS: Record<string, () => Response> = {
       client_id_configured: true,
       refresh_token_present: true,
       user_email: "club@alj.example",
-      backend: "firestore",
       db_accessible: true,
       error: "",
     }),

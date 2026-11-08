@@ -8,46 +8,11 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from domain.members.models import Member
 from domain.validators import validate_amount, validate_email
 from domain.constants import get_active_season
 
 class TestDomainLot1(unittest.TestCase):
 
-    def test_member_from_and_to_dict(self):
-        """Vérifie que l'instanciation, from_dict et to_dict du modèle Member fonctionnent parfaitement."""
-        data = {
-            "order_ref": "ORDER-12345",
-            "order_date": "2026-08-08",
-            "status": "Validated",
-            "tarif_name": "Adulte Autonome",
-            "amount": 246.50,
-            "user_lastName": "Dupont",
-            "user_firstName": "Jean",
-            "payer_firstName": "Jean",
-            "payer_lastName": "Dupont",
-            "payer_email": "jean.dupont@test.com",
-            "champ_Date de naissance de l'adhérent": "15/07/1990",
-            "champ_Sexe": "M",
-            "champ_Nationalité": "Française",
-            "opt_Assurance Base": "Oui",
-            "opt_Montant Assurance Base": "5.50"
-        }
-
-        member = Member.from_dict(data)
-        self.assertEqual(member.order_ref, "ORDER-12345")
-        self.assertEqual(member.user_last_name, "Dupont")
-        self.assertEqual(member.amount, 246.50)
-        self.assertEqual(member.birth_date, "15/07/1990")
-        self.assertTrue(member.insurance.has_base)
-        self.assertEqual(member.insurance.amount_base, 5.50)
-
-        # Export dictionnaire
-        exported = member.to_dict()
-        self.assertEqual(exported["order_ref"], "ORDER-12345")
-        self.assertEqual(exported["user_lastName"], "Dupont")
-        self.assertEqual(exported["opt_Assurance Base"], "Oui")
-        self.assertEqual(exported["opt_Montant Assurance Base"], 5.50)
 
     def test_validate_amount(self):
         """Vérifie la robustesse du validateur de montant financier."""

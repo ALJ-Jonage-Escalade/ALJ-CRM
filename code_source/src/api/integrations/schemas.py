@@ -20,7 +20,6 @@ class GoogleStatus(BaseModel):
     client_id_configured: bool
     refresh_token_present: bool
     user_email: Optional[str]
-    backend: str
     db_accessible: bool
     error: str
 

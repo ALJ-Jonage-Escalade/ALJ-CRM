@@ -14,7 +14,7 @@ Le dépôt contient **une seule base de code Python** (`../code_source`) qui pro
 
 | | Application web |
 |---|---|
-| Techno | FastAPI + HTML/JS statique (sans build) servi par FastAPI |
+| Techno | FastAPI (API) + application Vue 3 compilée par Vite (`frontend/`), servie par FastAPI |
 | Où ça tourne | Google Cloud Run (`europe-west1`, 0→2 instances) |
 | Point d'entrée | `src/server.py` (`uvicorn server:app`) |
 | Données | Uniquement via l'API (`/api/*`) ; le serveur lit Firestore (compétitions) et un cache SQLite éphémère (adhérents). Le navigateur n'utilise Firebase que pour la connexion. |
@@ -29,9 +29,9 @@ Docker (auth Firebase obligatoire).
                          ▼
           ┌───────────────────────────┐     ┌──────────────────────────┐
           │ CLOUD RUN — server.py     │     │ NAVIGATEUR               │
-          │ FastAPI + API + HTML      │     │ web/ (PWA + portail      │
-          │ WeasyPrint (PDF)          │◄────┤ bureau), Firebase Auth   │
-          │ cache SQLite éphémère     │ API │ (connexion seulement)    │
+          │ FastAPI + API + app Vue   │     │ application Vue (PWA,    │
+          │ WeasyPrint (PDF)          │◄────┤ téléphone et bureau),    │
+          │ cache SQLite éphémère     │ API │ Firebase Auth (connexion)│
           └─────────────┬─────────────┘     └──────────────────────────┘
                         │ REST v1 (metadata server)
                         ▼
@@ -39,7 +39,7 @@ Docker (auth Firebase obligatoire).
                          │ FIRESTORE  crm_* / competitions /   │
                          │ coaches / adherents / planning …    │
                          └─────────────────────────────────────┘
-          Gmail API (OAuth2 club)  ·  Google Drive (copie de sauvegarde)  ·  Nominatim (géocodage)
+          Gmail API (OAuth2 club)  ·  Nominatim (géocodage)
           Cloud Scheduler (07:00) → POST /api/competitions/cron/fetch-results (résultats MyCompet)
 ```
 
@@ -55,36 +55,38 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── paths.py             ← CODE_ROOT / ROOT_DIR / DATA_ROOT (à utiliser, ne jamais recalculer)
 │   │   ├── domain/              ← Python pur : members/, competitions/, attestation/ + constants, utils, validators
 │   │   ├── api/                 ← routeurs FastAPI, un fichier par domaine, rangés par thème (voir §4)
-│   │   ├── services/            ← cas d'usage, rangés comme api/ : competitions/, members/ (les autres thèmes
-│   │   │                          gardent encore leur logique dans le routeur)
+│   │   ├── services/            ← cas d'usage, rangés comme api/ : access/, competitions/, members/ (les autres
+│   │   │                          thèmes gardent encore leur logique dans le routeur)
 │   │   ├── infrastructure/      ← accès externes, un dossier par système : security/ (auth API, secrets),
-│   │   │                          sqlite/ (+ migrations/), firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/
-│   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME, Excel adhérents),
-│   │   │                          presence_sheets, planning_excel, spreadsheet_safety
+│   │   │                          sqlite/, firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/
+│   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME), competitors_excel,
+│   │   │                          competitors_pdf, presence_sheets, planning_excel, spreadsheet_safety
 │   ├── frontend/                ← application web Vue 3 + Vite + TypeScript (tous les écrans, téléphone et ordinateur) ;
 │   │                              src/sw.ts : service worker Workbox, compilé dans dist/sw.js (voir §5)
 │   ├── web/                     ← manifest.webmanifest et assets/logo.png (servis par FastAPI, hors compilation)
 │   ├── tests/                   ← tests pytest/unittest, rangés comme le code testé : domain/, exports/, infrastructure/, services/, api/, web/ ; modules racine de src/ à la racine
 │   ├── dev/                     ← mode dev local : émulateur Firebase (Docker), dev.env, run_server.sh, seed/ (données fictives)
-│   ├── docs/                    ← docs d'architecture/plan (partiellement obsolètes, voir §8)
 │   ├── doc/template/            ← modèles HTML/Excel (attestation, liste de présence)
-│   ├── Dockerfile, requirements-docker.txt, deploy_cloud_run.{sh,bat}, firestore.rules, firebase.json
-│   ├── VERSION                  ← 2.5.8 (source de vérité, doit == APP_VERSION dans domain/constants.py)
-│   └── GEMINI.md                ← doc historique la plus détaillée (voir §8 pour ses limites)
+│   ├── scripts/                 ← déploiement (deploy_cloud_run.{sh,bat}), tâche planifiée, sauvegardes, outils manuels
+│   ├── firestore/               ← firestore.rules, firebase.json (déployés à part, §7)
+│   ├── Dockerfile, requirements*.txt (exports générés de uv.lock)
+│   ├── VERSION                  ← numéro de version (doit == APP_VERSION dans domain/constants.py)
+│   └── AGENTS.md                ← conventions Python ; CLAUDE.md / GEMINI.md y renvoient
 ├── .github/workflows/           ← tests (ruff, mypy, pytest, e2e) + déploiement Cloud Run sur main
-└── GEMINI.md, *.bat…            ← doublons/raccourcis de la racine (deploy_cloud_run.bat, lancer_site_web.bat)
+└── AGENTS.md, scripts/*.bat     ← règles du dépôt ; raccourcis vers code_source/scripts (deploy_cloud_run.bat, lancer_site_web.bat)
 ```
 
 ### Couches (code_source/src)
 
-- **`domain/`** — pur Python, sans I/O.
+- **`domain/`** — règles métier en Python, sans accès au réseau ni au stockage. Deux exceptions connues :
+  `attestation/` lit son modèle et ses images sur disque et rend le PDF (WeasyPrint), et `constants` charge le `.env`.
   Rangé en `members/` (modèles, liste web, `age_rules`, `planning_groups`), `competitions/` (modèles,
   `matching` HelloAsso), `attestation/` (`document.build_attestation()`, HTML → PDF WeasyPrint) ;
   `constants`, `utils.apply_template_variables`, `validators` restent à la racine.
 - **`infrastructure/`** — adaptateurs, un sous-dossier par système externe. Les plus structurants :
   - `sqlite/schema_v2.py` : DDL SQLite, normalisations, vue de compatibilité `v_adherents_legacy` (**source unique**, recréée à chaque démarrage).
   - `sqlite/connection.py` (`SqliteDatabase` : chemin, connexion, schéma, sauvegarde) et un repository par domaine :
-    `members.py` (`get_members()` typé recommandé, `load_direct_data()` legacy), `seasons.py`, `planning.py`,
+    `members.py` (`load_direct_data()`, lignes de la vue `v_adherents_legacy`), `seasons.py`, `planning.py`,
     `email_templates.py`, `geocache.py`, `ffme_import.py`.
   - `firestore/cloud_database.py` : réplication SQLite ⇄ Firestore (collections `crm_<table>`, triggers `_fs_*`, flush toutes les 15 s, pull toutes les 2 min, merge champ par champ) ; façade `CloudDatabase` s'appuyant sur `firestore/cloud_sync/` : `common` (constantes, conversions), `rest_store` (REST Firestore), `cache` (SQLite, déclencheurs), `sync` (pull / flush / fusion), `bootstrap` (reconstruction du cache, import initial).
   - `firestore/client.py` : client REST Firestore (sans gRPC) ; `firestore/competition_repository.py` : compétitions (façade `CompetitionFirestoreRepository` composant les mixins de `firestore/competitions/` : adhérents, épreuves, participants, miroir HelloAsso, coachs) ;
@@ -97,7 +99,7 @@ ALJ-CRM/                         ← racine du dépôt
   - `security/api_auth.py` : middleware Firebase (rôles `readonly < coach < admin`). Seul juge des droits : `firestore.rules` refuse tout accès client.
   - `security/role_directory.py` : rôle d'une adresse vérifiée, lu dans la liste des accès (`firestore/access_store.py`, collection `access_roles`), gardée 60 s en mémoire ; liste illisible → `503`. Changements : `services/access/rules.py` (garde-fous, historique), administrateur initial : `services/access/bootstrap.py`.
   - `timed_cache.py` : cache mémoire commun du serveur (`TimedCache` : une valeur par clé, durée de vie, verrou, horloge injectable) ; l'utilisent la liste des accès, les compétitions, l'annuaire `adherents`, les clés Google de `api_auth`, le jeton OAuth HelloAsso et l'activité des formulaires.
-  - `mail/` (envoi, campagnes, corps HTML), `helloasso/` (API v5, webhook), `security/secret_store.py`, `google/drive.py` (OAuth Google, Drive).
+  - `mail/` (envoi, campagnes, corps HTML), `helloasso/` (API v5, webhook), `security/secret_store.py` (secrets : environnement, et Firestore pour les identifiants OAuth sur Cloud Run), `google/drive.py` (identifiants OAuth Google du club et jetons d'accès).
 
 ---
 
@@ -134,11 +136,13 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
 | `activities/` | `planning`, `presence` | `/api/planning` (GET/POST, `/item`, `/export`) · `/api/presence/config`, `/export` |
 | `reports/` | `map`, `pivot` | `/api/reports/map-points` (points de la carte des adhérents, affichée par l'application Vue avec Leaflet) · `/api/reports/pivot-records` (lignes du tableau croisé dynamique, affiché par l'application Vue avec vue-pivottable) |
 | `ffme/` | `ffme` | `/api/ffme/stats`, `/export` (CSV), `/preview`, `/import` |
-| `integrations/` | `helloasso`, `google_auth`, `cloud_db` | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync` · `/api/auth/google/*` · `/api/cloud-db/status`, `/sync` |
+| `integrations/` | `helloasso`, `helloasso_campaigns`, `google_auth`, `cloud_db` | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync`, `/api/helloasso/campaigns` · `/api/auth/google/*` · `/api/cloud-db/status`, `/sync` |
+| `admin/` | `access` | `/api/admin/access/roles` (liste des accès, invitations), `/history` |
+| `auth/` | `me` | `/api/me` (rôle de l'utilisateur connecté, acceptation de l'invitation) |
 
-- **Cache SQLite** : les routeurs `competitions`, `participants`, `coaches`, `members` (compétitions), `helloasso_items`
-  et `results` (résultats MyCompet : l'appel de Cloud Scheduler n'attend pas une reconstruction du cache) ne lisent que
-  Firestore et sautent le rafraîchissement du cache (`FIRESTORE_ONLY_PATHS`). Une route qui lit ou écrit le cache va
+- **Cache SQLite** : les routeurs `competitions`, `participants`, `coaches`, `members` (compétitions), `helloasso_items`,
+  `results` (résultats MyCompet : l'appel de Cloud Scheduler n'attend pas une reconstruction du cache), `me`, `access`
+  et `helloasso_campaigns` ne lisent que Firestore et sautent le rafraîchissement du cache (`FIRESTORE_ONLY_PATHS`). Une route qui lit ou écrit le cache va
   dans un autre routeur, même sous `/api/competitions` (`payments`).
 - **URL appelées de l'extérieur, à ne pas changer** : Cloud Scheduler (job `batch-resultats-competitions`,
   `POST /api/competitions/cron/fetch-results` chaque jour à 07h00, jeton OIDC — à déclarer avant `/{id}/fetch-results`), webhook
@@ -170,7 +174,7 @@ avec le code backend conservé et le code supprimé (récupérable dans l'histor
 
 ### Obstacles techniques récurrents
 
-1. **Logique métier dans des fichiers legacy** : `exports/membership_excel.py` (exports FFME), certaines méthodes de `infrastructure/sqlite/ffme_import.py` sans appelant depuis le retrait du client lourd (`merge_autonomes_data`, `merge_ffme_licensees`). À exposer en routes FastAPI avant de construire l'écran web.
+1. **Logique métier dans des fichiers legacy** : `exports/membership_excel.py` (exports FFME). Le code du client lourd sans appelant web a été supprimé (récupérable dans l'historique git) : à reprendre en route FastAPI avant de construire l'écran web.
 2. **Système de fichiers** : Cloud Run est éphémère → génération **en mémoire** puis téléchargement (comme les attestations), jamais de persistance locale.
 3. **Cache SQLite côté serveur** : reconstruit depuis Firestore au premier appel de données (`CloudDatabase.ensure_fresh`, 30 s) et flush après chaque écriture. Une route d'écriture doit passer par les repositories de `infrastructure/sqlite/` pour être répliquée.
 4. **Durée des requêtes** : timeout Cloud Run 300 s, mémoire 1 GiB (Pandas/WeasyPrint) ; les traitements lourds (géocodage Nominatim à 1,5 s/adresse) doivent rester en tâche de fond.
@@ -253,21 +257,21 @@ Fonctionnement :
 Pour un simple contrôle de l'API (aucune page connectée utilisable : la connexion Google réelle refuse `localhost`) :
 
 ```bash
-ALJ_API_AUTH=off MEMBER_BACKEND=drive ALJ_DATA_DIR=./data-dev \
+ALJ_API_AUTH=off ALJ_CACHE_REPLICATION=off ALJ_DATA_DIR=./data-dev \
   uvicorn server:app --app-dir src --host 127.0.0.1 --port 8080 --reload
 # Docker (identique à la prod) :
-docker build -t alj . && docker run -p 8080:8080 -e ALJ_API_AUTH=off -e MEMBER_BACKEND=drive alj
+docker build -t alj . && docker run -p 8080:8080 -e ALJ_API_AUTH=off -e ALJ_CACHE_REPLICATION=off alj
 ```
 
 - `ALJ_API_AUTH=off` : désactive le contrôle du jeton Firebase côté API (serveur local uniquement ; `api_auth.local_request_error` bloque alors les requêtes inter-sites).
 - `ALJ_DATA_DIR` : dossier du cache SQLite `database.db` (défaut : `<racine du dépôt>/data`), créé vide au premier accès.
-- `MEMBER_BACKEND` : `firestore` par défaut. **Hors mode dev**, `firestore` pousse les écritures du serveur local vers le
-  **Firestore de production** (`CloudDatabase.after_write`) ; `drive` = SQLite local seul.
+- `ALJ_CACHE_REPLICATION=off` : le cache SQLite reste local. Sans cette variable, **hors mode dev**, le serveur local
+  pousse ses écritures vers le **Firestore de production** (`CloudDatabase.after_write`), comme Cloud Run.
 - ⚠️ Hors mode dev, le serveur local lit et écrit **le Firestore de production** pour les compétitions, coachs et
-  éléments HelloAsso (les pages passent par l'API), quel que soit `MEMBER_BACKEND`.
+  éléments HelloAsso (les pages passent par l'API), même avec `ALJ_CACHE_REPLICATION=off`.
 
 **Configuration / secrets** : `../code_source/.env` (non versionné) ; sur Cloud Run, variables d'environnement / Secret Manager.
-Clés principales : `HELLOASSO_CLIENT_ID/SECRET/ORG_SLUG`, `CAMPAIGN_SLUG` (repli temporaire tant que `HELLOASSO_MEMBERSHIP_CAMPAIGN` n'est pas choisi), `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN/USER_EMAIL`, `SMTP_*`, `GOOGLE_DRIVE_*`, `MEMBER_BACKEND` (`firestore`|`drive`), `ALJ_DATA_DIR`, `ALJ_API_AUTH`. Ne jamais afficher ni committer ces valeurs.
+Clés principales : `HELLOASSO_CLIENT_ID/SECRET/ORG_SLUG`, `CAMPAIGN_SLUG` (repli temporaire tant que `HELLOASSO_MEMBERSHIP_CAMPAIGN` n'est pas choisi), `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN/USER_EMAIL`, `SMTP_*`, `ALJ_CACHE_REPLICATION`, `ALJ_DATA_DIR`, `ALJ_API_AUTH`. Ne jamais afficher ni committer ces valeurs.
 
 **Tests** (depuis `../code_source`) :
 
@@ -286,11 +290,11 @@ La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[too
 
 ## 8. Pièges & dette connue
 
-- **Documentation partiellement périmée** : `../GEMINI.md` (racine et `code_source/`) décrit encore Tkinter, un fonctionnement 100 % Windows/Excel/Drive et des chemins de l'ancien poste. `architecture_actuelle.md` et `plan_migration.md` datent de la migration Tkinter→PySide6. `plan_architecture_cloud_mobile.md` annonce `APP_VERSION 2.3.0`, `512Mi`. `pyproject.toml` dit `2.0.5`. **Faire confiance au code et à `VERSION`, puis `base_firestore.md` et `plan_frontend_vue.md` (les plus récents). `plan_pages_web_bureau.md` décrit les anciennes pages web, supprimées.**
-- `../GEMINI.md` impose une convention utile : scripts de diagnostic jetables dans `scripts_temporaires/` (ignoré par git), jamais à la racine.
+- **Documentation partiellement périmée** : `plan_architecture_cloud_mobile.md` annonce `APP_VERSION 2.3.0`, `512Mi`. `pyproject.toml` dit `2.0.5`. **Faire confiance au code et à `VERSION`, puis `base_firestore.md` et `plan_frontend_vue.md` (les plus récents). `plan_pages_web_bureau.md` décrit les anciennes pages web, supprimées.**
+- Scripts de diagnostic jetables dans `scripts_temporaires/` (ignoré par git), jamais dans `code_source/` (`../AGENTS.md`).
 - **Firestore indisponible** : seul l'administrateur initial (`BOOTSTRAP_ADMIN_EMAIL`) garde l'accès ; les autres reçoivent `503` (rôle non vérifiable) jusqu'au retour de Firestore.
 - **Exports FFME** : CSV strict (`;`, dates `jj/mm/aaaa`) ; le golden master doit rester vert ou être renouvelé avec accord du club.
-- **Sauvegardes** : API backup SQLite (jamais de copie brute avec WAL), PITR Firestore 7 j, export quotidien 14 j, retour arrière via `MEMBER_BACKEND=drive`.
+- **Sauvegardes** : API backup SQLite (jamais de copie brute avec WAL), PITR Firestore 7 j, export quotidien 14 j (`scripts/setup_firestore_backups.sh`).
 - Le dépôt contient aussi `../.agents`, `.idea/`, `.jolli/` (outillage local).
 
 ---
@@ -300,4 +304,4 @@ La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[too
 1. Lire dans l'ordre : ce fichier → `base_firestore.md` → `plan_frontend_vue.md` → `src/server.py` puis `src/api/` (§4) → `frontend/src/router.ts` → `frontend/src/pages/AdherentsPage.vue` (page de référence).
 2. Lancer le serveur en local et ouvrir `/bureau/` (§7) ; lancer les tests web/API.
 3. Choisir une fonction manquante dans `desktop_features_missing_in_web.md` (§6).
-4. Décider des questions ouvertes avec le club : envoi groupé (quotas Gmail, anti-doublon), droit d'écriture sur le web, hébergement des secrets (Secret Manager), sort de `database.db` Drive (retour arrière).
+4. Décider des questions ouvertes avec le club : envoi groupé (quotas Gmail, anti-doublon), droit d'écriture sur le web, hébergement des secrets (Secret Manager).

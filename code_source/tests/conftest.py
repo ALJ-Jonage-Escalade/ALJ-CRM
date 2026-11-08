@@ -21,7 +21,7 @@ for _path in (_SRC_DIR, _TESTS_DIR):
 # Dev mode variables (dev/dev.env): removed so the tests stay in production mode
 # even if the developer loaded them into their shell.
 _DEV_ENV_KEYS = ("ALJ_ENV", "FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST",
-                 "MEMBER_BACKEND", "ALJ_DATA_DIR",
+                 "ALJ_DATA_DIR",
                  "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM_EMAIL",
                  "GMAIL_USER_EMAIL", "GMAIL_CLIENT_ID", "GMAIL_REFRESH_TOKEN")
 
@@ -30,6 +30,8 @@ _DEV_ENV_KEYS = ("ALJ_ENV", "FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_H
 def _production_environment(monkeypatch):
     for key in _DEV_ENV_KEYS:
         monkeypatch.delenv(key, raising=False)
+    # The SQLite cache stays local: a test that needs Firestore replication turns it on itself
+    monkeypatch.setenv("ALJ_CACHE_REPLICATION", "off")
 
 
 @pytest.fixture(autouse=True)

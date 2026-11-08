@@ -19,8 +19,8 @@ Activation
 ----------
 - ``ALJ_API_AUTH=required`` (set in the Dockerfile) or running on Cloud Run
   (``K_SERVICE`` variable injected by the platform): checks on.
-- ``ALJ_API_AUTH=off``: checks off (local server of the desktop app, which only
-  listens on 127.0.0.1).
+- ``ALJ_API_AUTH=off``: checks off (local dev server and tests, dev/dev.env), protected by
+  local_guard_middleware (loopback hosts, same-origin writes).
 """
 
 from __future__ import annotations
@@ -399,7 +399,7 @@ async def auth_middleware(request, call_next):
 
 
 # ---------------------------------------------------------------------------
-# Local server without authentication (desktop app, local runs)
+# Local server without authentication (dev, tests: ALJ_API_AUTH=off)
 # ---------------------------------------------------------------------------
 LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "[::1]", "testserver"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})

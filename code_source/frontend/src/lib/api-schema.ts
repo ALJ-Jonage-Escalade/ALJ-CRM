@@ -2624,8 +2624,6 @@ export interface components {
             refresh_token_present: boolean;
             /** User Email */
             user_email: string | null;
-            /** Backend */
-            backend: string;
             /** Db Accessible */
             db_accessible: boolean;
             /** Error */

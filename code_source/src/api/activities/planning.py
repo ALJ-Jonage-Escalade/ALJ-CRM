@@ -28,7 +28,7 @@ def _slot(row: Dict[str, Any]) -> PlanningSlot:  # Any: a row of the planning ta
 def get_planning() -> List[PlanningSlot] | JSONResponse:
     """Récupère le planning depuis la BDD SQLite."""
     try:
-        return [_slot(row) for row in PlanningRepository.load_planning_data(log_debug=False)]
+        return [_slot(row) for row in PlanningRepository.load_planning_data()]
     except Exception as e:
         return error(500, internal_error(e, "get_planning"))
 
@@ -73,7 +73,7 @@ def export_planning_api(mode: Literal["grid", "list"] = Query("grid"), season: O
     target_season = season or get_active_season()
     if not is_valid_season(target_season):
         return error(400, "Saison invalide (format attendu : AAAA-AAAA).")
-    planning_data = PlanningRepository.load_planning_data(log_debug=False)
+    planning_data = PlanningRepository.load_planning_data()
 
     tmp_dir = tempfile.mkdtemp(prefix="alj_plan_export_")
     out_path = os.path.join(tmp_dir, "planning.xlsx")

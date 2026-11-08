@@ -132,7 +132,8 @@ def pull(conn, store, report: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
 
 
 def _build_write(conn, table: str, cols: List[str], pk: List[str], pk_str: str, by: str):
-    """Prépare l'écriture d'une ligne modifiée. Retourne (write, row, base) ou None."""
+    """Prépare l'écriture d'une ligne modifiée : (write, row) — row None pour une suppression, write {"noop": True}
+    quand rien n'a changé depuis la base — ou None (ligne supprimée jamais envoyée)."""
     vals = json.loads(pk_str)
     row = _read_row(conn, table, pk, vals)
     base, base_ut = _get_base(conn, table, pk_str)
@@ -173,7 +174,6 @@ def flush(conn, store, by: str = "", report: Optional[Dict[str, Any]] = None,
         cols, pk = meta[t]
         built = _build_write(conn, t, cols, pk, pk_str, by)
         if built is None or built[0].get("noop"):
-            row = None if built is None else built[1]
             conn.execute("DELETE FROM _fs_changes WHERE tbl = ? AND pk = ? AND seq <= ?", (t, pk_str, seq))
             continue
         items.append((t, pk_str, seq, built[0], built[1]))

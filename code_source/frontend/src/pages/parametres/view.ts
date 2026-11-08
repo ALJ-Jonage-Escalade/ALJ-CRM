@@ -30,10 +30,6 @@ export function googleStatus(s: Schemas["GoogleStatus"]): Status {
   return { color: "amber", label: "🟡 Non connecté", text: "Aucun jeton Google n'est configuré. Connectez le compte de l'association." };
 }
 
-export function dbMode(s: Schemas["GoogleStatus"]): string {
-  return s.backend === "drive" ? "Google Drive (mode secours)" : "Firestore (Google Cloud)";
-}
-
 export interface CheckLine {
   ok: boolean;
   label: string;

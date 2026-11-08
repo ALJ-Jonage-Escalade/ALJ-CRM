@@ -49,8 +49,6 @@ def get_google_auth_status() -> GoogleStatus:
     from infrastructure.google.drive import GoogleDriveClient
     from infrastructure.firestore.cloud_database import CloudDatabase
 
-    backend = (SecretStore.get_secret("MEMBER_BACKEND") or "firestore").strip().lower()
-
     if runtime_env.is_dev():
         db_ready = CloudDatabase.cache_ready() if CloudDatabase.is_enabled() else True
         return GoogleStatus(
@@ -60,7 +58,6 @@ def get_google_auth_status() -> GoogleStatus:
             client_id_configured=True,
             refresh_token_present=True,
             user_email="dev-emulator@alj-escalade.fr",
-            backend=backend,
             db_accessible=db_ready,
             error="",
         )
@@ -93,7 +90,6 @@ def get_google_auth_status() -> GoogleStatus:
         client_id_configured=bool(client_id),
         refresh_token_present=bool(refresh_token),
         user_email=user_email,
-        backend=backend,
         db_accessible=db_ready or valid,
         error=error_msg,
     )
@@ -139,10 +135,9 @@ def google_auth_login(request: Request, data: GoogleLoginStart) -> GoogleLoginUr
     with a signed state naming the admin, that the page then opens."""
     from infrastructure.google.drive import GoogleDriveClient
 
-    client_id, client_secret = GoogleDriveClient.get_client_credentials(prefer_web=True)
+    client_id, client_secret = GoogleDriveClient.get_client_credentials()
     if not client_id or not client_secret:
-        return error(503, "Aucun identifiant client Google (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET ou client_secret_*.json) "
-                          "n'est configuré sur le serveur.")
+        return error(503, "Aucun identifiant client Google (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET) n'est configuré sur le serveur.")
 
     redirect_uri = _callback_url(request)
     claims = getattr(request.state, "user", None) or {}  # None: token check off (local server)
@@ -245,7 +240,7 @@ def google_auth_callback(
             <p><a href="/bureau/parametres" class="btn">Retour aux paramètres</a></p>"""
         )
 
-    client_id, client_secret = GoogleDriveClient.get_client_credentials(prefer_web=True)
+    client_id, client_secret = GoogleDriveClient.get_client_credentials()
     if not client_id or not client_secret:
         return _render_page(
             "Configuration incomplète",
@@ -401,26 +396,15 @@ def test_google_auth() -> GoogleTest:
         results["gmail"]["message"] = "Test Gmail ignoré en raison de l'échec OAuth2."
         return GoogleTest(status="error", all_ok=False, results=_checks(results))
 
-    # 2. Test Accès BDD (Firestore ou Drive)
-    backend = (SecretStore.get_secret("MEMBER_BACKEND") or "firestore").strip().lower()
+    # 2. Test Accès BDD (Firestore)
     try:
-        if backend == "drive":
-            db_id = SecretStore.get_secret("GOOGLE_DRIVE_DB_ID")
-            if not db_id:
-                results["database"]["ok"] = False
-                results["database"]["message"] = "GOOGLE_DRIVE_DB_ID non configuré."
-            else:
-                name = GoogleDriveClient.get_file_name(db_id)
-                results["database"]["ok"] = True
-                results["database"]["message"] = f"Fichier Drive '{name}' accessible."
+        if CloudDatabase.is_enabled():
+            CloudDatabase.ensure_fresh(max_age=10)
+            results["database"]["ok"] = True
+            results["database"]["message"] = "Base Firestore synchronisée et opérationnelle."
         else:
-            if CloudDatabase.is_enabled():
-                CloudDatabase.ensure_fresh(max_age=10)
-                results["database"]["ok"] = True
-                results["database"]["message"] = "Base Firestore synchronisée et opérationnelle."
-            else:
-                results["database"]["ok"] = True
-                results["database"]["message"] = "Base locale opérationnelle."
+            results["database"]["ok"] = True
+            results["database"]["message"] = "Base locale opérationnelle (réplication Firestore désactivée)."
     except Exception as e:
         results["database"]["ok"] = False
         internal_error(e, "test_google_auth database")
