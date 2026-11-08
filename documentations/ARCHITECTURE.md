@@ -186,7 +186,7 @@ avec le code backend conservé et le code supprimé (récupérable dans l'histor
 1. **Logique métier dans des fichiers legacy** : `exports/membership_excel.py` (exports FFME). Le code du client lourd sans appelant web a été supprimé (récupérable dans l'historique git) : à reprendre en route FastAPI avant de construire l'écran web.
 2. **Système de fichiers** : Cloud Run est éphémère → génération **en mémoire** puis téléchargement (comme les attestations), jamais de persistance locale.
 3. **Cache SQLite côté serveur** : reconstruit depuis Firestore au premier appel de données (`CloudDatabase.ensure_fresh`, 30 s) et flush après chaque écriture. Une route d'écriture doit passer par les repositories de `infrastructure/sqlite/` pour être répliquée.
-4. **Durée des requêtes** : timeout Cloud Run 300 s, mémoire 1 GiB (Pandas/WeasyPrint) ; les traitements lourds (géocodage Nominatim à 1,5 s/adresse) doivent rester en tâche de fond.
+4. **Durée des requêtes** : timeout Cloud Run 300 s, mémoire 1 GiB (WeasyPrint) ; les traitements lourds (géocodage Nominatim à 1,5 s/adresse) doivent rester en tâche de fond.
 5. **Données personnelles/RGPD** (santé, urgences, mineurs) : ne jamais committer de BDD/exports ; golden master FFME non versionné (`tests/fixtures/`).
 
 ### Démarche recommandée pour chaque fonction à porter
@@ -209,7 +209,7 @@ avec le code backend conservé et le code supprimé (récupérable dans l'histor
 sudo apt install libpango-1.0-0 libpangoft2-1.0-0
 
 cd code_source
-uv sync --group web          # .venv/ (ignoré par git) : profil « web » + outils de dev + Faker
+uv sync                      # .venv/ (ignoré par git) : dépendances + outils de dev + Faker
 source .venv/bin/activate
 ```
 
@@ -285,7 +285,7 @@ Clés principales : `HELLOASSO_CLIENT_ID/SECRET/ORG_SLUG`, `CAMPAIGN_SLUG` (repl
 **Tests** (depuis `../code_source`) :
 
 ```bash
-uv sync --group web && uv run pytest tests
+uv sync && uv run pytest tests
 ```
 La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[tool.mypy] files`) et `pytest tests` ; tous sont bloquants. `test_ffme_golden_master` nécessite un fichier de référence local non versionné.
 

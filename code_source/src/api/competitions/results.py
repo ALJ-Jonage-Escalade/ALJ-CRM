@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from starlette.concurrency import run_in_threadpool
+from fastapi.concurrency import run_in_threadpool
 
 from api.competitions.schemas.results import (
     BatchReport, ResultsFetchRequest, ResultsSettings, ResultsSettingsSaved, ResultsSettingsUpdate,

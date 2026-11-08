@@ -99,7 +99,7 @@ class TestBureauFiles(unittest.TestCase):
 
     def test_build_attestation_pure_function_rules(self):
         """build_attestation respecte les règles de montant, d'annulation, de signature et de payeur."""
-        from exports.attestation import build_attestation, get_safe_pdf_filename, render_attestation_pdf
+        from exports.attestation import build_attestation, get_safe_pdf_filename
         club = "club@alj.example"
 
         # 1. Validation montant manquant ou nul
@@ -125,11 +125,6 @@ class TestBureauFiles(unittest.TestCase):
 
         # 4. Signature & tampon garantis en base64 dans le HTML
         self.assertIn("data:image/jpeg;base64,", html)
-
-        # 5. Rendu PDF valide
-        pdf_bytes = render_attestation_pdf(html)
-        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
-        self.assertGreater(len(pdf_bytes), 300)
 
         # 6. Nom de fichier sécurisé
         fn = get_safe_pdf_filename(m["last_name"], m["first_name"], "CMD-99")

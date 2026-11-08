@@ -32,7 +32,7 @@ class TestCloudRunLot4(unittest.TestCase):
         def names(requirements):
             return {re.split(r"[\[<>=!~; ]", r, maxsplit=1)[0].lower() for r in requirements}
 
-        web_profile = names(pyproject["project"]["dependencies"]) | names(pyproject["dependency-groups"]["web"])
+        web_profile = names(pyproject["project"]["dependencies"])
         for backend in ("fastapi", "uvicorn", "requests", "python-dotenv", "weasyprint"):
             self.assertIn(backend, web_profile)
         self.assertNotIn("desktop", pyproject["dependency-groups"])

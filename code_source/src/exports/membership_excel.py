@@ -4,21 +4,17 @@ import io
 import logging
 import os
 
-import pandas as pd
-
 from domain.club_emails import CLUB_CONTACT_EMAIL
 from domain.members.sex import parse_sex
 from domain.members.view import is_cancelled
+from domain.utils import is_missing
 from exports.spreadsheet_safety import csv_safe
 
 logger = logging.getLogger("alj")
 
 def parse_date_to_datetime(val):
-    if not val or pd.isna(val):
+    if not val or is_missing(val):
         return ""
-    # Si c'est déjà un timestamp ou datetime
-    if hasattr(val, "to_pydatetime"):
-        return val.to_pydatetime()
     if isinstance(val, (datetime.datetime, datetime.date)):
         if isinstance(val, datetime.date) and not isinstance(val, datetime.datetime):
             return datetime.datetime(val.year, val.month, val.day)
@@ -45,7 +41,7 @@ def clean_digits_only(val):
     if val is None:
         return ""
     if isinstance(val, (int, float)):
-        if pd.isna(val):
+        if is_missing(val):
             return ""
         try:
             return str(int(float(val)))

@@ -1,5 +1,4 @@
 import unittest
-import pandas as pd
 import sys
 import os
 
@@ -40,7 +39,7 @@ class TestDomainUtils(unittest.TestCase):
         self.assertEqual(clean_city_name("saint-maurice-de-gourdans"), "Saint Maurice De Gourdans")
         self.assertEqual(clean_city_name("D'HUISON-LONGUEVILLE"), "D'Huison Longueville")
         self.assertEqual(clean_city_name(None), "Inconnue")
-        self.assertEqual(clean_city_name(pd.NA), "Inconnue")
+        self.assertEqual(clean_city_name(float("nan")), "Inconnue")
 
     def test_normalize_string(self):
         # Accents et majuscules
@@ -50,7 +49,7 @@ class TestDomainUtils(unittest.TestCase):
         
         # None and NaN values
         self.assertEqual(normalize_string(None), "")
-        self.assertEqual(normalize_string(pd.NA), "")
+        self.assertEqual(normalize_string(float("nan")), "")
         self.assertEqual(normalize_string(float('nan')), "")
         
         # Espaces superflus
@@ -64,7 +63,7 @@ class TestDomainUtils(unittest.TestCase):
         
         # None and NaN values
         self.assertEqual(normalize_name(None), "")
-        self.assertEqual(normalize_name(pd.NA), "")
+        self.assertEqual(normalize_name(float("nan")), "")
 
     def test_normalize_key_part(self):
         # Retrait des espaces, tirets et deux-points

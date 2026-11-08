@@ -11,7 +11,6 @@ from __future__ import annotations
 import base64
 import datetime
 import html as _html
-import io
 import os
 import re
 from typing import Any, Optional
@@ -191,92 +190,16 @@ def build_attestation(
     return html
 
 
-def _render_minimal_pdf_with_pydyf(html: str) -> bytes:
-    """Générateur de secours pur Python (pydyf) si WeasyPrint n'a pas Pango sous Windows."""
-    import pydyf
-
-    # Extraction du texte pertinent depuis le HTML
-    title_match = re.search(r"<h2>(.*?)</h2>", html, re.I)
-    title = title_match.group(1).strip() if title_match else "Attestation de Paiement"
-
-    adh_match = re.search(r"<span>Adhérent</span>\s*<strong>(.*?)</strong>", html, re.I | re.S)
-    adherent = adh_match.group(1).strip() if adh_match else ""
-
-    payer_match = re.search(r"<span>Payeur[^<]*</span>\s*<strong>(.*?)</strong>", html, re.I | re.S)
-    payer = payer_match.group(1).strip() if payer_match else ""
-
-    amount_match = re.search(r"<span>Montant perçu</span>\s*<strong>(.*?)</strong>", html, re.I | re.S)
-    amount = amount_match.group(1).strip() if amount_match else ""
-
-    date_match = re.search(r"Date\s*:\s*<strong>(.*?)</strong>", html, re.I)
-    date_val = date_match.group(1).strip() if date_match else ""
-
-    season_match = re.search(r"Saison\s*:\s*<strong>(.*?)</strong>", html, re.I)
-    season_val = season_match.group(1).strip() if season_match else ""
-    
-    def clean(txt):
-        import unicodedata
-        return unicodedata.normalize("NFKD", _html.unescape(str(txt or "")).replace("€", "EUR")).encode("ascii", "ignore").decode("ascii").replace("(", "[").replace(")", "]")
-
-    pdf = pydyf.PDF()
-    font = pydyf.Dictionary({"Type": "/Font", "Subtype": "/Type1", "BaseFont": "/Helvetica"})
-    font_bold = pydyf.Dictionary({"Type": "/Font", "Subtype": "/Type1", "BaseFont": "/Helvetica-Bold"})
-    # add_object() returns None: the indirect reference is read from the object afterwards
-    pdf.add_object(font)
-    pdf.add_object(font_bold)
-    font_ref = font.reference
-    font_b_ref = font_bold.reference
-
-    stream_cmds = [
-        b"BT",
-        b"/F2 20 Tf 50 780 Td (ALJ Escalade - Amicale Laique de Jonage) Tj",
-        f"/F1 11 Tf 0 -22 Td (Date : {clean(date_val)} | Saison : {clean(season_val)}) Tj".encode("ascii"),
-        f"/F2 16 Tf 0 -38 Td ({clean(title).upper()}) Tj".encode("ascii"),
-        b"/F1 11 Tf 0 -30 Td (Je soussigne, le President de l'Amicale Laique de Jonage - Section Escalade, certifie) Tj",
-        b"0 -16 Td (que la personne mentionnee ci-dessous s'est acquittee de sa cotisation annuelle.) Tj",
-        f"/F2 12 Tf 0 -36 Td (Adherent : {clean(adherent)}) Tj".encode("ascii"),
-        f"/F1 11 Tf 0 -18 Td (Payeur : {clean(payer)}) Tj".encode("ascii"),
-        f"/F2 12 Tf 0 -18 Td (Montant regle : {clean(amount)}) Tj".encode("ascii"),
-        b"/F1 11 Tf 0 -18 Td (Reglement HelloAsso - Carte Bancaire) Tj",
-        b"0 -40 Td (Attestation delivree pour faire valoir ce que de droit.) Tj",
-        b"0 -40 Td (Pour le Bureau de l'ALJ Escalade) Tj",
-        b"ET"
-    ]
-
-    stream = pydyf.Stream([b"\n".join(stream_cmds)])
-    pdf.add_object(stream)
-    stream_ref = stream.reference
-
-    page = pydyf.Dictionary({
-        "Type": "/Page",
-        "MediaBox": pydyf.Array([0, 0, 595, 842]),  # Format A4
-        "Resources": pydyf.Dictionary({
-            "Font": pydyf.Dictionary({
-                "F1": font_ref,
-                "F2": font_b_ref
-            })
-        }),
-        "Contents": stream_ref
-    })
-    pdf.add_page(page)
-
-    buf = io.BytesIO()
-    pdf.write(buf)
-    return buf.getvalue()
-
-
 def render_attestation_pdf(html: str) -> bytes:
-    """Génère le flux binaire PDF à partir du code HTML.
+    """PDF bytes of the attestation HTML, rendered by WeasyPrint.
 
-    Sous Linux (Cloud Run avec libpango), WeasyPrint assure le rendu complet.
-    En environnement de test ou Windows sans bibliothèque C Pango, un fallback
-    pur Python (pydyf) génère un document PDF binaire valide.
+    WeasyPrint needs the Pango system library (installed by the Dockerfile and in CI): a missing
+    library raises instead of producing a degraded document.
     """
-    try:
-        from weasyprint import HTML
-        return HTML(string=html, url_fetcher=_data_uri_only_fetcher()).write_pdf()
-    except (ImportError, OSError):
-        return _render_minimal_pdf_with_pydyf(html)
+    # Imported here: loading WeasyPrint loads Pango, which only the attestation and PDF routes need
+    from weasyprint import HTML
+
+    return HTML(string=html, url_fetcher=_data_uri_only_fetcher()).write_pdf()
 
 
 def _data_uri_only_fetcher():
@@ -287,13 +210,4 @@ def _data_uri_only_fetcher():
     """
     from weasyprint import urls
 
-    if hasattr(urls, "URLFetcher"):  # WeasyPrint >= 66
-        return urls.URLFetcher(allowed_protocols={"data"})
-
-    from weasyprint import default_url_fetcher  # older versions: plain function
-
-    def fetch(url, *args, **kwargs):
-        if not str(url).lower().startswith("data:"):
-            raise ValueError(f"URL not allowed in an attestation: {url}")
-        return default_url_fetcher(url, *args, **kwargs)
-    return fetch
+    return urls.URLFetcher(allowed_protocols={"data"})

@@ -1,10 +1,10 @@
 # AGENTS.md — Python Project
 
-All commands run from `code_source/`. Python 3.14 (`.python-version`), `requires-python >= 3.11`.
+All commands run from `code_source/`. Python 3.14 (`.python-version`, `requires-python >= 3.14`: the lock only resolves for the interpreter CI and Cloud Run run).
 
 ## Commands
-- install: `uv sync --group web` (dev group by default, `web` adds WeasyPrint for the attestation PDFs and their tests, which needs Pango, see `README.md`; CI: `uv sync --frozen --group web`)
-- test: `uv run pytest tests` — always pass `tests`: bare `uv run pytest` also collects `e2e/` and fails without Playwright
+- install: `uv sync` (dev group by default; WeasyPrint, for the attestation PDFs and their tests, needs Pango from the system, see `README.md`; CI: `uv sync --frozen`)
+- test: `uv run pytest tests` (CI adds `--cov=src --cov-branch --cov-report=term -rs`: coverage report, no threshold, skip reasons listed) — always pass `tests`: bare `uv run pytest` also collects `e2e/` and fails without Playwright
 - e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker and `npm run build` in `frontend/`; see `dev/README.md`)
 - lint: `uv run ruff check src tests` (security rules `S` included; `tests/` and `e2e/` ignore a few of them, see `[tool.ruff.lint.per-file-ignores]`)
 - security scan (Semgrep CE, as CI, from the repo root): `uvx semgrep@1.182.1 scan --config p/python --config p/typescript --config p/owasp-top-ten --metrics=off --error --exclude code_source/frontend/src/lib/api-schema.ts code_source/src code_source/frontend/src`
@@ -24,7 +24,7 @@ All commands run from `code_source/`. Python 3.14 (`.python-version`), `requires
 
 ## Critical Rules
 1. Use `uv run <cmd>` for all commands — never activate venv manually
-2. Add dependencies with `uv add <pkg>` (`--group web|dev` as needed), not pip install, then run `uv run python dev/export_requirements.py` to regenerate the versioned `requirements*.txt`
+2. Add dependencies with `uv add <pkg>` (`--group dev` for tools), not pip install, then run `uv run python dev/export_requirements.py` to regenerate the versioned `requirements*.txt`
 3. Type-annotate new and modified functions and methods
 4. Use pytest to run tests
 5. Log through the `alj` logger (`logging.getLogger("alj")`); `print()` remains in older server code (stdout goes to Cloud Logging); do not add new ones

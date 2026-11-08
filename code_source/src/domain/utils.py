@@ -1,7 +1,6 @@
+import math
 import unicodedata
 from urllib.parse import urlparse
-
-import pandas as pd
 
 
 def is_helloasso_url(value: str) -> bool:
@@ -14,12 +13,17 @@ def is_helloasso_url(value: str) -> bool:
     return host == "helloasso.com" or host.endswith(".helloasso.com")
 
 
+def is_missing(value: object) -> bool:
+    """True for None and for a float NaN (an empty spreadsheet cell)."""
+    return value is None or (isinstance(value, float) and math.isnan(value))
+
+
 def normalize_string(s) -> str:
     """
     Normalisation générale d'une chaîne : conversion en minuscules, 
     retrait des accents (NFD/Mn) et suppression des espaces superflus.
     """
-    if s is None or pd.isna(s):
+    if is_missing(s):
         return ""
     s = str(s).strip().lower()
     # Retrait des accents
@@ -73,7 +77,7 @@ def clean_city_name(city_raw) -> str:
     """
     Harmonise et nettoie les noms de villes pour éviter les doublons (ex: Villette d'Anthon).
     """
-    if city_raw is None or pd.isna(city_raw):
+    if is_missing(city_raw):
         return "Inconnue"
     c = str(city_raw).replace("’", "'").replace("‘", "'").replace("-", " ").strip()
     c = c.upper()
