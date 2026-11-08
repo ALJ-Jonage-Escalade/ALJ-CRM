@@ -148,6 +148,13 @@ class HelloAssoSync(BaseModel):
     stats: HelloAssoSyncStats
 
 
+class AllPaidChecked(BaseModel):
+    """notified: every selected participant has paid and the summary e-mail was sent now."""
+    status: Literal["success"]
+    competition_id: int
+    notified: bool
+
+
 class ResultsFetched(BaseModel):
     """MyCompet results matched to the participants (the competition is updated: reload it)."""
     status: Literal["success"]

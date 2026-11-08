@@ -6,6 +6,8 @@ import datetime
 import itertools
 from unittest.mock import patch
 
+from domain.errors import UpstreamUnavailable
+
 from infrastructure.firestore.client import FirestoreError
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from services.competitions.results_batch import (
@@ -226,7 +228,7 @@ class TestDailyBatch(BatchTestCase):
         self.competition(1001, "Open de bloc de Valbrume", ended_days_ago=2)
         self.competition(1002, "Championnat du club", ended_days_ago=3, url_resultats=results_url(99902))
         self.published(99902, "Championnat du club", ended_days_ago=3, in_archive=False)
-        with patch("services.competitions.results_batch.fetch_ffme_archive_entries", side_effect=RuntimeError("503")):
+        with patch("services.competitions.results_batch.fetch_ffme_archive_entries", side_effect=UpstreamUnavailable("503")):
             report = self.run_batch()
         self.assertEqual([d["status"] for d in report["details"]], ["pending", "found"])
 

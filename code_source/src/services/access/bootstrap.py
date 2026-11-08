@@ -13,7 +13,7 @@ from infrastructure import runtime_env
 from infrastructure.firestore.access_store import AccessStore, HistoryEntry, RoleEntry
 from infrastructure.security.role_directory import Clock, RoleDirectory
 from services.access.rules import BOOTSTRAP_AUTHOR, checked_email, iso
-from services.errors import InvalidRequest
+from domain.errors import InvalidRequest
 
 logger = logging.getLogger("alj")
 

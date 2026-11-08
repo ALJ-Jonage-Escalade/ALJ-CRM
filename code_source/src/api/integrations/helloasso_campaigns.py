@@ -24,7 +24,7 @@ from infrastructure.firestore.app_settings import (
 from infrastructure.firestore.client import FirestoreError
 from infrastructure.helloasso import api as helloasso_api
 from infrastructure.helloasso import form_activities
-from services.errors import InvalidRequest, StorageUnavailable
+from domain.errors import InvalidRequest, StorageUnavailable
 
 logger = logging.getLogger("alj")
 

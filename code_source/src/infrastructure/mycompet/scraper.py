@@ -6,8 +6,10 @@ import logging
 import re
 from typing import List, Optional, TypedDict
 
-import requests
 import lxml.html
+import requests
+
+from domain.errors import InvalidRequest, NotFound, UpstreamUnavailable
 from domain.utils import normalize_string
 from infrastructure import runtime_env
 
@@ -115,10 +117,11 @@ def parse_mycompet_results_html(html_text: str, club_keyword: str = "JONAGE") ->
 
 
 def fetch_and_parse_mycompet_results(url_or_id: str, club_keyword: str = "JONAGE") -> list[dict]:
-    """Télécharge la page de résultats MyCompet et retourne les résultats extraits pour le club."""
+    """Télécharge la page de résultats MyCompet et retourne les résultats extraits pour le club.
+    InvalidRequest: no URL or number; UpstreamUnavailable: MyCompet unreachable or refusing the page."""
     url = normalize_result_url(url_or_id)
     if not url:
-        raise ValueError("URL ou identifiant de résultat MyCompet manquant.")
+        raise InvalidRequest("URL ou identifiant de résultat MyCompet manquant.")
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -126,9 +129,12 @@ def fetch_and_parse_mycompet_results(url_or_id: str, club_keyword: str = "JONAGE
         "Accept-Language": "fr,fr-FR;q=0.9,en;q=0.8"
     }
 
-    resp = requests.get(_fetch_url(url), headers=headers, timeout=15)
+    try:
+        resp = requests.get(_fetch_url(url), headers=headers, timeout=15)
+    except requests.RequestException as e:
+        raise UpstreamUnavailable(f"MyCompet injoignable ({url}) : {type(e).__name__}") from e
     if resp.status_code != 200:
-        raise RuntimeError(f"Impossible de récupérer les résultats MyCompet depuis {url} (code HTTP {resp.status_code})")
+        raise UpstreamUnavailable(f"Impossible de récupérer les résultats MyCompet depuis {url} (code HTTP {resp.status_code})")
 
     return parse_mycompet_results_html(resp.text, club_keyword=club_keyword)
 
@@ -179,11 +185,14 @@ def parse_ffme_archive_entries(html_text: str) -> List[ArchiveEntry]:
 
 
 def fetch_ffme_archive_entries() -> List[ArchiveEntry]:
-    """Downloads the FFME results archive (one request; RuntimeError / requests errors on failure)."""
+    """Downloads the FFME results archive (one request; UpstreamUnavailable on failure)."""
     url = runtime_env.ffme_archives_url()
-    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, timeout=10)
+    try:
+        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, timeout=10)
+    except requests.RequestException as e:
+        raise UpstreamUnavailable(f"Archives FFME injoignables ({url}) : {type(e).__name__}") from e
     if resp.status_code != 200:
-        raise RuntimeError(f"Archives FFME indisponibles ({url}, code HTTP {resp.status_code})")
+        raise UpstreamUnavailable(f"Archives FFME indisponibles ({url}, code HTTP {resp.status_code})")
     return parse_ffme_archive_entries(resp.text)
 
 
@@ -237,7 +246,7 @@ def find_mycompet_result_url(comp_nom: str, comp_date: str = "", comp_lieu: str 
     """Tente de trouver automatiquement l'URL de résultat MyCompet sans saisie manuelle (archives FFME)."""
     try:
         entries = fetch_ffme_archive_entries()
-    except (requests.RequestException, RuntimeError) as e:
+    except UpstreamUnavailable as e:
         logger.warning("[MYCOMPET] Recherche automatique dans les archives FFME impossible : %s", e)
         return ""
     return find_result_url_in_archives(entries, comp_nom, comp_lieu, comp_date, comp_date_fin)
@@ -277,7 +286,6 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
     """
     import secrets
     import time
-    from services.errors import InvalidRequest, NotFound, StorageUnavailable
 
     comp_id_str = str(competition_id).strip()
     if not comp_id_str.isdigit():
@@ -294,10 +302,10 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
         resp_entry = session.get("https://mycompet.ffme.fr/action/competitions", timeout=10)
     except requests.RequestException as err:
         logger.warning("Échec de connexion initiale à MyCompet : %s", err)
-        raise StorageUnavailable("Impossible de joindre le serveur MyCompet FFME.") from err
+        raise UpstreamUnavailable("Impossible de joindre le serveur MyCompet FFME.") from err
 
     if resp_entry.status_code != 200:
-        raise StorageUnavailable(f"MyCompet a répondu avec le statut HTTP {resp_entry.status_code}.")
+        raise UpstreamUnavailable(f"MyCompet a répondu avec le statut HTTP {resp_entry.status_code}.")
 
     match_init = re.search(r"Echo\.Boot\.boot\('(/app)',\s*'(\d+)'", resp_entry.text)
     init_id = match_init.group(2) if match_init else "0"
@@ -323,7 +331,7 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
         session.post("https://mycompet.ffme.fr/app?sid=Echo.Sync", data=init_xml.encode("utf-8"), headers=sync_headers, timeout=10)
     except requests.RequestException as err:
         logger.warning("Échec de l'initialisation Echo.Sync MyCompet : %s", err)
-        raise StorageUnavailable("Erreur lors de l'initialisation de session sur MyCompet.") from err
+        raise UpstreamUnavailable("Erreur lors de l'initialisation de session sur MyCompet.") from err
 
     # 2. Ouverture de la vue Calendrier des compétitions (composant C.34)
     cal_xml = (
@@ -340,7 +348,7 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
         )
     except requests.RequestException as err:
         logger.warning("Échec de l'ouverture du calendrier MyCompet : %s", err)
-        raise StorageUnavailable("Erreur lors du chargement du calendrier MyCompet.") from err
+        raise UpstreamUnavailable("Erreur lors du chargement du calendrier MyCompet.") from err
 
     # 3. Filtrage par numéro de compétition
     match_id_field = re.search(r'<c i="([^"]+)" t="RTF"><s>Grid</s><p n="toolTipText">CompetitionAdm\.c\.id\.tt</p>', resp_cal.text)
@@ -364,7 +372,7 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
             xml_table = resp_filter.text
         except requests.RequestException as err:
             logger.warning("Échec du filtre MyCompet : %s", err)
-            raise StorageUnavailable("Erreur lors du filtrage sur MyCompet.") from err
+            raise UpstreamUnavailable("Erreur lors du filtrage sur MyCompet.") from err
 
     # 4. Détection de la ligne de résultat
     match_row = re.search(rf'<p n="text">{re.escape(comp_id_str)}</p>(.*?)(?:<p n="text">\d{{5}}</p>|$)', xml_table, re.DOTALL)

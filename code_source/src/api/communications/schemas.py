@@ -108,10 +108,58 @@ class EmailStatus(BaseModel):
     sender: str
 
 
+class EmailRecipient(RequestBody):
+    """A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…)."""
+    id: Optional[int] = None
+    first_name: str = ""
+    last_name: str = ""
+    email: str = ""
+    num_licence: str = ""
+    tarif: str = ""
+    season: str = ""
+
+
+class EmailSendRequest(RequestBody):
+    """template_name: a saved template, whose subject, body and sender fill what is left empty here.
+    recipient_ids: members of the cache; recipients: people given by the page (both may be used)."""
+    template_name: str = ""
+    subject: str = ""
+    body: str = ""
+    recipient_ids: List[int] = []
+    recipients: List[EmailRecipient] = []
+    competition_id: Optional[int] = None
+    sender_email: str = ""
+    sender_name: str = ""
+    add_signature: bool = True
+
+
+class EmailPreviewRequest(RequestBody):
+    """recipient: whose values fill the variables (an example member when absent)."""
+    template_name: str = ""
+    subject: str = ""
+    body: str = ""
+    recipient: Optional[EmailRecipient] = None
+    competition_id: Optional[int] = None
+    add_signature: bool = True
+
+
+class EmailPreviewContent(BaseModel):
+    subject: str
+    body_plain: str
+    body_html: str
+    sender_email: str
+    sender_name: str
+
+
+class EmailPreview(BaseModel):
+    status: Literal["success"]
+    preview: EmailPreviewContent
+
+
 class EmailDispatch(BaseModel):
-    """Outcome of /api/send-email. A refused request (empty subject, no valid recipient) or a failed sending is
-    answered with HTTP 200 and status "error": the caller checks `status`, not the HTTP code."""
-    status: Literal["success", "partial", "error"]
+    """Outcome of /api/send-email when at least one e-mail left: status "partial" when some recipients failed (see
+    details). A refused request is a 400, and a sending where every e-mail failed a 502."""
+    status: Literal["success", "partial"]
     message: str = ""
     sent_count: int = 0
     errors_count: int = 0

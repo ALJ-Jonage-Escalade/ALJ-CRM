@@ -1,6 +1,6 @@
 """Plumbing shared by the services of the competition pages (Firestore-backed).
 
-- `storage` / `write`: decorators turning Firestore failures into services.errors; a write
+- `storage` / `write`: decorators turning Firestore failures into domain.errors; a write
   also drops the competition list cache, since most writes change a competition document
   (participants, coach names, HelloAsso payments).
 - The competition list cache, shared by every poll of every open page.
@@ -18,7 +18,7 @@ from infrastructure.firestore.competition_repository import CompetitionFirestore
 from infrastructure.firestore.client import FirestoreConflictError, FirestoreError
 from infrastructure.timed_cache import TimedCache
 from services.documents import Doc
-from services.errors import Conflict, NotFound, StorageUnavailable
+from domain.errors import Conflict, NotFound, StorageUnavailable
 
 logger = logging.getLogger("alj")
 P = ParamSpec("P")

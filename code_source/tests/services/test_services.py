@@ -10,7 +10,7 @@ from infrastructure.firestore.client import FirestoreConflictError, FirestoreErr
 from services.competitions import store as competition_store
 from services.competitions.competitions import CompetitionService as Service
 from services.competitions.helloasso_items import HelloAssoItemService
-from services.errors import Conflict, InvalidRequest, NotFound, StorageUnavailable
+from domain.errors import Conflict, InvalidRequest, NotFound, StorageUnavailable
 
 
 class TestCompetitionService(FirestoreRepoTestCase):

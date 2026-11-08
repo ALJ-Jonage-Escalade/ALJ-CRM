@@ -2,7 +2,7 @@
 
 The fields the browser used to compute (age, slot group, category, normalized status…)
 come from domain.members.view. Knows nothing about HTTP: failures are raised as
-services.errors.
+domain.errors.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from infrastructure.sqlite.members import MemberRepository
 from infrastructure.sqlite.planning import PlanningRepository
 from services.competitions.competitions import CompetitionService
 from services.documents import Doc
-from services.errors import NotFound
+from domain.errors import NotFound
 from services.members.seasons import SeasonService
 
 

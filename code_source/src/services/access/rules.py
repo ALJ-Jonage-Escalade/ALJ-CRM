@@ -26,7 +26,7 @@ from infrastructure.firestore.access_store import AccessStore, HistoryEntry, Rol
 from infrastructure.security import role_directory
 from infrastructure.security.role_directory import Clock, RoleDirectory, invitation_expired, normalized_email, parsed
 from infrastructure.security.roles import ROLES_BY_NAME, RoleName
-from services.errors import Conflict, InvalidRequest, NotFound
+from domain.errors import Conflict, InvalidRequest, NotFound
 
 logger = logging.getLogger("alj")
 

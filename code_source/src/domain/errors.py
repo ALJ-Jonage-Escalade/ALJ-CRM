@@ -1,4 +1,4 @@
-"""Errors raised by the services, independent of HTTP.
+"""Business errors, independent of HTTP: raised by the services and the infrastructure adapters alike.
 
 Each error carries a user-facing message and a machine `code` that the web pages test
 (e.g. "already_paid"). The API maps each class to an HTTP status (api.responses).

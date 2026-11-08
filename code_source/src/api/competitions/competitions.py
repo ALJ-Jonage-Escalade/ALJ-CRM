@@ -29,7 +29,7 @@ def list_competitions(request: Request) -> Response:
     return json_with_etag(request, Service.list_competitions())
 
 
-@router.get("/lookup-ffme/{id_ffme}", response_model=CompetitionFfmeLookup, responses=error_responses(400, 404, 503))
+@router.get("/lookup-ffme/{id_ffme}", response_model=CompetitionFfmeLookup, responses=error_responses(400, 404, 502))
 def lookup_ffme_competition(id_ffme: str) -> Doc:
     return Service.lookup_ffme(id_ffme)
 

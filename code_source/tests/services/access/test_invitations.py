@@ -9,7 +9,7 @@ import pytest
 from infrastructure.security.role_directory import RoleDirectory
 from services.access import invitations
 from services.access.rules import AccessRules
-from services.errors import Conflict
+from domain.errors import Conflict
 from support.fake_access import FakeClock, InMemoryAccessStore, role_entry
 
 ADMIN = "albus@alj.example"

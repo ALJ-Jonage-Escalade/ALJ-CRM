@@ -1,7 +1,7 @@
 """Participants of a competition (array embedded in the competition document).
 
 Every write goes through the repository's optimistic lock (re-read and retried on a
-concurrent change). Knows nothing about HTTP: failures are raised as services.errors.
+concurrent change). Knows nothing about HTTP: failures are raised as domain.errors.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from infrastructure.firestore.competition_repository import (
     ParticipantChanged,
 )
 from services.competitions.store import require_competition, write
-from services.errors import Conflict, NotFound
+from domain.errors import Conflict, NotFound
 
 
 def _written(competition_id: int, doc: Optional[dict]) -> dict:

@@ -6,23 +6,16 @@ Reads the SQLite cache (HelloAssoWebhookService): must not join the Firestore-on
 from __future__ import annotations
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 
-from api.responses import internal_error
+from api.competitions.schemas.views import AllPaidChecked
+from api.responses import error_responses
+from infrastructure.helloasso.webhook import HelloAssoWebhookService
 
 router = APIRouter(prefix="/api/competitions")
 
 
-@router.post("/{comp_id}/check-all-paid")
-def check_competition_all_paid_api(comp_id: int):
+@router.post("/{comp_id}/check-all-paid", response_model=AllPaidChecked, responses=error_responses(500, 503))
+def check_competition_all_paid_api(comp_id: int) -> AllPaidChecked:
     """Vérifie si tous les compétiteurs ont payé et envoie l'e-mail récapitulatif si applicable."""
-    try:
-        from infrastructure.helloasso.webhook import HelloAssoWebhookService
-        notified = HelloAssoWebhookService.check_and_notify_all_paid(comp_id)
-        return {
-            "status": "success",
-            "competition_id": comp_id,
-            "notified": notified
-        }
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": internal_error(e, "check_competition_all_paid_api")})
+    notified = HelloAssoWebhookService.check_and_notify_all_paid(comp_id)
+    return AllPaidChecked(status="success", competition_id=comp_id, notified=bool(notified))

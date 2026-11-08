@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Body, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, Response
 
-from api.activities.schemas import PlanningSlot, PlanningSlotDeleted, PlanningSlotSaved, PlanningSlotUpdate
-from api.responses import error, error_responses, internal_error
+from api.activities.schemas import PlanningReplaced, PlanningSlot, PlanningSlotDeleted, PlanningSlotSaved, PlanningSlotUpdate
+from api.responses import error, error_responses
 from infrastructure.sqlite.planning import PlanningRepository
 
 router = APIRouter()
@@ -27,10 +27,7 @@ def _slot(row: Dict[str, Any]) -> PlanningSlot:  # Any: a row of the planning ta
 @router.get("/api/planning", response_model=List[PlanningSlot], responses=error_responses(500))
 def get_planning() -> List[PlanningSlot] | JSONResponse:
     """Récupère le planning depuis la BDD SQLite."""
-    try:
-        return [_slot(row) for row in PlanningRepository.load_planning_data()]
-    except Exception as e:
-        return error(500, internal_error(e, "get_planning"))
+    return [_slot(row) for row in PlanningRepository.load_planning_data()]
 
 
 @router.post("/api/planning/item", response_model=PlanningSlotSaved, responses=error_responses(400, 500))
@@ -40,24 +37,18 @@ def save_planning_item_api(item: PlanningSlotUpdate) -> PlanningSlotSaved | JSON
         return error(400, "Le nom du groupe est obligatoire.")
     if not item.horaires:
         return error(400, "Les horaires sont obligatoires.")
-    try:
-        slot = item.model_dump()
-        slot["encadrants"] = [e.strip() for e in item.encadrants if e.strip()]
-        saved = PlanningRepository.save_planning_item(slot)
-        return PlanningSlotSaved(status="success", message="Créneau enregistré avec succès.", item=_slot(saved))
-    except Exception as e:
-        return error(500, internal_error(e, "save_planning_item_api"))
+    slot = item.model_dump()
+    slot["encadrants"] = [e.strip() for e in item.encadrants if e.strip()]
+    saved = PlanningRepository.save_planning_item(slot)
+    return PlanningSlotSaved(status="success", message="Créneau enregistré avec succès.", item=_slot(saved))
 
 
 @router.delete("/api/planning/item/{item_id}", response_model=PlanningSlotDeleted, responses=error_responses(404, 500))
 def delete_planning_item_api(item_id: int) -> PlanningSlotDeleted | JSONResponse:
     """Supprime un créneau de planning par son ID."""
-    try:
-        if not PlanningRepository.delete_planning_item(item_id):
-            return error(404, f"Créneau #{item_id} introuvable.")
-        return PlanningSlotDeleted(status="success", message=f"Créneau #{item_id} supprimé avec succès.")
-    except Exception as e:
-        return error(500, internal_error(e, "delete_planning_item_api"))
+    if not PlanningRepository.delete_planning_item(item_id):
+        return error(404, f"Créneau #{item_id} introuvable.")
+    return PlanningSlotDeleted(status="success", message=f"Créneau #{item_id} supprimé avec succès.")
 
 
 @router.get("/api/planning/export", response_class=Response,
@@ -99,17 +90,12 @@ def export_planning_api(mode: Literal["grid", "list"] = Query("grid"), season: O
                 "Access-Control-Expose-Headers": "Content-Disposition"
             }
         )
-    except Exception as e:
-        return error(500, internal_error(e, "export_planning_api"))
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-@router.post("/api/planning")
-def update_planning(planning_data: List[Dict[str, Any]] = Body(...)):
-    """Met à jour le planning dans la BDD SQLite."""
-    try:
-        PlanningRepository.save_planning_data(planning_data)
-        return {"status": "success", "message": "Planning mis à jour"}
-    except Exception as e:
-        return {"error": internal_error(e, "update_planning")}
+@router.post("/api/planning", response_model=PlanningReplaced, responses=error_responses(500))
+def update_planning(slots: List[PlanningSlotUpdate]) -> PlanningReplaced:
+    """Remplace le planning complet (administrateurs) ; un créneau d'id 0 reçoit un nouvel identifiant."""
+    PlanningRepository.save_planning_data([{**slot.model_dump(), "id": slot.id or None} for slot in slots])
+    return PlanningReplaced(status="success", message="Planning mis à jour", count=len(slots))

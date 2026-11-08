@@ -177,7 +177,7 @@ class TestCompetitions(ApiTestCase):
             self.assertEqual(data["date_competition"], "2026-11-07")
             self.assertEqual(data["date_fin"], "2026-11-07")
 
-        from services.errors import NotFound
+        from domain.errors import NotFound
         with patch("services.competitions.competitions.CompetitionService.lookup_ffme", side_effect=NotFound("Introuvable")):
             r = self.client.get("/api/competitions/lookup-ffme/99999")
             self.assertEqual(r.status_code, 404)

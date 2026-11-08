@@ -1,3 +1,4 @@
+import logging
 """
 Service d'expédition et de rendu d'e-mails sécurisé (contexte Compétitions & Adhérents).
 
@@ -19,9 +20,12 @@ from infrastructure.sqlite.members import MemberRepository
 from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as CompetitionRepository,
 )
-from infrastructure.mail.repository import EmailRepository
+from infrastructure.mail.repository import EmailRepository, MailError
+from domain.errors import InvalidRequest, UpstreamUnavailable
 from infrastructure.mail.senders import CLUB_SENDER_DOMAIN
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
+
+logger = logging.getLogger("alj")
 
 
 class EmailDispatchService:
@@ -242,9 +246,8 @@ class EmailDispatchService:
         sender_name: Optional[str] = None,
         add_signature: bool = True
     ) -> Dict[str, Any]:
-        """
-        Envoie les e-mails aux destinataires ciblés avec injection des variables.
-        """
+        """Sends the e-mail to each recipient, with its variables replaced. A failed recipient does not stop the
+        others (status "partial"). InvalidRequest: nothing to send; UpstreamUnavailable: every e-mail failed."""
         subj_tmpl = subject or ""
         body_tmpl = body or ""
         default_from_email = sender_email
@@ -261,23 +264,11 @@ class EmailDispatchService:
                     default_from_name = t.get("sender_name")
 
         if not subj_tmpl or not body_tmpl:
-            return {
-                "status": "error",
-                "message": "Le sujet et le corps de l'e-mail ne peuvent pas être vides.",
-                "sent_count": 0,
-                "errors_count": 0,
-                "details": []
-            }
+            raise InvalidRequest("Le sujet et le corps de l'e-mail ne peuvent pas être vides.")
 
         destinataires = cls.resolve_recipients(recipient_ids=recipient_ids, recipients_data=recipients)
         if not destinataires:
-            return {
-                "status": "error",
-                "message": "Aucun destinataire avec une adresse e-mail valide n'a été trouvé.",
-                "sent_count": 0,
-                "errors_count": 0,
-                "details": []
-            }
+            raise InvalidRequest("Aucun destinataire avec une adresse e-mail valide n'a été trouvé.")
 
         comp_ctx = cls.get_competition_context(competition_id)
 
@@ -316,7 +307,7 @@ class EmailDispatchService:
                 dest, comp_ctx, escape_html=True)
 
             try:
-                ok = EmailRepository.send_email(
+                EmailRepository.send_email(
                     to_email=to_email,
                     subject=sub_rendered,
                     body=plain_body,
@@ -325,25 +316,15 @@ class EmailDispatchService:
                     from_email=default_from_email,
                     from_name=default_from_name
                 )
-                if ok:
-                    sent_count += 1
-                    details.append({
-                        "id": dest.get("id"),
-                        "name": full_name,
-                        "email": to_email,
-                        "status": "sent"
-                    })
-                else:
-                    errors_count += 1
-                    details.append({
-                        "id": dest.get("id"),
-                        "name": full_name,
-                        "email": to_email,
-                        "status": "error",
-                        "error": "Échec d'envoi EmailRepository"
-                    })
-            except Exception as ex:
-                print(f"❌ [EMAIL_DISPATCH] Envoi impossible à {to_email} : {type(ex).__name__}: {ex}")
+                sent_count += 1
+                details.append({
+                    "id": dest.get("id"),
+                    "name": full_name,
+                    "email": to_email,
+                    "status": "sent"
+                })
+            except MailError as ex:  # this recipient only: the others are still sent
+                logger.warning("[EMAIL_DISPATCH] Envoi impossible à %s : %s", to_email, ex)
                 errors_count += 1
                 details.append({
                     "id": dest.get("id"),
@@ -353,9 +334,11 @@ class EmailDispatchService:
                     "error": "Erreur lors de l'envoi (détails dans les journaux)."
                 })
 
-        first_err = details[0]["error"] if details and "error" in details[0] else "Erreur d'envoi."
+        first_err = next((d["error"] for d in details if "error" in d), "Erreur d'envoi.")
+        if errors_count and not sent_count:
+            raise UpstreamUnavailable(f"Aucun e-mail n'est parti : {first_err}")
         return {
-            "status": "success" if errors_count == 0 else ("partial" if sent_count > 0 else "error"),
+            "status": "success" if errors_count == 0 else "partial",
             "sent_count": sent_count,
             "errors_count": errors_count,
             "total_recipients": len(destinataires),

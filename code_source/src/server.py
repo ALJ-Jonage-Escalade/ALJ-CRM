@@ -73,6 +73,8 @@ async def cloud_db_middleware(request, call_next):
     return response
 
 
+from api.responses import unhandled_error_middleware
+app.middleware("http")(unhandled_error_middleware)  # innermost: registered first
 app.middleware("http")(cloud_db_middleware)
 
 from infrastructure.security.api_auth import auth_middleware, local_guard_middleware
@@ -107,7 +109,7 @@ from api.integrations import cloud_db, google_auth, helloasso, helloasso_campaig
 from api.reports import map as members_map, pivot
 from api.web import health, pages, pwa
 from api.responses import service_error_handler
-from services.errors import ServiceError
+from domain.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
              results, payments, members, seasons, dashboard, helloasso_import, email, whatsapp, attestations,
              planning, presence, members_map, pivot, ffme,

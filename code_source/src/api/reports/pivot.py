@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from api.reports import resolve_season
 from api.reports.schemas import PivotRecord, PivotRecords
-from api.responses import error, error_responses, internal_error
+from api.responses import error_responses
 from domain.members.age_rules import age_at, get_season_start_date, parse_birth_date
 from domain.members.sex import parse_sex
 from domain.members.view import fmt_first_name, fmt_last_name, is_cancelled
@@ -91,8 +91,5 @@ def pivot_records(season: str) -> List[PivotRecord]:
 @router.get("/api/reports/pivot-records", response_model=PivotRecords, responses=error_responses(500))
 def get_pivot_records(season: str = "active") -> Union[PivotRecords, JSONResponse]:
     """Members of a season for the pivot table of the Outils page ("Toutes les saisons": every season)."""
-    try:
-        target_season = resolve_season(season)
-        return PivotRecords(season=target_season, records=pivot_records(target_season))
-    except Exception as e:
-        return error(500, internal_error(e, "get_pivot_records"))
+    target_season = resolve_season(season)
+    return PivotRecords(season=target_season, records=pivot_records(target_season))

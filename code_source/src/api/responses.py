@@ -5,13 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Awaitable, Callable, Dict, Literal, Optional, Union
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from services.errors import Conflict, InvalidRequest, NotFound, ServiceError, StorageUnavailable, UpstreamUnavailable
+from domain.errors import Conflict, InvalidRequest, NotFound, ServiceError, StorageUnavailable, UpstreamUnavailable
 
 logger = logging.getLogger("alj")
 
@@ -84,6 +84,19 @@ SERVICE_ERROR_STATUS = (
     (StorageUnavailable, 503),
     (UpstreamUnavailable, 502),
 )
+
+
+async def unhandled_error_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """Innermost middleware: an exception no route handled gets the API's error shape (not Starlette's plain text),
+    503 when Firestore failed, else 500; logged with its traceback, never shown. Being a middleware, its answer still
+    goes through the other ones (security headers, replication of what was written)."""
+    from infrastructure.firestore.client import FirestoreError
+    try:
+        return await call_next(request)
+    except FirestoreError as e:
+        return error(503, f"Base de données momentanément indisponible : {internal_error(e, request.url.path)}")
+    except Exception as e:  # last resort for the whole app: every other failure answers the same 500
+        return error(500, internal_error(e, request.url.path))
 
 
 def service_error_handler(request: Request, exc: ServiceError) -> JSONResponse:

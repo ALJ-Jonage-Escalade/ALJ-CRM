@@ -41,15 +41,12 @@ def preview_attestation_api(data: AttestationRequest) -> Response:
     problem = attestation_error(member)
     if problem:
         return error(400, problem)
-    try:
-        pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name"), club_email=CLUB_CONTACT_EMAIL))
-    except Exception as e:
-        return error(500, internal_error(e, "preview_attestation_api"))
+    pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name"), club_email=CLUB_CONTACT_EMAIL))
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": _content_disposition(_filename(member))})
 
 
-@router.post("/api/attestations/send", response_model=AttestationSent, responses=error_responses(400, 403, 404, 500))
+@router.post("/api/attestations/send", response_model=AttestationSent, responses=error_responses(400, 403, 404, 500, 502))
 def send_attestation_api(data: AttestationSend) -> AttestationSent | JSONResponse:
     """Génère une attestation PDF en mémoire, l'envoie par e-mail et met à jour la date d'envoi."""
     to_email = data.to_email
@@ -60,10 +57,7 @@ def send_attestation_api(data: AttestationSend) -> AttestationSent | JSONRespons
     problem = attestation_error(member)
     if problem:
         return error(400, problem)
-    try:
-        return _send(member, data)
-    except Exception as e:
-        return error(500, internal_error(e, "send_attestation_api"))
+    return _send(member, data)
 
 
 def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
@@ -71,7 +65,7 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
     from domain.utils import apply_template_variables
     from infrastructure.mail.dispatch import EmailDispatchService
     from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
-    from infrastructure.mail.repository import EmailRepository
+    from infrastructure.mail.repository import EmailRepository, MailError
 
     pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name"), club_email=CLUB_CONTACT_EMAIL))
     filename_pdf = _filename(member)
@@ -99,19 +93,20 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
     plain_body = body + ("\n\n" + build_signature_plain() if data.add_signature else "")
     inline_images = get_inline_images() if data.add_signature else []
 
-    ok = EmailRepository.send_email(
-        to_email=data.to_email,
-        subject=subject,
-        body=plain_body,
-        html_body=html_body,
-        attachment_bytes=pdf_bytes,
-        attachment_filename=filename_pdf,
-        inline_images=inline_images,
-        from_email=sender_email,
-        from_name=sender_name
-    )
-    if not ok:
-        return error(500, "Échec d'envoi de l'e-mail.")
+    try:
+        EmailRepository.send_email(
+            to_email=data.to_email,
+            subject=subject,
+            body=plain_body,
+            html_body=html_body,
+            attachment_bytes=pdf_bytes,
+            attachment_filename=filename_pdf,
+            inline_images=inline_images,
+            from_email=sender_email,
+            from_name=sender_name
+        )
+    except MailError as e:
+        return error(502, f"Échec d'envoi de l'e-mail : {internal_error(e, 'send_attestation_api')}")
 
     # Date the certificate was sent, in SQLite (replicated to Firestore after the request, server.py)
     now_str = datetime.datetime.now().strftime("%d/%m/%Y")

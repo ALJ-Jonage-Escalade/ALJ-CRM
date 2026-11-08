@@ -135,7 +135,7 @@ files = [
     "src/services/competitions/competitions.py",
     "src/services/competitions/store.py",
     "src/services/documents.py",
-    "src/services/errors.py",
+    "src/domain/errors.py",
     "src/services/competitions/helloasso_items.py",
     "src/services/members/members.py",
     "src/services/competitions/participants.py",

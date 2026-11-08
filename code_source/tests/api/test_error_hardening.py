@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from domain.constants import is_valid_season
+from domain.errors import UpstreamUnavailable
 from infrastructure.sqlite.connection import DB_WRITE_ERROR, SqliteDatabase
 from infrastructure.sqlite.members import MemberRepository
 
@@ -86,7 +87,7 @@ def test_repository_write_error_is_generic() -> None:
 
 
 def test_mycompet_scraping_error_is_generic(client: TestClient) -> None:
-    with patch("services.competitions.results_batch.fetch_and_parse_mycompet_results", side_effect=RuntimeError(SECRET_DETAIL)), \
+    with patch("services.competitions.results_batch.fetch_and_parse_mycompet_results", side_effect=UpstreamUnavailable(SECRET_DETAIL)), \
             patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.get_stored_competition_doc",
                   return_value={"id": 1, "nom": "Open"}):
         resp = client.post("/api/competitions/1/fetch-results", json={"url": "https://mycompet.ffme.fr/resultat/resultat_1"})
