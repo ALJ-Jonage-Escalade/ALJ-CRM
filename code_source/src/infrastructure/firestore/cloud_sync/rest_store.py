@@ -5,22 +5,20 @@ from typing import Any, Callable, Dict, Iterable, List, Optional
 import requests
 
 from infrastructure import runtime_env
-from infrastructure.firestore.client import FirestoreClient
-from infrastructure.firestore.cloud_sync.common import (
-    BY_FIELD,
+from infrastructure.firestore.client import (
     DEFAULT_PROJECT_ID,
-    DEL_FIELD,
-    META_FIELDS,
-    MOD_FIELD,
-    CloudConflictError,
-    CloudSyncError,
-    decode_value,
-    encode_value,
-    quote_field_path,
+    FirestoreClient,
+    FirestoreConflictError,
+    FirestoreError,
+    firestore_to_python_value,
+    python_to_firestore_value,
 )
+from infrastructure.firestore.cloud_sync.common import BY_FIELD, DEL_FIELD, META_FIELDS, MOD_FIELD, quote_field_path
+
 
 class RestStore:
-    """Opérations Firestore nécessaires au cache (liste, requête, lecture, commit)."""
+    """Firestore operations of the cache replication (list, query, read, commit), on the project, token, value
+    conversion and errors of FirestoreClient. Tests and scripts can give their own project and token."""
 
     def __init__(self, project_id: Optional[str] = None,
                  token_provider: Optional[Callable[[], str]] = None):
@@ -64,18 +62,18 @@ class RestStore:
         try:
             return requests.request(method, url, headers=self._headers(), timeout=60, **kw)
         except requests.RequestException as e:
-            raise CloudSyncError(f"Firestore injoignable : {e}")
+            raise FirestoreError(f"Firestore injoignable : {e}")
 
     @staticmethod
     def _parse_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
         raw = doc.get("fields", {}) or {}
-        fields = {k: decode_value(v) for k, v in raw.items() if k not in META_FIELDS}
+        fields = {k: firestore_to_python_value(v) for k, v in raw.items() if k not in META_FIELDS}
         return {
             "id": doc.get("name", "").rsplit("/", 1)[-1],
             "fields": fields,
-            "deleted": bool(decode_value(raw.get(DEL_FIELD, {"nullValue": None}))),
+            "deleted": bool(firestore_to_python_value(raw.get(DEL_FIELD, {"nullValue": None}))),
             "update_time": doc.get("updateTime"),
-            "modified_at": decode_value(raw.get(MOD_FIELD, {"nullValue": None})) or doc.get("updateTime"),
+            "modified_at": firestore_to_python_value(raw.get(MOD_FIELD, {"nullValue": None})) or doc.get("updateTime"),
         }
 
     def list_all(self, collection: str) -> List[Dict[str, Any]]:
@@ -87,7 +85,7 @@ class RestStore:
                 params["pageToken"] = token
             resp = self._request("GET", url, params=params)
             if resp.status_code != 200:
-                raise CloudSyncError(f"Liste {collection} : HTTP {resp.status_code} - {resp.text[:200]}")
+                raise FirestoreError(f"Liste {collection} : HTTP {resp.status_code} - {resp.text[:200]}")
             payload = resp.json()
             out.extend(self._parse_doc(d) for d in payload.get("documents", []))
             token = payload.get("nextPageToken")
@@ -106,7 +104,7 @@ class RestStore:
         }}
         resp = self._request("POST", url, json=body)
         if resp.status_code != 200:
-            raise CloudSyncError(f"Requête {collection} : HTTP {resp.status_code} - {resp.text[:200]}")
+            raise FirestoreError(f"Requête {collection} : HTTP {resp.status_code} - {resp.text[:200]}")
         return [self._parse_doc(r["document"]) for r in resp.json() if r.get("document")]
 
     def get_many(self, collection: str, doc_ids: Iterable[str]) -> Dict[str, Optional[Dict[str, Any]]]:
@@ -117,7 +115,7 @@ class RestStore:
             names = [f"{self._root}/{collection}/{d}" for d in ids[i:i + 300]]
             resp = self._request("POST", url, json={"documents": names})
             if resp.status_code != 200:
-                raise CloudSyncError(f"Lecture {collection} : HTTP {resp.status_code} - {resp.text[:200]}")
+                raise FirestoreError(f"Lecture {collection} : HTTP {resp.status_code} - {resp.text[:200]}")
             for r in resp.json():
                 if r.get("found"):
                     d = self._parse_doc(r["found"])
@@ -135,7 +133,7 @@ class RestStore:
         }}
         resp = self._request("POST", url, json=body)
         if resp.status_code != 200:
-            raise CloudSyncError(f"Requête {collection} : HTTP {resp.status_code} - {resp.text[:200]}")
+            raise FirestoreError(f"Requête {collection} : HTTP {resp.status_code} - {resp.text[:200]}")
         for r in resp.json():
             if r.get("document"):
                 v = self._parse_doc(r["document"])["fields"].get(field)
@@ -151,7 +149,7 @@ class RestStore:
         url = f"{self._base}:commit"
         body = []
         for w in writes:
-            fields = {k: encode_value(v) for k, v in (w.get("fields") or {}).items()}
+            fields = {k: python_to_firestore_value(v) for k, v in (w.get("fields") or {}).items()}
             fields[DEL_FIELD] = {"booleanValue": bool(w.get("deleted"))}
             fields[BY_FIELD] = {"stringValue": w.get("by") or ""}
             op: Dict[str, Any] = {
@@ -175,5 +173,5 @@ class RestStore:
             return out
         text = resp.text or ""
         if resp.status_code in (404, 409) or "FAILED_PRECONDITION" in text or "ALREADY_EXISTS" in text:
-            raise CloudConflictError(f"commit HTTP {resp.status_code} - {text[:200]}")
-        raise CloudSyncError(f"commit HTTP {resp.status_code} - {text[:300]}")
+            raise FirestoreConflictError(f"commit HTTP {resp.status_code} - {text[:200]}")
+        raise FirestoreError(f"commit HTTP {resp.status_code} - {text[:300]}")

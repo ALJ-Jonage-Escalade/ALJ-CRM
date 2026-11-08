@@ -13,7 +13,8 @@ if _src_dir not in sys.path:
 
 from infrastructure.firestore.cloud_sync.bootstrap import build_cache, create_schema, import_database  # noqa: E402
 from infrastructure.firestore.cloud_sync.cache import connect, pending_count  # noqa: E402
-from infrastructure.firestore.cloud_sync.common import CloudConflictError, collection_for, ts_key  # noqa: E402
+from infrastructure.firestore.client import FirestoreConflictError  # noqa: E402
+from infrastructure.firestore.cloud_sync.common import collection_for, ts_key  # noqa: E402
 from infrastructure.firestore.cloud_sync.sync import flush, pull  # noqa: E402
 from infrastructure.sqlite.connection import SqliteDatabase  # noqa: E402
 from infrastructure.sqlite.email_templates import EmailTemplateRepository  # noqa: E402
@@ -62,9 +63,9 @@ class FakeStore:
             pre = w.get("precondition") or {}
             cur = self.docs.get(key)
             if "exists" in pre and bool(cur) != pre["exists"]:
-                raise CloudConflictError("exists")
+                raise FirestoreConflictError("exists")
             if "updateTime" in pre and (not cur or cur["update_time"] != pre["updateTime"]):
-                raise CloudConflictError("updateTime")
+                raise FirestoreConflictError("updateTime")
         self.commits += 1
         out = []
         for w in writes:

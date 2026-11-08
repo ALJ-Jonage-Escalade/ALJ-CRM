@@ -1,5 +1,4 @@
-"""Constantes, erreurs et conversions de valeurs communes à la réplication Firestore."""
-import base64
+"""Constants and helpers of the Firestore replication (values and errors: infrastructure/firestore/client.py)."""
 import datetime
 import hashlib
 import json
@@ -31,15 +30,6 @@ REFERENCES = {
     "orders": [("purchases", "order_id")],
     "purchases": [("purchase_options", "purchase_id")],
 }
-DEFAULT_PROJECT_ID = "smart-amplifier-510811-n6"
-
-
-class CloudSyncError(RuntimeError):
-    """Échange impossible avec Firestore."""
-
-
-class CloudConflictError(CloudSyncError):
-    """Précondition refusée : le document a changé côté Firestore."""
 
 
 def collection_for(table: str) -> str:
@@ -55,45 +45,6 @@ def upgrade_legacy_fields(table: str, fields: Dict[str, Any]) -> Dict[str, Any]:
         sex = parse_sex(fields["gender"])
         return {**fields, "sex": sex.value if sex else None}
     return fields
-
-
-# ----------------------------------------------------------------------
-# Valeurs Firestore <-> SQLite (aller-retour exact : int, float, str, None, bytes)
-# ----------------------------------------------------------------------
-def encode_value(val: Any) -> Dict[str, Any]:
-    if val is None:
-        return {"nullValue": None}
-    if isinstance(val, bool):
-        return {"booleanValue": val}
-    if isinstance(val, int):
-        return {"integerValue": str(val)}
-    if isinstance(val, float):
-        if val != val:
-            return {"doubleValue": "NaN"}
-        if val in (float("inf"), float("-inf")):
-            return {"doubleValue": "Infinity" if val > 0 else "-Infinity"}
-        return {"doubleValue": val}
-    if isinstance(val, (bytes, bytearray, memoryview)):
-        return {"bytesValue": base64.b64encode(bytes(val)).decode("ascii")}
-    return {"stringValue": str(val)}
-
-
-def decode_value(f: Dict[str, Any]) -> Any:
-    if not isinstance(f, dict) or "nullValue" in f:
-        return None
-    if "integerValue" in f:
-        return int(f["integerValue"])
-    if "doubleValue" in f:
-        return float(f["doubleValue"])
-    if "stringValue" in f:
-        return f["stringValue"]
-    if "booleanValue" in f:
-        return bool(f["booleanValue"])
-    if "bytesValue" in f:
-        return base64.b64decode(f["bytesValue"])
-    if "timestampValue" in f:
-        return f["timestampValue"]
-    return None
 
 
 def quote_field_path(name: str) -> str:

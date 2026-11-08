@@ -2,14 +2,18 @@
 Client REST Google Cloud Firestore (API v1) du serveur.
 
 Fournit les opérations document (get / list / upsert / update partiel / delete)
-et les écritures par lot (commit) utilisées par le référentiel des compétitions.
+et les écritures par lot (commit) utilisées par le référentiel des compétitions, ainsi que
+ce que partage la réplication du cache SQLite (cloud_sync.rest_store) : projet, jeton,
+conversion des valeurs et erreurs.
 
 Authentification :
 - Sur Cloud Run / GCP : jeton du compte de service (metadata server).
 - Sur le poste de bureau : jeton OAuth2 du club (GoogleDriveClient), dont le
   consentement inclut déjà le scope Firestore `https://www.googleapis.com/auth/datastore`.
 """
+import base64
 import datetime
+import math
 from typing import Dict, Any, List, Optional
 
 import requests
@@ -47,7 +51,13 @@ def python_to_firestore_value(val: Any) -> Dict[str, Any]:
     if isinstance(val, int):
         return {"integerValue": str(val)}
     if isinstance(val, float):
+        if math.isnan(val):
+            return {"doubleValue": "NaN"}
+        if math.isinf(val):
+            return {"doubleValue": "Infinity" if val > 0 else "-Infinity"}
         return {"doubleValue": val}
+    if isinstance(val, (bytes, bytearray, memoryview)):
+        return {"bytesValue": base64.b64encode(bytes(val)).decode("ascii")}
     if isinstance(val, (datetime.date, datetime.datetime)):
         iso = val.isoformat()
         if isinstance(val, datetime.date) and not isinstance(val, datetime.datetime):
@@ -84,6 +94,8 @@ def firestore_to_python_value(f_val: Dict[str, Any]) -> Any:
         return f_val["stringValue"]
     if "timestampValue" in f_val:
         return f_val["timestampValue"]
+    if "bytesValue" in f_val:
+        return base64.b64decode(f_val["bytesValue"])
     if "arrayValue" in f_val:
         arr = f_val["arrayValue"].get("values", [])
         return [firestore_to_python_value(x) for x in arr]
@@ -111,6 +123,14 @@ def _is_precondition_failure(resp) -> bool:
 def firestore_fields_to_dict(fields: Dict[str, Any]) -> Dict[str, Any]:
     """Convertit une structure de champs Firestore en dictionnaire Python."""
     return {k: firestore_to_python_value(v) for k, v in (fields or {}).items()}
+
+
+def document_to_dict(doc: Dict[str, Any]) -> Dict[str, Any]:  # Any: a Firestore REST document, then its values
+    """A REST document as a flat dict of its fields, plus META_KEYS (`_doc_id`, `_update_time`)."""
+    data = firestore_fields_to_dict(doc.get("fields", {}))
+    data["_doc_id"] = doc.get("name", "").rsplit("/", 1)[-1]
+    data["_update_time"] = doc.get("updateTime")
+    return data
 
 
 class FirestoreClient:
@@ -170,11 +190,7 @@ class FirestoreClient:
         except requests.RequestException as e:
             raise FirestoreError(f"Firestore injoignable ({collection_name}/{doc_id}) : {e}")
         if resp.status_code == 200:
-            doc = resp.json()
-            data = firestore_fields_to_dict(doc.get("fields", {}))
-            data["_doc_id"] = doc.get("name", "").rsplit("/", 1)[-1]
-            data["_update_time"] = doc.get("updateTime")
-            return data
+            return document_to_dict(resp.json())
         if resp.status_code == 404:
             return None
         raise FirestoreError(
@@ -203,11 +219,7 @@ class FirestoreClient:
                     f"Liste Firestore {collection_name} : HTTP {resp.status_code} - {resp.text[:200]}"
                 )
             payload = resp.json()
-            for doc in payload.get("documents", []):
-                data = firestore_fields_to_dict(doc.get("fields", {}))
-                data["_doc_id"] = doc.get("name", "").rsplit("/", 1)[-1]
-                data["_update_time"] = doc.get("updateTime")
-                results.append(data)
+            results.extend(document_to_dict(doc) for doc in payload.get("documents", []))
             page_token = payload.get("nextPageToken")
             if not page_token:
                 break
@@ -233,16 +245,7 @@ class FirestoreClient:
             raise FirestoreError(
                 f"Requête Firestore {collection_name} : HTTP {resp.status_code} - {resp.text[:200]}"
             )
-        results: List[Dict[str, Any]] = []
-        for row in resp.json():
-            doc = row.get("document")
-            if not doc:
-                continue
-            data = firestore_fields_to_dict(doc.get("fields", {}))
-            data["_doc_id"] = doc.get("name", "").rsplit("/", 1)[-1]
-            data["_update_time"] = doc.get("updateTime")
-            results.append(data)
-        return results
+        return [document_to_dict(row["document"]) for row in resp.json() if row.get("document")]
 
     # ------------------------------------------------------------------
     # Écriture
