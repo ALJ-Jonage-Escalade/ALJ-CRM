@@ -4,9 +4,16 @@ import os
 
 # Ajustement du chemin d'import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src")))
-from domain.utils import normalize_string, normalize_name, normalize_key_part, clean_city_name, is_helloasso_url
+from domain.utils import normalize_string, normalize_name, normalize_key_part, clean_city_name, is_helloasso_url, clean_digits_only
 
 class TestDomainUtils(unittest.TestCase):
+    def test_clean_digits_only(self):
+        cases = [(636947, "636947"), (636947.0, "636947"), ("636947.0", "636947"), ('="636947"', "636947"),
+                 ("06 12-34", "061234"), (None, ""), (float("nan"), ""), ("", "")]
+        for value, expected in cases:
+            with self.subTest(value=value):
+                self.assertEqual(clean_digits_only(value), expected)
+
     def test_is_helloasso_url(self):
         cases = {
             "https://www.helloasso.com/associations/alj/evenements/x": True,

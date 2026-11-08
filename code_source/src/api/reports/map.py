@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 
-from api.reports import resolve_season, season_read
+from api.reports import resolve_report_season, season_read
 from api.reports.schemas import MapMember, MapPoint, MapPoints
 from api.responses import error_responses
 from domain.members.view import is_cancelled
@@ -69,8 +69,8 @@ def map_points(season: str, background_tasks: Optional[BackgroundTasks] = None) 
     return list(points.values())
 
 
-@router.get("/api/reports/map-points", response_model=MapPoints, responses=error_responses(500))
+@router.get("/api/reports/map-points", response_model=MapPoints, responses=error_responses(400, 500))
 def get_map_points(background_tasks: BackgroundTasks, season: str = "active") -> Union[MapPoints, JSONResponse]:
     """Members of a season grouped by address, for the map of the Outils page ("Toutes les saisons": every season)."""
-    target_season = resolve_season(season)
+    target_season = resolve_report_season(season)
     return MapPoints(season=target_season, points=map_points(target_season, background_tasks))

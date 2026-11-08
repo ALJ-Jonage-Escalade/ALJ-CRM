@@ -85,7 +85,7 @@ class TestSqliteCacheScope(unittest.TestCase):
                                                 me.router, access.router, helloasso_campaigns.router)))
         routes = [r for r in app_routes(server.app.routes)
                   if id(r) not in firestore_only and r.path.startswith("/api/")]
-        self.assertIn("/api/competitions/{comp_id}/check-all-paid", [r.path for r in routes])
+        self.assertIn("/api/competitions/{competition_id}/check-all-paid", [r.path for r in routes])
         for r in routes:
             self.assertTrue(server.uses_sqlite_cache(concrete(r.path)), r.path)
 

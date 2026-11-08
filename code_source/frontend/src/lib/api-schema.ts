@@ -373,7 +373,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/competitions/{comp_id}/check-all-paid": {
+    "/api/competitions/{competition_id}/check-all-paid": {
         parameters: {
             query?: never;
             header?: never;
@@ -386,7 +386,7 @@ export interface paths {
          * Check Competition All Paid Api
          * @description Vérifie si tous les compétiteurs ont payé et envoie l'e-mail récapitulatif si applicable.
          */
-        post: operations["check_competition_all_paid_api_api_competitions__comp_id__check_all_paid_post"];
+        post: operations["check_competition_all_paid_api_api_competitions__competition_id__check_all_paid_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5570,12 +5570,12 @@ export interface operations {
             };
         };
     };
-    check_competition_all_paid_api_api_competitions__comp_id__check_all_paid_post: {
+    check_competition_all_paid_api_api_competitions__competition_id__check_all_paid_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                comp_id: number;
+                competition_id: number;
             };
             cookie?: never;
         };
@@ -5637,6 +5637,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemberList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Not Found */
@@ -5801,6 +5810,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SeasonTarifs"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -6772,6 +6790,15 @@ export interface operations {
                     "application/json": components["schemas"]["MapPoints"];
                 };
             };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6810,6 +6837,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PivotRecords"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */

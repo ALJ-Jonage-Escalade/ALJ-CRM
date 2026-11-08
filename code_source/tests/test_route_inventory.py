@@ -46,7 +46,7 @@ EXPECTED_ROUTES = {
     ("POST", "/api/competitions"),
     ("POST", "/api/competitions/archive-past"),
     ("POST", "/api/competitions/cron/fetch-results"),
-    ("POST", "/api/competitions/{comp_id}/check-all-paid"),
+    ("POST", "/api/competitions/{competition_id}/check-all-paid"),
     ("POST", "/api/competitions/{competition_id}/fetch-results"),
     ("DELETE", "/api/competitions/{competition_id}"),
     ("PATCH", "/api/competitions/{competition_id}"),

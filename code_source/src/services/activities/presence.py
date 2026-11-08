@@ -9,7 +9,7 @@ import zipfile
 from dataclasses import dataclass
 from typing import List, Literal, Optional
 
-from domain.constants import get_active_season, is_valid_season
+from domain.constants import get_active_season, resolve_season
 from domain.errors import InvalidRequest
 from domain.members.planning_groups import is_autonome_creneau
 from domain.members.presence_rules import AutonomousCounts, count_autonomous, members_with_tarifs
@@ -82,9 +82,7 @@ def export_presence_sheets(variant: Variant, season: str, start_date: str, end_d
                            show_health_col: bool, same_sheet: bool) -> PresenceDownload:
     """The attendance sheets asked for: one workbook, or a ZIP of one workbook per course.
     season: the active one when empty; dates (dd/mm/yyyy): the season's course dates when empty."""
-    season = season or get_active_season()
-    if not is_valid_season(season):
-        raise InvalidRequest("Saison invalide (format attendu : AAAA-AAAA).")
+    season = resolve_season(season)
     first_day, last_day = _session_day(start_date), _session_day(end_date)
     if first_day and last_day and first_day > last_day:
         raise InvalidRequest("La date de début doit précéder la date de fin.")

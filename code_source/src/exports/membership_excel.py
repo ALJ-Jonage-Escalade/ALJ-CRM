@@ -7,7 +7,7 @@ import os
 from domain.club_emails import CLUB_CONTACT_EMAIL
 from domain.members.sex import parse_sex
 from domain.members.view import is_cancelled
-from domain.utils import is_missing
+from domain.utils import clean_digits_only, is_missing
 from exports.spreadsheet_safety import csv_safe
 
 logger = logging.getLogger("alj")
@@ -36,24 +36,6 @@ def parse_date_to_datetime(val):
             
     # Si on n'a pas réussi à parser mais que c'est une chaîne non vide, on la renvoie brute
     return val_str
-
-def clean_digits_only(val):
-    if val is None:
-        return ""
-    if isinstance(val, (int, float)):
-        if is_missing(val):
-            return ""
-        try:
-            return str(int(float(val)))
-        except (ValueError, TypeError):
-            return ""
-    val_str = str(val).strip()
-    if not val_str:
-        return ""
-    if val_str.endswith(".0"):
-        val_str = val_str[:-2]
-    return "".join(c for c in val_str if c.isdigit())
-
 
 
 FFME_CSV_HEADERS = [
@@ -90,184 +72,138 @@ def _render_ffme_csv(csv_rows: list[list[str]]) -> bytes:
     return buffer.getvalue().encode("utf-8")
 
 
+# Birth dates after this day get a youth licence ("J"), the others an adult one ("A")
+YOUTH_BIRTH_DATE_CUTOFF = datetime.datetime(2009, 8, 31)
+_YES_VALUES = ("OUI", "TRUE", "VRAI")
+
+
+def _is_yes(value: object) -> bool:
+    return str(value).upper() in _YES_VALUES
+
+
 def _ffme_csv_rows(participants_data, include_termine: bool) -> tuple[list[list[str]], list[str]]:
     """The CSV rows of the members to declare, and a line per member left out (missing birth date or sex)."""
-    csv_rows = []
-    ignored_members = []
-
-    for p in participants_data:
-        # Les valeurs None du schéma v2 (vue legacy) deviennent des chaînes vides AVANT traitement :
-        # sinon str(None) produirait 'NO' (pays), 'none' (courriel 2), 'NONE' (pap), 'None' (adresse, ville).
-        p = {k: (v if v is not None else "") for k, v in p.items()}
-
-        # Exclure les listes d'attente, montants nuls (sauf les ajouts manuels), commandes annulées/canceled ou déjà validées (terminé si non demandé)
-        tarif_name = str(p.get("tarif_name", "")).lower()
-        amount = p.get("amount", 0.0)
-        status = str(p.get("status", "")).lower()
-        commentaires = str(p.get("commentaires_correctif", "")).lower()
-        is_manual = "ajout manuel" in commentaires
-        
-        if "attente" in tarif_name or (amount == 0.0 and not is_manual) or is_cancelled(status):
+    csv_rows: list[list[str]] = []
+    ignored_members: list[str] = []
+    for member in participants_data:
+        # None values of the member read model become empty strings first: otherwise str(None) would give
+        # 'NO' (country), 'none' (second e-mail), 'NONE' (emergency contact), 'None' (address, city)
+        member = {k: (v if v is not None else "") for k, v in member.items()}
+        if not _is_declared(member, include_termine):
             continue
-        if not include_termine and "termin" in status:
-            continue
-
-        nom = str(p.get("last_name", "")).strip().upper()
-        if not nom: nom = "INCONNU"
-
-        prenom = str(p.get("first_name", "")).strip()
-        if not prenom: prenom = "INCONNU"
-
-        # 1. Licence
-        lic_num = clean_digits_only(p.get("licence_ffme", ""))
-        if len(lic_num) < 5 or len(lic_num) > 10:
-            lic_num = ""
-
-        # 2. DOB
-        dob_val = p.get("birth_date", "")
-        dob_date = None
-        if isinstance(dob_val, (datetime.datetime, datetime.date)):
-            dob_date = dob_val
+        row = _ffme_row(member)
+        if isinstance(row, str):
+            ignored_members.append(row)
         else:
-            dob_str = str(dob_val).strip()
-            parsed_dt = parse_date_to_datetime(dob_str)
-            if isinstance(parsed_dt, (datetime.datetime, datetime.date)):
-                dob_date = parsed_dt
-
-        if not dob_date or dob_date >= datetime.datetime.now():
-            ignored_members.append(f"⚠️ [IGNORÉ] {nom} {prenom} (Commande {p.get('order_ref')}) : date de naissance absente ou invalide ('{dob_val}')")
-            continue
-            
-        dob = dob_date.strftime("%d/%m/%Y")
-            
-        # 3. Sexe : obligatoire pour une première licence (jamais deviné), vide accepté pour un renouvellement
-        sex = parse_sex(p.get("sex"))
-        if sex is None and not lic_num:
-            ignored_members.append(f"⚠️ [IGNORÉ] {nom} {prenom} (Commande {p.get('order_ref')}) : sexe non renseigné")
-            continue
-        sexe = sex.value if sex else ""
-            
-        # 4. Pays
-        pays_raw = str(p.get("country", "France")).strip().upper()
-        pays = "FR" if "FR" in pays_raw or pays_raw == "FRANCE" or pays_raw == "" else pays_raw[:2]
-        if not pays and not lic_num:
-            pays = "FR"
-            
-        # 5. Nationalité
-        nat_raw = str(p.get("nationality", "Francaise")).strip().upper()
-        if "FR" in nat_raw or nat_raw == "FRANCE" or nat_raw == "":
-            nat = "FR"
-        elif "SUED" in nat_raw or "SWE" in nat_raw:
-            nat = "SE"
-        elif len(nat_raw) == 2:
-            nat = nat_raw
-        else:
-            nat = "FR" if not lic_num else ""
-            
-        # 6. Adresse
-        adresse = str(p.get("address", "")).strip()[:255]
-        if not adresse and not lic_num:
-            adresse = "ADRESSE NON COMMUNIQUEE"
-            
-        # 7. Code postal
-        cp = clean_digits_only(p.get("zip_code", ""))
-        if pays == "FR":
-            if cp:
-                cp = cp.zfill(5)[:5]
-            else:
-                cp = "69330" if not lic_num else ""
-        else:
-            cp = cp[:10]
-            
-        # 8. Ville
-        ville = str(p.get("city", "")).strip().upper()[:100]
-        if not ville and not lic_num:
-            ville = "JONAGE"
-            
-        # 9. Téléphones
-        tel_raw = clean_digits_only(p.get("phone", ""))
-        if pays == "FR" and tel_raw:
-            if tel_raw.startswith("33"):
-                tel_raw = "0" + tel_raw[2:]
-            tel_raw = tel_raw[:10]
-        tel = tel_raw
-        
-        # 10. Courriels
-        email = str(p.get("email_primary", "")).strip().lower()[:100]
-        if not email:
-            email = str(p.get("payer_email", "")).strip().lower()[:100]
-        if not email and not lic_num:
-            email = CLUB_CONTACT_EMAIL
-            
-        email2 = str(p.get("email_secondary", "")).strip().lower()[:100]
-        
-        # 11. PAP
-        pap_raw = str(p.get("emergency1_name", "")).strip()
-        pap_nom = ""
-        pap_prenom = ""
-        if pap_raw:
-            if " " in pap_raw:
-                parts = pap_raw.split(" ", 1)
-                pap_prenom = parts[0][:100]
-                pap_nom = parts[1].upper()[:100]
-            else:
-                pap_nom = pap_raw.upper()[:100]
-                
-        pap_tel = clean_digits_only(p.get("emergency1_phone", ""))[:15]
-        
-        # 12. Type licence (J, A, F)
-        is_tribu = str(p.get("is_tribe", "")).lower()
-        if is_tribu in ("true", "vrai", "oui", "1"):
-            type_licence = "F"
-        else:
-            cutoff_date = datetime.datetime(2009, 8, 31)
-            if dob_date > cutoff_date:
-                type_licence = "J"
-            else:
-                type_licence = "A"
-                
-        # 13. Assurance (RC, B, B+, B++)
-        val_ass_base = str(p.get("opt_Assurance Base", "Non")).upper()
-        val_ass_plus = str(p.get("opt_Assurance Base +", "Non")).upper()
-        val_ass_plusplus = str(p.get("opt_Assurance Base ++", "Non")).upper()
-        
-        if val_ass_plusplus in ("OUI", "TRUE", "VRAI"):
-            assurance = "B++"
-        elif val_ass_plus in ("OUI", "TRUE", "VRAI"):
-            assurance = "B+"
-        elif val_ass_base in ("OUI", "TRUE", "VRAI"):
-            assurance = "B"
-        else:
-            assurance = "RC"
-            
-        # 14. Options
-        val_ski = str(p.get("opt_Assurance Option ski de piste", "Non")).upper()
-        opt_ski = "OUI" if val_ski in ("OUI", "TRUE", "VRAI") else "NON"
-        
-        val_vtt = str(p.get("opt_Assurance Option VTT", "Non")).upper()
-        opt_vtt = "OUI" if val_vtt in ("OUI", "TRUE", "VRAI") else "NON"
-        
-        val_trail = str(p.get("opt_Assurance Option Trail", "Non")).upper()
-        opt_trail = "OUI" if val_trail in ("OUI", "TRUE", "VRAI") else "NON"
-        
-        row = [
-            lic_num, nom, prenom, dob, sexe, nat, adresse, "", cp, ville, pays, "", tel, 
-            email, email2, pap_nom, pap_prenom, pap_tel, "", "", "", "", type_licence, 
-            assurance, opt_ski, "NON", opt_trail, opt_vtt, "NON", "NON"
-        ]
-        csv_rows.append(row)
-        
+            csv_rows.append(row)
     return csv_rows, ignored_members
 
 
+def _is_declared(member: dict, include_termine: bool) -> bool:
+    """False for the waiting lists, nothing paid (unless added by hand), cancelled orders, and members already
+    declared ('Terminé') unless asked for."""
+    tarif_name = str(member.get("tarif_name", "")).lower()
+    status = str(member.get("status", "")).lower()
+    added_by_hand = "ajout manuel" in str(member.get("commentaires_correctif", "")).lower()
+    if "attente" in tarif_name or (member.get("amount", 0.0) == 0.0 and not added_by_hand) or is_cancelled(status):
+        return False
+    return include_termine or "termin" not in status
 
 
+def _ffme_row(member: dict) -> list[str] | str:
+    """The CSV row of a member to declare, or the line telling why they are left out."""
+    last_name = str(member.get("last_name", "")).strip().upper() or "INCONNU"
+    first_name = str(member.get("first_name", "")).strip() or "INCONNU"
 
+    licence = clean_digits_only(member.get("licence_ffme", ""))
+    if not 5 <= len(licence) <= 10:
+        licence = ""
 
+    raw_birth_date = member.get("birth_date", "")
+    birth_date = parse_date_to_datetime(raw_birth_date if isinstance(raw_birth_date, datetime.date) else str(raw_birth_date).strip())
+    if not isinstance(birth_date, datetime.datetime) or birth_date >= datetime.datetime.now():
+        return (f"⚠️ [IGNORÉ] {last_name} {first_name} (Commande {member.get('order_ref')}) : "
+                f"date de naissance absente ou invalide ('{raw_birth_date}')")
 
+    # Sex: required for a first licence (never guessed), may be empty for a renewal
+    sex = parse_sex(member.get("sex"))
+    if sex is None and not licence:
+        return f"⚠️ [IGNORÉ] {last_name} {first_name} (Commande {member.get('order_ref')}) : sexe non renseigné"
 
+    country_raw = str(member.get("country", "France")).strip().upper()
+    country = "FR" if "FR" in country_raw or country_raw == "" else country_raw[:2]
 
+    nationality_raw = str(member.get("nationality", "Francaise")).strip().upper()
+    if "FR" in nationality_raw or nationality_raw == "":
+        nationality = "FR"
+    elif "SUED" in nationality_raw or "SWE" in nationality_raw:
+        nationality = "SE"
+    elif len(nationality_raw) == 2:
+        nationality = nationality_raw
+    else:
+        nationality = "FR" if not licence else ""
 
+    # A first licence needs an address: the club's when the member gave none
+    address = str(member.get("address", "")).strip()[:255]
+    if not address and not licence:
+        address = "ADRESSE NON COMMUNIQUEE"
 
+    zip_code = clean_digits_only(member.get("zip_code", ""))
+    if country == "FR":
+        if zip_code:
+            zip_code = zip_code.zfill(5)[:5]
+        else:
+            zip_code = "69330" if not licence else ""
+    else:
+        zip_code = zip_code[:10]
 
+    city = str(member.get("city", "")).strip().upper()[:100]
+    if not city and not licence:
+        city = "JONAGE"
 
+    phone = clean_digits_only(member.get("phone", ""))
+    if country == "FR" and phone:
+        if phone.startswith("33"):
+            phone = "0" + phone[2:]
+        phone = phone[:10]
+
+    email = str(member.get("email_primary", "")).strip().lower()[:100]
+    if not email:
+        email = str(member.get("payer_email", "")).strip().lower()[:100]
+    if not email and not licence:
+        email = CLUB_CONTACT_EMAIL
+    second_email = str(member.get("email_secondary", "")).strip().lower()[:100]
+
+    # Emergency contact ("PAP"): "First Last", or a single last name
+    emergency_name = str(member.get("emergency1_name", "")).strip()
+    emergency_last_name = emergency_first_name = ""
+    if " " in emergency_name:
+        first, last = emergency_name.split(" ", 1)
+        emergency_first_name, emergency_last_name = first[:100], last.upper()[:100]
+    elif emergency_name:
+        emergency_last_name = emergency_name.upper()[:100]
+    emergency_phone = clean_digits_only(member.get("emergency1_phone", ""))[:15]
+
+    if str(member.get("is_tribe", "")).lower() in ("true", "vrai", "oui", "1"):
+        licence_type = "F"
+    else:
+        licence_type = "J" if birth_date > YOUTH_BIRTH_DATE_CUTOFF else "A"
+
+    if _is_yes(member.get("opt_Assurance Base ++", "Non")):
+        insurance = "B++"
+    elif _is_yes(member.get("opt_Assurance Base +", "Non")):
+        insurance = "B+"
+    elif _is_yes(member.get("opt_Assurance Base", "Non")):
+        insurance = "B"
+    else:
+        insurance = "RC"
+
+    def option(key: str) -> str:
+        return "OUI" if _is_yes(member.get(key, "Non")) else "NON"
+
+    return [
+        licence, last_name, first_name, birth_date.strftime("%d/%m/%Y"), sex.value if sex else "", nationality, address, "",
+        zip_code, city, country, "", phone, email, second_email, emergency_last_name, emergency_first_name, emergency_phone,
+        "", "", "", "", licence_type, insurance, option("opt_Assurance Option ski de piste"), "NON",
+        option("opt_Assurance Option Trail"), option("opt_Assurance Option VTT"), "NON", "NON",
+    ]

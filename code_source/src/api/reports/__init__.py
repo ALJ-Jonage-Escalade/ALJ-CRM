@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from domain.constants import get_active_season
+from domain.constants import resolve_season
 
 
 ALL_SEASONS = "Toutes les saisons"  # the pages' choice for every season
@@ -15,7 +15,8 @@ def season_read(season: str) -> Optional[str]:
     return None if season == ALL_SEASONS else season
 
 
-def resolve_season(season: str) -> str:
-    """The season to read: "", "active" and "default" mean the active season."""
+def resolve_report_season(season: str) -> str:
+    """The season to read: ALL_SEASONS (every season) or a season name, the active one when empty
+    (domain.constants.resolve_season, InvalidRequest on a bad format)."""
     season = (season or "").strip()
-    return get_active_season() if season.lower() in ("", "active", "default") else season
+    return ALL_SEASONS if season == ALL_SEASONS else resolve_season(season)

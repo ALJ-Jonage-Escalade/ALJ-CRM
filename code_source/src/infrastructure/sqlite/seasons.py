@@ -24,7 +24,7 @@ class SeasonRepository:
             conn.close()
 
     @classmethod
-    def get_season_tarifs(cls, season_name: str = "2026-2027") -> list:
+    def get_season_tarifs(cls, season_name: str) -> list:
         """Retourne la liste triée des tarifs HelloAsso distincts d'une saison (groupes disponibles)."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()

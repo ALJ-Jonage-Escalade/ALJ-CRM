@@ -21,7 +21,6 @@ from domain.utils import normalize_name
 logger = logging.getLogger("alj")
 
 SCHEMA_TARGET_VERSION = 2
-SEASON_ACTIVE = "2026-2027"
 
 STATUS_NORMALIZATION = {
     "processed": "Traité",
@@ -487,7 +486,7 @@ def insert_options_v2(cur, purchase_id, rec):
     return added
 
 
-def write_members_to_v2(cur, members, season_name=SEASON_ACTIVE):
+def write_members_to_v2(cur, members, season_name):
     """Écrit un lot d'adhésions dans le schéma v2, payeurs (payer_*) compris.
     Appelé par MemberRepository.upsert_members (même transaction)."""
     ensure_v2_schema(cur)

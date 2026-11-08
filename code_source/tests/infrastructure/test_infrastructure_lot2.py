@@ -64,7 +64,7 @@ class TestInfrastructureLot2(unittest.TestCase):
             "commentaires_correctif": ""
         }
         
-        inserted = MemberRepository.upsert_members([test_member])
+        inserted = MemberRepository.upsert_members([test_member], "2026-2027")
         self.assertEqual(inserted, 1)
         
         # 3. Chargement des membres (Read)

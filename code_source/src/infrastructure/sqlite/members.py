@@ -5,14 +5,19 @@ from __future__ import annotations
 import datetime
 import logging
 import sqlite3
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional
 
+from domain.errors import InvalidRequest
 from domain.members.sex import parse_sex
 from domain.utils import normalize_name
 from infrastructure.sqlite import schema_v2
 from infrastructure.sqlite.connection import SqliteDatabase
 
 logger = logging.getLogger("alj")
+
+HIGHER_PRIORITY_REGISTRATION = ("Une inscription plus prioritaire existe déjà pour cet adhérent "
+                                "cette saison (statut/montant supérieurs).")
+DUPLICATE_MEMBER = "Un autre adhérent avec les mêmes nom, prénom et date de naissance existe déjà."
 
 EXTRA_COLUMNS = {
     "is_modified": "TEXT DEFAULT 'Non'",
@@ -93,7 +98,7 @@ class MemberRepository:
         return cls._query_member_rows(f"u.id IN ({', '.join('?' * len(ids))})", ids)
 
     @classmethod
-    def upsert_members(cls, members: list, season_name: str = "2026-2027") -> int:
+    def upsert_members(cls, members: list, season_name: str) -> int:
         """Insère ou met à jour un lot d'adhérents dans le schéma v2 (users / orders / purchases / purchase_options).
         Returns the number of purchases written; a database failure is rolled back and raised."""
         SqliteDatabase.setup_database()
@@ -114,14 +119,14 @@ class MemberRepository:
 
 
     @classmethod
-    def add_manual_member(cls, fields: dict, season_name: str = "2026-2027") -> Tuple[bool, str]:
+    def add_manual_member(cls, fields: dict, season_name: str) -> str:
         """
         Ajoute manuellement un adhérent dans le schéma v2 (users + orders + purchases),
         en synthétisant une commande « MANUEL-... » équivalente à une inscription HelloAsso.
         Champs attendus : last_name, first_name, birth_date ('JJ/MM/AAAA' ou ISO), sex,
         phone, email_primary, address, zip_code, city, tarif_name, status, amount.
-        Retourne (True, order_ref) ou (False, message) quand une inscription prioritaire existe déjà ;
-        une erreur de base de données est annulée (rollback) et propagée.
+        Returns the order reference. InvalidRequest when a registration with a higher priority already exists;
+        a database error is rolled back and raised.
         """
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
@@ -185,14 +190,11 @@ class MemberRepository:
             stats = schema_v2.write_members_to_v2(cursor, [rec], season_name)
             if not stats.get("purchases"):
                 conn.rollback()
-                msg = ("Une inscription plus prioritaire existe déjà pour cet adhérent "
-                       "cette saison (statut/montant supérieurs).")
-                logger.info(f"[SQLITE] Ajout manuel refusé : {msg}")
-                return False, msg
+                raise InvalidRequest(HIGHER_PRIORITY_REGISTRATION)
             conn.commit()
             # Personal data (names) never goes to the logs: the order reference identifies the purchase
             logger.info(f"[SQLITE] Manual member added ({order_ref}, season {season_name}).")
-            return True, order_ref
+            return order_ref
         except Exception:
             conn.rollback()
             raise
@@ -290,16 +292,16 @@ class MemberRepository:
         fields: Optional[dict] = None,
         purchase_id: Optional[int] = None,
         order_ref: Optional[str] = None
-    ) -> Tuple[bool, str]:
+    ) -> None:
         """
         Met à jour de manière ciblée les informations d'un adhérent :
         - Table users : badge_rouge, autonomie_bloc, email_primary, email_secondary, phone, sex…
         - Table purchases : tarif_name.
-        Retourne (succès: bool, message: str) ; (False, message) pour un doublon d'adhérent, une autre erreur
-        de base de données est annulée (rollback) et propagée.
+        InvalidRequest when nothing is given or when the change would duplicate another member; any other
+        database error is rolled back and raised.
         """
         if not fields:
-            return False, "Aucun champ à mettre à jour."
+            raise InvalidRequest("Aucun champ à mettre à jour.")
 
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
@@ -351,10 +353,9 @@ class MemberRepository:
 
             conn.commit()
             logger.debug(f"[SQLITE] Adhérent #{resolved_uid} mis à jour avec succès : {list(fields.keys())}")
-            return True, ""
         except sqlite3.IntegrityError:
             conn.rollback()
-            return False, "Un autre adhérent avec les mêmes nom, prénom et date de naissance existe déjà."
+            raise InvalidRequest(DUPLICATE_MEMBER) from None
         except Exception:
             conn.rollback()
             raise

@@ -77,7 +77,7 @@ def extract_licence(item: dict) -> str:
     for field in item.get("customFields") or []:
         name = str(field.get("name") or "")
         if "licence" in name.lower():
-            val = field.get("answer", field.get("value") or "")
+            val = field.get("answer") or field.get("value") or ""
             digits = re.sub(r"\D", "", str(val or ""))
             if digits:
                 return digits

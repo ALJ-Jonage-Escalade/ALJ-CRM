@@ -18,6 +18,19 @@ def is_missing(value: object) -> bool:
     return value is None or (isinstance(value, float) and math.isnan(value))
 
 
+def clean_digits_only(value: object) -> str:
+    """The digits of a licence, phone or postcode cell: a number loses its float suffix (636947.0 -> "636947"),
+    text keeps only its digits, without a trailing ".0" or the Excel formula wrapping ('="636947"')."""
+    if is_missing(value):
+        return ""
+    if isinstance(value, (int, float)):
+        return str(int(value))
+    text = str(value).strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return "".join(c for c in text if c.isdigit())
+
+
 def normalize_string(s) -> str:
     """
     Normalisation générale d'une chaîne : conversion en minuscules, 

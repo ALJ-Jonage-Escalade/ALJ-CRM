@@ -43,14 +43,9 @@ class FfmeImportRepository:
 
     @classmethod
     def apply_ffme_matches(cls, updates: List[FfmeMatch], season_name: Optional[str] = None) -> None:
-        """
-        Phase B de l'import FFME — écrit en base les associations validées :
-        updates = [(match_type, licence, passeports, diplomas, document_sante, user_id), ...]
-        Met à jour la licence/passeports/diplômes de l'utilisateur, écrit le Document de
-        santé (associé à la personne pour la saison active, via purchases) et bascule
-        ses achats de la saison active en statut "Terminé" (licence FFME confirmée).
-        A database failure is rolled back and raised.
-        """
+        """Second step of the FFME import: writes the validated matches (see FfmeMatch). Updates each member's
+        licence, passports and diplomas, and sets the status and health document of their purchases of the season
+        (the active one by default). A database failure is rolled back and raised."""
         if not updates:
             return
         SqliteDatabase.setup_database()
@@ -58,47 +53,28 @@ class FfmeImportRepository:
         cursor = conn.cursor()
         try:
             target_season = str(season_name or get_active_season()).strip()
+            now = datetime.datetime.now().isoformat(timespec="seconds")
 
-            for u in updates:
-                lic = str(u[1] or "").strip()
-                passp = str(u[2] or "").strip()
-                dipl = str(u[3] or "").strip()
-                uid = int(u[5])
-
-                if passp and dipl:
-                    cursor.execute("""
-                        UPDATE users
-                        SET licence_ffme = ?, raw_passports = ?, raw_diplomas = ?
-                        WHERE id = ?
-                    """, (lic, passp, dipl, uid))
-                elif passp:
-                    cursor.execute("""
-                        UPDATE users
-                        SET licence_ffme = ?, raw_passports = ?
-                        WHERE id = ?
-                    """, (lic, passp, uid))
-                elif dipl:
-                    cursor.execute("""
-                        UPDATE users
-                        SET licence_ffme = ?, raw_diplomas = ?
-                        WHERE id = ?
-                    """, (lic, dipl, uid))
-                else:
-                    cursor.execute("""
-                        UPDATE users
-                        SET licence_ffme = ?
-                        WHERE id = ?
-                    """, (lic, uid))
+            # An empty passport or diploma cell keeps the stored value
+            cursor.executemany("""
+                UPDATE users
+                SET licence_ffme = ?,
+                    raw_passports = COALESCE(NULLIF(?, ''), raw_passports),
+                    raw_diplomas = COALESCE(NULLIF(?, ''), raw_diplomas)
+                WHERE id = ?
+            """, [(str(licence or "").strip(), str(passports or "").strip(), str(diplomas or "").strip(), int(user_id))
+                  for _, licence, passports, diplomas, _, user_id in updates])
 
             cursor.executemany("""
                 UPDATE purchases
                 SET status = ?, status_normalized = ?, document_sante = ?, updated_at = ?
                 WHERE user_id = ? AND order_id IN (
                     SELECT id FROM orders
-                    WHERE season_id = (SELECT id FROM seasons WHERE name = ? OR is_active = 1 LIMIT 1)
+                    -- the season asked for, the active one when it does not exist
+                    WHERE season_id = (SELECT id FROM seasons WHERE name = ? OR is_active = 1 ORDER BY name = ? DESC LIMIT 1)
                 )
-            """, [(u[0], schema_v2.normalize_status(u[0]), u[4],
-                   datetime.datetime.now().isoformat(timespec="seconds"), u[5], target_season) for u in updates])
+            """, [(status, schema_v2.normalize_status(status), health_document, now, user_id, target_season, target_season)
+                  for status, _, _, _, health_document, user_id in updates])
             conn.commit()
         except Exception:
             conn.rollback()

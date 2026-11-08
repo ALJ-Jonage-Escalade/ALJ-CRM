@@ -29,7 +29,7 @@ def client():
 
 def _get(client, rows, season="active"):
     with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", return_value=rows) as load, \
-         patch("api.reports.get_active_season", return_value="2026-2027"):
+         patch("domain.constants.get_active_season", return_value="2026-2027"):
         response = client.get("/api/reports/pivot-records", params={"season": season})
     return response, load
 

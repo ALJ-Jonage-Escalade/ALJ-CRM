@@ -1753,19 +1753,19 @@
         }
       }
     },
-    "/api/competitions/{comp_id}/check-all-paid": {
+    "/api/competitions/{competition_id}/check-all-paid": {
       "post": {
         "summary": "Check Competition All Paid Api",
         "description": "Vérifie si tous les compétiteurs ont payé et envoie l'e-mail récapitulatif si applicable.",
-        "operationId": "check_competition_all_paid_api_api_competitions__comp_id__check_all_paid_post",
+        "operationId": "check_competition_all_paid_api_api_competitions__competition_id__check_all_paid_post",
         "parameters": [
           {
-            "name": "comp_id",
+            "name": "competition_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Comp Id"
+              "title": "Competition Id"
             }
           }
         ],
@@ -1845,6 +1845,16 @@
                 }
               }
             }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "404": {
             "content": {
@@ -2040,6 +2050,16 @@
                 }
               }
             }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "500": {
             "content": {
@@ -3164,6 +3184,16 @@
               }
             }
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
           "500": {
             "content": {
               "application/json": {
@@ -3214,6 +3244,16 @@
                 }
               }
             }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "500": {
             "content": {
