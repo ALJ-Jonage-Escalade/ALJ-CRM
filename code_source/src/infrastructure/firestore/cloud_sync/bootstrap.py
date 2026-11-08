@@ -1,10 +1,10 @@
 """Construction complète du cache depuis Firestore et export initial d'une base vers Firestore."""
 import datetime
+import logging
 import os
 import sqlite3
 from typing import Any, Callable, Dict, List, Optional
 
-from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.firestore.cloud_sync.cache import (
     _Applying,
     _pk_string,
@@ -28,6 +28,9 @@ from infrastructure.firestore.cloud_sync.common import (
     ts_key,
     upgrade_legacy_fields,
 )
+from infrastructure.sqlite.connection import SqliteDatabase
+
+logger = logging.getLogger("alj")
 
 def create_schema(path: str):
     """Crée une base vide au schéma de l'application (SqliteDatabase)."""
@@ -94,7 +97,7 @@ def build_cache(path: str, store, schema_factory: Callable[[str], None] = create
                 dst.close()
                 bk.close()
             except Exception as e:
-                print(f"⚠️ [CLOUD_DB] Sauvegarde de l'ancien cache impossible : {e}")
+                logger.warning(f"[CLOUD_DB] Sauvegarde de l'ancien cache impossible : {e}")
         for suffix in ("-wal", "-shm", "-journal"):
             try:
                 os.remove(path + suffix)

@@ -49,7 +49,7 @@ class MemberService:
     @staticmethod
     def list_competitors() -> List[Doc]:
         """Contacts of the participants of the competitions that are not archived, the only
-        member data a coach's phone keeps offline (plan phase 5). Taken from the active season,
+        member data a coach's phone keeps offline. Taken from the active season,
         else from the participant's latest season (not registered again yet)."""
         ids = {p.get("adherent_id")
                for c in CompetitionService.list_competitions() if c.get("statut") != STATUT_CLOSE

@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import sqlite3
 from typing import Dict, Iterable, List, Optional, Tuple
-
 
 from domain.members.sex import parse_sex
 from domain.utils import normalize_name
 from infrastructure.sqlite import schema_v2
 from infrastructure.sqlite.connection import SqliteDatabase
+
+logger = logging.getLogger("alj")
 
 EXTRA_COLUMNS = {
     "is_modified": "TEXT DEFAULT 'Non'",
@@ -101,7 +103,7 @@ class MemberRepository:
             stats = schema_v2.write_members_to_v2(cursor, members, season_name)
             inserted_count = stats["purchases"]
             conn.commit()
-            print(f"[SQLITE] Synchro reussie : {inserted_count} adhesions enregistrees/mises a jour "
+            logger.info(f"[SQLITE] Synchro reussie : {inserted_count} adhesions enregistrees/mises a jour "
                   f"pour la saison {season_name}. (v2: {stats})")
         except Exception:
             conn.rollback()
@@ -185,11 +187,11 @@ class MemberRepository:
                 conn.rollback()
                 msg = ("Une inscription plus prioritaire existe déjà pour cet adhérent "
                        "cette saison (statut/montant supérieurs).")
-                print(f"[SQLITE] Ajout manuel refusé : {msg}")
+                logger.info(f"[SQLITE] Ajout manuel refusé : {msg}")
                 return False, msg
             conn.commit()
-            print(f"[SQLITE] Adhérent manuel ajouté : {rec['user_lastName']} {rec['user_firstName']} "
-                  f"({order_ref}, saison {season_name}).")
+            # Personal data (names) never goes to the logs: the order reference identifies the purchase
+            logger.info(f"[SQLITE] Manual member added ({order_ref}, season {season_name}).")
             return True, order_ref
         except Exception:
             conn.rollback()
@@ -248,7 +250,7 @@ class MemberRepository:
                 """, (date_str, int(purchase_id)))
                 if cursor.rowcount > 0:
                     conn.commit()
-                    print(f"[SQLITE] Date d'envoi d'e-mail enregistree pour l'achat #{purchase_id} : {date_str}")
+                    logger.debug(f"[SQLITE] Date d'envoi d'e-mail enregistree pour l'achat #{purchase_id} : {date_str}")
                     return True
 
             cursor.execute("""
@@ -271,9 +273,9 @@ class MemberRepository:
                 rows_affected = cursor.rowcount
             conn.commit()
             if rows_affected > 0:
-                print(f"[SQLITE] Date d'envoi d'e-mail enregistree pour la commande {order_ref} : {date_str}")
+                logger.debug(f"[SQLITE] Date d'envoi d'e-mail enregistree pour la commande {order_ref} : {date_str}")
                 return True
-            print(f"[SQLITE] Aucun achat trouve pour la commande {order_ref} (achat #{purchase_id})")
+            logger.info(f"[SQLITE] Aucun achat trouve pour la commande {order_ref} (achat #{purchase_id})")
             return False
         except Exception:
             conn.rollback()
@@ -348,7 +350,7 @@ class MemberRepository:
                     """, (*status_params, int(purchase_id)))
 
             conn.commit()
-            print(f"[SQLITE] Adhérent #{resolved_uid} mis à jour avec succès : {list(fields.keys())}")
+            logger.debug(f"[SQLITE] Adhérent #{resolved_uid} mis à jour avec succès : {list(fields.keys())}")
             return True, ""
         except sqlite3.IntegrityError:
             conn.rollback()

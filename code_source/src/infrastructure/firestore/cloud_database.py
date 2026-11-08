@@ -117,7 +117,7 @@ class CloudDatabase:
             except Exception as e:
                 cls._last_error = str(e)
                 report.setdefault("errors", []).append(str(e))
-                print(f"❌ [CLOUD_DB] Synchronisation Firestore impossible : {e}")
+                logger.warning(f"[CLOUD_DB] Synchronisation Firestore impossible : {e}")
             cls._last_report = report
             cls._last_sync = time.time()
             return report
@@ -147,7 +147,7 @@ class CloudDatabase:
         if set(report.get("tables") or []) & {"users", "orders", "purchases", "planning", "seasons"}:
             cls._projection_dirty = True
         if report.get("pushed") or report.get("deleted") or report.get("pulled"):
-            print(f"☁️ [CLOUD_DB] envoyés={report.get('pushed', 0)} supprimés={report.get('deleted', 0)} "
+            logger.info(f"[CLOUD_DB] envoyés={report.get('pushed', 0)} supprimés={report.get('deleted', 0)} "
                   f"reçus={report.get('pulled', 0)} conflits={report.get('conflicts', 0)}")
 
     @classmethod
@@ -162,7 +162,7 @@ class CloudDatabase:
             if not rep.get("errors"):
                 cls._projection_dirty = False
         except Exception as e:
-            print(f"⚠️ [CLOUD_DB] Mise à jour de l'annuaire Firestore impossible : {e}")
+            logger.warning(f"[CLOUD_DB] Mise à jour de l'annuaire Firestore impossible : {e}")
 
     @classmethod
     def status(cls) -> Dict[str, Any]:

@@ -50,7 +50,7 @@ class EmailDispatchService:
         try:
             emails.update(str(a.get("email") or "").strip().lower() for a in CompetitionRepository.list_members())
         except Exception as e:
-            print(f"⚠️ [EMAIL_DISPATCH] Competition members unavailable for the recipient check: {e}")
+            logger.warning(f"[EMAIL_DISPATCH] Competition members unavailable for the recipient check: {e}")
         emails.discard("")
         return emails
 

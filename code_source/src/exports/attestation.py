@@ -116,23 +116,20 @@ def build_attestation(
     - Payeur par défaut = l'adhérent lui-même si non renseigné.
     - Images embarquées en base64 (rendu indépendant du système de fichiers).
     """
-    # 1. Extraction des champs (supporte indifféremment dict ou objet)
+    # The member may be a dict or an object
     def _get(key, alt=None):
         return _member_field(member, key, alt)
 
-    # 2. Validation (statut non annulé, montant > 0, nom renseigné)
     problem = attestation_error(member)
     if problem:
         raise ValueError(problem)
 
-    # 3. Formatage du montant
     amount_str = f"{_parse_amount(_get('amount')):.2f}".replace(".", ",")
 
-    # 4. Formatage du nom et du prénom de l'adhérent
     user_first = str(_get("first_name", "user_first_name") or "").strip().capitalize()
     user_last = str(_get("last_name", "user_last_name") or "").strip().upper()
 
-    # 5. Formatage du payeur (payeur par défaut = l'adhérent)
+    # Payer: the member when not given
     payer_first = str(_get("payer_first_name") or "").strip().capitalize()
     payer_last = str(_get("payer_last_name") or "").strip().upper()
     payer_full = str(_get("payer") or "").strip()
@@ -150,14 +147,12 @@ def build_attestation(
             payer_first = user_first
             payer_last = user_last
 
-    # 6. Date du jour et saison
     date_jour_fr = date_jour or get_french_date()
     if not season:
         season = str(_get("season_name") or "").strip()
     if not season:
         season = get_active_season()
 
-    # 7. Chargement du template HTML
     template_file = template_path("ATTESTATION_TEMPLATE.html")
     if not os.path.exists(template_file):
         raise FileNotFoundError(f"Modèle d'attestation HTML introuvable : {template_file}")
@@ -165,7 +160,6 @@ def build_attestation(
     with open(template_file, "r", encoding="utf-8") as f:
         html = f.read()
 
-    # 8. Remplacement des variables du modèle
     # Values come from member data (public HelloAsso form) and the request body:
     # escaped so they can never inject markup (e.g. a <link rel="attachment"> read by WeasyPrint).
     values = {
@@ -181,7 +175,7 @@ def build_attestation(
     for placeholder, value in values.items():
         html = html.replace(placeholder, _html.escape(str(value)))
 
-    # 9. Embarquement des images en base64 pour un HTML 100% autonome
+    # Images embedded as base64: the HTML is self-contained
     logo_data = _image_to_base64_data_uri(LOGO_PATH, "image/png")
     if logo_data:
         html = re.sub(r'src=["\']logo\.png["\']', f'src="{logo_data}"', html)

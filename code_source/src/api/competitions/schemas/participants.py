@@ -21,7 +21,7 @@ class ParticipantAdd(RequestBody):
 class ParticipantUpdate(RequestBody):
     selectionne: Optional[bool] = None
     present: Optional[bool] = None  # pass-through field (plan appendix B)
-    # Change queued offline (plan phase 5b): the participant's `updated_at` the phone saw.
+    # Change queued offline: the participant's `updated_at` the phone saw.
     # Refused (409 `changed`) when the participant changed since. One flag per request, as
     # the first write would change `updated_at` for the second.
     unchanged_since: Optional[str] = Field(default=None, max_length=64)

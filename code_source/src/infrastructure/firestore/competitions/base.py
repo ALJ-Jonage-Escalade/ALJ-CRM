@@ -1,15 +1,16 @@
 """Shared base of the competition repository mixins: collection names, time and retry
 helpers, and the competition documents (read, normalization, building, participant writes)."""
-import time
 import datetime
-from typing import Dict, Any, List, Optional
+import logging
+import time
+from typing import Any, Dict, List, Optional
 
 from domain.competitions.models import (
     LEGACY_COACH_SLOTS,
+    PAIEMENT_PAYE,
     Competition,
     coach_ids_of,
     default_deadline,
-    PAIEMENT_PAYE,
 )
 from infrastructure.firestore.client import (
     META_KEYS,
@@ -17,6 +18,8 @@ from infrastructure.firestore.client import (
     FirestoreConflictError,
     FirestoreError,
 )
+
+logger = logging.getLogger("alj")
 
 # Verrouillage optimiste des participants : nombre de tentatives (relecture +
 # ré-application de la modification) quand un autre poste, la page web ou le
@@ -67,7 +70,7 @@ class CompetitionStoreBase:
             except FirestoreConflictError:
                 if n == _MAX_WRITE_ATTEMPTS - 1:
                     raise
-                print(f"🔁 [FIRESTORE] {what} modifié(e) entre-temps : "
+                logger.info(f"[FIRESTORE] {what} modifié(e) entre-temps : "
                       f"nouvelle tentative ({n + 2}/{_MAX_WRITE_ATTEMPTS})")
                 time.sleep(0.2 * (n + 1))
         return None
@@ -107,7 +110,7 @@ class CompetitionStoreBase:
                 FirestoreClient.delete_document(cls.COLLECTION_COMPETITIONS, doc_id)
                 doc["_doc_id"] = key
             except FirestoreError as e:
-                print(f"⚠️ [FIRESTORE] Normalisation de l'épreuve #{key} impossible : {e}")
+                logger.warning(f"[FIRESTORE] Normalisation de l'épreuve #{key} impossible : {e}")
         return list(kept.values())
 
     @classmethod

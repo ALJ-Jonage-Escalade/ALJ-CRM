@@ -1,3 +1,4 @@
+import logging
 import math
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -6,6 +7,8 @@ import requests
 from infrastructure import runtime_env
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.timed_cache import TimedCache
+
+logger = logging.getLogger("alj")
 
 # Délai max d'une requête HelloAsso (connexion + lecture), en secondes
 REQUEST_TIMEOUT_SECONDS = 30
@@ -55,7 +58,7 @@ def get_access_token():
             return _request_access_token()[0]
         return _token_cache.get_or_load_expiring(_OAUTH_KEY, _request_access_token)
     except requests.exceptions.RequestException as e:
-        print(f"Erreur d'authentification: {e}")
+        logger.error(f"Erreur d'authentification: {e}")
         return None
 
 

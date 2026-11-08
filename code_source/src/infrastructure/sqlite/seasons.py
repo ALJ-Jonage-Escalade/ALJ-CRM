@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from domain.constants import DEFAULT_EXTRA_TARIFS
 from infrastructure.sqlite.connection import SqliteDatabase
+
+logger = logging.getLogger("alj")
 
 
 class SeasonRepository:
@@ -38,7 +42,7 @@ class SeasonRepository:
             combined = set(db_tarifs) | set(DEFAULT_EXTRA_TARIFS)
             return sorted(combined)
         except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors du chargement des tarifs de la saison {season_name} : {e}")
+            logger.warning(f"[SQLITE] Erreur lors du chargement des tarifs de la saison {season_name} : {e}")
             return list(DEFAULT_EXTRA_TARIFS)
         finally:
             conn.close()

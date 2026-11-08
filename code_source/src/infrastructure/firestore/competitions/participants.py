@@ -29,7 +29,7 @@ class ParticipantAlreadyPaid(Exception):
 
 class ParticipantChanged(Exception):
     """The participant row changed since the client read it (its `updated_at` differs): a
-    change queued offline is refused rather than overwrite a newer one (plan phase 5b)."""
+    change queued offline is refused rather than overwrite a newer one."""
 
 
 # Row guard of _update_participant: False leaves the row as it is, an exception refuses the write

@@ -1,9 +1,12 @@
 """Coaches CRUD; the competitions store coach ids only (names are resolved when read)."""
-from typing import Dict, Any, Optional
+import logging
+from typing import Any, Dict, Optional
 
 from domain.competitions.models import coach_ids_of
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions.base import CompetitionStoreBase
+
+logger = logging.getLogger("alj")
 
 
 class CoachesMixin(CompetitionStoreBase):
@@ -54,5 +57,5 @@ class CoachesMixin(CompetitionStoreBase):
                 FirestoreClient.update_fields(cls.COLLECTION_COMPETITIONS, str(doc.get("id")),
                                               {**make_patch(ids), "updated_at": cls._now_iso()})
             except FirestoreError as e:
-                print(f"⚠️ [FIRESTORE] {what} #{coach_id} sur l'épreuve "
+                logger.warning(f"[FIRESTORE] {what} #{coach_id} sur l'épreuve "
                       f"#{doc.get('id')} impossible : {e}")

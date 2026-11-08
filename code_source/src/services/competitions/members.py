@@ -1,6 +1,6 @@
 """Members as seen by the competition pages (Firestore `adherents` projection, read-only).
 
-The full member records are served by the member routes (plan phase 2), not here.
+The full member records are served by the member routes, not here.
 """
 
 from __future__ import annotations

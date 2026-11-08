@@ -55,7 +55,7 @@ class ParticipantService:
         coach must then choose whether the money is lost or carried over (cancel_participant).
 
         `unchanged_since`: the participant's `updated_at` the client saw, sent with a change
-        queued on a phone while offline (plan phase 5b), one flag at a time. The change is
+        queued on a phone while offline, one flag at a time. The change is
         refused when the participant changed meanwhile (Conflict `changed`), on an archived
         competition (`competition_closed`), or when the member is no longer listed
         (NotFound); a flag already at the new value is accepted without a write."""

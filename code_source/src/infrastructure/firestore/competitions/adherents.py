@@ -1,17 +1,20 @@
 """`adherents` directory: snapshot of the members of database.db, read through a short cache."""
 import json
-from typing import Dict, Any, List, Optional, Sequence, Tuple
+import logging
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from domain.constants import get_active_season
-from domain.members.age_rules import parse_birth_date, age_at, get_season_start_date
 from domain.members import view as member_view
+from domain.members.age_rules import age_at, get_season_start_date, parse_birth_date
+from domain.members.purchase_priority import purchase_priority_score
 from domain.members.sex import parse_sex
 from domain.utils import normalize_string
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions.base import CompetitionStoreBase
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.timed_cache import TimedCache
-from domain.members.purchase_priority import purchase_priority_score
+
+logger = logging.getLogger("alj")
 
 _ADHERENTS_CACHE_SECONDS = 30.0
 _ADHERENTS_CACHE_KEY = "adherents"
@@ -210,7 +213,7 @@ class MemberDirectoryMixin(CompetitionStoreBase):
         try:
             docs = FirestoreClient.list_documents(cls.COLLECTION_ADHERENTS)
         except Exception as e:
-            print(f"⚠️ [FIRESTORE] Lecture de l'annuaire adhérents impossible : {e}")
+            logger.warning(f"[FIRESTORE] Lecture de l'annuaire adhérents impossible : {e}")
             if cls._adherents_last_read is not None:
                 return cls._adherents_last_read
             if isinstance(e, FirestoreError):
