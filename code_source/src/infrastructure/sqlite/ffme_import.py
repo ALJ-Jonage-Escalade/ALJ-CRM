@@ -1,193 +1,48 @@
-"""FFME licensee and autonomy (badge rouge) imports from the federation Excel exports."""
+"""Writes of the FFME licensee import (services/members/ffme.py reads the file and matches it)."""
 
 from __future__ import annotations
 
 import datetime
 import logging
-import os
-from typing import Optional
+from typing import List, Optional, Tuple, TypedDict
 
+from domain.constants import get_active_season
 from infrastructure.sqlite import schema_v2
 from infrastructure.sqlite.connection import SqliteDatabase
 
 logger = logging.getLogger("alj")
 
-# Shown to the office (the cause goes to the logs only: it may hold the temporary file's path)
-UNREADABLE_EXCEL = "Fichier Excel illisible : vérifiez qu'il s'agit bien de l'export .xlsx des licenciés MyFFME."
-MATCHING_FAILED = "Erreur lors du rapprochement FFME (détails dans les journaux)."
+# A match to write: (purchase status, licence, passports, diplomas, health document, user id)
+FfmeMatch = Tuple[str, str, str, str, str, int]
+
+
+class MemberForMatching(TypedDict):
+    id: int
+    last_name: str
+    first_name: str
+    licence_ffme: str
+    birth_date: str
 
 
 class FfmeImportRepository:
     @classmethod
-    def prepare_ffme_licensees(cls, excel_path: str) -> dict:
-        """
-        Phase A de l'import FFME — lit le fichier Excel, charge les utilisateurs et
-        applique le rapprochement automatique (N° de licence puis Nom/Prénom).
-        Ne modifie PAS la base. Retourne :
-          {
-            "updates":   [(match_type, licence, passeports, diplomas, document_sante, user_id), ...],
-            "unmatched": [{"nom", "prenom", "licence", "birth_date", "passeports", "diplomes",
-                           "document_sante"}, ...],
-            "users":     [{"id", "last_name", "first_name", "licence_ffme", "birth_date"}, ...],
-            "stats":     {"total_processed", "matched_by_licence", "matched_by_name", "errors"},
-          }
-        """
-        import pandas as pd
-        from domain.utils import normalize_name
-
-        prep = {"updates": [], "unmatched": [], "users": [],
-                "stats": {"total_processed": 0, "matched_by_licence": 0,
-                          "matched_by_name": 0, "errors": []}}
-        stats = prep["stats"]
-
-        if not os.path.exists(excel_path):
-            logger.error("FFME import: file not found: %s", excel_path)
-            stats["errors"].append(UNREADABLE_EXCEL)
-            return prep
-        try:
-            df = pd.read_excel(excel_path)
-            required_cols = ["Nom", "Pr\u00e9nom", "N\u00b0 de licence"]
-            if not all(col in df.columns for col in required_cols):
-                try:
-                    df_h1 = pd.read_excel(excel_path, header=1)
-                    if all(col in df_h1.columns for col in required_cols):
-                        df = df_h1
-                except Exception:
-                    logger.debug("Lecture de l'export FFME avec l'en-tête en ligne 2 impossible", exc_info=True)
-        except Exception:
-            logger.exception("FFME import: Excel file unreadable")
-            stats["errors"].append(UNREADABLE_EXCEL)
-            return prep
-
-        required_cols = ["Nom", "Pr\u00e9nom", "N\u00b0 de licence"]
-        for col in required_cols:
-            if col not in df.columns:
-                stats["errors"].append(f"Colonne requise manquante dans le fichier Excel : {col}")
-                return prep
-
-        def _clean_licence(val):
-            """Extrait le N° de licence numérique : retire l'enrobage formule Excel
-            ('=\"636947\"'), le suffixe float ('636947.0') et tout caractère non numérique.
-            La mise à jour du N° de licence utilise cette valeur nettoyée (cohérente avec
-            l'index users_by_licence)."""
-            s = str(val or "").strip()
-            if s.endswith(".0"):
-                s = s[:-2]
-            return "".join(c for c in s if c.isdigit())
-
+    def list_members_for_matching(cls) -> List[MemberForMatching]:
+        """Every member, with what the matching compares (licence, names) and shows (birth date)."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
-            cursor = conn.cursor()
-
-            # Secours lecture des N° de licence : les exports FFME récents stockent la
-            # colonne « N° de licence » en formule Excel ('=\"636947\"') SANS valeur
-            # cachée — pandas la lit alors comme NaN. openpyxl (data_only=False) permet
-            # de relire le texte de la formule et d'en extraire le numéro.
-            openpyxl_licences = {}
-            try:
-                import openpyxl as _openpyxl
-                _wb = _openpyxl.load_workbook(excel_path, read_only=True, data_only=False)
-                _ws = _wb.active
-                _rows = list(_ws.iter_rows(values_only=True))
-                _wb.close()
-                if _rows:
-                    _headers = [str(h or "").strip() for h in _rows[0]]
-                    if "N\u00b0 de licence" in _headers:
-                        _ci = _headers.index("N\u00b0 de licence")
-                        for _r in _rows[1:]:
-                            _nom = str(_r[0] or "").strip() if len(_r) > 0 else ""
-                            _prenom = str(_r[1] or "").strip() if len(_r) > 1 else ""
-                            _val = _r[_ci] if _ci < len(_r) else None
-                            openpyxl_licences[(_nom, _prenom)] = "" if _val is None else str(_val)
-            except Exception:
-                openpyxl_licences = {}
-
-            cursor.execute("""
+            rows = conn.execute("""
                 SELECT id, last_name, first_name, licence_ffme,
                        COALESCE(birth_date, birth_date_raw, '') AS birth_date
                 FROM users
-            """)
-            users = [dict(row) for row in cursor.fetchall()]
-            prep["users"] = [
-                {"id": u["id"], "last_name": u["last_name"], "first_name": u["first_name"],
-                 "licence_ffme": u["licence_ffme"], "birth_date": u["birth_date"]}
-                for u in users
-            ]
-
-            users_by_licence = {}
-            users_by_name = {}
-            for u in users:
-                clean_lic = _clean_licence(u["licence_ffme"])
-                if clean_lic:
-                    users_by_licence[clean_lic] = u
-                nk = normalize_name(u["last_name"])
-                fk = normalize_name(u["first_name"])
-                if nk and fk:
-                    users_by_name[(nk, fk)] = u
-
-            def _cell_str(row, key):
-                val = row.get(key)
-                if val is None or (isinstance(val, float) and pd.isna(val)):
-                    return ""
-                return str(val).strip() if not hasattr(val, "strftime") else val.strftime("%d/%m/%Y")
-
-            has_sante_col = "Document de sant\u00e9" in df.columns
-
-            for idx, row in df.iterrows():
-                stats["total_processed"] += 1
-                nom = str(row["Nom"] or "").strip()
-                prenom = str(row["Pr\u00e9nom"] or "").strip()
-                raw_lic = row["N\u00b0 de licence"]
-                lic_str = "" if pd.isna(raw_lic) else _clean_licence(raw_lic)
-                if not lic_str:
-                    # Secours openpyxl : formules '=\"636947\"' sans valeur cachée
-                    lic_str = _clean_licence(openpyxl_licences.get((nom, prenom), ""))
-
-                matched = None
-                if lic_str and lic_str in users_by_licence:
-                    matched = users_by_licence[lic_str]
-                    match_type = "licence"
-                if not matched and nom and prenom:
-                    key = (normalize_name(nom), normalize_name(prenom))
-                    if key in users_by_name:
-                        matched = users_by_name[key]
-                        match_type = "name"
-                if matched:
-                    # Le N° de licence du fichier FFME (nettoyé) fait foi ; on conserve
-                    # la licence existante uniquement si le fichier n'en fournit pas.
-                    final_lic = lic_str if lic_str else _clean_licence(matched["licence_ffme"])
-                    passports_str = _cell_str(row, "Passeports")
-                    if passports_str.lower() in ("nan", "none", ""):
-                        passports_str = ""
-                    diplomas_str = _cell_str(row, "Dipl\u00f4mes")
-                    if diplomas_str.lower() in ("nan", "none", ""):
-                        diplomas_str = ""
-                    sante_str = _cell_str(row, "Document de sant\u00e9") if has_sante_col else ""
-                    if sante_str.lower() in ("nan", "none"):
-                        sante_str = ""
-                    prep["updates"].append(("Terminé", final_lic, passports_str, diplomas_str, sante_str, matched["id"]))
-                    if match_type == "licence":
-                        stats["matched_by_licence"] += 1
-                    else:
-                        stats["matched_by_name"] += 1
-                else:
-                    prep["unmatched"].append({
-                        "nom": nom, "prenom": prenom, "licence": lic_str,
-                        "birth_date": _cell_str(row, "Date de naissance"),
-                        "passeports": _cell_str(row, "Passeports"),
-                        "diplomes": _cell_str(row, "Dipl\u00f4mes"),
-                        "document_sante": _cell_str(row, "Document de sant\u00e9") if has_sante_col else "",
-                    })
-        except Exception:  # reported to the office as a fixed message; the cause (SQL, paths) goes to the logs
-            logger.exception("FFME import: matching failed")
-            stats["errors"].append(MATCHING_FAILED)
+            """).fetchall()
         finally:
             conn.close()
-        return prep
+        return [MemberForMatching(id=row["id"], last_name=row["last_name"], first_name=row["first_name"],
+                                  licence_ffme=row["licence_ffme"], birth_date=row["birth_date"]) for row in rows]
 
     @classmethod
-    def apply_ffme_matches(cls, updates: list, season_name: Optional[str] = None) -> None:
+    def apply_ffme_matches(cls, updates: List[FfmeMatch], season_name: Optional[str] = None) -> None:
         """
         Phase B de l'import FFME — écrit en base les associations validées :
         updates = [(match_type, licence, passeports, diplomas, document_sante, user_id), ...]
@@ -203,7 +58,6 @@ class FfmeImportRepository:
         conn = SqliteDatabase.get_connection()
         cursor = conn.cursor()
         try:
-            from domain.constants import get_active_season
             target_season = str(season_name or get_active_season()).strip()
 
             for u in updates:

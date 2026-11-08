@@ -16,7 +16,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from domain.utils import apply_template_variables, sanitize_email_header  # noqa: E402
-from infrastructure.mail.dispatch import EmailDispatchService  # noqa: E402
+from services.communications.email_dispatch import EmailDispatchService  # noqa: E402
 from support.fake_access import grant_roles  # noqa: E402
 
 EVIL_NAME = '<a href="https://evil.example">Pay here</a>'

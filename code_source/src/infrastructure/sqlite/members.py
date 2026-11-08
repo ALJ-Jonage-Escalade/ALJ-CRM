@@ -348,181 +348,30 @@ class MemberRepository:
                 if row:
                     resolved_uid = row["user_id"]
 
-            # 1. Mise à jour de la table users
-            user_updates = {}
-            if "last_name" in fields:
-                ln = str(fields["last_name"] or "").strip().upper()
-                if ln:
-                    user_updates["last_name"] = ln
-                    user_updates["last_name_key"] = normalize_name(ln).upper()
-            if "first_name" in fields:
-                fn = str(fields["first_name"] or "").strip()
-                if fn:
-                    user_updates["first_name"] = fn
-                    user_updates["first_name_key"] = normalize_name(fn).lower()
-            if "birth_date" in fields:
-                raw_dob = str(fields["birth_date"] or "").strip()
-                user_updates["birth_date"] = schema_v2.parse_iso_date(raw_dob) if raw_dob else ""
-                user_updates["birth_date_raw"] = raw_dob
-            if "badge_rouge" in fields:
-                user_updates["badge_rouge"] = str(fields["badge_rouge"] or "Non").strip()
-            if "autonomie_bloc" in fields:
-                user_updates["autonomie_bloc"] = str(fields["autonomie_bloc"] or "Non").strip()
-            if "photo_auth" in fields:
-                user_updates["photo_auth"] = str(fields["photo_auth"] or "Oui").strip()
-            if "email_primary" in fields:
-                user_updates["email_primary"] = str(fields["email_primary"] or "").strip()
-            if "email_secondary" in fields:
-                user_updates["email_secondary"] = str(fields["email_secondary"] or "").strip()
-            if "phone" in fields:
-                user_updates["phone"] = str(fields["phone"] or "").strip()
-            if "licence_ffme" in fields:
-                user_updates["licence_ffme"] = str(fields["licence_ffme"] or "").strip()
-            if "sex" in fields:
-                sex = parse_sex(fields["sex"])
-                user_updates["sex"] = sex.value if sex else None
-            if "address" in fields:
-                user_updates["address"] = str(fields["address"] or "").strip()
-            if "zip_code" in fields:
-                user_updates["zip_code"] = str(fields["zip_code"] or "").strip()
-            if "city" in fields:
-                user_updates["city"] = str(fields["city"] or "").strip()
-            if "emergency1_name" in fields:
-                user_updates["emergency1_name"] = str(fields["emergency1_name"] or "").strip()
-            if "emergency1_phone" in fields:
-                user_updates["emergency1_phone"] = str(fields["emergency1_phone"] or "").strip()
-            if "emergency2_name" in fields:
-                user_updates["emergency2_name"] = str(fields["emergency2_name"] or "").strip()
-            if "emergency2_phone" in fields:
-                user_updates["emergency2_phone"] = str(fields["emergency2_phone"] or "").strip()
-            if "hid_proxkey" in fields:
-                val = fields["hid_proxkey"]
-                if isinstance(val, bool):
-                    user_updates["hid_proxkey"] = "Oui" if val else "Non"
-                else:
-                    norm = str(val or "Non").strip().lower()
-                    user_updates["hid_proxkey"] = "Oui" if norm in ("oui", "true", "1", "yes") else "Non"
-            if "hid_proxkey_date" in fields:
-                user_updates["hid_proxkey_date"] = str(fields["hid_proxkey_date"] or "").strip()
-            if "hid_proxkey_comment" in fields:
-                user_updates["hid_proxkey_comment"] = str(fields["hid_proxkey_comment"] or "").strip()
-
+            user_updates = _user_column_updates(fields)
             if user_updates and resolved_uid is not None:
                 sets = [f'"{col}" = ?' for col in user_updates.keys()]
                 sets.append('updated_at = ?')
                 params = list(user_updates.values()) + [now_iso, int(resolved_uid)]
-                cursor.execute(f'UPDATE users SET {", ".join(sets)} WHERE id = ?', params)  # noqa: S608 - colonnes de la liste fixe ci-dessus
+                cursor.execute(f'UPDATE users SET {", ".join(sets)} WHERE id = ?', params)  # noqa: S608 - columns from _user_column_updates' fixed lists
 
-            # 2. Mise à jour de la table purchases (créneau / tarif, montant)
-            if "tarif_name" in fields:
-                new_tarif = str(fields["tarif_name"] or "").strip()
-                if new_tarif:
-                    if purchase_id:
-                        cursor.execute("""
-                            UPDATE purchases
-                            SET tarif_name = ?, updated_at = ?, is_modified = 'Oui'
-                            WHERE id = ?
-                        """, (new_tarif, now_iso, int(purchase_id)))
-                    elif order_ref and resolved_uid:
-                        cursor.execute("""
-                            UPDATE purchases
-                            SET tarif_name = ?, updated_at = ?, is_modified = 'Oui'
-                            WHERE user_id = ? AND order_id IN (SELECT id FROM orders WHERE order_ref = ?)
-                        """, (new_tarif, now_iso, int(resolved_uid), str(order_ref).strip()))
-                    elif resolved_uid:
-                        cursor.execute("""
-                            UPDATE purchases
-                            SET tarif_name = ?, updated_at = ?, is_modified = 'Oui'
-                            WHERE user_id = ?
-                        """, (new_tarif, now_iso, int(resolved_uid)))
-
-            if "amount" in fields and fields["amount"] is not None:
-                new_amount = float(fields["amount"])
-                if purchase_id:
+            purchase_updates = _purchase_column_updates(fields)
+            if purchase_updates:
+                _update_purchases(cursor, purchase_updates, purchase_id, order_ref, resolved_uid, now_iso)
+            if "status" in purchase_updates:  # the order carries the status too
+                status_params = (purchase_updates["status"], purchase_updates["status_normalized"], now_iso)
+                if order_ref:
                     cursor.execute("""
-                        UPDATE purchases
-                        SET amount = ?, updated_at = ?, is_modified = 'Oui'
-                        WHERE id = ?
-                    """, (new_amount, now_iso, int(purchase_id)))
-                elif order_ref and resolved_uid:
+                        UPDATE orders
+                        SET status = ?, status_normalized = ?, updated_at = ?
+                        WHERE order_ref = ?
+                    """, (*status_params, str(order_ref).strip()))
+                elif purchase_id:
                     cursor.execute("""
-                        UPDATE purchases
-                        SET amount = ?, updated_at = ?, is_modified = 'Oui'
-                        WHERE user_id = ? AND order_id IN (SELECT id FROM orders WHERE order_ref = ?)
-                    """, (new_amount, now_iso, int(resolved_uid), str(order_ref).strip()))
-                elif resolved_uid:
-                    cursor.execute("""
-                        UPDATE purchases
-                        SET amount = ?, updated_at = ?, is_modified = 'Oui'
-                        WHERE user_id = ?
-                    """, (new_amount, now_iso, int(resolved_uid)))
-
-            # 3. Mise à jour du statut de l'adhésion (purchases & orders)
-            if "status" in fields:
-                new_status = str(fields["status"] or "").strip()
-                if new_status:
-                    norm = "Validé" if new_status.lower() in ("processed", "validated", "validé", "valide") else ("Annulé" if new_status.lower() in ("annulé", "annule", "canceled", "cancelled") else new_status.title())
-                    if purchase_id:
-                        cursor.execute("""
-                            UPDATE purchases
-                            SET status = ?, status_normalized = ?, updated_at = ?, is_modified = 'Oui'
-                            WHERE id = ?
-                        """, (new_status, norm, now_iso, int(purchase_id)))
-                    elif order_ref and resolved_uid:
-                        cursor.execute("""
-                            UPDATE purchases
-                            SET status = ?, status_normalized = ?, updated_at = ?, is_modified = 'Oui'
-                            WHERE user_id = ? AND order_id IN (SELECT id FROM orders WHERE order_ref = ?)
-                        """, (new_status, norm, now_iso, int(resolved_uid), str(order_ref).strip()))
-                    elif resolved_uid:
-                        cursor.execute("""
-                            UPDATE purchases
-                            SET status = ?, status_normalized = ?, updated_at = ?, is_modified = 'Oui'
-                            WHERE user_id = ?
-                        """, (new_status, norm, now_iso, int(resolved_uid)))
-
-                    if order_ref:
-                        cursor.execute("""
-                            UPDATE orders
-                            SET status = ?, status_normalized = ?, updated_at = ?
-                            WHERE order_ref = ?
-                        """, (new_status, norm, now_iso, str(order_ref).strip()))
-                    elif purchase_id:
-                        cursor.execute("""
-                            UPDATE orders
-                            SET status = ?, status_normalized = ?, updated_at = ?
-                            WHERE id = (SELECT order_id FROM purchases WHERE id = ?)
-                        """, (new_status, norm, now_iso, int(purchase_id)))
-
-            # 4. Mise à jour des commentaires / correctifs (purchases)
-            comment_val = None
-            if "commentaires_correctif" in fields:
-                comment_val = fields["commentaires_correctif"]
-            elif "commentaire" in fields:
-                comment_val = fields["commentaire"]
-            elif "comment" in fields:
-                comment_val = fields["comment"]
-
-            if comment_val is not None:
-                new_comment = str(comment_val or "").strip()
-                if purchase_id:
-                    cursor.execute("""
-                        UPDATE purchases
-                        SET commentaires_correctif = ?, updated_at = ?, is_modified = 'Oui'
-                        WHERE id = ?
-                    """, (new_comment, now_iso, int(purchase_id)))
-                elif order_ref and resolved_uid:
-                    cursor.execute("""
-                        UPDATE purchases
-                        SET commentaires_correctif = ?, updated_at = ?, is_modified = 'Oui'
-                        WHERE user_id = ? AND order_id IN (SELECT id FROM orders WHERE order_ref = ?)
-                    """, (new_comment, now_iso, int(resolved_uid), str(order_ref).strip()))
-                elif resolved_uid:
-                    cursor.execute("""
-                        UPDATE purchases
-                        SET commentaires_correctif = ?, updated_at = ?, is_modified = 'Oui'
-                        WHERE user_id = ?
-                    """, (new_comment, now_iso, int(resolved_uid)))
+                        UPDATE orders
+                        SET status = ?, status_normalized = ?, updated_at = ?
+                        WHERE id = (SELECT order_id FROM purchases WHERE id = ?)
+                    """, (*status_params, int(purchase_id)))
 
             conn.commit()
             print(f"[SQLITE] Adhérent #{resolved_uid} mis à jour avec succès : {list(fields.keys())}")
@@ -535,3 +384,85 @@ class MemberRepository:
             raise
         finally:
             conn.close()
+
+
+# Member fields written as trimmed text, and the yes/no fields with their default
+_USER_TEXT_FIELDS = (
+    "email_primary", "email_secondary", "phone", "licence_ffme", "address", "zip_code", "city",
+    "emergency1_name", "emergency1_phone", "emergency2_name", "emergency2_phone", "hid_proxkey_date", "hid_proxkey_comment",
+)
+_USER_YES_NO_DEFAULTS = {"badge_rouge": "Non", "autonomie_bloc": "Non", "photo_auth": "Oui"}
+_TRUE_TEXTS = ("oui", "true", "1", "yes")
+
+
+def _user_column_updates(fields: Dict[str, object]) -> Dict[str, Optional[str]]:
+    """users columns to write for the fields sent (an empty name is left unchanged)."""
+    updates: Dict[str, Optional[str]] = {}
+    last_name = str(fields.get("last_name") or "").strip().upper()
+    if last_name:
+        updates["last_name"] = last_name
+        updates["last_name_key"] = normalize_name(last_name).upper()
+    first_name = str(fields.get("first_name") or "").strip()
+    if first_name:
+        updates["first_name"] = first_name
+        updates["first_name_key"] = normalize_name(first_name).lower()
+    if "birth_date" in fields:
+        raw_birth_date = str(fields["birth_date"] or "").strip()
+        updates["birth_date"] = schema_v2.parse_iso_date(raw_birth_date) if raw_birth_date else ""
+        updates["birth_date_raw"] = raw_birth_date
+    for column, default in _USER_YES_NO_DEFAULTS.items():
+        if column in fields:
+            updates[column] = str(fields[column] or default).strip()
+    for column in _USER_TEXT_FIELDS:
+        if column in fields:
+            updates[column] = str(fields[column] or "").strip()
+    if "sex" in fields:
+        sex = parse_sex(fields["sex"])
+        updates["sex"] = sex.value if sex else None
+    if "hid_proxkey" in fields:
+        value = fields["hid_proxkey"]
+        has_key = value if isinstance(value, bool) else str(value or "Non").strip().lower() in _TRUE_TEXTS
+        updates["hid_proxkey"] = "Oui" if has_key else "Non"
+    return updates
+
+
+def _normalized_status(status: str) -> str:
+    lowered = status.lower()
+    if lowered in ("processed", "validated", "validé", "valide"):
+        return "Validé"
+    if lowered in ("annulé", "annule", "canceled", "cancelled"):
+        return "Annulé"
+    return status.title()
+
+
+def _purchase_column_updates(fields: Dict[str, object]) -> Dict[str, object]:
+    """purchases columns to write for the fields sent (an empty tariff or status is left unchanged)."""
+    updates: Dict[str, object] = {}
+    tariff = str(fields.get("tarif_name") or "").strip()
+    if tariff:
+        updates["tarif_name"] = tariff
+    if fields.get("amount") is not None:
+        updates["amount"] = float(fields["amount"])  # type: ignore[arg-type]  # validated by MemberFields (a number)
+    status = str(fields.get("status") or "").strip()
+    if status:
+        updates["status"] = status
+        updates["status_normalized"] = _normalized_status(status)
+    comment = next((fields[key] for key in ("commentaires_correctif", "commentaire", "comment") if key in fields), None)
+    if comment is not None:
+        updates["commentaires_correctif"] = str(comment or "").strip()
+    return updates
+
+
+def _update_purchases(cursor: sqlite3.Cursor, updates: Dict[str, object], purchase_id: Optional[int],
+                      order_ref: Optional[str], user_id: Optional[int], now_iso: str) -> None:
+    """Writes `updates` on the edited purchase: by id, else the member's purchase of the order, else all the member's
+    purchases. Marks it as edited by hand (is_modified)."""
+    sets = ", ".join(f'"{column}" = ?' for column in updates) + ", updated_at = ?, is_modified = 'Oui'"
+    values = [*updates.values(), now_iso]
+    if purchase_id:
+        cursor.execute(f"UPDATE purchases SET {sets} WHERE id = ?", (*values, int(purchase_id)))  # noqa: S608 - columns from _purchase_column_updates
+    elif order_ref and user_id:
+        cursor.execute(f"UPDATE purchases SET {sets} WHERE user_id = ? AND order_id IN "  # noqa: S608 - as above
+                       "(SELECT id FROM orders WHERE order_ref = ?)", (*values, int(user_id), str(order_ref).strip()))
+    elif user_id:
+        cursor.execute(f"UPDATE purchases SET {sets} WHERE user_id = ?", (*values, int(user_id)))  # noqa: S608 - as above

@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, Response
 
 from api.communications.schemas import AttestationRequest, AttestationSend, AttestationSent
 from api.responses import error, error_responses, internal_error
-from infrastructure.mail.senders import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from services.documents import Doc
 from services.members.members import MemberService
 
@@ -63,7 +63,7 @@ def send_attestation_api(data: AttestationSend) -> AttestationSent | JSONRespons
 def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
     from domain.attestation.document import build_attestation, render_attestation_pdf
     from domain.utils import apply_template_variables
-    from infrastructure.mail.dispatch import EmailDispatchService
+    from services.communications.email_dispatch import EmailDispatchService
     from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
     from infrastructure.mail.repository import EmailRepository, MailError
 

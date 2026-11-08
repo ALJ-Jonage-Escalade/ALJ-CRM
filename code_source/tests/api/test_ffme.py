@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security.api_auth import Role, required_role
 from infrastructure.sqlite.connection import SqliteDatabase
-from infrastructure.sqlite.ffme_import import UNREADABLE_EXCEL
+from services.members.ffme import UNREADABLE_EXCEL
 from support.member_db import MemberDbTestCase
 
 import server

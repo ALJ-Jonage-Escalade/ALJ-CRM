@@ -11,8 +11,8 @@ from api.communications.schemas import (
     EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate,
 )
 from api.responses import error, error_responses
-from infrastructure.mail.dispatch import EmailDispatchService
-from infrastructure.mail.senders import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
+from services.communications.email_dispatch import EmailDispatchService
+from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
 from infrastructure.security.secret_store import SecretStore
 
 router = APIRouter()

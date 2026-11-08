@@ -14,7 +14,7 @@ import time
 from typing import Optional
 
 from paths import DATA_ROOT, ROOT_DIR
-from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.sqlite import schema_v2
 
 _DEFAULT_EMAIL_TEMPLATES = [

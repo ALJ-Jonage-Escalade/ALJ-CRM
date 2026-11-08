@@ -17,7 +17,6 @@ from api.integrations.schemas import HelloAssoCampaignChoice, HelloAssoCampaignR
 from api.responses import error_responses, internal_error
 from domain import helloasso_campaigns as campaigns
 from domain.helloasso_campaigns import CampaignKind, CampaignRef
-from domain.members.helloasso_membership import parse_membership_campaign
 from infrastructure.firestore.app_settings import (
     HELLOASSO_COMPETITION_CAMPAIGN, HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository,
 )
@@ -45,23 +44,13 @@ def _setting(kind: str) -> str:
         raise StorageUnavailable(SETTINGS_UNAVAILABLE) from e
 
 
-def get_target_slug() -> str:
-    """Slug of the membership campaign, the import's (MembershipImportService.campaign_reference). A reference that
-    cannot be read gives its last URL segment."""
-    reference = MembershipImportService.campaign_reference()
-    try:
-        return parse_membership_campaign(reference).slug
-    except ValueError:
-        return [segment for segment in reference.split("/") if segment.strip()][-1]
-
-
 def _active_campaign(kind: str) -> tuple[CampaignRef | None, bool]:
     """Active campaign of the kind and whether it was chosen (False: the default in use, or none)."""
     active = campaigns.parse_setting(_setting(kind), kind)
     configured = active is not None
     if active is None and kind == "membership":
         # What the members import uses until a campaign is chosen (CAMPAIGN_SLUG variable or seasonal slug)
-        active = {"form_type": campaigns.FORM_TYPE_OF_KIND[kind], "slug": get_target_slug()}
+        active = {"form_type": campaigns.FORM_TYPE_OF_KIND[kind], "slug": MembershipImportService.campaign_slug()}
     return active, configured
 
 

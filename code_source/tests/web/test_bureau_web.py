@@ -292,21 +292,15 @@ class TestBureauFiles(unittest.TestCase):
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_member_add_validation(self):
-        """add_member_api rejette les requêtes avec champs obligatoires manquants."""
-        from api.members.members import add_member_api
-        from api.members.schemas import MemberCreate
+        """MemberService.add_member rejette les requêtes avec champs obligatoires manquants (400 côté API)."""
+        from domain.errors import InvalidRequest
+        from services.members.members import MemberService
 
-        # Nom manquant
-        res = add_member_api(MemberCreate.model_validate({"fields": {"first_name": "Jean", "birth_date": "2000-01-01", "tarif_name": "Licence"}}))
-        self.assertEqual(res.status_code, 400)
-
-        # Date de naissance manquante
-        res = add_member_api(MemberCreate.model_validate({"fields": {"last_name": "DUPONT", "first_name": "Jean", "tarif_name": "Licence"}}))
-        self.assertEqual(res.status_code, 400)
-
-        # Tarif manquant
-        res = add_member_api(MemberCreate.model_validate({"fields": {"last_name": "DUPONT", "first_name": "Jean", "birth_date": "2000-01-01"}}))
-        self.assertEqual(res.status_code, 400)
+        for fields in ({"first_name": "Jean", "birth_date": "2000-01-01", "tarif_name": "Licence"},  # nom manquant
+                       {"last_name": "DUPONT", "first_name": "Jean", "tarif_name": "Licence"},  # date de naissance manquante
+                       {"last_name": "DUPONT", "first_name": "Jean", "birth_date": "2000-01-01"}):  # tarif manquant
+            with self.subTest(fields=fields), self.assertRaises(InvalidRequest):
+                MemberService.add_member(fields)
 
     def test_member_update_requires_admin_role(self):
         """L'endpoint /api/members/update exige le rôle admin."""

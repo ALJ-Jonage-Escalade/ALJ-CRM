@@ -74,6 +74,16 @@ class MembershipImportService:
                 or default_membership_campaign(MembershipImportService.active_season()))
 
     @staticmethod
+    def campaign_slug() -> str:
+        """Slug of campaign_reference, shown by Paramètres › Campagnes. A reference that cannot be read gives its last
+        URL segment."""
+        reference = MembershipImportService.campaign_reference()
+        try:
+            return parse_membership_campaign(reference).slug
+        except ValueError:
+            return [segment for segment in reference.split("/") if segment.strip()][-1]
+
+    @staticmethod
     def campaign(chosen: Optional[str] = None) -> MembershipCampaign:
         """The membership form read by the import: `chosen` (a campaign picked for this sync only, never saved), else
         campaign_reference. InvalidRequest when it cannot be read."""

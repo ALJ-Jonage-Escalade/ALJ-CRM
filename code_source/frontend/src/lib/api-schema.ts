@@ -907,7 +907,7 @@ export interface paths {
         };
         /**
          * Get Ffme Stats Api
-         * @description Calcule et renvoie les statistiques de l'export fédéral FFME.
+         * @description Members of the season that the federal CSV export would declare, and those it leaves out.
          */
         get: operations["get_ffme_stats_api_api_ffme_stats_get"];
         put?: never;
@@ -1019,8 +1019,8 @@ export interface paths {
         /**
          * Sync Helloasso Api
          * @description Reads the competitions' HelloAsso campaign and links its payments (mirror, automatic links, participants).
-         *     400: no campaign chosen; 502: HelloAsso could not be read completely, nothing is written (a partial read would
-         *     unlink the payments it missed); 503: Firestore unavailable.
+         *     400 `no_campaign`: no campaign chosen; 502: HelloAsso could not be read completely, nothing is written;
+         *     503: Firestore unavailable.
          */
         post: operations["sync_helloasso_api_api_helloasso_sync_post"];
         delete?: never;
@@ -5719,15 +5719,6 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
         };
     };
     add_member_api_api_members_create_post: {
@@ -5768,15 +5759,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -6725,15 +6707,6 @@ export interface operations {
                     "application/json": components["schemas"]["PresenceConfig"];
                 };
             };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
         };
     };
     export_presence_api_api_presence_export_post: {
@@ -6775,15 +6748,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -6906,15 +6870,6 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
         };
     };
     export_ffme_api_api_ffme_export_get: {
@@ -6954,15 +6909,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -7007,15 +6953,6 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
         };
     };
     apply_ffme_import_api_api_ffme_import_post: {
@@ -7056,15 +6993,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -7146,6 +7074,15 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

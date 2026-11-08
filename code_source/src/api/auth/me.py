@@ -23,6 +23,8 @@ logger = logging.getLogger("alj")
 
 router = APIRouter(prefix="/api/me")
 
+LOCAL_AUTHOR = "serveur local"
+
 
 class Me(BaseModel):
     email: str
@@ -33,6 +35,12 @@ class Me(BaseModel):
 def signed_in_claims(request: Request) -> Optional[Dict[str, Any]]:  # Any: the token's claims
     """Verified by auth_middleware when token checks are on; the emulator's token in dev mode."""
     return getattr(request.state, "user", None) or emulator_claims(request.headers.get("authorization"))
+
+
+def author_of(request: Request) -> str:
+    """E-mail of the person making a change, kept for audit (the local server without token checks has none)."""
+    claims = signed_in_claims(request)
+    return str((claims or {}).get("email") or LOCAL_AUTHOR).strip().lower()
 
 
 def _record_sign_in(email: str) -> None:
