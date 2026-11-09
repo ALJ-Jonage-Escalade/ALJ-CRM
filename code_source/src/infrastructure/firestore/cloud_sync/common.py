@@ -12,6 +12,7 @@ from domain.members.sex import parse_sex
 TRACKED_TABLES = (
     "seasons", "users", "orders", "purchases", "purchase_options",
     "planning", "email_templates", "app_settings", "geocache",
+    "keys",  # club keys, plans/club-keys.md
 )
 COLLECTION_PREFIX = "crm_"
 MOD_FIELD = "_modified_at"

@@ -55,6 +55,18 @@ _COMPETITION_EMAIL_TEMPLATES = [
 ]
 
 
+# Club keys (HID ProxKey) of the climbing wall, plans/club-keys.md: replicated to Firestore (cloud_sync TRACKED_TABLES).
+# A code is unique whatever its case, archived keys included.
+KEYS_DDL = (
+    """CREATE TABLE IF NOT EXISTS keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        status TEXT NOT NULL DEFAULT 'available',
+        created_at TEXT, updated_at TEXT
+    )""",
+)
+
+
 def _add_missing_column(conn: sqlite3.Connection, cursor: sqlite3.Cursor, table: str, column: str, ddl: str) -> None:
     """Migration auto des BDD existantes : ajoute la colonne si elle manque."""
     try:
@@ -231,6 +243,8 @@ class SqliteDatabase:
         _add_missing_column(conn, cursor, "users", "hid_proxkey_comment", "TEXT DEFAULT ''")
 
         _ensure_email_templates(conn, cursor)
+        for statement in KEYS_DDL:
+            cursor.execute(statement)
 
         # Table de réglages clé/valeur, plus écrite par l'application (les réglages sont dans la
         # collection Firestore `app_settings`) : conservée pour la réplication de crm_app_settings.

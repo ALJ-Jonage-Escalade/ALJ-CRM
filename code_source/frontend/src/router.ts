@@ -45,6 +45,7 @@ const OutilsPresencePage = () => import("./pages/outils/OutilsPresencePage.vue")
 const OutilsFfmePage = () => import("./pages/outils/OutilsFfmePage.vue");
 const OutilsFfmeImportPage = () => import("./pages/outils/OutilsFfmeImportPage.vue");
 const OutilsHelloAssoImportPage = () => import("./pages/outils/OutilsHelloAssoImportPage.vue");
+const OutilsKeysPage = () => import("./pages/outils/OutilsKeysPage.vue");
 
 /** Component of each sub-page, by page then sub-page id (lib/access.ts subPages). */
 const SUB_COMPONENTS: Partial<Record<PageId, Record<string, RouteComponent>>> = {
@@ -64,6 +65,7 @@ const SUB_COMPONENTS: Partial<Record<PageId, Record<string, RouteComponent>>> = 
     ffme: OutilsFfmePage,
     "ffme-import": OutilsFfmeImportPage,
     "helloasso-import": OutilsHelloAssoImportPage,
+    cles: OutilsKeysPage,
   },
 };
 

@@ -49,6 +49,7 @@ const REFRESHED: Record<string, string> = {
   ffme: "🔄 Statistiques FFME réactualisées.",
   "ffme-import": "🔄 Formulaire d'import FFME réinitialisé.",
   "helloasso-import": "🔄 Import HelloAsso réinitialisé.",
+  cles: "🔄 Clés réactualisées.",
 };
 const openPage = ref<ReloadablePage | null>(null);
 
