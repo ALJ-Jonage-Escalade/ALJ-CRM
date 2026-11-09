@@ -6,7 +6,7 @@ import sys
 # Ajuster le chemin d'import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../src")))
 from infrastructure.mycompet.scraper import scrape_competition_info_by_id
-from services.errors import InvalidRequest, NotFound, StorageUnavailable
+from domain.errors import InvalidRequest, NotFound, UpstreamUnavailable
 
 class TestMyCompetScraper(unittest.TestCase):
 
@@ -83,7 +83,7 @@ class TestMyCompetScraper(unittest.TestCase):
         import requests
         mock_session.get.side_effect = requests.RequestException("Connexion impossible")
 
-        with self.assertRaises(StorageUnavailable):
+        with self.assertRaises(UpstreamUnavailable):
             scrape_competition_info_by_id("18896")
 
     @patch("requests.Session")

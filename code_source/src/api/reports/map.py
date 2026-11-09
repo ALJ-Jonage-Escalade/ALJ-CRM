@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from api.reports import resolve_season
 from api.reports.schemas import MapMember, MapPoint, MapPoints
-from api.responses import error, error_responses, internal_error
+from api.responses import error_responses
 from domain.members.view import is_cancelled
 from domain.utils import clean_city_name
 from infrastructure.geocoding import geocode_missing_addresses
@@ -72,8 +72,5 @@ def map_points(season: str, background_tasks: Optional[BackgroundTasks] = None) 
 @router.get("/api/reports/map-points", response_model=MapPoints, responses=error_responses(500))
 def get_map_points(background_tasks: BackgroundTasks, season: str = "active") -> Union[MapPoints, JSONResponse]:
     """Members of a season grouped by address, for the map of the Outils page ("Toutes les saisons": every season)."""
-    try:
-        target_season = resolve_season(season)
-        return MapPoints(season=target_season, points=map_points(target_season, background_tasks))
-    except Exception as e:
-        return error(500, internal_error(e, "get_map_points"))
+    target_season = resolve_season(season)
+    return MapPoints(season=target_season, points=map_points(target_season, background_tasks))

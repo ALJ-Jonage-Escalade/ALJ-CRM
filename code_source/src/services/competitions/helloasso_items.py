@@ -1,6 +1,6 @@
 """HelloAsso mirror items: manual links to a participant, and ignored items.
 
-Knows nothing about HTTP: failures are raised as services.errors.
+Knows nothing about HTTP: failures are raised as domain.errors.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from infrastructure.firestore.competition_repository import (
 )
 from services.competitions.store import competition_not_found, storage, write
 from services.documents import Doc
-from services.errors import Conflict, InvalidRequest, NotFound
+from domain.errors import Conflict, InvalidRequest, NotFound
 
 
 def _item_not_found() -> NotFound:

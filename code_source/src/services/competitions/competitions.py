@@ -2,7 +2,7 @@
 
 Over CompetitionFirestoreRepository (shared with the HelloAsso webhook and the MyCompet
 results, so they all write with the same rules). Knows nothing about HTTP: failures are
-raised as services.errors.
+raised as domain.errors.
 """
 
 from __future__ import annotations

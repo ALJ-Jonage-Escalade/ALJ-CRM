@@ -90,7 +90,7 @@ en se connectant avec un compte Google de cette adresse dans les 7 jours.
 
 - Un bandeau orange « DEV » en bas de page confirme le branchement sur l'émulateur.
 - `dev/run_server.sh` refuse de démarrer si un `.env` du dépôt réactive Gmail ou un SMTP externe.
-- HelloAsso (`/api/dashboard`, synchro) appelle l'API réelle : en erreur sans identifiants.
+- HelloAsso (synchro, import des adhésions) appelle l'API réelle : en erreur sans identifiants.
 - Plus de détails : [code_source/dev/README.md](code_source/dev/README.md).
 
 ### Scripts Windows

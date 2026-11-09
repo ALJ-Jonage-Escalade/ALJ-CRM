@@ -23,6 +23,26 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
           }
         }
       },
@@ -46,6 +66,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Competition"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
                 }
               }
             }
@@ -109,7 +149,7 @@
             },
             "description": "Not Found"
           },
-          "503": {
+          "502": {
             "content": {
               "application/json": {
                 "schema": {
@@ -117,7 +157,7 @@
                 }
               }
             },
-            "description": "Service Unavailable"
+            "description": "Bad Gateway"
           },
           "422": {
             "description": "Validation Error",
@@ -178,6 +218,26 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -225,6 +285,26 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -249,6 +329,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PastArchived"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
                 }
               }
             }
@@ -287,6 +387,26 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -333,6 +453,26 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -392,6 +532,26 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -472,6 +632,16 @@
             },
             "description": "Conflict"
           },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -527,6 +697,26 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -596,6 +786,26 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -663,6 +873,26 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -741,6 +971,26 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -772,6 +1022,26 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
           }
         }
       },
@@ -795,6 +1065,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Coach"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
                 }
               }
             }
@@ -858,6 +1148,26 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -904,6 +1214,26 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -967,6 +1297,26 @@
               }
             }
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -995,6 +1345,26 @@
                   },
                   "type": "array",
                   "title": "Response List Helloasso Items Api Helloasso Items Get"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
                 }
               }
             }
@@ -1047,6 +1417,26 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -1116,6 +1506,16 @@
               }
             },
             "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -1374,9 +1774,31 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AllPaidChecked"
+                }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -1648,65 +2070,6 @@
               }
             },
             "description": "Internal Server Error"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/dashboard": {
-      "get": {
-        "summary": "Get Dashboard Data",
-        "description": "Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import\ndes adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.\n404: campaign unknown to HelloAsso; 502: HelloAsso could not be read completely (never a partial dashboard).",
-        "operationId": "get_dashboard_data_api_dashboard_get",
-        "parameters": [
-          {
-            "name": "force_refresh",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Force Refresh"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "502": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            },
-            "description": "Bad Gateway"
           },
           "422": {
             "description": "Validation Error",
@@ -2050,9 +2413,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Data"
+                "$ref": "#/components/schemas/EmailPreviewRequest"
               }
             }
           },
@@ -2063,7 +2424,19 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/EmailPreview"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -2102,15 +2475,13 @@
     "/api/send-email": {
       "post": {
         "summary": "Send Email Api",
-        "description": "Déclenche l'envoi d'e-mails sécurisé via Gmail API ou SMTP avec injection de variables.",
+        "description": "Envoie un e-mail personnalisé à chaque destinataire (Gmail API ou SMTP), avec les variables remplacées.\n400: nothing to send (empty subject or body, no valid recipient); 502: every e-mail failed.",
         "operationId": "send_email_api_api_send_email_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Data"
+                "$ref": "#/components/schemas/EmailSendRequest"
               }
             }
           },
@@ -2127,8 +2498,38 @@
               }
             }
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
             "content": {
               "application/json": {
                 "schema": {
@@ -2168,6 +2569,16 @@
           },
           "500": {
             "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -2215,6 +2626,16 @@
           },
           "500": {
             "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -2367,6 +2788,16 @@
               }
             }
           },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2414,18 +2845,17 @@
       },
       "post": {
         "summary": "Update Planning",
-        "description": "Met à jour le planning dans la BDD SQLite.",
+        "description": "Remplace le planning complet (administrateurs) ; un créneau d'id 0 reçoit un nouvel identifiant.",
         "operationId": "update_planning_api_planning_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "items": {
-                  "additionalProperties": true,
-                  "type": "object"
+                  "$ref": "#/components/schemas/PlanningSlotUpdate"
                 },
                 "type": "array",
-                "title": "Planning Data"
+                "title": "Slots"
               }
             }
           },
@@ -2436,7 +2866,19 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningReplaced"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
               }
             }
           },
@@ -4404,6 +4846,31 @@
         "title": "AccessInvitation",
         "description": "An invitation created or sent again; the entry is kept when its e-mail fails."
       },
+      "AllPaidChecked": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "competition_id": {
+            "type": "integer",
+            "title": "Competition Id"
+          },
+          "notified": {
+            "type": "boolean",
+            "title": "Notified"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "competition_id",
+          "notified"
+        ],
+        "title": "AllPaidChecked",
+        "description": "notified: every selected participant has paid and the summary e-mail was sent now."
+      },
       "ApiErrorBody": {
         "properties": {
           "status": {
@@ -4525,7 +4992,14 @@
             "title": "Message"
           },
           "email_sent_date": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Email Sent Date"
           },
           "filename": {
@@ -5558,8 +6032,7 @@
             "type": "string",
             "enum": [
               "success",
-              "partial",
-              "error"
+              "partial"
             ],
             "title": "Status"
           },
@@ -5597,7 +6070,156 @@
           "status"
         ],
         "title": "EmailDispatch",
-        "description": "Outcome of /api/send-email. A refused request (empty subject, no valid recipient) or a failed sending is\nanswered with HTTP 200 and status \"error\": the caller checks `status`, not the HTTP code."
+        "description": "Outcome of /api/send-email when at least one e-mail left: status \"partial\" when some recipients failed (see\ndetails). A refused request is a 400, and a sending where every e-mail failed a 502."
+      },
+      "EmailPreview": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/EmailPreviewContent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "preview"
+        ],
+        "title": "EmailPreview"
+      },
+      "EmailPreviewContent": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "body_plain": {
+            "type": "string",
+            "title": "Body Plain"
+          },
+          "body_html": {
+            "type": "string",
+            "title": "Body Html"
+          },
+          "sender_email": {
+            "type": "string",
+            "title": "Sender Email"
+          },
+          "sender_name": {
+            "type": "string",
+            "title": "Sender Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "body_plain",
+          "body_html",
+          "sender_email",
+          "sender_name"
+        ],
+        "title": "EmailPreviewContent"
+      },
+      "EmailPreviewRequest": {
+        "properties": {
+          "template_name": {
+            "type": "string",
+            "title": "Template Name",
+            "default": ""
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "default": ""
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": ""
+          },
+          "recipient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmailRecipient"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "competition_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Id"
+          },
+          "add_signature": {
+            "type": "boolean",
+            "title": "Add Signature",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EmailPreviewRequest",
+        "description": "recipient: whose values fill the variables (an example member when absent)."
+      },
+      "EmailRecipient": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name",
+            "default": ""
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name",
+            "default": ""
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "default": ""
+          },
+          "num_licence": {
+            "type": "string",
+            "title": "Num Licence",
+            "default": ""
+          },
+          "tarif": {
+            "type": "string",
+            "title": "Tarif",
+            "default": ""
+          },
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EmailRecipient",
+        "description": "A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…)."
       },
       "EmailSendDetail": {
         "properties": {
@@ -5657,6 +6279,71 @@
         ],
         "title": "EmailSendDetail",
         "description": "Outcome for one recipient."
+      },
+      "EmailSendRequest": {
+        "properties": {
+          "template_name": {
+            "type": "string",
+            "title": "Template Name",
+            "default": ""
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "default": ""
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": ""
+          },
+          "recipient_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Recipient Ids",
+            "default": []
+          },
+          "recipients": {
+            "items": {
+              "$ref": "#/components/schemas/EmailRecipient"
+            },
+            "type": "array",
+            "title": "Recipients",
+            "default": []
+          },
+          "competition_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Id"
+          },
+          "sender_email": {
+            "type": "string",
+            "title": "Sender Email",
+            "default": ""
+          },
+          "sender_name": {
+            "type": "string",
+            "title": "Sender Name",
+            "default": ""
+          },
+          "add_signature": {
+            "type": "boolean",
+            "title": "Add Signature",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EmailSendRequest",
+        "description": "template_name: a saved template, whose subject, body and sender fill what is left empty here.\nrecipient_ids: members of the cache; recipients: people given by the page (both may be used)."
       },
       "EmailStatus": {
         "properties": {
@@ -8688,6 +9375,31 @@
         ],
         "title": "PivotRecords",
         "description": "Members of a season for the pivot table. season: the season actually read (the active one for \"active\")."
+      },
+      "PlanningReplaced": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "count"
+        ],
+        "title": "PlanningReplaced",
+        "description": "The whole planning replaced; count: its slots."
       },
       "PlanningSlot": {
         "properties": {

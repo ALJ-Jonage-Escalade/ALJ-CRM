@@ -9,7 +9,8 @@ import pytest
 from infrastructure.security.role_directory import RoleDirectory
 from services.access import invitations
 from services.access.rules import AccessRules
-from services.errors import Conflict
+from domain.errors import Conflict
+from infrastructure.mail.repository import MailError
 from support.fake_access import FakeClock, InMemoryAccessStore, role_entry
 
 ADMIN = "albus@alj.example"
@@ -18,15 +19,15 @@ PAGE = "https://bureau.alj.example"
 
 
 class FakeSender:
-    def __init__(self, result: bool | Exception = True) -> None:
-        self.result = result
+    """EmailRepository.send_email: records the e-mail, raises `failure` when given."""
+    def __init__(self, failure: Exception | None = None) -> None:
+        self.failure = failure
         self.sent: list[dict[str, Any]] = []  # Any: the keyword arguments of EmailRepository.send_email
 
-    def __call__(self, **mail: Any) -> bool:  # Any: as above
+    def __call__(self, **mail: Any) -> None:  # Any: as above
         self.sent.append(mail)
-        if isinstance(self.result, Exception):
-            raise self.result
-        return self.result
+        if self.failure:
+            raise self.failure
 
 
 @pytest.fixture
@@ -90,9 +91,9 @@ def test_inviter_without_name_shown_by_address(rules: AccessRules, store: InMemo
     assert "minerva@alj.example vous invite" in sender.sent[0]["body"]
 
 
-@pytest.mark.parametrize("result", [False, ValueError("Aucune configuration d'envoi d'e-mails")])
-def test_send_failure_keeps_the_invitation(rules: AccessRules, store: InMemoryAccessStore, result: bool | Exception) -> None:
-    invitation = invitations.invite(rules, ADMIN, GUEST, "coach", "", PAGE, FakeSender(result))
+@pytest.mark.parametrize("failure", [MailError("SMTP refusé"), ValueError("Aucune configuration d'envoi d'e-mails")])
+def test_send_failure_keeps_the_invitation(rules: AccessRules, store: InMemoryAccessStore, failure: Exception) -> None:
+    invitation = invitations.invite(rules, ADMIN, GUEST, "coach", "", PAGE, FakeSender(failure))
     assert invitation["email_sent"] is False
     assert invitation["email_error"]
     assert store.roles[GUEST]["invitation_sent_at"] is None
@@ -107,7 +108,7 @@ def test_refused_invitation_sends_nothing(rules: AccessRules) -> None:
 
 
 def test_resend_after_expiry(rules: AccessRules, store: InMemoryAccessStore, clock: FakeClock) -> None:
-    invitations.invite(rules, ADMIN, GUEST, "coach", "", PAGE, FakeSender(False))
+    invitations.invite(rules, ADMIN, GUEST, "coach", "", PAGE, FakeSender(MailError("SMTP refusé")))
     clock.advance(days=8)
     sender = FakeSender()
     invitation = invitations.resend(rules, ADMIN, GUEST, PAGE, sender)

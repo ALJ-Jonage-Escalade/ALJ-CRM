@@ -10,7 +10,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from domain.constants import is_valid_season
-from infrastructure.sqlite.connection import DB_WRITE_ERROR, SqliteDatabase
+from domain.errors import UpstreamUnavailable
+from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.members import MemberRepository
 
 SECRET_DETAIL = "sqlite3 at /srv/app/data/database.db: no such table"
@@ -48,6 +49,19 @@ def test_presence_export_rejects_bad_season(client: TestClient, season: str) -> 
     assert "Saison invalide" in resp.json()["message"]
 
 
+@pytest.mark.parametrize(("dates", "message"), [
+    ({"start_date": "2026-09-01"}, "Date invalide"),
+    ({"end_date": "31/02/2027"}, "Date invalide"),
+    ({"start_date": "30/06/2027", "end_date": "01/09/2026"}, "date de début"),
+])
+def test_presence_export_rejects_bad_dates(client: TestClient, dates: dict, message: str) -> None:
+    with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data") as load:
+        resp = client.post("/api/presence/export", json=dates)
+    assert resp.status_code == 400
+    assert message in resp.json()["message"]
+    load.assert_not_called()
+
+
 def test_presence_export_error_is_generic(client: TestClient) -> None:
     with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", side_effect=RuntimeError(SECRET_DETAIL)):
         body = client.post("/api/presence/export", json={}).json()
@@ -75,18 +89,34 @@ def test_cloud_db_status_hides_last_error(client: TestClient) -> None:
     assert body["last_error"]  # still truthy: the page knows the last sync failed
 
 
-def test_repository_write_error_is_generic() -> None:
+def test_repository_write_error_is_rolled_back_and_raised() -> None:
     conn = MagicMock()
     conn.cursor.return_value.execute.side_effect = RuntimeError(SECRET_DETAIL)
-    with patch.object(SqliteDatabase, "setup_database"), patch.object(SqliteDatabase, "get_connection", return_value=conn):
-        ok, message = MemberRepository.update_member_fields(user_id=1, fields={"phone": "0600000000"})
-    assert not ok
-    assert message == DB_WRITE_ERROR
+    with patch.object(SqliteDatabase, "setup_database"), patch.object(SqliteDatabase, "get_connection", return_value=conn), \
+            pytest.raises(RuntimeError):
+        MemberRepository.update_member_fields(user_id=1, fields={"phone": "0600000000"})
     conn.rollback.assert_called_once()
 
 
+def test_repository_write_error_answers_generic_500(client: TestClient) -> None:
+    with patch.object(MemberRepository, "update_member_fields", side_effect=RuntimeError(SECRET_DETAIL)):
+        resp = client.post("/api/members/update", json={"user_id": 1, "fields": {"phone": "0600000000"}})
+    assert resp.status_code == 500
+    assert SECRET_DETAIL not in resp.text
+
+
+def test_repository_read_error_is_not_an_empty_list(client: TestClient) -> None:
+    from infrastructure.sqlite.planning import PlanningRepository
+    conn = MagicMock()
+    conn.cursor.return_value.execute.side_effect = RuntimeError(SECRET_DETAIL)
+    with patch.object(SqliteDatabase, "setup_database"), patch.object(SqliteDatabase, "get_connection", return_value=conn), \
+            pytest.raises(RuntimeError):
+        PlanningRepository.load_planning_data()
+    conn.close.assert_called_once()
+
+
 def test_mycompet_scraping_error_is_generic(client: TestClient) -> None:
-    with patch("services.competitions.results_batch.fetch_and_parse_mycompet_results", side_effect=RuntimeError(SECRET_DETAIL)), \
+    with patch("services.competitions.results_batch.fetch_and_parse_mycompet_results", side_effect=UpstreamUnavailable(SECRET_DETAIL)), \
             patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.get_stored_competition_doc",
                   return_value={"id": 1, "nom": "Open"}):
         resp = client.post("/api/competitions/1/fetch-results", json={"url": "https://mycompet.ffme.fr/resultat/resultat_1"})

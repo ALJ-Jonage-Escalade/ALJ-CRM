@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from unittest.mock import patch
 
 from api.competitions.schemas.results import BatchReport
+from domain.errors import UpstreamUnavailable
 from infrastructure.firestore.client import FirestoreClient, FirestoreConflictError, FirestoreError
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from support.api_case import ApiTestCase
@@ -127,7 +128,7 @@ class TestFetchCompetitionResults(ApiTestCase):
         self.search.assert_called_once()
 
     def test_mycompet_failure_is_upstream(self) -> None:
-        r = self.fetch({"url": "13660"}, doc=competition_doc(), scraped=RuntimeError("HTTP 500 from mycompet"))
+        r = self.fetch({"url": "13660"}, doc=competition_doc(), scraped=UpstreamUnavailable("HTTP 500 from mycompet"))
         self.assertEqual(r.status_code, 502)
 
     def test_untyped_body_refused(self) -> None:

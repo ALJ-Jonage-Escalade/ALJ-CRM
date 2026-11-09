@@ -504,28 +504,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Dashboard Data
-         * @description Route principale renvoyant toutes les données formatées pour le frontend. La campagne est celle de l'import
-         *     des adhésions (get_target_slug) et les inscriptions sont lues par le même mapper.
-         *     404: campaign unknown to HelloAsso; 502: HelloAsso could not be read completely (never a partial dashboard).
-         */
-        get: operations["get_dashboard_data_api_dashboard_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/helloasso/memberships/preview": {
         parameters: {
             query?: never;
@@ -682,7 +660,8 @@ export interface paths {
         put?: never;
         /**
          * Send Email Api
-         * @description Déclenche l'envoi d'e-mails sécurisé via Gmail API ou SMTP avec injection de variables.
+         * @description Envoie un e-mail personnalisé à chaque destinataire (Gmail API ou SMTP), avec les variables remplacées.
+         *     400: nothing to send (empty subject or body, no valid recipient); 502: every e-mail failed.
          */
         post: operations["send_email_api_api_send_email_post"];
         delete?: never;
@@ -770,7 +749,7 @@ export interface paths {
         put?: never;
         /**
          * Update Planning
-         * @description Met à jour le planning dans la BDD SQLite.
+         * @description Remplace le planning complet (administrateurs) ; un créneau d'id 0 reçoit un nouvel identifiant.
          */
         post: operations["update_planning_api_planning_post"];
         delete?: never;
@@ -1571,6 +1550,21 @@ export interface components {
             email_error: string | null;
         };
         /**
+         * AllPaidChecked
+         * @description notified: every selected participant has paid and the summary e-mail was sent now.
+         */
+        AllPaidChecked: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Competition Id */
+            competition_id: number;
+            /** Notified */
+            notified: boolean;
+        };
+        /**
          * ApiErrorBody
          * @description Body of error(): what the frontend's API client turns into an ApiError.
          */
@@ -1649,7 +1643,7 @@ export interface components {
             /** Message */
             message: string;
             /** Email Sent Date */
-            email_sent_date: string;
+            email_sent_date: string | null;
             /** Filename */
             filename: string;
         };
@@ -2196,15 +2190,15 @@ export interface components {
         };
         /**
          * EmailDispatch
-         * @description Outcome of /api/send-email. A refused request (empty subject, no valid recipient) or a failed sending is
-         *     answered with HTTP 200 and status "error": the caller checks `status`, not the HTTP code.
+         * @description Outcome of /api/send-email when at least one e-mail left: status "partial" when some recipients failed (see
+         *     details). A refused request is a 400, and a sending where every e-mail failed a 502.
          */
         EmailDispatch: {
             /**
              * Status
              * @enum {string}
              */
-            status: "success" | "partial" | "error";
+            status: "success" | "partial";
             /**
              * Message
              * @default
@@ -2231,6 +2225,95 @@ export interface components {
              */
             details?: components["schemas"]["EmailSendDetail"][];
         };
+        /** EmailPreview */
+        EmailPreview: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            preview: components["schemas"]["EmailPreviewContent"];
+        };
+        /** EmailPreviewContent */
+        EmailPreviewContent: {
+            /** Subject */
+            subject: string;
+            /** Body Plain */
+            body_plain: string;
+            /** Body Html */
+            body_html: string;
+            /** Sender Email */
+            sender_email: string;
+            /** Sender Name */
+            sender_name: string;
+        };
+        /**
+         * EmailPreviewRequest
+         * @description recipient: whose values fill the variables (an example member when absent).
+         */
+        EmailPreviewRequest: {
+            /**
+             * Template Name
+             * @default
+             */
+            template_name?: string;
+            /**
+             * Subject
+             * @default
+             */
+            subject?: string;
+            /**
+             * Body
+             * @default
+             */
+            body?: string;
+            recipient?: components["schemas"]["EmailRecipient"] | null;
+            /** Competition Id */
+            competition_id?: number | null;
+            /**
+             * Add Signature
+             * @default true
+             */
+            add_signature?: boolean;
+        };
+        /**
+         * EmailRecipient
+         * @description A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…).
+         */
+        EmailRecipient: {
+            /** Id */
+            id?: number | null;
+            /**
+             * First Name
+             * @default
+             */
+            first_name?: string;
+            /**
+             * Last Name
+             * @default
+             */
+            last_name?: string;
+            /**
+             * Email
+             * @default
+             */
+            email?: string;
+            /**
+             * Num Licence
+             * @default
+             */
+            num_licence?: string;
+            /**
+             * Tarif
+             * @default
+             */
+            tarif?: string;
+            /**
+             * Season
+             * @default
+             */
+            season?: string;
+        };
         /**
          * EmailSendDetail
          * @description Outcome for one recipient.
@@ -2252,6 +2335,55 @@ export interface components {
             status: "sent" | "error";
             /** Error */
             error?: string | null;
+        };
+        /**
+         * EmailSendRequest
+         * @description template_name: a saved template, whose subject, body and sender fill what is left empty here.
+         *     recipient_ids: members of the cache; recipients: people given by the page (both may be used).
+         */
+        EmailSendRequest: {
+            /**
+             * Template Name
+             * @default
+             */
+            template_name?: string;
+            /**
+             * Subject
+             * @default
+             */
+            subject?: string;
+            /**
+             * Body
+             * @default
+             */
+            body?: string;
+            /**
+             * Recipient Ids
+             * @default []
+             */
+            recipient_ids?: number[];
+            /**
+             * Recipients
+             * @default []
+             */
+            recipients?: components["schemas"]["EmailRecipient"][];
+            /** Competition Id */
+            competition_id?: number | null;
+            /**
+             * Sender Email
+             * @default
+             */
+            sender_email?: string;
+            /**
+             * Sender Name
+             * @default
+             */
+            sender_name?: string;
+            /**
+             * Add Signature
+             * @default true
+             */
+            add_signature?: boolean;
         };
         /**
          * EmailStatus
@@ -3653,6 +3785,21 @@ export interface components {
             records: components["schemas"]["PivotRecord"][];
         };
         /**
+         * PlanningReplaced
+         * @description The whole planning replaced; count: its slots.
+         */
+        PlanningReplaced: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Message */
+            message: string;
+            /** Count */
+            count: number;
+        };
+        /**
          * PlanningSlot
          * @description A weekly slot. jour: a day ("Lundi"…), or several ("Lundi / Jeudi"); horaires: "18:00 - 20:00".
          *     helloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds.
@@ -4053,6 +4200,24 @@ export interface operations {
                     "application/json": components["schemas"]["Competition"][];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
         };
     };
     create_competition_api_competitions_post: {
@@ -4077,6 +4242,15 @@ export interface operations {
                     "application/json": components["schemas"]["Competition"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4084,6 +4258,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4135,8 +4318,8 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Service Unavailable */
-            503: {
+            /** @description Bad Gateway */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4175,6 +4358,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4182,6 +4374,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4219,6 +4420,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4226,6 +4436,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4246,6 +4465,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PastArchived"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4279,6 +4516,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4286,6 +4532,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4320,6 +4575,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4327,6 +4591,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4364,6 +4637,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4371,6 +4653,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4405,6 +4696,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4412,6 +4712,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4468,6 +4777,15 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
         };
     };
     record_manual_payment_api_competitions__competition_id__participants__adherent_id__manual_payment_post: {
@@ -4504,6 +4822,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4511,6 +4838,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4549,6 +4885,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4556,6 +4901,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4592,6 +4946,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4599,6 +4962,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4619,6 +4991,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Coach"][];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4645,6 +5035,15 @@ export interface operations {
                     "application/json": components["schemas"]["Coach"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4652,6 +5051,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4689,6 +5097,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4696,6 +5113,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4729,6 +5155,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4736,6 +5171,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4761,6 +5205,15 @@ export interface operations {
                     "application/json": components["schemas"]["CompetitionMember"][];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4768,6 +5221,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4788,6 +5250,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HelloAssoItem"][];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4825,6 +5305,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -4832,6 +5321,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -4885,6 +5383,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -5080,7 +5587,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AllPaidChecked"];
                 };
             };
             /** @description Validation Error */
@@ -5090,6 +5597,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -5307,55 +5832,6 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
-    get_dashboard_data_api_dashboard_get: {
-        parameters: {
-            query?: {
-                force_refresh?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Bad Gateway */
-            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5652,9 +6128,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["EmailPreviewRequest"];
             };
         };
         responses: {
@@ -5664,7 +6138,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EmailPreview"];
                 };
             };
             /** @description Validation Error */
@@ -5674,6 +6148,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -5707,9 +6190,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["EmailSendRequest"];
             };
         };
         responses: {
@@ -5720,6 +6201,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmailDispatch"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Forbidden */
@@ -5738,6 +6228,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };
@@ -5762,6 +6270,15 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5813,6 +6330,15 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5949,6 +6475,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
         };
     };
     get_planning_api_planning_get: {
@@ -5989,9 +6524,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                }[];
+                "application/json": components["schemas"]["PlanningSlotUpdate"][];
             };
         };
         responses: {
@@ -6001,7 +6534,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PlanningReplaced"];
                 };
             };
             /** @description Validation Error */
@@ -6011,6 +6544,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

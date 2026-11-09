@@ -10,7 +10,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 
 from api.members.schemas import CompetitorContact, MemberCreate, MemberCreated, MemberList, MemberUpdate, MemberUpdated
-from api.responses import error, error_responses, internal_error, json_with_etag
+from api.responses import error, error_responses, json_with_etag
 from services.members.members import MemberService as Service
 
 router = APIRouter(prefix="/api/members")
@@ -34,12 +34,9 @@ def update_member_api(data: MemberUpdate) -> Union[MemberUpdated, JSONResponse]:
     fields = data.fields.model_dump(exclude_unset=True)  # only the fields sent are written
     if not fields:
         return error(400, "Aucune modification à enregistrer.")
-    try:
-        from infrastructure.sqlite.members import MemberRepository
-        success, err = MemberRepository.update_member_fields(
-            user_id=data.user_id, fields=fields, purchase_id=data.purchase_id, order_ref=data.order_ref or None)
-    except Exception as e:
-        return error(500, internal_error(e, "update_member_api"))
+    from infrastructure.sqlite.members import MemberRepository
+    success, err = MemberRepository.update_member_fields(
+        user_id=data.user_id, fields=fields, purchase_id=data.purchase_id, order_ref=data.order_ref or None)
     if not success:
         return error(400, err)
 
@@ -62,11 +59,8 @@ def add_member_api(data: MemberCreate) -> Union[MemberCreated, JSONResponse]:
     if not member.tarif_name:
         return error(400, "Le groupe (tarif) est obligatoire.")
     season = data.season or get_active_season()
-    try:
-        from infrastructure.sqlite.members import MemberRepository
-        success, res = MemberRepository.add_manual_member(member.model_dump(), season_name=season)
-    except Exception as e:
-        return error(500, internal_error(e, "add_member_api"))
+    from infrastructure.sqlite.members import MemberRepository
+    success, res = MemberRepository.add_manual_member(member.model_dump(), season_name=season)
     if not success:
         return error(400, res)
 

@@ -173,10 +173,10 @@ class CloudDatabase:
             try:
                 if pending_count(conn):
                     flush(conn, cls.store(), cls.who(), report)
-            except Exception as e:
+            except Exception as e:  # kept in _fs_changes: sent again by the next sync of this instance
                 cls._last_error = str(e)
                 report.setdefault("errors", []).append(str(e))
-                print(f"❌ [CLOUD_DB] Envoi vers Firestore impossible : {e}")
+                logger.exception("[CLOUD_DB] Envoi vers Firestore impossible, modification gardée en attente")
             finally:
                 conn.close()
             cls._after_sync(report)
@@ -264,10 +264,12 @@ class CloudDatabase:
             cls.sync()
 
     @classmethod
-    def after_write(cls) -> None:
+    def after_write(cls) -> bool:
         """Envoie aussitôt les modifications locales (serveur) et met à jour
-        l'annuaire `adherents` de la PWA si des adhérents / le planning ont changé."""
+        l'annuaire `adherents` de la PWA si des adhérents / le planning ont changé.
+        False when the changes could not be sent to Firestore (they stay pending, see flush_only)."""
         if not cls.is_enabled():
-            return
-        cls.flush_only()
+            return True
+        sent = not cls.flush_only().get("errors")
         cls.refresh_projection()
+        return sent

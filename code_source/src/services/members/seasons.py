@@ -1,6 +1,6 @@
 """Membership seasons (SQLite cache of the crm_* collections).
 
-Knows nothing about HTTP: failures are raised as services.errors.
+Knows nothing about HTTP: failures are raised as domain.errors.
 """
 
 from __future__ import annotations

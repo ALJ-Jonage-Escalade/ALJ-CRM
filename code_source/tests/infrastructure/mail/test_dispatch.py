@@ -107,10 +107,11 @@ class TestEmailDispatchService(unittest.TestCase):
             "body": "Bonjour {first_name}",
             "recipient": {"first_name": "Paul", "last_name": "NOEL"}
         }
-        res_p = preview_email(preview_req)
-        self.assertEqual(res_p["status"], "success")
-        self.assertEqual(res_p["preview"]["subject"], "Test Paul")
-        self.assertIn("Bonjour Paul", res_p["preview"]["body_plain"])
+        from api.communications.schemas import EmailPreviewRequest
+        res_p = preview_email(EmailPreviewRequest.model_validate(preview_req))
+        self.assertEqual(res_p.status, "success")
+        self.assertEqual(res_p.preview.subject, "Test Paul")
+        self.assertIn("Bonjour Paul", res_p.preview.body_plain)
 
         # 3. Email Status
         res_st = get_email_status()

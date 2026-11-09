@@ -1,6 +1,6 @@
 """Coaches. A rename or a delete also updates the competitions the coach is on.
 
-Knows nothing about HTTP: failures are raised as services.errors.
+Knows nothing about HTTP: failures are raised as domain.errors.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from typing import List
 
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from services.competitions.store import storage, write
-from services.errors import NotFound
+from domain.errors import NotFound
 
 
 def _require_coach(coach_id: int) -> None:

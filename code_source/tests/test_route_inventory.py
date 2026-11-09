@@ -56,7 +56,6 @@ EXPECTED_ROUTES = {
     ("PATCH", "/api/competitions/{competition_id}/participants/{adherent_id}"),
     ("POST", "/api/competitions/{competition_id}/participants/{adherent_id}/cancel"),
     ("POST", "/api/competitions/{competition_id}/participants/{adherent_id}/manual-payment"),
-    ("GET", "/api/dashboard"),
     ("GET", "/api/email-status"),
     ("GET", "/api/email-templates"),
     ("POST", "/api/email-templates"),

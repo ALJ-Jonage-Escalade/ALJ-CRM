@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from typing import List
@@ -50,6 +51,10 @@ from infrastructure.firestore.cloud_database import CloudDatabase
 # under /api/competitions (check-all-paid) use the cache.
 FIRESTORE_ONLY_PATHS: List[re.Pattern[str]] = []
 
+# Set on a write's answer when it was saved in the SQLite cache but could not be sent to Firestore yet
+REPLICATION_PENDING_HEADER = "X-Replication-Pending"
+logger = logging.getLogger("alj")
+
 
 def uses_sqlite_cache(path: str) -> bool:
     """True for the data routes served from the SQLite cache of the crm_* collections."""
@@ -69,10 +74,16 @@ async def cloud_db_middleware(request, call_next):
         await run_in_threadpool(CloudDatabase.ensure_fresh, 30)
     response = await call_next(request)
     if relevant and request.method not in ("GET", "HEAD", "OPTIONS") and CloudDatabase.is_enabled():
-        await run_in_threadpool(CloudDatabase.after_write)
+        if not await run_in_threadpool(CloudDatabase.after_write):
+            # Saved in the server's cache but not in Firestore yet (retried by the next sync). Not an error status:
+            # the write did happen, and a retried send-email or member creation would be done twice
+            logger.error("[CLOUD_DB] %s %s: write kept pending, Firestore replication failed", request.method, request.url.path)
+            response.headers[REPLICATION_PENDING_HEADER] = "1"
     return response
 
 
+from api.responses import unhandled_error_middleware
+app.middleware("http")(unhandled_error_middleware)  # innermost: registered first
 app.middleware("http")(cloud_db_middleware)
 
 from infrastructure.security.api_auth import auth_middleware, local_guard_middleware
@@ -101,15 +112,15 @@ from api.activities import planning, presence
 from api.admin import access
 from api.auth import me
 from api.communications import attestations, email, whatsapp
-from api.members import dashboard, helloasso_import, members, seasons
+from api.members import helloasso_import, members, seasons
 from api.ffme import ffme
 from api.integrations import cloud_db, google_auth, helloasso, helloasso_campaigns
 from api.reports import map as members_map, pivot
 from api.web import health, pages, pwa
 from api.responses import service_error_handler
-from services.errors import ServiceError
+from domain.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
-             results, payments, members, seasons, dashboard, helloasso_import, email, whatsapp, attestations,
+             results, payments, members, seasons, helloasso_import, email, whatsapp, attestations,
              planning, presence, members_map, pivot, ffme,
              helloasso, helloasso_campaigns, google_auth, cloud_db, me, access,
              pages, pwa, health):

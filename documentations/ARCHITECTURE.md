@@ -92,7 +92,7 @@ ALJ-CRM/                         ← racine du dépôt
   - `firestore/client.py` : client REST Firestore (sans gRPC) ; `firestore/competition_repository.py` : compétitions (façade `CompetitionFirestoreRepository` composant les mixins de `firestore/competitions/` : adhérents, épreuves, participants, miroir HelloAsso, coachs) ;
     `firestore/app_settings.py` : réglages applicatifs (collection `app_settings`, seul emplacement). Campagnes HelloAsso
     actives, choisies dans **Paramètres › Campagne HelloAsso** (`api/integrations/helloasso_campaigns.py`), au format
-    `FormType:slug` : `HELLOASSO_MEMBERSHIP_CAMPAIGN` (adhésions, lue par `/api/dashboard`) et `HELLOASSO_ANNUAL_CAMPAIGN`
+    `FormType:slug` : `HELLOASSO_MEMBERSHIP_CAMPAIGN` (adhésions, lue par l'import des adhésions) et `HELLOASSO_ANNUAL_CAMPAIGN`
     (formulaire Event d'activité « Compétition » de la saison, lu par la synchro et le webhook des compétitions).
     L'activité des formulaires Event n'est pas dans la liste HelloAsso : lue sur leur détail
     (`helloasso/form_activities.py`, gardée 24 h en mémoire par formulaire).
@@ -130,7 +130,7 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
 | Thème (`api/…`) | Fichiers | Routes |
 |---|---|---|
 | `web/` | `pages`, `pwa`, `health` | page d'entrée de l'application Vue sur `/competitions`, `/index`, `/bureau`, `/bureau/{page}` (liste blanche) ; anciennes adresses redirigées (`/`, `/competitions/gestion`, `/bureau/competitions-gestion`, `/bureau/adherents-fiche`, `/annuaire/*.html`) ; `/spa/*` (compilation) et `/annuaire/assets/*` (`mount_static`) · `/sw.js` (compilé), `/manifest.webmanifest`, `/runtime-config.js`, `/api/web-version` (version de l'application) · `/health` |
-| `members/` | `members`, `seasons`, `dashboard` | `/api/members` (+ `/competitors`, `/update`, `/create`, `/add`) · `/api/seasons`, `/api/season-tarifs` · `/api/dashboard` |
+| `members/` | `members`, `seasons`, `helloasso_import` | `/api/members` (+ `/competitors`, `/update`, `/create`, `/add`) · `/api/seasons`, `/api/season-tarifs` · `/api/helloasso/memberships/` (`preview`, `import`, `last-sync`) |
 | `competitions/` | `competitions`, `participants`, `coaches`, `members`, `helloasso_items`, `results`, `payments` | `/api/competitions/*`, `/api/coaches`, `/api/competition-members`, `/api/helloasso/items` · résultats MyCompet (`/api/competitions/cron/fetch-results`, `/{id}/fetch-results`, `/api/settings/competitions-results`) · `/{id}/check-all-paid` |
 | `communications/` | `email`, `whatsapp`, `attestations` | `/api/email-templates` (GET/POST/DELETE), `/api/preview-email`, `/api/email-status`, `/api/send-email` · `/api/whatsapp-template` · `/api/attestations/preview`, `/send` (PDF en mémoire, admin) |
 | `activities/` | `planning`, `presence` | `/api/planning` (GET/POST, `/item`, `/export`) · `/api/presence/config`, `/export` |
@@ -249,7 +249,7 @@ Fonctionnement :
   `runtime_env.validate()` refuse le mode dev sur Cloud Run (`K_SERVICE`) ou sans variables d'émulateur ;
   le seed refuse de s'exécuter hors émulateur ; les tests retirent les variables dev (`tests/conftest.py`).
 - L'émulateur applique le vrai `firestore.rules` et conserve ses données dans `dev/.emulator-data/` (ignoré par git).
-- Limites : `/api/dashboard` et la synchro HelloAsso interrogent l'API HelloAsso réelle (lecture) ; sans identifiants,
+- Limites : la synchro et l'import des adhésions HelloAsso interrogent l'API HelloAsso réelle (lecture) ; sans identifiants,
   ces écrans sont en erreur.
 
 ### 7.3 Serveur seul, sans émulateur

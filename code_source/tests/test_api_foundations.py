@@ -150,6 +150,22 @@ class TestSqliteCacheScope(unittest.TestCase):
             True)
         self.assertEqual(r.json(), {"status": "success", "competition_id": 12, "notified": True})
 
+    def test_write_not_replicated_keeps_success_and_flags_header(self):
+        """A write saved in the cache but not sent to Firestore stays a success (it happened, a retry would repeat it)
+        and is flagged by a header."""
+        client = TestClient(server.app)
+        with patch.dict(os.environ, SERVER_MODE), \
+                patch.object(server.CloudDatabase, "is_enabled", return_value=True), \
+                patch.object(server.CloudDatabase, "ensure_fresh"), \
+                patch.object(server.CloudDatabase, "after_write", side_effect=[True, False]), \
+                patch("infrastructure.helloasso.webhook.HelloAssoWebhookService.check_and_notify_all_paid", return_value=True), \
+                self.assertLogs("alj", "ERROR"):
+            replicated = client.post("/api/competitions/12/check-all-paid")
+            pending = client.post("/api/competitions/12/check-all-paid")
+        self.assertNotIn(server.REPLICATION_PENDING_HEADER, replicated.headers)
+        self.assertEqual(pending.status_code, 200)
+        self.assertEqual(pending.headers[server.REPLICATION_PENDING_HEADER], "1")
+
 
 def _app():
     app = FastAPI()

@@ -1,7 +1,7 @@
 """Import of the HelloAsso membership campaign into the members (plans/helloasso-membership-import.md).
 
 Thin orchestration, no business rule: the campaign is the one chosen in Paramètres › Campagnes (else CAMPAIGN_SLUG, else the
-season's default form), HelloAsso gives the items, the domain maps and classifies them. Knows nothing about HTTP: failures are raised as services.errors.
+season's default form), HelloAsso gives the items, the domain maps and classifies them. Knows nothing about HTTP: failures are raised as domain.errors.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from infrastructure.firestore.membership_import_history import ImportedItem, Imp
 from infrastructure.helloasso import api as helloasso_api
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.membership_import import AppliedWrite, MembershipImportRepository, MembershipWriteRefused
-from services.errors import Conflict, InvalidRequest, UpstreamUnavailable
+from domain.errors import Conflict, InvalidRequest, UpstreamUnavailable
 from services.members.seasons import SeasonService
 
 logger = logging.getLogger("alj")

@@ -13,7 +13,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, Response
 
 from api.ffme.schemas import FfmeFile, FfmeImportRequest, FfmeImportResult, FfmeLicensee, FfmeMatchStats, FfmeMember, FfmePreview, FfmeStats
-from api.responses import error, error_responses, internal_error
+from api.responses import error, error_responses
 from domain.members.sex import parse_sex
 from domain.members.view import is_cancelled
 
@@ -57,83 +57,80 @@ def get_ffme_stats_api(season: Optional[str] = None) -> Union[FfmeStats, JSONRes
     target_season = _season(season)
     if not target_season:
         return error(400, INVALID_SEASON)
-    try:
-        import datetime
-        from infrastructure.sqlite.members import MemberRepository
-        from exports.membership_excel import parse_date_to_datetime, clean_digits_only
+    import datetime
+    from infrastructure.sqlite.members import MemberRepository
+    from exports.membership_excel import parse_date_to_datetime, clean_digits_only
 
-        participants = MemberRepository.load_direct_data(season_filter=target_season)
+    participants = MemberRepository.load_direct_data(season_filter=target_season)
 
-        produced_count = 0
-        ignored_count = 0
-        termine_count = 0
-        renewals_count = 0
-        new_licences_count = 0
-        ignored_details = []
+    produced_count = 0
+    ignored_count = 0
+    termine_count = 0
+    renewals_count = 0
+    new_licences_count = 0
+    ignored_details = []
 
-        now = datetime.datetime.now()
+    now = datetime.datetime.now()
 
-        for p in participants:
-            tarif_name = str(p.get("tarif_name") or "").lower()
-            amount = p.get("amount", 0.0)
-            status = str(p.get("status") or "").lower()
-            commentaires = str(p.get("commentaires_correctif") or "").lower()
-            is_manual = "ajout manuel" in commentaires
+    for p in participants:
+        tarif_name = str(p.get("tarif_name") or "").lower()
+        amount = p.get("amount", 0.0)
+        status = str(p.get("status") or "").lower()
+        commentaires = str(p.get("commentaires_correctif") or "").lower()
+        is_manual = "ajout manuel" in commentaires
 
-            # 1. Ignoré (liste d'attente, montant nul non manuel, annulé)
-            if "attente" in tarif_name or (amount == 0.0 and not is_manual) or is_cancelled(status):
-                ignored_count += 1
-                continue
+        # 1. Ignoré (liste d'attente, montant nul non manuel, annulé)
+        if "attente" in tarif_name or (amount == 0.0 and not is_manual) or is_cancelled(status):
+            ignored_count += 1
+            continue
 
-            # 2. Date de naissance manquante ou invalide
-            dob_val = p.get("birth_date") or p.get("champ_Date de naissance de l'adhérent") or ""
-            dob_date = None
-            if isinstance(dob_val, (datetime.datetime, datetime.date)):
-                dob_date = dob_val
-            else:
-                parsed_dt = parse_date_to_datetime(str(dob_val).strip())
-                if isinstance(parsed_dt, (datetime.datetime, datetime.date)):
-                    dob_date = parsed_dt
+        # 2. Date de naissance manquante ou invalide
+        dob_val = p.get("birth_date") or p.get("champ_Date de naissance de l'adhérent") or ""
+        dob_date = None
+        if isinstance(dob_val, (datetime.datetime, datetime.date)):
+            dob_date = dob_val
+        else:
+            parsed_dt = parse_date_to_datetime(str(dob_val).strip())
+            if isinstance(parsed_dt, (datetime.datetime, datetime.date)):
+                dob_date = parsed_dt
 
-            nom = str(p.get("last_name") or "Inconnu").strip().upper()
-            prenom = str(p.get("first_name") or "Inconnu").strip()
-            if not dob_date or dob_date >= now:
-                ignored_count += 1
-                ignored_details.append(f"{nom} {prenom} (date de naissance manquante/invalide)")
-                continue
+        nom = str(p.get("last_name") or "Inconnu").strip().upper()
+        prenom = str(p.get("first_name") or "Inconnu").strip()
+        if not dob_date or dob_date >= now:
+            ignored_count += 1
+            ignored_details.append(f"{nom} {prenom} (date de naissance manquante/invalide)")
+            continue
 
-            # 3. Sexe : obligatoire pour une première licence (même règle que generate_ffme_csv)
-            lic = clean_digits_only(p.get("licence_ffme") or "")
-            is_renewal = 5 <= len(lic) <= 10
-            if not is_renewal and parse_sex(p.get("sex")) is None:
-                ignored_count += 1
-                ignored_details.append(f"{nom} {prenom} (sexe non renseigné)")
-                continue
+        # 3. Sexe : obligatoire pour une première licence (même règle que generate_ffme_csv)
+        lic = clean_digits_only(p.get("licence_ffme") or "")
+        is_renewal = 5 <= len(lic) <= 10
+        if not is_renewal and parse_sex(p.get("sex")) is None:
+            ignored_count += 1
+            ignored_details.append(f"{nom} {prenom} (sexe non renseigné)")
+            continue
 
-            # 4. Terminé ou à produire
-            if "termin" in status:
-                termine_count += 1
-            else:
-                produced_count += 1
+        # 4. Terminé ou à produire
+        if "termin" in status:
+            termine_count += 1
+        else:
+            produced_count += 1
 
-            if is_renewal:
-                renewals_count += 1
-            else:
-                new_licences_count += 1
+        if is_renewal:
+            renewals_count += 1
+        else:
+            new_licences_count += 1
 
-        return FfmeStats(
-            status="success",
-            season=target_season,
-            produced_count=produced_count,
-            termine_count=termine_count,
-            ignored_count=ignored_count,
-            estimated_total=produced_count + termine_count,
-            renewals_count=renewals_count,
-            new_licences_count=new_licences_count,
-            ignored_details=ignored_details[:20],
-        )
-    except Exception as e:
-        return error(500, internal_error(e, "get_ffme_stats_api"))
+    return FfmeStats(
+        status="success",
+        season=target_season,
+        produced_count=produced_count,
+        termine_count=termine_count,
+        ignored_count=ignored_count,
+        estimated_total=produced_count + termine_count,
+        renewals_count=renewals_count,
+        new_licences_count=new_licences_count,
+        ignored_details=ignored_details[:20],
+    )
 
 
 @router.get("/api/ffme/export", response_class=Response,
@@ -147,33 +144,30 @@ def export_ffme_api(season: Optional[str] = None, include_termine: bool = Query(
     target_season = _season(season)
     if not target_season:
         return error(400, INVALID_SEASON)
+    raw_data = MemberRepository.load_direct_data(season_filter=target_season)
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"import_ffme_{timestamp}.csv"
+    
+    tmp_dir = tempfile.mkdtemp(prefix="alj_ffme_export_")
+    tmp_csv = os.path.join(tmp_dir, filename)
+
     try:
-        raw_data = MemberRepository.load_direct_data(season_filter=target_season)
+        generate_ffme_csv(raw_data, output_path=tmp_csv, include_termine=include_termine)
+        with open(tmp_csv, "rb") as f:
+            content_bytes = f.read()
 
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"import_ffme_{timestamp}.csv"
-        
-        tmp_dir = tempfile.mkdtemp(prefix="alj_ffme_export_")
-        tmp_csv = os.path.join(tmp_dir, filename)
-
-        try:
-            generate_ffme_csv(raw_data, output_path=tmp_csv, include_termine=include_termine)
-            with open(tmp_csv, "rb") as f:
-                content_bytes = f.read()
-
-            return Response(
-                content=content_bytes,
-                media_type="text/csv; charset=utf-8",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"',
-                    "Access-Control-Expose-Headers": "Content-Disposition"
-                }
-            )
-        finally:
-            import shutil
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-    except Exception as e:
-        return error(500, internal_error(e, "export_ffme_api"))
+        return Response(
+            content=content_bytes,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
+    finally:
+        import shutil
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 # --------------------------------------------------------------------------
@@ -191,8 +185,6 @@ def preview_ffme_import_api(data: FfmeFile) -> Union[FfmePreview, JSONResponse]:
         prep = _prepare(data.content_base64)
     except binascii.Error:
         return error(400, UNREADABLE_FILE)
-    except Exception as e:
-        return error(500, internal_error(e, "preview_ffme_import_api"))
     stats = prep.get("stats", {})
     if stats.get("errors") and not prep.get("updates"):
         return error(400, stats["errors"][0])
@@ -226,8 +218,6 @@ def apply_ffme_import_api(data: FfmeImportRequest) -> Union[FfmeImportResult, JS
             prep = _prepare(data.content_base64)
         except binascii.Error:
             return error(400, UNREADABLE_FILE)
-        except Exception as e:
-            return error(500, internal_error(e, "apply_ffme_import_api"))
         updates = list(prep.get("updates", []))
         stats = dict(prep.get("stats", {}))
 
@@ -238,14 +228,10 @@ def apply_ffme_import_api(data: FfmeImportRequest) -> Union[FfmeImportResult, JS
     if not updates:
         message = (stats.get("errors") or ["Aucune mise à jour à appliquer (aucun rapprochement trouvé)."])[0]
         return error(400, message)
-    try:
-        if not FfmeImportRepository.apply_ffme_matches(updates, season_name=season):
-            return error(500, "Échec de l'écriture des associations en base de données.")
-        from infrastructure.firestore.cloud_database import CloudDatabase
-        if CloudDatabase.is_enabled():
-            CloudDatabase.after_write()
-    except Exception as e:
-        return error(500, internal_error(e, "apply_ffme_import_api"))
+    FfmeImportRepository.apply_ffme_matches(updates, season_name=season)
+    from infrastructure.firestore.cloud_database import CloudDatabase
+    if CloudDatabase.is_enabled():
+        CloudDatabase.after_write()
 
     return FfmeImportResult(
         status="success",

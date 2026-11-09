@@ -27,10 +27,9 @@ _src_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-import requests
 
 from domain.utils import normalize_name
-from infrastructure.mail.repository import EmailRepository
+from infrastructure.mail.repository import EmailRepository, MailError
 from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
@@ -44,7 +43,7 @@ from infrastructure.mycompet.scraper import (
     normalize_result_url,
 )
 from services.competitions.store import invalidate_cache
-from services.errors import NotFound, StorageUnavailable, UpstreamUnavailable
+from domain.errors import InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
 
 DEFAULT_NOTIFICATION_EMAIL = "david.lopez@alj-jonage.fr"
 SETTING_NOTIFICATION_EMAIL = "RESULTATS_NOTIFICATION_EMAIL"
@@ -180,7 +179,8 @@ class CompetitionResultsBatchService:
         clean = ", ".join(valid)
 
         try:
-            return AppSettingsRepository.save(SETTING_NOTIFICATION_EMAIL, clean)
+            AppSettingsRepository.save(SETTING_NOTIFICATION_EMAIL, clean)
+            return True
         except FirestoreError as e:
             print(f"⚠️ [BATCH_RESULTATS] Enregistrement de l'e-mail de notification impossible : {e}")
             return False
@@ -204,7 +204,8 @@ class CompetitionResultsBatchService:
         if not 1 <= int(days) <= 365:
             raise ValueError("Fenêtre de recherche invalide : entre 1 et 365 jours.")
         try:
-            return AppSettingsRepository.save(SETTING_BATCH_WINDOW_DAYS, str(int(days)))
+            AppSettingsRepository.save(SETTING_BATCH_WINDOW_DAYS, str(int(days)))
+            return True
         except FirestoreError:
             logger.warning("Enregistrement du réglage %s impossible", SETTING_BATCH_WINDOW_DAYS, exc_info=True)
             return False
@@ -306,7 +307,7 @@ class CompetitionResultsBatchService:
 
         try:
             scraped = fetch_and_parse_mycompet_results(url, club_keyword)
-        except (requests.RequestException, RuntimeError, ValueError) as e:
+        except (UpstreamUnavailable, InvalidRequest, ValueError) as e:  # ValueError: a page lxml cannot parse
             logger.warning("[BATCH_RESULTATS] Échec scraping %s (%s) : %s", nom, url, e)
             return CompetitionOutcome(status="error", matched_count=0, athletes=[], url=canonical_url)
         if not scraped:
@@ -352,7 +353,7 @@ class CompetitionResultsBatchService:
 
         try:
             scraped = fetch_and_parse_mycompet_results(url, club_keyword)
-        except (requests.RequestException, RuntimeError, ValueError) as e:
+        except (UpstreamUnavailable, InvalidRequest, ValueError) as e:  # ValueError: a page lxml cannot parse
             logger.warning("[MYCOMPET] Échec de la récupération des résultats (%s) : %s", url, e, exc_info=True)
             raise UpstreamUnavailable("Erreur lors de la récupération des résultats MyCompet (détails dans les journaux).") from e
 
@@ -573,7 +574,7 @@ class CompetitionResultsBatchService:
         plain_body = "\n".join(lines)
 
         try:
-            ok = EmailRepository.send_email(
+            EmailRepository.send_email(
                 to_email=recipient,
                 subject=subject,
                 body=plain_body,
@@ -581,14 +582,11 @@ class CompetitionResultsBatchService:
                 from_email=DEFAULT_SENDER_EMAIL,
                 from_name="ALJ Escalade - Résultats Compétitions"
             )
-            if ok:
-                print(f"✅ [BATCH_RESULTATS] E-mail de notification envoyé avec succès à {recipient}")
-            else:
-                logger.error("[BATCH_RESULTATS] Échec lors de l'envoi de l'e-mail à %s", recipient)
-            return ok
-        except Exception:  # any mail backend failure: the results are saved, only the e-mail is lost
-            logger.exception("[BATCH_RESULTATS] Erreur envoi e-mail notification")
+        except MailError:  # the results are saved, only the e-mail is lost
+            logger.exception("[BATCH_RESULTATS] Erreur envoi e-mail notification à %s", recipient)
             return False
+        logger.info("[BATCH_RESULTATS] E-mail de notification envoyé à %s", recipient)
+        return True
 
     @classmethod
     def _load_archive(cls, pending: List[Dict[str, Any]]) -> List[ArchiveEntry]:
@@ -597,7 +595,7 @@ class CompetitionResultsBatchService:
             return []
         try:
             return fetch_ffme_archive_entries()
-        except (requests.RequestException, RuntimeError) as e:
+        except UpstreamUnavailable as e:
             logger.warning("[BATCH_RESULTATS] Archives FFME illisibles, recherche automatique des URL impossible : %s", e)
             return []
 

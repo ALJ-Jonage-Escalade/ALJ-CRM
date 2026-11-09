@@ -41,15 +41,12 @@ def preview_attestation_api(data: AttestationRequest) -> Response:
     problem = attestation_error(member)
     if problem:
         return error(400, problem)
-    try:
-        pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name"), club_email=CLUB_CONTACT_EMAIL))
-    except Exception as e:
-        return error(500, internal_error(e, "preview_attestation_api"))
+    pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name"), club_email=CLUB_CONTACT_EMAIL))
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": _content_disposition(_filename(member))})
 
 
-@router.post("/api/attestations/send", response_model=AttestationSent, responses=error_responses(400, 403, 404, 500))
+@router.post("/api/attestations/send", response_model=AttestationSent, responses=error_responses(400, 403, 404, 500, 502))
 def send_attestation_api(data: AttestationSend) -> AttestationSent | JSONResponse:
     """Génère une attestation PDF en mémoire, l'envoie par e-mail et met à jour la date d'envoi."""
     to_email = data.to_email
@@ -60,10 +57,7 @@ def send_attestation_api(data: AttestationSend) -> AttestationSent | JSONRespons
     problem = attestation_error(member)
     if problem:
         return error(400, problem)
-    try:
-        return _send(member, data)
-    except Exception as e:
-        return error(500, internal_error(e, "send_attestation_api"))
+    return _send(member, data)
 
 
 def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
@@ -71,7 +65,7 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
     from domain.utils import apply_template_variables
     from infrastructure.mail.dispatch import EmailDispatchService
     from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
-    from infrastructure.mail.repository import EmailRepository
+    from infrastructure.mail.repository import EmailRepository, MailError
 
     pdf_bytes = render_attestation_pdf(build_attestation(member, season=member.get("season_name"), club_email=CLUB_CONTACT_EMAIL))
     filename_pdf = _filename(member)
@@ -99,33 +93,41 @@ def _send(member: Doc, data: AttestationSend) -> AttestationSent | JSONResponse:
     plain_body = body + ("\n\n" + build_signature_plain() if data.add_signature else "")
     inline_images = get_inline_images() if data.add_signature else []
 
-    ok = EmailRepository.send_email(
-        to_email=data.to_email,
-        subject=subject,
-        body=plain_body,
-        html_body=html_body,
-        attachment_bytes=pdf_bytes,
-        attachment_filename=filename_pdf,
-        inline_images=inline_images,
-        from_email=sender_email,
-        from_name=sender_name
-    )
-    if not ok:
-        return error(500, "Échec d'envoi de l'e-mail.")
+    try:
+        EmailRepository.send_email(
+            to_email=data.to_email,
+            subject=subject,
+            body=plain_body,
+            html_body=html_body,
+            attachment_bytes=pdf_bytes,
+            attachment_filename=filename_pdf,
+            inline_images=inline_images,
+            from_email=sender_email,
+            from_name=sender_name
+        )
+    except MailError as e:
+        return error(502, f"Échec d'envoi de l'e-mail : {internal_error(e, 'send_attestation_api')}")
 
-    # Date the certificate was sent, in SQLite (replicated to Firestore after the request, server.py)
+    # Date the certificate was sent, in SQLite (replicated to Firestore after the request, server.py).
+    # The e-mail is already gone: a failure here must not answer an error (the office would send it again)
     now_str = datetime.datetime.now().strftime("%d/%m/%Y")
     try:
         from infrastructure.sqlite.members import MemberRepository
-        MemberRepository.update_email_sent_date(
+        recorded = MemberRepository.update_email_sent_date(
             order_ref=str(member.get("order_ref") or "").strip(),
             last_name=str(member.get("last_name") or "").strip(),
             first_name=str(member.get("first_name") or "").strip(),
             date_str=now_str,
             purchase_id=int(member["purchase_id"]),
         )
-    except Exception:
+    except Exception:  # the e-mail was sent: report the unsaved date instead of failing the request
         logger.exception("Attestation: sent date not recorded in SQLite")
+        recorded = False
+    else:
+        if not recorded:
+            logger.error("Attestation: no purchase matched to record the sent date (purchase #%s)", member.get("purchase_id"))
 
-    return AttestationSent(status="success", message=f"Attestation envoyée avec succès à {data.to_email}.",
-                           email_sent_date=now_str, filename=filename_pdf)
+    message = f"Attestation envoyée avec succès à {data.to_email}."
+    if not recorded:
+        message += " La date d'envoi n'a pas pu être enregistrée sur la fiche."
+    return AttestationSent(status="success", message=message, email_sent_date=now_str if recorded else None, filename=filename_pdf)

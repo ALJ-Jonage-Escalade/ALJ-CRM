@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import os
+from typing import Optional
 
 from infrastructure.sqlite import schema_v2
 from infrastructure.sqlite.connection import SqliteDatabase
@@ -13,6 +14,7 @@ logger = logging.getLogger("alj")
 
 # Shown to the office (the cause goes to the logs only: it may hold the temporary file's path)
 UNREADABLE_EXCEL = "Fichier Excel illisible : vérifiez qu'il s'agit bien de l'export .xlsx des licenciés MyFFME."
+MATCHING_FAILED = "Erreur lors du rapprochement FFME (détails dans les journaux)."
 
 
 class FfmeImportRepository:
@@ -39,7 +41,8 @@ class FfmeImportRepository:
         stats = prep["stats"]
 
         if not os.path.exists(excel_path):
-            stats["errors"].append(f"Fichier introuvable : {excel_path}")
+            logger.error("FFME import: file not found: %s", excel_path)
+            stats["errors"].append(UNREADABLE_EXCEL)
             return prep
         try:
             df = pd.read_excel(excel_path)
@@ -176,23 +179,25 @@ class FfmeImportRepository:
                         "diplomes": _cell_str(row, "Dipl\u00f4mes"),
                         "document_sante": _cell_str(row, "Document de sant\u00e9") if has_sante_col else "",
                     })
-        except Exception as e:
-            stats["errors"].append(f"Erreur lors du rapprochement FFME : {e}")
+        except Exception:  # reported to the office as a fixed message; the cause (SQL, paths) goes to the logs
+            logger.exception("FFME import: matching failed")
+            stats["errors"].append(MATCHING_FAILED)
         finally:
             conn.close()
         return prep
 
     @classmethod
-    def apply_ffme_matches(cls, updates: list, season_name: str = None) -> bool:
+    def apply_ffme_matches(cls, updates: list, season_name: Optional[str] = None) -> None:
         """
         Phase B de l'import FFME — écrit en base les associations validées :
         updates = [(match_type, licence, passeports, diplomas, document_sante, user_id), ...]
         Met à jour la licence/passeports/diplômes de l'utilisateur, écrit le Document de
         santé (associé à la personne pour la saison active, via purchases) et bascule
         ses achats de la saison active en statut "Terminé" (licence FFME confirmée).
+        A database failure is rolled back and raised.
         """
         if not updates:
-            return True
+            return
         SqliteDatabase.create_db_backup()
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
@@ -242,11 +247,9 @@ class FfmeImportRepository:
             """, [(u[0], schema_v2.normalize_status(u[0]), u[4],
                    datetime.datetime.now().isoformat(timespec="seconds"), u[5], target_season) for u in updates])
             conn.commit()
-            return True
-        except Exception as e:
-            print(f"[SQLITE] Erreur lors de la fusion FFME en BDD : {e}")
+        except Exception:
             conn.rollback()
-            return False
+            raise
         finally:
             conn.close()
 

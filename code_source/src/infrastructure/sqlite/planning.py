@@ -26,7 +26,7 @@ class PlanningRepository:
                 if encadrants_raw:
                     try:
                         encadrants = json.loads(encadrants_raw)
-                    except Exception:
+                    except (json.JSONDecodeError, TypeError):
                         encadrants = []
                 else:
                     encadrants = []
@@ -37,7 +37,7 @@ class PlanningRepository:
                 if tarifs_raw:
                     try:
                         tarifs = json.loads(tarifs_raw)
-                    except Exception:
+                    except (json.JSONDecodeError, TypeError):
                         tarifs = []
                 else:
                     tarifs = []
@@ -46,9 +46,6 @@ class PlanningRepository:
                 planning_list.append(row_dict)
 
             return planning_list
-        except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors du chargement du planning : {e}")
-            return []
         finally:
             conn.close()
 
@@ -108,10 +105,9 @@ class PlanningRepository:
                 ))
             conn.commit()
             print("💾 [SQLITE] Planning enregistré avec succès dans SQLite.")
-        except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors de la sauvegarde du planning : {e}")
+        except Exception:
             conn.rollback()
-            raise e
+            raise
         finally:
             conn.close()
 
@@ -150,10 +146,9 @@ class PlanningRepository:
             conn.commit()
             print(f"💾 [SQLITE] Créneau #{item_id} ({item.get('groupe')}) enregistré avec succès.")
             return item
-        except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors de l'enregistrement du créneau : {e}")
+        except Exception:
             conn.rollback()
-            raise e
+            raise
         finally:
             conn.close()
 
@@ -170,9 +165,8 @@ class PlanningRepository:
             if deleted:
                 print(f"🗑️ [SQLITE] Créneau #{item_id} supprimé avec succès.")
             return deleted
-        except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors de la suppression du créneau #{item_id} : {e}")
+        except Exception:
             conn.rollback()
-            raise e
+            raise
         finally:
             conn.close()

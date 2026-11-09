@@ -56,7 +56,7 @@ async function send(): Promise<void> {
   }
   sending.value = true;
   try {
-    const result = await communicationsApi.sendEmail({
+    await communicationsApi.sendEmail({
       subject: subject.value.trim(),
       body: body.value.trim(),
       add_signature: signature.value,
@@ -72,10 +72,6 @@ async function send(): Promise<void> {
         },
       ],
     });
-    if (result.status === "error") {
-      emit("failed", `❌ Échec d'envoi : ${result.message || result.details?.[0]?.error || "erreur d'envoi."}`);
-      return;
-    }
     emit("sent", `✅ E-mail envoyé avec succès à ${m.first_name} ${m.last_name} !`);
   } catch (e) {
     emit("failed", `❌ Échec d'envoi : ${errorText(e)}`);

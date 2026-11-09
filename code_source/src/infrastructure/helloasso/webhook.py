@@ -31,6 +31,7 @@ from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL
 from infrastructure.security.api_auth import auth_enforced, constant_time_equals
 from infrastructure.security.secret_store import SecretStore
 
+from domain.competitions.models import PAIEMENT_PAYE, Competition, Participant
 from domain.competitions.matching import (
     auto_link_items,
     summarize_items,
@@ -411,28 +412,22 @@ class HelloAssoWebhookService:
     # Notification lorsque tous les compétiteurs ont payé
     # ------------------------------------------------------------------
     @classmethod
-    def build_all_paid_email_html(cls, comp: Any, participants: List[Any]) -> str:
+    def build_all_paid_email_html(cls, comp: Competition, participants: List[Participant]) -> str:
         """Génère le corps HTML de l'e-mail récapitulatif 'Tous les paiements reçus'."""
-        nom_comp = html.escape(str(getattr(comp, "nom", None) if not isinstance(comp, dict) else comp.get("nom")) or "Compétition")
-        date_c = str(getattr(comp, "date_competition", None) if not isinstance(comp, dict) else comp.get("date_competition") or "")
+        nom_comp = html.escape(comp.nom or "Compétition")
+        date_c = str(comp.date_competition or "")
         date_fmt = "/".join(reversed(date_c.split("-"))) if ("-" in date_c and len(date_c.split("-")) == 3) else date_c
-        try:
-            prix = float(getattr(comp, "prix", 0.0) if not isinstance(comp, dict) else comp.get("prix") or 0.0)
-        except Exception:
-            prix = 0.0
+        prix = float(comp.prix or 0.0)
 
         rows_html = []
         total_collecte = 0.0
         for p in participants:
-            nom = str(getattr(p, "nom", None) if not isinstance(p, dict) else p.get("nom") or "")
-            prenom = str(getattr(p, "prenom", None) if not isinstance(p, dict) else p.get("prenom") or "")
-            licence = str(getattr(p, "num_licence", None) if not isinstance(p, dict) else p.get("num_licence") or "")
-            try:
-                montant = float(getattr(p, "montant_paye", 0.0) if not isinstance(p, dict) else p.get("montant_paye") or 0.0)
-            except Exception:
-                montant = 0.0
-            cmd = str(getattr(p, "commande_helloasso", None) if not isinstance(p, dict) else p.get("commande_helloasso") or "")
-            date_sync = str(getattr(p, "date_synchro_helloasso", None) if not isinstance(p, dict) else p.get("date_synchro_helloasso") or "")
+            nom = str(p.nom or "")
+            prenom = str(p.prenom or "")
+            licence = str(p.num_licence or "")
+            montant = float(p.montant_paye or 0.0)
+            cmd = str(p.commande_helloasso or "")
+            date_sync = str(p.date_synchro_helloasso or "")
             total_collecte += montant
 
             rows_html.append(f"""
@@ -530,11 +525,11 @@ class HelloAssoWebhookService:
 """
 
     @classmethod
-    def build_all_paid_email_text(cls, comp: Any, participants: List[Any]) -> str:
+    def build_all_paid_email_text(cls, comp: Competition, participants: List[Participant]) -> str:
         """Génère le texte brut de secours de l'e-mail récapitulatif."""
-        nom_comp = str(getattr(comp, "nom", None) if not isinstance(comp, dict) else comp.get("nom")) or "Compétition"
-        date_c = str(getattr(comp, "date_competition", None) if not isinstance(comp, dict) else comp.get("date_competition") or "")
-        total_collecte = sum(float(getattr(p, "montant_paye", 0.0) if not isinstance(p, dict) else p.get("montant_paye") or 0.0) for p in participants)
+        nom_comp = comp.nom or "Compétition"
+        date_c = str(comp.date_competition or "")
+        total_collecte = sum(float(p.montant_paye or 0.0) for p in participants)
 
         lines = [
             f"ALJ Escalade — Tous les paiements validés pour : {nom_comp}",
@@ -548,11 +543,11 @@ class HelloAssoWebhookService:
             "Liste des compétiteurs :",
         ]
         for p in participants:
-            nom = str(getattr(p, "nom", None) if not isinstance(p, dict) else p.get("nom") or "")
-            prenom = str(getattr(p, "prenom", None) if not isinstance(p, dict) else p.get("prenom") or "")
-            licence = str(getattr(p, "num_licence", None) if not isinstance(p, dict) else p.get("num_licence") or "")
-            montant = float(getattr(p, "montant_paye", 0.0) if not isinstance(p, dict) else p.get("montant_paye") or 0.0)
-            cmd = str(getattr(p, "commande_helloasso", None) if not isinstance(p, dict) else p.get("commande_helloasso") or "")
+            nom = str(p.nom or "")
+            prenom = str(p.prenom or "")
+            licence = str(p.num_licence or "")
+            montant = float(p.montant_paye or 0.0)
+            cmd = str(p.commande_helloasso or "")
             lines.append(f" - {nom} {prenom} (Licence : {licence or '—'}) : {montant:.2f} € [Commande : {cmd or '—'}]")
 
         lines.extend([
@@ -563,35 +558,24 @@ class HelloAssoWebhookService:
 
     @classmethod
     def check_and_notify_all_paid(cls, competition_id: int) -> bool:
-        """
-        Vérifie si tous les compétiteurs sélectionnés d'une épreuve ont payé.
-        Si la condition est remplie et qu'aucune notification n'a encore été envoyée,
-        expédie l'e-mail récapitulatif à l'adresse de notification du club.
-        """
+        """Sends the club the summary e-mail once every selected competitor of the competition has paid, once:
+        the setting COMP_ALL_PAID_NOTIFIED_<id> records the send, and is cleared as soon as one of them has not paid
+        (so a later full payment notifies again). Returns whether the e-mail was sent now."""
         comp = CompetitionRepository.get_competition(competition_id)
         if not comp:
             return False
 
         participants = CompetitionRepository.list_participants(competition_id, selected_only=False)
-        selected_parts = [
-            p for p in participants
-            if (getattr(p, "selectionne", False) or (isinstance(p, dict) and p.get("selectionne")))
-        ]
+        selected_parts = [p for p in participants if p.selectionne]
 
         if not selected_parts:
             return False
 
-        # Vérifier que CHAQUE compétiteur sélectionné a bien le statut "paye"
-        for p in selected_parts:
-            st = getattr(p, "statut_paiement", None) if not isinstance(p, dict) else p.get("statut_paiement")
-            if str(st or "").strip().lower() != "paye":
-                # Si au moins un participant n'a pas encore payé, réinitialiser le flag
-                setting_key = f"COMP_ALL_PAID_NOTIFIED_{competition_id}"
-                AppSettingsRepository.save(setting_key, "")
-                return False
-
-        # Tous les compétiteurs sélectionnés ont payé !
         setting_key = f"COMP_ALL_PAID_NOTIFIED_{competition_id}"
+        if any(str(p.statut_paiement or "").strip().lower() != PAIEMENT_PAYE for p in selected_parts):
+            AppSettingsRepository.save(setting_key, "")  # not all paid (again): notify at the next full payment
+            return False
+
         already_notified = AppSettingsRepository.get(setting_key, "")
         if already_notified:
             return False
@@ -600,17 +584,17 @@ class HelloAssoWebhookService:
         from services.competitions.results_batch import CompetitionResultsBatchService
         recipient = CompetitionResultsBatchService.get_notification_email()
         if not recipient or "@" not in recipient:
-            print(f"⚠️ [WEBHOOK_HELLOASSO] Adresse de notification invalide ou non configurée : '{recipient}'")
+            logger.warning("[WEBHOOK_HELLOASSO] Adresse de notification invalide ou non configurée : %r", recipient)
             return False
 
-        nom_comp = str(getattr(comp, "nom", None) if not isinstance(comp, dict) else comp.get("nom")) or "Compétition"
+        nom_comp = comp.nom or "Compétition"
         subject = f"✅ [ALJ Compétitions] Tous les paiements validés : {nom_comp}"
         html_body = cls.build_all_paid_email_html(comp, selected_parts)
         plain_body = cls.build_all_paid_email_text(comp, selected_parts)
 
-        from infrastructure.mail.repository import EmailRepository
+        from infrastructure.mail.repository import EmailRepository, MailError
         try:
-            ok = EmailRepository.send_email(
+            EmailRepository.send_email(
                 to_email=recipient,
                 subject=subject,
                 body=plain_body,
@@ -618,14 +602,9 @@ class HelloAssoWebhookService:
                 from_email=DEFAULT_SENDER_EMAIL,
                 from_name="ALJ Escalade - Compétitions"
             )
-            if ok:
-                now_iso = datetime.datetime.now().isoformat(timespec="seconds")
-                AppSettingsRepository.save(setting_key, now_iso)
-                print(f"✅ [WEBHOOK_HELLOASSO] E-mail 'Tous les paiements validés' envoyé à {recipient} pour la compétition '{nom_comp}'")
-                return True
-            else:
-                print(f"❌ [WEBHOOK_HELLOASSO] Échec lors de l'envoi de l'e-mail 'Tous les paiements validés' à {recipient}")
-                return False
-        except Exception as err:
-            print(f"❌ [WEBHOOK_HELLOASSO] Erreur envoi e-mail notification tous payés : {err}")
+        except MailError:  # the payments are recorded; the e-mail is tried again on the next notification
+            logger.exception("[WEBHOOK_HELLOASSO] E-mail 'Tous les paiements validés' non envoyé à %s", recipient)
             return False
+        AppSettingsRepository.save(setting_key, datetime.datetime.now().isoformat(timespec="seconds"))
+        logger.info("[WEBHOOK_HELLOASSO] E-mail 'Tous les paiements validés' envoyé à %s pour « %s »", recipient, nom_comp)
+        return True
