@@ -12,6 +12,7 @@ import { AUTH_KEY } from "../../composables/auth";
 import { dialogs } from "../../composables/dialogs";
 import { CLIENT_KEY, errorText } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
+import { plural } from "../../lib/text";
 import { createKeysApi } from "../../services/keys";
 import { OUTILS_KEY } from "./context";
 import KeyArchiveDialog from "./KeyArchiveDialog.vue";
@@ -59,7 +60,7 @@ const COLUMNS: DataColumn<Key>[] = [
 const holderLink = (k: Key) =>
   k.holder ? `/bureau/adherents?${new URLSearchParams({ id: String(k.holder.user_id), saison: k.holder.season })}` : "";
 
-const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? "s" : ""}`;
+const counted = (n: number, word: string) => `${n} ${word}${plural(n)}`;
 
 async function reload(): Promise<void> {
   try {
@@ -102,8 +103,8 @@ defineExpose({ reload });
         <div class="min-w-0">
           <h3 class="text-sm font-bold">🔑 Clés de la salle</h3>
           <p class="text-xs text-slate-500" data-testid="key-counts">
-            {{ plural(counts.assigned, "attribuée") }} · {{ plural(counts.available, "disponible") }} ·
-            {{ plural(counts.archived, "archivée") }}
+            {{ counted(counts.assigned, "attribuée") }} · {{ counted(counts.available, "disponible") }} ·
+            {{ counted(counts.archived, "archivée") }}
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
