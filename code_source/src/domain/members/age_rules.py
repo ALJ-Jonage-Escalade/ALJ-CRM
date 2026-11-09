@@ -13,6 +13,8 @@ Règles métier :
 import datetime
 import re
 
+from domain.constants import get_active_season
+
 ADULT_AGE = 18
 SEASON_START_MONTH = 9
 SEASON_START_DAY = 1
@@ -36,11 +38,7 @@ _BIRTH_FORMATS = (
 def get_season_start_date(season=None):
     """Retourne la date de début de la saison (01/09 de l'année de début)."""
     if not season:
-        try:
-            from domain.constants import get_active_season
-            season = get_active_season()
-        except Exception:
-            season = None
+        season = get_active_season()
     try:
         start_year = int(str(season).strip().split("-")[0])
     except (ValueError, IndexError, AttributeError):

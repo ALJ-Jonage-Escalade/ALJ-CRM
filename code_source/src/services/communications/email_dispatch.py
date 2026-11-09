@@ -1,4 +1,3 @@
-import logging
 """
 Service d'expédition et de rendu d'e-mails sécurisé (contexte Compétitions & Adhérents).
 
@@ -10,20 +9,23 @@ Permet de :
 4. Expédier les messages via l'API Gmail sécurisée du club (OAuth2) ou SMTP.
 """
 
-from typing import Dict, Any, List, Optional
+from __future__ import annotations
 
+import logging
+from typing import Any, Dict, List, Optional
+
+from domain.club_emails import CLUB_SENDER_DOMAIN
 from domain.competitions.models import Competition, default_deadline
-from domain.utils import apply_template_variables, format_montant
+from domain.errors import InvalidRequest, UpstreamUnavailable
+from domain.email_personalization import apply_template_variables
+from domain.utils import format_montant, format_periode, normalize_name
+from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as CompetitionRepository
+from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
+from infrastructure.mail.repository import EmailRepository, MailError
+from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
 from infrastructure.sqlite.members import MemberRepository
-from infrastructure.firestore.competition_repository import (
-    CompetitionFirestoreRepository as CompetitionRepository,
-)
-from infrastructure.mail.repository import EmailRepository, MailError
-from domain.errors import InvalidRequest, UpstreamUnavailable
-from infrastructure.mail.senders import CLUB_SENDER_DOMAIN
-from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
 
 logger = logging.getLogger("alj")
 
@@ -34,7 +36,6 @@ class EmailDispatchService:
     @classmethod
     def is_allowed_sender(cls, sender_email: Optional[str]) -> bool:
         """An empty sender (default account) or a club / configured address."""
-        from infrastructure.security.secret_store import SecretStore
         email = (sender_email or "").strip().lower()
         if not email:
             return True
@@ -80,7 +81,6 @@ class EmailDispatchService:
     @classmethod
     def get_template_by_name(cls, name: str) -> Optional[Dict[str, Any]]:
         """Recherche un modèle d'e-mail par son nom (insensible à la casse et aux accents)."""
-        from domain.utils import normalize_name
         name_clean = normalize_name(name)
         for t in cls.list_templates():
             if normalize_name(t.get("name") or "") == name_clean:
@@ -98,7 +98,6 @@ class EmailDispatchService:
             return {}
         comp = Competition.from_row(doc)
 
-        from domain.utils import format_periode
         date_formatted = format_periode(comp.date_competition, comp.date_fin)
         deadline = comp.deadline or default_deadline(comp.date_competition)
         deadline_formatted = format_periode(deadline) if deadline else ""

@@ -62,7 +62,7 @@ def test_pivot_records_every_season_ages_each_row_at_its_season(client):
     rows = [_row(season_name="2025-2026"), _row(season_name="2026-2027")]
     response, load = _get(client, rows, season="Toutes les saisons")
 
-    load.assert_called_once_with("Toutes les saisons")
+    load.assert_called_once_with(None)
     body = response.json()
     assert body["season"] == "Toutes les saisons"
     assert [r["Âge"] for r in body["records"]] == [25, 26]

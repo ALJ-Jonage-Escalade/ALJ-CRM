@@ -28,7 +28,7 @@ from fastapi.testclient import TestClient
 from infrastructure.helloasso import api as helloasso_api
 from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
-from infrastructure.helloasso.webhook import HelloAssoWebhookService
+from services.competitions.helloasso_webhook import HelloAssoWebhookService
 from server import app
 from support.fake_access import FakeClock, InMemoryAccessStore, grant_roles, install_access, role_entry
 
@@ -451,7 +451,7 @@ class TestWebhookVerification(unittest.TestCase):
 
     def secrets(self, token=""):
         real = api_auth.SecretStore.get_secret
-        return patch("infrastructure.helloasso.webhook.SecretStore.get_secret",
+        return patch("services.competitions.helloasso_webhook.SecretStore.get_secret",
                      side_effect=lambda k: token if k == "HELLOASSO_WEBHOOK_TOKEN" else real(k))
 
     def test_token_required_when_configured(self):
@@ -509,7 +509,7 @@ class TestWebhookVerification(unittest.TestCase):
         """Avec des articles vérifiés, le contenu du payload n'est pas utilisé."""
         with patch.object(HelloAssoWebhookService, "extract_items_from_payload") as extract, \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=""), \
-             patch("infrastructure.helloasso.webhook.CompetitionRepository") as repo:
+             patch("services.competitions.helloasso_webhook.CompetitionRepository") as repo:
             repo.list_competitions.return_value = []
             repo.list_adherents.return_value = []
             repo.list_helloasso_links.return_value = {}

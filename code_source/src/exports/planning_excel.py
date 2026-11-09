@@ -18,6 +18,7 @@ import io
 import math
 import re
 
+from domain.utils import normalize_string
 from exports.spreadsheet_safety import neutralize_formulas
 
 DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]
@@ -40,7 +41,6 @@ FILL_BLOC_AUTONOME = "FFD8A8"      # orange clair pastel (groupe « Autonome Blo
 def fill_for_item(item):
     """Couleur de fond d'un créneau : priorité au nom du groupe (« Autonome Bloc »
     = orange clair pastel), sinon le type de groupe."""
-    from domain.utils import normalize_string
     label = normalize_string(item.get("groupe") or "")
     if "autonome" in label and "bloc" in label:
         return FILL_BLOC_AUTONOME

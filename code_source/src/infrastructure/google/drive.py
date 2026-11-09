@@ -4,6 +4,7 @@ import requests
 from typing import Dict, Tuple
 
 from infrastructure.security.secret_store import SecretPersistenceError, SecretStore
+from paths import CODE_ROOT, ROOT_DIR
 
 logger = logging.getLogger("alj")
 
@@ -45,7 +46,6 @@ class GoogleDriveClient:
         1. Le SecretStore (Firestore sur Cloud Run, puis l'environnement),
         2. Les fichiers .env sur disque (fraîchement écrits par l'assistant OAuth2)."""
         if env_paths is None:
-            from paths import CODE_ROOT, ROOT_DIR
             env_paths = [os.path.join(ROOT_DIR, ".env"), os.path.join(CODE_ROOT, ".env")]
 
         candidates = []

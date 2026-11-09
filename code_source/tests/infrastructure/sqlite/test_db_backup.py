@@ -1,4 +1,5 @@
-"""SqliteDatabase.create_db_backup: local safety copy, pointless with Firestore (the cache is rebuilt from it)."""
+"""SqliteDatabase.create_db_backup: local safety copy, before the FFME import changes a database of its own; pointless
+with Firestore (the cache is rebuilt from it)."""
 
 import glob
 import os
@@ -6,20 +7,31 @@ from unittest.mock import patch
 
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.sqlite.connection import SqliteDatabase
+from services.members import ffme
 from support.member_db import MemberDbTestCase
 
 
 class TestCreateDbBackup(MemberDbTestCase):
 
-    def _backups_after_call(self, firestore_enabled: bool) -> list[str]:
-        with patch("infrastructure.sqlite.connection.ROOT_DIR", self._tmp.name), \
-                patch.object(CloudDatabase, "is_enabled", return_value=firestore_enabled):
-            SqliteDatabase.create_db_backup()
+    def _backups(self) -> list[str]:
         return glob.glob(os.path.join(self._tmp.name, "archive", "db", "database_backup_*.db"))
 
-    def test_create_db_backup_writes_a_copy_without_firestore(self):
-        self.assertEqual(len(self._backups_after_call(firestore_enabled=False)), 1)
+    def test_create_db_backup_writes_a_copy(self):
+        with patch("infrastructure.sqlite.connection.ROOT_DIR", self._tmp.name):
+            SqliteDatabase.create_db_backup()
+        self.assertEqual(len(self._backups()), 1)
 
-    def test_create_db_backup_writes_nothing_with_firestore(self):
-        self.assertEqual(self._backups_after_call(firestore_enabled=True), [])
-        self.assertFalse(os.path.exists(os.path.join(self._tmp.name, "archive")))
+    def test_ffme_import_backs_up_only_without_firestore(self):
+        self.seed("1", "Léo", "MARTIN", "Cours ados")
+        conn = SqliteDatabase.get_connection()
+        try:
+            user_id = conn.execute("SELECT id FROM users WHERE last_name = 'MARTIN'").fetchone()["id"]
+        finally:
+            conn.close()
+        match = ("Terminé", "112233", "", "", "", user_id)
+        for firestore_enabled, backups in ((True, 0), (False, 1)):
+            with self.subTest(firestore_enabled=firestore_enabled), \
+                    patch("infrastructure.sqlite.connection.ROOT_DIR", self._tmp.name), \
+                    patch.object(CloudDatabase, "is_enabled", return_value=firestore_enabled):
+                ffme.apply_import("2026-2027", None, [match])
+            self.assertEqual(len(self._backups()), backups)

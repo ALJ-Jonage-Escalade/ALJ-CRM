@@ -148,6 +148,6 @@ def test_same_sheet_stacks_every_course_in_one_workbook() -> None:
 
 
 def test_missing_template_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
-    monkeypatch.setattr(presence_sheets, "find_doc_template", lambda name: str(tmp_path / name))
+    monkeypatch.setattr(presence_sheets, "template_path", lambda name: str(tmp_path / name))
     with pytest.raises(FileNotFoundError):
         generate_presence_sheets(["Loisir lundi"], MEMBERS, PLANNING, variant="cours")

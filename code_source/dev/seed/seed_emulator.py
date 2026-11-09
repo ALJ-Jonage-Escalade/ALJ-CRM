@@ -478,7 +478,8 @@ def main() -> int:
 
     from faker import Faker
     from hp_names import COACHES
-    from infrastructure.firestore import cloud_database as cdb
+    from infrastructure.firestore.cloud_sync.bootstrap import import_database
+    from infrastructure.firestore.cloud_sync.rest_store import RestStore
     from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 
     Faker.seed(SEED)
@@ -494,7 +495,7 @@ def main() -> int:
     n_cur, n_prev = build_sqlite(db_path, fake, rng, COACHES)
     print(f"🧙 {n_cur} memberships {SEASON}, {n_prev} memberships {PREVIOUS_SEASON} (re-registrations)")
 
-    written = cdb.import_database(db_path, cdb.RestStore())
+    written = import_database(db_path, RestStore())
     print(f"☁️  crm_* collections: {written}")
 
     # Coaches: fixed ids, Snape first (id 1)
@@ -520,4 +521,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    runtime_env.load_env_files()  # .env files as the server reads them (never at import: tests call main())
     sys.exit(main())

@@ -146,7 +146,7 @@ class TestSqliteCacheScope(unittest.TestCase):
     def test_check_all_paid_runs_on_refreshed_cache(self):
         r = self._assert_cache_around(
             "POST", "/api/competitions/12/check-all-paid",
-            "infrastructure.helloasso.webhook.HelloAssoWebhookService.check_and_notify_all_paid",
+            "api.competitions.payments.check_and_notify_all_paid",
             True)
         self.assertEqual(r.json(), {"status": "success", "competition_id": 12, "notified": True})
 
@@ -158,7 +158,7 @@ class TestSqliteCacheScope(unittest.TestCase):
                 patch.object(server.CloudDatabase, "is_enabled", return_value=True), \
                 patch.object(server.CloudDatabase, "ensure_fresh"), \
                 patch.object(server.CloudDatabase, "after_write", side_effect=[True, False]), \
-                patch("infrastructure.helloasso.webhook.HelloAssoWebhookService.check_and_notify_all_paid", return_value=True), \
+                patch("api.competitions.payments.check_and_notify_all_paid", return_value=True), \
                 self.assertLogs("alj", "ERROR"):
             replicated = client.post("/api/competitions/12/check-all-paid")
             pending = client.post("/api/competitions/12/check-all-paid")

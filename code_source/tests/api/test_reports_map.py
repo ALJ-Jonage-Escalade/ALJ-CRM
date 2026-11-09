@@ -67,7 +67,7 @@ def test_map_points_every_season_lists_a_member_once(client):
     rows = [_row("Ron", "Weasley"), _row("Ron", "Weasley"), _row("Ron", "Weasley", tarif="Compet")]
     response, load, _ = _get(client, rows, season="Toutes les saisons")
 
-    load.assert_called_once_with("Toutes les saisons")
+    load.assert_called_once_with(None)
     assert response.json()["points"][0]["members"] == [{"name": "Ron WEASLEY", "group": "Compet"},
                                                        {"name": "Ron WEASLEY", "group": "Loisir"}]
 

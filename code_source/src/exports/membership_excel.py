@@ -1,12 +1,15 @@
+import csv
+import datetime
+import io
 import logging
 import os
-import pandas as pd
-import datetime
-import csv
 
+import pandas as pd
+
+from domain.club_emails import CLUB_CONTACT_EMAIL
 from domain.members.sex import parse_sex
 from domain.members.view import is_cancelled
-from infrastructure.mail.senders import CLUB_CONTACT_EMAIL
+from exports.spreadsheet_safety import csv_safe
 
 logger = logging.getLogger("alj")
 
@@ -57,24 +60,42 @@ def clean_digits_only(val):
 
 
 
+FFME_CSV_HEADERS = [
+    "numero de licence", "nom", "prenom", "date de naissance", "sexe", "nationalite",
+    "adresse", "adresse complement", "code postal", "ville", "pays", "tel fixe", "tel mobile",
+    "courriel", "courriel 2", "pap nom", "pap prenom", "pap telephone", "pap courriel",
+    "nom de naissance", "commune de naissance", "departement de naissance", "type licence",
+    "assurance", "option ski", "option slackline", "option trail", "option vtt",
+    "assurance complementaire", "option protection agression"
+]
+
+
+def ffme_csv_bytes(participants_data, include_termine: bool = False) -> bytes:
+    """The FFME import CSV (strict format: « ; » separator, dd/mm/yyyy dates), built in memory.
+    With include_termine, members whose status is 'Terminé' are included too."""
+    return _render_ffme_csv(_ffme_csv_rows(participants_data, include_termine)[0])
+
+
 def generate_ffme_csv(participants_data, output_path: str, include_termine: bool = False):
-    """
-    Génère le CSV d'import FFME à `output_path` (format strict : séparateur « ; », dates jj/mm/aaaa).
-    Si include_termine est True, inclut également les adhérents dont le statut est 'Terminé'.
-    """
-    print("\nGénération simultanée du fichier CSV FFME...")
-    csv_path = output_path
-    os.makedirs(os.path.dirname(os.path.abspath(csv_path)), exist_ok=True)
+    """Writes the FFME import CSV (see ffme_csv_bytes) to `output_path`; returns the members left out, with the reason."""
+    csv_rows, ignored_members = _ffme_csv_rows(participants_data, include_termine)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with open(output_path, "wb") as f:
+        f.write(_render_ffme_csv(csv_rows))
+    return ignored_members
 
-    headers = [
-        "numero de licence", "nom", "prenom", "date de naissance", "sexe", "nationalite",
-        "adresse", "adresse complement", "code postal", "ville", "pays", "tel fixe", "tel mobile", 
-        "courriel", "courriel 2", "pap nom", "pap prenom", "pap telephone", "pap courriel", 
-        "nom de naissance", "commune de naissance", "departement de naissance", "type licence", 
-        "assurance", "option ski", "option slackline", "option trail", "option vtt", 
-        "assurance complementaire", "option protection agression"
-    ]
 
+def _render_ffme_csv(csv_rows: list[list[str]]) -> bytes:
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer, delimiter=";")
+    writer.writerow(FFME_CSV_HEADERS)
+    # Member data must never be evaluated as a formula when the file is opened
+    writer.writerows([[csv_safe(v) for v in row] for row in csv_rows])
+    return buffer.getvalue().encode("utf-8")
+
+
+def _ffme_csv_rows(participants_data, include_termine: bool) -> tuple[list[list[str]], list[str]]:
+    """The CSV rows of the members to declare, and a line per member left out (missing birth date or sex)."""
     csv_rows = []
     ignored_members = []
 
@@ -240,15 +261,7 @@ def generate_ffme_csv(participants_data, output_path: str, include_termine: bool
         ]
         csv_rows.append(row)
         
-    from exports.spreadsheet_safety import csv_safe
-    with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f, delimiter=";")
-        writer.writerow(headers)
-        # Member data must never be evaluated as a formula when the file is opened
-        writer.writerows([[csv_safe(v) for v in row] for row in csv_rows])
-        
-    print(f"Fichier CSV FFME généré : {csv_path}")
-    return ignored_members
+    return csv_rows, ignored_members
 
 
 

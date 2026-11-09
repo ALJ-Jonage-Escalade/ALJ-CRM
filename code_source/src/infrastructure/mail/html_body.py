@@ -3,7 +3,7 @@ import os
 import re
 from urllib.parse import quote
 
-from infrastructure.mail.senders import CLUB_CONTACT_EMAIL
+from domain.club_emails import CLUB_CONTACT_EMAIL
 from paths import CODE_ROOT
 
 ASSETS_SOCIAL_DIR = os.path.join(CODE_ROOT, "src", "assets", "social")

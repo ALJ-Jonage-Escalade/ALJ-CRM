@@ -10,7 +10,7 @@ from infrastructure.firestore.competition_repository import CompetitionFirestore
 from infrastructure.helloasso.api import HelloAssoApiError
 from support.api_case import ApiTestCase
 
-FETCH = "infrastructure.helloasso.api.fetch_form_items"
+FETCH = "services.competitions.helloasso_items.fetch_form_items"
 
 
 class TestHelloAssoSync(ApiTestCase):

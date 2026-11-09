@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from infrastructure.firestore.access_store import RoleEntry
 from infrastructure.mail.repository import EmailRepository
-from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.security.role_directory import normalized_email, parsed
 from services.access.rules import AccessRules
 

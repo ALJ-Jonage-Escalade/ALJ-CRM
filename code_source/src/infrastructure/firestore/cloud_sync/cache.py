@@ -3,7 +3,8 @@ import json
 import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
 
-from infrastructure.firestore.cloud_sync.common import TRACKED_TABLES, CloudSyncError
+from infrastructure.firestore.client import FirestoreError
+from infrastructure.firestore.cloud_sync.common import TRACKED_TABLES
 
 def connect(path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(path, timeout=30.0, isolation_level=None)
@@ -101,7 +102,7 @@ def _read_row(conn, table: str, pk: List[str], values: List[Any]) -> Optional[Di
 def _upsert_row(conn, table: str, cols: List[str], pk: List[str], data: Dict[str, Any]):
     use = [c for c in cols if c in data]
     if not all(c in use for c in pk):
-        raise CloudSyncError(f"Document {table} sans clé primaire complète")
+        raise FirestoreError(f"Document {table} sans clé primaire complète")
     placeholders = ", ".join("?" for _ in use)
     col_sql = ", ".join(f'"{c}"' for c in use)
     upd = [c for c in use if c not in pk]

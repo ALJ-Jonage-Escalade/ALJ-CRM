@@ -14,13 +14,14 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from starlette.concurrency import run_in_threadpool
 
-from dotenv import load_dotenv
-load_dotenv()
-
-# Imported for its side effect before the check below: loads the .env files (ROOT_DIR/.env overrides)
-import infrastructure.security.secret_store  # noqa: F401
 from infrastructure import runtime_env
 
+runtime_env.load_env_files()  # before anything reads the environment
+
+from infrastructure.firestore.server_credentials import FirestoreCredentialsDocument
+from infrastructure.security import secret_store
+
+secret_store.use_credentials_document(FirestoreCredentialsDocument())  # Google OAuth values kept in Firestore on Cloud Run
 # Inconsistent dev mode (Firebase emulator) or dev mode on Cloud Run: stop immediately.
 runtime_env.validate()
 
@@ -69,7 +70,7 @@ async def cloud_db_middleware(request, call_next):
     Enregistré avant le contrôle d'accès : il ne s'exécute qu'après lui."""
     relevant = uses_sqlite_cache(request.url.path)
     # Cloud Run, or local dev on the emulator: the cache follows Firestore as in production
-    server_mode = os.environ.get("K_SERVICE") or runtime_env.is_dev()
+    server_mode = runtime_env.is_cloud_run() or runtime_env.is_dev()
     if relevant and server_mode and CloudDatabase.is_enabled():
         await run_in_threadpool(CloudDatabase.ensure_fresh, 30)
     response = await call_next(request)

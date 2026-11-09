@@ -7,7 +7,6 @@ from unittest.mock import patch
 
 import pytest
 
-from api.integrations import helloasso_campaigns
 from infrastructure.firestore.app_settings import HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.client import FirestoreError
 from services.members import helloasso_import
@@ -20,7 +19,7 @@ class TestTargetSlug(FirestoreRepoTestCase):
     def target_slug(self, env_value: str = "") -> str:
         with patch.object(helloasso_import.SecretStore, "get_secret", return_value=env_value), \
                 patch.object(MembershipImportService, "active_season", return_value="2026-2027"):
-            return helloasso_campaigns.get_target_slug()
+            return MembershipImportService.campaign_slug()
 
     def test_setting_wins_over_env_variable(self) -> None:
         AppSettingsRepository.save(HELLOASSO_MEMBERSHIP_CAMPAIGN, "Membership:adhesion-2026")
@@ -49,6 +48,6 @@ class TestTargetSlug(FirestoreRepoTestCase):
     ("https://www.helloasso.com/associations/club/adhesions/adhesion-2026/", "adhesion-2026"),
     ("https://www.helloasso.com/associations/club/inconnu/adhesion-2026", "adhesion-2026"),
 ])
-def test_get_target_slug_value_formats(value: str, slug: str) -> None:
+def test_campaign_slug_value_formats(value: str, slug: str) -> None:
     with patch.object(MembershipImportService, "campaign_reference", return_value=value):
-        assert helloasso_campaigns.get_target_slug() == slug
+        assert MembershipImportService.campaign_slug() == slug

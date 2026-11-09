@@ -134,7 +134,7 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         self.assertIn("DUPONT", names)
 
     def test_attestation_reads_the_member_from_the_database(self):
-        with patch("domain.attestation.document.render_attestation_pdf", return_value=b"%PDF-fake") as render:
+        with patch("api.communications.attestations.render_attestation_pdf", return_value=b"%PDF-fake") as render:
             r = self.client.post("/api/attestations/preview", json={"purchase_id": self.leo["purchase_id"]})
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(r.content, b"%PDF-fake")

@@ -68,7 +68,7 @@ class TestWorkbooks(unittest.TestCase):
         self.assertEqual(ws["B2"].value, "+33 6 12 34 56 78")
 
     def test_presence_template_formulas_survive(self):
-        path = os.path.join(_code_root, "doc", "template", "Template Export liste adhérents à imprimer.xlsx")
+        path = os.path.join(_code_root, "src", "assets", "templates", "Template Export liste adhérents à imprimer.xlsx")
         if not os.path.exists(path):
             self.skipTest("presence template not available")
         wb = openpyxl.load_workbook(path)

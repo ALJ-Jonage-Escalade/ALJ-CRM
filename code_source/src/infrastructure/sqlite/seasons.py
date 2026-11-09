@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from domain.constants import DEFAULT_EXTRA_TARIFS
 from infrastructure.sqlite.connection import SqliteDatabase
 
 
@@ -34,12 +35,10 @@ class SeasonRepository:
                 ORDER BY p.tarif_name ASC
             """, (season_name,))
             db_tarifs = [r["tarif_name"].strip() for r in cursor.fetchall()]
-            from domain.constants import DEFAULT_EXTRA_TARIFS
             combined = set(db_tarifs) | set(DEFAULT_EXTRA_TARIFS)
             return sorted(combined)
         except Exception as e:
             print(f"❌ [SQLITE] Erreur lors du chargement des tarifs de la saison {season_name} : {e}")
-            from domain.constants import DEFAULT_EXTRA_TARIFS
             return list(DEFAULT_EXTRA_TARIFS)
         finally:
             conn.close()

@@ -5,6 +5,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Set
 
+from domain.competitions import matching as competition_matching
 from domain.competitions.models import (
     PAIEMENT_EN_ATTENTE,
     PAIEMENT_NON_INVITE,
@@ -35,8 +36,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
 
     @staticmethod
     def _is_paid_item(item: Dict[str, Any]) -> bool:
-        from domain.competitions.matching import STATUTS_PAYES
-        return str(item.get("etat") or "").lower() in {str(s).lower() for s in STATUTS_PAYES}
+        return str(item.get("etat") or "").lower() in {str(s).lower() for s in competition_matching.STATUTS_PAYES}
 
     @classmethod
     def _items_map(cls) -> Dict[int, Dict[str, Any]]:
@@ -292,7 +292,6 @@ class HelloAssoItemsMixin(ParticipantsMixin):
             if raw_json_str:
                 try:
                     raw_data = json.loads(raw_json_str)
-                    from domain.competitions import matching as competition_matching
                     comp_name_val = competition_matching.extract_competition_name(raw_data)
                     comp_num_val = competition_matching.extract_competition_number(raw_data, fallback=False)
                 except Exception:

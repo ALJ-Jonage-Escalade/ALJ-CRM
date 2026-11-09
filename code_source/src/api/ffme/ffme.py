@@ -5,239 +5,87 @@ from __future__ import annotations
 
 import base64
 import binascii
-import os
-import tempfile
-from typing import Any, Dict, List, Optional, Tuple, Union
+import datetime
+from typing import List, Optional
 
 from fastapi import APIRouter, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from api.ffme.schemas import FfmeFile, FfmeImportRequest, FfmeImportResult, FfmeLicensee, FfmeMatchStats, FfmeMember, FfmePreview, FfmeStats
-from api.responses import error, error_responses
-from domain.members.sex import parse_sex
-from domain.members.view import is_cancelled
+from api.responses import error_responses, file_download
+from domain.errors import InvalidRequest
+from infrastructure.sqlite.ffme_import import FfmeMatch
+from services.members import ffme
 
 router = APIRouter()
 
-INVALID_SEASON = "Saison invalide (format attendu : AAAA-AAAA)."
-# A match written by apply_ffme_matches: (status, licence, passports, diplomas, health document, user id)
-Match = Tuple[str, str, str, str, str, int]
-
-
-def _season(season: Optional[str]) -> Optional[str]:
-    """The season asked for, the active one when empty; None when it is not a season name."""
-    from domain.constants import get_active_season, is_valid_season
-    target = (season or "").strip() or get_active_season()
-    return target if is_valid_season(target) else None
-
-
-def _prepare(content_base64: str) -> Dict[str, Any]:  # Any: FfmeImportRepository.prepare_ffme_licensees' result
-    """Matches the uploaded Excel file against the members (nothing written). Raises binascii.Error for bad base64."""
-    from infrastructure.sqlite.ffme_import import FfmeImportRepository
-    file_bytes = base64.b64decode(content_base64, validate=True)
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-        tmp.write(file_bytes)
-        tmp_path = tmp.name
-    try:
-        return FfmeImportRepository.prepare_ffme_licensees(tmp_path)
-    finally:
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
-
-
-def _match_stats(stats: Dict[str, Any]) -> FfmeMatchStats:  # Any: counters and the list of errors
-    return FfmeMatchStats(**{k: v for k, v in stats.items() if k in FfmeMatchStats.model_fields})
-
-
-@router.get("/api/ffme/stats", response_model=FfmeStats, responses=error_responses(400, 500))
-def get_ffme_stats_api(season: Optional[str] = None) -> Union[FfmeStats, JSONResponse]:
-    """Calcule et renvoie les statistiques de l'export fédéral FFME."""
-    target_season = _season(season)
-    if not target_season:
-        return error(400, INVALID_SEASON)
-    import datetime
-    from infrastructure.sqlite.members import MemberRepository
-    from exports.membership_excel import parse_date_to_datetime, clean_digits_only
-
-    participants = MemberRepository.load_direct_data(season_filter=target_season)
-
-    produced_count = 0
-    ignored_count = 0
-    termine_count = 0
-    renewals_count = 0
-    new_licences_count = 0
-    ignored_details = []
-
-    now = datetime.datetime.now()
-
-    for p in participants:
-        tarif_name = str(p.get("tarif_name") or "").lower()
-        amount = p.get("amount", 0.0)
-        status = str(p.get("status") or "").lower()
-        commentaires = str(p.get("commentaires_correctif") or "").lower()
-        is_manual = "ajout manuel" in commentaires
-
-        # 1. Ignoré (liste d'attente, montant nul non manuel, annulé)
-        if "attente" in tarif_name or (amount == 0.0 and not is_manual) or is_cancelled(status):
-            ignored_count += 1
-            continue
-
-        # 2. Date de naissance manquante ou invalide
-        dob_val = p.get("birth_date") or p.get("champ_Date de naissance de l'adhérent") or ""
-        dob_date = None
-        if isinstance(dob_val, (datetime.datetime, datetime.date)):
-            dob_date = dob_val
-        else:
-            parsed_dt = parse_date_to_datetime(str(dob_val).strip())
-            if isinstance(parsed_dt, (datetime.datetime, datetime.date)):
-                dob_date = parsed_dt
-
-        nom = str(p.get("last_name") or "Inconnu").strip().upper()
-        prenom = str(p.get("first_name") or "Inconnu").strip()
-        if not dob_date or dob_date >= now:
-            ignored_count += 1
-            ignored_details.append(f"{nom} {prenom} (date de naissance manquante/invalide)")
-            continue
-
-        # 3. Sexe : obligatoire pour une première licence (même règle que generate_ffme_csv)
-        lic = clean_digits_only(p.get("licence_ffme") or "")
-        is_renewal = 5 <= len(lic) <= 10
-        if not is_renewal and parse_sex(p.get("sex")) is None:
-            ignored_count += 1
-            ignored_details.append(f"{nom} {prenom} (sexe non renseigné)")
-            continue
-
-        # 4. Terminé ou à produire
-        if "termin" in status:
-            termine_count += 1
-        else:
-            produced_count += 1
-
-        if is_renewal:
-            renewals_count += 1
-        else:
-            new_licences_count += 1
-
-    return FfmeStats(
-        status="success",
-        season=target_season,
-        produced_count=produced_count,
-        termine_count=termine_count,
-        ignored_count=ignored_count,
-        estimated_total=produced_count + termine_count,
-        renewals_count=renewals_count,
-        new_licences_count=new_licences_count,
-        ignored_details=ignored_details[:20],
-    )
-
-
-@router.get("/api/ffme/export", response_class=Response,
-            responses={200: {"content": {"text/csv": {}}, "description": "Fichier CSV FFME"}, **error_responses(400, 500)})
-def export_ffme_api(season: Optional[str] = None, include_termine: bool = Query(True)) -> Response:
-    """Génère le fichier CSV d'import FFME et le renvoie directement en téléchargement."""
-    import datetime
-    from infrastructure.sqlite.members import MemberRepository
-    from exports.membership_excel import generate_ffme_csv
-
-    target_season = _season(season)
-    if not target_season:
-        return error(400, INVALID_SEASON)
-    raw_data = MemberRepository.load_direct_data(season_filter=target_season)
-
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"import_ffme_{timestamp}.csv"
-    
-    tmp_dir = tempfile.mkdtemp(prefix="alj_ffme_export_")
-    tmp_csv = os.path.join(tmp_dir, filename)
-
-    try:
-        generate_ffme_csv(raw_data, output_path=tmp_csv, include_termine=include_termine)
-        with open(tmp_csv, "rb") as f:
-            content_bytes = f.read()
-
-        return Response(
-            content=content_bytes,
-            media_type="text/csv; charset=utf-8",
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Access-Control-Expose-Headers": "Content-Disposition"
-            }
-        )
-    finally:
-        import shutil
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-
-
-# --------------------------------------------------------------------------
-# Importation & Rapprochement Fédéral FFME (Excel)
-# --------------------------------------------------------------------------
 UNREADABLE_FILE = "Fichier illisible : il doit s'agir d'un fichier Excel encodé en base64."
 
 
-@router.post("/api/ffme/preview", response_model=FfmePreview, responses=error_responses(400, 500))
-def preview_ffme_import_api(data: FfmeFile) -> Union[FfmePreview, JSONResponse]:
+def _decoded(content_base64: str) -> bytes:
+    try:
+        return base64.b64decode(content_base64, validate=True)
+    except binascii.Error as e:
+        raise InvalidRequest(UNREADABLE_FILE) from e
+
+
+def _match_stats(stats: ffme.MatchStats, matched_manually: int = 0) -> FfmeMatchStats:
+    return FfmeMatchStats(**stats, matched_manually=matched_manually)
+
+
+@router.get("/api/ffme/stats", response_model=FfmeStats, responses=error_responses(400))
+def get_ffme_stats_api(season: Optional[str] = None) -> FfmeStats:
+    """Members of the season that the federal CSV export would declare, and those it leaves out."""
+    target_season = ffme.resolve_season(season)
+    return FfmeStats(status="success", season=target_season, **ffme.export_stats(target_season))
+
+
+@router.get("/api/ffme/export", response_class=Response,
+            responses={200: {"content": {"text/csv": {}}, "description": "Fichier CSV FFME"}, **error_responses(400)})
+def export_ffme_api(season: Optional[str] = None, include_termine: bool = Query(True)) -> Response:
+    """Génère le fichier CSV d'import FFME et le renvoie directement en téléchargement."""
+    content = ffme.export_csv(ffme.resolve_season(season), include_termine)
+    filename = f"import_ffme_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return file_download(content, filename, "text/csv; charset=utf-8")
+
+
+@router.post("/api/ffme/preview", response_model=FfmePreview, responses=error_responses(400))
+def preview_ffme_import_api(data: FfmeFile) -> FfmePreview:
     """Analyse un fichier Excel FFME et prépare le rapprochement sans modifier la base."""
     if not data.content_base64:
-        return error(400, "Fichier Excel manquant (content_base64 obligatoire).")
-    try:
-        prep = _prepare(data.content_base64)
-    except binascii.Error:
-        return error(400, UNREADABLE_FILE)
-    stats = prep.get("stats", {})
-    if stats.get("errors") and not prep.get("updates"):
-        return error(400, stats["errors"][0])
-    unmatched = [FfmeLicensee(**{k: str(row.get(k) or "") for k in FfmeLicensee.model_fields}) for row in prep.get("unmatched", [])]
-    users = [FfmeMember(id=int(u["id"]), last_name=str(u.get("last_name") or ""), first_name=str(u.get("first_name") or ""),
-                        birth_date=str(u.get("birth_date") or "")) for u in prep.get("users", [])]
+        raise InvalidRequest("Fichier Excel manquant (content_base64 obligatoire).")
+    preparation = ffme.prepare_licensees(_decoded(data.content_base64))
+    stats = preparation["stats"]
+    if stats["errors"] and not preparation["updates"]:
+        raise InvalidRequest(stats["errors"][0])
+    unmatched = [FfmeLicensee(**{k: str(row.get(k) or "") for k in FfmeLicensee.model_fields}) for row in preparation["unmatched"]]
+    users = [FfmeMember(id=int(u["id"]), last_name=str(u["last_name"] or ""), first_name=str(u["first_name"] or ""),
+                        birth_date=str(u["birth_date"] or "")) for u in preparation["users"]]
     return FfmePreview(
         status="success",
         filename=data.filename,
         stats=_match_stats(stats),
-        matched_count=len(prep.get("updates", [])),
+        matched_count=len(preparation["updates"]),
         unmatched_count=len(unmatched),
         unmatched=unmatched,
         users=users,
     )
 
 
-@router.post("/api/ffme/import", response_model=FfmeImportResult, responses=error_responses(400, 500))
-def apply_ffme_import_api(data: FfmeImportRequest) -> Union[FfmeImportResult, JSONResponse]:
+@router.post("/api/ffme/import", response_model=FfmeImportResult, responses=error_responses(400))
+def apply_ffme_import_api(data: FfmeImportRequest) -> FfmeImportResult:
     """Applique l'importation FFME en BDD : rapprochements automatiques du fichier (recalculés ici, comme
     dans l'aperçu) et associations manuelles choisies par le bureau."""
-    from infrastructure.sqlite.ffme_import import FfmeImportRepository
-
-    season = _season(data.season)
-    if not season:
-        return error(400, INVALID_SEASON)
-    updates: List[Match] = []
-    stats: Dict[str, Any] = {}  # Any: counters and the list of errors
-    if data.content_base64:
-        try:
-            prep = _prepare(data.content_base64)
-        except binascii.Error:
-            return error(400, UNREADABLE_FILE)
-        updates = list(prep.get("updates", []))
-        stats = dict(prep.get("stats", {}))
-
-    for m in data.manual_matches:
-        updates.append(("Terminé", m.licence, m.passeports, m.diplomes, m.document_sante, m.user_id))
-    stats["matched_manually"] = len(data.manual_matches)
-
-    if not updates:
-        message = (stats.get("errors") or ["Aucune mise à jour à appliquer (aucun rapprochement trouvé)."])[0]
-        return error(400, message)
-    FfmeImportRepository.apply_ffme_matches(updates, season_name=season)
-    from infrastructure.firestore.cloud_database import CloudDatabase
-    if CloudDatabase.is_enabled():
-        CloudDatabase.after_write()
-
+    season = ffme.resolve_season(data.season)
+    excel_content = _decoded(data.content_base64) if data.content_base64 else None
+    manual_matches: List[FfmeMatch] = [
+        (ffme.STATUS_DONE, m.licence, m.passeports, m.diplomes, m.document_sante, m.user_id) for m in data.manual_matches]
+    updated_count, stats = ffme.apply_import(season, excel_content, manual_matches)
     return FfmeImportResult(
         status="success",
-        message=f"Importation FFME validée : {len(updates)} adhérents mis à jour.",
-        updated_count=len(updates),
-        matched_manually=len(data.manual_matches),
+        message=f"Importation FFME validée : {updated_count} adhérents mis à jour.",
+        updated_count=updated_count,
+        matched_manually=len(manual_matches),
         season=season,
-        stats=_match_stats(stats),
+        stats=_match_stats(stats, len(manual_matches)),
     )

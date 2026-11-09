@@ -40,9 +40,9 @@ class TestFFMEGoldenMaster(unittest.TestCase):
         from infrastructure.sqlite.connection import SqliteDatabase
         from infrastructure.sqlite.members import MemberRepository
         from exports.membership_excel import generate_ffme_csv
-        from paths import DATA_ROOT
+        from paths import data_root
 
-        db_live = os.path.join(DATA_ROOT, "database.db")
+        db_live = os.path.join(data_root(), "database.db")
         self.assertTrue(os.path.exists(db_live), "database.db introuvable dans data/ (cache local)")
 
         tmpdir = tempfile.mkdtemp(prefix="alj_golden_test_")
@@ -60,7 +60,7 @@ class TestFFMEGoldenMaster(unittest.TestCase):
             ancien_path = SqliteDatabase.get_db_path()
             SqliteDatabase.set_db_path(tmp_db)
             try:
-                raw_data = MemberRepository.load_direct_data(season_filter="2026-2027")
+                raw_data = MemberRepository.load_direct_data("2026-2027")
             finally:
                 SqliteDatabase.set_db_path(ancien_path)
             self.assertTrue(raw_data, "Aucune donnée chargée depuis la copie de la base")
