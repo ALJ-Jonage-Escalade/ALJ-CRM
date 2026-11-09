@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI
-from starlette.concurrency import run_in_threadpool
+from fastapi.concurrency import run_in_threadpool
 
 from infrastructure import runtime_env
 
@@ -46,10 +46,10 @@ from infrastructure.firestore.cloud_database import CloudDatabase
 
 
 # Paths of the routes that only read/write Firestore collections (competitions, coaches,
-# projections, HelloAsso mirror) through CompetitionFirestoreRepository: they never touch the
+# projections, HelloAsso mirror) through CompetitionRepository: they never touch the
 # SQLite cache, so they must not wait for its refresh (a full rebuild after a cold start).
-# Filled from their routers once included (below). Exact routes, not path prefixes: other routes
-# under /api/competitions (check-all-paid) use the cache.
+# Filled from their routers once included (below). Exact routes, not path prefixes: a cache-backed
+# route added later under /api/competitions must still refresh the cache.
 FIRESTORE_ONLY_PATHS: List[re.Pattern[str]] = []
 
 # Set on a write's answer when it was saved in the SQLite cache but could not be sent to Firestore yet
@@ -108,7 +108,7 @@ app.middleware("http")(security_headers_middleware)  # outermost
 # Data routes of the web front end (competitions, coaches, HelloAsso links, members): src/api/
 from api.competitions import coaches, competitions, helloasso_items, participants
 from api.competitions import members as competition_members
-from api.competitions import payments, results
+from api.competitions import results
 from api.activities import planning, presence
 from api.admin import access
 from api.auth import me
@@ -121,15 +121,15 @@ from api.web import health, pages, pwa
 from api.responses import service_error_handler
 from domain.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
-             results, payments, members, seasons, helloasso_import, email, whatsapp, attestations,
+             results, members, seasons, helloasso_import, email, whatsapp, attestations,
              planning, presence, members_map, pivot, ffme,
              helloasso, helloasso_campaigns, google_auth, cloud_db, me, access,
              pages, pwa, health):
     app.include_router(_api.router)
 pages.mount_static(app)
 # Every route of these routers skips the SQLite cache refresh: a route that reads or writes the
-# cache (members, email templates, HelloAsso payments…) must live in another router, even under
-# /api/competitions (check-all-paid). /api/me and /api/admin/access only use the access list,
+# cache (members, email templates…) must live in another router, even under /api/competitions.
+# /api/me and /api/admin/access only use the access list,
 # /api/helloasso/campaigns the app_settings collection and HelloAsso. The MyCompet results batch
 # (results) reads its settings from Firestore: Cloud Scheduler's 07:00 call must not wait for a
 # full cache rebuild on a cold start (180 s deadline).

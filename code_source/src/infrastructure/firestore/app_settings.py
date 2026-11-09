@@ -41,7 +41,10 @@ class AppSettingsRepository:
 
     @classmethod
     def get(cls, key: str, default: Optional[str] = "") -> Optional[str]:
-        """Value of the setting, or `default` when it is missing or blank."""
+        """Value of the setting, or `default` when it is missing or blank.
+
+        Writes too: a setting found only in the former collection (LEGACY_COLLECTION) is copied to COLLECTION
+        on its first read."""
         doc = FirestoreClient.get_document(COLLECTION, str(key))
         if doc is not None:
             value = doc.get("value")

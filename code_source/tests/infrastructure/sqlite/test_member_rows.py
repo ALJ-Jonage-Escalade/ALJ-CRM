@@ -31,7 +31,7 @@ class TestMemberRows(MemberDbTestCase):
     def test_same_people_as_the_legacy_view(self):
         self.seed("1", "Léo", "MARTIN", "Loisir")
         self.seed("2", "Zoé", "DURAND", "Adultes")
-        legacy = MemberRepository.load_direct_data("2026-2027")
+        legacy = MemberRepository.list_flat_member_rows("2026-2027")
         rows = MemberRepository.list_member_rows("2026-2027")
         key = ("user_id", "last_name", "first_name", "tarif_name", "status", "order_ref", "season_name")
         self.assertEqual(sorted(tuple(r[k] for k in key) for r in rows),

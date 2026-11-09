@@ -13,6 +13,7 @@ from fastapi.responses import Response
 
 from api.ffme.schemas import FfmeFile, FfmeImportRequest, FfmeImportResult, FfmeLicensee, FfmeMatchStats, FfmeMember, FfmePreview, FfmeStats
 from api.responses import error_responses, file_download
+from domain.constants import resolve_season
 from domain.errors import InvalidRequest
 from infrastructure.sqlite.ffme_import import FfmeMatch
 from services.members import ffme
@@ -36,7 +37,7 @@ def _match_stats(stats: ffme.MatchStats, matched_manually: int = 0) -> FfmeMatch
 @router.get("/api/ffme/stats", response_model=FfmeStats, responses=error_responses(400))
 def get_ffme_stats_api(season: Optional[str] = None) -> FfmeStats:
     """Members of the season that the federal CSV export would declare, and those it leaves out."""
-    target_season = ffme.resolve_season(season)
+    target_season = resolve_season(season)
     return FfmeStats(status="success", season=target_season, **ffme.export_stats(target_season))
 
 
@@ -44,7 +45,7 @@ def get_ffme_stats_api(season: Optional[str] = None) -> FfmeStats:
             responses={200: {"content": {"text/csv": {}}, "description": "Fichier CSV FFME"}, **error_responses(400)})
 def export_ffme_api(season: Optional[str] = None, include_termine: bool = Query(True)) -> Response:
     """Génère le fichier CSV d'import FFME et le renvoie directement en téléchargement."""
-    content = ffme.export_csv(ffme.resolve_season(season), include_termine)
+    content = ffme.export_csv(resolve_season(season), include_termine)
     filename = f"import_ffme_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     return file_download(content, filename, "text/csv; charset=utf-8")
 
@@ -76,7 +77,7 @@ def preview_ffme_import_api(data: FfmeFile) -> FfmePreview:
 def apply_ffme_import_api(data: FfmeImportRequest) -> FfmeImportResult:
     """Applique l'importation FFME en BDD : rapprochements automatiques du fichier (recalculés ici, comme
     dans l'aperçu) et associations manuelles choisies par le bureau."""
-    season = ffme.resolve_season(data.season)
+    season = resolve_season(data.season)
     excel_content = _decoded(data.content_base64) if data.content_base64 else None
     manual_matches: List[FfmeMatch] = [
         (ffme.STATUS_DONE, m.licence, m.passeports, m.diplomes, m.document_sante, m.user_id) for m in data.manual_matches]

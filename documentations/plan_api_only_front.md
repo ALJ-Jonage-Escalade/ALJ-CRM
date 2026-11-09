@@ -53,13 +53,13 @@ The plan file is updated with any decisions taken during a review. Nothing is co
 
 1. **Routers, not `server.py`.** New routes go in `src/api/competitions.py` and `src/api/members.py` (FastAPI `APIRouter`), included from `src/server.py`, which is already about 1,900 lines. Auth stays in the path-based middleware (`api_auth.required_role`), so routers need no `Depends`.
 2. **Pydantic request models** for new routes (`src/api/schemas.py`). Existing routes keep `Dict = Body(...)`; converting them is out of scope.
-3. **Thin routes over existing repositories.** Competition logic stays in `CompetitionFirestoreRepository` (`src/infrastructure/competition_firestore_repository.py`). It already has optimistic locking (`_mutate_participants`, `updateTime` precondition, 5 retries) and is shared with the desktop app and webhook, so all three clients get the same semantics. Member data comes from SQLite through `SqliteRepository` + `CloudDatabase.ensure_fresh`.
+3. **Thin routes over existing repositories.** Competition logic stays in `CompetitionRepository` (`src/infrastructure/competition_firestore_repository.py`). It already has optimistic locking (`_mutate_participants`, `updateTime` precondition, 5 retries) and is shared with the desktop app and webhook, so all three clients get the same semantics. Member data comes from SQLite through `SqliteRepository` + `CloudDatabase.ensure_fresh`.
 4. **One JS polling helper.** New classic script `web/shared/alj-sync.js`, following the `alj-firebase.js` pattern and exposing `window.ALJSync`. It handles interval, visibility pause, focus refetch, ETag, offline detection and the snapshot store, and is usable from both the classic PWA pages and the bureau modules.
 5. **Write responses return the updated resource** (e.g. the full competition), so the UI updates without waiting for the next poll.
 
 ## API to create
 
-Roles: R = readonly+, C = coach+, A = admin. "Repo" means `CompetitionFirestoreRepository` unless stated. All list GETs support `ETag`/`If-None-Match`.
+Roles: R = readonly+, C = coach+, A = admin. "Repo" means `CompetitionRepository` unless stated. All list GETs support `ETag`/`If-None-Match`.
 
 ### Phase 1 — Competitions, coaches, HelloAsso links (Firestore-backed)
 
@@ -659,7 +659,7 @@ Kept for reference; the decision is « Phase 5b — as built ».
 | A27 | `server.py` `POST /api/competitions/{id}/fetch-results` (main, 3ea9078 series) | Reads the competition, adds the MyCompet results to its participants, then rewrites the whole `participants` array with no precondition. A participant change made in between (coach, webhook payment) is lost. It also bypasses the service layer. | **Still present.** Fix: move it to `ParticipantService` and write per participant through `_update_participant` (optimistic lock). |
 | A28 | `api_auth.LOCAL_HOSTS` (main) | `"testserver"` (the FastAPI TestClient's host) was added to the hosts accepted by the local server without authentication. Production code is relaxed to suit tests: a local server then also accepts requests sent with `Host: testserver`. Tests should set `base_url="http://127.0.0.1"` instead. | **Still present.** Low risk (local server only), review with the author. |
 | A29 | `api_auth.PUBLIC_PATHS` (main, 635109d) | `POST /api/competitions/cron/fetch-results` is public: anyone can start the MyCompet scraping batch, and the `email` query parameter sends the summary e-mail to any address. **Security, prioritize.** | **Fixed in code** (branch `fix/job_comp_update`): admin or Cloud Scheduler OIDC token (`api_auth.SCHEDULER_PATHS`), `force` / `email` admin only. Effective once the job sends its token and the app is deployed (`guide_deploiement_cloud_run_helloasso.md`, « Tâche planifiée Cloud Scheduler »). |
-| A30 | `CompetitionFirestoreRepository._new_id` | Ids of new competitions and coaches are `int(time.time() * 1000)`. Two creations in the same millisecond (two coaches on a busy API, a script, tests) get the same id, and the second **silently overwrites** the first (`upsert_document`). Found while writing the C2 tests. | **Still present.** Fix: create with a precondition (`exists=false`) and retry with the next id, or use a Firestore-generated id. |
+| A30 | `CompetitionRepository._new_id` | Ids of new competitions and coaches are `int(time.time() * 1000)`. Two creations in the same millisecond (two coaches on a busy API, a script, tests) get the same id, and the second **silently overwrites** the first (`upsert_document`). Found while writing the C2 tests. | **Still present.** Fix: create with a precondition (`exists=false`) and retry with the next id, or use a Firestore-generated id. |
 
 ## Appendix B — Fields to migrate later (D4)
 

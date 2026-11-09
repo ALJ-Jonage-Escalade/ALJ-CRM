@@ -61,7 +61,7 @@ ALJ_FIRESTORE_ACCESS_TOKEN=$(gcloud auth print-access-token) \
 ```
 
 `--verify` reconstruit un cache depuis Firestore et le compare à la source, table par
-table puis via `load_direct_data` pour chaque saison.
+table puis via `list_flat_member_rows` pour chaque saison.
 
 Migration du 08/10/2026 : 1 991 documents, vérification identique pour 2025-2026
 (264 adhésions) et 2026-2027 (287).

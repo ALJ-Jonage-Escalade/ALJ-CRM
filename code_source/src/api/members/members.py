@@ -16,7 +16,7 @@ from services.members.members import MemberService as Service
 router = APIRouter(prefix="/api/members")
 
 
-@router.get("", response_model=MemberList, responses=error_responses(404))
+@router.get("", response_model=MemberList, responses=error_responses(400, 404))
 def list_members(request: Request, season: Optional[str] = None) -> Response:
     return json_with_etag(request, Service.list_members(season))
 

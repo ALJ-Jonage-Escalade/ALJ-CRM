@@ -11,10 +11,14 @@ Dates are ISO 8601 strings in UTC (`2026-10-30T09:15:00+00:00`): they sort as te
 
 from __future__ import annotations
 
+import logging
 import uuid
-from typing import Any, Dict, List, Optional, Protocol, TypedDict
+from typing import Any, Dict, List, Literal, Optional, Protocol, TypedDict, TypeGuard, get_args
 
 from infrastructure.firestore.client import META_KEYS, FirestoreClient
+from infrastructure.security.roles import RoleName, is_role_name
+
+logger = logging.getLogger("alj")
 
 ROLES_COLLECTION = "access_roles"
 HISTORY_COLLECTION = "access_history"
@@ -22,7 +26,7 @@ HISTORY_COLLECTION = "access_history"
 
 class RoleEntry(TypedDict):
     email: str
-    role: str  # admin | coach | readonly
+    role: RoleName
     display_name: str
     last_sign_in_at: Optional[str]
     created_at: Optional[str]
@@ -35,10 +39,18 @@ class RoleEntry(TypedDict):
     accepted_at: Optional[str]
 
 
+# "added": an entry created before invitations existed
+HistoryAction = Literal["invited", "invitation_resent", "added", "role_changed", "name_changed", "removed", "bootstrap"]
+
+
+def is_history_action(value: object) -> TypeGuard[HistoryAction]:
+    return value in get_args(HistoryAction)
+
+
 class HistoryEntry(TypedDict):
     at: str
     author: str  # e-mail of the admin, or "bootstrap"
-    action: str  # invited | invitation_resent | added (before invitations) | role_changed | name_changed | removed | bootstrap
+    action: HistoryAction
     target_email: str
     old_role: Optional[str]
     new_role: Optional[str]
@@ -61,10 +73,16 @@ class AccessStore(Protocol):
         ...
 
 
-def _role_entry(doc: Dict[str, Any]) -> RoleEntry:  # Any: a Firestore document
+def _role_entry(doc: Dict[str, Any]) -> Optional[RoleEntry]:  # Any: a Firestore document
+    """The entry of a stored document; None for a role this version does not know (edited by hand in the console),
+    which gives no access either way."""
+    role = doc.get("role")
+    if not is_role_name(role):
+        logger.warning("Access list: entry %s has an unknown role, left out", doc.get("_doc_id") or doc.get("email"))
+        return None
     return RoleEntry(
         email=str(doc.get("email") or doc.get("_doc_id") or ""),
-        role=str(doc.get("role") or ""),
+        role=role,
         display_name=str(doc.get("display_name") or ""),
         last_sign_in_at=doc.get("last_sign_in_at"),
         created_at=doc.get("created_at"),
@@ -78,11 +96,15 @@ def _role_entry(doc: Dict[str, Any]) -> RoleEntry:  # Any: a Firestore document
     )
 
 
-def _history_entry(doc: Dict[str, Any]) -> HistoryEntry:  # Any: a Firestore document
+def _history_entry(doc: Dict[str, Any]) -> Optional[HistoryEntry]:  # Any: a Firestore document
+    action = doc.get("action")
+    if not is_history_action(action):
+        logger.warning("Access history: entry %s has an unknown action, left out", doc.get("_doc_id"))
+        return None
     return HistoryEntry(
         at=str(doc.get("at") or ""),
         author=str(doc.get("author") or ""),
-        action=str(doc.get("action") or ""),
+        action=action,
         target_email=str(doc.get("target_email") or ""),
         old_role=doc.get("old_role"),
         new_role=doc.get("new_role"),
@@ -97,7 +119,8 @@ class FirestoreAccessStore:
     """AccessStore on the project's Firestore database (through FirestoreClient)."""
 
     def list_roles(self) -> List[RoleEntry]:
-        return [_role_entry(doc) for doc in FirestoreClient.list_documents(ROLES_COLLECTION)]
+        entries = (_role_entry(doc) for doc in FirestoreClient.list_documents(ROLES_COLLECTION))
+        return [entry for entry in entries if entry is not None]
 
     def get_role(self, email: str) -> Optional[RoleEntry]:
         doc = FirestoreClient.get_document(ROLES_COLLECTION, email)
@@ -120,4 +143,5 @@ class FirestoreAccessStore:
         FirestoreClient.upsert_document(HISTORY_COLLECTION, f"{entry['at']}-{uuid.uuid4().hex[:8]}", _fields(entry))
 
     def list_history(self, limit: int) -> List[HistoryEntry]:
-        return [_history_entry(doc) for doc in FirestoreClient.list_latest(HISTORY_COLLECTION, "at", limit)]
+        entries = (_history_entry(doc) for doc in FirestoreClient.list_latest(HISTORY_COLLECTION, "at", limit))
+        return [entry for entry in entries if entry is not None]

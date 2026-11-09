@@ -9,10 +9,10 @@ from domain.competitions.models import (
     PAIEMENT_ANNULE_PERDU,
     PAIEMENT_PAYE,
     PAIEMENT_STATUTS_ANNULES,
-    statut_paiement_apres_bascule,
+    payment_status_after_toggle,
 )
 from infrastructure.firestore.client import FirestoreClient
-from infrastructure.firestore.competitions.adherents import AdherentsMixin
+from infrastructure.firestore.competitions.adherents import MemberDirectoryMixin
 
 # Collé pour l'ancien appelant (web) : état de paiement par défaut d'un nouveau
 # participant ajouté explicitement (même sémantique que l'ancienne base SQLite).
@@ -29,7 +29,7 @@ class ParticipantAlreadyPaid(Exception):
 
 class ParticipantChanged(Exception):
     """The participant row changed since the client read it (its `updated_at` differs): a
-    change queued offline is refused rather than overwrite a newer one (plan phase 5b)."""
+    change queued offline is refused rather than overwrite a newer one."""
 
 
 # Row guard of _update_participant: False leaves the row as it is, an exception refuses the write
@@ -43,16 +43,16 @@ def unchanged_since_guard(field: str, value: bool, seen_updated_at: Optional[str
     if seen_updated_at is None:
         return None
 
-    def guard(p: Dict[str, Any]) -> bool:
-        if bool(p.get(field)) == bool(value):
+    def guard(participant: Dict[str, Any]) -> bool:
+        if bool(participant.get(field)) == bool(value):
             return False
-        if str(p.get("updated_at") or "") != seen_updated_at:
+        if str(participant.get("updated_at") or "") != seen_updated_at:
             raise ParticipantChanged(field)
         return True
     return guard
 
 
-class ParticipantsMixin(AdherentsMixin):
+class ParticipantsMixin(MemberDirectoryMixin):
     """Participant rows of a competition; new rows are copied from the member directory."""
 
     # ------------------------------------------------------------------
@@ -198,15 +198,15 @@ class ParticipantsMixin(AdherentsMixin):
                             selectionne: bool = True, reactivate_cancelled: bool = True) -> Optional[Dict[str, Any]]:
         """Lists the member (idempotent). `selectionne`: also selects them, which reactivates a cancelled row as paid
         (the money is already there) unless `reactivate_cancelled` is False: then a cancelled row is left as it is."""
-        def change(p):
+        def change(participant):
             if not selectionne:
                 return None
-            cancelled = (p.get("statut_paiement") or "") in PAIEMENT_STATUTS_ANNULES
+            cancelled = (participant.get("statut_paiement") or "") in PAIEMENT_STATUTS_ANNULES
             if cancelled and not reactivate_cancelled:
                 return False
-            p["selectionne"] = True
+            participant["selectionne"] = True
             if cancelled:
-                p["statut_paiement"] = PAIEMENT_PAYE   # réactivation : l'argent est déjà là
+                participant["statut_paiement"] = PAIEMENT_PAYE   # réactivation : l'argent est déjà là
             return None
         return cls._update_participant(competition_id, adherent_id, change, add_missing=selectionne)
 
@@ -249,14 +249,14 @@ class ParticipantsMixin(AdherentsMixin):
         meanwhile by the webhook is seen). `unchanged_since`: see unchanged_since_guard; the
         member must then be listed already. None: unknown competition, member not listed
         where that applies, or nothing to change."""
-        def change(p):
+        def change(participant):
             if (refuse_unselect_paid and not selectionne
-                    and (p.get("statut_paiement") or "") == PAIEMENT_PAYE):
+                    and (participant.get("statut_paiement") or "") == PAIEMENT_PAYE):
                 raise ParticipantAlreadyPaid(adherent_id)
-            p["selectionne"] = bool(selectionne)
-            nouveau = statut_paiement_apres_bascule(p.get("statut_paiement"), selectionne)
+            participant["selectionne"] = bool(selectionne)
+            nouveau = payment_status_after_toggle(participant.get("statut_paiement"), selectionne)
             if nouveau:
-                p["statut_paiement"] = nouveau
+                participant["statut_paiement"] = nouveau
         guard = unchanged_since_guard("selectionne", selectionne, unchanged_since)
         return cls._update_participant(competition_id, adherent_id, change,
                                        add_missing=selectionne if guard is None else None, guard=guard)
@@ -280,8 +280,8 @@ class ParticipantsMixin(AdherentsMixin):
                                   montant: float) -> Optional[Dict[str, Any]]:
         """Payment received outside HelloAsso (cheque, cash): the participant is selected and
         paid. None when the member is not listed on the competition."""
-        def change(p):
-            p.update(selectionne=True, statut_paiement=PAIEMENT_PAYE,
+        def change(participant):
+            participant.update(selectionne=True, statut_paiement=PAIEMENT_PAYE,
                      montant_paye=float(montant), commande_helloasso=MANUAL_PAYMENT_REF)
         return cls._update_participant(competition_id, adherent_id, change)
 
@@ -306,11 +306,11 @@ class ParticipantsMixin(AdherentsMixin):
         if statut_annulation not in PAIEMENT_STATUTS_ANNULES:
             statut_annulation = PAIEMENT_ANNULE_PERDU
 
-        def change(p):
-            p["selectionne"] = False
-            p["statut_paiement"] = statut_annulation
+        def change(participant):
+            participant["selectionne"] = False
+            participant["statut_paiement"] = statut_annulation
             if note:
-                p["note_paiement"] = str(note)
+                participant["note_paiement"] = str(note)
         return cls._update_participant(competition_id, adherent_id, change)
 
     @classmethod
@@ -318,15 +318,15 @@ class ParticipantsMixin(AdherentsMixin):
                                 montant_paye: float, date_synchro: str = "",
                                 order_ref: str = "") -> bool:
         date_val = date_synchro or cls._now_display()
-        def change(p):
-            if (p.get("statut_paiement") or "") in PAIEMENT_STATUTS_ANNULES:
+        def change(participant):
+            if (participant.get("statut_paiement") or "") in PAIEMENT_STATUTS_ANNULES:
                 # Annulation explicite du coach : la re-synchronisation
                 # HelloAsso ne doit pas l'écraser.
                 return False
-            p["statut_paiement"] = PAIEMENT_PAYE
-            p["montant_paye"] = float(montant_paye or 0.0)
-            p["commande_helloasso"] = str(order_ref or "")
-            p["updated_at"] = date_val
+            participant["statut_paiement"] = PAIEMENT_PAYE
+            participant["montant_paye"] = float(montant_paye or 0.0)
+            participant["commande_helloasso"] = str(order_ref or "")
+            participant["updated_at"] = date_val
         return cls._update_participant(competition_id, adherent_id, change) is not None
 
     @classmethod
@@ -339,7 +339,7 @@ class ParticipantsMixin(AdherentsMixin):
                                    statuses: Optional[Sequence[str]] = None) -> Tuple[int, Optional[Dict[str, Any]]]:
         """(number added, document written); the document is None when nobody was added.
         `statuses`: only the members at one of these membership statuses; None: every status."""
-        groupe = cls.list_adherents(competition_only=True, statuses=statuses)
+        groupe = cls.list_members(competition_only=True, statuses=statuses)
         added = {"count": 0}
 
         def mutate(parts):

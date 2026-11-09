@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from support.fake_firestore import FirestoreRepoTestCase
 
 import server
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from services.competitions import store as competition_store
 
 
@@ -30,5 +30,5 @@ class ApiTestCase(FirestoreRepoTestCase):
         return r.json()
 
     def participant(self, comp_id, adherent_id):
-        doc = Repo.get_competition_doc(comp_id)
+        doc = CompetitionRepository.get_competition_doc(comp_id)
         return next(p for p in doc["participants"] if p["adherent_id"] == adherent_id)

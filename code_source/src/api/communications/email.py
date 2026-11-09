@@ -1,4 +1,4 @@
-"""E-mail templates, preview, sending configuration and sending (Gmail API or SMTP)."""
+"""E-mail templates, sending configuration and sending (Gmail API or SMTP)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from api.communications.schemas import (
-    EmailDispatch, EmailPreview, EmailPreviewContent, EmailPreviewRequest, EmailSendRequest, EmailStatus, EmailTemplate,
+    EmailDispatch, EmailSendRequest, EmailStatus, EmailTemplate,
     EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate,
 )
 from api.responses import error, error_responses
@@ -90,19 +90,6 @@ def delete_email_template_api(template_name: str) -> EmailTemplateDeleted | JSON
 
     return EmailTemplateDeleted(status="success", message=f"Modèle '{clean_name}' supprimé avec succès.")
 
-
-@router.post("/api/preview-email", response_model=EmailPreview, responses=error_responses(500))
-def preview_email(data: EmailPreviewRequest) -> EmailPreview:
-    """Génère un aperçu fidèle d'un e-mail personnalisé pour un destinataire et une compétition."""
-    preview = EmailDispatchService.preview(
-        template_name=data.template_name or None,
-        subject=data.subject,
-        body=data.body,
-        recipient=data.recipient.model_dump() if data.recipient else None,
-        competition_id=data.competition_id,
-        add_signature=data.add_signature,
-    )
-    return EmailPreview(status="success", preview=EmailPreviewContent(**preview))
 
 
 @router.get("/api/email-status", response_model=EmailStatus)

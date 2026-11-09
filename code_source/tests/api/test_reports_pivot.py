@@ -28,8 +28,8 @@ def client():
 
 
 def _get(client, rows, season="active"):
-    with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", return_value=rows) as load, \
-         patch("api.reports.get_active_season", return_value="2026-2027"):
+    with patch("infrastructure.sqlite.members.MemberRepository.list_flat_member_rows", return_value=rows) as load, \
+         patch("domain.constants.get_active_season", return_value="2026-2027"):
         response = client.get("/api/reports/pivot-records", params={"season": season})
     return response, load
 
@@ -94,7 +94,7 @@ def test_iso_date(value, iso):
 
 
 def test_pivot_records_failure_is_a_generic_error(client):
-    with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", side_effect=RuntimeError("disk")):
+    with patch("infrastructure.sqlite.members.MemberRepository.list_flat_member_rows", side_effect=RuntimeError("disk")):
         response = client.get("/api/reports/pivot-records")
     assert response.status_code == 500
     assert response.json()["status"] == "error"

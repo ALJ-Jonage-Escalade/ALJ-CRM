@@ -1,9 +1,12 @@
 """Coaches CRUD; the competitions store coach ids only (names are resolved when read)."""
-from typing import Dict, Any, Optional
+import logging
+from typing import Any, Dict, Optional
 
 from domain.competitions.models import coach_ids_of
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions.base import CompetitionStoreBase
+
+logger = logging.getLogger("alj")
 
 
 class CoachesMixin(CompetitionStoreBase):
@@ -29,7 +32,7 @@ class CoachesMixin(CompetitionStoreBase):
         return cls._coach_dict(doc) if doc else None
 
     @classmethod
-    def save_coach(cls, nom: str, coach_id: int = None) -> int:
+    def save_coach(cls, nom: str, coach_id: Optional[int] = None) -> int:
         ret_id = coach_id or cls._new_id()
         FirestoreClient.upsert_document(cls.COLLECTION_COACHES, str(ret_id),
                                         {"id": ret_id, "nom": nom, "updated_at": cls._now_iso()})
@@ -54,5 +57,5 @@ class CoachesMixin(CompetitionStoreBase):
                 FirestoreClient.update_fields(cls.COLLECTION_COMPETITIONS, str(doc.get("id")),
                                               {**make_patch(ids), "updated_at": cls._now_iso()})
             except FirestoreError as e:
-                print(f"⚠️ [FIRESTORE] {what} #{coach_id} sur l'épreuve "
+                logger.warning(f"[FIRESTORE] {what} #{coach_id} sur l'épreuve "
                       f"#{doc.get('id')} impossible : {e}")

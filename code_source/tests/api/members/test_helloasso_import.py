@@ -128,7 +128,7 @@ class TestMembershipImport(HelloAssoImportTestCase):
         self.assertEqual([row["bucket"] for row in preview["rows"]], ["new", "new"])
 
         with patch("smtplib.SMTP") as smtp, patch("smtplib.SMTP_SSL") as smtp_ssl, \
-                patch("infrastructure.mail.repository.EmailRepository.send_email") as send_email:
+                patch("infrastructure.mail.sender.EmailSender.send_email") as send_email:
             response = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {
                 "1": {"bucket": "new", "choice": "import"}, "2": {"bucket": "new", "choice": "skip"}}})
 

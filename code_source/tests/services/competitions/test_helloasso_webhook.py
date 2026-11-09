@@ -59,13 +59,13 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         self.assertEqual(items[0]["amount"], 1800)
 
     @patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value="")
-    @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.refresh_helloasso_payment")
-    @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.set_item_link")
-    @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.sync_helloasso_mirror")
-    @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.known_helloasso_item_ids", new=lambda: set())
-    @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.list_helloasso_links", return_value={})
-    @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.list_adherents")
-    @patch("infrastructure.firestore.competition_repository.CompetitionFirestoreRepository.list_competitions")
+    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.refresh_helloasso_payment")
+    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.set_item_link")
+    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.update_helloasso_mirror")
+    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.known_helloasso_item_ids", new=lambda: set())
+    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_helloasso_links", return_value={})
+    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_members")
+    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_competitions")
     def test_process_webhook_match_successful(
         self,
         mock_list_comps,
@@ -101,7 +101,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
             }
         }
 
-        report = HelloAssoWebhookService.process_webhook(payload)
+        report = HelloAssoWebhookService.reconcile_payment_items(payload)
         self.assertEqual(report["status"], "success")
         self.assertEqual(report["matched_count"], 1)
         self.assertEqual(len(report["anomalies"]), 0)
@@ -122,19 +122,19 @@ class TestHelloAssoWebhookService(unittest.TestCase):
                   "order": {"id": 2, "formSlug": "regularisation-inscription-competiteurs-2026-2027"}}
         url = ("https://www.helloasso.com/associations/amicale-laique-de-jonage/evenements/"
                "regularisation-inscription-competiteurs-2026-2027")
-        Repo = "infrastructure.firestore.competition_repository.CompetitionFirestoreRepository"
+        repository_path = "infrastructure.firestore.competition_repository.CompetitionRepository"
         with patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=url), \
-             patch(f"{Repo}.sync_helloasso_mirror") as mirror, \
-             patch(f"{Repo}.list_competitions", return_value=[]), \
-             patch(f"{Repo}.list_adherents", return_value=[]), \
-             patch(f"{Repo}.list_helloasso_links", return_value={}), \
-             patch(f"{Repo}.known_helloasso_item_ids", return_value=set()):
-            report = HelloAssoWebhookService.process_webhook({"eventType": "Order"}, items=[tshirt])
+             patch(f"{repository_path}.update_helloasso_mirror") as mirror, \
+             patch(f"{repository_path}.list_competitions", return_value=[]), \
+             patch(f"{repository_path}.list_members", return_value=[]), \
+             patch(f"{repository_path}.list_helloasso_links", return_value={}), \
+             patch(f"{repository_path}.known_helloasso_item_ids", return_value=set()):
+            report = HelloAssoWebhookService.reconcile_payment_items({"eventType": "Order"}, items=[tshirt])
             self.assertEqual(report["status"], "ignored")
             self.assertEqual(report["other_forms"], ["vetements-club-al-jonage-2026-2027"])
             mirror.assert_not_called()
 
-            report = HelloAssoWebhookService.process_webhook({"eventType": "Order"}, items=[tshirt, compet])
+            report = HelloAssoWebhookService.reconcile_payment_items({"eventType": "Order"}, items=[tshirt, compet])
             self.assertEqual(report["processed_count"], 1)
             mirror.assert_called_once()
             self.assertEqual(mirror.call_args.kwargs["raw_items"][0]["id"], 42)
@@ -185,7 +185,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         p3 = Participant(competition_id=10, adherent_id=3, nom="DURAND", prenom="Charlie",
                          num_licence="999999", selectionne=False, statut_paiement="non_invite")
 
-        Repo = "infrastructure.firestore.competition_repository.CompetitionFirestoreRepository"
+        repository_path = "infrastructure.firestore.competition_repository.CompetitionRepository"
         settings_store = {}
 
         def mock_get_setting(key, default=""):
@@ -195,12 +195,12 @@ class TestHelloAssoWebhookService(unittest.TestCase):
             settings_store[key] = value
             return True
 
-        with patch(f"{Repo}.get_competition", return_value=comp), \
-             patch(f"{Repo}.list_participants", return_value=[p1, p2, p3]), \
+        with patch(f"{repository_path}.get_competition", return_value=comp), \
+             patch(f"{repository_path}.list_participants", return_value=[p1, p2, p3]), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", side_effect=mock_get_setting), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.save", side_effect=mock_save_setting), \
              patch("services.competitions.results_batch.CompetitionResultsBatchService.get_notification_email", return_value="coach@alj-escalade.fr"), \
-             patch("infrastructure.mail.repository.EmailRepository.send_email", return_value=True) as mock_send:
+             patch("infrastructure.mail.sender.EmailSender.send_email", return_value=True) as mock_send:
 
             res = check_and_notify_all_paid(10)
             self.assertTrue(res)
@@ -226,12 +226,12 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         p1 = Participant(competition_id=11, adherent_id=1, nom="DUPONT", prenom="Alice", selectionne=True, statut_paiement="paye")
         p2 = Participant(competition_id=11, adherent_id=2, nom="MARTIN", prenom="Bob", selectionne=True, statut_paiement="en_attente")
 
-        Repo = "infrastructure.firestore.competition_repository.CompetitionFirestoreRepository"
-        with patch(f"{Repo}.get_competition", return_value=comp), \
-             patch(f"{Repo}.list_participants", return_value=[p1, p2]), \
+        repository_path = "infrastructure.firestore.competition_repository.CompetitionRepository"
+        with patch(f"{repository_path}.get_competition", return_value=comp), \
+             patch(f"{repository_path}.list_participants", return_value=[p1, p2]), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=""), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.save"), \
-             patch("infrastructure.mail.repository.EmailRepository.send_email") as mock_send:
+             patch("infrastructure.mail.sender.EmailSender.send_email") as mock_send:
 
             res = check_and_notify_all_paid(11)
             self.assertFalse(res)

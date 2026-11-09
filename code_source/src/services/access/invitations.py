@@ -16,7 +16,7 @@ from typing import Callable, Optional, TypedDict
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from infrastructure.firestore.access_store import RoleEntry
-from infrastructure.mail.repository import EmailRepository
+from infrastructure.mail.sender import EmailSender
 from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.security.role_directory import normalized_email, parsed
 from services.access.rules import AccessRules
@@ -28,8 +28,8 @@ GOOGLE_SIGNUP_URL = "https://accounts.google.com/signup"
 SUBJECT = "Invitation au bureau de la section escalade ALJ"
 ROLE_LABELS = {"admin": "administrateur", "coach": "coach", "readonly": "lecture seule"}
 
-# Sends one e-mail: EmailRepository.send_email (keyword arguments), a fake in the tests
-Sender = Callable[..., None]  # EmailRepository.send_email: raises MailError on failure
+# Sends one e-mail: EmailSender.send_email (keyword arguments), a fake in the tests
+Sender = Callable[..., None]  # EmailSender.send_email: raises MailError on failure
 
 
 class Invitation(TypedDict):
@@ -94,8 +94,8 @@ def inviter_name(rules: AccessRules, author: str) -> str:
 
 def send_invitation(rules: AccessRules, entry: RoleEntry, author: str, page_url: str,
                     send: Optional[Sender] = None) -> Invitation:
-    """Sends the e-mail of this invitation (EmailRepository.send_email by default); a failure is reported, never raised."""
-    send = send or EmailRepository.send_email
+    """Sends the e-mail of this invitation (EmailSender.send_email by default); a failure is reported, never raised."""
+    send = send or EmailSender.send_email
     try:
         text, html = invitation_email(entry, inviter_name(rules, author), app_link(page_url))
         send(to_email=entry["email"], subject=SUBJECT, body=text, html_body=html,

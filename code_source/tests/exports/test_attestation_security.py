@@ -16,7 +16,6 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from exports.attestation import (  # noqa: E402
-    _render_minimal_pdf_with_pydyf,
     build_attestation,
     render_attestation_pdf,
 )
@@ -69,21 +68,6 @@ class TestAttestationEscaping(unittest.TestCase):
         self.assertIn(f"Email : {CLUB_EMAIL} |", html)
         self.assertNotIn("{Email club}", html)
 
-    def test_fallback_renderer_shows_plain_text(self):
-        html = build_attestation({"first_name": "Seamus", "last_name": "O'Flaherty & Co", "amount": 150},
-                                 season="2026-2027", date_jour="1 September 2026", club_email=CLUB_EMAIL)
-        pdf = _render_minimal_pdf_with_pydyf(html)
-        self.assertTrue(_pdf_contains(pdf, b"O'FLAHERTY & CO"))
-        self.assertFalse(_pdf_contains(pdf, b"&amp;"))
-
-    def test_fallback_renderer_links_page_resources(self):
-        html = build_attestation({"first_name": "Harry", "last_name": "Potter", "amount": 150},
-                                 season="2026-2027", date_jour="1 September 2026", club_email=CLUB_EMAIL)
-        pdf = _render_minimal_pdf_with_pydyf(html)
-        self.assertNotIn(b"None", pdf)
-        self.assertRegex(pdf, rb"/Contents \d+ 0 R")
-        self.assertTrue(_pdf_contains(pdf, b"150,00 EUR"))
-
 
 @unittest.skipUnless(_weasyprint_available(), "WeasyPrint (Pango) not available")
 class TestAttestationRendering(unittest.TestCase):
@@ -95,6 +79,13 @@ class TestAttestationRendering(unittest.TestCase):
         pdf = render_attestation_pdf(f"<p>{INJECTION}</p><img src='file:///etc/hostname'>")
         self.assertNotIn(b"/EmbeddedFile", pdf)
         self.assertFalse(_pdf_contains(pdf, secret))
+
+    def test_renders_a_pdf(self):
+        html = build_attestation({"first_name": "Alex", "last_name": "Martin", "amount": 195},
+                                 season="2026-2027", club_email=CLUB_EMAIL)
+        pdf = render_attestation_pdf(html)
+        self.assertTrue(pdf.startswith(b"%PDF"))
+        self.assertGreater(len(pdf), 300)
 
     def test_embedded_images_still_rendered(self):
         html = build_attestation({"first_name": "Harry", "last_name": "Potter", "amount": 150},

@@ -14,7 +14,7 @@ import logging
 import os
 from typing import Callable, List, ParamSpec, TypeVar
 
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from infrastructure.firestore.client import FirestoreConflictError, FirestoreError
 from infrastructure.timed_cache import TimedCache
 from services.documents import Doc
@@ -73,7 +73,7 @@ def competition_not_found() -> NotFound:
 
 
 def require_competition(competition_id: int) -> Doc:
-    doc = Repo.get_competition_doc(competition_id)
+    doc = CompetitionRepository.get_competition_doc(competition_id)
     if doc is None:
         raise competition_not_found()
     return doc

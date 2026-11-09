@@ -91,12 +91,12 @@ ALJ-CRM/                         ← racine du dépôt
   FFME), `activities/presence.py`. Quelques routeurs plus anciens gardent encore de la logique ; elle rejoint un
   service quand le routeur est modifié.
 - **`infrastructure/`** — adaptateurs, un sous-dossier par système externe. Les plus structurants :
-  - `sqlite/schema_v2.py` : DDL SQLite, normalisations, vue de compatibilité `v_adherents_legacy` (**source unique**, recréée à chaque démarrage).
+  - `sqlite/schema_v2.py` : DDL SQLite, normalisations, vue plate des adhérents `v_member_flat` (une ligne par achat, recréée à chaque démarrage).
   - `sqlite/connection.py` (`SqliteDatabase` : chemin, connexion, schéma, sauvegarde) et un repository par domaine :
-    `members.py` (`load_direct_data()`, lignes de la vue `v_adherents_legacy`), `seasons.py`, `planning.py`,
+    `members.py` (`list_flat_member_rows()`, lignes de la vue `v_member_flat` ; `list_member_rows()` pour les pages), `seasons.py`, `planning.py`,
     `email_templates.py`, `geocache.py`, `ffme_import.py`.
   - `firestore/cloud_database.py` : réplication SQLite ⇄ Firestore (collections `crm_<table>`, triggers `_fs_*`, merge champ par champ) : pull avant une route de données si le dernier date de plus de 30 s, flush après chaque écriture (middleware de `server.py`) ; façade `CloudDatabase` s'appuyant sur `firestore/cloud_sync/` : `common` (constantes), `rest_store` (requêtes de la réplication), `cache` (SQLite, déclencheurs), `sync` (pull / flush / fusion), `bootstrap` (reconstruction du cache, import initial).
-  - `firestore/client.py` : client REST Firestore (sans gRPC), dont le projet, le jeton, la conversion des valeurs et les erreurs (`FirestoreError`, `FirestoreConflictError`) partagés avec la réplication ; `firestore/competition_repository.py` : compétitions (façade `CompetitionFirestoreRepository` composant les mixins de `firestore/competitions/` : adhérents, épreuves, participants, miroir HelloAsso, coachs) ;
+  - `firestore/client.py` : client REST Firestore (sans gRPC), dont le projet, le jeton, la conversion des valeurs et les erreurs (`FirestoreError`, `FirestoreConflictError`) partagés avec la réplication ; `firestore/competition_repository.py` : compétitions (façade `CompetitionRepository` composant les mixins de `firestore/competitions/` : adhérents, épreuves, participants, miroir HelloAsso, coachs) ;
     `firestore/app_settings.py` : réglages applicatifs (collection `app_settings`, seul emplacement). Campagnes HelloAsso
     actives, choisies dans **Paramètres › Campagne HelloAsso** (`api/integrations/helloasso_campaigns.py`), au format
     `FormType:slug` : `HELLOASSO_MEMBERSHIP_CAMPAIGN` (adhésions, lue par l'import des adhésions) et `HELLOASSO_ANNUAL_CAMPAIGN`
@@ -140,9 +140,9 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
 |---|---|---|
 | `web/` | `pages`, `pwa`, `health` | page d'entrée de l'application Vue sur `/competitions`, `/index`, `/bureau`, `/bureau/{page}` (liste blanche) ; anciennes adresses redirigées (`/`, `/competitions/gestion`, `/bureau/competitions-gestion`, `/bureau/adherents-fiche`, `/annuaire/*.html`) ; `/spa/*` (compilation) et `/annuaire/assets/*` (`mount_static`) · `/sw.js` (compilé), `/manifest.webmanifest`, `/runtime-config.js`, `/api/web-version` (version de l'application) · `/health` |
 | `members/` | `members`, `seasons`, `helloasso_import` | `/api/members` (+ `/competitors`, `/update`, `/create`, `/add`) · `/api/seasons`, `/api/season-tarifs` · `/api/helloasso/memberships/` (`preview`, `import`, `last-sync`) |
-| `competitions/` | `competitions`, `participants`, `coaches`, `members`, `helloasso_items`, `results`, `payments` | `/api/competitions/*`, `/api/coaches`, `/api/competition-members`, `/api/helloasso/items` · résultats MyCompet (`/api/competitions/cron/fetch-results`, `/{id}/fetch-results`, `/api/settings/competitions-results`) · `/{id}/check-all-paid` |
-| `communications/` | `email`, `whatsapp`, `attestations` | `/api/email-templates` (GET/POST/DELETE), `/api/preview-email`, `/api/email-status`, `/api/send-email` · `/api/whatsapp-template` · `/api/attestations/preview`, `/send` (PDF en mémoire, admin) |
-| `activities/` | `planning`, `presence` | `/api/planning` (GET/POST, `/item`, `/export`) · `/api/presence/config`, `/export` |
+| `competitions/` | `competitions`, `participants`, `coaches`, `members`, `helloasso_items`, `results` | `/api/competitions/*`, `/api/coaches`, `/api/competition-members`, `/api/helloasso/items` · résultats MyCompet (`/api/competitions/cron/fetch-results`, `/{id}/fetch-results`, `/api/settings/competitions-results`) |
+| `communications/` | `email`, `whatsapp`, `attestations` | `/api/email-templates` (GET/POST/DELETE), `/api/email-status`, `/api/send-email` · `/api/whatsapp-template` · `/api/attestations/preview`, `/send` (PDF en mémoire, admin) |
+| `activities/` | `planning`, `presence` | `/api/planning` (GET, `/item`, `/export`) · `/api/presence/config`, `/export` |
 | `reports/` | `map`, `pivot` | `/api/reports/map-points` (points de la carte des adhérents, affichée par l'application Vue avec Leaflet) · `/api/reports/pivot-records` (lignes du tableau croisé dynamique, affiché par l'application Vue avec vue-pivottable) |
 | `ffme/` | `ffme` | `/api/ffme/stats`, `/export` (CSV), `/preview`, `/import` |
 | `integrations/` | `helloasso`, `helloasso_campaigns`, `google_auth`, `cloud_db` | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync`, `/api/helloasso/campaigns` · `/api/auth/google/*` · `/api/cloud-db/status`, `/sync` |
@@ -186,7 +186,7 @@ avec le code backend conservé et le code supprimé (récupérable dans l'histor
 1. **Logique métier dans des fichiers legacy** : `exports/membership_excel.py` (exports FFME). Le code du client lourd sans appelant web a été supprimé (récupérable dans l'historique git) : à reprendre en route FastAPI avant de construire l'écran web.
 2. **Système de fichiers** : Cloud Run est éphémère → génération **en mémoire** puis téléchargement (comme les attestations), jamais de persistance locale.
 3. **Cache SQLite côté serveur** : reconstruit depuis Firestore au premier appel de données (`CloudDatabase.ensure_fresh`, 30 s) et flush après chaque écriture. Une route d'écriture doit passer par les repositories de `infrastructure/sqlite/` pour être répliquée.
-4. **Durée des requêtes** : timeout Cloud Run 300 s, mémoire 1 GiB (Pandas/WeasyPrint) ; les traitements lourds (géocodage Nominatim à 1,5 s/adresse) doivent rester en tâche de fond.
+4. **Durée des requêtes** : timeout Cloud Run 300 s, mémoire 1 GiB (WeasyPrint) ; les traitements lourds (géocodage Nominatim à 1,5 s/adresse) doivent rester en tâche de fond.
 5. **Données personnelles/RGPD** (santé, urgences, mineurs) : ne jamais committer de BDD/exports ; golden master FFME non versionné (`tests/fixtures/`).
 
 ### Démarche recommandée pour chaque fonction à porter
@@ -209,7 +209,7 @@ avec le code backend conservé et le code supprimé (récupérable dans l'histor
 sudo apt install libpango-1.0-0 libpangoft2-1.0-0
 
 cd code_source
-uv sync --group web          # .venv/ (ignoré par git) : profil « web » + outils de dev + Faker
+uv sync                      # .venv/ (ignoré par git) : dépendances + outils de dev + Faker
 source .venv/bin/activate
 ```
 
@@ -221,7 +221,7 @@ regroupées en une seule PR par semaine, `.github/workflows/dependabot-uv-sync.y
 
 La version de Python est définie dans `../code_source/.python-version` (version complète, ex. `3.14.8`), lue par
 la CI (`setup-python`) et uv. Seul le `FROM python:<version>-slim` du `Dockerfile` la répète : un test
-(`tests/test_cloud_run_lot4.py`) vérifie que les deux concordent. Pour changer de version, modifier ces **deux
+(`tests/test_deployment_artifacts.py`) vérifie que les deux concordent. Pour changer de version, modifier ces **deux
 fichiers** (vérifier d'abord que les roues existent : `pip download --only-binary=:all: --python-version X.Y …`).
 
 ### 7.2 Mode dev sur l'émulateur Firebase (recommandé)
@@ -285,7 +285,7 @@ Clés principales : `HELLOASSO_CLIENT_ID/SECRET/ORG_SLUG`, `CAMPAIGN_SLUG` (repl
 **Tests** (depuis `../code_source`) :
 
 ```bash
-uv sync --group web && uv run pytest tests
+uv sync && uv run pytest tests
 ```
 La CI (Ubuntu) lance `ruff check src tests`, `mypy` (fichiers listés dans `[tool.mypy] files`) et `pytest tests` ; tous sont bloquants. `test_ffme_golden_master` nécessite un fichier de référence local non versionné.
 

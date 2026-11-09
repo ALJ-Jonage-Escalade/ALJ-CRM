@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from domain.members.membership_import import ImportWrite, KnownMember, KnownPurchase, MembersSnapshot, WriteAction
+from domain.members.view import normalize_status
 from infrastructure.sqlite import schema_v2
 from infrastructure.sqlite.connection import SqliteDatabase
 
@@ -87,7 +88,7 @@ def _assign(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: st
         raise MembershipWriteRefused(f"L'adhésion à reprendre de l'inscription HelloAsso {write.item_id} a disparu.")
     cur.execute("UPDATE purchases SET order_id = ?, tarif_name = ?, amount = ?, status = ?, status_normalized = ?, updated_at = ?"
                 " WHERE id = ?", (order_id, record.tarif_name.strip(), record.amount, record.status,
-                                  schema_v2.normalize_status(record.status), now_iso, entry.purchase_id))
+                                  normalize_status(record.status), now_iso, entry.purchase_id))
     cur.execute("DELETE FROM purchase_options WHERE purchase_id = ?", (entry.purchase_id,))
     schema_v2.insert_options_v2(cur, entry.purchase_id, fields)
     _record_helloasso_values(cur, entry.purchase_id, write)
@@ -115,7 +116,7 @@ def _update(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: st
         cur.execute(f'UPDATE purchases SET "{column}" = ?, updated_at = ? WHERE id = ?',  # noqa: S608 - column: a key of new_values
                     (new_values[column], now_iso, entry.purchase_id))
         if column == "status":
-            cur.execute("UPDATE purchases SET status_normalized = ? WHERE id = ?", (schema_v2.normalize_status(record.status), entry.purchase_id))
+            cur.execute("UPDATE purchases SET status_normalized = ? WHERE id = ?", (normalize_status(record.status), entry.purchase_id))
     _record_helloasso_values(cur, entry.purchase_id, write)
     return AppliedWrite(write.item_id, write.action, entry.member_id, entry.purchase_id)
 

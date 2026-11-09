@@ -1,8 +1,7 @@
 """
-Firestore rules against the local emulator (dev/docker-compose.yml, which mounts
-firestore.rules): every client is denied, whatever its role (plan phase 3). The pages
-use Firebase only to sign in; the API reaches Firestore through IAM.
-Skipped when the emulator is not running (CI).
+Firestore rules against the e2e stack's emulator (e2e/docker-compose.yml mounts firestore/firestore.rules):
+every client is denied, whatever its role. The pages use Firebase only to sign in; the API reaches Firestore
+through IAM. Runs in CI with the rest of e2e/: a permissive edit of the rules fails here.
 """
 
 import json
@@ -10,21 +9,14 @@ import unittest
 import urllib.error
 import urllib.request
 
-AUTH = "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1"
-FIRESTORE = "http://127.0.0.1:8081/v1/projects/demo-alj/databases/(default)/documents"
+from helpers.stack import AUTH_HOST, FIRESTORE_HOST
+
+AUTH = f"http://{AUTH_HOST}/identitytoolkit.googleapis.com/v1"
+FIRESTORE = f"http://{FIRESTORE_HOST}/v1/projects/demo-alj/databases/(default)/documents"
 
 COLLECTIONS = ("competitions", "coaches", "adherents", "planning", "helloasso_items",
                "email_templates", "app_settings", "crm_users", "crm_purchases",
                "access_roles", "access_requests", "access_history")
-
-
-def _emulator_running() -> bool:
-    try:
-        urllib.request.urlopen("http://127.0.0.1:8081/", timeout=1)
-        urllib.request.urlopen("http://127.0.0.1:9099/", timeout=1)
-        return True
-    except Exception:
-        return False
 
 
 def _post(url: str, body: dict, headers: dict = None) -> dict:
@@ -45,7 +37,6 @@ def _status(path: str, id_token: str, method: str = "GET", body: dict = None) ->
         return e.code
 
 
-@unittest.skipUnless(_emulator_running(), "Firebase emulator not running (dev/docker-compose.yml)")
 class TestRulesDenyEveryClient(unittest.TestCase):
 
     def _google_sign_in(self, email: str, **claims) -> str:
@@ -80,9 +71,5 @@ class TestRulesDenyEveryClient(unittest.TestCase):
                                              {"fields": {"x": {"stringValue": "y"}}}), 403)
 
     def test_server_access_is_not_affected(self):
-        """The emulator's admin token stands for IAM access (server, desktop app)."""
+        """The emulator's admin token stands for IAM access (the server)."""
         self.assertEqual(_status("competitions?pageSize=1", "owner"), 200)
-
-
-if __name__ == "__main__":
-    unittest.main()

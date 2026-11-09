@@ -149,10 +149,10 @@ class TestMembershipImportRepository(MemberDbTestCase):
     def manual_member(self, comment: str = "") -> dict[str, Any]:  # Any: SQLite values
         """Ginny created by hand in Adhérents: her membership is a "MANUEL-…" order."""
         from infrastructure.sqlite.members import MemberRepository
-        ok, _order_ref = MemberRepository.add_manual_member(
+        order_ref = MemberRepository.add_manual_member(
             {"last_name": "WEASLEY", "first_name": "Ginny", "birth_date": "11/08/2013", "tarif_name": "Loisir lycée", "city": "Meyzieu"},
             season_name=SEASON)
-        self.assertTrue(ok)
+        self.assertTrue(order_ref.startswith("MANUEL-"))
         [purchase] = self.rows("SELECT id, user_id FROM purchases")
         if comment:
             conn = SqliteDatabase.get_connection()

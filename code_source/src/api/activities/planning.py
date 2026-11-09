@@ -7,9 +7,9 @@ from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, Response
 
-from api.activities.schemas import PlanningReplaced, PlanningSlot, PlanningSlotDeleted, PlanningSlotSaved, PlanningSlotUpdate
+from api.activities.schemas import PlanningSlot, PlanningSlotDeleted, PlanningSlotSaved, PlanningSlotUpdate
 from api.responses import XLSX, error, error_responses, file_download
-from domain.constants import get_active_season, is_valid_season
+from domain.constants import resolve_season
 from exports.planning_excel import export_planning_excel, export_planning_list_excel
 from infrastructure.sqlite.planning import PlanningRepository
 
@@ -55,9 +55,7 @@ def delete_planning_item_api(item_id: int) -> PlanningSlotDeleted | JSONResponse
             responses={200: {"content": {XLSX: {}}, "description": "Classeur Excel"}, **error_responses(400, 500)})
 def export_planning_api(mode: Literal["grid", "list"] = Query("grid"), season: Optional[str] = Query(None)) -> Response:
     """Exporte le planning au format Excel (grille visuelle hebdomadaire ou liste tabulaire)."""
-    target_season = season or get_active_season()
-    if not is_valid_season(target_season):
-        return error(400, "Saison invalide (format attendu : AAAA-AAAA).")
+    target_season = resolve_season(season)
     planning_data = PlanningRepository.load_planning_data()
     if mode == "list":
         return file_download(export_planning_list_excel(planning_data, target_season), f"Planning_Liste_{target_season}.xlsx", XLSX)
@@ -67,9 +65,3 @@ def export_planning_api(mode: Literal["grid", "list"] = Query("grid"), season: O
         return error(400, "Aucun créneau à placer sur la grille : il faut un jour et des horaires lisibles.")
     return file_download(content, f"Planning_Grille_{target_season}.xlsx", XLSX)
 
-
-@router.post("/api/planning", response_model=PlanningReplaced, responses=error_responses(500))
-def update_planning(slots: List[PlanningSlotUpdate]) -> PlanningReplaced:
-    """Remplace le planning complet (administrateurs) ; un créneau d'id 0 reçoit un nouvel identifiant."""
-    PlanningRepository.save_planning_data([{**slot.model_dump(), "id": slot.id or None} for slot in slots])
-    return PlanningReplaced(status="success", message="Planning mis à jour", count=len(slots))

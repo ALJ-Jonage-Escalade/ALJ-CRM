@@ -10,12 +10,12 @@ from domain.competitions.models import (
     STATUT_CLOSE,
 )
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.firestore.competitions.adherents import AdherentsMixin
+from infrastructure.firestore.competitions.adherents import MemberDirectoryMixin
 
 logger = logging.getLogger("alj")
 
 
-class CompetitionsMixin(AdherentsMixin):
+class CompetitionsMixin(MemberDirectoryMixin):
     """Competition documents; the season report reads the member directory."""
 
     # ------------------------------------------------------------------
@@ -191,7 +191,7 @@ class CompetitionsMixin(AdherentsMixin):
         doc_by_id = {d.get("id"): d for d in docs}
         participants_map = {}
         payments_map = {}
-        students = {}
+        students: Dict[Any, Any] = {}  # Any: keys and values as the participants carry them
         for c in comps:
             doc = doc_by_id.get(c.id) or {}
             for p in (doc.get("participants") or []):

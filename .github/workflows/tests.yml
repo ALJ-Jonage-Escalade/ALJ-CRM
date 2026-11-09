@@ -39,7 +39,7 @@ jobs:
       working-directory: code_source
       env:
         UV_PYTHON_PREFERENCE: only-system # use the interpreter installed above
-      run: uv sync --frozen --group web
+      run: uv sync --frozen
 
     - name: Check lock and exported requirements are up to date
       working-directory: code_source
@@ -60,9 +60,14 @@ jobs:
       working-directory: code_source
       run: uv run --no-sync mypy
 
+    - name: Type check ratchet over the whole src/ tree (mypy)
+      working-directory: code_source
+      run: uv run --no-sync python dev/mypy_ratchet.py
+
     - name: Run Unit Tests (pytest)
       working-directory: code_source
-      run: uv run --no-sync pytest tests
+      # Coverage report without a threshold (as the frontend job); -rs lists the reasons of skipped tests
+      run: uv run --no-sync pytest tests --cov=src --cov-branch --cov-report=term -rs
 
   frontend:
     # Vue app (code_source/frontend/): same commands as locally, Node version from .nvmrc
