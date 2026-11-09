@@ -13,6 +13,10 @@ export function createKeysApi(client: ApiClient) {
       unwrap(client.POST("/api/keys/{key_id}/return", { params: { path: { key_id: keyId } }, body })),
     rename: (keyId: number, code: string) =>
       unwrap(client.PATCH("/api/keys/{key_id}", { params: { path: { key_id: keyId } }, body: { code } })),
+    archive: (keyId: number, body: Schemas["KeyArchiveIn"]) =>
+      unwrap(client.POST("/api/keys/{key_id}/archive", { params: { path: { key_id: keyId } }, body })),
+    restore: (keyId: number, comment: string) =>
+      unwrap(client.POST("/api/keys/{key_id}/restore", { params: { path: { key_id: keyId } }, body: { comment } })),
     history: (keyId: number) => unwrap(client.GET("/api/keys/{key_id}/history", { params: { path: { key_id: keyId } } })),
     correctAssignment: (assignmentId: number, body: Schemas["KeyAssignmentPatch"]) =>
       unwrap(client.PATCH("/api/key-assignments/{assignment_id}", { params: { path: { assignment_id: assignmentId } }, body })),

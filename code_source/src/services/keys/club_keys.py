@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import List, Literal, Optional, TypedDict, Union
 
 from domain.errors import Conflict, InvalidRequest, NotFound
-from infrastructure.sqlite.keys import AssignmentRow, EventRow, HolderRow, KeyRepository, KeyRow
+from infrastructure.sqlite.keys import ArchiveRow, AssignmentRow, EventRow, HolderRow, KeyRepository, KeyRow
 from services.members.seasons import SeasonService
 
 
@@ -27,6 +27,7 @@ class Key(TypedDict):
     code: str
     status: str
     holder: Optional[Holder]
+    archive: Optional[ArchiveRow]
 
 
 class AssignmentEntry(AssignmentRow):
@@ -80,7 +81,8 @@ class KeyService:
     def list_keys() -> List[Key]:
         season = _active_season()
         members = KeyRepository.members_of_season(season)
-        return [Key(id=k["id"], code=k["code"], status=k["status"], holder=_holder(k["holder"], season, members) if k["holder"] else None)
+        return [Key(id=k["id"], code=k["code"], status=k["status"], holder=_holder(k["holder"], season, members) if k["holder"] else None,
+                    archive=k["archive"])
                 for k in KeyRepository.list_keys()]
 
     @staticmethod
@@ -142,3 +144,21 @@ class KeyService:
             raise Conflict("Seule la dernière attribution d'une clé peut être supprimée.", "not_latest")
         who = f"{assignment['last_name']} {assignment['first_name']}".strip()
         KeyRepository.delete_assignment(assignment, f"{who}, remise le {_day(assignment['given_on'])}", by)
+
+    @staticmethod
+    def archive(key_id: int, archived_on: str, comment: str, by: str) -> None:
+        """Archives a lost or broken key (never deleted: its history stays); a held key's assignment ends that day."""
+        key = _key(key_id)
+        if key["status"] == "archived":
+            raise Conflict(f"La clé « {key['code']} » est déjà archivée.", "already_archived")
+        if key["holder"] is not None and archived_on < key["holder"]["given_on"]:
+            raise InvalidRequest("La date d'archivage précède la remise de la clé à son détenteur.")
+        KeyRepository.archive(key_id, archived_on, comment, by)
+
+    @staticmethod
+    def restore(key_id: int, comment: str, by: str) -> None:
+        """Undoes an archive: the key is available again (its last holder is not given it back)."""
+        key = _key(key_id)
+        if key["status"] != "archived":
+            raise Conflict(f"La clé « {key['code']} » n'est pas archivée.", "not_archived")
+        KeyRepository.restore(key_id, comment, by)

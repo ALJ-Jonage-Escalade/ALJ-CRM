@@ -66,9 +66,9 @@ const HARRY = {
   season: "2026-2027",
 };
 const KEYS: Key[] = [
-  { id: 1, code: "10", status: "assigned", holder: HARRY },
-  { id: 2, code: "2", status: "available", holder: null },
-  { id: 3, code: "B1", status: "available", holder: null },
+  { id: 1, code: "10", status: "assigned", holder: HARRY, archive: null },
+  { id: 2, code: "2", status: "available", holder: null, archive: null },
+  { id: 3, code: "B1", status: "available", holder: null, archive: null },
 ];
 const MEMBERS = {
   season: "2026-2027",
@@ -112,7 +112,7 @@ describe("OutilsKeysPage", () => {
     const keys = [...KEYS];
     const { byId, all, sent } = await render("admin", keys, {
       "POST /api/keys": (body) => {
-        const added: Key = { id: 4, code: (body as { code: string }).code, status: "available", holder: null };
+        const added: Key = { id: 4, code: (body as { code: string }).code, status: "available", holder: null, archive: null };
         keys.push(added);
         return json(added, 201);
       },
@@ -137,7 +137,7 @@ describe("OutilsKeysPage", () => {
 
   it("shows who holds a key, links to their record and flags those who did not renew", async () => {
     const gone = { ...HARRY, user_id: 9, last_name: "DIGGORY", first_name: "Cedric", member_this_season: false, season: "2025-2026" };
-    const keys: Key[] = [...KEYS, { id: 4, code: "11", status: "assigned", holder: gone }];
+    const keys: Key[] = [...KEYS, { id: 4, code: "11", status: "assigned", holder: gone, archive: null }];
     const { byId, all } = await render("coach", keys);
     const holders = all("key-holder");
     expect(holders.map((h) => h.textContent.trim())).toEqual(["POTTER Harry", "DIGGORY Cedric ⚠️"]);
@@ -284,6 +284,65 @@ describe("OutilsKeysPage", () => {
       expect(confirm.mock.calls[0]![0].variant).toBe("danger");
       expect(sent("DELETE", "/api/key-assignments/32")).toHaveLength(1);
       expect(byId("toast")!.textContent).toBe("✅ Attribution supprimée.");
+    });
+  });
+
+  describe("archives", () => {
+    const LOST: Key = { id: 5, code: "7", status: "archived", holder: null, archive: { date: "2026-11-03", comment: "Perdue" } };
+
+    it("hides the archived keys behind a toggle, as the competitions do", async () => {
+      const { byId, all } = await render("coach", [...KEYS, LOST]);
+      expect(all("key-code").map((c) => c.textContent.trim())).toEqual(["2", "10", "B1"]);
+      expect(byId("archived-keys")).toBeNull();
+      const toggle = byId("toggle-key-archives")!;
+      expect(toggle.textContent.trim()).toBe("🗂 Afficher les archives (1)");
+      toggle.click();
+      await flushPromises();
+      expect(toggle.textContent.trim()).toBe("🙈 Masquer les archives");
+      expect(all("archived-key").map((k) => k.textContent.replace(/\s+/g, " ").trim())).toEqual([
+        "🔑 7 · 📦 Archivée le 03/11/2026 · Perdue",
+      ]);
+    });
+
+    it("has no archives toggle without an archived key", async () => {
+      const { byId } = await render("coach", KEYS);
+      expect(byId("toggle-key-archives")).toBeNull();
+    });
+
+    it("lets an admin archive a key from its panel, with a reason", async () => {
+      const { byId, sent } = await render("admin", KEYS, {
+        "GET /api/keys/1/history": () => json([]),
+        "POST /api/keys/1/archive": () => json({ status: "success" }),
+      });
+      document.querySelector<HTMLElement>('[data-testid="data-row"][data-id="1"] td')!.click();
+      await flushPromises();
+      byId("panel-archive")!.click();
+      await flushPromises();
+      expect(byId("archive-dialog")!.textContent).toContain("POTTER Harry ne la détiendra plus");
+      expect(byId("archive-submit")!.hasAttribute("disabled")).toBe(true); // a reason is required
+      await typeIn(byId("archive-date"), "2026-11-03");
+      await typeIn(byId("archive-comment"), "Perdue");
+      byId("archive-submit")!.click();
+      await flushPromises();
+      expect(sent("POST", "/api/keys/1/archive").map((c) => c.body)).toEqual([{ archived_on: "2026-11-03", comment: "Perdue" }]);
+      expect(byId("toast")!.textContent).toBe("✅ Clé « 10 » archivée.");
+    });
+
+    it("lets an admin restore an archived key", async () => {
+      const { byId, all, sent } = await render("admin", [...KEYS, LOST], {
+        "GET /api/keys/5/history": () => json([]),
+        "POST /api/keys/5/restore": () => json({ status: "success" }),
+      });
+      byId("toggle-key-archives")!.click();
+      await flushPromises();
+      all("archived-key")[0]!.click();
+      await flushPromises();
+      expect(byId("panel-archive")).toBeNull();
+      vi.spyOn(dialogs, "prompt").mockResolvedValue("Retrouvée");
+      byId("panel-restore")!.click();
+      await flushPromises();
+      expect(sent("POST", "/api/keys/5/restore").map((c) => c.body)).toEqual([{ comment: "Retrouvée" }]);
+      expect(byId("toast")!.textContent).toBe("✅ Clé « 7 » restaurée : elle est de nouveau disponible.");
     });
   });
 });

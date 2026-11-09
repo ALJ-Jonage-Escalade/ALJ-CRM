@@ -20,11 +20,17 @@ class HolderRow(TypedDict):
     last_season: str  # latest season they had a membership in (their record), "" without any
 
 
+class ArchiveRow(TypedDict):
+    date: str
+    comment: str
+
+
 class KeyRow(TypedDict):
     id: int
     code: str
     status: str
     holder: Optional[HolderRow]  # the open assignment
+    archive: Optional[ArchiveRow]  # when and why an archived key was archived
 
 
 class AssignmentRow(TypedDict):
@@ -64,16 +70,20 @@ class KeyRepository:
         try:
             rows = conn.execute("""
                 SELECT k.id, k.code, k.status, a.user_id, a.given_on, a.comment, u.last_name, u.first_name,
+                       e.date AS archived_on, e.comment AS archive_comment,
                        (SELECT MAX(s.name) FROM purchases p JOIN orders o ON o.id = p.order_id
                         JOIN seasons s ON s.id = o.season_id WHERE p.user_id = a.user_id) AS last_season
                 FROM keys k
                 LEFT JOIN key_assignments a ON a.key_id = k.id AND a.returned_on IS NULL
                 LEFT JOIN users u ON u.id = a.user_id
+                LEFT JOIN key_events e ON k.status = 'archived' AND e.id = (
+                    SELECT MAX(id) FROM key_events WHERE key_id = k.id AND type = 'archived')
                 ORDER BY k.id
             """).fetchall()
             return [KeyRow(id=r["id"], code=r["code"], status=r["status"],
                            holder=HolderRow(user_id=r["user_id"], last_name=r["last_name"] or "", first_name=r["first_name"] or "",
-                                            given_on=r["given_on"], comment=r["comment"], last_season=r["last_season"] or "") if r["user_id"] is not None else None)
+                                            given_on=r["given_on"], comment=r["comment"], last_season=r["last_season"] or "") if r["user_id"] is not None else None,
+                           archive=ArchiveRow(date=r["archived_on"], comment=r["archive_comment"]) if r["archived_on"] else None)
                     for r in rows]
         finally:
             conn.close()
@@ -121,7 +131,7 @@ class KeyRepository:
             conn.commit()
             key_id = cursor.lastrowid
             assert key_id is not None  # noqa: S101 - set by the INSERT
-            return KeyRow(id=key_id, code=code, status="available", holder=None)
+            return KeyRow(id=key_id, code=code, status="available", holder=None, archive=None)
         finally:
             conn.close()
 
@@ -228,6 +238,31 @@ class KeyRepository:
             if assignment["returned_on"] is None:
                 conn.execute("UPDATE keys SET status = 'available', updated_at = ? WHERE id = ?", (now, assignment["key_id"]))
             _add_event(conn, assignment["key_id"], "assignment_deleted", now[:10], event_comment, by)
+            conn.commit()
+        finally:
+            conn.close()
+
+    @classmethod
+    def archive(cls, key_id: int, archived_on: str, comment: str, by: str) -> None:
+        """Archives the key, ending its open assignment at that date (the reason as its return comment)."""
+        now = _now()
+        conn = _connect()
+        try:
+            conn.execute("UPDATE key_assignments SET returned_on = ?, return_comment = ? WHERE key_id = ? AND returned_on IS NULL",
+                         (archived_on, comment, key_id))
+            conn.execute("UPDATE keys SET status = 'archived', updated_at = ? WHERE id = ?", (now, key_id))
+            _add_event(conn, key_id, "archived", archived_on, comment, by)
+            conn.commit()
+        finally:
+            conn.close()
+
+    @classmethod
+    def restore(cls, key_id: int, comment: str, by: str) -> None:
+        now = _now()
+        conn = _connect()
+        try:
+            conn.execute("UPDATE keys SET status = 'available', updated_at = ? WHERE id = ?", (now, key_id))
+            _add_event(conn, key_id, "restored", now[:10], comment, by)
             conn.commit()
         finally:
             conn.close()

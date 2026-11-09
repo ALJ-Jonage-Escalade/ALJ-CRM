@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* Outils › Clés: the panel of one key, its history oldest first (who held it, from when to when; what else happened
-   to it) and, for admins, its actions: rename, correct an assignment, delete the latest one (entered by mistake). */
+   to it) and, for admins, its actions: hand over / return, archive / restore, rename, correct an assignment, delete
+   the latest one (entered by mistake). */
 import { inject, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiSidePanel from "../../components/ui/UiSidePanel.vue";
@@ -12,7 +13,14 @@ import KeyAssignmentEditDialog from "./KeyAssignmentEditDialog.vue";
 import { EVENT_LABEL, holderName, STATUS_LABEL, type AssignmentEntry, type HistoryEntry, type Key } from "./keys";
 
 const props = defineProps<{ shownKey: Key; admin: boolean }>();
-const emit = defineEmits<{ changed: [message: string]; failed: [message: string]; assign: []; giveBack: []; close: [] }>();
+const emit = defineEmits<{
+  changed: [message: string];
+  failed: [message: string];
+  assign: [];
+  giveBack: [];
+  archive: [];
+  close: [];
+}>();
 
 const keysApi = createKeysApi(inject(CLIENT_KEY)!);
 const open = ref(true);
@@ -64,6 +72,24 @@ async function remove(a: AssignmentEntry): Promise<void> {
   }
 }
 
+async function restore(): Promise<void> {
+  const comment = await dialogs.prompt({
+    title: `Restaurer la clé « ${props.shownKey.code} » ?`,
+    message: "Elle redeviendra disponible ; son archivage reste dans l'historique.",
+    label: "Commentaire (facultatif)",
+    confirmLabel: "Restaurer",
+  });
+  if (comment === null) {
+    return;
+  }
+  try {
+    await keysApi.restore(props.shownKey.id, comment.trim());
+    emit("changed", `✅ Clé « ${props.shownKey.code} » restaurée : elle est de nouveau disponible.`);
+  } catch (e) {
+    emit("failed", errorText(e));
+  }
+}
+
 function edited(message: string): void {
   editing.value = null;
   emit("changed", message);
@@ -72,13 +98,20 @@ function edited(message: string): void {
 
 <template>
   <UiSidePanel id="key-panel" v-model:open="open" :title="`🔑 Clé ${shownKey.code}`" data-testid="key-panel">
-    <p class="mb-2 text-xs text-slate-500">{{ STATUS_LABEL[shownKey.status] }}</p>
+    <p class="mb-2 text-xs text-slate-500">
+      {{ STATUS_LABEL[shownKey.status] }}
+      <template v-if="shownKey.archive">le {{ formatDayText(shownKey.archive.date) }} : {{ shownKey.archive.comment }}</template>
+    </p>
     <div v-if="admin" class="mb-3 flex flex-wrap gap-2">
       <UiButton v-if="shownKey.status === 'available'" small data-testid="panel-assign" @click="emit('assign')">Remettre</UiButton>
       <UiButton v-if="shownKey.status === 'assigned'" small variant="muted" data-testid="panel-return" @click="emit('giveBack')">
         Retour
       </UiButton>
       <UiButton small variant="muted" data-testid="key-rename" @click="rename">✏️ Modifier le code</UiButton>
+      <UiButton v-if="shownKey.status !== 'archived'" small variant="warning" data-testid="panel-archive" @click="emit('archive')">
+        📦 Archiver
+      </UiButton>
+      <UiButton v-else small data-testid="panel-restore" @click="restore">♻️ Restaurer</UiButton>
     </div>
 
     <h3 class="mb-1.5 text-[11.5px] font-bold text-slate-500 uppercase">Historique</h3>

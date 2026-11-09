@@ -23,12 +23,19 @@ class KeyHolder(BaseModel):
     season: str  # season of the member's record (the active one, else their last one), for the link to it
 
 
+class KeyArchive(BaseModel):
+    """When and why a key was archived."""
+    date: str
+    comment: str
+
+
 class Key(BaseModel):
-    """A club key, its status and its current holder."""
+    """A club key, its status, its current holder and, archived, when and why."""
     id: int
     code: str
     status: KeyStatus
     holder: Optional[KeyHolder] = None
+    archive: Optional[KeyArchive] = None
 
 
 class KeyDone(BaseModel):
@@ -92,3 +99,14 @@ class KeyEventEntry(BaseModel):
 
 
 KeyHistory = List[Union[KeyAssignmentEntry, KeyEventEntry]]
+
+
+class KeyArchiveIn(RequestBody):
+    """A key archived (lost, broken): the reason is required."""
+    archived_on: datetime.date
+    comment: str = Field(min_length=1, max_length=500)
+
+
+class KeyRestoreIn(RequestBody):
+    """An archive undone (the key found again)."""
+    comment: str = Field(default="", max_length=500)

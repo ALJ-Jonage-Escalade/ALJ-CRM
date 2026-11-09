@@ -7,7 +7,7 @@ from typing import Dict, List
 from fastapi import APIRouter, Request
 
 from api.auth.me import author_of
-from api.keys.schemas import Key, KeyAssignmentIn, KeyAssignmentPatch, KeyDone, KeyHistory, KeyIn, KeyRename, KeyReturnIn
+from api.keys.schemas import Key, KeyArchiveIn, KeyAssignmentIn, KeyAssignmentPatch, KeyDone, KeyHistory, KeyIn, KeyRename, KeyRestoreIn, KeyReturnIn
 from api.responses import SUCCESS, error_responses
 from infrastructure.sqlite.keys import KeyRow
 from services.keys import club_keys
@@ -59,4 +59,16 @@ def correct_assignment(assignment_id: int, body: KeyAssignmentPatch) -> Dict[str
 @router.delete("/api/key-assignments/{assignment_id}", response_model=KeyDone, responses=error_responses(404, 409))
 def delete_assignment(request: Request, assignment_id: int) -> Dict[str, str]:
     KeyService.delete_assignment(assignment_id, author_of(request))
+    return SUCCESS
+
+
+@router.post("/api/keys/{key_id}/archive", response_model=KeyDone, responses=error_responses(400, 404, 409))
+def archive_key(request: Request, key_id: int, body: KeyArchiveIn) -> Dict[str, str]:
+    KeyService.archive(key_id, body.archived_on.isoformat(), body.comment, author_of(request))
+    return SUCCESS
+
+
+@router.post("/api/keys/{key_id}/restore", response_model=KeyDone, responses=error_responses(404, 409))
+def restore_key(request: Request, key_id: int, body: KeyRestoreIn) -> Dict[str, str]:
+    KeyService.restore(key_id, body.comment, author_of(request))
     return SUCCESS

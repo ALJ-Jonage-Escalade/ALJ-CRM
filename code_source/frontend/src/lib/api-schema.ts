@@ -1039,6 +1039,40 @@ export interface paths {
         patch: operations["correct_assignment_api_key_assignments__assignment_id__patch"];
         trace?: never;
     };
+    "/api/keys/{key_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Key */
+        post: operations["archive_key_api_keys__key_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/keys/{key_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Key */
+        post: operations["restore_key_api_keys__key_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/webhooks/helloasso": {
         parameters: {
             query?: never;
@@ -3097,7 +3131,7 @@ export interface components {
         };
         /**
          * Key
-         * @description A club key, its status and its current holder.
+         * @description A club key, its status, its current holder and, archived, when and why.
          */
         Key: {
             /** Id */
@@ -3110,6 +3144,30 @@ export interface components {
              */
             status: "available" | "assigned" | "archived";
             holder?: components["schemas"]["KeyHolder"] | null;
+            archive?: components["schemas"]["KeyArchive"] | null;
+        };
+        /**
+         * KeyArchive
+         * @description When and why a key was archived.
+         */
+        KeyArchive: {
+            /** Date */
+            date: string;
+            /** Comment */
+            comment: string;
+        };
+        /**
+         * KeyArchiveIn
+         * @description A key archived (lost, broken): the reason is required.
+         */
+        KeyArchiveIn: {
+            /**
+             * Archived On
+             * Format: date
+             */
+            archived_on: string;
+            /** Comment */
+            comment: string;
         };
         /**
          * KeyAssignmentEntry
@@ -3251,6 +3309,17 @@ export interface components {
         KeyRename: {
             /** Code */
             code: string;
+        };
+        /**
+         * KeyRestoreIn
+         * @description An archive undone (the key found again).
+         */
+        KeyRestoreIn: {
+            /**
+             * Comment
+             * @default
+             */
+            comment?: string;
         };
         /**
          * KeyReturnIn
@@ -7403,6 +7472,121 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_key_api_keys__key_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyArchiveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_key_api_keys__key_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyRestoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

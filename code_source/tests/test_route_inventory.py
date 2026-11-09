@@ -78,6 +78,8 @@ EXPECTED_ROUTES: dict[tuple[str, str], Optional[Role]] = {
     ("POST", "/api/keys/{key_id}/assignments"): Role.ADMIN,
     ("POST", "/api/keys/{key_id}/return"): Role.ADMIN,
     ("PATCH", "/api/keys/{key_id}"): Role.ADMIN,
+    ("POST", "/api/keys/{key_id}/archive"): Role.ADMIN,
+    ("POST", "/api/keys/{key_id}/restore"): Role.ADMIN,
     ("GET", "/api/keys/{key_id}/history"): Role.COACH,
     ("PATCH", "/api/key-assignments/{assignment_id}"): Role.ADMIN,
     ("DELETE", "/api/key-assignments/{assignment_id}"): Role.ADMIN,

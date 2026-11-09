@@ -3807,6 +3807,154 @@
         }
       }
     },
+    "/api/keys/{key_id}/archive": {
+      "post": {
+        "summary": "Archive Key",
+        "operationId": "archive_key_api_keys__key_id__archive_post",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyArchiveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{key_id}/restore": {
+      "post": {
+        "summary": "Restore Key",
+        "operationId": "restore_key_api_keys__key_id__restore_post",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyRestoreIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/webhooks/helloasso": {
       "get": {
         "summary": "Webhook Helloasso Ping",
@@ -7886,6 +8034,16 @@
                 "type": "null"
               }
             ]
+          },
+          "archive": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyArchive"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7895,7 +8053,49 @@
           "status"
         ],
         "title": "Key",
-        "description": "A club key, its status and its current holder."
+        "description": "A club key, its status, its current holder and, archived, when and why."
+      },
+      "KeyArchive": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "comment"
+        ],
+        "title": "KeyArchive",
+        "description": "When and why a key was archived."
+      },
+      "KeyArchiveIn": {
+        "properties": {
+          "archived_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Archived On"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Comment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "archived_on",
+          "comment"
+        ],
+        "title": "KeyArchiveIn",
+        "description": "A key archived (lost, broken): the reason is required."
       },
       "KeyAssignmentEntry": {
         "properties": {
@@ -8169,6 +8369,20 @@
         ],
         "title": "KeyRename",
         "description": "A key's new code (a placeholder replaced, a typo fixed)."
+      },
+      "KeyRestoreIn": {
+        "properties": {
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Comment",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "KeyRestoreIn",
+        "description": "An archive undone (the key found again)."
       },
       "KeyReturnIn": {
         "properties": {

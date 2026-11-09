@@ -250,3 +250,63 @@ class TestKeyHistory(KeysTestCase):
 
     def test_unknown_assignment(self) -> None:
         self.assertEqual(self.client.delete("/api/key-assignments/999").status_code, 404)
+
+
+class TestArchiveKey(KeysTestCase):
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.key_id = self.add_key("12")["id"]
+        self.harry = self.member("1", "Harry", "POTTER")
+
+    def archive(self, archived_on: str = "2026-11-03", comment: str = "Perdue") -> object:
+        return self.client.post(f"/api/keys/{self.key_id}/archive", json={"archived_on": archived_on, "comment": comment})
+
+    def restore(self, comment: str = "") -> object:
+        return self.client.post(f"/api/keys/{self.key_id}/restore", json={"comment": comment})
+
+    def history(self) -> list:
+        return self.client.get(f"/api/keys/{self.key_id}/history").json()
+
+    def test_archived_key_keeps_its_date_and_reason(self) -> None:
+        self.assertEqual(self.archive("2026-11-03", "Cassée").status_code, 200)
+        key = self.key(self.key_id)
+        self.assertEqual((key["status"], key["archive"]), ("archived", {"date": "2026-11-03", "comment": "Cassée"}))
+        self.assertEqual([(e["type"], e["date"], e["comment"]) for e in self.history()], [("archived", "2026-11-03", "Cassée")])
+
+    def test_a_reason_is_required(self) -> None:
+        self.assertEqual(self.archive(comment="  ").status_code, 422)
+        self.assertEqual(self.key(self.key_id)["status"], "available")
+
+    def test_archiving_a_held_key_ends_its_assignment(self) -> None:
+        self.assign(self.key_id, self.harry, "2026-09-12")
+        self.assertEqual(self.archive("2026-11-03", "Perdue").status_code, 200)
+        key = self.key(self.key_id)
+        self.assertEqual((key["status"], key["holder"]), ("archived", None))
+        assignment = self.history()[0]
+        self.assertEqual((assignment["returned_on"], assignment["return_comment"]), ("2026-11-03", "Perdue"))
+        # Harry may be given another key
+        other = self.add_key("13")["id"]
+        self.assertEqual(self.assign(other, self.harry, "2026-11-04").status_code, 200)
+
+    def test_archive_date_cannot_precede_the_handover(self) -> None:
+        self.assign(self.key_id, self.harry, "2026-09-12")
+        self.assertEqual(self.archive("2026-09-01").status_code, 400)
+        self.assertEqual(self.key(self.key_id)["status"], "assigned")
+
+    def test_an_archived_key_cannot_be_assigned_nor_archived_again(self) -> None:
+        self.archive()
+        self.assertEqual(self.assign(self.key_id, self.harry).json()["code"], "key_not_available")
+        self.assertEqual(self.archive().status_code, 409)
+
+    def test_restored_key_is_available_and_its_archive_stays_in_the_history(self) -> None:
+        self.assign(self.key_id, self.harry, "2026-09-12")
+        self.archive("2026-11-03", "Perdue")
+        self.assertEqual(self.restore("Retrouvée dans le casier").status_code, 200)
+        key = self.key(self.key_id)
+        self.assertEqual((key["status"], key["holder"], key["archive"]), ("available", None, None))
+        self.assertEqual([e.get("type", e["kind"]) for e in self.history()], ["assignment", "archived", "restored"])
+        self.assertEqual(self.history()[-1]["comment"], "Retrouvée dans le casier")
+
+    def test_only_an_archived_key_can_be_restored(self) -> None:
+        self.assertEqual(self.restore().status_code, 409)
