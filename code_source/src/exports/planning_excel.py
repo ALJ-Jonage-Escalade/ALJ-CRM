@@ -14,6 +14,7 @@ Construit une grille « Lundi → Samedi », de 9h à 22h par pas de 30 minutes 
 Logique pure et testable : parse_horaire / clean_group_label / _initiales /
 encadrants_text / assign_lanes, puis export_planning_excel (openpyxl).
 """
+import io
 import math
 import re
 
@@ -122,8 +123,8 @@ def normalize_type(type_value):
     return t if t in TYPE_FILLS else "cours"
 
 
-def export_planning_excel(planning_data, saison, out_path):
-    """Construit le fichier Excel du planning hebdomadaire et retourne le chemin."""
+def export_planning_excel(planning_data, saison) -> bytes:
+    """Classeur Excel (en mémoire) du planning hebdomadaire ; ValueError sans aucun créneau plaçable sur la grille."""
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
@@ -268,11 +269,12 @@ def export_planning_excel(planning_data, saison, out_path):
     ws.sheet_properties.pageSetUpPr.fitToPage = True
 
     neutralize_formulas(wb)
-    wb.save(out_path)
-    return out_path
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
 
 
-def export_planning_list_excel(planning_data, saison, out_path):
+def export_planning_list_excel(planning_data, saison) -> bytes:
     """Extraction « liste » du planning : une ligne par créneau, au format de la BDD.
 
     Colonnes proches de la table `planning` : Jour, Groupe, Type, Horaires, Encadrants,
@@ -339,5 +341,6 @@ def export_planning_list_excel(planning_data, saison, out_path):
     ws.freeze_panes = "A2"
 
     neutralize_formulas(wb)
-    wb.save(out_path)
-    return out_path
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()

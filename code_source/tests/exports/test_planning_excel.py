@@ -1,7 +1,7 @@
 """Tests de l'export Excel du planning hebdomadaire (onglet Créneaux)."""
+import io
 import os
 import sys
-import tempfile
 import unittest
 
 _test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -109,13 +109,6 @@ class TestAssignLanes(unittest.TestCase):
 
 
 class TestExportExcel(unittest.TestCase):
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.path = os.path.join(self._tmp.name, "planning.xlsx")
-
-    def tearDown(self):
-        self._tmp.cleanup()
-
     def _planning(self):
         return [
             {"groupe": "Compétition - U11-U13", "type": "compétition", "jour": "Lundi",
@@ -130,9 +123,8 @@ class TestExportExcel(unittest.TestCase):
 
     def test_export_creates_grid(self):
         from openpyxl import load_workbook
-        out = export_planning_excel(self._planning(), "2026-2027", self.path)
-        self.assertTrue(os.path.exists(out))
-        wb = load_workbook(out)
+        out = export_planning_excel(self._planning(), "2026-2027")
+        wb = load_workbook(io.BytesIO(out))
         ws = wb.active
         self.assertEqual(ws.title, "Planning")
         # Titre saison
@@ -165,7 +157,7 @@ class TestExportExcel(unittest.TestCase):
 
     def test_export_without_valid_slots_raises(self):
         with self.assertRaises(ValueError):
-            export_planning_excel([{"groupe": "X", "jour": "Lundi", "horaires": "invalide"}], "2026-2027", self.path)
+            export_planning_excel([{"groupe": "X", "jour": "Lundi", "horaires": "invalide"}], "2026-2027")
 
     def test_day_separator_vs_lane_separator(self):
         """Deux créneaux qui se chevauchent : voie thin, fin de jour thick."""
@@ -178,8 +170,8 @@ class TestExportExcel(unittest.TestCase):
             {"groupe": "Autonome", "type": "autonome", "jour": "Mardi",
              "horaires": "20:00 - 22:00", "encadrants": []},
         ]
-        out = export_planning_excel(planning, "2026-2027", self.path)
-        ws = load_workbook(out).active
+        out = export_planning_excel(planning, "2026-2027")
+        ws = load_workbook(io.BytesIO(out)).active
         # Lundi : 2 voies (col2 = voie 0, col3 = fin du jour) puis Mardi (col4 = fin du jour)
         self.assertEqual(ws.cell(row=3, column=2).border.right.style, "thin")
         self.assertEqual(ws.cell(row=3, column=3).border.right.style, "thick")
@@ -187,13 +179,6 @@ class TestExportExcel(unittest.TestCase):
 
 
 class TestExportListExcel(unittest.TestCase):
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.path = os.path.join(self._tmp.name, "planning_liste.xlsx")
-
-    def tearDown(self):
-        self._tmp.cleanup()
-
     def test_list_matches_db_shape(self):
         from openpyxl import load_workbook
         planning = [
@@ -206,8 +191,8 @@ class TestExportListExcel(unittest.TestCase):
              "helloasso_tarifs": ["Adultes autonomes"], "categorie_age": "Adultes",
              "naissance_min": "", "naissance_max": ""},
         ]
-        out = export_planning_list_excel(planning, "2026-2027", self.path)
-        ws = load_workbook(out).active
+        out = export_planning_list_excel(planning, "2026-2027")
+        ws = load_workbook(io.BytesIO(out)).active
         self.assertEqual(ws.title, "Planning (liste)")
         # En-têtes proches de la BDD
         headers = [ws.cell(row=1, column=c).value for c in range(1, 10)]
@@ -221,8 +206,8 @@ class TestExportListExcel(unittest.TestCase):
 
     def test_empty_planning(self):
         from openpyxl import load_workbook
-        out = export_planning_list_excel([], "2026-2027", self.path)
-        ws = load_workbook(out).active
+        out = export_planning_list_excel([], "2026-2027")
+        ws = load_workbook(io.BytesIO(out)).active
         self.assertEqual(ws.max_row, 1)   # en-têtes seuls
 
 
