@@ -22,3 +22,5 @@ def test_assignments_are_replicated_and_follow_renumbered_ids() -> None:
     assert "key_assignments" in TRACKED_TABLES
     assert ("key_assignments", "key_id") in REFERENCES["keys"]
     assert ("key_assignments", "user_id") in REFERENCES["users"]
+    assert "key_events" in TRACKED_TABLES
+    assert ("key_events", "key_id") in REFERENCES["keys"]

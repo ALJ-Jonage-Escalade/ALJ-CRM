@@ -177,3 +177,76 @@ class TestReturnKey(KeysTestCase):
     def test_a_key_nobody_holds_cannot_be_returned(self) -> None:
         self.give_back(self.key_id)
         self.assertEqual(self.give_back(self.key_id).status_code, 409)
+
+
+class TestKeyHistory(KeysTestCase):
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.key_id = self.add_key("12")["id"]
+        self.harry = self.member("1", "Harry", "POTTER")
+        self.ron = self.member("2", "Ron", "WEASLEY")
+
+    def history(self, key_id: int | None = None) -> list:
+        r = self.client.get(f"/api/keys/{key_id or self.key_id}/history")
+        self.assertEqual(r.status_code, 200, r.text)
+        return r.json()
+
+    def test_history_lists_the_holders_in_order(self) -> None:
+        self.assign(self.key_id, self.harry, "2026-09-12", "Forum")
+        self.give_back(self.key_id, "2026-12-20", "Départ")
+        self.assign(self.key_id, self.ron, "2027-01-05")
+        entries = self.history()
+        self.assertEqual([(e["kind"], e["last_name"], e["given_on"], e["returned_on"]) for e in entries],
+                         [("assignment", "POTTER", "2026-09-12", "2026-12-20"), ("assignment", "WEASLEY", "2027-01-05", None)])
+        self.assertEqual((entries[0]["comment"], entries[0]["return_comment"], entries[0]["by"]), ("Forum", "Départ", "serveur local"))
+
+    def test_rename_keeps_uniqueness_and_is_recorded(self) -> None:
+        self.add_key("13")
+        r = self.client.patch(f"/api/keys/{self.key_id}", json={"code": "13"})
+        self.assertEqual(r.status_code, 409, r.text)
+        r = self.client.patch(f"/api/keys/{self.key_id}", json={"code": "12-B"})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(self.key(self.key_id)["code"], "12-B")
+        self.assertEqual([(e["kind"], e["type"], e["comment"]) for e in self.history()], [("event", "renamed", "12 → 12-B")])
+
+    def test_assignment_dates_and_comments_can_be_corrected(self) -> None:
+        self.assign(self.key_id, self.harry, "2026-09-12")
+        self.give_back(self.key_id, "2026-12-20")
+        assignment = self.history()[0]["id"]
+        r = self.client.patch(f"/api/key-assignments/{assignment}",
+                              json={"given_on": "2026-09-10", "returned_on": "2026-12-21", "comment": "Forum", "return_comment": "Ok"})
+        self.assertEqual(r.status_code, 200, r.text)
+        e = self.history()[0]
+        self.assertEqual((e["given_on"], e["returned_on"], e["comment"], e["return_comment"]), ("2026-09-10", "2026-12-21", "Forum", "Ok"))
+
+    def test_corrected_return_cannot_precede_the_handover(self) -> None:
+        self.assign(self.key_id, self.harry, "2026-09-12")
+        self.give_back(self.key_id, "2026-12-20")
+        assignment = self.history()[0]["id"]
+        r = self.client.patch(f"/api/key-assignments/{assignment}", json={"given_on": "2026-12-21", "returned_on": "2026-12-20",
+                                                                          "comment": "", "return_comment": ""})
+        self.assertEqual(r.status_code, 400, r.text)
+
+    def test_a_held_key_gets_no_return_date_by_correction(self) -> None:
+        self.assign(self.key_id, self.harry, "2026-09-12")
+        assignment = self.history()[0]["id"]
+        r = self.client.patch(f"/api/key-assignments/{assignment}", json={"given_on": "2026-09-12", "returned_on": "2026-12-20",
+                                                                          "comment": "", "return_comment": ""})
+        self.assertEqual(r.status_code, 400, r.text)
+        self.assertEqual(self.key(self.key_id)["status"], "assigned")
+
+    def test_only_the_latest_assignment_can_be_deleted(self) -> None:
+        self.assign(self.key_id, self.harry, "2026-09-12")
+        self.give_back(self.key_id, "2026-12-20")
+        self.assign(self.key_id, self.ron, "2027-01-05")
+        first, latest = (e["id"] for e in self.history())
+        self.assertEqual(self.client.delete(f"/api/key-assignments/{first}").status_code, 409)
+        r = self.client.delete(f"/api/key-assignments/{latest}")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(self.key(self.key_id)["status"], "available")  # Ron's was open: nobody holds it now
+        self.assertEqual([(e["kind"], e.get("type"), e["comment"]) for e in self.history()],
+                         [("assignment", None, ""), ("event", "assignment_deleted", "WEASLEY Ron, remise le 05/01/2027")])
+
+    def test_unknown_assignment(self) -> None:
+        self.assertEqual(self.client.delete("/api/key-assignments/999").status_code, 404)

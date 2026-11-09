@@ -15,6 +15,7 @@ import { formatDayText } from "../../lib/format";
 import { createKeysApi } from "../../services/keys";
 import { OUTILS_KEY } from "./context";
 import KeyAssignDialog from "./KeyAssignDialog.vue";
+import KeyPanel from "./KeyPanel.vue";
 import KeyReturnDialog from "./KeyReturnDialog.vue";
 import { holderName, keyCounts, shownKeys, STATUS_LABEL, type Key } from "./keys";
 
@@ -29,6 +30,9 @@ const flaggedOnly = ref(false);
 const shown = computed(() => shownKeys(keys.value ?? [], search.value, flaggedOnly.value));
 const assigning = ref<Key | null>(null);
 const returning = ref<Key | null>(null);
+// The key whose panel is open: its id, so the panel follows the reloaded list
+const selectedId = ref<number | null>(null);
+const selected = computed(() => keys.value?.find((k) => k.id === selectedId.value) ?? null);
 const counts = computed(() => keyCounts(keys.value ?? []));
 
 const COLUMNS: DataColumn<Key>[] = [
@@ -106,63 +110,84 @@ defineExpose({ reload });
       </div>
     </UiCard>
 
-    <DataTable
-      :rows="shown"
-      :columns="COLUMNS"
-      :row-key="(k: Key) => String(k.id)"
-      :sort="{ id: 'code' }"
-      label="Clés"
-      :hidden="isAdmin ? [] : ['actions']"
-      :empty="keys ? 'Aucune clé.' : 'Chargement en cours…'"
-    >
-      <template #cell-code="{ row }">
-        <b data-testid="key-code">{{ row.code }}</b>
-      </template>
-      <template #cell-holder="{ row }">
-        <span v-if="row.holder" data-testid="key-holder">
-          <RouterLink
-            :to="holderLink(row)"
-            class="text-slate-800 no-underline hover:text-accent hover:underline"
-            title="Ouvrir la fiche adhérent"
-          >
-            {{ holderName(row.holder) }}
-          </RouterLink>
-          <span v-if="!row.holder.member_this_season" class="cursor-help" title="Pas d'adhésion pour la saison active : clé à récupérer ?">
-            ⚠️
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-start">
+      <DataTable
+        class="min-w-0 flex-1"
+        :selected-key="selectedId === null ? undefined : String(selectedId)"
+        :on-row-click="(k: Key) => (selectedId = k.id)"
+        :rows="shown"
+        :columns="COLUMNS"
+        :row-key="(k: Key) => String(k.id)"
+        :sort="{ id: 'code' }"
+        label="Clés"
+        :hidden="isAdmin ? [] : ['actions']"
+        :empty="keys ? 'Aucune clé.' : 'Chargement en cours…'"
+      >
+        <template #cell-code="{ row }">
+          <b data-testid="key-code">{{ row.code }}</b>
+        </template>
+        <template #cell-holder="{ row }">
+          <span v-if="row.holder" data-testid="key-holder">
+            <RouterLink
+              :to="holderLink(row)"
+              class="text-slate-800 no-underline hover:text-accent hover:underline"
+              title="Ouvrir la fiche adhérent"
+            >
+              {{ holderName(row.holder) }}
+            </RouterLink>
+            <span
+              v-if="!row.holder.member_this_season"
+              class="cursor-help"
+              title="Pas d'adhésion pour la saison active : clé à récupérer ?"
+            >
+              ⚠️
+            </span>
           </span>
-        </span>
-        <span v-else class="text-slate-400">—</span>
-      </template>
-      <template #cell-given_on="{ row }">
-        <span v-if="row.holder" data-testid="key-given-on">{{ formatDayText(row.holder.given_on) }}</span>
-        <span v-else class="text-slate-400">—</span>
-      </template>
-      <template #cell-actions="{ row }">
-        <span data-testid="key-actions">
-          <UiButton v-if="row.status === 'available'" small :data-testid="`key-assign-${row.id}`" @click="assigning = row">
-            Remettre
-          </UiButton>
-          <UiButton
-            v-else-if="row.status === 'assigned'"
-            small
-            variant="muted"
-            :data-testid="`key-return-${row.id}`"
-            @click="returning = row"
-          >
-            Retour
-          </UiButton>
-        </span>
-      </template>
-      <template #card="{ row }">
-        <b>🔑 {{ row.code }}</b>
-        <span class="ml-2 text-xs text-slate-500">{{ STATUS_LABEL[row.status] }}</span>
-        <div v-if="row.holder" class="text-xs">
-          <RouterLink :to="holderLink(row)">{{ holderName(row.holder) }}</RouterLink>
-          <template v-if="!row.holder.member_this_season">⚠️</template>
-          · depuis le {{ formatDayText(row.holder.given_on) }}
-        </div>
-      </template>
-    </DataTable>
+          <span v-else class="text-slate-400">—</span>
+        </template>
+        <template #cell-given_on="{ row }">
+          <span v-if="row.holder" data-testid="key-given-on">{{ formatDayText(row.holder.given_on) }}</span>
+          <span v-else class="text-slate-400">—</span>
+        </template>
+        <template #cell-actions="{ row }">
+          <span data-testid="key-actions">
+            <UiButton v-if="row.status === 'available'" small :data-testid="`key-assign-${row.id}`" @click="assigning = row">
+              Remettre
+            </UiButton>
+            <UiButton
+              v-else-if="row.status === 'assigned'"
+              small
+              variant="muted"
+              :data-testid="`key-return-${row.id}`"
+              @click="returning = row"
+            >
+              Retour
+            </UiButton>
+          </span>
+        </template>
+        <template #card="{ row }">
+          <b>🔑 {{ row.code }}</b>
+          <span class="ml-2 text-xs text-slate-500">{{ STATUS_LABEL[row.status] }}</span>
+          <div v-if="row.holder" class="text-xs">
+            <RouterLink :to="holderLink(row)">{{ holderName(row.holder) }}</RouterLink>
+            <template v-if="!row.holder.member_this_season">⚠️</template>
+            · depuis le {{ formatDayText(row.holder.given_on) }}
+          </div>
+        </template>
+      </DataTable>
+      <KeyPanel
+        v-if="selected"
+        :key="selected.id"
+        class="order-first lg:order-none"
+        :shown-key="selected"
+        :admin="isAdmin"
+        @close="selectedId = null"
+        @changed="done"
+        @failed="(m) => toast.show(`❌ ${m}`, 8000)"
+        @assign="assigning = selected"
+        @give-back="returning = selected"
+      />
+    </div>
 
     <KeyAssignDialog
       :key-to-assign="assigning"

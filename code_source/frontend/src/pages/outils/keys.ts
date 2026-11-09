@@ -11,6 +11,16 @@ export const STATUS_LABEL: Record<KeyStatus, string> = {
   archived: "⚫ Archivée",
 };
 
+export type HistoryEntry = Schemas["KeyAssignmentEntry"] | Schemas["KeyEventEntry"];
+export type AssignmentEntry = Schemas["KeyAssignmentEntry"];
+
+export const EVENT_LABEL: Record<Schemas["KeyEventEntry"]["type"], string> = {
+  archived: "📦 Archivée",
+  restored: "♻️ Restaurée",
+  renamed: "✏️ Code modifié",
+  assignment_deleted: "🗑️ Attribution supprimée",
+};
+
 export const holderName = (h: { last_name: string; first_name: string }): string => `${h.last_name} ${h.first_name}`.trim();
 
 /** The keys matching the search (code or holder, case ignored), only those of holders who did not renew when

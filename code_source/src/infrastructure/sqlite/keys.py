@@ -1,4 +1,4 @@
-"""Club keys of the climbing wall in the SQLite cache (tables keys, key_assignments; plans/club-keys.md)."""
+"""Club keys of the climbing wall in the SQLite cache (tables keys, key_assignments, key_events; plans/club-keys.md)."""
 
 from __future__ import annotations
 
@@ -25,6 +25,27 @@ class KeyRow(TypedDict):
     code: str
     status: str
     holder: Optional[HolderRow]  # the open assignment
+
+
+class AssignmentRow(TypedDict):
+    id: int
+    key_id: int
+    user_id: int
+    last_name: str
+    first_name: str
+    given_on: str
+    returned_on: Optional[str]  # None while held
+    comment: str
+    return_comment: str
+    by: str
+
+
+class EventRow(TypedDict):
+    id: int
+    type: str  # archived, restored, renamed, assignment_deleted
+    date: str
+    comment: str
+    by: str
 
 
 def _now() -> str:
@@ -132,3 +153,92 @@ class KeyRepository:
             conn.commit()
         finally:
             conn.close()
+
+    @classmethod
+    def assignments(cls, key_id: int) -> List[AssignmentRow]:
+        """The key's assignments, oldest first."""
+        conn = _connect()
+        try:
+            rows = conn.execute("""
+                SELECT a.id, a.key_id, a.user_id, a.given_on, a.returned_on, a.comment, a.return_comment, a.by,
+                       u.last_name, u.first_name
+                FROM key_assignments a LEFT JOIN users u ON u.id = a.user_id
+                WHERE a.key_id = ? ORDER BY a.given_on, a.id
+            """, (key_id,)).fetchall()
+            return [_assignment(r) for r in rows]
+        finally:
+            conn.close()
+
+    @classmethod
+    def get_assignment(cls, assignment_id: int) -> Optional[AssignmentRow]:
+        conn = _connect()
+        try:
+            row = conn.execute("""
+                SELECT a.id, a.key_id, a.user_id, a.given_on, a.returned_on, a.comment, a.return_comment, a.by,
+                       u.last_name, u.first_name
+                FROM key_assignments a LEFT JOIN users u ON u.id = a.user_id WHERE a.id = ?
+            """, (assignment_id,)).fetchone()
+            return _assignment(row) if row else None
+        finally:
+            conn.close()
+
+    @classmethod
+    def events(cls, key_id: int) -> List[EventRow]:
+        """The key's events, oldest first."""
+        conn = _connect()
+        try:
+            rows = conn.execute("SELECT id, type, date, comment, by FROM key_events WHERE key_id = ? ORDER BY date, id",
+                                (key_id,)).fetchall()
+            return [EventRow(id=r["id"], type=r["type"], date=r["date"], comment=r["comment"], by=r["by"]) for r in rows]
+        finally:
+            conn.close()
+
+    @classmethod
+    def rename(cls, key_id: int, code: str, event_comment: str, by: str) -> None:
+        """New code (Conflict when another key has it) and its `renamed` event, in one transaction."""
+        now = _now()
+        conn = _connect()
+        try:
+            try:
+                conn.execute("UPDATE keys SET code = ?, updated_at = ? WHERE id = ?", (code, now, key_id))
+            except sqlite3.IntegrityError as e:
+                raise Conflict(f"La clé « {code} » existe déjà.", "duplicate_code") from e
+            _add_event(conn, key_id, "renamed", now[:10], event_comment, by)
+            conn.commit()
+        finally:
+            conn.close()
+
+    @classmethod
+    def update_assignment(cls, assignment_id: int, given_on: str, returned_on: Optional[str], comment: str, return_comment: str) -> None:
+        conn = _connect()
+        try:
+            conn.execute("UPDATE key_assignments SET given_on = ?, returned_on = ?, comment = ?, return_comment = ? WHERE id = ?",
+                         (given_on, returned_on, comment, return_comment, assignment_id))
+            conn.commit()
+        finally:
+            conn.close()
+
+    @classmethod
+    def delete_assignment(cls, assignment: AssignmentRow, event_comment: str, by: str) -> None:
+        """Deletes an assignment entered by mistake, records it as an event; an open one leaves the key available."""
+        now = _now()
+        conn = _connect()
+        try:
+            conn.execute("DELETE FROM key_assignments WHERE id = ?", (assignment["id"],))
+            if assignment["returned_on"] is None:
+                conn.execute("UPDATE keys SET status = 'available', updated_at = ? WHERE id = ?", (now, assignment["key_id"]))
+            _add_event(conn, assignment["key_id"], "assignment_deleted", now[:10], event_comment, by)
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def _assignment(r: sqlite3.Row) -> AssignmentRow:
+    return AssignmentRow(id=r["id"], key_id=r["key_id"], user_id=r["user_id"], last_name=r["last_name"] or "",
+                         first_name=r["first_name"] or "", given_on=r["given_on"], returned_on=r["returned_on"],
+                         comment=r["comment"], return_comment=r["return_comment"], by=r["by"])
+
+
+def _add_event(conn: sqlite3.Connection, key_id: int, type_: str, date: str, comment: str, by: str) -> None:
+    conn.execute("INSERT INTO key_events (key_id, type, date, comment, by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                 (key_id, type_, date, comment, by, _now()))

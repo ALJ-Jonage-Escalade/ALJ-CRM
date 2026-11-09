@@ -78,6 +78,16 @@ KEYS_DDL = (
     )""",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_key_assignments_open_key ON key_assignments(key_id) WHERE returned_on IS NULL",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_key_assignments_open_user ON key_assignments(user_id) WHERE returned_on IS NULL",
+    # What else happened to a key: archived, restored, renamed, assignment_deleted
+    """CREATE TABLE IF NOT EXISTS key_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_id INTEGER NOT NULL REFERENCES keys(id),
+        type TEXT NOT NULL,
+        date TEXT NOT NULL,
+        comment TEXT NOT NULL DEFAULT '',
+        by TEXT NOT NULL DEFAULT '',
+        created_at TEXT
+    )""",
 )
 
 

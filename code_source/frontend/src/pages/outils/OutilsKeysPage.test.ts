@@ -191,4 +191,99 @@ describe("OutilsKeysPage", () => {
     expect(sent("POST", "/api/keys/1/return").map((c) => c.body)).toEqual([{ returned_on: "2027-06-30", comment: "Fin de saison" }]);
     expect(byId("toast")!.textContent).toBe("✅ Retour de la clé « 10 » enregistré.");
   });
+
+  describe("history panel", () => {
+    const HISTORY = [
+      {
+        kind: "assignment",
+        id: 31,
+        user_id: 9,
+        last_name: "DIGGORY",
+        first_name: "Cedric",
+        given_on: "2025-09-10",
+        returned_on: "2026-06-30",
+        comment: "Forum",
+        return_comment: "Fin de saison",
+        by: "albus@alj.example",
+      },
+      { kind: "event", id: 5, type: "renamed", date: "2026-07-01", comment: "9 → 10", by: "albus@alj.example" },
+      {
+        kind: "assignment",
+        id: 32,
+        user_id: 7,
+        last_name: "POTTER",
+        first_name: "Harry",
+        given_on: "2026-09-12",
+        returned_on: null,
+        comment: "Remise au forum",
+        return_comment: "",
+        by: "minerva@alj.example",
+      },
+    ];
+    const openRow = async (byId: (id: string) => HTMLElement | null) => {
+      document.querySelector<HTMLElement>('[data-testid="data-row"][data-id="1"] td')!.click();
+      await flushPromises();
+      expect(byId("key-panel")).not.toBeNull();
+    };
+
+    it("shows the key's history, oldest first, read only for a coach", async () => {
+      const { byId, all } = await render("coach", KEYS, { "GET /api/keys/1/history": () => json(HISTORY) });
+      await openRow(byId);
+      // textContent joins the entry's lines without a space
+      expect(all("history-entry").map((e) => e.textContent.replace(/\s+/g, " ").trim())).toEqual([
+        "👤 DIGGORY Cedricdu 10/09/2025 au 30/06/2026Remise : ForumRetour : Fin de saisonpar albus@alj.example",
+        "✏️ Code modifié le 01/07/2026 9 → 10par albus@alj.example",
+        "👤 POTTER Harrydepuis le 12/09/2026Remise : Remise au forumpar minerva@alj.example",
+      ]);
+      expect(byId("key-rename")).toBeNull();
+      expect(byId("assignment-edit-32")).toBeNull();
+    });
+
+    it("lets an admin rename the key", async () => {
+      const { byId, sent } = await render("admin", KEYS, {
+        "GET /api/keys/1/history": () => json(HISTORY),
+        "PATCH /api/keys/1": () => json({ status: "success" }),
+      });
+      await openRow(byId);
+      vi.spyOn(dialogs, "prompt").mockResolvedValue("10-B");
+      byId("key-rename")!.click();
+      await flushPromises();
+      expect(sent("PATCH", "/api/keys/1").map((c) => c.body)).toEqual([{ code: "10-B" }]);
+      expect(byId("toast")!.textContent).toBe("✅ Clé « 10 » renommée en « 10-B ».");
+      expect(sent("GET", "/api/keys/1/history")).toHaveLength(2);
+    });
+
+    it("lets an admin correct an assignment", async () => {
+      const { byId, sent } = await render("admin", KEYS, {
+        "GET /api/keys/1/history": () => json(HISTORY),
+        "PATCH /api/key-assignments/31": () => json({ status: "success" }),
+      });
+      await openRow(byId);
+      byId("assignment-edit-31")!.click();
+      await flushPromises();
+      expect((byId("edit-given-on") as HTMLInputElement).value).toBe("2025-09-10");
+      await typeIn(byId("edit-returned-on"), "2026-07-01");
+      byId("edit-submit")!.click();
+      await flushPromises();
+      expect(sent("PATCH", "/api/key-assignments/31").map((c) => c.body)).toEqual([
+        { given_on: "2025-09-10", returned_on: "2026-07-01", comment: "Forum", return_comment: "Fin de saison" },
+      ]);
+      expect(byId("toast")!.textContent).toBe("✅ Attribution corrigée.");
+    });
+
+    it("lets an admin delete the latest assignment only, after confirming", async () => {
+      const { byId, sent } = await render("admin", KEYS, {
+        "GET /api/keys/1/history": () => json(HISTORY),
+        "DELETE /api/key-assignments/32": () => json({ status: "success" }),
+      });
+      await openRow(byId);
+      expect(byId("assignment-delete-31")).toBeNull();
+      const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+      byId("assignment-delete-32")!.click();
+      await flushPromises();
+      expect(confirm.mock.calls[0]![0].variant).toBe("danger");
+      expect(sent("DELETE", "/api/key-assignments/32")).toHaveLength(1);
+      expect(byId("toast")!.textContent).toBe("✅ Attribution supprimée.");
+    });
+  });
 });

@@ -3552,6 +3552,261 @@
         }
       }
     },
+    "/api/keys/{key_id}": {
+      "patch": {
+        "summary": "Rename Key",
+        "operationId": "rename_key_api_keys__key_id__patch",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyRename"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{key_id}/history": {
+      "get": {
+        "summary": "Key History",
+        "operationId": "key_history_api_keys__key_id__history_get",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/KeyAssignmentEntry"
+                      },
+                      {
+                        "$ref": "#/components/schemas/KeyEventEntry"
+                      }
+                    ]
+                  },
+                  "title": "Response Key History Api Keys  Key Id  History Get"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/key-assignments/{assignment_id}": {
+      "patch": {
+        "summary": "Correct Assignment",
+        "operationId": "correct_assignment_api_key_assignments__assignment_id__patch",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyAssignmentPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Assignment",
+        "operationId": "delete_assignment_api_key_assignments__assignment_id__delete",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/webhooks/helloasso": {
       "get": {
         "summary": "Webhook Helloasso Ping",
@@ -7642,6 +7897,73 @@
         "title": "Key",
         "description": "A club key, its status and its current holder."
       },
+      "KeyAssignmentEntry": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "assignment",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "given_on": {
+            "type": "string",
+            "title": "Given On"
+          },
+          "returned_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned On"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "return_comment": {
+            "type": "string",
+            "title": "Return Comment"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "user_id",
+          "last_name",
+          "first_name",
+          "given_on",
+          "returned_on",
+          "comment",
+          "return_comment",
+          "by"
+        ],
+        "title": "KeyAssignmentEntry",
+        "description": "Who held the key, from given_on to returned_on (None: still held), who handed it over (by)."
+      },
       "KeyAssignmentIn": {
         "properties": {
           "user_id": {
@@ -7669,6 +7991,46 @@
         "title": "KeyAssignmentIn",
         "description": "A key handed over to a member of the active season."
       },
+      "KeyAssignmentPatch": {
+        "properties": {
+          "given_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Given On"
+          },
+          "returned_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned On"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Comment",
+            "default": ""
+          },
+          "return_comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Return Comment",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "given_on"
+        ],
+        "title": "KeyAssignmentPatch",
+        "description": "Corrected dates and comments of an assignment; returned_on only on a key given back."
+      },
       "KeyDone": {
         "properties": {
           "status": {
@@ -7683,6 +8045,52 @@
         ],
         "title": "KeyDone",
         "description": "A key write with nothing else to return."
+      },
+      "KeyEventEntry": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "event",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "archived",
+              "restored",
+              "renamed",
+              "assignment_deleted"
+            ],
+            "title": "Type"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "type",
+          "date",
+          "comment",
+          "by"
+        ],
+        "title": "KeyEventEntry",
+        "description": "Something else that happened to the key, and the admin who did it."
       },
       "KeyHolder": {
         "properties": {
@@ -7744,6 +8152,23 @@
         ],
         "title": "KeyIn",
         "description": "A new key: its code (engraved number or club number), unique whatever its case."
+      },
+      "KeyRename": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "KeyRename",
+        "description": "A key's new code (a placeholder replaced, a typo fixed)."
       },
       "KeyReturnIn": {
         "properties": {

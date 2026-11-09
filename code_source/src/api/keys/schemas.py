@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import Literal, Optional
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -52,3 +52,43 @@ class KeyReturnIn(RequestBody):
     """A key given back (not before it was handed over)."""
     returned_on: datetime.date
     comment: str = Field(default="", max_length=500)
+
+
+class KeyRename(RequestBody):
+    """A key's new code (a placeholder replaced, a typo fixed)."""
+    code: str = Field(min_length=1, max_length=40)
+
+
+class KeyAssignmentPatch(RequestBody):
+    """Corrected dates and comments of an assignment; returned_on only on a key given back."""
+    given_on: datetime.date
+    returned_on: Optional[datetime.date] = None
+    comment: str = Field(default="", max_length=500)
+    return_comment: str = Field(default="", max_length=500)
+
+
+class KeyAssignmentEntry(BaseModel):
+    """Who held the key, from given_on to returned_on (None: still held), who handed it over (by)."""
+    kind: Literal["assignment"]
+    id: int
+    user_id: int
+    last_name: str
+    first_name: str
+    given_on: str
+    returned_on: Optional[str]
+    comment: str
+    return_comment: str
+    by: str
+
+
+class KeyEventEntry(BaseModel):
+    """Something else that happened to the key, and the admin who did it."""
+    kind: Literal["event"]
+    id: int
+    type: Literal["archived", "restored", "renamed", "assignment_deleted"]
+    date: str
+    comment: str
+    by: str
+
+
+KeyHistory = List[Union[KeyAssignmentEntry, KeyEventEntry]]
