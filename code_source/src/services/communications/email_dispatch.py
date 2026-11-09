@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, TypedDict
 from domain.club_emails import CLUB_SENDER_DOMAIN
 from domain.competitions.models import Competition, default_deadline
 from domain.errors import InvalidRequest, UpstreamUnavailable
-from domain.email_personalization import apply_template_variables
+from domain.email_personalization import apply_template_variables, template_recipient
 from domain.utils import format_amount, format_period, normalize_name
 from infrastructure.firestore.competitions import competitions, member_directory
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
@@ -39,14 +39,15 @@ def render_email(subject: str, body: str, recipient: Dict[str, Any], competition
                  add_signature: bool) -> RenderedEmail:  # Any: a member row or a recipient sent by the page
     """The e-mail personalised for one recipient. The HTML part is built from the template first, then filled with
     escaped values, so a member's value (public HelloAsso form) never adds markup."""
-    body_plain = apply_template_variables(body, recipient, competition)
+    person = template_recipient(recipient)
+    body_plain = apply_template_variables(body, person, competition)
     if add_signature:
         body_plain += "\n\n" + build_signature_plain()
     return RenderedEmail(
-        subject=apply_template_variables(subject, recipient, competition),
+        subject=apply_template_variables(subject, person, competition),
         body_plain=body_plain,
         body_html=apply_template_variables(build_email_html(body, add_signature=add_signature, image_src_mode="cid"),
-                                           recipient, competition, escape_html=True),
+                                           person, competition, escape_html=True),
     )
 
 

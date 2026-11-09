@@ -64,13 +64,13 @@ class HelloAssoWebhookService:
         (événement 'Payment', 'Order', 'Form', ou liste brute d'articles).
         """
         event_type = payload.get("eventType") or "Unknown"
-        data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+        data = cls._event_data(payload)
 
-        items = []
+        items: List[Dict[str, Any]] = []
 
         # 1. Si le payload contient directement une liste d'items
         if isinstance(data.get("items"), list) and data.get("items"):
-            items = data.get("items")
+            items = data["items"]
         # 2. Si le payload est lui-même un item individuel (contient un id et un montant)
         elif data.get("id") and (data.get("amount") is not None or data.get("price") is not None):
             items = [data]
@@ -105,15 +105,23 @@ class HelloAssoWebhookService:
         expected = (SecretStore.get_secret("HELLOASSO_WEBHOOK_TOKEN") or "").strip()
         if not expected:
             return None
-        return bool(token) and constant_time_equals(token.strip(), expected)
+        return bool(token) and constant_time_equals((token or "").strip(), expected)
 
     @staticmethod
-    def _ids(objs) -> List[int]:
+    def _event_data(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """The `data` object of a notification, or the payload itself when it has none."""
+        data = payload.get("data")
+        return data if isinstance(data, dict) else payload
+
+    @staticmethod
+    def _ids(objs: object) -> List[int]:
+        """The integer `id` of each object of a JSON list; entries without a valid one are skipped."""
         ids = []
-        for o in objs or []:
-            raw = o.get("id") if isinstance(o, dict) else None
+        for o in objs if isinstance(objs, list) else []:
+            if not isinstance(o, dict) or o.get("id") is None:
+                continue
             try:
-                ids.append(int(raw))
+                ids.append(int(o["id"]))
             except (TypeError, ValueError):
                 continue
         return ids
@@ -126,7 +134,7 @@ class HelloAssoWebhookService:
         payload ; un identifiant inconnu de HelloAsso est simplement ignoré.
         """
         event_type = payload.get("eventType") or ""
-        data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+        data = cls._event_data(payload)
         try:
             item_ids = cls._ids(data.get("items"))
             if not item_ids and data.get("id") is not None:
@@ -318,7 +326,7 @@ class HelloAssoWebhookService:
 
         competition_id = link.get("competition_id")
         adherent_id = link.get("adherent_id")
-        if not competition_id:
+        if not competition_id or item_id is None:  # an item without id gets no link from the matching
             return "anomaly", {
                 "id_item": item_id,
                 "payer": payer_name,
