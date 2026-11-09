@@ -64,7 +64,7 @@ class TestQueuedFlagChanges(ApiTestCase):
         writes, no forced date): to the second, the row looked unchanged and the phone's older change won."""
         ticks = (datetime.datetime(2026, 10, 23, 9, 57, 42, n) for n in range(1, 1000))
         clock = SimpleNamespace(datetime=SimpleNamespace(now=lambda: next(ticks)))
-        with patch("infrastructure.firestore.competitions.base.datetime", clock):
+        with patch("infrastructure.firestore.competitions.documents.datetime", clock):
             CompetitionRepository.set_selection(self.comp, 1, True)  # the row the phone shows
             seen = self.participant(self.comp, 1)["updated_at"]
             CompetitionRepository.set_selection(self.comp, 1, False)

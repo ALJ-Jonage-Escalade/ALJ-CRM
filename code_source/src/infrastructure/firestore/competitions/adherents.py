@@ -10,7 +10,7 @@ from domain.members.purchase_priority import purchase_priority_score
 from domain.members.sex import parse_sex
 from domain.utils import normalize_string
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.firestore.competitions.base import CompetitionStoreBase
+from infrastructure.firestore.competitions import documents
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.timed_cache import TimedCache
 
@@ -20,7 +20,7 @@ _ADHERENTS_CACHE_SECONDS = 30.0
 _ADHERENTS_CACHE_KEY = "adherents"
 
 
-class MemberDirectoryMixin(CompetitionStoreBase):
+class MemberDirectoryMixin:
     """Member directory: sync from the main database, cached reads, search."""
 
     _adherents_cache: TimedCache[str, List[Dict[str, Any]]] = TimedCache(_ADHERENTS_CACHE_SECONDS)
@@ -80,7 +80,7 @@ class MemberDirectoryMixin(CompetitionStoreBase):
                     except (ValueError, TypeError):
                         pass
                 planning_writes.append({
-                    "path": f"{cls.COLLECTION_PLANNING}/{pr['id']}",
+                    "path": f"{documents.COLLECTION_PLANNING}/{pr['id']}",
                     "data": {
                         "id": pr["id"],
                         "groupe": pr["groupe"] or "",
@@ -98,7 +98,7 @@ class MemberDirectoryMixin(CompetitionStoreBase):
             main_conn.close()
 
         ref_date = get_season_start_date(season or get_active_season())
-        now = cls._now_iso()
+        now = documents.now_iso()
         adherent_writes = []
         for d in cls._best_purchase_rows(rows):
             adherent_id = d.get("user_id") or d.get("id")
@@ -109,7 +109,7 @@ class MemberDirectoryMixin(CompetitionStoreBase):
             groupe = planning_groups.get(normalize_string(t_name), "")
             licence = str(d.get("licence_ffme") or "").strip()
             adherent_writes.append({
-                "path": f"{cls.COLLECTION_ADHERENTS}/{adherent_id}",
+                "path": f"{documents.COLLECTION_ADHERENTS}/{adherent_id}",
                 "data": {
                     "id": adherent_id,
                     "nom": str(d.get("last_name") or "").strip().upper(),
@@ -211,7 +211,7 @@ class MemberDirectoryMixin(CompetitionStoreBase):
         """Reads the directory. A failed read keeps serving the last copy; with none yet, FirestoreError is raised
         (never an empty directory: it would look like a club without members, and is not cached)."""
         try:
-            docs = FirestoreClient.list_documents(cls.COLLECTION_ADHERENTS)
+            docs = FirestoreClient.list_documents(documents.COLLECTION_ADHERENTS)
         except Exception as e:
             logger.warning(f"[FIRESTORE] Lecture de l'annuaire adhérents impossible : {e}")
             if cls._adherents_last_read is not None:

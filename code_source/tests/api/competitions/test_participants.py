@@ -8,6 +8,7 @@ from services.competitions import store as competition_store
 
 from domain.competitions.models import PAIEMENT_PAYE
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import documents
 from infrastructure.firestore.client import FirestoreClient
 
 
@@ -45,7 +46,7 @@ class TestParticipants(ApiTestCase):
         self.seed_adherent(3, nom="WEASLEY", prenom="Ginny", sex="F")
         r = self.client.post(self.url(), json={"adherent_id": 3})
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertNotIn("sex", CompetitionRepository._load_comp_doc(self.comp)["participants"][0])  # not copied
+        self.assertNotIn("sex", documents.load_comp_doc(self.comp)["participants"][0])  # not copied
         self.assertEqual(next(p for p in r.json()["participants"] if p["adherent_id"] == 3)["sex"], "F")
         self.assertEqual(self.listed_participant(3)["sex"], "F")
 
@@ -58,7 +59,7 @@ class TestParticipants(ApiTestCase):
         rewritten since hold `gender` (read as a code)."""
         self.seed_adherent(3, gender="Femme")
         CompetitionRepository.add_participant(self.comp, 3)
-        doc = CompetitionRepository._load_comp_doc(self.comp)
+        doc = documents.load_comp_doc(self.comp)
         doc["participants"][0]["gender"] = "Homme"
         self.fake.upsert_document("competitions", doc["_doc_id"], {k: v for k, v in doc.items() if k != "_doc_id"})
         competition_store.invalidate_cache()

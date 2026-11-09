@@ -12,6 +12,7 @@ from domain.competitions.models import (
     payment_status_after_toggle,
 )
 from infrastructure.firestore.client import FirestoreClient
+from infrastructure.firestore.competitions import documents
 from infrastructure.firestore.competitions.adherents import MemberDirectoryMixin
 
 # Collé pour l'ancien appelant (web) : état de paiement par défaut d'un nouveau
@@ -60,7 +61,7 @@ class ParticipantsMixin(MemberDirectoryMixin):
     # ------------------------------------------------------------------
     @classmethod
     def list_participants(cls, competition_id: int, selected_only: bool = False) -> List[Participant]:
-        doc = cls._load_comp_doc(competition_id)
+        doc = documents.load_comp_doc(competition_id)
         if not doc:
             return []
         parts = doc.get("participants") or []
@@ -102,7 +103,7 @@ class ParticipantsMixin(MemberDirectoryMixin):
             "note_paiement": "",
             "urgence_nom": str(adherent_doc.get("emergency_name") or ""),
             "urgence_tel": str(adherent_doc.get("emergency_phone") or ""),
-            "updated_at": cls._row_stamp(),
+            "updated_at": documents.row_stamp(),
         }
 
     @classmethod
@@ -124,16 +125,16 @@ class ParticipantsMixin(MemberDirectoryMixin):
         fois). `mutate` doit donc pouvoir être rejoué : il ne dépend que de la
         liste reçue. Le document renvoyé contient les participants écrits."""
         def attempt():
-            doc = cls._load_comp_doc(competition_id)
+            doc = documents.load_comp_doc(competition_id)
             if not doc:
                 return None
             parts = [dict(p) for p in (doc.get("participants") or [])]
             new_parts = mutate(parts)
             if new_parts is None:
                 return None
-            doc.update(cls._save_parts(doc, new_parts))  # participants, counters, updated_at
+            doc.update(documents.save_parts(doc, new_parts))  # participants, counters, updated_at
             return doc
-        return cls._with_retries(f"Épreuve #{competition_id}", attempt)
+        return documents.with_retries(f"Épreuve #{competition_id}", attempt)
 
     @classmethod
     def record_results(cls, competition_id: int | str, apply_rankings: Callable[[List[Dict[str, Any]]], int],
@@ -144,19 +145,19 @@ class ParticipantsMixin(MemberDirectoryMixin):
         optimistic lock (replayed on conflict), so an edit made meanwhile on the web is kept. Returns the matched
         count (0: no ranking written, or no such competition)."""
         def attempt() -> int:
-            doc = cls._load_comp_doc(competition_id)
+            doc = documents.load_comp_doc(competition_id)
             if not doc:
                 return 0
             parts = [dict(p) for p in (doc.get("participants") or [])]
             matched = apply_rankings(parts)
             if matched or save_fields_without_match:
                 FirestoreClient.update_fields(
-                    cls.COLLECTION_COMPETITIONS, doc.get("_doc_id") or str(doc.get("id")),
+                    documents.COLLECTION_COMPETITIONS, doc.get("_doc_id") or str(doc.get("id")),
                     {"participants": parts, **fields} if matched else dict(fields),
                     expected_update_time=doc.get("_update_time"),
                 )
             return matched
-        return cls._with_retries(f"Résultats de l'épreuve #{competition_id}", attempt)
+        return documents.with_retries(f"Résultats de l'épreuve #{competition_id}", attempt)
 
     @classmethod
     def _update_participant(cls, competition_id: int, adherent_id: int, change,
@@ -179,7 +180,7 @@ class ParticipantsMixin(MemberDirectoryMixin):
                 if guard is not None and not guard(p):
                     continue
                 before = dict(p)
-                p["updated_at"] = cls._row_stamp()
+                p["updated_at"] = documents.row_stamp()
                 if change(p) is False:
                     p.clear()
                     p.update(before)
@@ -317,7 +318,7 @@ class ParticipantsMixin(MemberDirectoryMixin):
     def apply_helloasso_payment(cls, competition_id: int, adherent_id: int,
                                 montant_paye: float, date_synchro: str = "",
                                 order_ref: str = "") -> bool:
-        date_val = date_synchro or cls._now_display()
+        date_val = date_synchro or documents.now_display()
         def change(participant):
             if (participant.get("statut_paiement") or "") in PAIEMENT_STATUTS_ANNULES:
                 # Annulation explicite du coach : la re-synchronisation
@@ -344,7 +345,7 @@ class ParticipantsMixin(MemberDirectoryMixin):
 
         def mutate(parts):
             existing = {p.get("adherent_id") for p in parts}
-            now = cls._row_stamp()
+            now = documents.row_stamp()
             added["count"] = 0
             for a in groupe:
                 if a["id"] in existing:

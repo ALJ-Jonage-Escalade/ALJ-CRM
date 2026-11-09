@@ -34,6 +34,7 @@ from domain.club_emails import DEFAULT_SENDER_EMAIL
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import documents
 from infrastructure.mycompet.scraper import (
     ArchiveEntry,
     fetch_and_parse_mycompet_results,
@@ -602,7 +603,7 @@ class CompetitionResultsBatchService:
     @classmethod
     def _mark_url_requested(cls, comp: Dict[str, Any], at: str) -> None:
         try:
-            FirestoreClient.update_fields(CompetitionRepository.COLLECTION_COMPETITIONS,
+            FirestoreClient.update_fields(documents.COLLECTION_COMPETITIONS,
                                           comp.get("_doc_id") or str(comp["id"]), {FIELD_NEEDS_URL_NOTIFIED: at})
         except FirestoreError:
             logger.warning("[BATCH_RESULTATS] Mémorisation de la demande d'URL impossible (#%s)", comp.get("id"), exc_info=True)

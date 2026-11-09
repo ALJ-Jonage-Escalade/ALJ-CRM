@@ -13,6 +13,7 @@ from domain.competitions.models import (
     PAIEMENT_STATUTS_ANNULES,
 )
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
+from infrastructure.firestore.competitions import documents
 from infrastructure.firestore.competitions.participants import MANUAL_PAYMENT_REF, ParticipantsMixin
 
 logger = logging.getLogger("alj")
@@ -42,7 +43,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
     def _items_map(cls) -> Dict[int, Dict[str, Any]]:
         """{id_item: document miroir} — une seule lecture de la collection."""
         items = {}
-        for d in FirestoreClient.list_documents(cls.COLLECTION_ITEMS):
+        for d in FirestoreClient.list_documents(documents.COLLECTION_ITEMS):
             try:
                 iid = int(d.get("id_item") or "")  # missing: ValueError, skipped below
             except (TypeError, ValueError):
@@ -61,7 +62,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         """Upsert du miroir : ce que dit HelloAsso remplace la copie, en préservant
         le commentaire et le rattachement (liens) de chaque article."""
         existing = cls._items_map()
-        now = cls._now_display()
+        now = documents.now_display()
         writes = []
         written = 0
         # Champs appartenant à HelloAsso : pour un article déjà connu, seuls eux
@@ -96,7 +97,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
             doc.setdefault("source", None)
             doc.setdefault("link_updated_at", None)
             doc.setdefault("commentaire", "")
-            write = {"path": f"{cls.COLLECTION_ITEMS}/{int(id_item)}", "data": doc}
+            write = {"path": f"{documents.COLLECTION_ITEMS}/{int(id_item)}", "data": doc}
             if int(id_item) in existing:
                 write["data"] = {k: doc[k] for k in helloasso_fields}
                 write["update_fields"] = helloasso_fields
@@ -126,9 +127,9 @@ class HelloAssoItemsMixin(ParticipantsMixin):
     @classmethod
     def set_item_link(cls, id_item: int, competition_id, adherent_id,
                       source: str = "manuel") -> bool:
-        FirestoreClient.update_fields(cls.COLLECTION_ITEMS, str(id_item),
+        FirestoreClient.update_fields(documents.COLLECTION_ITEMS, str(id_item),
                                       cls._link_fields(competition_id, adherent_id, source,
-                                                       cls._now_iso()))
+                                                       documents.now_iso()))
         return True
 
     @classmethod
@@ -138,10 +139,10 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         is stored without a source; choosing both marks the link `manuel`, which the
         automatic matching never overwrites. Also lifts an `ignore` flag."""
         linked = competition_id is not None and adherent_id is not None
-        now = cls._now_iso()
+        now = documents.now_iso()
         patch = cls._link_fields(competition_id, adherent_id, "manuel" if linked else None, now)
         patch.update({"commentaire": str(commentaire or ""), "ignore": False, "updated_at": now})
-        FirestoreClient.update_fields(cls.COLLECTION_ITEMS, str(id_item), patch)
+        FirestoreClient.update_fields(documents.COLLECTION_ITEMS, str(id_item), patch)
         return True
 
     @classmethod
@@ -153,10 +154,10 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         another coach) raises ItemAlreadyLinked instead of being ignored. Returns False when
         the item does not exist."""
         def attempt():
-            doc = FirestoreClient.get_document(cls.COLLECTION_ITEMS, str(id_item))
+            doc = FirestoreClient.get_document(documents.COLLECTION_ITEMS, str(id_item))
             if doc is None:
                 return False
-            now = cls._now_iso()
+            now = documents.now_iso()
             if ignore:
                 if doc.get("competition_id") is not None and doc.get("adherent_id") is not None:
                     raise ItemAlreadyLinked(id_item)
@@ -168,16 +169,16 @@ class HelloAssoItemsMixin(ParticipantsMixin):
                 patch = {"ignore": False, "ignore_motif": "", "ignored_at": None,
                          "ignored_by": None, "commentaire": str(commentaire or ""),
                          "updated_at": now}
-            FirestoreClient.update_fields(cls.COLLECTION_ITEMS, str(id_item), patch,
+            FirestoreClient.update_fields(documents.COLLECTION_ITEMS, str(id_item), patch,
                                           expected_update_time=doc.get("_update_time"))
             return True
-        return bool(cls._with_retries(f"Article HelloAsso #{id_item}", attempt))
+        return bool(documents.with_retries(f"Article HelloAsso #{id_item}", attempt))
 
     @classmethod
     def list_item_docs(cls) -> List[Dict[str, Any]]:
         """HelloAsso mirror documents as stored (links, comments and ignore flags included),
         most recent first: the shape the web pages use."""
-        docs = [cls._clean_doc(d) for d in cls._items_map().values()]
+        docs = [documents.clean_doc(d) for d in cls._items_map().values()]
         docs.sort(key=lambda d: (str(d.get("date_item") or ""), int(d.get("id_item") or 0)),
                   reverse=True)
         return docs
@@ -186,8 +187,8 @@ class HelloAssoItemsMixin(ParticipantsMixin):
     def clear_item_link(cls, id_item: int) -> bool:
         """Efface le rattachement d'un article (choix « Ignorer »)."""
         try:
-            FirestoreClient.update_fields(cls.COLLECTION_ITEMS, str(id_item),
-                                          cls._link_fields(None, None, None, cls._now_iso()))
+            FirestoreClient.update_fields(documents.COLLECTION_ITEMS, str(id_item),
+                                          cls._link_fields(None, None, None, documents.now_iso()))
             return True
         except FirestoreError:
             return False
@@ -197,7 +198,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         """Remplace tous les liens 'auto' par le calcul courant ; les liens
         'manuel' sont intacts. `links` : retour de auto_link_items()."""
         items = cls._items_map()
-        now = cls._now_display()
+        now = documents.now_display()
         writes = []
         for iid, doc in items.items():
             source = doc.get("source")
@@ -207,7 +208,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
             fields = (cls._link_fields(link.get("competition_id"), link.get("adherent_id"), "auto", now)
                       if link is not None else cls._link_fields(None, None, None, now))
             if any(doc.get(k) != v for k, v in fields.items()):
-                writes.append({"path": f"{cls.COLLECTION_ITEMS}/{iid}",
+                writes.append({"path": f"{documents.COLLECTION_ITEMS}/{iid}",
                                "data": fields, "update_fields": list(fields)})
         if writes:
             FirestoreClient.batch_upsert(writes)
@@ -215,11 +216,11 @@ class HelloAssoItemsMixin(ParticipantsMixin):
 
     @classmethod
     def get_item(cls, id_item: int) -> Optional[Dict[str, Any]]:
-        return FirestoreClient.get_document(cls.COLLECTION_ITEMS, str(id_item))
+        return FirestoreClient.get_document(documents.COLLECTION_ITEMS, str(id_item))
 
     @classmethod
     def save_item_comment(cls, id_item: int, comment: str) -> bool:
-        FirestoreClient.update_fields(cls.COLLECTION_ITEMS, str(id_item),
+        FirestoreClient.update_fields(documents.COLLECTION_ITEMS, str(id_item),
                                       {"commentaire": str(comment or "")})
         return True
 
@@ -234,7 +235,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
     def list_mirror_items(cls) -> list:
         items = cls._items_map()
         comps = {}
-        for d in cls._list_comp_docs():
+        for d in documents.list_comp_docs():
             comps[d.get("id")] = d
         adh = cls._adherent_map()
         rows = []
@@ -337,7 +338,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         for (comp_id, adherent_id) in groupes:
             by_comp.setdefault(comp_id, []).append(adherent_id)
 
-        now = cls._now_display()
+        now = documents.now_display()
         applied = 0
         for comp_id, adherent_ids in by_comp.items():
             done = {"count": 0}

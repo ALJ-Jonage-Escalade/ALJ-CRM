@@ -1,22 +1,5 @@
-"""
-Référentiel des compétitions sur Google Cloud Firestore (source de vérité unique).
-
-Remplace l'ancienne base SQLite locale (database_Competition.db) : l'API (lue et
-écrite par l'application Vue, frontend/) s'appuie sur ce modèle de documents
-Firestore :
-
-- `competitions/{id}`        : épreuve + tableau `participants` embarqué ;
-- `coaches/{id}`             : référentiel des coachs ;
-- `adherents/{id}`           : instantané des adhérents (miroir de database.db) ;
-- `helloasso_items/{id_item}` : miroir des paiements HelloAsso + rattachements.
-
-The only competition store left (the SQLite one was removed). All methods are classmethods.
-
-Normalisation des identifiants : les documents hérités créés par la page web
-avaient un identifiant Firestore aléatoire. À la première lecture d'une épreuve,
-le document est recopié vers l'identifiant canonique `str(id)` et le document
-hérité est supprimé ; les écritures ciblent toujours l'identifiant canonique.
-"""
+"""Facade over the per-domain modules of infrastructure.firestore.competitions, kept while the callers
+move to those modules (the Firestore model is described in competitions/documents.py)."""
 from infrastructure.firestore.competitions.coaches import CoachesMixin
 from infrastructure.firestore.competitions.competitions import CompetitionsMixin
 from infrastructure.firestore.competitions.helloasso_items import HelloAssoItemsMixin, ItemAlreadyLinked

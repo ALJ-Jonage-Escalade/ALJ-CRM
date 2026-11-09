@@ -35,6 +35,7 @@ from infrastructure.firestore.client import FirestoreClient  # noqa: E402
 from infrastructure.firestore.cloud_sync.common import COMMIT_CHUNK, collection_for  # noqa: E402
 from infrastructure.firestore.cloud_sync.rest_store import RestStore  # noqa: E402
 from infrastructure.firestore.competition_repository import CompetitionRepository  # noqa: E402
+from infrastructure.firestore.competitions import documents  # noqa: E402
 
 LEGACY = "gender"
 NOT_GIVEN = "(non renseigné)"
@@ -117,7 +118,7 @@ def migrate_users(store: RestStore, apply: bool, report: Report) -> None:
 
 
 def migrate_competitions(apply: bool, report: Report) -> None:
-    for doc in FirestoreClient.list_documents(CompetitionRepository.COLLECTION_COMPETITIONS):
+    for doc in FirestoreClient.list_documents(documents.COLLECTION_COMPETITIONS):
         participants = doc.get("participants") or []
         if without_gender(participants) is None:
             continue
@@ -132,11 +133,11 @@ def migrate_competitions(apply: bool, report: Report) -> None:
 
 def migrate_directory(apply: bool, report: Report) -> None:
     writes = []
-    for doc in FirestoreClient.list_documents(CompetitionRepository.COLLECTION_ADHERENTS):
+    for doc in FirestoreClient.list_documents(documents.COLLECTION_ADHERENTS):
         if LEGACY not in doc:
             continue
         report.directory += 1
-        writes.append({"path": f"{CompetitionRepository.COLLECTION_ADHERENTS}/{doc['_doc_id']}",
+        writes.append({"path": f"{documents.COLLECTION_ADHERENTS}/{doc['_doc_id']}",
                        "data": {"sex": CompetitionRepository._sex_code(doc)}, "update_fields": ["sex", LEGACY]})
     if apply and writes:
         result = FirestoreClient.batch_upsert(writes)

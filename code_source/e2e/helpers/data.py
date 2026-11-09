@@ -30,11 +30,12 @@ import json, sys, traceback
 sys.path.insert(0, "src")
 from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import documents
 for line in sys.stdin:
     request = json.loads(line)
     try:
         CompetitionRepository._invalidate_adherents_cache()
-        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "Competition": Competition, "args": request["args"]}}
+        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "documents": documents, "Competition": Competition, "args": request["args"]}}
         exec(request["body"], scope)
         print({_RESULT!r} + json.dumps(scope["result"], default=str), flush=True)
     except Exception:
@@ -187,8 +188,8 @@ result = cid
 
     def competition(self, competition_id: int):
         """The competition document as stored (participants embedded), or None."""
-        return self._run("result = CompetitionRepository._load_comp_doc(args['cid'])", cid=competition_id)
+        return self._run("result = documents.load_comp_doc(args['cid'])", cid=competition_id)
 
     def competition_by_name(self, nom: str):
-        return self._run("result = next((d for d in CompetitionRepository._list_comp_docs() if d.get('nom') == args['nom']), None)",
+        return self._run("result = next((d for d in documents.list_comp_docs() if d.get('nom') == args['nom']), None)",
                          nom=nom)

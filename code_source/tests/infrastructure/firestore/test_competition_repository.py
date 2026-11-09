@@ -17,7 +17,7 @@ from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.firestore import client as fc
-from infrastructure.firestore.competitions import base as repo_base
+from infrastructure.firestore.competitions import documents
 from infrastructure.firestore.competition_repository import CompetitionRepository
 from support.fake_firestore import FakeFirestore, FirestoreRepoTestCase  # noqa: F401
 from support.member_db import MemberDbTestCase
@@ -479,7 +479,7 @@ class TestAdherents(FirestoreRepoTestCase):
             CompetitionRepository.list_members()
             CloudDatabase.refresh_projection()
             rewrite.assert_not_called()
-            self.fake.upsert_document(CompetitionRepository.COLLECTION_ADHERENTS, "102", {"id": 102, "nom": "ANCIEN"})
+            self.fake.upsert_document(documents.COLLECTION_ADHERENTS, "102", {"id": 102, "nom": "ANCIEN"})
             CompetitionRepository._invalidate_adherents_cache()
             self.assertEqual(CompetitionRepository.list_members(statuses=["Terminé"])[0]["id"], 101)  # strict until rewritten
             self.assertTrue(CompetitionRepository.directory_outdated())
@@ -582,7 +582,7 @@ class TestModificationsConcurrentes(FirestoreRepoTestCase):
         def always(collection_name, doc_id):
             self.fake._touch(collection_name, doc_id)
         self.fake.before_conditional_write = always
-        with patch.object(repo_base.time, "sleep"):
+        with patch.object(documents.time, "sleep"):
             with self.assertRaises(fc.FirestoreConflictError):
                 CompetitionRepository.set_payment_status(self.comp_id, 101, PAIEMENT_PAYE)
 
