@@ -469,21 +469,27 @@ class TestAdherents(FirestoreRepoTestCase):
         self.assertEqual(ids(statuses=["Terminé", "Validé"]), [101, 102, 103])
         self.assertEqual(ids(statuses=[]), [])
 
-    def test_directory_without_status_is_rewritten_next_tick(self):
-        """A directory written before `statut` existed marks the projection dirty (rewritten by the next tick)."""
+    def test_directory_without_status_is_rewritten_after_next_write(self):
+        """A directory written before `statut` existed reports itself outdated: CloudDatabase.refresh_projection, run
+        after the next replicated write, rewrites it."""
         self.seed_adherent(101)
-        with patch.object(CloudDatabase, "_projection_dirty", False), patch.object(Repo, "_directory_heal_requested", False):
+        with patch.object(CloudDatabase, "_projection_dirty", False), patch.object(Repo, "_directory_heal_requested", False), \
+                patch.object(Repo, "_directory_outdated", False), \
+                patch.object(Repo, "sync_adherents_from_main", return_value={"errors": []}) as rewrite:
             Repo.list_adherents()
-            self.assertFalse(CloudDatabase._projection_dirty)
+            CloudDatabase.refresh_projection()
+            rewrite.assert_not_called()
             self.fake.upsert_document(Repo.COLLECTION_ADHERENTS, "102", {"id": 102, "nom": "ANCIEN"})
             Repo._invalidate_adherents_cache()
             self.assertEqual(Repo.list_adherents(statuses=["Terminé"])[0]["id"], 101)  # strict until rewritten
-            self.assertTrue(CloudDatabase._projection_dirty)
+            self.assertTrue(Repo.directory_outdated())
+            CloudDatabase.refresh_projection()
+            rewrite.assert_called_once()
             # Still lacking after the rewrite (a member no longer synced): not sent for rewriting again
-            CloudDatabase._projection_dirty = False
+            Repo._directory_outdated = False
             Repo._invalidate_adherents_cache()
             Repo.list_adherents()
-            self.assertFalse(CloudDatabase._projection_dirty)
+            self.assertFalse(Repo.directory_outdated())
 
 
 class TestBatchUpsertCommitBody(unittest.TestCase):

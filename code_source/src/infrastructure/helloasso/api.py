@@ -1,19 +1,12 @@
 import math
-import os
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
-from dotenv import load_dotenv
 
 from infrastructure import runtime_env
+from infrastructure.security.secret_store import SecretStore
 from infrastructure.timed_cache import TimedCache
 
-# Charger les variables d'environnement depuis le fichier .env
-load_dotenv()
-
-CLIENT_ID = os.getenv("HELLOASSO_CLIENT_ID")
-CLIENT_SECRET = os.getenv("HELLOASSO_CLIENT_SECRET")
-ORG_SLUG = os.getenv("HELLOASSO_ORG_SLUG")
 # Délai max d'une requête HelloAsso (connexion + lecture), en secondes
 REQUEST_TIMEOUT_SECONDS = 30
 # The token is dropped this long before HelloAsso expires it: it must stay valid for the calls of the running request
@@ -22,12 +15,22 @@ _OAUTH_KEY = "oauth"
 _token_cache: TimedCache[str, Optional[str]] = TimedCache(math.inf)  # kept for the `expires_in` of the token
 
 
+def client_credentials() -> Tuple[str, str]:
+    """(client id, client secret) of the club's HelloAsso API client, read on each call; "" when not configured."""
+    return SecretStore.get_secret("HELLOASSO_CLIENT_ID"), SecretStore.get_secret("HELLOASSO_CLIENT_SECRET")
+
+
+def org_slug() -> str:
+    return SecretStore.get_secret("HELLOASSO_ORG_SLUG")
+
+
 def _request_access_token() -> Tuple[Optional[str], float]:
     """A new OAuth2 token and how long to keep it (0, so not kept, without a usable `expires_in` or token)."""
     url = runtime_env.helloasso_oauth_url()
+    client_id, client_secret = client_credentials()
     data = {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
+        "client_id": client_id,
+        "client_secret": client_secret,
         "grant_type": "client_credentials"
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -45,7 +48,7 @@ def _request_access_token() -> Tuple[Optional[str], float]:
 def get_access_token():
     """Jeton d'accès OAuth2 HelloAsso, réutilisé jusqu'à peu avant son expiration (None si indisponible).
     Dev mode: a new one every time (no cache, as the access roles)."""
-    if not CLIENT_ID or not CLIENT_SECRET:
+    if not all(client_credentials()):
         return None
     try:
         if runtime_env.is_dev():
@@ -82,7 +85,7 @@ class HelloAssoApiError(Exception):
 
 def credentials_configured():
     """Les identifiants API HelloAsso sont-ils disponibles ?"""
-    return bool(CLIENT_ID and CLIENT_SECRET)
+    return all(client_credentials())
 
 
 def _get_resource(path, params=None):
@@ -135,7 +138,7 @@ def list_forms(form_types: Iterable[str], states: Iterable[str], token: str | No
     liste vide ou partielle : la page Paramètres affiche l'erreur. Sans filtre : tous les formulaires.
     `token` : jeton déjà obtenu (require_access_token), sinon il est demandé ici."""
     token = token or require_access_token()
-    url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms"
+    url = f"{runtime_env.helloasso_api_url()}/organizations/{org_slug()}/forms"
     params = {"formTypes": list(form_types), "states": list(states), "pageSize": 100}
     forms: List[Dict[str, Any]] = []
     while True:
@@ -159,7 +162,7 @@ def list_forms(form_types: Iterable[str], states: Iterable[str], token: str | No
 def get_public_form(form_type: str, form_slug: str, token: str) -> Dict[str, Any]:  # Any: HelloAsso JSON
     """Détail public d'un formulaire (FormPublicModel : activityType, activityTypeId… absents de list_forms).
     Lève HelloAssoApiError (réseau, erreur HTTP)."""
-    url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms/{form_type}/{form_slug}/public"
+    url = f"{runtime_env.helloasso_api_url()}/organizations/{org_slug()}/forms/{form_type}/{form_slug}/public"
     try:
         response = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=REQUEST_TIMEOUT_SECONDS)
     except requests.exceptions.RequestException as e:
@@ -180,7 +183,7 @@ def fetch_form_items(form_type: str, slug: str) -> list:
     token = get_access_token()
     if not token:
         raise HelloAssoApiError("Connexion à l'API HelloAsso refusée (jeton d'accès indisponible).")
-    url = f"{runtime_env.helloasso_api_url()}/organizations/{ORG_SLUG}/forms/{form_type}/{slug}/items"
+    url = f"{runtime_env.helloasso_api_url()}/organizations/{org_slug()}/forms/{form_type}/{slug}/items"
     headers = {"Authorization": f"Bearer {token}"}
     params = {"withDetails": "true", "pageSize": 100}
     items: list = []

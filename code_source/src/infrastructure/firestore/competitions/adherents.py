@@ -25,6 +25,8 @@ class AdherentsMixin(CompetitionStoreBase):
     _adherents_last_read: Optional[List[Dict[str, Any]]] = None
     # The outdated directory was already sent for rewriting by this process (_heal_outdated_directory)
     _directory_heal_requested: bool = False
+    # Waiting to be rewritten (CloudDatabase.refresh_projection reads it)
+    _directory_outdated: bool = False
 
     # ------------------------------------------------------------------
     # Instantané des adhérents (source : database.db principale -> Firestore)
@@ -149,6 +151,7 @@ class AdherentsMixin(CompetitionStoreBase):
                 return report
 
         cls._invalidate_adherents_cache()
+        cls._directory_outdated = False
         report["updated"] = len(adherent_writes)
         return report
 
@@ -219,13 +222,18 @@ class AdherentsMixin(CompetitionStoreBase):
 
     @classmethod
     def _heal_outdated_directory(cls, docs: List[Dict[str, Any]]) -> None:
-        """A directory written before a field was added to it (`statut`, plans/competitor-status-filter.md) is
-        rewritten by the next background tick: without it, the status filters would find nobody. Once per process:
-        the sync never deletes, so the document of a member no longer synced keeps lacking the field."""
+        """A directory written before a field was added to it (`statut`, plans/competitor-status-filter.md) is marked
+        outdated: CloudDatabase.refresh_projection rewrites it after the next write replicated to Firestore (it is
+        built from the SQLite cache, which a read-only route may not have refreshed). Without it, the status filters
+        would find nobody. Once per process: the sync never deletes, so the document of a member no longer synced
+        keeps lacking the field."""
         if not cls._directory_heal_requested and any("statut" not in doc for doc in docs):
-            from infrastructure.firestore.cloud_database import CloudDatabase
-            CloudDatabase.mark_projection_dirty()
+            cls._directory_outdated = True
             cls._directory_heal_requested = True
+
+    @classmethod
+    def directory_outdated(cls) -> bool:
+        return cls._directory_outdated
 
     @classmethod
     def _adherent_map(cls) -> Dict[int, Dict[str, Any]]:

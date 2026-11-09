@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from domain.constants import get_active_season
+
+
+ALL_SEASONS = "Toutes les saisons"  # the pages' choice for every season
+
+
+def season_read(season: str) -> Optional[str]:
+    """MemberRepository.load_direct_data's argument for a resolved season: None for ALL_SEASONS."""
+    return None if season == ALL_SEASONS else season
 
 
 def resolve_season(season: str) -> str:

@@ -1,8 +1,10 @@
 """The club's credentials (Google OAuth, SMTP, HelloAsso…): environment variables and the .env files.
 
-On Cloud Run, the Google OAuth values renewed from the app (refresh token, client, account) also live in the
-Firestore document server_credentials/google_oauth: an instance's environment is lost on restart and not shared
-with the other instances, so that document is read first and every renewal is written to it.
+On Cloud Run, the Google OAuth values renewed from the app (refresh token, client, account) also live in a
+document of the database (infrastructure/firestore/server_credentials.py, handed over by server.py at startup through
+use_credentials_document): an instance's environment is lost on restart and not shared with the other instances, so
+that document is read first and every renewal is written to it. Received rather than imported: the Firestore client
+itself needs these secrets.
 """
 
 from __future__ import annotations
@@ -12,21 +14,13 @@ import logging
 import os
 import threading
 import time
-from typing import Dict
+from typing import Any, Dict, Optional, Protocol
 
-from dotenv import load_dotenv
-
-from paths import CODE_ROOT, ROOT_DIR
+from infrastructure import runtime_env
 
 logger = logging.getLogger("alj")
 
-# Charger le .env embarqué et surcharger avec le .env local
-load_dotenv(os.path.join(CODE_ROOT, ".env"))
-load_dotenv(os.path.join(ROOT_DIR, ".env"), override=True)
-
-FIRESTORE_COLLECTION = "server_credentials"
-FIRESTORE_DOCUMENT = "google_oauth"
-# Secret name -> field of server_credentials/google_oauth
+# Secret name -> field of the credentials document
 FIRESTORE_FIELDS: Dict[str, str] = {
     "GMAIL_REFRESH_TOKEN": "refresh_token",
     "GMAIL_USER_EMAIL": "user_email",
@@ -40,14 +34,29 @@ class SecretPersistenceError(RuntimeError):
     """A secret could not be saved where it must survive a restart (Firestore, on Cloud Run): nothing was changed."""
 
 
+class CredentialsDocument(Protocol):
+    """Where the Google OAuth values are kept on Cloud Run."""
+
+    def read(self) -> Dict[str, Any]: ...  # Any: the document's fields as stored
+
+    def update(self, fields: Dict[str, str]) -> None: ...
+
+
+
 _lock = threading.Lock()
 _firestore_values: Dict[str, str] = {}  # fields of the Firestore document, once read
 _firestore_loaded = False
 _last_failed_load = -RELOAD_AFTER_FAILURE  # time.monotonic() of the last failed read
+_credentials_document: Optional[CredentialsDocument] = None
 
 
-def _on_cloud_run() -> bool:
-    return bool(os.environ.get("K_SERVICE") or os.environ.get("K_CONFIGURATION"))
+def use_credentials_document(document: Optional[CredentialsDocument]) -> None:
+    """Called once at startup (server.py). Without one, on Cloud Run, the environment answers alone and saving fails."""
+    global _credentials_document, _firestore_loaded, _last_failed_load
+    with _lock:
+        _credentials_document = document
+        _firestore_loaded = False
+        _last_failed_load = -RELOAD_AFTER_FAILURE
 
 
 def _load_firestore_values() -> None:
@@ -57,27 +66,22 @@ def _load_firestore_values() -> None:
         if _firestore_loaded or time.monotonic() - _last_failed_load < RELOAD_AFTER_FAILURE:
             return
         try:
-            from infrastructure.firestore.client import FirestoreClient
-            doc = FirestoreClient.get_document(FIRESTORE_COLLECTION, FIRESTORE_DOCUMENT)
+            if _credentials_document is None:
+                raise RuntimeError("no credentials document (secret_store.use_credentials_document not called)")
+            doc = _credentials_document.read()
         except Exception:  # Firestore or its access token unreachable: the environment answers meanwhile
             _last_failed_load = time.monotonic()
-            # Collection name and delay only, never a secret value
-            logger.warning("Chargement des secrets Firestore (%s) impossible, nouvel essai dans %d s",  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
-                           FIRESTORE_COLLECTION, RELOAD_AFTER_FAILURE, exc_info=True)
+            # The delay only, never a secret value
+            logger.warning("Chargement des secrets Firestore impossible, nouvel essai dans %d s",  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+                           RELOAD_AFTER_FAILURE, exc_info=True)
             return
         fields = set(FIRESTORE_FIELDS.values())
         _firestore_values = {k: str(v).strip() for k, v in (doc or {}).items() if k in fields and v}
         _firestore_loaded = True
 
 
-def _env_file_path() -> str:
-    """The .env that a local server reads last (ROOT_DIR overrides CODE_ROOT, see load_dotenv above)."""
-    root_env = os.path.join(ROOT_DIR, ".env")
-    return root_env if os.path.exists(root_env) else os.path.join(CODE_ROOT, ".env")
-
-
 def _write_env_file(key: str, value: str) -> None:
-    env_path = _env_file_path()
+    env_path = runtime_env.local_env_file()
     lines = []
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
@@ -105,7 +109,7 @@ class SecretStore:
         """The secret's value, "" when unknown: Firestore first for the Google OAuth values on Cloud Run, then
         the environment (.env included)."""
         field = FIRESTORE_FIELDS.get(key)
-        if field and _on_cloud_run():
+        if field and runtime_env.is_cloud_run():
             _load_firestore_values()
             value = _firestore_values.get(field)
             if value:
@@ -122,12 +126,13 @@ class SecretStore:
         """Saves secrets for this process and the next ones: in Firestore on Cloud Run (Google OAuth values, in one
         write so they never get mixed with older ones), in the .env file locally. Raises SecretPersistenceError,
         without changing anything, when they can't be kept."""
-        if _on_cloud_run():
+        if runtime_env.is_cloud_run():
             fields = {FIRESTORE_FIELDS[key]: value for key, value in values.items() if key in FIRESTORE_FIELDS}
             if fields:
                 try:
-                    from infrastructure.firestore.client import FirestoreClient
-                    FirestoreClient.update_fields(FIRESTORE_COLLECTION, FIRESTORE_DOCUMENT, {
+                    if _credentials_document is None:
+                        raise RuntimeError("no credentials document (secret_store.use_credentials_document not called)")
+                    _credentials_document.update({
                         **fields, "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
                 except Exception as e:  # Firestore or its access token unreachable
                     # Key names only, never the values

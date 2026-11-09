@@ -6,6 +6,8 @@ Fournit :
 - get_safe_pdf_filename(last_name, first_name, order_ref) -> nom de fichier PDF sécurisé.
 """
 
+from __future__ import annotations
+
 import base64
 import datetime
 import html as _html
@@ -14,8 +16,12 @@ import os
 import re
 from typing import Any, Optional
 
+from domain.constants import get_active_season
 from domain.members.view import is_cancelled
-from paths import CODE_ROOT, ROOT_DIR, find_doc_template
+from exports.attestation_signature import OFFICIAL_SIGNATURE_DATA_URI
+from paths import CODE_ROOT, template_path
+
+LOGO_PATH = os.path.join(CODE_ROOT, "web", "assets", "logo.png")
 
 
 def get_french_date(dt: Optional[datetime.date] = None) -> str:
@@ -54,20 +60,6 @@ def _image_to_base64_data_uri(file_path: str, mime_type: str = "image/png") -> O
             return f"data:{mime_type};base64,{encoded}"
     except Exception:
         return None
-
-
-def _find_image_path(name: str) -> Optional[str]:
-    """Localise une image (logo, signature) dans code_source ou à la racine."""
-    candidates = [
-        os.path.join(CODE_ROOT, name),
-        os.path.join(ROOT_DIR, name),
-        os.path.join(CODE_ROOT, "doc", name),
-        os.path.join(CODE_ROOT, "web", "assets", name)
-    ]
-    for c in candidates:
-        if os.path.exists(c):
-            return c
-    return None
 
 
 def _member_field(member: Any, key: str, alt: Optional[str] = None) -> Any:  # Any: dict or member object, any field type
@@ -164,18 +156,14 @@ def build_attestation(
     if not season:
         season = str(_get("season_name") or "").strip()
     if not season:
-        try:
-            from domain.constants import get_active_season
-            season = get_active_season()
-        except Exception:
-            season = "2026-2027"
+        season = get_active_season()
 
     # 7. Chargement du template HTML
-    template_path = find_doc_template("ATTESTATION_TEMPLATE.html")
-    if not template_path or not os.path.exists(template_path):
-        raise FileNotFoundError(f"Modèle d'attestation HTML introuvable : {template_path}")
+    template_file = template_path("ATTESTATION_TEMPLATE.html")
+    if not os.path.exists(template_file):
+        raise FileNotFoundError(f"Modèle d'attestation HTML introuvable : {template_file}")
 
-    with open(template_path, "r", encoding="utf-8") as f:
+    with open(template_file, "r", encoding="utf-8") as f:
         html = f.read()
 
     # 8. Remplacement des variables du modèle
@@ -195,25 +183,10 @@ def build_attestation(
         html = html.replace(placeholder, _html.escape(str(value)))
 
     # 9. Embarquement des images en base64 pour un HTML 100% autonome
-    logo_path = _find_image_path("logo.png")
-    if logo_path:
-        logo_data = _image_to_base64_data_uri(logo_path, "image/png")
-        if logo_data:
-            html = re.sub(r'src=["\']logo\.png["\']', f'src="{logo_data}"', html)
-
-    sig_path = _find_image_path("signature.jpg") or _find_image_path("doc/signature.jpg")
-    sig_data = None
-    if sig_path:
-        sig_data = _image_to_base64_data_uri(sig_path, "image/jpeg")
-    if not sig_data:
-        try:
-            from domain.attestation.signature_asset import OFFICIAL_SIGNATURE_DATA_URI
-            sig_data = OFFICIAL_SIGNATURE_DATA_URI
-        except Exception:
-            sig_data = None
-
-    if sig_data:
-        html = re.sub(r'src=["\'](?:doc/)?signature\.jpg["\']', f'src="{sig_data}"', html)
+    logo_data = _image_to_base64_data_uri(LOGO_PATH, "image/png")
+    if logo_data:
+        html = re.sub(r'src=["\']logo\.png["\']', f'src="{logo_data}"', html)
+    html = re.sub(r'src=["\'](?:doc/)?signature\.jpg["\']', f'src="{OFFICIAL_SIGNATURE_DATA_URI}"', html)
 
     return html
 

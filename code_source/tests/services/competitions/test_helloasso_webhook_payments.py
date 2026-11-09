@@ -6,7 +6,7 @@ from support.api_case import ApiTestCase
 
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.helloasso.webhook import HelloAssoWebhookService
+from services.competitions.helloasso_webhook import HelloAssoWebhookService
 
 REPO = "infrastructure.firestore.competition_repository.CompetitionFirestoreRepository"
 
@@ -30,7 +30,7 @@ class TestWebhookPayments(ApiTestCase):
         self.seed_adherent(101)
         self.comp = self.create(id_ffme="18846", prix=15)["id"]
         for target, kwargs in (("infrastructure.firestore.app_settings.AppSettingsRepository.get", {"return_value": ""}),
-                               ("infrastructure.helloasso.webhook.HelloAssoWebhookService.check_and_notify_all_paid",
+                               ("services.competitions.helloasso_webhook.check_and_notify_all_paid",
                                 {"return_value": False})):
             p = patch(target, **kwargs)
             p.start()

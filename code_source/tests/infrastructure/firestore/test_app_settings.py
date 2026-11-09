@@ -1,7 +1,7 @@
 """AppSettingsRepository: Firestore `app_settings`, with the former crm_app_settings values as fallback."""
 
 from infrastructure.firestore.app_settings import COLLECTION, LEGACY_COLLECTION, AppSettingsRepository as Settings
-from infrastructure.firestore.cloud_database import doc_id_for
+from infrastructure.firestore.cloud_sync.common import doc_id_for
 from support.fake_firestore import FirestoreRepoTestCase
 
 

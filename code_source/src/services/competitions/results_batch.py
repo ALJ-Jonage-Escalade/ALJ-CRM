@@ -30,7 +30,7 @@ if _src_dir not in sys.path:
 
 from domain.utils import normalize_name
 from infrastructure.mail.repository import EmailRepository, MailError
-from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL
+from domain.club_emails import DEFAULT_SENDER_EMAIL
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository

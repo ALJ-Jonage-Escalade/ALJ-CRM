@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from api.reports import resolve_season
+from api.reports import resolve_season, season_read
 from api.reports.schemas import PivotRecord, PivotRecords
 from api.responses import error_responses
 from domain.members.age_rules import age_at, get_season_start_date, parse_birth_date
@@ -85,7 +85,7 @@ def pivot_record(row: Dict[str, Any], season: str) -> PivotRecord:  # Any: a row
 
 def pivot_records(season: str) -> List[PivotRecord]:
     """Every member of the season (cancelled ones included: the table filters them out by default)."""
-    return [pivot_record(row, season) for row in MemberRepository.load_direct_data(season)]
+    return [pivot_record(row, season) for row in MemberRepository.load_direct_data(season_read(season))]
 
 
 @router.get("/api/reports/pivot-records", response_model=PivotRecords, responses=error_responses(500))

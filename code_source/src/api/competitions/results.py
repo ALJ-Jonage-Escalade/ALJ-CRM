@@ -18,6 +18,9 @@ from api.competitions.schemas.results import (
 )
 from api.competitions.schemas.views import ResultsFetched
 from api.responses import error, error_responses
+from infrastructure.security.api_auth import Role, has_role, is_scheduler
+from services.competitions.results_batch import CompetitionResultsBatchService, ResultsBatchError
+from services.competitions.store import invalidate_cache
 
 # Full paths: /api/competitions/... and /api/settings/...
 router = APIRouter()
@@ -39,9 +42,6 @@ async def api_cron_fetch_competition_results(
     `force` (every competition ended in the last year, results or not) and `email` (another recipient): admin only.
     503: the competitions could not be read, nothing was done (Cloud Scheduler shows the run as failed).
     """
-    from infrastructure.security.api_auth import Role, has_role, is_scheduler
-    from services.competitions.results_batch import CompetitionResultsBatchService, ResultsBatchError
-    from services.competitions.store import invalidate_cache
     claims = getattr(request.state, "user", None)  # None: token check off (local server)
     is_admin = claims is None or (not is_scheduler(claims) and has_role(claims, Role.ADMIN))
     if (force or email) and not is_admin:
@@ -61,7 +61,6 @@ def api_fetch_competition_results(competition_id: int, data: ResultsFetchRequest
     """Fetches a competition's MyCompet results and writes the club's rankings (coaches).
     404 `needs_url`: the results page was not found automatically, the coach gives its address or number;
     502: MyCompet failed; 503: Firestore failed (nothing reported as saved)."""
-    from services.competitions.results_batch import CompetitionResultsBatchService
     fetched = CompetitionResultsBatchService.fetch_results_for(competition_id, data.url, data.club or "JONAGE")
     return ResultsFetched(status="success", **fetched)
 
@@ -69,14 +68,12 @@ def api_fetch_competition_results(competition_id: int, data: ResultsFetchRequest
 @router.get("/api/settings/competitions-results", response_model=ResultsSettings)
 def get_competitions_results_settings_api() -> ResultsSettings:
     """Retourne la configuration et l'état du batch quotidien de résultats."""
-    from services.competitions.results_batch import CompetitionResultsBatchService
     return ResultsSettings(status="success", **CompetitionResultsBatchService.get_batch_status())
 
 
 @router.post("/api/settings/competitions-results", response_model=ResultsSettingsSaved, responses=error_responses(400))
 def update_competitions_results_settings_api(data: ResultsSettingsUpdate) -> ResultsSettingsSaved | JSONResponse:
     """Met à jour les adresses e-mail de notification des résultats (et la fenêtre de recherche, si fournie)."""
-    from services.competitions.results_batch import CompetitionResultsBatchService
     if data.window_days is not None and not 1 <= data.window_days <= 365:
         return error(400, "Fenêtre de recherche invalide : entre 1 et 365 jours.")
     try:

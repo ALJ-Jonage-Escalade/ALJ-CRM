@@ -114,7 +114,7 @@ def auth_enforced() -> bool:
         return True
     if mode in ("off", "0", "false", "no", "disabled"):
         return False
-    return bool(os.environ.get("K_SERVICE"))
+    return runtime_env.is_cloud_run()
 
 
 def firebase_project_id() -> str:
