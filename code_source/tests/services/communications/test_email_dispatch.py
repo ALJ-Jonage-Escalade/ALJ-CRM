@@ -12,14 +12,14 @@ _src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from services.communications.email_dispatch import EmailDispatchService
-from api.communications.email import get_email_templates, preview_email, get_email_status
+from services.communications.email_dispatch import EmailDispatchService, render_email
+from api.communications.email import get_email_templates, get_email_status
 
 
 class TestEmailDispatchService(unittest.TestCase):
     """Vérifie la résolution des variables, l'aperçu et l'envoi d'e-mails."""
 
-    def test_preview_with_variables(self):
+    def test_render_with_variables(self):
         comp_ctx = {
             "name_competition": "Coupe Régionale Bugey",
             "no_competition": "18866",
@@ -36,21 +36,13 @@ class TestEmailDispatchService(unittest.TestCase):
         template_subj = "Convocation {name_competition} - {first_name}"
         template_body = "Bonjour {first_name} {last_name},\nTa sélection pour {name_competition} (#{no_competition}) est confirmée.\nMontant : {montant_competition}.\nGroupe WhatsApp : {whatapp_Id}"
 
-        with patch.object(EmailDispatchService, "get_competition_context", return_value=comp_ctx):
-            preview = EmailDispatchService.preview(
-                subject=template_subj,
-                body=template_body,
-                recipient=recipient,
-                competition_id=3,
-                add_signature=False
-            )
-
-            self.assertIn("Convocation Coupe Régionale Bugey - Éden", preview["subject"])
-            self.assertIn("Bonjour Éden COCHE", preview["body_plain"])
-            self.assertIn("Coupe Régionale Bugey (#18866)", preview["body_plain"])
-            self.assertIn("18,00 €", preview["body_plain"])
-            self.assertIn("https://chat.whatsapp.com/testgroup", preview["body_plain"])
-            self.assertIn("<div", preview["body_html"])
+        rendered = render_email(template_subj, template_body, recipient, comp_ctx, add_signature=False)
+        self.assertIn("Convocation Coupe Régionale Bugey - Éden", rendered["subject"])
+        self.assertIn("Bonjour Éden COCHE", rendered["body_plain"])
+        self.assertIn("Coupe Régionale Bugey (#18866)", rendered["body_plain"])
+        self.assertIn("18,00 €", rendered["body_plain"])
+        self.assertIn("https://chat.whatsapp.com/testgroup", rendered["body_plain"])
+        self.assertIn("<div", rendered["body_html"])
 
     def test_get_competition_context_includes_whatsapp_link(self):
         fake_doc = {
@@ -92,8 +84,8 @@ class TestEmailDispatchService(unittest.TestCase):
         self.assertEqual(res["errors_count"], 0)
         self.assertEqual(mock_send.call_count, 2)
 
-    def test_fastapi_preview_and_templates_endpoints(self):
-        """Teste les route handlers FastAPI /api/email-templates et /api/preview-email."""
+    def test_fastapi_templates_and_status_endpoints(self):
+        """Teste les route handlers FastAPI /api/email-templates et /api/email-status."""
         # 1. Templates
         res_t = get_email_templates()
         self.assertEqual(res_t.status, "success")
@@ -101,19 +93,7 @@ class TestEmailDispatchService(unittest.TestCase):
         self.assertIn("Compétition - 1er Inscription", template_names)
         self.assertIn("Compétition - relance", template_names)
 
-        # 2. Preview
-        preview_req = {
-            "subject": "Test {first_name}",
-            "body": "Bonjour {first_name}",
-            "recipient": {"first_name": "Paul", "last_name": "NOEL"}
-        }
-        from api.communications.schemas import EmailPreviewRequest
-        res_p = preview_email(EmailPreviewRequest.model_validate(preview_req))
-        self.assertEqual(res_p.status, "success")
-        self.assertEqual(res_p.preview.subject, "Test Paul")
-        self.assertIn("Bonjour Paul", res_p.preview.body_plain)
-
-        # 3. Email Status
+        # 2. Email Status
         res_st = get_email_status()
         self.assertEqual(res_st.status, "success")
         self.assertIn(res_st.mode, ("gmail_oauth2", "smtp", "none"))

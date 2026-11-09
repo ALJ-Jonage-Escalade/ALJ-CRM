@@ -1753,66 +1753,6 @@
         }
       }
     },
-    "/api/competitions/{competition_id}/check-all-paid": {
-      "post": {
-        "summary": "Check Competition All Paid Api",
-        "description": "Vérifie si tous les compétiteurs ont payé et envoie l'e-mail récapitulatif si applicable.",
-        "operationId": "check_competition_all_paid_api_api_competitions__competition_id__check_all_paid_post",
-        "parameters": [
-          {
-            "name": "competition_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Competition Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AllPaidChecked"
-                }
-              }
-            }
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            },
-            "description": "Service Unavailable"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/members": {
       "get": {
         "summary": "List Members",
@@ -2404,55 +2344,6 @@
         }
       }
     },
-    "/api/preview-email": {
-      "post": {
-        "summary": "Preview Email",
-        "description": "Génère un aperçu fidèle d'un e-mail personnalisé pour un destinataire et une compétition.",
-        "operationId": "preview_email_api_preview_email_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmailPreviewRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmailPreview"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/email-status": {
       "get": {
         "summary": "Get Email Status",
@@ -2837,57 +2728,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Update Planning",
-        "description": "Remplace le planning complet (administrateurs) ; un créneau d'id 0 reçoit un nouvel identifiant.",
-        "operationId": "update_planning_api_planning_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "items": {
-                  "$ref": "#/components/schemas/PlanningSlotUpdate"
-                },
-                "type": "array",
-                "title": "Slots"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlanningReplaced"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -4816,31 +4656,6 @@
         "title": "AccessInvitation",
         "description": "An invitation created or sent again; the entry is kept when its e-mail fails."
       },
-      "AllPaidChecked": {
-        "properties": {
-          "status": {
-            "type": "string",
-            "const": "success",
-            "title": "Status"
-          },
-          "competition_id": {
-            "type": "integer",
-            "title": "Competition Id"
-          },
-          "notified": {
-            "type": "boolean",
-            "title": "Notified"
-          }
-        },
-        "type": "object",
-        "required": [
-          "status",
-          "competition_id",
-          "notified"
-        ],
-        "title": "AllPaidChecked",
-        "description": "notified: every selected participant has paid and the summary e-mail was sent now."
-      },
       "ApiErrorBody": {
         "properties": {
           "status": {
@@ -6053,106 +5868,6 @@
         ],
         "title": "EmailDispatch",
         "description": "Outcome of /api/send-email when at least one e-mail left: status \"partial\" when some recipients failed (see\ndetails). A refused request is a 400, and a sending where every e-mail failed a 502."
-      },
-      "EmailPreview": {
-        "properties": {
-          "status": {
-            "type": "string",
-            "const": "success",
-            "title": "Status"
-          },
-          "preview": {
-            "$ref": "#/components/schemas/EmailPreviewContent"
-          }
-        },
-        "type": "object",
-        "required": [
-          "status",
-          "preview"
-        ],
-        "title": "EmailPreview"
-      },
-      "EmailPreviewContent": {
-        "properties": {
-          "subject": {
-            "type": "string",
-            "title": "Subject"
-          },
-          "body_plain": {
-            "type": "string",
-            "title": "Body Plain"
-          },
-          "body_html": {
-            "type": "string",
-            "title": "Body Html"
-          },
-          "sender_email": {
-            "type": "string",
-            "title": "Sender Email"
-          },
-          "sender_name": {
-            "type": "string",
-            "title": "Sender Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "subject",
-          "body_plain",
-          "body_html",
-          "sender_email",
-          "sender_name"
-        ],
-        "title": "EmailPreviewContent"
-      },
-      "EmailPreviewRequest": {
-        "properties": {
-          "template_name": {
-            "type": "string",
-            "title": "Template Name",
-            "default": ""
-          },
-          "subject": {
-            "type": "string",
-            "title": "Subject",
-            "default": ""
-          },
-          "body": {
-            "type": "string",
-            "title": "Body",
-            "default": ""
-          },
-          "recipient": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/EmailRecipient"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "competition_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Competition Id"
-          },
-          "add_signature": {
-            "type": "boolean",
-            "title": "Add Signature",
-            "default": true
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "EmailPreviewRequest",
-        "description": "recipient: whose values fill the variables (an example member when absent)."
       },
       "EmailRecipient": {
         "properties": {
@@ -9339,31 +9054,6 @@
         ],
         "title": "PivotRecords",
         "description": "Members of a season for the pivot table. season: the season actually read (the active one for \"active\")."
-      },
-      "PlanningReplaced": {
-        "properties": {
-          "status": {
-            "type": "string",
-            "const": "success",
-            "title": "Status"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "count": {
-            "type": "integer",
-            "title": "Count"
-          }
-        },
-        "type": "object",
-        "required": [
-          "status",
-          "message",
-          "count"
-        ],
-        "title": "PlanningReplaced",
-        "description": "The whole planning replaced; count: its slots."
       },
       "PlanningSlot": {
         "properties": {

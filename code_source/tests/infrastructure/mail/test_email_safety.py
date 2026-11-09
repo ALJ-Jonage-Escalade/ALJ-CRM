@@ -17,7 +17,7 @@ if _src_dir not in sys.path:
 
 from domain.email_personalization import apply_template_variables  # noqa: E402
 from infrastructure.mail.sender import sanitize_email_header  # noqa: E402
-from services.communications.email_dispatch import EmailDispatchService  # noqa: E402
+from services.communications.email_dispatch import EmailDispatchService, render_email  # noqa: E402
 from support.fake_access import grant_roles  # noqa: E402
 
 EVIL_NAME = '<a href="https://evil.example">Pay here</a>'
@@ -26,11 +26,8 @@ EVIL_NAME = '<a href="https://evil.example">Pay here</a>'
 class TestPersonalisedHtml(unittest.TestCase):
 
     def _preview(self, body, first_name):
-        with patch.object(EmailDispatchService, "get_competition_context", return_value={}):
-            return EmailDispatchService.preview(
-                subject="Hello {first_name}", body=body,
-                recipient={"first_name": first_name, "last_name": "X", "email": "x@example.com"},
-                add_signature=False)
+        return render_email("Hello {first_name}", body, {"first_name": first_name, "last_name": "X", "email": "x@example.com"},
+                            {}, add_signature=False)
 
     def test_member_value_cannot_add_markup(self):
         html = self._preview("Hello {first_name}", EVIL_NAME)["body_html"]

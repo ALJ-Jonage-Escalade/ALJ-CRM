@@ -5,14 +5,13 @@ Permet de :
 1. Charger les modèles de mails configurés dans le CRM (table email_templates).
 2. Résoudre les variables dynamiques ({first_name}, {last_name}, {num_licence},
    {no_competition}, {name_competition}, {montant_competition}, {date_competition}).
-3. Générer un aperçu fidèle (texte brut et HTML) pour validation préalable.
-4. Expédier les messages via l'API Gmail sécurisée du club (OAuth2) ou SMTP.
+3. Expédier les messages via l'API Gmail sécurisée du club (OAuth2) ou SMTP.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 from domain.club_emails import CLUB_SENDER_DOMAIN
 from domain.competitions.models import Competition, default_deadline
@@ -28,6 +27,27 @@ from infrastructure.sqlite.email_templates import EmailTemplateRepository
 from infrastructure.sqlite.members import MemberRepository
 
 logger = logging.getLogger("alj")
+
+
+class RenderedEmail(TypedDict):
+    subject: str
+    body_plain: str
+    body_html: str
+
+
+def render_email(subject: str, body: str, recipient: Dict[str, Any], competition: Dict[str, str],
+                 add_signature: bool) -> RenderedEmail:  # Any: a member row or a recipient sent by the page
+    """The e-mail personalised for one recipient. The HTML part is built from the template first, then filled with
+    escaped values, so a member's value (public HelloAsso form) never adds markup."""
+    body_plain = apply_template_variables(body, recipient, competition)
+    if add_signature:
+        body_plain += "\n\n" + build_signature_plain()
+    return RenderedEmail(
+        subject=apply_template_variables(subject, recipient, competition),
+        body_plain=body_plain,
+        body_html=apply_template_variables(build_email_html(body, add_signature=add_signature, image_src_mode="cid"),
+                                           recipient, competition, escape_html=True),
+    )
 
 
 class EmailDispatchService:
@@ -179,59 +199,6 @@ class EmailDispatchService:
         return resolved
 
     @classmethod
-    def preview(
-        cls,
-        template_name: Optional[str] = None,
-        subject: Optional[str] = None,
-        body: Optional[str] = None,
-        recipient: Optional[Dict[str, Any]] = None,
-        competition_id: Optional[int] = None,
-        add_signature: bool = True
-    ) -> Dict[str, str]:
-        """Génère l'aperçu du sujet et du corps (texte brut + HTML) avec les variables résolues."""
-        subj_tmpl = subject or ""
-        body_tmpl = body or ""
-        sender_email = None
-        sender_name = None
-
-        if template_name:
-            t = cls.get_template_by_name(template_name)
-            if t:
-                subj_tmpl = subj_tmpl or t.get("subject") or ""
-                body_tmpl = body_tmpl or t.get("body") or ""
-                sender_email = t.get("sender_email")
-                sender_name = t.get("sender_name")
-
-        # Contexte
-        comp_ctx = cls.get_competition_context(competition_id)
-        dummy_recipient = recipient or {
-            "first_name": "Jean",
-            "last_name": "DUPONT",
-            "email": "jean.dupont@example.com",
-            "licence_ffme": "123456"
-        }
-
-        subj_rendered = apply_template_variables(subj_tmpl, dummy_recipient, comp_ctx)
-        body_rendered = apply_template_variables(body_tmpl, dummy_recipient, comp_ctx)
-
-        plain_text = body_rendered
-        if add_signature:
-            plain_text = body_rendered + "\n\n" + build_signature_plain()
-
-        # HTML built from the template, then personalised with escaped values
-        html_text = apply_template_variables(
-            build_email_html(body_tmpl or "", add_signature=add_signature, image_src_mode="cid"),
-            dummy_recipient, comp_ctx, escape_html=True)
-
-        return {
-            "subject": subj_rendered,
-            "body_plain": plain_text,
-            "body_html": html_text,
-            "sender_email": sender_email or "",
-            "sender_name": sender_name or ""
-        }
-
-    @classmethod
     def dispatch_emails(
         cls,
         template_name: Optional[str] = None,
@@ -289,28 +256,14 @@ class EmailDispatchService:
                 })
                 continue
 
-            # Personnalisation
-            sub_rendered = apply_template_variables(subj_tmpl, dest, comp_ctx)
-            body_rendered = apply_template_variables(body_tmpl, dest, comp_ctx)
-
-            plain_body = body_rendered
-            inline_imgs = None
-            if add_signature:
-                plain_body = body_rendered + "\n\n" + build_signature_plain()
-                inline_imgs = get_inline_images()
-
-            # HTML built from the template, then personalised with escaped values
-            html_body = apply_template_variables(
-                build_email_html(body_tmpl or "", add_signature=add_signature, image_src_mode="cid"),
-                dest, comp_ctx, escape_html=True)
-
+            rendered = render_email(subj_tmpl, body_tmpl, dest, comp_ctx, add_signature)
             try:
                 EmailSender.send_email(
                     to_email=to_email,
-                    subject=sub_rendered,
-                    body=plain_body,
-                    html_body=html_body,
-                    inline_images=inline_imgs,
+                    subject=rendered["subject"],
+                    body=rendered["body_plain"],
+                    html_body=rendered["body_html"],
+                    inline_images=get_inline_images() if add_signature else None,
                     from_email=default_from_email,
                     from_name=default_from_name
                 )

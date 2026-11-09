@@ -170,7 +170,6 @@ files = [
     "src/api/admin/access.py",
     # Fully annotated in desloppify batch 6
     "src/api/communications/email.py",
-    "src/api/competitions/payments.py",
     "src/api/integrations/google_auth.py",
     "src/domain/validators.py",
     "src/exports/competitors_excel.py",

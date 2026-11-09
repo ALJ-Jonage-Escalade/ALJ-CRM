@@ -97,7 +97,6 @@ class TestRoles(unittest.TestCase):
         for path in ("/api/send-email", "/api/helloasso/sync", "/api/email-status",
                      "/api/reports/pivot-records", "/docs", "/openapi.json", "/api/une-route-future"):
             self.assertEqual(r("GET", path), Role.COACH, path)
-        self.assertEqual(r("POST", "/api/planning"), Role.ADMIN)
         self.assertEqual(r("POST", "/api/planning/item"), Role.COACH)
         self.assertEqual(r("DELETE", "/api/planning/item/3"), Role.COACH)
         self.assertEqual(r("GET", "/api/planning/export"), Role.COACH)
@@ -405,15 +404,8 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
         self.assertEqual(self.get("/api/competitions", make_token(email=STRANGER)).status_code, 403)
         self.assertEqual(self.get("/api/competitions").status_code, 401)
 
-    def test_planning_write_requires_admin(self):
+    def test_coaches_change_single_planning_slots(self):
         coach = make_token(email=COACH)
-        r = self.client.post("/api/planning", json=[], headers={"Authorization": f"Bearer {coach}"})
-        self.assertEqual(r.status_code, 403)
-        with patch("api.activities.planning.PlanningRepository.save_planning_data") as save:
-            r = self.client.post("/api/planning", json=[], headers={"Authorization": f"Bearer {make_token()}"})
-            self.assertEqual(r.status_code, 200)
-            save.assert_called_once()
-        # Single slots: coaches change them too (Planning page)
         with patch("api.activities.planning.PlanningRepository.delete_planning_item", return_value=True) as delete:
             r = self.client.delete("/api/planning/item/1", headers={"Authorization": f"Bearer {coach}"})
             self.assertEqual(r.status_code, 200)

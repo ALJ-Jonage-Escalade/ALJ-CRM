@@ -373,26 +373,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/competitions/{competition_id}/check-all-paid": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Check Competition All Paid Api
-         * @description Vérifie si tous les compétiteurs ont payé et envoie l'e-mail récapitulatif si applicable.
-         */
-        post: operations["check_competition_all_paid_api_api_competitions__competition_id__check_all_paid_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/members": {
         parameters: {
             query?: never;
@@ -609,26 +589,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/preview-email": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Preview Email
-         * @description Génère un aperçu fidèle d'un e-mail personnalisé pour un destinataire et une compétition.
-         */
-        post: operations["preview_email_api_preview_email_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/email-status": {
         parameters: {
             query?: never;
@@ -747,11 +707,7 @@ export interface paths {
          */
         get: operations["get_planning_api_planning_get"];
         put?: never;
-        /**
-         * Update Planning
-         * @description Remplace le planning complet (administrateurs) ; un créneau d'id 0 reçoit un nouvel identifiant.
-         */
-        post: operations["update_planning_api_planning_post"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1550,21 +1506,6 @@ export interface components {
             email_error: string | null;
         };
         /**
-         * AllPaidChecked
-         * @description notified: every selected participant has paid and the summary e-mail was sent now.
-         */
-        AllPaidChecked: {
-            /**
-             * Status
-             * @constant
-             */
-            status: "success";
-            /** Competition Id */
-            competition_id: number;
-            /** Notified */
-            notified: boolean;
-        };
-        /**
          * ApiErrorBody
          * @description Body of error(): what the frontend's API client turns into an ApiError.
          */
@@ -2229,57 +2170,6 @@ export interface components {
              * @default []
              */
             details?: components["schemas"]["EmailSendDetail"][];
-        };
-        /** EmailPreview */
-        EmailPreview: {
-            /**
-             * Status
-             * @constant
-             */
-            status: "success";
-            preview: components["schemas"]["EmailPreviewContent"];
-        };
-        /** EmailPreviewContent */
-        EmailPreviewContent: {
-            /** Subject */
-            subject: string;
-            /** Body Plain */
-            body_plain: string;
-            /** Body Html */
-            body_html: string;
-            /** Sender Email */
-            sender_email: string;
-            /** Sender Name */
-            sender_name: string;
-        };
-        /**
-         * EmailPreviewRequest
-         * @description recipient: whose values fill the variables (an example member when absent).
-         */
-        EmailPreviewRequest: {
-            /**
-             * Template Name
-             * @default
-             */
-            template_name?: string;
-            /**
-             * Subject
-             * @default
-             */
-            subject?: string;
-            /**
-             * Body
-             * @default
-             */
-            body?: string;
-            recipient?: components["schemas"]["EmailRecipient"] | null;
-            /** Competition Id */
-            competition_id?: number | null;
-            /**
-             * Add Signature
-             * @default true
-             */
-            add_signature?: boolean;
         };
         /**
          * EmailRecipient
@@ -3780,21 +3670,6 @@ export interface components {
             season: string;
             /** Records */
             records: components["schemas"]["PivotRecord"][];
-        };
-        /**
-         * PlanningReplaced
-         * @description The whole planning replaced; count: its slots.
-         */
-        PlanningReplaced: {
-            /**
-             * Status
-             * @constant
-             */
-            status: "success";
-            /** Message */
-            message: string;
-            /** Count */
-            count: number;
         };
         /**
          * PlanningSlot
@@ -5567,55 +5442,6 @@ export interface operations {
             };
         };
     };
-    check_competition_all_paid_api_api_competitions__competition_id__check_all_paid_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                competition_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AllPaidChecked"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
     list_members_api_members_get: {
         parameters: {
             query?: {
@@ -6116,48 +5942,6 @@ export interface operations {
             };
         };
     };
-    preview_email_api_preview_email_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EmailPreviewRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmailPreview"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
     get_email_status_api_email_status_get: {
         parameters: {
             query?: never;
@@ -6499,48 +6283,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlanningSlot"][];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
-    update_planning_api_planning_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PlanningSlotUpdate"][];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PlanningReplaced"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Internal Server Error */

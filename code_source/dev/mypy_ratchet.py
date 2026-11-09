@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-MAX_ERRORS = 44
+MAX_ERRORS = 41
 CODE_ROOT = Path(__file__).resolve().parent.parent  # code_source/
 
 

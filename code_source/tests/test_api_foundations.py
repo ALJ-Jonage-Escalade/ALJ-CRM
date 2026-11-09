@@ -62,8 +62,8 @@ class TestSqliteCacheScope(unittest.TestCase):
             self.assertFalse(f(path), path)
         for path in ("/api/members", "/api/email-templates", "/api/helloasso/sync",
                      "/api/competitions-x", "/api/reports/map-points", "/api/reports/pivot-records",
-                     # cache-backed route under the Firestore prefixes
-                     "/api/competitions/12/check-all-paid"):
+                     # not a route of the Firestore-only routers, although under their prefix
+                     "/api/competitions/12/route-future"):
             self.assertTrue(f(path), path)
 
     def test_every_firestore_router_route_skips_cache(self):
@@ -78,14 +78,13 @@ class TestSqliteCacheScope(unittest.TestCase):
 
     def test_every_other_api_route_uses_cache(self):
         """Outside the Firestore-only routers, every /api/ route reads the SQLite cache (app
-        settings, members…), whatever its prefix: check-all-paid lives under /api/competitions in a
-        router that must not join the Firestore-only list."""
+        settings, members…), whatever its prefix."""
         firestore_only = set(map(id, api_routes(competitions.router, participants.router, coaches.router,
                                                 competition_members.router, helloasso_items.router, results.router,
                                                 me.router, access.router, helloasso_campaigns.router)))
         routes = [r for r in app_routes(server.app.routes)
                   if id(r) not in firestore_only and r.path.startswith("/api/")]
-        self.assertIn("/api/competitions/{competition_id}/check-all-paid", [r.path for r in routes])
+        self.assertGreater(len(routes), 15)
         for r in routes:
             self.assertTrue(server.uses_sqlite_cache(concrete(r.path)), r.path)
 
@@ -143,12 +142,12 @@ class TestSqliteCacheScope(unittest.TestCase):
             after.assert_not_called()
         self.assertEqual(r.json(), report)
 
-    def test_check_all_paid_runs_on_refreshed_cache(self):
+    def test_cache_write_runs_on_refreshed_cache(self):
         r = self._assert_cache_around(
-            "POST", "/api/competitions/12/check-all-paid",
-            "api.competitions.payments.check_and_notify_all_paid",
+            "DELETE", "/api/planning/item/12",
+            "api.activities.planning.PlanningRepository.delete_planning_item",
             True)
-        self.assertEqual(r.json(), {"status": "success", "competition_id": 12, "notified": True})
+        self.assertEqual(r.json()["status"], "success")
 
     def test_write_not_replicated_keeps_success_and_flags_header(self):
         """A write saved in the cache but not sent to Firestore stays a success (it happened, a retry would repeat it)
@@ -158,10 +157,10 @@ class TestSqliteCacheScope(unittest.TestCase):
                 patch.object(server.CloudDatabase, "is_enabled", return_value=True), \
                 patch.object(server.CloudDatabase, "ensure_fresh"), \
                 patch.object(server.CloudDatabase, "after_write", side_effect=[True, False]), \
-                patch("api.competitions.payments.check_and_notify_all_paid", return_value=True), \
+                patch("api.activities.planning.PlanningRepository.delete_planning_item", return_value=True), \
                 self.assertLogs("alj", "ERROR"):
-            replicated = client.post("/api/competitions/12/check-all-paid")
-            pending = client.post("/api/competitions/12/check-all-paid")
+            replicated = client.delete("/api/planning/item/12")
+            pending = client.delete("/api/planning/item/12")
         self.assertNotIn(server.REPLICATION_PENDING_HEADER, replicated.headers)
         self.assertEqual(pending.status_code, 200)
         self.assertEqual(pending.headers[server.REPLICATION_PENDING_HEADER], "1")
