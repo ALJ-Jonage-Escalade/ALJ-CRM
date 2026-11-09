@@ -10,6 +10,7 @@ from typing import List, Optional, TypedDict
 from domain.competitions import matching as competition_matching
 from domain.errors import Conflict, InvalidRequest, NotFound, UpstreamUnavailable
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
+from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.competition_repository import (
     CompetitionRepository,
     ItemAlreadyLinked,
@@ -59,7 +60,7 @@ class HelloAssoItemService:
 
         competitions = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom} for c in CompetitionRepository.list_competitions()]
         existing_links = CompetitionRepository.list_helloasso_links()
-        links = competition_matching.auto_link_items(summarized, competitions, CompetitionRepository.list_members(), existing_links)
+        links = competition_matching.auto_link_items(summarized, competitions, member_directory.list_members(), existing_links)
         CompetitionRepository.replace_auto_links(links)
         applied_count = CompetitionRepository.apply_links_to_participants()
 

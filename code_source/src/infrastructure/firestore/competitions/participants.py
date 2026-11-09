@@ -12,8 +12,7 @@ from domain.competitions.models import (
     payment_status_after_toggle,
 )
 from infrastructure.firestore.client import FirestoreClient
-from infrastructure.firestore.competitions import documents
-from infrastructure.firestore.competitions.adherents import MemberDirectoryMixin
+from infrastructure.firestore.competitions import documents, member_directory
 
 # Collé pour l'ancien appelant (web) : état de paiement par défaut d'un nouveau
 # participant ajouté explicitement (même sémantique que l'ancienne base SQLite).
@@ -53,7 +52,7 @@ def unchanged_since_guard(field: str, value: bool, seen_updated_at: Optional[str
     return guard
 
 
-class ParticipantsMixin(MemberDirectoryMixin):
+class ParticipantsMixin:
     """Participant rows of a competition; new rows are copied from the member directory."""
 
     # ------------------------------------------------------------------
@@ -67,7 +66,7 @@ class ParticipantsMixin(MemberDirectoryMixin):
         parts = doc.get("participants") or []
         if selected_only:
             parts = [p for p in parts if p.get("selectionne")]
-        adh = cls._adherent_map()
+        adh = member_directory.adherent_map()
         result = []
         for p in parts:
             row = dict(p)
@@ -109,7 +108,7 @@ class ParticipantsMixin(MemberDirectoryMixin):
     @classmethod
     def _new_participant(cls, adherent_id: int, selectionne: bool) -> Dict[str, Any]:
         """New participant row for a member, copied from the `adherents` directory."""
-        adh = cls._adherent_map().get(adherent_id) or {"id": adherent_id}
+        adh = member_directory.adherent_map().get(adherent_id) or {"id": adherent_id}
         return cls._new_participant_map(adh, selectionne)
 
     @classmethod
@@ -340,7 +339,7 @@ class ParticipantsMixin(MemberDirectoryMixin):
                                    statuses: Optional[Sequence[str]] = None) -> Tuple[int, Optional[Dict[str, Any]]]:
         """(number added, document written); the document is None when nobody was added.
         `statuses`: only the members at one of these membership statuses; None: every status."""
-        groupe = cls.list_members(competition_only=True, statuses=statuses)
+        groupe = member_directory.list_members(competition_only=True, statuses=statuses)
         added = {"count": 0}
 
         def mutate(parts):

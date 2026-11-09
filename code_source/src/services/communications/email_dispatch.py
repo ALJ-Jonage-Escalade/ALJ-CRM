@@ -19,6 +19,7 @@ from domain.errors import InvalidRequest, UpstreamUnavailable
 from domain.email_personalization import apply_template_variables
 from domain.utils import format_amount, format_period, normalize_name
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import member_directory
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
 from infrastructure.mail.sender import EmailSender, MailError
 from infrastructure.security.secret_store import SecretStore
@@ -68,7 +69,7 @@ class EmailDispatchService:
         """Every member and payer address known to the club database (lower-cased)."""
         emails = MemberRepository.list_contact_emails()
         try:
-            emails.update(str(a.get("email") or "").strip().lower() for a in CompetitionRepository.list_members())
+            emails.update(str(a.get("email") or "").strip().lower() for a in member_directory.list_members())
         except Exception as e:
             logger.warning(f"[EMAIL_DISPATCH] Competition members unavailable for the recipient check: {e}")
         emails.discard("")
@@ -160,7 +161,7 @@ class EmailDispatchService:
             # Charger les profils depuis la base adhérents
             all_users = MemberRepository.get_users_by_ids(recipient_ids)
             # Charger les profils depuis la base compétitions en secours
-            comp_adh = {a["id"]: a for a in CompetitionRepository.list_members()}
+            comp_adh = {a["id"]: a for a in member_directory.list_members()}
 
             for uid in recipient_ids:
                 u_row = all_users.get(uid)

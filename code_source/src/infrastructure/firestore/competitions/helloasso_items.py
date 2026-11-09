@@ -13,7 +13,7 @@ from domain.competitions.models import (
     PAIEMENT_STATUTS_ANNULES,
 )
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.firestore.competitions import documents
+from infrastructure.firestore.competitions import documents, member_directory
 from infrastructure.firestore.competitions.participants import MANUAL_PAYMENT_REF, ParticipantsMixin
 
 logger = logging.getLogger("alj")
@@ -237,7 +237,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         comps = {}
         for d in documents.list_comp_docs():
             comps[d.get("id")] = d
-        adh = cls._adherent_map()
+        adh = member_directory.adherent_map()
         rows = []
         for iid, doc in items.items():
             comp_id = doc.get("competition_id")
@@ -274,7 +274,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
 
     @classmethod
     def list_unlinked_items(cls) -> list:
-        adh = {a["id"]: a for a in cls.list_members()}
+        adh = {a["id"]: a for a in member_directory.list_members()}
         result = []
         for it in cls.list_mirror_items():
             if not cls._is_paid_item(it):

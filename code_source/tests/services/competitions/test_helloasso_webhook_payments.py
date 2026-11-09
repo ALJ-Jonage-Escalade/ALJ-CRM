@@ -5,6 +5,7 @@ from unittest.mock import patch
 from support.api_case import ApiTestCase
 
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.competitions import documents
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from services.competitions.helloasso_webhook import HelloAssoWebhookService
@@ -95,7 +96,7 @@ class TestWebhookPayments(ApiTestCase):
             if collection == documents.COLLECTION_ADHERENTS:
                 raise FirestoreError("down")
             return real(collection, *args, **kwargs)
-        CompetitionRepository._invalidate_adherents_cache()  # no copy of the list yet (the competition read in setUp keeps one)
+        member_directory.invalidate_cache()  # no copy of the list yet (the competition read in setUp keeps one)
         with patch.object(FirestoreClient, "list_documents", side_effect=adherents_down):
             r = self.client.post("/webhooks/helloasso", json={"eventType": "Payment", "data": payment_item(7777, 9999, 1500)})
         self.assertEqual(r.status_code, 503, r.text)

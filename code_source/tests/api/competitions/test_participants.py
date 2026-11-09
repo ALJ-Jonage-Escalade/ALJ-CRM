@@ -8,6 +8,7 @@ from services.competitions import store as competition_store
 
 from domain.competitions.models import PAIEMENT_PAYE
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.competitions import documents
 from infrastructure.firestore.client import FirestoreClient
 
@@ -69,7 +70,7 @@ class TestParticipants(ApiTestCase):
 
     def reads_during(self, method, url, body=None):
         """(response, competition documents read, coaches collection reads) of one request."""
-        CompetitionRepository._adherent_map()  # member directory already cached, as on a warm server
+        member_directory.adherent_map()  # member directory already cached, as on a warm server
         with patch.object(FirestoreClient, "get_document", wraps=self.fake.get_document) as get, \
                 patch.object(FirestoreClient, "list_documents", wraps=self.fake.list_documents) as lst:
             r = self.client.request(method, url, json=body)

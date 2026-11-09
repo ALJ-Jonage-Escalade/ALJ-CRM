@@ -30,12 +30,13 @@ import json, sys, traceback
 sys.path.insert(0, "src")
 from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.competitions import documents
 for line in sys.stdin:
     request = json.loads(line)
     try:
-        CompetitionRepository._invalidate_adherents_cache()
-        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "documents": documents, "Competition": Competition, "args": request["args"]}}
+        member_directory.invalidate_cache()
+        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "documents": documents, "member_directory": member_directory, "Competition": Competition, "args": request["args"]}}
         exec(request["body"], scope)
         print({_RESULT!r} + json.dumps(scope["result"], default=str), flush=True)
     except Exception:
@@ -117,7 +118,7 @@ class TestData:
     def members(self, competition_only: bool = False, statuses: list | None = None) -> list:
         """Members of the `adherents` projection (id, nom, prenom, tarif, statut, email…); `statuses`: only those
         at one of these membership statuses."""
-        return self._run("result = CompetitionRepository.list_members(competition_only=args['only'], statuses=args['statuses'])",
+        return self._run("result = member_directory.list_members(competition_only=args['only'], statuses=args['statuses'])",
                          only=competition_only, statuses=statuses)
 
     def competition_group(self) -> list:

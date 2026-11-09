@@ -10,13 +10,12 @@ from domain.competitions.models import (
     STATUT_CLOSE,
 )
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.firestore.competitions import documents
-from infrastructure.firestore.competitions.adherents import MemberDirectoryMixin
+from infrastructure.firestore.competitions import documents, member_directory
 
 logger = logging.getLogger("alj")
 
 
-class CompetitionsMixin(MemberDirectoryMixin):
+class CompetitionsMixin:
     """Competition documents; the season report reads the member directory."""
 
     # ------------------------------------------------------------------
@@ -65,7 +64,7 @@ class CompetitionsMixin(MemberDirectoryMixin):
         """{adherent id -> sex code} from the `adherents` directory: the single source of the participants'
         sex (plans/sex-enum.md D7). Empty when the directory cannot be read: the sexes show as not given."""
         try:
-            return {doc["id"]: cls._sex_code(doc) for doc in cls._adherents_raw() if doc.get("id") is not None}
+            return {doc["id"]: member_directory.sex_code(doc) for doc in member_directory.adherents_raw() if doc.get("id") is not None}
         except FirestoreError as e:
             logger.warning("Annuaire adhérents illisible, sexe des participants non renseigné : %s", e)
             return {}
@@ -185,7 +184,7 @@ class CompetitionsMixin(MemberDirectoryMixin):
         docs = documents.list_comp_docs()
         comps = [documents.comp_from_doc(d) for d in docs]
         comps.sort(key=lambda c: documents.comp_sort_key(c.date_competition, c.id))
-        adh = cls._adherent_map()
+        adh = member_directory.adherent_map()
         if season:
             comps = [c for c in comps if cls.season_of_date(c.date_competition) == season]
 

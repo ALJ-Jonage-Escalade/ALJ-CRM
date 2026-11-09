@@ -318,6 +318,7 @@ def build_sqlite(path, fake, rng, coach_names):
 def seed_competitions(coach_ids):
     from domain.competitions.models import STATUT_CLOSE, STATUT_EN_COURS, STATUT_EN_PREPARATION, Competition
     from infrastructure.firestore.competition_repository import CompetitionRepository
+    from infrastructure.firestore.competitions import member_directory
 
     snape, mcgonagall, flitwick = coach_ids[0], coach_ids[1], coach_ids[2]
     today = datetime.date.today()
@@ -331,7 +332,7 @@ def seed_competitions(coach_ids):
         # publishes its results on the fake MyCompet
         ("Gringotts Bouldering Open", "1688", today - datetime.timedelta(days=5), 12.0, STATUT_CLOSE, flitwick, None),
     ]
-    competitors = [a["id"] for a in CompetitionRepository.list_members(competition_only=True, statuses=["Terminé"])]
+    competitors = [a["id"] for a in member_directory.list_members(competition_only=True, statuses=["Terminé"])]
     rng = random.Random(SEED)
     base_id = int(datetime.datetime(today.year, today.month, today.day).timestamp() * 1000)
     competitions = []
@@ -390,7 +391,7 @@ def seed_helloasso_items(competitions):
     from infrastructure.firestore.competition_repository import CompetitionRepository
 
     cup, lead_open, regional = competitions[0], competitions[1], competitions[2]
-    members = [a for a in CompetitionRepository.list_members(competition_only=True) if a.get("num_licence")]
+    members = [a for a in member_directory.list_members(competition_only=True) if a.get("num_licence")]
     if len(members) < 8:
         print(f"⚠️  HelloAsso items skipped: {len(members)} competitors with a licence (8 needed)")
         return 0
@@ -452,7 +453,7 @@ def seed_helloasso_items(competitions):
     summarized = matching.summarize_items(items)
     CompetitionRepository.update_helloasso_mirror(summarized, items, HELLOASSO_FORM)
     comps = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom} for c in competitions]
-    CompetitionRepository.replace_auto_links(matching.auto_link_items(summarized, comps, CompetitionRepository.list_members(), {}))
+    CompetitionRepository.replace_auto_links(matching.auto_link_items(summarized, comps, member_directory.list_members(), {}))
     CompetitionRepository.save_manual_link(manual, lead_open.id, members[5]["id"], "Mistyped competition number on the form")
     CompetitionRepository.set_item_ignored(test_payment, True, "Test payment", by=DEV_ACCOUNTS[0][1])
     CompetitionRepository.set_item_ignored(duplicate, True, "Duplicate payment, refunded", by=DEV_ACCOUNTS[1][1])
@@ -505,7 +506,7 @@ def main() -> int:
     print(f"🧑‍🏫 Coaches: {', '.join(COACHES)}")
 
     # Projection read by the PWA (adherents / planning), from the seed SQLite database
-    report = CompetitionRepository.rebuild_member_directory(SEASON)
+    report = member_directory.rebuild_member_directory(SEASON)
     if report.get("errors"):
         print(f"⚠️  adherents projection: {report['errors']}")
 

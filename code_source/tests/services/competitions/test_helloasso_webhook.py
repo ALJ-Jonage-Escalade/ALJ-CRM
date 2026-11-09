@@ -64,7 +64,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
     @patch("infrastructure.firestore.competition_repository.CompetitionRepository.update_helloasso_mirror")
     @patch("infrastructure.firestore.competition_repository.CompetitionRepository.known_helloasso_item_ids", new=lambda: set())
     @patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_helloasso_links", return_value={})
-    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_members")
+    @patch("infrastructure.firestore.competitions.member_directory.list_members")
     @patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_competitions")
     def test_process_webhook_match_successful(
         self,
@@ -126,7 +126,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         with patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=url), \
              patch(f"{repository_path}.update_helloasso_mirror") as mirror, \
              patch(f"{repository_path}.list_competitions", return_value=[]), \
-             patch(f"{repository_path}.list_members", return_value=[]), \
+             patch("infrastructure.firestore.competitions.member_directory.list_members", return_value=[]), \
              patch(f"{repository_path}.list_helloasso_links", return_value={}), \
              patch(f"{repository_path}.known_helloasso_item_ids", return_value=set()):
             report = HelloAssoWebhookService.reconcile_payment_items({"eventType": "Order"}, items=[tshirt])
