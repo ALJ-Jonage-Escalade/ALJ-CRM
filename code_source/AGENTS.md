@@ -8,7 +8,7 @@ All commands run from `code_source/`. Python 3.14 (`.python-version`, `requires-
 - e2e: not managed by uv — `pip install -r requirements-docker.txt -r requirements-e2e.txt`, `python -m playwright install chromium`, then `python -m pytest -c e2e/pytest.ini e2e` (needs Docker and `npm run build` in `frontend/`; see `dev/README.md`)
 - lint: `uv run ruff check src tests` (security rules `S` included; `tests/` and `e2e/` ignore a few of them, see `[tool.ruff.lint.per-file-ignores]`)
 - security scan (Semgrep CE, as CI, from the repo root): `uvx semgrep@1.182.1 scan --config p/python --config p/typescript --config p/owasp-top-ten --metrics=off --error --exclude code_source/frontend/src/lib/api-schema.ts code_source/src code_source/frontend/src`
-- typecheck: `uv run mypy` (no path: checks the files listed under `[tool.mypy] files` in pyproject.toml; `mypy src/` fails on module-path errors); CI also runs `uv run python dev/mypy_ratchet.py`, which fails when the error count over all of `src/` rises above its `MAX_ERRORS` (lower it when you fix some)
+- typecheck: `uv run mypy` (no path: checks all of `src/` as configured under `[tool.mypy]` in pyproject.toml; `mypy src/` fails on module-path errors)
 - all checks (as CI): `uv lock --check && uv run python dev/export_requirements.py --check && uv run ruff check src tests && uv run mypy && uv run pytest tests`
 - API contract: `uv run python dev/export_openapi.py --check` (`frontend/openapi.json` matches the Pydantic models)
 - frontend (Vue 3 + Vite + TypeScript, in `frontend/`, Node version from `frontend/.nvmrc`):
@@ -40,8 +40,7 @@ All commands run from `code_source/`. Python 3.14 (`.python-version`, `requires-
 - Prefer a TypedDict to returning `dict[str, Any]`
 
 ## Type Checking
-- mypy is being adopted progressively: only the files listed in `[tool.mypy] files` are checked (not strict, `check_untyped_defs = false`)
-- When a file is fully typed, add it to that `files` list
+- mypy checks all of `src/` with 0 errors (not strict, `check_untyped_defs = false`: the bodies of unannotated functions are not checked)
 - No `Any` without a comment explaining why
 - No `type: ignore` without a specific error code and reason
 - `from __future__ import annotations` in new source files

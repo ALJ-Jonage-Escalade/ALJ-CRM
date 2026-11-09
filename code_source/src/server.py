@@ -136,7 +136,8 @@ pages.mount_static(app)
 FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items,
                                                       results, me, access, helloasso_campaigns)
                             for r in _api.router.routes if isinstance(r, APIRoute))
-app.add_exception_handler(ServiceError, service_error_handler)
+# FastAPI's decorator form: add_exception_handler's type only accepts handlers taking any Exception
+app.exception_handler(ServiceError)(service_error_handler)
 
 # No CORS: every page calls the API from its own origin. Allowing other origins would let any
 # website read a local (unauthenticated) dev server.
