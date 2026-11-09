@@ -51,11 +51,11 @@ pillow==13.0.0
     #   weasyprint
 pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi
-pydantic==2.14.2
+pydantic==2.14.3
     # via
     #   alj-escalade-manager
     #   fastapi
-pydantic-core==2.50.2
+pydantic-core==2.50.4
     # via pydantic
 pydyf==0.13.0
     # via weasyprint
@@ -85,7 +85,7 @@ typing-extensions==4.16.0
     #   pydantic
     #   pydantic-core
     #   typing-inspection
-typing-inspection==0.4.4
+typing-inspection==0.4.5
     # via
     #   fastapi
     #   pydantic
