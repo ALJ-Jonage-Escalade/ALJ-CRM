@@ -23,8 +23,8 @@ Durable decisions that apply across all phases:
 - **Schema** (SQLite cache, replicated to Firestore: in `TRACKED_TABLES`, ids renumbered through `REFERENCES`):
   - `keys(id, code, status, created_at, updated_at)` — `code` free text, trimmed, unique case-insensitive, archived
     keys included; `status` ∈ `available | assigned | archived`
-  - `key_assignments(id, key_id, user_id, given_on, returned_on, comment, by, created_at)` — `returned_on` NULL while
-    held; at most one open assignment per key and per user (partial unique indexes)
+  - `key_assignments(id, key_id, user_id, given_on, returned_on, comment, return_comment, by, created_at)` —
+    `returned_on` NULL while held; at most one open assignment per key and per user (partial unique indexes)
   - `key_events(id, key_id, type, date, comment, by, created_at)` — `type` ∈ `archived | restored | renamed |
     assignment_deleted`
   - `by`: e-mail of the admin who acted
@@ -70,8 +70,9 @@ membership in the active season.
 ### Acceptance criteria
 
 - [ ] Assigning an assigned or archived key, or a member who holds a key, or a member not in the active season → 409
-- [ ] Return closes the open assignment, the key becomes available; returned_on < given_on → 422
-- [ ] `GET /api/keys` returns the holder (id, name), given_on, comment and the not-renewed flag
+- [ ] Return closes the open assignment, the key becomes available; returned_on < given_on → 400
+- [ ] `GET /api/keys` returns the holder (id, name), given_on, comment, the not-renewed flag and the season of
+      their record (active one, else their last one: the link opens it)
 - [ ] Page: assign / return dialogs, holder link, ⚠️ filter
 
 ---

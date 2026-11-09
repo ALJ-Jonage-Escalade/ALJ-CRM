@@ -953,6 +953,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/keys/{key_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Key */
+        post: operations["assign_key_api_keys__key_id__assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/keys/{key_id}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Return Key */
+        post: operations["return_key_api_keys__key_id__return_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/webhooks/helloasso": {
         parameters: {
             query?: never;
@@ -3011,7 +3045,7 @@ export interface components {
         };
         /**
          * Key
-         * @description A club key and its status.
+         * @description A club key, its status and its current holder.
          */
         Key: {
             /** Id */
@@ -3023,6 +3057,56 @@ export interface components {
              * @enum {string}
              */
             status: "available" | "assigned" | "archived";
+            holder?: components["schemas"]["KeyHolder"] | null;
+        };
+        /**
+         * KeyAssignmentIn
+         * @description A key handed over to a member of the active season.
+         */
+        KeyAssignmentIn: {
+            /** User Id */
+            user_id: number;
+            /**
+             * Given On
+             * Format: date
+             */
+            given_on: string;
+            /**
+             * Comment
+             * @default
+             */
+            comment?: string;
+        };
+        /**
+         * KeyDone
+         * @description A key write with nothing else to return.
+         */
+        KeyDone: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+        };
+        /**
+         * KeyHolder
+         * @description Who holds a key, since when; member_this_season false: no membership of the active season (to chase up).
+         */
+        KeyHolder: {
+            /** User Id */
+            user_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Given On */
+            given_on: string;
+            /** Comment */
+            comment: string;
+            /** Member This Season */
+            member_this_season: boolean;
+            /** Season */
+            season: string;
         };
         /**
          * KeyIn
@@ -3031,6 +3115,22 @@ export interface components {
         KeyIn: {
             /** Code */
             code: string;
+        };
+        /**
+         * KeyReturnIn
+         * @description A key given back (not before it was handed over).
+         */
+        KeyReturnIn: {
+            /**
+             * Returned On
+             * Format: date
+             */
+            returned_on: string;
+            /**
+             * Comment
+             * @default
+             */
+            comment?: string;
         };
         /**
          * ManualPayment
@@ -6853,6 +6953,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Key"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_key_api_keys__key_id__assignments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyAssignmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    return_key_api_keys__key_id__return_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyReturnIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Conflict */

@@ -64,6 +64,20 @@ KEYS_DDL = (
         status TEXT NOT NULL DEFAULT 'available',
         created_at TEXT, updated_at TEXT
     )""",
+    # Who held a key and when; returned_on empty while held. One open assignment per key and per person.
+    """CREATE TABLE IF NOT EXISTS key_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_id INTEGER NOT NULL REFERENCES keys(id),
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        given_on TEXT NOT NULL,
+        returned_on TEXT,
+        comment TEXT NOT NULL DEFAULT '',
+        return_comment TEXT NOT NULL DEFAULT '',
+        by TEXT NOT NULL DEFAULT '',
+        created_at TEXT
+    )""",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_key_assignments_open_key ON key_assignments(key_id) WHERE returned_on IS NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_key_assignments_open_user ON key_assignments(user_id) WHERE returned_on IS NULL",
 )
 
 

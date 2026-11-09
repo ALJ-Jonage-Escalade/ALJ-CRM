@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { keyCounts, shownKeys, type Key } from "./keys";
 
-const key = (id: number, code: string, status: Key["status"] = "available"): Key => ({ id, code, status });
+const key = (id: number, code: string, status: Key["status"] = "available"): Key => ({ id, code, status, holder: null });
 
 describe("shownKeys", () => {
   it("keeps every key without a search", () => {

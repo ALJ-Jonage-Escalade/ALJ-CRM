@@ -12,7 +12,7 @@ from domain.members.sex import parse_sex
 TRACKED_TABLES = (
     "seasons", "users", "orders", "purchases", "purchase_options",
     "planning", "email_templates", "app_settings", "geocache",
-    "keys",  # club keys, plans/club-keys.md
+    "keys", "key_assignments",  # club keys, plans/club-keys.md
 )
 COLLECTION_PREFIX = "crm_"
 MOD_FIELD = "_modified_at"
@@ -27,7 +27,8 @@ COMMIT_CHUNK = 400
 # par un autre poste).
 REFERENCES = {
     "seasons": [("orders", "season_id")],
-    "users": [("purchases", "user_id")],
+    "users": [("purchases", "user_id"), ("key_assignments", "user_id")],
+    "keys": [("key_assignments", "key_id")],
     "orders": [("purchases", "order_id")],
     "purchases": [("purchase_options", "purchase_id")],
 }

@@ -15,3 +15,10 @@ def test_a_new_key_is_queued_for_firestore(tmp_path: Path) -> None:
     install_tracking(conn)
     conn.execute("INSERT INTO keys (code, status) VALUES ('12', 'available')")
     assert [r["tbl"] for r in conn.execute("SELECT tbl FROM _fs_changes")] == ["keys"]
+
+
+def test_assignments_are_replicated_and_follow_renumbered_ids() -> None:
+    from infrastructure.firestore.cloud_sync.common import REFERENCES, TRACKED_TABLES
+    assert "key_assignments" in TRACKED_TABLES
+    assert ("key_assignments", "key_id") in REFERENCES["keys"]
+    assert ("key_assignments", "user_id") in REFERENCES["users"]

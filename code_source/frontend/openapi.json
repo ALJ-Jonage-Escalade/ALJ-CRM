@@ -3404,6 +3404,154 @@
         }
       }
     },
+    "/api/keys/{key_id}/assignments": {
+      "post": {
+        "summary": "Assign Key",
+        "operationId": "assign_key_api_keys__key_id__assignments_post",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyAssignmentIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{key_id}/return": {
+      "post": {
+        "summary": "Return Key",
+        "operationId": "return_key_api_keys__key_id__return_post",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyReturnIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/webhooks/helloasso": {
       "get": {
         "summary": "Webhook Helloasso Ping",
@@ -7473,6 +7621,16 @@
               "archived"
             ],
             "title": "Status"
+          },
+          "holder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyHolder"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7482,7 +7640,93 @@
           "status"
         ],
         "title": "Key",
-        "description": "A club key and its status."
+        "description": "A club key, its status and its current holder."
+      },
+      "KeyAssignmentIn": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "given_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Given On"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Comment",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id",
+          "given_on"
+        ],
+        "title": "KeyAssignmentIn",
+        "description": "A key handed over to a member of the active season."
+      },
+      "KeyDone": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "KeyDone",
+        "description": "A key write with nothing else to return."
+      },
+      "KeyHolder": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "given_on": {
+            "type": "string",
+            "title": "Given On"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "member_this_season": {
+            "type": "boolean",
+            "title": "Member This Season"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "last_name",
+          "first_name",
+          "given_on",
+          "comment",
+          "member_this_season",
+          "season"
+        ],
+        "title": "KeyHolder",
+        "description": "Who holds a key, since when; member_this_season false: no membership of the active season (to chase up)."
       },
       "KeyIn": {
         "properties": {
@@ -7500,6 +7744,28 @@
         ],
         "title": "KeyIn",
         "description": "A new key: its code (engraved number or club number), unique whatever its case."
+      },
+      "KeyReturnIn": {
+        "properties": {
+          "returned_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Returned On"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Comment",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "returned_on"
+        ],
+        "title": "KeyReturnIn",
+        "description": "A key given back (not before it was handed over)."
       },
       "ManualPayment": {
         "properties": {
