@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 from domain.competitions.matching import auto_link_items, parse_campaign_identifier, summarize_items
 from domain.competitions.models import PAIEMENT_PAYE
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions, helloasso_items, member_directory, participants
 from infrastructure.helloasso import api as helloasso_api
 from infrastructure.security.api_auth import auth_enforced, constant_time_equals
 from infrastructure.security.secret_store import SecretStore
@@ -260,12 +260,12 @@ class HelloAssoWebhookService:
         summarized = summarize_items(raw_items)
         computed_links = auto_link_items(
             items=summarized,
-            competitions=[c.to_dict() for c in CompetitionRepository.list_competitions()],
-            adherents=CompetitionRepository.list_members(),
-            existing_links=CompetitionRepository.list_helloasso_links(),
+            competitions=[c.to_dict() for c in competitions.list_competitions()],
+            adherents=member_directory.list_members(),
+            existing_links=helloasso_items.list_helloasso_links(),
         )
         # Items already received: HelloAsso redelivers notifications, which must not undo a coach's cancellation
-        known_items = {str(item_id) for item_id in CompetitionRepository.known_helloasso_item_ids()}
+        known_items = {str(item_id) for item_id in helloasso_items.known_helloasso_item_ids()}
 
         matches: List[Dict[str, Any]] = []
         anomalies: List[Dict[str, Any]] = []
@@ -310,7 +310,7 @@ class HelloAssoWebhookService:
 
         mirrored = False
         try:
-            CompetitionRepository.update_helloasso_mirror(
+            helloasso_items.update_helloasso_mirror(
                 summarized=[item_summary], raw_items=[raw], campagne_slug=cls.item_form_slug(raw))
             mirrored = True
         except Exception:  # the payment is still recorded below, from this item's amount alone
@@ -337,7 +337,7 @@ class HelloAssoWebhookService:
                 "reason": "Compétition reconnue mais aucun adhérent trouvé par licence ou nom"
             }
 
-        CompetitionRepository.set_item_link(id_item=item_id, competition_id=competition_id, adherent_id=adherent_id,
+        helloasso_items.set_item_link(id_item=item_id, competition_id=competition_id, adherent_id=adherent_id,
                                             source="webhook")
 
         payment = _ItemPayment(competition_id, adherent_id, mirrored, amount, order_ref,
@@ -346,7 +346,7 @@ class HelloAssoWebhookService:
         # (selected and paid) and reactivates a cancellation; a redelivered notification of an item already
         # received only lists a member who is missing.
         if not _record_payment(payment):
-            added = CompetitionRepository.add_participant_doc(
+            added = participants.add_participant_doc(
                 competition_id=competition_id,
                 adherent_id=adherent_id,
                 selectionne=True,
@@ -381,7 +381,7 @@ def _record_payment(payment: _ItemPayment) -> bool:
     """Participant's payment = sum of every paid item linked to them (a 2nd payment adds to the 1st).
     Item missing from the mirror (failed write): its own amount only. Returns whether a participant was updated."""
     if payment.mirrored:
-        return CompetitionRepository.refresh_helloasso_payment(payment.competition_id, payment.adherent_id)
-    return CompetitionRepository.apply_helloasso_payment(
+        return helloasso_items.refresh_helloasso_payment(payment.competition_id, payment.adherent_id)
+    return participants.apply_helloasso_payment(
         competition_id=payment.competition_id, adherent_id=payment.adherent_id, montant_paye=payment.amount,
         order_ref=payment.order_ref, date_synchro=payment.item_date)

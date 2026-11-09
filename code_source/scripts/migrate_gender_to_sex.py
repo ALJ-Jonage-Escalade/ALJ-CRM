@@ -34,7 +34,7 @@ from infrastructure import runtime_env  # noqa: E402
 from infrastructure.firestore.client import FirestoreClient  # noqa: E402
 from infrastructure.firestore.cloud_sync.common import COMMIT_CHUNK, collection_for  # noqa: E402
 from infrastructure.firestore.cloud_sync.rest_store import RestStore  # noqa: E402
-from infrastructure.firestore.competition_repository import CompetitionRepository  # noqa: E402
+from infrastructure.firestore.competitions import documents, member_directory, participants  # noqa: E402
 
 LEGACY = "gender"
 NOT_GIVEN = "(non renseigné)"
@@ -69,11 +69,11 @@ def user_change(doc: Dict[str, Any]) -> Optional[UserChange]:
     return UserChange(doc["id"], doc.get("update_time"), sex.value if sex else None)
 
 
-def without_gender(participants: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
+def without_gender(rows: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
     """The participant rows without their copied `gender`, None when none holds one (nothing to write)."""
-    if not any(LEGACY in p for p in participants):
+    if not any(LEGACY in row for row in rows):
         return None
-    return [{k: v for k, v in p.items() if k != LEGACY} for p in participants]
+    return [{k: v for k, v in row.items() if k != LEGACY} for row in rows]
 
 
 def order_refs_by_user(store: RestStore) -> Dict[Any, List[str]]:
@@ -117,27 +117,27 @@ def migrate_users(store: RestStore, apply: bool, report: Report) -> None:
 
 
 def migrate_competitions(apply: bool, report: Report) -> None:
-    for doc in FirestoreClient.list_documents(CompetitionRepository.COLLECTION_COMPETITIONS):
-        participants = doc.get("participants") or []
-        if without_gender(participants) is None:
+    for doc in FirestoreClient.list_documents(documents.COLLECTION_COMPETITIONS):
+        rows = doc.get("participants") or []
+        if without_gender(rows) is None:
             continue
         report.competitions += 1
-        report.participants += sum(1 for p in participants if LEGACY in p)
+        report.participants += sum(1 for row in rows if LEGACY in row)
         if apply:
             if doc.get("id") is None:
                 raise SystemExit(f"Compétition sans identifiant (document {doc.get('_doc_id')}) : ouvrez-la dans l'application puis relancez.")
             # Re-read and retried on a concurrent write; participant `updated_at` untouched (offline guards)
-            CompetitionRepository._mutate_participants(doc["id"], without_gender)
+            participants.mutate_participants(doc["id"], without_gender)
 
 
 def migrate_directory(apply: bool, report: Report) -> None:
     writes = []
-    for doc in FirestoreClient.list_documents(CompetitionRepository.COLLECTION_ADHERENTS):
+    for doc in FirestoreClient.list_documents(documents.COLLECTION_ADHERENTS):
         if LEGACY not in doc:
             continue
         report.directory += 1
-        writes.append({"path": f"{CompetitionRepository.COLLECTION_ADHERENTS}/{doc['_doc_id']}",
-                       "data": {"sex": CompetitionRepository._sex_code(doc)}, "update_fields": ["sex", LEGACY]})
+        writes.append({"path": f"{documents.COLLECTION_ADHERENTS}/{doc['_doc_id']}",
+                       "data": {"sex": member_directory.sex_code(doc)}, "update_fields": ["sex", LEGACY]})
     if apply and writes:
         result = FirestoreClient.batch_upsert(writes)
         if result["errors_count"]:

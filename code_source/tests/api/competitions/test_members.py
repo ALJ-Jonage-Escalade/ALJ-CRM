@@ -6,7 +6,7 @@ from unittest.mock import patch
 from support.api_case import ApiTestCase
 
 from api.competitions.schemas.views import CompetitionMember
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 
 
@@ -50,7 +50,7 @@ class TestCompetitionMembers(ApiTestCase):
         self.seed_adherent(1)
         self.client.get("/api/competition-members")
         now = time.monotonic()
-        with patch.object(CompetitionRepository._adherents_cache, "clock", lambda: now + 3600), \
+        with patch.object(member_directory._state.cache, "clock", lambda: now + 3600), \
                 patch.object(FirestoreClient, "list_documents", side_effect=FirestoreError("down")) as read:  # copy expired
             r = self.client.get("/api/competition-members")
             self.assertEqual((r.status_code, [m["id"] for m in r.json()]), (200, [1]))

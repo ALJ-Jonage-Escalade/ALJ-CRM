@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import datetime  # noqa: E402
 
 from infrastructure import runtime_env  # noqa: E402
-from infrastructure.firestore.competition_repository import CompetitionRepository  # noqa: E402
+from infrastructure.firestore.competitions import competitions  # noqa: E402
 
 FIRST_NUMBER = 99_000  # fake results page numbers
 
@@ -37,7 +37,7 @@ def main() -> int:
         return 1
     today = datetime.date.today()
     published = []
-    for number, doc in enumerate(CompetitionRepository.list_competition_docs(), start=FIRST_NUMBER):
+    for number, doc in enumerate(competitions.list_competition_docs(), start=FIRST_NUMBER):
         ended = str(doc.get("date_fin") or doc.get("date_competition") or "")[:10]
         if not ended or datetime.date.fromisoformat(ended) > today:
             continue

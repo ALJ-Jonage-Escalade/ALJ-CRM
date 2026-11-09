@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import List, Optional, Sequence
 
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import member_directory
 from services.competitions.store import storage
 from services.documents import Doc
 
@@ -18,4 +18,4 @@ class CompetitionMemberService:
     @storage
     def list_members(statuses: Optional[Sequence[str]] = None) -> List[Doc]:
         """`statuses`: only the members at one of these membership statuses; None: every member."""
-        return CompetitionRepository.list_members(statuses=statuses)
+        return member_directory.list_members(statuses=statuses)

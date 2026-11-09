@@ -83,7 +83,7 @@ LIBELLES_STATUT_PAIEMENT: dict[str, str] = {
 PAIEMENT_STATUTS_ANNULES = (PAIEMENT_ANNULE_PERDU, PAIEMENT_ANNULE_REPORTE)
 
 
-def payment_status_after_toggle(statut_paiement: str, selectionne: bool):
+def payment_status_after_toggle(statut_paiement: Optional[str], selectionne: bool) -> Optional[str]:
     """Statut de paiement résultant de la bascule « Participe ».
 
     Règle : le paiement « payé » et les annulations ne sont JAMAIS modifiés par
