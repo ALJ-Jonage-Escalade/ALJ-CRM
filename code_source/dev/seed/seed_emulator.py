@@ -318,6 +318,7 @@ def build_sqlite(path, fake, rng, coach_names):
 def seed_competitions(coach_ids):
     from domain.competitions.models import STATUT_CLOSE, STATUT_EN_COURS, STATUT_EN_PREPARATION, Competition
     from infrastructure.firestore.competition_repository import CompetitionRepository
+    from infrastructure.firestore.competitions import coaches
     from infrastructure.firestore.competitions import member_directory
 
     snape, mcgonagall, flitwick = coach_ids[0], coach_ids[1], coach_ids[2]
@@ -502,7 +503,7 @@ def main() -> int:
     # Coaches: fixed ids, Snape first (id 1)
     coach_ids = []
     for i, name in enumerate(COACHES, start=1):
-        coach_ids.append(CompetitionRepository.save_coach(name, coach_id=i))
+        coach_ids.append(coaches.save_coach(name, coach_id=i))
     print(f"🧑‍🏫 Coaches: {', '.join(COACHES)}")
 
     # Projection read by the PWA (adherents / planning), from the seed SQLite database

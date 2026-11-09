@@ -30,13 +30,14 @@ import json, sys, traceback
 sys.path.insert(0, "src")
 from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import coaches
 from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.competitions import documents
 for line in sys.stdin:
     request = json.loads(line)
     try:
         member_directory.invalidate_cache()
-        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "documents": documents, "member_directory": member_directory, "Competition": Competition, "args": request["args"]}}
+        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "documents": documents, "member_directory": member_directory, "coaches": coaches, "Competition": Competition, "args": request["args"]}}
         exec(request["body"], scope)
         print({_RESULT!r} + json.dumps(scope["result"], default=str), flush=True)
     except Exception:
@@ -127,7 +128,7 @@ class TestData:
         return self.members(competition_only=True, statuses=["Terminé"])
 
     def coaches(self) -> list:
-        return self._run("result = CompetitionRepository.list_coaches()")
+        return self._run("result = coaches.list_coaches()")
 
     def save_setting(self, key: str, value: str) -> None:
         """Firestore app setting (e.g. HELLOASSO_ANNUAL_CAMPAIGN), as the bureau pages save it."""
@@ -162,7 +163,7 @@ result = len(set(collect.addresses))
 """)
 
     def create_coach(self, nom: str) -> int:
-        return self._run("result = CompetitionRepository.save_coach(args['nom'])", nom=nom)
+        return self._run("result = coaches.save_coach(args['nom'])", nom=nom)
 
     def create_competition(self, nom: str, date: str = "", prix: float = 10.0, participants=(),
                            selected=(), coach_ids=(), id_ffme: str = "") -> int:

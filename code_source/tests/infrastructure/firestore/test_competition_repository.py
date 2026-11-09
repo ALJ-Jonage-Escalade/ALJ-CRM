@@ -17,6 +17,7 @@ from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore import client as fc
 from infrastructure.firestore.competitions import documents
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import coaches
 from support.fake_firestore import FakeFirestore, FirestoreRepoTestCase  # noqa: F401
 from domain.competitions.models import (
     Competition,
@@ -65,7 +66,7 @@ class TestCompetitionsCrud(FirestoreRepoTestCase):
     def test_coach_fields_roundtrip(self):
         ids = [1, 2, 3, 4]  # fixed ids: _new_id() repeats within a millisecond (A30)
         for cid, nom in zip(ids, "ABCD", strict=True):
-            CompetitionRepository.save_coach(nom, coach_id=cid)
+            coaches.save_coach(nom, coach_id=cid)
         comp_id = CompetitionRepository.save_competition(Competition(nom="Épreuve", coach_ids=ids[::-1]))
         self.assertEqual(CompetitionRepository.get_competition(comp_id).coach_ids, ids[::-1])  # no limit, order kept
         doc = self.fake.store["competitions"][str(comp_id)]
@@ -75,7 +76,7 @@ class TestCompetitionsCrud(FirestoreRepoTestCase):
 
     def test_legacy_coach_slots_read(self):
         """A document from an older version, with only coach1_id..coach3_id."""
-        a, b = CompetitionRepository.save_coach("A", coach_id=1), CompetitionRepository.save_coach("B", coach_id=2)
+        a, b = coaches.save_coach("A", coach_id=1), coaches.save_coach("B", coach_id=2)
         self.fake.upsert_document("competitions", "5", {"id": 5, "nom": "Ancienne",
                                                         "coach1_id": b, "coach2_id": None, "coach3_id": a,
                                                         "coaches": ["nom périmé"]})
@@ -87,7 +88,7 @@ class TestCompetitionsCrud(FirestoreRepoTestCase):
 
     def test_empty_coach_ids_ignore_stale_legacy_slots(self):
         """A document updated since plan C2 with every coach removed: its old slots must not bring them back."""
-        a = CompetitionRepository.save_coach("A", coach_id=1)
+        a = coaches.save_coach("A", coach_id=1)
         self.fake.upsert_document("competitions", "6", {"id": 6, "nom": "Sans coach", "coach_ids": [], "coach1_id": a})
         self.assertEqual(CompetitionRepository.get_competition(6).coach_ids, [])
         self.assertEqual(CompetitionRepository.get_competition_doc(6)["coaches"], [])
@@ -225,25 +226,6 @@ class TestBilan(FirestoreRepoTestCase):
         CompetitionRepository.set_selection(self.comp_id, 101, False)
         bilan = CompetitionRepository.get_bilan()
         self.assertNotIn((101, self.comp_id), bilan["participations"])
-
-
-class TestCoaches(FirestoreRepoTestCase):
-    def test_crud_and_competition_propagation(self):
-        cid = CompetitionRepository.save_coach("Adrien BERGER")
-        self.assertEqual(CompetitionRepository.get_coach(cid)["nom"], "Adrien BERGER")
-        self.assertEqual([c["nom"] for c in CompetitionRepository.list_coaches()], ["Adrien BERGER"])
-
-        comp_id = CompetitionRepository.save_competition(Competition(nom="Épreuve", coach_ids=[cid]))
-        self.assertEqual([c.id for c in CompetitionRepository.list_competitions_for_coach(cid)], [comp_id])
-        self.assertEqual([c.id for c in CompetitionRepository.list_competitions_for_coach(9999)], [])
-
-        CompetitionRepository.save_coach("Adrien BERGERAT", coach_id=cid)
-        self.assertEqual(CompetitionRepository.get_competition_doc(comp_id)["coaches"], ["Adrien BERGERAT"])  # renamed, nothing copied
-
-        self.assertTrue(CompetitionRepository.delete_coach(cid))
-        comp_doc = self.fake.store["competitions"][str(comp_id)]
-        self.assertEqual(comp_doc["coach_ids"], [])
-        self.assertEqual(CompetitionRepository.get_competition(comp_id).coach_ids, [])
 
 
 class TestHelloAssoMirror(FirestoreRepoTestCase):
