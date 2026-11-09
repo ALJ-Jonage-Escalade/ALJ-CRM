@@ -185,7 +185,6 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         p3 = Participant(competition_id=10, adherent_id=3, nom="DURAND", prenom="Charlie",
                          num_licence="999999", selectionne=False, statut_paiement="non_invite")
 
-        repository_path = "infrastructure.firestore.competition_repository.CompetitionRepository"
         settings_store = {}
 
         def mock_get_setting(key, default=""):
@@ -196,7 +195,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
             return True
 
         with patch("infrastructure.firestore.competitions.competitions.get_competition", return_value=comp), \
-             patch(f"{repository_path}.list_participants", return_value=[p1, p2, p3]), \
+             patch("infrastructure.firestore.competitions.participants.list_participants", return_value=[p1, p2, p3]), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", side_effect=mock_get_setting), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.save", side_effect=mock_save_setting), \
              patch("services.competitions.results_batch.CompetitionResultsBatchService.get_notification_email", return_value="coach@alj-escalade.fr"), \
@@ -226,9 +225,8 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         p1 = Participant(competition_id=11, adherent_id=1, nom="DUPONT", prenom="Alice", selectionne=True, statut_paiement="paye")
         p2 = Participant(competition_id=11, adherent_id=2, nom="MARTIN", prenom="Bob", selectionne=True, statut_paiement="en_attente")
 
-        repository_path = "infrastructure.firestore.competition_repository.CompetitionRepository"
         with patch("infrastructure.firestore.competitions.competitions.get_competition", return_value=comp), \
-             patch(f"{repository_path}.list_participants", return_value=[p1, p2]), \
+             patch("infrastructure.firestore.competitions.participants.list_participants", return_value=[p1, p2]), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=""), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.save"), \
              patch("infrastructure.mail.sender.EmailSender.send_email") as mock_send:

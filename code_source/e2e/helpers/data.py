@@ -30,6 +30,7 @@ import json, sys, traceback
 sys.path.insert(0, "src")
 from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import participants
 from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import coaches
 from infrastructure.firestore.competitions import member_directory
@@ -38,7 +39,7 @@ for line in sys.stdin:
     request = json.loads(line)
     try:
         member_directory.invalidate_cache()
-        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "documents": documents, "member_directory": member_directory, "coaches": coaches, "competitions": competitions, "Competition": Competition, "args": request["args"]}}
+        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "documents": documents, "member_directory": member_directory, "coaches": coaches, "competitions": competitions, "participants": participants, "Competition": Competition, "args": request["args"]}}
         exec(request["body"], scope)
         print({_RESULT!r} + json.dumps(scope["result"], default=str), flush=True)
     except Exception:
@@ -174,19 +175,19 @@ comp = Competition(nom=args['nom'], date_competition=args['date'], prix=args['pr
                    coach_ids=list(args['coach_ids']))
 cid = competitions.save_competition(comp)
 for aid in args['participants']:
-    CompetitionRepository.add_participant(cid, aid, selectionne=aid in args['selected'])
+    participants.add_participant(cid, aid, selectionne=aid in args['selected'])
 result = cid
 """, nom=nom, date=date, prix=prix, participants=list(participants), selected=list(selected),
             coach_ids=list(coach_ids), id_ffme=id_ffme)
 
     def mark_paid(self, competition_id: int, adherent_id: int, amount: float, order_ref: str = "E2E-ORDER") -> None:
         """Records a HelloAsso payment (same call as the webhook)."""
-        self._run("CompetitionRepository.apply_helloasso_payment(args['cid'], args['aid'], args['amount'], order_ref=args['ref'])\n"
+        self._run("participants.apply_helloasso_payment(args['cid'], args['aid'], args['amount'], order_ref=args['ref'])\n"
                   "result = True", cid=competition_id, aid=adherent_id, amount=amount, ref=order_ref)
 
     def set_selection(self, competition_id: int, adherent_id: int, selectionne: bool) -> None:
         """« Participe » changed elsewhere (desktop app, another coach): same repository call."""
-        self._run("CompetitionRepository.set_selection(args['cid'], args['aid'], args['value'])\nresult = True",
+        self._run("participants.set_selection_doc(args['cid'], args['aid'], args['value'])\nresult = True",
                   cid=competition_id, aid=adherent_id, value=selectionne)
 
     def competition(self, competition_id: int):

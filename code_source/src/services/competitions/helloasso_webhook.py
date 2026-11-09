@@ -32,6 +32,7 @@ from domain.competitions.matching import auto_link_items, parse_campaign_identif
 from domain.competitions.models import PAIEMENT_PAYE
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import participants
 from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import member_directory
 from infrastructure.helloasso import api as helloasso_api
@@ -348,7 +349,7 @@ class HelloAssoWebhookService:
         # (selected and paid) and reactivates a cancellation; a redelivered notification of an item already
         # received only lists a member who is missing.
         if not _record_payment(payment):
-            added = CompetitionRepository.add_participant_doc(
+            added = participants.add_participant_doc(
                 competition_id=competition_id,
                 adherent_id=adherent_id,
                 selectionne=True,
@@ -384,6 +385,6 @@ def _record_payment(payment: _ItemPayment) -> bool:
     Item missing from the mirror (failed write): its own amount only. Returns whether a participant was updated."""
     if payment.mirrored:
         return CompetitionRepository.refresh_helloasso_payment(payment.competition_id, payment.adherent_id)
-    return CompetitionRepository.apply_helloasso_payment(
+    return participants.apply_helloasso_payment(
         competition_id=payment.competition_id, adherent_id=payment.adherent_id, montant_paye=payment.amount,
         order_ref=payment.order_ref, date_synchro=payment.item_date)

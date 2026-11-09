@@ -317,7 +317,7 @@ def build_sqlite(path, fake, rng, coach_names):
 
 def seed_competitions(coach_ids):
     from domain.competitions.models import STATUT_CLOSE, STATUT_EN_COURS, STATUT_EN_PREPARATION, Competition
-    from infrastructure.firestore.competition_repository import CompetitionRepository
+    from infrastructure.firestore.competitions import participants
     from infrastructure.firestore.competitions import competitions, member_directory
 
     snape, mcgonagall, flitwick = coach_ids[0], coach_ids[1], coach_ids[2]
@@ -342,7 +342,7 @@ def seed_competitions(coach_ids):
         comp.id = competitions.save_competition(comp)
         seeded.append(comp)
         for member_id in rng.sample(competitors, k=min(len(competitors), rng.randint(4, 9))):
-            CompetitionRepository.add_participant(comp.id, member_id, selectionne=rng.random() < 0.8)
+            participants.add_participant(comp.id, member_id, selectionne=rng.random() < 0.8)
     return seeded, len(competitors)
 
 

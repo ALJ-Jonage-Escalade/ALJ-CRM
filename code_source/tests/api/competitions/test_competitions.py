@@ -6,7 +6,7 @@ from support.api_case import ApiTestCase
 
 from api.competitions.schemas.views import Competition as CompetitionView, CompetitionParticipant
 from domain.competitions.models import Competition
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import participants
 from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.client import FirestoreError
 
@@ -22,7 +22,7 @@ class TestCompetitions(ApiTestCase):
         self.assertEqual(doc["participants"], [])
         self.assertNotIn("_update_time", doc)
 
-        CompetitionRepository.add_participant(doc["id"], 1)
+        participants.add_participant(doc["id"], 1)
         r = self.client.get("/api/competitions")
         self.assertEqual(r.status_code, 200)
         self.assertEqual([c["id"] for c in r.json()], [doc["id"]])
@@ -119,7 +119,7 @@ class TestCompetitions(ApiTestCase):
 
         def coach_adds_participant(collection, doc_id):
             self.fake.before_conditional_write = None
-            CompetitionRepository.add_participant(doc["id"], 1)
+            participants.add_participant(doc["id"], 1)
         self.fake.before_conditional_write = coach_adds_participant
         self.assertEqual(self.client.patch(f"/api/competitions/{doc['id']}", json={"prix": 20}).status_code, 200)
         stored = competitions.get_competition_doc(doc["id"])
@@ -129,7 +129,7 @@ class TestCompetitions(ApiTestCase):
     def test_update_keeps_participants(self):
         self.seed_adherent(1)
         doc = self.create()
-        CompetitionRepository.add_participant(doc["id"], 1)
+        participants.add_participant(doc["id"], 1)
         r = self.client.patch(f"/api/competitions/{doc['id']}", json={"statut": "close"})
         self.assertEqual(r.json()["statut"], "close")
         self.assertEqual(len(r.json()["participants"]), 1)
@@ -187,7 +187,7 @@ class TestCompetitions(ApiTestCase):
     def test_export_competition_excel_and_pdf(self):
         doc = self.create()
         self.seed_adherent(1)
-        CompetitionRepository.add_participant(doc["id"], 1)
+        participants.add_participant(doc["id"], 1)
 
         r_excel = self.client.get(f"/api/competitions/{doc['id']}/export-excel")
         self.assertEqual(r_excel.status_code, 200)

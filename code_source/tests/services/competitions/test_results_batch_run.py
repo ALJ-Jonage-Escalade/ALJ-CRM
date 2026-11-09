@@ -207,18 +207,18 @@ class TestDailyBatch(BatchTestCase):
         """Firestore refuses one competition's write: reported as an error, the others are still searched."""
         from unittest.mock import patch
         from infrastructure.firestore.client import FirestoreError
-        from infrastructure.firestore.competition_repository import CompetitionRepository
+        from infrastructure.firestore.competitions import participants
         self.competition(911, "Open de bloc de Valbrume", ended_days_ago=2)
         self.competition(912, "Coupe de difficulté Brumevent", ended_days_ago=4)
         self.published(99911, "Open de bloc de Valbrume", ended_days_ago=2)
         self.published(99912, "Coupe de difficulté Brumevent", ended_days_ago=4)
-        real = CompetitionRepository.record_results.__func__
+        real = participants.record_results
 
-        def record_results(cls, competition_id, *args, **kwargs):
+        def record_results(competition_id, *args, **kwargs):
             if str(competition_id) == "911":
                 raise FirestoreError("HTTP 500")
-            return real(cls, competition_id, *args, **kwargs)
-        with patch.object(CompetitionRepository, "record_results", classmethod(record_results)):
+            return real(competition_id, *args, **kwargs)
+        with patch.object(participants, "record_results", record_results):
             report = self.run_batch()
 
         self.assertEqual([d["status"] for d in report["details"]], ["error", "found"])

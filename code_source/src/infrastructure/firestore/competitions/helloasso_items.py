@@ -13,8 +13,7 @@ from domain.competitions.models import (
     PAIEMENT_STATUTS_ANNULES,
 )
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.firestore.competitions import documents, member_directory
-from infrastructure.firestore.competitions.participants import MANUAL_PAYMENT_REF, ParticipantsMixin
+from infrastructure.firestore.competitions import documents, member_directory, participants
 
 logger = logging.getLogger("alj")
 
@@ -23,7 +22,7 @@ class ItemAlreadyLinked(Exception):
     """A HelloAsso item linked to a competition and a member cannot be ignored."""
 
 
-class HelloAssoItemsMixin(ParticipantsMixin):
+class HelloAssoItemsMixin:
     """Mirror of the HelloAsso items, their links, and the payments applied from them."""
 
     # ------------------------------------------------------------------
@@ -350,7 +349,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
                     g = groupes[(comp_id, adherent_id)]
                     p = index.get(adherent_id)
                     if p is None:
-                        p = cls._new_participant(adherent_id, True)
+                        p = participants.new_participant(adherent_id, True)
                         parts.append(p)
                         index[adherent_id] = p
                     elif (p.get("statut_paiement") or "") in PAIEMENT_STATUTS_ANNULES:
@@ -363,7 +362,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
                     p["updated_at"] = now
                     done["count"] += 1
                 return parts
-            if cls._mutate_participants(comp_id, mutate) is not None:
+            if participants.mutate_participants(comp_id, mutate) is not None:
                 applied += done["count"]
         return applied
 
@@ -387,9 +386,9 @@ class HelloAssoItemsMixin(ParticipantsMixin):
             if linked:
                 participant.update(statut_paiement=PAIEMENT_PAYE, montant_paye=montant, commande_helloasso=orders)
                 return None
-            if statut != PAIEMENT_PAYE or (participant.get("commande_helloasso") or "") in ("", MANUAL_PAYMENT_REF):
+            if statut != PAIEMENT_PAYE or (participant.get("commande_helloasso") or "") in ("", participants.MANUAL_PAYMENT_REF):
                 return False
             participant.update(statut_paiement=PAIEMENT_EN_ATTENTE if participant.get("selectionne") else PAIEMENT_NON_INVITE,
                      montant_paye=0.0, commande_helloasso="")
             return None
-        return cls._update_participant(competition_id, adherent_id, change) is not None
+        return participants.update_participant(competition_id, adherent_id, change) is not None

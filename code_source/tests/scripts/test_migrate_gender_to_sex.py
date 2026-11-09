@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from support.fake_firestore import FirestoreRepoTestCase
 
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import participants
 from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import documents
 
@@ -98,7 +98,7 @@ class TestMigrateCompetitionsAndDirectory(FirestoreRepoTestCase):
         super().setUp()
         self.seed_adherent(1, gender="Femme")
         self.seed_adherent(2, sex="H")
-        CompetitionRepository.add_participant(self.create_competition(), 1)
+        participants.add_participant(self.create_competition(), 1)
 
     def create_competition(self) -> int:
         from domain.competitions.models import Competition

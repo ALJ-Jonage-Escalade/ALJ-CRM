@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from support.api_case import ApiTestCase
 
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import participants
 from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.competitions import documents
@@ -62,14 +62,14 @@ class TestWebhookPayments(ApiTestCase):
     def test_cancellation_reactivated_as_before(self):
         """Unchanged rule: a new HelloAsso payment for a cancelled participant reactivates them."""
         self.receive(payment_item(7777, 9999, 1500))
-        CompetitionRepository.mark_cancelled(self.comp, 101, "annule_reporte")
+        participants.mark_cancelled_doc(self.comp, 101, "annule_reporte")
         self.receive(payment_item(7778, 10000, 500))
         self.assertEqual(self.payment(), (True, "paye", 20.0, ["10000", "9999"]))
 
     def test_redelivered_payment_keeps_the_cancellation(self):
         """HelloAsso redelivers a notification already received: the coach's later cancellation is kept."""
         self.receive(payment_item(7777, 9999, 1500))
-        CompetitionRepository.mark_cancelled(self.comp, 101, "annule_reporte")
+        participants.mark_cancelled_doc(self.comp, 101, "annule_reporte")
         before = self.payment()
         self.receive(payment_item(7777, 9999, 1500))
         self.assertEqual(self.payment(), before)
@@ -78,7 +78,7 @@ class TestWebhookPayments(ApiTestCase):
     def test_redelivered_payment_lists_a_member_removed_meanwhile(self):
         """A known item whose member is no longer listed: listed again, selected and paid (nothing to undo)."""
         self.receive(payment_item(7777, 9999, 1500))
-        CompetitionRepository.remove_participant(self.comp, 101)
+        participants.remove_participant_doc(self.comp, 101)
         self.receive(payment_item(7777, 9999, 1500))
         self.assertEqual(self.payment(), (True, "paye", 15.0, ["9999"]))
 

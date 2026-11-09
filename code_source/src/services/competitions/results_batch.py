@@ -33,7 +33,7 @@ from infrastructure.mail.sender import EmailSender, MailError
 from domain.club_emails import DEFAULT_SENDER_EMAIL
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import participants
 from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import documents
 from infrastructure.mycompet.scraper import (
@@ -323,7 +323,7 @@ class CompetitionResultsBatchService:
             return len(athletes)
 
         try:
-            matched = CompetitionRepository.record_results(
+            matched = participants.record_results(
                 comp["id"], rank, {"url_resultats": canonical_url, "resultats_synced_at": now_iso})
         except FirestoreError:  # this competition only: the others are still searched, the next run retries it
             logger.error("[BATCH_RESULTATS] Enregistrement des résultats de « %s » impossible", nom, exc_info=True)
@@ -363,7 +363,7 @@ class CompetitionResultsBatchService:
         canonical_url = normalize_result_url(url)
         try:
             # The URL is kept even when nobody matched: the coach gave it, the next try starts from it
-            matched = CompetitionRepository.record_results(
+            matched = participants.record_results(
                 competition_id, lambda parts: len(apply_rankings(parts, scraped, now_iso)),
                 {"url_resultats": canonical_url, "resultats_synced_at": now_iso}, save_fields_without_match=True)
         except FirestoreError as e:

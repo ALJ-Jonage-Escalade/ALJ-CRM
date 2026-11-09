@@ -4,6 +4,7 @@ from support.api_case import ApiTestCase
 
 from api.competitions.schemas.views import HelloAssoItem
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import participants
 from infrastructure.firestore.competitions import competitions
 
 
@@ -96,7 +97,7 @@ class TestHelloAssoItems(ApiTestCase):
     def test_relinking_keeps_a_cancellation(self):
         self.seed_adherent(2)
         self.link(competition_id=self.comp, adherent_id=1)
-        CompetitionRepository.mark_cancelled(self.comp, 1, "annule_reporte")
+        participants.mark_cancelled_doc(self.comp, 1, "annule_reporte")
         self.link(competition_id=self.comp, adherent_id=2)
         self.assertEqual(self.participant(self.comp, 1)["statut_paiement"], "annule_reporte")
         self.assertEqual(self.payment(2), (True, "paye", 15.0, "9001"))
@@ -104,7 +105,7 @@ class TestHelloAssoItems(ApiTestCase):
     def test_relinking_keeps_a_manual_payment_recorded_since(self):
         self.seed_adherent(2)
         self.link(competition_id=self.comp, adherent_id=1)
-        CompetitionRepository.record_manual_payment(self.comp, 1, 12.0)  # the coach got a cheque instead
+        participants.record_manual_payment_doc(self.comp, 1, 12.0)  # the coach got a cheque instead
         self.link(competition_id=self.comp, adherent_id=2)
         self.assertEqual(self.payment(1), (True, "paye", 12.0, "Règlement manuel"))
 

@@ -13,7 +13,7 @@ from typing import List
 from domain.club_emails import DEFAULT_SENDER_EMAIL
 from domain.competitions.models import PAIEMENT_PAYE, Competition, Participant
 from infrastructure.firestore.app_settings import AppSettingsRepository
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import participants
 from infrastructure.firestore.competitions import competitions
 from infrastructure.mail.sender import EmailSender, MailError
 from services.competitions.results_batch import CompetitionResultsBatchService
@@ -34,8 +34,7 @@ def check_and_notify_all_paid(competition_id: int) -> bool:
     if not competition:
         return False
 
-    participants = CompetitionRepository.list_participants(competition_id, selected_only=False)
-    selected = [p for p in participants if p.selectionne]
+    selected = [p for p in participants.list_participants(competition_id, selected_only=False) if p.selectionne]
     if not selected:
         return False
 

@@ -12,6 +12,7 @@ from domain.errors import Conflict, InvalidRequest, NotFound, UpstreamUnavailabl
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.competitions import competitions
+from infrastructure.firestore.competitions import participants
 from infrastructure.firestore.competition_repository import (
     CompetitionRepository,
     ItemAlreadyLinked,
@@ -97,7 +98,7 @@ class HelloAssoItemService:
         linked = False
         if competition_id is not None and adherent_id is not None:
             linked = True
-            CompetitionRepository.add_participant(competition_id, adherent_id, selectionne=True)
+            participants.add_participant(competition_id, adherent_id, selectionne=True)
             CompetitionRepository.refresh_helloasso_payment(competition_id, adherent_id)
         if (prev_comp is not None and prev_adherent is not None
                 and (prev_comp, prev_adherent) != (competition_id, adherent_id)):
