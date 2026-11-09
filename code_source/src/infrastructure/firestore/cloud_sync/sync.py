@@ -4,6 +4,7 @@ import json
 import sqlite3
 from typing import Any, Dict, List, Optional
 
+from infrastructure.firestore.client import FirestoreConflictError
 from infrastructure.firestore.cloud_sync.cache import (
     _Applying,
     _get_base,
@@ -24,7 +25,6 @@ from infrastructure.firestore.cloud_sync.common import (
     COMMIT_CHUNK,
     PULL_MARGIN_SECONDS,
     REFERENCES,
-    CloudConflictError,
     _same,
     collection_for,
     doc_id_for,
@@ -237,12 +237,12 @@ def flush(conn, store, by: str = "", report: Optional[Dict[str, Any]] = None,
             results = store.commit([it[3] for it in chunk])
             for it, res in zip(chunk, results, strict=False):
                 done(it, res)
-        except CloudConflictError:
+        except FirestoreConflictError:
             for it in chunk:
                 try:
                     res = store.commit([it[3]])[0]
                     done(it, res)
-                except CloudConflictError:
+                except FirestoreConflictError:
                     conflicts.append(it)
     if conflicts:
         report["conflicts"] = report.get("conflicts", 0) + len(conflicts)

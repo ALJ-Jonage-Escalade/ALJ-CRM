@@ -12,7 +12,7 @@ _src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.helloasso.webhook import HelloAssoWebhookService
+from services.competitions.helloasso_webhook import HelloAssoWebhookService
 from api.integrations.helloasso import webhook_helloasso
 
 
@@ -173,7 +173,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
     def test_check_and_notify_all_paid_success(self):
         """Vérifie l'envoi d'e-mail récapitulatif lorsque tous les compétiteurs ont réglé."""
         from domain.competitions.models import Competition, Participant
-        from infrastructure.helloasso.webhook import HelloAssoWebhookService
+        from services.competitions.all_paid_notification import check_and_notify_all_paid
 
         comp = Competition(id=10, nom="Open Régional Bloc", date_competition="2026-11-20", prix=15.0)
         p1 = Participant(competition_id=10, adherent_id=1, nom="DUPONT", prenom="Alice",
@@ -202,7 +202,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
              patch("services.competitions.results_batch.CompetitionResultsBatchService.get_notification_email", return_value="coach@alj-escalade.fr"), \
              patch("infrastructure.mail.repository.EmailRepository.send_email", return_value=True) as mock_send:
 
-            res = HelloAssoWebhookService.check_and_notify_all_paid(10)
+            res = check_and_notify_all_paid(10)
             self.assertTrue(res)
             mock_send.assert_called_once()
             call_kwargs = mock_send.call_args.kwargs
@@ -213,14 +213,14 @@ class TestHelloAssoWebhookService(unittest.TestCase):
             self.assertIn("30.00 €", call_kwargs["html_body"])
 
             # Deuxième appel : déduplication active, pas de réexpédition
-            res_again = HelloAssoWebhookService.check_and_notify_all_paid(10)
+            res_again = check_and_notify_all_paid(10)
             self.assertFalse(res_again)
             self.assertEqual(mock_send.call_count, 1)
 
     def test_check_and_notify_all_paid_incomplete(self):
         """Ne déclenche pas d'e-mail si au moins un compétiteur sélectionné n'a pas encore payé."""
         from domain.competitions.models import Competition, Participant
-        from infrastructure.helloasso.webhook import HelloAssoWebhookService
+        from services.competitions.all_paid_notification import check_and_notify_all_paid
 
         comp = Competition(id=11, nom="Coupe de France Difficulté", prix=20.0)
         p1 = Participant(competition_id=11, adherent_id=1, nom="DUPONT", prenom="Alice", selectionne=True, statut_paiement="paye")
@@ -233,7 +233,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.save"), \
              patch("infrastructure.mail.repository.EmailRepository.send_email") as mock_send:
 
-            res = HelloAssoWebhookService.check_and_notify_all_paid(11)
+            res = check_and_notify_all_paid(11)
             self.assertFalse(res)
             mock_send.assert_not_called()
 

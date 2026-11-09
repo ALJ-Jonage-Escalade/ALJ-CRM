@@ -63,7 +63,9 @@ def test_presence_export_rejects_bad_dates(client: TestClient, dates: dict, mess
 
 
 def test_presence_export_error_is_generic(client: TestClient) -> None:
-    with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", side_effect=RuntimeError(SECRET_DETAIL)):
+    course = {"groupe": "Cours", "tarifs": ["Cours"], "slots": []}
+    with patch("infrastructure.sqlite.planning.PlanningRepository.load_creneaux_groups", return_value=[course]), \
+            patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", side_effect=RuntimeError(SECRET_DETAIL)):
         body = client.post("/api/presence/export", json={}).json()
     assert SECRET_DETAIL not in str(body)
     assert "journaux" in body["message"]

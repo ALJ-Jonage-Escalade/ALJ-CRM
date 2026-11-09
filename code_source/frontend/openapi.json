@@ -1927,16 +1927,6 @@
               }
             }
           },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1978,16 +1968,6 @@
           },
           "400": {
             "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3106,16 +3086,6 @@
                 }
               }
             }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
           }
         }
       }
@@ -3145,16 +3115,6 @@
           },
           "400": {
             "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3281,7 +3241,7 @@
     "/api/ffme/stats": {
       "get": {
         "summary": "Get Ffme Stats Api",
-        "description": "Calcule et renvoie les statistiques de l'export fédéral FFME.",
+        "description": "Members of the season that the federal CSV export would declare, and those it leaves out.",
         "operationId": "get_ffme_stats_api_api_ffme_stats_get",
         "parameters": [
           {
@@ -3321,16 +3281,6 @@
               }
             },
             "description": "Bad Request"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            },
-            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -3395,16 +3345,6 @@
             },
             "description": "Bad Request"
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3454,16 +3394,6 @@
               }
             }
           },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3505,16 +3435,6 @@
           },
           "400": {
             "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3611,7 +3531,7 @@
     "/api/helloasso/sync": {
       "post": {
         "summary": "Sync Helloasso Api",
-        "description": "Reads the competitions' HelloAsso campaign and links its payments (mirror, automatic links, participants).\n400: no campaign chosen; 502: HelloAsso could not be read completely, nothing is written (a partial read would\nunlink the payments it missed); 503: Firestore unavailable.",
+        "description": "Reads the competitions' HelloAsso campaign and links its payments (mirror, automatic links, participants).\n400 `no_campaign`: no campaign chosen; 502: HelloAsso could not be read completely, nothing is written;\n503: Firestore unavailable.",
         "operationId": "sync_helloasso_api_api_helloasso_sync_post",
         "responses": {
           "200": {
@@ -3636,6 +3556,16 @@
           },
           "502": {
             "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -3829,7 +3759,7 @@
     "/api/auth/google/callback": {
       "get": {
         "summary": "Google Auth Callback",
-        "description": "Réceptionne le code d'autorisation OAuth2 de Google, échange contre le refresh_token et enregistre les identifiants.",
+        "description": "Google's redirect after the consent: exchanges the code for a refresh token and saves the club's credentials.",
         "operationId": "google_auth_callback_api_auth_google_callback_get",
         "parameters": [
           {

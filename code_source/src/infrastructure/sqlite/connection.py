@@ -13,8 +13,8 @@ import sqlite3
 import time
 from typing import Optional
 
-from paths import DATA_ROOT, ROOT_DIR
-from infrastructure.mail.senders import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from paths import ROOT_DIR, data_root
+from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.sqlite import schema_v2
 
 _DEFAULT_EMAIL_TEMPLATES = [
@@ -121,12 +121,12 @@ def _ensure_email_templates(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
 
 class SqliteDatabase:
     """Chemin, connexions et schéma de la base SQLite locale des adhérents."""
-    _db_path = os.path.join(DATA_ROOT, "database.db")
+    _db_path: Optional[str] = None  # set_db_path(); else database.db of data_root()
     _database_setup_done = False
 
     @classmethod
     def get_db_path(cls) -> str:
-        return cls._db_path
+        return cls._db_path or os.path.join(data_root(), "database.db")
 
     @classmethod
     def set_db_path(cls, path: str) -> None:
@@ -136,7 +136,7 @@ class SqliteDatabase:
     @classmethod
     def get_connection(cls, path: Optional[str] = None) -> sqlite3.Connection:
         """Connection to the application's database, or to the file at `path`."""
-        conn = sqlite3.connect(path or cls._db_path, timeout=30.0)
+        conn = sqlite3.connect(path or cls.get_db_path(), timeout=30.0)
         conn.row_factory = sqlite3.Row
         try:
             conn.execute("PRAGMA journal_mode=WAL")
@@ -152,7 +152,7 @@ class SqliteDatabase:
         """Initialise la base de données de l'application (une fois par processus, sauf `force`)."""
         if not force and cls._database_setup_done:
             return
-        cls.apply_schema(cls._db_path)
+        cls.apply_schema(cls.get_db_path())
         cls._database_setup_done = True
 
     @classmethod
@@ -260,10 +260,11 @@ class SqliteDatabase:
     @classmethod
     def check_readable(cls) -> Optional[str]:
         """None when the database file exists and can be queried, else the reason."""
-        if not os.path.exists(cls._db_path):
+        db_path = cls.get_db_path()
+        if not os.path.exists(db_path):
             return "database file not found"
         try:
-            conn = sqlite3.connect(cls._db_path)
+            conn = sqlite3.connect(db_path)
             try:
                 conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             finally:
@@ -276,14 +277,9 @@ class SqliteDatabase:
     def create_db_backup(cls) -> None:
         """Crée une sauvegarde de sécurité horodatée de la base de données dans archive/db avec rétention de 10 jours.
 
-        Sans objet avec Firestore : le cache SQLite en est reconstruit, et sur Cloud Run ROOT_DIR (« / ») n'est
-        pas inscriptible. La sauvegarde reste facultative : son échec ne doit jamais bloquer l'opération en cours.
+        Pointless with Firestore replication (the cache is rebuilt from it, and ROOT_DIR, « / » on Cloud Run, is not
+        writable): the caller skips it then. Optional: a failure never blocks the operation in progress.
         """
-        from infrastructure.firestore.cloud_database import CloudDatabase
-
-        if CloudDatabase.is_enabled():
-            return
-
         db_path = cls.get_db_path()
         if not os.path.exists(db_path):
             return

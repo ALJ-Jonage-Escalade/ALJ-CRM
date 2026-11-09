@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 
-from api.reports import resolve_season
+from api.reports import resolve_season, season_read
 from api.reports.schemas import MapMember, MapPoint, MapPoints
 from api.responses import error_responses
 from domain.members.view import is_cancelled
@@ -27,7 +27,7 @@ def map_points(season: str, background_tasks: Optional[BackgroundTasks] = None) 
     seen: Set[Tuple[str, str, str]] = set()  # (point, name, group): a member of several seasons is listed once
     missing_addresses: Set[str] = set()
 
-    for row in MemberRepository.load_direct_data(season):
+    for row in MemberRepository.load_direct_data(season_read(season)):
         if is_cancelled(row.get("status")):
             continue
 

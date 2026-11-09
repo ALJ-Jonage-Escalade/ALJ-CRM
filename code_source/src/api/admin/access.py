@@ -12,7 +12,7 @@ from typing import Dict, List
 from fastapi import APIRouter, Request
 
 from api.admin.schemas import AccessDone, AccessEntry, AccessEntryIn, AccessEntryPatch, AccessHistoryEntry, AccessInvitation
-from api.auth.me import signed_in_claims
+from api.auth.me import author_of
 from api.responses import SUCCESS, error_responses
 from infrastructure.firestore.access_store import HistoryEntry, RoleEntry
 from services.access import invitations
@@ -20,20 +20,11 @@ from services.access import rules as access_rules
 
 router = APIRouter(prefix="/api/admin/access")
 
-LOCAL_AUTHOR = "serveur local"
-
-
 def page_origin(request: Request) -> str:
     """Where the admin's page is served (the browser's Origin), for the link of an invitation without APP_PUBLIC_URL;
     the server's address when there is none (Cloud Run's base URL says http, behind its proxy)."""
     origin = request.headers.get("origin", "")
     return origin if origin.startswith(("https://", "http://")) else str(request.base_url)
-
-
-def author_of(request: Request) -> str:
-    """E-mail of the admin making the change (the local server without token checks has none)."""
-    claims = signed_in_claims(request)
-    return str((claims or {}).get("email") or LOCAL_AUTHOR).strip().lower()
 
 
 @router.get("/roles", response_model=List[AccessEntry])

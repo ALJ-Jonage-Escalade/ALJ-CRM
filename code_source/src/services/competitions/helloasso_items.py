@@ -1,26 +1,75 @@
-"""HelloAsso mirror items: manual links to a participant, and ignored items.
+"""HelloAsso mirror items: campaign sync, manual links to a participant, and ignored items.
 
 Knows nothing about HTTP: failures are raised as domain.errors.
 """
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, TypedDict
 
+from domain.competitions import matching as competition_matching
+from domain.errors import Conflict, InvalidRequest, NotFound, UpstreamUnavailable
+from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.competition_repository import (
     CompetitionFirestoreRepository as Repo,
     ItemAlreadyLinked,
 )
+from infrastructure.helloasso.api import HelloAssoApiError, fetch_form_items
 from services.competitions.store import competition_not_found, storage, write
 from services.documents import Doc
-from domain.errors import Conflict, InvalidRequest, NotFound
 
 
 def _item_not_found() -> NotFound:
     return NotFound("Article HelloAsso introuvable.")
 
 
+class CampaignSyncStats(TypedDict):
+    nb_items: int
+    nb_auto: int
+    nb_manual: int
+    nb_applied: int
+    nb_unlinked: int
+
+
 class HelloAssoItemService:
+
+    @staticmethod
+    @write
+    def sync_campaign() -> CampaignSyncStats:
+        """Reads the competitions' HelloAsso campaign and links its payments (mirror, automatic links, participants).
+        InvalidRequest `no_campaign`: no usable campaign chosen. UpstreamUnavailable: HelloAsso could not be read
+        completely, and nothing is written (automatic links are recomputed from the items read, so a partial read
+        would unlink the payments it missed)."""
+        reference = AppSettingsRepository.get(HELLOASSO_COMPETITION_CAMPAIGN) or ""
+        if not reference.strip():
+            raise InvalidRequest("Aucune campagne compétitions choisie : choisissez-la dans Paramètres › Campagne HelloAsso.",
+                                 "no_campaign")
+        try:
+            campaign = competition_matching.parse_campaign_identifier(reference)
+        except ValueError as e:
+            raise InvalidRequest(f"Campagne compétitions inexploitable ({e}) : choisissez-la dans Paramètres › Campagne HelloAsso.",
+                                 "no_campaign") from e
+        try:
+            items = fetch_form_items(campaign["form_type"], campaign["slug"])
+        except HelloAssoApiError as e:
+            raise UpstreamUnavailable(f"{e.message} Rien n'a été modifié.", e.code) from e
+        summarized = competition_matching.summarize_items(items)
+
+        Repo.sync_helloasso_mirror(summarized, items, campaign["slug"])
+
+        competitions = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom} for c in Repo.list_competitions()]
+        existing_links = Repo.list_helloasso_links()
+        links = competition_matching.auto_link_items(summarized, competitions, Repo.list_adherents(), existing_links)
+        Repo.replace_auto_links(links)
+        applied_count = Repo.apply_links_to_participants()
+
+        return CampaignSyncStats(
+            nb_items=len(items),
+            nb_auto=len([link for link in (links or {}).values() if link]),
+            nb_manual=len([link for link in existing_links.values() if link.get("source") == "manuel"]),
+            nb_applied=applied_count,
+            nb_unlinked=len(Repo.list_unlinked_items()),
+        )
 
     @staticmethod
     @storage

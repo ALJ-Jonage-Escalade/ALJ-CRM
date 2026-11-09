@@ -52,21 +52,23 @@ ALJ-CRM/                         ← racine du dépôt
 ├── code_source/                 ← TOUT le code (la racine ne contient que des doublons/raccourcis, voir §9)
 │   ├── src/
 │   │   ├── server.py            ← entrée WEB/API : assemble l'app FastAPI (middlewares, routeurs de api/), aucune route
-│   │   ├── paths.py             ← CODE_ROOT / ROOT_DIR / DATA_ROOT (à utiliser, ne jamais recalculer)
-│   │   ├── domain/              ← Python pur : members/, competitions/, attestation/ + constants, utils, validators
+│   │   ├── paths.py             ← CODE_ROOT / ROOT_DIR / data_root() / template_path() (à utiliser, ne jamais recalculer)
+│   │   ├── domain/              ← Python pur : members/, competitions/ + constants, utils, validators, club_emails,
+│   │   │                          email_personalization, errors
 │   │   ├── api/                 ← routeurs FastAPI, un fichier par domaine, rangés par thème (voir §4)
-│   │   ├── services/            ← cas d'usage, rangés comme api/ : access/, competitions/, members/ (les autres
-│   │   │                          thèmes gardent encore leur logique dans le routeur)
+│   │   ├── services/            ← cas d'usage, rangés comme api/ : access/, activities/, communications/,
+│   │   │                          competitions/ (dont webhook HelloAsso), members/ (dont import FFME)
 │   │   ├── infrastructure/      ← accès externes, un dossier par système : security/ (auth API, secrets),
 │   │   │                          sqlite/, firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/
 │   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME), competitors_excel,
-│   │   │                          competitors_pdf, presence_sheets, planning_excel, spreadsheet_safety
+│   │   │                          competitors_pdf, presence_sheets, planning_excel, attestation (PDF), spreadsheet_safety
+│   │   ├── assets/              ← ressources lues à l'exécution : templates/ (attestation HTML, liste de présence Excel), social/
 │   ├── frontend/                ← application web Vue 3 + Vite + TypeScript (tous les écrans, téléphone et ordinateur) ;
 │   │                              src/sw.ts : service worker Workbox, compilé dans dist/sw.js (voir §5)
 │   ├── web/                     ← manifest.webmanifest et assets/logo.png (servis par FastAPI, hors compilation)
 │   ├── tests/                   ← tests pytest/unittest, rangés comme le code testé : domain/, exports/, infrastructure/, services/, api/, web/ ; modules racine de src/ à la racine
 │   ├── dev/                     ← mode dev local : émulateur Firebase (Docker), dev.env, run_server.sh, seed/ (données fictives)
-│   ├── doc/template/            ← modèles HTML/Excel (attestation, liste de présence)
+│   ├── doc/                     ← captures et schémas (documentation seulement, hors image Docker)
 │   ├── scripts/                 ← déploiement (deploy_cloud_run.{sh,bat}), tâche planifiée, sauvegardes, outils manuels
 │   ├── firestore/               ← firestore.rules, firebase.json (déployés à part, §7)
 │   ├── Dockerfile, requirements*.txt (exports générés de uv.lock)
@@ -78,18 +80,23 @@ ALJ-CRM/                         ← racine du dépôt
 
 ### Couches (code_source/src)
 
-- **`domain/`** — règles métier en Python, sans accès au réseau ni au stockage. Deux exceptions connues :
-  `attestation/` lit son modèle et ses images sur disque et rend le PDF (WeasyPrint), et `constants` charge le `.env`.
+- **`domain/`** — règles métier en Python, sans accès au réseau ni au stockage, et sans effet à l'import.
   Rangé en `members/` (modèles, liste web, `age_rules`, `planning_groups`), `competitions/` (modèles,
-  `matching` HelloAsso), `attestation/` (`document.build_attestation()`, HTML → PDF WeasyPrint) ;
-  `constants`, `utils.apply_template_variables`, `validators` restent à la racine.
+  `matching` HelloAsso) ; à la racine `constants`, `utils`, `validators`, `errors` (erreurs métier levées par les
+  services), `club_emails` (adresses du club), `email_personalization` (variables `{…}` des e-mails).
+- **`services/`** — cas d'usage : un routeur lit la requête, appelle une fonction de service et met en forme la
+  réponse ; le service valide, orchestre les dépôts et lève `domain.errors` (traduites en statuts HTTP par
+  `api/responses.py`). Exemples : `competitions/helloasso_webhook.py` (notifications HelloAsso),
+  `competitions/all_paid_notification.py`, `communications/email_dispatch.py`, `members/ffme.py` (export et import
+  FFME), `activities/presence.py`. Quelques routeurs plus anciens gardent encore de la logique ; elle rejoint un
+  service quand le routeur est modifié.
 - **`infrastructure/`** — adaptateurs, un sous-dossier par système externe. Les plus structurants :
   - `sqlite/schema_v2.py` : DDL SQLite, normalisations, vue de compatibilité `v_adherents_legacy` (**source unique**, recréée à chaque démarrage).
   - `sqlite/connection.py` (`SqliteDatabase` : chemin, connexion, schéma, sauvegarde) et un repository par domaine :
     `members.py` (`load_direct_data()`, lignes de la vue `v_adherents_legacy`), `seasons.py`, `planning.py`,
     `email_templates.py`, `geocache.py`, `ffme_import.py`.
-  - `firestore/cloud_database.py` : réplication SQLite ⇄ Firestore (collections `crm_<table>`, triggers `_fs_*`, flush toutes les 15 s, pull toutes les 2 min, merge champ par champ) ; façade `CloudDatabase` s'appuyant sur `firestore/cloud_sync/` : `common` (constantes, conversions), `rest_store` (REST Firestore), `cache` (SQLite, déclencheurs), `sync` (pull / flush / fusion), `bootstrap` (reconstruction du cache, import initial).
-  - `firestore/client.py` : client REST Firestore (sans gRPC) ; `firestore/competition_repository.py` : compétitions (façade `CompetitionFirestoreRepository` composant les mixins de `firestore/competitions/` : adhérents, épreuves, participants, miroir HelloAsso, coachs) ;
+  - `firestore/cloud_database.py` : réplication SQLite ⇄ Firestore (collections `crm_<table>`, triggers `_fs_*`, merge champ par champ) : pull avant une route de données si le dernier date de plus de 30 s, flush après chaque écriture (middleware de `server.py`) ; façade `CloudDatabase` s'appuyant sur `firestore/cloud_sync/` : `common` (constantes), `rest_store` (requêtes de la réplication), `cache` (SQLite, déclencheurs), `sync` (pull / flush / fusion), `bootstrap` (reconstruction du cache, import initial).
+  - `firestore/client.py` : client REST Firestore (sans gRPC), dont le projet, le jeton, la conversion des valeurs et les erreurs (`FirestoreError`, `FirestoreConflictError`) partagés avec la réplication ; `firestore/competition_repository.py` : compétitions (façade `CompetitionFirestoreRepository` composant les mixins de `firestore/competitions/` : adhérents, épreuves, participants, miroir HelloAsso, coachs) ;
     `firestore/app_settings.py` : réglages applicatifs (collection `app_settings`, seul emplacement). Campagnes HelloAsso
     actives, choisies dans **Paramètres › Campagne HelloAsso** (`api/integrations/helloasso_campaigns.py`), au format
     `FormType:slug` : `HELLOASSO_MEMBERSHIP_CAMPAIGN` (adhésions, lue par l'import des adhésions) et `HELLOASSO_ANNUAL_CAMPAIGN`
@@ -99,7 +106,9 @@ ALJ-CRM/                         ← racine du dépôt
   - `security/api_auth.py` : middleware Firebase (rôles `readonly < coach < admin`). Seul juge des droits : `firestore.rules` refuse tout accès client.
   - `security/role_directory.py` : rôle d'une adresse vérifiée, lu dans la liste des accès (`firestore/access_store.py`, collection `access_roles`), gardée 60 s en mémoire ; liste illisible → `503`. Changements : `services/access/rules.py` (garde-fous, historique), administrateur initial : `services/access/bootstrap.py`.
   - `timed_cache.py` : cache mémoire commun du serveur (`TimedCache` : une valeur par clé, durée de vie, verrou, horloge injectable) ; l'utilisent la liste des accès, les compétitions, l'annuaire `adherents`, les clés Google de `api_auth`, le jeton OAuth HelloAsso et l'activité des formulaires.
-  - `mail/` (envoi, campagnes, corps HTML), `helloasso/` (API v5, webhook), `security/secret_store.py` (secrets : environnement, et Firestore pour les identifiants OAuth sur Cloud Run), `google/drive.py` (identifiants OAuth Google du club et jetons d'accès).
+  - `mail/` (envoi Gmail ou SMTP, corps HTML), `helloasso/` (client de l'API v5), `security/secret_store.py` (secrets : environnement, et sur Cloud Run le document Firestore `server_credentials/google_oauth` pour les identifiants OAuth, transmis au démarrage par `server.py` via `firestore/server_credentials.py`), `google/drive.py` (identifiants OAuth Google du club et jetons d'accès).
+  - Aucun cycle d'import dans `src/` (imports en tête de module) ; le `.env` est chargé une fois par `server.py`
+    (`runtime_env.load_env_files()`), jamais à l'import.
 
 ---
 
@@ -234,7 +243,7 @@ Connexion par le sélecteur de comptes de l'émulateur : `albus.dumbledore@alj-e
 Fonctionnement :
 
 - **Source unique côté serveur** : `src/infrastructure/runtime_env.py`. `ALJ_ENV=dev` redirige l'URL Firestore, le jeton
-  (`owner`, admin de l'émulateur) et le projet (`demo-alj`) de `cloud_database.RestStore` et `FirestoreClient` ;
+  (`owner`, admin de l'émulateur) et le projet (`demo-alj`) de `cloud_sync.rest_store.RestStore` et `FirestoreClient` ;
   active le rafraîchissement du cache comme sur Cloud Run. Sans `ALJ_ENV`, rien ne change (production).
 - **E-mails** : aucun code spécifique. `dev.env` dirige le SMTP de l'application (`SMTP_HOST=localhost`,
   `SMTP_PORT=1025`, variables `GMAIL_*` vides) vers **Mailpit** (conteneur de `dev/docker-compose.yml`), qui capture
@@ -246,7 +255,7 @@ Fonctionnement :
   comprise) et branche l'émulateur en dev, avec un bandeau « DEV ». La détection ne repose pas sur `localhost` :
   un serveur local hors mode dev (`lancer_site_web.bat`, §7.3) sert aussi ces pages et doit rester en production.
 - **Garde-fous** : un projet `demo-*` n'existe pas chez Google (aucun accès réel possible, même mal configuré) ;
-  `runtime_env.validate()` refuse le mode dev sur Cloud Run (`K_SERVICE`) ou sans variables d'émulateur ;
+  `runtime_env.validate()` refuse le mode dev sur Cloud Run (`runtime_env.is_cloud_run()`) ou sans variables d'émulateur ;
   le seed refuse de s'exécuter hors émulateur ; les tests retirent les variables dev (`tests/conftest.py`).
 - L'émulateur applique le vrai `firestore.rules` et conserve ses données dans `dev/.emulator-data/` (ignoré par git).
 - Limites : la synchro et l'import des adhésions HelloAsso interrogent l'API HelloAsso réelle (lecture) ; sans identifiants,

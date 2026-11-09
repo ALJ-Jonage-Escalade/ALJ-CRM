@@ -8,7 +8,7 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from paths import CODE_ROOT, DATA_ROOT
+from paths import CODE_ROOT, data_root
 from domain.constants import APP_VERSION
 
 
@@ -26,8 +26,8 @@ class TestVersionAndPaths(unittest.TestCase):
     def test_data_root_is_separate_from_code_root(self):
         """data/ (cache SQLite, fichiers utilisateurs) vit en dehors du code source :
         une mise à jour de l'app ne doit jamais toucher les données."""
-        self.assertNotEqual(os.path.abspath(DATA_ROOT), os.path.abspath(CODE_ROOT))
-        self.assertFalse(DATA_ROOT.startswith(CODE_ROOT + os.sep))
+        self.assertNotEqual(data_root(), os.path.abspath(CODE_ROOT))
+        self.assertFalse(data_root().startswith(CODE_ROOT + os.sep))
 
 
 if __name__ == "__main__":

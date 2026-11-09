@@ -11,7 +11,11 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.firestore import cloud_database as cdb  # noqa: E402
+from infrastructure.firestore.cloud_sync.bootstrap import build_cache, create_schema, import_database  # noqa: E402
+from infrastructure.firestore.cloud_sync.cache import connect, pending_count  # noqa: E402
+from infrastructure.firestore.client import FirestoreConflictError  # noqa: E402
+from infrastructure.firestore.cloud_sync.common import collection_for, ts_key  # noqa: E402
+from infrastructure.firestore.cloud_sync.sync import flush, pull  # noqa: E402
 from infrastructure.sqlite.connection import SqliteDatabase  # noqa: E402
 from infrastructure.sqlite.email_templates import EmailTemplateRepository  # noqa: E402
 from infrastructure.sqlite.members import MemberRepository  # noqa: E402
@@ -41,7 +45,7 @@ class FakeStore:
 
     def list_modified_since(self, coll, since):
         return [self._out(c, i) for (c, i), d in sorted(self.docs.items())
-                if c == coll and cdb.ts_key(d["modified_at"]) >= cdb.ts_key(since)]
+                if c == coll and ts_key(d["modified_at"]) >= ts_key(since)]
 
     def get_many(self, coll, ids):
         return {i: (self._out(coll, i) if (coll, i) in self.docs else None) for i in ids}
@@ -59,9 +63,9 @@ class FakeStore:
             pre = w.get("precondition") or {}
             cur = self.docs.get(key)
             if "exists" in pre and bool(cur) != pre["exists"]:
-                raise cdb.CloudConflictError("exists")
+                raise FirestoreConflictError("exists")
             if "updateTime" in pre and (not cur or cur["update_time"] != pre["updateTime"]):
-                raise cdb.CloudConflictError("updateTime")
+                raise FirestoreConflictError("updateTime")
         self.commits += 1
         out = []
         for w in writes:
@@ -79,14 +83,14 @@ class FakeStore:
 
     # aide aux tests : modification « par un autre poste »
     def remote_patch(self, table, doc_id, **fields):
-        key = (cdb.collection_for(table), str(doc_id))
+        key = (collection_for(table), str(doc_id))
         ts = self._ts()
         self.docs[key]["fields"].update(fields)
         self.docs[key].update(update_time=ts, modified_at=ts)
 
 
 def _seed(path):
-    cdb.create_schema(path)
+    create_schema(path)
     conn = sqlite3.connect(path)
     conn.executescript("""
         DELETE FROM seasons;
@@ -118,21 +122,21 @@ class CloudDatabaseTest(unittest.TestCase):
         self.src = os.path.join(self.tmp, "source.db")
         _seed(self.src)
         self.store = FakeStore()
-        cdb.import_database(self.src, self.store)
+        import_database(self.src, self.store)
         self.a = os.path.join(self.tmp, "a.db")
         self.b = os.path.join(self.tmp, "b.db")
-        cdb.build_cache(self.a, self.store)
-        cdb.build_cache(self.b, self.store)
+        build_cache(self.a, self.store)
+        build_cache(self.b, self.store)
         self._saved_path = SqliteDatabase.get_db_path()
 
     def tearDown(self):
         SqliteDatabase.set_db_path(self._saved_path)
 
     def sync(self, path):
-        conn = cdb.connect(path)
+        conn = connect(path)
         try:
-            rep = cdb.pull(conn, self.store)
-            cdb.flush(conn, self.store, "test", rep)
+            rep = pull(conn, self.store)
+            flush(conn, self.store, "test", rep)
             return rep
         finally:
             conn.close()
@@ -160,14 +164,14 @@ class CloudDatabaseTest(unittest.TestCase):
 
     def test_local_update_sends_only_changed_fields(self):
         self.write(self.a, "UPDATE users SET city = 'Lyon' WHERE id = 1")
-        conn = cdb.connect(self.a)
-        self.assertEqual(cdb.pending_count(conn), 1)
+        conn = connect(self.a)
+        self.assertEqual(pending_count(conn), 1)
         conn.close()
         rep = self.sync(self.a)
         self.assertEqual(rep.get("pushed"), 1)
         self.assertEqual(self.store.docs[("crm_users", "1")]["fields"]["city"], "Lyon")
-        conn = cdb.connect(self.a)
-        self.assertEqual(cdb.pending_count(conn), 0)
+        conn = connect(self.a)
+        self.assertEqual(pending_count(conn), 0)
         conn.close()
         self.sync(self.b)
         self.assertEqual(self.row(self.b, "SELECT city FROM users WHERE id = 1")[0], "Lyon")
@@ -187,8 +191,8 @@ class CloudDatabaseTest(unittest.TestCase):
         self.write(self.a, "UPDATE purchases SET email_sent_date = '2026-10-08' WHERE id = 100")
         # Un autre poste modifie le même document entre la préparation et l'envoi
         self.store.before_commit = lambda: self.store.remote_patch("purchases", 100, is_modified="Oui")
-        conn = cdb.connect(self.a)
-        rep = cdb.flush(conn, self.store, "test")
+        conn = connect(self.a)
+        rep = flush(conn, self.store, "test")
         conn.close()
         self.assertGreaterEqual(rep.get("conflicts", 0), 1)
         f = self.store.docs[("crm_purchases", "100")]["fields"]
@@ -203,7 +207,7 @@ class CloudDatabaseTest(unittest.TestCase):
         self.assertIsNone(self.row(self.b, "SELECT * FROM purchase_options WHERE id = 1"))
         # une base reconstruite ne contient pas la tombe
         c = os.path.join(self.tmp, "c.db")
-        cdb.build_cache(c, self.store)
+        build_cache(c, self.store)
         self.assertIsNone(self.row(c, "SELECT * FROM purchase_options WHERE id = 1"))
 
     def test_insert_or_replace_logs_replaced_row(self):

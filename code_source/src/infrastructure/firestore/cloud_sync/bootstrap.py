@@ -4,6 +4,7 @@ import os
 import sqlite3
 from typing import Any, Callable, Dict, List, Optional
 
+from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.firestore.cloud_sync.cache import (
     _Applying,
     _pk_string,
@@ -30,7 +31,6 @@ from infrastructure.firestore.cloud_sync.common import (
 
 def create_schema(path: str):
     """Crée une base vide au schéma de l'application (SqliteDatabase)."""
-    from infrastructure.sqlite.connection import SqliteDatabase
     SqliteDatabase.apply_schema(path)  # the application keeps its own file meanwhile
 
 

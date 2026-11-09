@@ -28,7 +28,11 @@ SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from infrastructure.firestore import cloud_database as cdb  # noqa: E402
+from infrastructure import runtime_env  # noqa: E402
+from infrastructure.firestore.cloud_sync.bootstrap import build_cache, import_database  # noqa: E402
+from infrastructure.firestore.cloud_sync.cache import table_columns, table_pk, tracked_tables  # noqa: E402
+from infrastructure.firestore.cloud_sync.common import collection_for  # noqa: E402
+from infrastructure.firestore.cloud_sync.rest_store import RestStore  # noqa: E402
 from infrastructure.sqlite.connection import SqliteDatabase  # noqa: E402
 from infrastructure.sqlite.members import MemberRepository  # noqa: E402
 
@@ -47,7 +51,7 @@ def normalized_copy(src: str, workdir: str) -> str:
 def counts(path: str) -> dict:
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
-        return {t: conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in cdb.tracked_tables(conn)}  # noqa: S608 - noms de tables/colonnes issus de tracked_tables et PRAGMA table_info
+        return {t: conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in tracked_tables(conn)}  # noqa: S608 - noms de tables/colonnes issus de tracked_tables et PRAGMA table_info
     finally:
         conn.close()
 
@@ -66,9 +70,9 @@ def compare(source: str, cache: str) -> list:
     s = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
     c = sqlite3.connect(f"file:{cache}?mode=ro", uri=True)
     try:
-        for t in cdb.tracked_tables(s):
-            pk = cdb.table_pk(s, t)
-            cols = cdb.table_columns(s, t)
+        for t in tracked_tables(s):
+            pk = table_pk(s, t)
+            cols = table_columns(s, t)
             order = ", ".join(f'"{k}"' for k in pk)
             col_sql = ", ".join(f'"{k}"' for k in cols)
             a = s.execute(f'SELECT {col_sql} FROM "{t}" ORDER BY {order}').fetchall()  # noqa: S608 - noms de tables/colonnes issus de tracked_tables et PRAGMA table_info
@@ -108,13 +112,13 @@ def main():
     args = ap.parse_args()
 
     workdir = tempfile.mkdtemp(prefix="alj_migration_")
-    store = cdb.RestStore(project_id=args.project)
+    store = RestStore(project_id=args.project)
     print(f"📦 Source : {args.source}")
     print(f"☁️  Projet Firestore : {store.project_id}")
     src = normalized_copy(args.source, workdir)
     n = counts(src)
     for t, k in n.items():
-        print(f"   {t:<18} {k:>5} ligne(s) -> {cdb.collection_for(t)}")
+        print(f"   {t:<18} {k:>5} ligne(s) -> {collection_for(t)}")
     print(f"   Total : {sum(n.values())} documents")
 
     if args.dry_run:
@@ -122,15 +126,15 @@ def main():
         return 0
 
     if args.apply:
-        existing = {t: len(store.list_all(cdb.collection_for(t))) for t in n}
+        existing = {t: len(store.list_all(collection_for(t))) for t in n}
         if any(existing.values()) and not args.force:
             print(f"❌ Firestore contient déjà des données : {existing}. Relancer avec --force pour écraser.")
             return 2
-        written = cdb.import_database(src, store)
+        written = import_database(src, store)
         print(f"✅ Écrit : {written}")
 
     cache = os.path.join(workdir, "cache_firestore.db")
-    cdb.build_cache(cache, store)
+    build_cache(cache, store)
     print("🔎 Vérification Firestore -> cache -> comparaison avec la source…")
     problems = compare(src, cache)
     if problems:
@@ -144,4 +148,5 @@ def main():
 
 
 if __name__ == "__main__":
+    runtime_env.load_env_files()  # .env files as the server reads them (never at import: tests call main())
     sys.exit(main())

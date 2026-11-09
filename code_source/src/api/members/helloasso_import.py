@@ -21,7 +21,7 @@ from api.members.helloasso_import_schemas import (
     MembershipPreviewRequest,
     MembershipRow,
 )
-from api.admin.access import author_of
+from api.auth.me import author_of
 from api.responses import error_responses
 from domain.members.membership_import import Bucket, Decision, ImportPlan, KnownMember, PlanEntry, WriteAction, season_membership
 from infrastructure.sqlite.membership_import import AppliedWrite

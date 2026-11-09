@@ -7,15 +7,16 @@ domain.errors.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from domain.members import view as member_view
 from domain.competitions.models import STATUT_CLOSE
+from domain.constants import get_active_season
+from domain.errors import InvalidRequest, NotFound
+from domain.members import view as member_view
 from infrastructure.sqlite.members import MemberRepository
 from infrastructure.sqlite.planning import PlanningRepository
 from services.competitions.competitions import CompetitionService
 from services.documents import Doc
-from domain.errors import NotFound
 from services.members.seasons import SeasonService
 
 
@@ -61,3 +62,32 @@ class MemberService:
         rows = sorted(MemberRepository.list_member_rows_of_users(ids), key=lambda r: rank.get(r["season_name"], len(rank)))
         planning = PlanningRepository.load_planning_data()
         return member_view.competitor_contacts(rows, planning, seasons["active"])
+
+    @staticmethod
+    def update_member(fields: Dict[str, Any], user_id: Optional[int] = None, purchase_id: Optional[int] = None,
+                      order_ref: Optional[str] = None) -> None:  # Any: the MemberFields sent, by name
+        """Writes the fields sent on the member (badges, licence, contacts, address) and on their purchase (tariff,
+        amount, status, comment), found by user_id, purchase_id or order_ref."""
+        if not user_id and not purchase_id and not order_ref:
+            raise InvalidRequest("Identifiant d'adhérent manquant (user_id, purchase_id ou order_ref).")
+        if not fields:
+            raise InvalidRequest("Aucune modification à enregistrer.")
+        saved, message = MemberRepository.update_member_fields(
+            user_id=user_id, fields=fields, purchase_id=purchase_id, order_ref=order_ref or None)
+        if not saved:
+            raise InvalidRequest(message)
+
+    @staticmethod
+    def add_member(fields: Dict[str, Any], season: Optional[str] = None) -> tuple[str, str]:  # Any: as above
+        """Adds a member by hand to `season` (the active one when not given). Returns (order reference, season)."""
+        if not fields.get("last_name") or not fields.get("first_name"):
+            raise InvalidRequest("Le nom et le prénom de l'adhérent sont obligatoires.")
+        if not fields.get("birth_date"):
+            raise InvalidRequest("La date de naissance est obligatoire.")
+        if not fields.get("tarif_name"):
+            raise InvalidRequest("Le groupe (tarif) est obligatoire.")
+        target_season = season or get_active_season()
+        added, order_ref_or_message = MemberRepository.add_manual_member(fields, season_name=target_season)
+        if not added:
+            raise InvalidRequest(order_ref_or_message)
+        return order_ref_or_message, target_season

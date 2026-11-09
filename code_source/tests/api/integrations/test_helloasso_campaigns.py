@@ -96,7 +96,7 @@ class TestHelloAssoCampaigns(ApiTestCase):
         self.assertEqual([c["slug"] for c in body["others"]], ["soiree-club", "competitions-2026"])
 
     def test_membership_default_when_not_chosen(self) -> None:
-        with patch.object(route, "get_target_slug", return_value="adhesion-env"):
+        with patch.object(route.MembershipImportService, "campaign_slug", return_value="adhesion-env"):
             body = self.campaigns()
         self.assertEqual(body["membership"]["active"], {"form_type": "Membership", "slug": "adhesion-env"})
         self.assertFalse(body["membership"]["configured"])

@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 
 from api.integrations.schemas import CloudDbStatus, CloudDbSync, SyncCounters
 from api.responses import error_responses
+from infrastructure.firestore.cloud_database import CloudDatabase
+from infrastructure.sqlite.connection import SqliteDatabase
 
 logger = logging.getLogger("alj")
 
@@ -19,8 +21,6 @@ router = APIRouter()
 @router.get("/api/cloud-db/status", response_model=CloudDbStatus, responses=error_responses(500))
 def get_cloud_db_status_api() -> CloudDbStatus | JSONResponse:
     """Retourne l'état détaillé du cache local SQLite et de sa synchronisation Firestore."""
-    from infrastructure.firestore.cloud_database import CloudDatabase
-    from infrastructure.sqlite.connection import SqliteDatabase
     enabled = CloudDatabase.is_enabled()
     st = CloudDatabase.status() if enabled else {}
     db_path = SqliteDatabase.get_db_path()
@@ -53,7 +53,6 @@ def get_cloud_db_status_api() -> CloudDbStatus | JSONResponse:
 @router.post("/api/cloud-db/sync", response_model=CloudDbSync, responses=error_responses(500))
 def sync_cloud_db_api(force: bool = Query(False)) -> CloudDbSync | JSONResponse:
     """Force la synchronisation bilatérale entre Firestore et la base SQLite locale."""
-    from infrastructure.firestore.cloud_database import CloudDatabase
     if not CloudDatabase.is_enabled():
         return CloudDbSync(status="skipped", message="Réplication Firestore désactivée sur ce serveur (ALJ_CACHE_REPLICATION=off).")
 

@@ -89,7 +89,7 @@ class TestResponseHardening(unittest.TestCase):
 
     def test_internal_errors_are_generic(self):
         secret_detail = "sqlite3 at /srv/app/data/database.db: no such table"
-        with patch("infrastructure.mail.dispatch.EmailDispatchService.list_templates",
+        with patch("services.communications.email_dispatch.EmailDispatchService.list_templates",
                    side_effect=RuntimeError(secret_detail)):
             body = self.client.get("/api/email-templates").json()
         self.assertNotIn(secret_detail, str(body))

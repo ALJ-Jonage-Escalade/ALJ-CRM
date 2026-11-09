@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
+from infrastructure.firestore.server_credentials import FirestoreCredentialsDocument
 from infrastructure.security import secret_store
 from infrastructure.security.secret_store import SecretPersistenceError, SecretStore
 
@@ -27,6 +28,8 @@ def cloud_run(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setattr(secret_store, "_firestore_values", {})
     monkeypatch.setattr(secret_store, "_firestore_loaded", False)
     monkeypatch.setattr(secret_store, "_last_failed_load", -secret_store.RELOAD_AFTER_FAILURE)
+    monkeypatch.setattr(secret_store, "_credentials_document", None)
+    secret_store.use_credentials_document(FirestoreCredentialsDocument())
     yield
 
 
@@ -79,8 +82,15 @@ def test_local_set_secret_writes_the_env_file(tmp_path, monkeypatch: pytest.Monk
     monkeypatch.delenv("K_CONFIGURATION", raising=False)
     env_file = tmp_path / ".env"
     env_file.write_text("# comment\nOTHER=1\nALJ_TEST_KEY=old\n", encoding="utf-8")
-    monkeypatch.setattr(secret_store, "_env_file_path", lambda: str(env_file))
+    monkeypatch.setattr(secret_store.runtime_env, "local_env_file", lambda: str(env_file))
     monkeypatch.delenv("ALJ_TEST_KEY", raising=False)
     SecretStore.set_secret("ALJ_TEST_KEY", "new")
     assert env_file.read_text(encoding="utf-8") == "# comment\nOTHER=1\nALJ_TEST_KEY=new\n"
     assert SecretStore.get_secret("ALJ_TEST_KEY") == "new"
+
+
+def test_without_credentials_document_the_environment_answers_and_saving_fails(cloud_run: None) -> None:
+    secret_store.use_credentials_document(None)
+    assert SecretStore.get_secret("GMAIL_REFRESH_TOKEN") == "env-GMAIL_REFRESH_TOKEN"
+    with pytest.raises(SecretPersistenceError):
+        SecretStore.set_secret("GMAIL_REFRESH_TOKEN", "never-saved")

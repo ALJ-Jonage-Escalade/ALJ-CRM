@@ -68,7 +68,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         self.assertEqual(inserted, 1)
         
         # 3. Chargement des membres (Read)
-        loaded = MemberRepository.load_direct_data()
+        loaded = MemberRepository.load_direct_data("2026-2027")
         self.assertEqual(len(loaded), 1)
         self.assertEqual(loaded[0]["last_name"], "DUPONT")
         self.assertEqual(loaded[0]["first_name"], "Jean")
@@ -102,17 +102,17 @@ class TestInfrastructureLot2(unittest.TestCase):
         test_subj = "Test Audit Subject"
         
         # Supprimer le journal temporairement pour le test ou vérifier l'ajout
-        if os.path.exists(EmailRepository.AUDIT_FILE_PATH):
+        if os.path.exists(EmailRepository.audit_file_path()):
             try:
-                os.remove(EmailRepository.AUDIT_FILE_PATH)
+                os.remove(EmailRepository.audit_file_path())
             except OSError:
                 pass
                 
         EmailRepository.log_audit(test_dest, test_subj, "SUCCESS")
         
-        self.assertTrue(os.path.exists(EmailRepository.AUDIT_FILE_PATH))
+        self.assertTrue(os.path.exists(EmailRepository.audit_file_path()))
         
-        with open(EmailRepository.AUDIT_FILE_PATH, "r", encoding="utf-8") as f:
+        with open(EmailRepository.audit_file_path(), "r", encoding="utf-8") as f:
             lines = f.readlines()
             
         self.assertTrue(len(lines) > 0)
@@ -123,7 +123,7 @@ class TestInfrastructureLot2(unittest.TestCase):
         
         # Nettoyage
         try:
-            os.remove(EmailRepository.AUDIT_FILE_PATH)
+            os.remove(EmailRepository.audit_file_path())
         except OSError:
             pass
 

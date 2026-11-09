@@ -15,7 +15,7 @@ import logging
 from typing import Optional
 
 from infrastructure.firestore.client import FirestoreClient
-from infrastructure.firestore.cloud_database import DEL_FIELD, collection_for, doc_id_for
+from infrastructure.firestore.cloud_sync.common import DEL_FIELD, collection_for, doc_id_for
 
 logger = logging.getLogger("alj")
 
