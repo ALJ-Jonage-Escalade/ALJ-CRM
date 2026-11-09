@@ -7,7 +7,7 @@ from support.api_case import ApiTestCase
 from services.competitions import store as competition_store
 
 from domain.competitions.models import PAIEMENT_PAYE
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions, documents, member_directory, participants
 from infrastructure.firestore.client import FirestoreClient
 
 
@@ -45,7 +45,7 @@ class TestParticipants(ApiTestCase):
         self.seed_adherent(3, nom="WEASLEY", prenom="Ginny", sex="F")
         r = self.client.post(self.url(), json={"adherent_id": 3})
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertNotIn("sex", CompetitionRepository._load_comp_doc(self.comp)["participants"][0])  # not copied
+        self.assertNotIn("sex", documents.load_comp_doc(self.comp)["participants"][0])  # not copied
         self.assertEqual(next(p for p in r.json()["participants"] if p["adherent_id"] == 3)["sex"], "F")
         self.assertEqual(self.listed_participant(3)["sex"], "F")
 
@@ -57,8 +57,8 @@ class TestParticipants(ApiTestCase):
         """Rows written before plans/sex-enum.md hold a copied `gender` (dropped); directory documents not
         rewritten since hold `gender` (read as a code)."""
         self.seed_adherent(3, gender="Femme")
-        CompetitionRepository.add_participant(self.comp, 3)
-        doc = CompetitionRepository._load_comp_doc(self.comp)
+        participants.add_participant(self.comp, 3)
+        doc = documents.load_comp_doc(self.comp)
         doc["participants"][0]["gender"] = "Homme"
         self.fake.upsert_document("competitions", doc["_doc_id"], {k: v for k, v in doc.items() if k != "_doc_id"})
         competition_store.invalidate_cache()
@@ -68,7 +68,7 @@ class TestParticipants(ApiTestCase):
 
     def reads_during(self, method, url, body=None):
         """(response, competition documents read, coaches collection reads) of one request."""
-        CompetitionRepository._adherent_map()  # member directory already cached, as on a warm server
+        member_directory.adherent_map()  # member directory already cached, as on a warm server
         with patch.object(FirestoreClient, "get_document", wraps=self.fake.get_document) as get, \
                 patch.object(FirestoreClient, "list_documents", wraps=self.fake.list_documents) as lst:
             r = self.client.request(method, url, json=body)
@@ -79,7 +79,7 @@ class TestParticipants(ApiTestCase):
 
     def test_each_write_reads_the_competition_once(self):
         """The answer is the document the write produced: no existence check before, no read after."""
-        CompetitionRepository.add_participant(self.comp, 2)
+        participants.add_participant(self.comp, 2)
         writes = [("POST", self.url(), {"adherent_id": 1}),
                   ("PATCH", self.url("/1"), {"selectionne": False}),
                   ("PATCH", self.url("/1"), {"present": True}),
@@ -91,7 +91,7 @@ class TestParticipants(ApiTestCase):
                 r, comp_reads, coach_reads = self.reads_during(method, url, body)
                 self.assertEqual(r.status_code, 200, r.text)
                 self.assertEqual((comp_reads, coach_reads), (1, 1))
-                stored = CompetitionRepository.get_competition_doc(self.comp)
+                stored = competitions.get_competition_doc(self.comp)
                 for key in ("participants", "nb_participants", "nb_selectionnes", "nb_payes", "total_collecte", "updated_at"):
                     self.assertEqual(r.json()[key], stored[key], key)
 
@@ -111,8 +111,8 @@ class TestParticipants(ApiTestCase):
         self.assertEqual((r.status_code, r.json()["message"]), (404, "Compétiteur absent de cette compétition."))
 
     def test_unselect_paid_participant_needs_cancellation(self):
-        CompetitionRepository.add_participant(self.comp, 1)
-        CompetitionRepository.set_payment_status(self.comp, 1, PAIEMENT_PAYE)
+        participants.add_participant(self.comp, 1)
+        participants.update_participant(self.comp, 1, lambda row: row.update(statut_paiement=PAIEMENT_PAYE))
         r = self.client.patch(self.url("/1"), json={"selectionne": False})
         self.assertEqual(r.status_code, 409)
         self.assertEqual(r.json()["code"], "already_paid")
@@ -125,7 +125,7 @@ class TestParticipants(ApiTestCase):
                          (False, "annule_reporte", "Blessure"))
 
     def test_cancel_validation(self):
-        CompetitionRepository.add_participant(self.comp, 1)
+        participants.add_participant(self.comp, 1)
         self.assertEqual(self.client.post(self.url("/1/cancel"),
                                           json={"mode": "rembourse", "note": "x"}).status_code, 422)
         self.assertEqual(self.client.post(self.url("/1/cancel"),
@@ -134,17 +134,17 @@ class TestParticipants(ApiTestCase):
                                           json={"mode": "perdu", "note": "x"}).status_code, 404)
 
     def test_present_flag_and_remove(self):
-        CompetitionRepository.add_participant(self.comp, 1)
+        participants.add_participant(self.comp, 1)
         self.assertEqual(self.client.patch(self.url("/1"), json={"present": True}).status_code, 200)
         self.assertTrue(self.participant(self.comp, 1)["present"])
         self.assertEqual(self.client.patch(self.url("/2"), json={"present": True}).status_code, 404)
 
         self.assertEqual(self.client.delete(self.url("/1")).status_code, 200)
-        self.assertEqual(CompetitionRepository.get_competition_doc(self.comp)["participants"], [])
+        self.assertEqual(competitions.get_competition_doc(self.comp)["participants"], [])
         self.assertEqual(self.client.delete(self.url("/1")).status_code, 404)
 
     def test_manual_payment_and_restore(self):
-        CompetitionRepository.add_participant(self.comp, 1, selectionne=False)
+        participants.add_participant(self.comp, 1, selectionne=False)
         r = self.client.post(self.url("/1/manual-payment"), json={"montant": 12.5})
         self.assertEqual(r.status_code, 200, r.text)
         p = self.participant(self.comp, 1)

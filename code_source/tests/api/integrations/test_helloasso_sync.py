@@ -6,7 +6,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import helloasso_items
 from infrastructure.helloasso.api import HelloAssoApiError
 from support.api_case import ApiTestCase
 
@@ -26,7 +26,7 @@ class TestHelloAssoSync(ApiTestCase):
         for failure in (HelloAssoApiError("API HelloAsso injoignable : ReadTimeout"),
                         HelloAssoApiError("Identifiants manquants.", "helloasso_credentials_missing")):
             with self.subTest(code=failure.code), patch(FETCH, side_effect=failure), \
-                 patch.object(CompetitionRepository, "update_helloasso_mirror") as mirror, patch.object(CompetitionRepository, "replace_auto_links") as relink:
+                 patch.object(helloasso_items, "update_helloasso_mirror") as mirror, patch.object(helloasso_items, "replace_auto_links") as relink:
                 r = self.client.post("/api/helloasso/sync")
             self.assertEqual((r.status_code, r.json()["code"]), (502, failure.code))
             self.assertIn("Rien n'a été modifié", r.json()["message"])

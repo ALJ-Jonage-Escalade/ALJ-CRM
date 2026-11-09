@@ -39,7 +39,7 @@ from infrastructure.firestore.cloud_sync.cache import connect, get_state, instal
 from infrastructure.firestore.cloud_sync.common import CACHE_FORMAT
 from infrastructure.firestore.cloud_sync.rest_store import RestStore
 from infrastructure.firestore.cloud_sync.sync import flush, pull
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import member_directory
 from infrastructure.sqlite.connection import SqliteDatabase
 
 logger = logging.getLogger("alj")
@@ -154,11 +154,11 @@ class CloudDatabase:
     def refresh_projection(cls, force: bool = False):
         """Rewrites the `adherents` / `planning` directory read by the competition pages and the webhook, when a sync
         touched members or the planning, or when the directory reported itself outdated (written before a field
-        existed, CompetitionRepository.directory_outdated)."""
-        if not (cls._projection_dirty or CompetitionRepository.directory_outdated() or force):
+        existed, member_directory.directory_outdated)."""
+        if not (cls._projection_dirty or member_directory.directory_outdated() or force):
             return
         try:
-            rep = CompetitionRepository.rebuild_member_directory()
+            rep = member_directory.rebuild_member_directory()
             if not rep.get("errors"):
                 cls._projection_dirty = False
         except Exception as e:

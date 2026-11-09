@@ -37,6 +37,13 @@ Plain function modules, one per domain, with no class and no `cls.` lookups:
 Callers import the module they need: `from infrastructure.firestore.competitions import coaches` then
 `coaches.save_coach(...)`. `competition_repository.py` and `CompetitionRepository` are deleted at the end.
 
+## Status
+
+Done in desloppify batch 7 (branch `feat/deslopify-batch-7`, 2.51.0). Owner answers (2026-11-09): Q1 functions,
+Q2 one commit per domain in one PR, Q3 delete, Q4 rename. Besides the Q3 list, the boolean wrappers of the
+`*_doc` writes (`remove_participant`, `record_manual_payment`), `season_of_date` (only used by `get_bilan`) and
+`list_mirror_items` (folded into `list_unlinked_items`) went too.
+
 ## Decisions to take before starting (owner)
 
 | # | Question | Proposal |

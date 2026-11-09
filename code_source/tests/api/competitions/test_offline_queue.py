@@ -9,7 +9,7 @@ from unittest.mock import patch
 from support.api_case import ApiTestCase
 
 from domain.competitions.models import PAIEMENT_PAYE
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions, participants
 
 
 class TestQueuedFlagChanges(ApiTestCase):
@@ -18,7 +18,7 @@ class TestQueuedFlagChanges(ApiTestCase):
         super().setUp()
         self.seed_adherent(1)
         self.comp = self.create()["id"]
-        CompetitionRepository.add_participant(self.comp, 1, selectionne=True)
+        participants.add_participant(self.comp, 1, selectionne=True)
         self.seen = self.participant(self.comp, 1)["updated_at"]  # what the phone shows
 
     def url(self, comp=None, adherent=1):
@@ -31,7 +31,7 @@ class TestQueuedFlagChanges(ApiTestCase):
     def other_device_changes(self, **fields):
         """A write elsewhere (other coach, bureau page, desktop app, webhook) after the phone
         read the participant: its `updated_at` moves on."""
-        CompetitionRepository._update_participant(self.comp, 1, lambda p: p.update(fields, updated_at="2099-01-01T00:00:00"))
+        participants.update_participant(self.comp, 1, lambda p: p.update(fields, updated_at="2099-01-01T00:00:00"))
 
     def test_k1_unchanged_participant_is_applied(self):
         r = self.queued(selectionne=False)
@@ -41,10 +41,10 @@ class TestQueuedFlagChanges(ApiTestCase):
 
     def test_k2_same_value_set_meanwhile_is_accepted_without_write(self):
         self.other_device_changes(selectionne=False)
-        before = CompetitionRepository.get_competition_doc(self.comp)["updated_at"]
+        before = competitions.get_competition_doc(self.comp)["updated_at"]
         r = self.queued(selectionne=False)
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(CompetitionRepository.get_competition_doc(self.comp)["updated_at"], before)
+        self.assertEqual(competitions.get_competition_doc(self.comp)["updated_at"], before)
 
     def test_k3_participant_changed_meanwhile_is_refused(self):
         """Coach B unselected then selected again: the value is back to what A saw, but A's
@@ -64,18 +64,18 @@ class TestQueuedFlagChanges(ApiTestCase):
         writes, no forced date): to the second, the row looked unchanged and the phone's older change won."""
         ticks = (datetime.datetime(2026, 10, 23, 9, 57, 42, n) for n in range(1, 1000))
         clock = SimpleNamespace(datetime=SimpleNamespace(now=lambda: next(ticks)))
-        with patch("infrastructure.firestore.competitions.base.datetime", clock):
-            CompetitionRepository.set_selection(self.comp, 1, True)  # the row the phone shows
+        with patch("infrastructure.firestore.competitions.documents.datetime", clock):
+            participants.set_selection_doc(self.comp, 1, True)  # the row the phone shows
             seen = self.participant(self.comp, 1)["updated_at"]
-            CompetitionRepository.set_selection(self.comp, 1, False)
-            CompetitionRepository.set_selection(self.comp, 1, True)
+            participants.set_selection_doc(self.comp, 1, False)
+            participants.set_selection_doc(self.comp, 1, True)
             self.assertEqual(self.participant(self.comp, 1)["updated_at"][:19], seen[:19])  # same second
             r = self.queued(selectionne=False, seen=seen)
         self.assertEqual((r.status_code, r.json()["code"]), (409, "changed"))
         self.assertTrue(self.participant(self.comp, 1)["selectionne"])
 
     def test_k4_paid_meanwhile_unselect_is_refused(self):
-        CompetitionRepository.set_payment_status(self.comp, 1, PAIEMENT_PAYE)  # webhook: also a change of the row
+        participants.update_participant(self.comp, 1, lambda row: row.update(statut_paiement=PAIEMENT_PAYE))  # webhook: also a change of the row
         r = self.queued(selectionne=False)
         self.assertEqual(r.status_code, 409)
         self.assertIn(r.json()["code"], ("changed", "already_paid"))
@@ -85,10 +85,10 @@ class TestQueuedFlagChanges(ApiTestCase):
         self.assertEqual((r.status_code, r.json()["code"]), (409, "already_paid"))
 
     def test_k5_removed_participant_or_deleted_competition(self):
-        CompetitionRepository.remove_participant_doc(self.comp, 1)
+        participants.remove_participant_doc(self.comp, 1)
         for flag in ({"selectionne": False}, {"selectionne": True}, {"present": True}):
             self.assertEqual(self.queued(**flag).status_code, 404, flag)
-        self.assertEqual(CompetitionRepository.get_competition_doc(self.comp)["participants"], [])  # never re-added
+        self.assertEqual(competitions.get_competition_doc(self.comp)["participants"], [])  # never re-added
         self.assertEqual(self.queued(comp=999, selectionne=False).status_code, 404)
 
     def test_k6_archived_competition_is_refused(self):

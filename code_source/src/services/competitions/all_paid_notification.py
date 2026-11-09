@@ -13,7 +13,7 @@ from typing import List
 from domain.club_emails import DEFAULT_SENDER_EMAIL
 from domain.competitions.models import PAIEMENT_PAYE, Competition, Participant
 from infrastructure.firestore.app_settings import AppSettingsRepository
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions, participants
 from infrastructure.mail.sender import EmailSender, MailError
 from services.competitions.results_batch import CompetitionResultsBatchService
 
@@ -29,12 +29,11 @@ def check_and_notify_all_paid(competition_id: int) -> bool:
     """Sends the club the summary e-mail once every selected competitor of the competition has paid, once:
     the setting COMP_ALL_PAID_NOTIFIED_<id> records the send, and is cleared as soon as one of them has not paid
     (so a later full payment notifies again). Returns whether the e-mail was sent now."""
-    competition = CompetitionRepository.get_competition(competition_id)
+    competition = competitions.get_competition(competition_id)
     if not competition:
         return False
 
-    participants = CompetitionRepository.list_participants(competition_id, selected_only=False)
-    selected = [p for p in participants if p.selectionne]
+    selected = [p for p in participants.list_participants(competition_id, selected_only=False) if p.selectionne]
     if not selected:
         return False
 
