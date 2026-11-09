@@ -10,9 +10,7 @@ from unittest.mock import patch
 
 from support.fake_firestore import FirestoreRepoTestCase
 
-from infrastructure.firestore.competitions import participants
-from infrastructure.firestore.competitions import competitions
-from infrastructure.firestore.competitions import documents
+from infrastructure.firestore.competitions import competitions, documents, participants
 
 _SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts",
                        "migrate_gender_to_sex.py")

@@ -1,6 +1,6 @@
 """
-Test data set up through the application's own repository (CompetitionRepository, the
-code path of the desktop app and the HelloAsso webhook), run in a dev-mode subprocess like the
+Test data set up through the application's own Firestore modules (infrastructure.firestore.competitions,
+the code path of the API and the HelloAsso webhook), run in a dev-mode subprocess like the
 seed: the pytest process never talks to Firestore itself.
 
 The subprocess is started once and serves every request (JSON lines on stdin / stdout): a fresh
@@ -23,23 +23,20 @@ _RESULT, _ERROR = "__RESULT__", "__ERROR__"
 _TIMEOUT = 60   # seconds per request
 EVENTUALLY_TIMEOUT = 5.0   # seconds, as Playwright's expect (shortened by conftest.known_bug_timeouts)
 
-# Each request line is {"body", "args"}: `body` runs with `args`, `CompetitionRepository` and `Competition` in scope and sets
+# Each request line is {"body", "args"}: `body` runs with `args`, `Competition` and the competitions modules in scope and sets
 # `result`. The adherents cache is dropped first, so that every request reads Firestore as a fresh process would.
 _WORKER = f"""
 import json, sys, traceback
 sys.path.insert(0, "src")
 from domain.competitions.models import Competition
-from infrastructure.firestore.competition_repository import CompetitionRepository
-from infrastructure.firestore.competitions import participants
-from infrastructure.firestore.competitions import competitions
-from infrastructure.firestore.competitions import coaches
-from infrastructure.firestore.competitions import member_directory
-from infrastructure.firestore.competitions import documents
+from infrastructure.firestore.competitions import coaches, competitions, documents, helloasso_items, member_directory, participants
 for line in sys.stdin:
     request = json.loads(line)
     try:
         member_directory.invalidate_cache()
-        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "documents": documents, "member_directory": member_directory, "coaches": coaches, "competitions": competitions, "participants": participants, "Competition": Competition, "args": request["args"]}}
+        scope = {{"json": json, "sys": sys, "Competition": Competition, "args": request["args"], "documents": documents,
+                  "member_directory": member_directory, "coaches": coaches, "competitions": competitions,
+                  "participants": participants, "helloasso_items": helloasso_items}}
         exec(request["body"], scope)
         print({_RESULT!r} + json.dumps(scope["result"], default=str), flush=True)
     except Exception:
@@ -139,7 +136,7 @@ class TestData:
 
     def helloasso_item(self, id_item: int):
         """Mirror document of a HelloAsso item (link, ignore flag, comment), or None."""
-        return self._run("result = CompetitionRepository.get_item(args['id'])", id=id_item)
+        return self._run("result = helloasso_items.get_item(args['id'])", id=id_item)
 
     def fill_geocache(self) -> int:
         """Fake coordinates (around Jonage) for every address the map would geocode, so that it

@@ -3,9 +3,7 @@
 from support.api_case import ApiTestCase
 
 from api.competitions.schemas.views import HelloAssoItem
-from infrastructure.firestore.competition_repository import CompetitionRepository
-from infrastructure.firestore.competitions import participants
-from infrastructure.firestore.competitions import competitions
+from infrastructure.firestore.competitions import competitions, helloasso_items, participants
 
 
 class TestHelloAssoItems(ApiTestCase):
@@ -38,7 +36,7 @@ class TestHelloAssoItems(ApiTestCase):
     def test_link_records_payment_once(self):
         r = self.link(competition_id=self.comp, adherent_id=1, commentaire="ok")
         self.assertEqual(r.status_code, 200, r.text)
-        item = CompetitionRepository.get_item(55)
+        item = helloasso_items.get_item(55)
         self.assertEqual((item["source"], item["commentaire"]), ("manuel", "ok"))
         p = self.participant(self.comp, 1)
         self.assertEqual((p["selectionne"], p["statut_paiement"], p["montant_paye"], p["commande_helloasso"]),
@@ -61,14 +59,14 @@ class TestHelloAssoItems(ApiTestCase):
         """A refunded or pending item is not money received (same rule as the automatic link)."""
         for etat in ("Refunded", "Pending"):
             with self.subTest(etat=etat):
-                self.fake.upsert_document("helloasso_items", "55", dict(CompetitionRepository.get_item(55), etat=etat))
+                self.fake.upsert_document("helloasso_items", "55", dict(helloasso_items.get_item(55), etat=etat))
                 self.assertEqual(self.link(competition_id=self.comp, adherent_id=1).status_code, 200)
                 self.assertEqual(self.payment(1), (True, "en_attente", 0.0, ""))
 
     def test_amounts_of_all_linked_items_add_up(self):
         self.add_item(56, 9002, 5.0, competition_id=self.comp, adherent_id=1, source="auto")
         self.add_item(57, 9003, 30.0, etat="Refunded", competition_id=self.comp, adherent_id=1, source="auto")
-        CompetitionRepository.apply_links_to_participants()
+        helloasso_items.apply_links_to_participants()
         self.assertEqual(self.payment(1), (True, "paye", 5.0, "9002"))
         self.link(competition_id=self.comp, adherent_id=1)
         selectionne, statut, montant, orders = self.payment(1)
@@ -111,7 +109,7 @@ class TestHelloAssoItems(ApiTestCase):
 
     def test_partial_link_and_errors(self):
         self.assertEqual(self.link(competition_id=self.comp).status_code, 200)
-        item = CompetitionRepository.get_item(55)
+        item = helloasso_items.get_item(55)
         self.assertEqual((item["competition_id"], item["adherent_id"], item["source"]), (self.comp, None, None))
         self.assertEqual(competitions.get_competition_doc(self.comp)["participants"], [])
         self.assertEqual(self.link(competition_id=999, adherent_id=1).status_code, 404)
@@ -122,10 +120,10 @@ class TestHelloAssoItems(ApiTestCase):
         r = self.client.put(url, json={"ignore": True})
         self.assertEqual((r.status_code, r.json()["code"]), (400, "motif_required"))
         self.assertEqual(self.client.put(url, json={"ignore": True, "motif": "Test"}).status_code, 200)
-        item = CompetitionRepository.get_item(55)
+        item = helloasso_items.get_item(55)
         self.assertEqual((item["ignore"], item["ignore_motif"], item["commentaire"]), (True, "Test", "Test"))
         self.assertEqual(self.client.put(url, json={"ignore": False, "commentaire": "Erreur"}).status_code, 200)
-        item = CompetitionRepository.get_item(55)
+        item = helloasso_items.get_item(55)
         self.assertEqual((item["ignore"], item["ignore_motif"], item["commentaire"]), (False, "", "Erreur"))
 
     def test_linked_item_cannot_be_ignored(self):
@@ -137,8 +135,8 @@ class TestHelloAssoItems(ApiTestCase):
         """The webhook links the item between the read and the write: the retry sees it."""
         def webhook_links(collection, doc_id):
             self.fake.before_conditional_write = None
-            CompetitionRepository.set_item_link(55, self.comp, 1, source="webhook")
+            helloasso_items.set_item_link(55, self.comp, 1, source="webhook")
         self.fake.before_conditional_write = webhook_links
         r = self.client.put("/api/helloasso/items/55/ignore", json={"ignore": True, "motif": "Test"})
         self.assertEqual(r.status_code, 409)
-        self.assertNotEqual(CompetitionRepository.get_item(55).get("ignore"), True)
+        self.assertNotEqual(helloasso_items.get_item(55).get("ignore"), True)

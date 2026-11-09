@@ -59,11 +59,11 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         self.assertEqual(items[0]["amount"], 1800)
 
     @patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value="")
-    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.refresh_helloasso_payment")
-    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.set_item_link")
-    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.update_helloasso_mirror")
-    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.known_helloasso_item_ids", new=lambda: set())
-    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_helloasso_links", return_value={})
+    @patch("infrastructure.firestore.competitions.helloasso_items.refresh_helloasso_payment")
+    @patch("infrastructure.firestore.competitions.helloasso_items.set_item_link")
+    @patch("infrastructure.firestore.competitions.helloasso_items.update_helloasso_mirror")
+    @patch("infrastructure.firestore.competitions.helloasso_items.known_helloasso_item_ids", new=lambda: set())
+    @patch("infrastructure.firestore.competitions.helloasso_items.list_helloasso_links", return_value={})
     @patch("infrastructure.firestore.competitions.member_directory.list_members")
     @patch("infrastructure.firestore.competitions.competitions.list_competitions")
     def test_process_webhook_match_successful(
@@ -122,13 +122,12 @@ class TestHelloAssoWebhookService(unittest.TestCase):
                   "order": {"id": 2, "formSlug": "regularisation-inscription-competiteurs-2026-2027"}}
         url = ("https://www.helloasso.com/associations/amicale-laique-de-jonage/evenements/"
                "regularisation-inscription-competiteurs-2026-2027")
-        repository_path = "infrastructure.firestore.competition_repository.CompetitionRepository"
         with patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=url), \
-             patch(f"{repository_path}.update_helloasso_mirror") as mirror, \
+             patch("infrastructure.firestore.competitions.helloasso_items.update_helloasso_mirror") as mirror, \
              patch("infrastructure.firestore.competitions.competitions.list_competitions", return_value=[]), \
              patch("infrastructure.firestore.competitions.member_directory.list_members", return_value=[]), \
-             patch(f"{repository_path}.list_helloasso_links", return_value={}), \
-             patch(f"{repository_path}.known_helloasso_item_ids", return_value=set()):
+             patch("infrastructure.firestore.competitions.helloasso_items.list_helloasso_links", return_value={}), \
+             patch("infrastructure.firestore.competitions.helloasso_items.known_helloasso_item_ids", return_value=set()):
             report = HelloAssoWebhookService.reconcile_payment_items({"eventType": "Order"}, items=[tshirt])
             self.assertEqual(report["status"], "ignored")
             self.assertEqual(report["other_forms"], ["vetements-club-al-jonage-2026-2027"])

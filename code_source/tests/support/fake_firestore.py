@@ -5,8 +5,7 @@ from unittest.mock import patch
 
 from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore import client as fc
-from infrastructure.firestore.competitions import member_directory
-from infrastructure.firestore.competitions import documents
+from infrastructure.firestore.competitions import documents, member_directory
 
 
 class FakeFirestore:

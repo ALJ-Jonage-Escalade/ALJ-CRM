@@ -34,9 +34,7 @@ from infrastructure import runtime_env  # noqa: E402
 from infrastructure.firestore.client import FirestoreClient  # noqa: E402
 from infrastructure.firestore.cloud_sync.common import COMMIT_CHUNK, collection_for  # noqa: E402
 from infrastructure.firestore.cloud_sync.rest_store import RestStore  # noqa: E402
-from infrastructure.firestore.competitions import participants  # noqa: E402
-from infrastructure.firestore.competitions import member_directory  # noqa: E402
-from infrastructure.firestore.competitions import documents  # noqa: E402
+from infrastructure.firestore.competitions import documents, member_directory, participants  # noqa: E402
 
 LEGACY = "gender"
 NOT_GIVEN = "(non renseigné)"

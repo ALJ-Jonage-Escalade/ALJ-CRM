@@ -6,8 +6,7 @@ from support.api_case import ApiTestCase
 
 from api.competitions.schemas.views import Competition as CompetitionView, CompetitionParticipant
 from domain.competitions.models import Competition
-from infrastructure.firestore.competitions import participants
-from infrastructure.firestore.competitions import competitions
+from infrastructure.firestore.competitions import competitions, participants
 from infrastructure.firestore.client import FirestoreError
 
 

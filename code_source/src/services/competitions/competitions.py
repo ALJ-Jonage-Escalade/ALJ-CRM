@@ -1,6 +1,6 @@
 """Competitions: list, create, partial update, delete, archive.
 
-Over CompetitionRepository (shared with the HelloAsso webhook and the MyCompet
+Over infrastructure.firestore.competitions (shared with the HelloAsso webhook and the MyCompet
 results, so they all write with the same rules). Knows nothing about HTTP: failures are
 raised as domain.errors.
 """

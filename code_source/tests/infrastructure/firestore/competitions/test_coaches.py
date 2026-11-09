@@ -1,8 +1,7 @@
 """Coaches (`coaches` collection) on an in-memory Firestore."""
 
 from domain.competitions.models import Competition
-from infrastructure.firestore.competitions import competitions
-from infrastructure.firestore.competitions import coaches
+from infrastructure.firestore.competitions import coaches, competitions
 from support.fake_firestore import FirestoreRepoTestCase
 
 

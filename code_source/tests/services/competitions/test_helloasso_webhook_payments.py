@@ -4,14 +4,10 @@ from unittest.mock import patch
 
 from support.api_case import ApiTestCase
 
-from infrastructure.firestore.competitions import participants
-from infrastructure.firestore.competitions import competitions
-from infrastructure.firestore.competitions import member_directory
-from infrastructure.firestore.competitions import documents
+from infrastructure.firestore.competitions import competitions, documents, member_directory, participants
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from services.competitions.helloasso_webhook import HelloAssoWebhookService
 
-REPO = "infrastructure.firestore.competition_repository.CompetitionRepository"
 
 
 def payment_item(id_item: int, order_id: int, cents: int, state: str = "Processed") -> dict:
@@ -84,7 +80,7 @@ class TestWebhookPayments(ApiTestCase):
 
     def test_item_missing_from_the_mirror_records_its_own_amount(self):
         """Mirror write failed: the item cannot be added up with the others, its amount is kept."""
-        with patch(f"{REPO}.update_helloasso_mirror", side_effect=RuntimeError("Firestore indisponible")):
+        with patch("infrastructure.firestore.competitions.helloasso_items.update_helloasso_mirror", side_effect=RuntimeError("Firestore indisponible")):
             self.receive(payment_item(7777, 9999, 1500))
         self.assertEqual(self.payment(), (True, "paye", 15.0, ["9999"]))
 

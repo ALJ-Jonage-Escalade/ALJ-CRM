@@ -11,8 +11,8 @@ Fully resets the emulator database, then follows the production path:
    the HelloAsso import (`MemberRepository.upsert_members`, `save_planning_data`, …),
    plus fake coordinates in the geocache (members map, never geocoded through Nominatim);
 2. push to Firestore with `cloud_database.import_database` (real `crm_*` format);
-3. PWA `adherents` / `planning` projection, coaches and competitions through
-   `CompetitionRepository`.
+3. PWA `adherents` / `planning` projection, coaches and competitions through the modules of
+   `infrastructure.firestore.competitions`.
 
 Refuses to run outside dev mode (ALJ_ENV=dev + emulator + demo-alj project).
 """
@@ -317,8 +317,7 @@ def build_sqlite(path, fake, rng, coach_names):
 
 def seed_competitions(coach_ids):
     from domain.competitions.models import STATUT_CLOSE, STATUT_EN_COURS, STATUT_EN_PREPARATION, Competition
-    from infrastructure.firestore.competitions import participants
-    from infrastructure.firestore.competitions import competitions, member_directory
+    from infrastructure.firestore.competitions import competitions, member_directory, participants
 
     snape, mcgonagall, flitwick = coach_ids[0], coach_ids[1], coach_ids[2]
     today = datetime.date.today()
@@ -388,8 +387,7 @@ def seed_helloasso_items(competitions):
     (test payment, refunded duplicate). Goes through the same steps as POST /api/helloasso/sync."""
     from domain.competitions import matching
     from hp_names import PARENTS
-    from infrastructure.firestore.competition_repository import CompetitionRepository
-    from infrastructure.firestore.competitions import member_directory
+    from infrastructure.firestore.competitions import helloasso_items, member_directory
 
     cup, lead_open, regional = competitions[0], competitions[1], competitions[2]
     members = [a for a in member_directory.list_members(competition_only=True) if a.get("num_licence")]
@@ -452,13 +450,13 @@ def seed_helloasso_items(competitions):
                                "date": f"{days_ago(59)}T11:00:00+02:00", "paymentMeans": "Card"}])
 
     summarized = matching.summarize_items(items)
-    CompetitionRepository.update_helloasso_mirror(summarized, items, HELLOASSO_FORM)
+    helloasso_items.update_helloasso_mirror(summarized, items, HELLOASSO_FORM)
     comps = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom} for c in competitions]
-    CompetitionRepository.replace_auto_links(matching.auto_link_items(summarized, comps, member_directory.list_members(), {}))
-    CompetitionRepository.save_manual_link(manual, lead_open.id, members[5]["id"], "Mistyped competition number on the form")
-    CompetitionRepository.set_item_ignored(test_payment, True, "Test payment", by=DEV_ACCOUNTS[0][1])
-    CompetitionRepository.set_item_ignored(duplicate, True, "Duplicate payment, refunded", by=DEV_ACCOUNTS[1][1])
-    CompetitionRepository.apply_links_to_participants()
+    helloasso_items.replace_auto_links(matching.auto_link_items(summarized, comps, member_directory.list_members(), {}))
+    helloasso_items.save_manual_link(manual, lead_open.id, members[5]["id"], "Mistyped competition number on the form")
+    helloasso_items.set_item_ignored(test_payment, True, "Test payment", by=DEV_ACCOUNTS[0][1])
+    helloasso_items.set_item_ignored(duplicate, True, "Duplicate payment, refunded", by=DEV_ACCOUNTS[1][1])
+    helloasso_items.apply_links_to_participants()
     return len(items)
 
 

@@ -9,8 +9,7 @@ from unittest.mock import patch
 from support.api_case import ApiTestCase
 
 from domain.competitions.models import PAIEMENT_PAYE
-from infrastructure.firestore.competitions import participants
-from infrastructure.firestore.competitions import competitions
+from infrastructure.firestore.competitions import competitions, participants
 
 
 class TestQueuedFlagChanges(ApiTestCase):

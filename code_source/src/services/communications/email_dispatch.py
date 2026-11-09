@@ -18,8 +18,7 @@ from domain.competitions.models import Competition, default_deadline
 from domain.errors import InvalidRequest, UpstreamUnavailable
 from domain.email_personalization import apply_template_variables
 from domain.utils import format_amount, format_period, normalize_name
-from infrastructure.firestore.competitions import competitions
-from infrastructure.firestore.competitions import member_directory
+from infrastructure.firestore.competitions import competitions, member_directory
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
 from infrastructure.mail.sender import EmailSender, MailError
 from infrastructure.security.secret_store import SecretStore

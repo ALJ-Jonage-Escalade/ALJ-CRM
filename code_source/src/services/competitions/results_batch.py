@@ -33,9 +33,7 @@ from infrastructure.mail.sender import EmailSender, MailError
 from domain.club_emails import DEFAULT_SENDER_EMAIL
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.firestore.competitions import participants
-from infrastructure.firestore.competitions import competitions
-from infrastructure.firestore.competitions import documents
+from infrastructure.firestore.competitions import competitions, documents, participants
 from infrastructure.mycompet.scraper import (
     ArchiveEntry,
     fetch_and_parse_mycompet_results,

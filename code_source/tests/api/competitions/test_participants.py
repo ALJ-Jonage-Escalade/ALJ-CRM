@@ -7,10 +7,7 @@ from support.api_case import ApiTestCase
 from services.competitions import store as competition_store
 
 from domain.competitions.models import PAIEMENT_PAYE
-from infrastructure.firestore.competitions import participants
-from infrastructure.firestore.competitions import competitions
-from infrastructure.firestore.competitions import member_directory
-from infrastructure.firestore.competitions import documents
+from infrastructure.firestore.competitions import competitions, documents, member_directory, participants
 from infrastructure.firestore.client import FirestoreClient
 
 

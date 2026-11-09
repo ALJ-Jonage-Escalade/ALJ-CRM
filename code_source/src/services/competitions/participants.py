@@ -9,8 +9,7 @@ from __future__ import annotations
 from typing import Optional, Sequence, Tuple
 
 from domain.competitions.models import STATUT_CLOSE
-from infrastructure.firestore.competitions import competitions
-from infrastructure.firestore.competitions import participants
+from infrastructure.firestore.competitions import competitions, participants
 from services.competitions.store import require_competition, write
 from domain.errors import Conflict, NotFound
 

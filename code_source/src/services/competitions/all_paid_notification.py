@@ -13,8 +13,7 @@ from typing import List
 from domain.club_emails import DEFAULT_SENDER_EMAIL
 from domain.competitions.models import PAIEMENT_PAYE, Competition, Participant
 from infrastructure.firestore.app_settings import AppSettingsRepository
-from infrastructure.firestore.competitions import participants
-from infrastructure.firestore.competitions import competitions
+from infrastructure.firestore.competitions import competitions, participants
 from infrastructure.mail.sender import EmailSender, MailError
 from services.competitions.results_batch import CompetitionResultsBatchService
 
