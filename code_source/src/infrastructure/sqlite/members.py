@@ -62,7 +62,6 @@ class MemberRepository:
                u.address, u.zip_code, u.city, u.phone, u.email_primary, u.email_secondary,
                u.emergency1_name, u.emergency1_phone, u.emergency2_name, u.emergency2_phone,
                u.licence_ffme, u.health_commitment, u.photo_auth, u.badge_rouge, u.autonomie_bloc,
-               u.hid_proxkey, u.hid_proxkey_date, u.hid_proxkey_comment,
                u.raw_passports, u.raw_diplomas,
                o.payer_first_name, o.payer_last_name, o.payer_email, o.order_ref, o.order_date,
                p.tarif_name, p.amount, p.status, p.document_sante, p.email_sent_date,
@@ -176,13 +175,6 @@ class MemberRepository:
                 rec["champ_Parent 2 - Numéro de téléphone portable"] = str(fields.get("emergency2_phone") or "").strip()
             if "photo_auth" in fields:
                 rec["champ_Autorisation d'utilisation de l'image (photos, vidéos)"] = str(fields.get("photo_auth") or "Oui").strip()
-            if "hid_proxkey" in fields:
-                val = fields.get("hid_proxkey")
-                rec["hid_proxkey"] = "Oui" if (val is True or str(val or "").strip().lower() in ("oui", "true", "1", "yes")) else "Non"
-            if "hid_proxkey_date" in fields:
-                rec["hid_proxkey_date"] = str(fields.get("hid_proxkey_date") or "").strip()
-            if "hid_proxkey_comment" in fields:
-                rec["hid_proxkey_comment"] = str(fields.get("hid_proxkey_comment") or "").strip()
             comment = fields.get("commentaires_correctif") if "commentaires_correctif" in fields else fields.get("commentaire")
             if comment is not None:
                 rec["commentaires_correctif"] = str(comment).strip()
@@ -367,10 +359,9 @@ class MemberRepository:
 # Member fields written as trimmed text, and the yes/no fields with their default
 _USER_TEXT_FIELDS = (
     "email_primary", "email_secondary", "phone", "licence_ffme", "address", "zip_code", "city",
-    "emergency1_name", "emergency1_phone", "emergency2_name", "emergency2_phone", "hid_proxkey_date", "hid_proxkey_comment",
+    "emergency1_name", "emergency1_phone", "emergency2_name", "emergency2_phone",
 )
 _USER_YES_NO_DEFAULTS = {"badge_rouge": "Non", "autonomie_bloc": "Non", "photo_auth": "Oui"}
-_TRUE_TEXTS = ("oui", "true", "1", "yes")
 
 
 def _user_column_updates(fields: Dict[str, object]) -> Dict[str, Optional[str]]:
@@ -397,10 +388,6 @@ def _user_column_updates(fields: Dict[str, object]) -> Dict[str, Optional[str]]:
     if "sex" in fields:
         sex = parse_sex(fields["sex"])
         updates["sex"] = sex.value if sex else None
-    if "hid_proxkey" in fields:
-        value = fields["hid_proxkey"]
-        has_key = value if isinstance(value, bool) else str(value or "Non").strip().lower() in _TRUE_TEXTS
-        updates["hid_proxkey"] = "Oui" if has_key else "Non"
     return updates
 
 

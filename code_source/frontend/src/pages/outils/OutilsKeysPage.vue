@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /* Outils › Clés: the club keys of the climbing wall (plans/club-keys.md). Coaches read; admins add the keys, hand
-   them over and record their return. A holder links to their record in Adhérents, flagged ⚠️ without a membership of
-   the active season. */
+   them over, record their return, archive and restore them. A holder links to their record in Adhérents, flagged ⚠️
+   without a membership of the active season; a member record links back here (?cle=<key id> opens its panel). */
 import { computed, inject, onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 import DataTable from "../../components/DataTable.vue";
 import type { DataColumn } from "../../components/dataTable";
 import UiButton from "../../components/ui/UiButton.vue";
@@ -41,8 +41,10 @@ const shown = computed(() => shownKeys(current.value, search.value, flaggedOnly.
 const archiving = ref<Key | null>(null);
 const assigning = ref<Key | null>(null);
 const returning = ref<Key | null>(null);
-// The key whose panel is open: its id, so the panel follows the reloaded list
-const selectedId = ref<number | null>(null);
+// The key whose panel is open: its id, so the panel follows the reloaded list. ?cle=<id>: the link of a member record
+const route = useRoute();
+const linked = Number(route.query.cle);
+const selectedId = ref<number | null>(Number.isInteger(linked) && linked > 0 ? linked : null);
 const selected = computed(() => keys.value?.find((k) => k.id === selectedId.value) ?? null);
 const counts = computed(() => keyCounts(keys.value ?? []));
 

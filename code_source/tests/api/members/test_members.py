@@ -77,6 +77,18 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         leo = self.client.get("/api/members").json()["members"][0]
         self.assertEqual((leo["phone"], leo["badge_rouge"], leo["tarif_name"], leo["status_norm"]), ("06 11 22 33 44", "Oui", "Loisir", "Validé"))
 
+    def test_members_carry_the_key_they_hold(self):
+        self.seed("1", "Léo", "MARTIN", "Loisir")
+        self.seed("2", "Max", "PETIT", "Loisir")
+        ids = {m["first_name"]: m["user_id"] for m in self.client.get("/api/members").json()["members"]}
+        key = self.client.post("/api/keys", json={"code": "12"}).json()
+        r = self.client.post(f"/api/keys/{key['id']}/assignments", json={"user_id": ids["Léo"], "given_on": "2026-09-12"})
+        self.assertEqual(r.status_code, 200, r.text)
+        members = {m["first_name"]: m for m in self.client.get("/api/members").json()["members"]}
+        self.assertEqual(members["Léo"]["key"], {"id": key["id"], "code": "12", "given_on": "2026-09-12"})
+        self.assertIsNone(members["Max"]["key"])
+        self.assertNotIn("hid_proxkey", members["Léo"])
+
     def test_update_modifies_all_fields_including_identity_and_emergency(self):
         r = self.update({
             "last_name": "BERNARD",
@@ -88,9 +100,6 @@ class TestMemberRecordRoutes(MemberDbTestCase):
             "emergency2_name": "DUPONT Marie",
             "emergency2_phone": "06 05 06 07 08",
             "photo_auth": "Non",
-            "hid_proxkey": "Oui",
-            "hid_proxkey_date": "2024-09-12",
-            "hid_proxkey_comment": "Caution 20€ remise",
         })
         self.assertEqual(r.status_code, 200, r.text)
         updated = self.client.get("/api/members").json()["members"][0]
@@ -103,9 +112,6 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         self.assertEqual(updated["emergency2_name"], "Dupont Marie")
         self.assertEqual(updated["emergency2_phone"], "06 05 06 07 08")
         self.assertEqual(updated["photo_auth"], "Non")
-        self.assertEqual(updated["hid_proxkey"], "Oui")
-        self.assertEqual(updated["hid_proxkey_date"], "2024-09-12")
-        self.assertEqual(updated["hid_proxkey_comment"], "Caution 20€ remise")
 
     def test_update_refusals(self):
         bad_email = self.update({"email_primary": "pas-une-adresse"})
@@ -113,6 +119,8 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         self.assertEqual(bad_email.json()["detail"][0]["loc"][-1], "email_primary")
         self.assertEqual(self.update({"badge_rouge": "peut-être"}).status_code, 422)
         self.assertEqual(self.update({"inconnu": "x"}).status_code, 422)
+        # The key is no longer a member field: Outils › Clés (plans/club-keys.md)
+        self.assertEqual(self.update({"hid_proxkey": "Oui"}).status_code, 422)
         empty = self.update({})
         self.assertEqual((empty.status_code, empty.json()["message"]), (400, "Aucune modification à enregistrer."))
         no_id = self.client.post("/api/members/update", json={"fields": {"phone": "0600000000"}})

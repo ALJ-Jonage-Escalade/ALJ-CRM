@@ -8648,17 +8648,15 @@
             "type": "string",
             "title": "Autonomie Bloc"
           },
-          "hid_proxkey": {
-            "type": "string",
-            "title": "Hid Proxkey"
-          },
-          "hid_proxkey_date": {
-            "type": "string",
-            "title": "Hid Proxkey Date"
-          },
-          "hid_proxkey_comment": {
-            "type": "string",
-            "title": "Hid Proxkey Comment"
+          "key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemberKey"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "passeport_orange": {
             "type": "string",
@@ -8758,9 +8756,6 @@
           "photo_auth",
           "badge_rouge",
           "autonomie_bloc",
-          "hid_proxkey",
-          "hid_proxkey_date",
-          "hid_proxkey_comment",
           "passeport_orange",
           "raw_passports",
           "raw_diplomas",
@@ -8915,43 +8910,6 @@
               }
             ],
             "title": "Photo Auth"
-          },
-          "hid_proxkey": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "Oui",
-                  "Non"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hid Proxkey"
-          },
-          "hid_proxkey_date": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hid Proxkey Date"
-          },
-          "hid_proxkey_comment": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hid Proxkey Comment"
           },
           "email_primary": {
             "anyOf": [
@@ -9139,6 +9097,30 @@
           "season"
         ],
         "title": "MemberCreated"
+      },
+      "MemberKey": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "given_on": {
+            "type": "string",
+            "title": "Given On"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "given_on"
+        ],
+        "title": "MemberKey",
+        "description": "The club key a member holds, since when."
       },
       "MemberList": {
         "properties": {
@@ -9785,25 +9767,6 @@
             ],
             "title": "Photo Auth",
             "default": "Oui"
-          },
-          "hid_proxkey": {
-            "type": "string",
-            "enum": [
-              "Oui",
-              "Non"
-            ],
-            "title": "Hid Proxkey",
-            "default": "Non"
-          },
-          "hid_proxkey_date": {
-            "type": "string",
-            "title": "Hid Proxkey Date",
-            "default": ""
-          },
-          "hid_proxkey_comment": {
-            "type": "string",
-            "title": "Hid Proxkey Comment",
-            "default": ""
           },
           "email_primary": {
             "type": "string",

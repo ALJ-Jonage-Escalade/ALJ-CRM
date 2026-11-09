@@ -125,13 +125,10 @@ describe("display", () => {
       badge_rouge: "Oui",
       autonomie_bloc: "x",
       raw_passports: "Passeport Orange escalade",
-      hid_proxkey: "Oui",
-      hid_proxkey_date: "2025-09-10",
-      hid_proxkey_comment: "Caution versée",
+      key: { id: 4, code: "12", given_on: "2025-09-10" }, // a key is no diploma (Outils › Clés)
     });
-    expect(diplomes(m).map((d) => d.icon)).toEqual(["🔴", "🧗", "🟠", "🔑"]);
-    expect(diplomeWeight(m)).toBe(15);
-    expect(diplomes(m)[3]?.label).toContain("Clé HID ProxKey (reçue le 10/09/2025 - Caution versée)");
+    expect(diplomes(m).map((d) => d.icon)).toEqual(["🔴", "🧗", "🟠"]);
+    expect(diplomeWeight(m)).toBe(7);
     expect(diplomeWeight(member({ autonomie_bloc: "non" }))).toBe(0);
   });
 
@@ -163,8 +160,8 @@ describe("CSV export", () => {
       member({ last_name: "DUPONT", first_name: "Léa", birth_date: "2012-05-04", age: 14, amount: 180, order_date: "2026-09-01T12:00:00" }),
     ]);
     expect(rows[0]!.slice(0, 4)).toEqual(["Nom", "Prénom", "Date de naissance", "Âge"]);
-    expect(rows[0]).toHaveLength(28);
-    expect(rows[0]!.slice(25)).toEqual(["Clé HID ProxKey", "Date réception clé HID", "Commentaire clé HID"]);
+    expect(rows[0]).toHaveLength(25);
+    expect(rows[0]!.at(-1)).toBe("Date commande");
     expect(rows[1]!.slice(0, 4)).toEqual(["DUPONT", "Léa", "04/05/2012", 14]);
     expect(rows[1]![8]).toBe(180);
     expect(rows[1]![24]).toBe("01/09/2026");

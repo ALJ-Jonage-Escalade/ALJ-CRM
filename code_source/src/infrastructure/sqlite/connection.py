@@ -261,11 +261,6 @@ class SqliteDatabase:
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_purchases_helloasso_item ON purchases(helloasso_item_id)"
                        " WHERE helloasso_item_id IS NOT NULL")
 
-        # Clé d'accès salle d'escalade (HID ProxKey) : information associée à la personne (users).
-        _add_missing_column(conn, cursor, "users", "hid_proxkey", "TEXT DEFAULT 'Non'")
-        _add_missing_column(conn, cursor, "users", "hid_proxkey_date", "TEXT DEFAULT ''")
-        _add_missing_column(conn, cursor, "users", "hid_proxkey_comment", "TEXT DEFAULT ''")
-
         _ensure_email_templates(conn, cursor)
         for statement in KEYS_DDL:
             cursor.execute(statement)
@@ -290,6 +285,7 @@ class SqliteDatabase:
         if current_version == 0:
             cursor.execute(f"PRAGMA user_version = {schema_v2.SCHEMA_TARGET_VERSION}")
             logger.info(f"[SQLITE] Base neuve taguée en version {schema_v2.SCHEMA_TARGET_VERSION} (schéma v2 natif).")
+        schema_v2.drop_former_user_columns(cursor)
         # Flat member view: created again on every start to follow the code's definition
         schema_v2.recreate_member_flat_view(cursor)
 

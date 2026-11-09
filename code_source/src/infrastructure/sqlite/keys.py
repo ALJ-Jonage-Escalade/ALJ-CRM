@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import sqlite3
-from typing import List, Optional, Set, TypedDict
+from typing import Dict, List, Optional, Set, TypedDict
 
 from domain.errors import Conflict
 from domain.members.view import is_cancelled
@@ -23,6 +23,12 @@ class HolderRow(TypedDict):
 class ArchiveRow(TypedDict):
     date: str
     comment: str
+
+
+class HeldKeyRow(TypedDict):
+    id: int
+    code: str
+    given_on: str
 
 
 class KeyRow(TypedDict):
@@ -91,6 +97,17 @@ class KeyRepository:
     @classmethod
     def get_key(cls, key_id: int) -> Optional[KeyRow]:
         return next((k for k in cls.list_keys() if k["id"] == key_id), None)
+
+    @classmethod
+    def held_keys(cls) -> Dict[int, HeldKeyRow]:
+        """The key each holder holds, by user id."""
+        conn = _connect()
+        try:
+            rows = conn.execute("SELECT a.user_id, k.id, k.code, a.given_on FROM key_assignments a JOIN keys k ON k.id = a.key_id"
+                                " WHERE a.returned_on IS NULL").fetchall()
+            return {r["user_id"]: HeldKeyRow(id=r["id"], code=r["code"], given_on=r["given_on"]) for r in rows}
+        finally:
+            conn.close()
 
     @classmethod
     def key_held_by(cls, user_id: int) -> Optional[str]:

@@ -17,7 +17,7 @@ function json(body: unknown, status = 200): Response {
 
 type Answer = (body: unknown) => Response;
 
-async function render(role: Role, keys: Key[], extra: Record<string, Answer> = {}) {
+async function render(role: Role, keys: Key[], extra: Record<string, Answer> = {}, path = "/bureau/outils/cles") {
   const calls: { method: string; path: string; body?: unknown }[] = [];
   const answers: Record<string, Answer> = {
     "GET /api/seasons": () => json({ seasons: ["2026-2027"], active: "2026-2027" }),
@@ -40,7 +40,7 @@ async function render(role: Role, keys: Key[], extra: Record<string, Answer> = {
     stop: vi.fn(),
   };
   const router = createRouter({ history: createMemoryHistory(), routes });
-  await router.push("/bureau/outils/cles");
+  await router.push(path);
   mount(RouterView, {
     attachTo: document.body,
     global: {
@@ -344,5 +344,10 @@ describe("OutilsKeysPage", () => {
       expect(sent("POST", "/api/keys/5/restore").map((c) => c.body)).toEqual([{ comment: "Retrouvée" }]);
       expect(byId("toast")!.textContent).toBe("✅ Clé « 7 » restaurée : elle est de nouveau disponible.");
     });
+  });
+
+  it("opens the key a member record links to", async () => {
+    const { byId } = await render("coach", KEYS, { "GET /api/keys/1/history": () => json([]) }, "/bureau/outils/cles?cle=1");
+    expect(byId("key-panel")!.getAttribute("aria-label")).toBe("🔑 Clé 10");
   });
 });

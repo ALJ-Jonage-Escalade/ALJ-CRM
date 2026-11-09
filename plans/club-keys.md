@@ -48,10 +48,10 @@ Holder, Given on, Comment), natural sort by code, text search, counters (assigne
 
 ### Acceptance criteria
 
-- [ ] `POST /api/keys` creates an available key; a duplicate code (case-insensitive, trimmed) → 409; empty → 422
-- [ ] A coach can `GET /api/keys` but gets 403 on `POST`
-- [ ] The tables are tracked by the replication (`TRACKED_TABLES`, `REFERENCES`)
-- [ ] The sub-page lists keys sorted naturally (2 before 10), filters on the search, shows the counters; the add
+- [x] `POST /api/keys` creates an available key; a duplicate code (case-insensitive, trimmed) → 409; empty → 422
+- [x] A coach can `GET /api/keys` but gets 403 on `POST`
+- [x] The tables are tracked by the replication (`TRACKED_TABLES`, `REFERENCES`)
+- [x] The sub-page lists keys sorted naturally (2 before 10), filters on the search, shows the counters; the add
       button only shows for admins
 
 ---
@@ -69,11 +69,11 @@ membership in the active season.
 
 ### Acceptance criteria
 
-- [ ] Assigning an assigned or archived key, or a member who holds a key, or a member not in the active season → 409
-- [ ] Return closes the open assignment, the key becomes available; returned_on < given_on → 400
-- [ ] `GET /api/keys` returns the holder (id, name), given_on, comment, the not-renewed flag and the season of
+- [x] Assigning an assigned or archived key, or a member who holds a key, or a member not in the active season → 409
+- [x] Return closes the open assignment, the key becomes available; returned_on < given_on → 400
+- [x] `GET /api/keys` returns the holder (id, name), given_on, comment, the not-renewed flag and the season of
       their record (active one, else their last one: the link opens it)
-- [ ] Page: assign / return dialogs, holder link, ⚠️ filter
+- [x] Page: assign / return dialogs, holder link, ⚠️ filter
 
 ---
 
@@ -90,10 +90,10 @@ old → new).
 
 ### Acceptance criteria
 
-- [ ] `GET /api/keys/{id}/history` returns assignments and events in date order
-- [ ] Editing respects given_on ≤ returned_on; deleting an older assignment → 409
-- [ ] Rename keeps uniqueness (409) and writes the event
-- [ ] Panel shows the history and the actions (admins only)
+- [x] `GET /api/keys/{id}/history` returns assignments and events in date order
+- [x] Editing respects given_on ≤ returned_on; deleting an older assignment → 409
+- [x] Rename keeps uniqueness (409) and writes the event
+- [x] Panel shows the history and the actions (admins only)
 
 ---
 
@@ -110,10 +110,10 @@ Competitions list (separate greyed list, archive date and comment shown).
 
 ### Acceptance criteria
 
-- [ ] Archive without comment → 422; archiving an archived key / restoring a non-archived key → 409
-- [ ] Archiving an assigned key closes its assignment at the archive date
-- [ ] An archived key cannot be assigned (phase 2 rule, tested here)
-- [ ] Page: archive / restore dialogs, archives toggle
+- [x] Archive without comment → 422; archiving an archived key / restoring a non-archived key → 409
+- [x] Archiving an assigned key closes its assignment at the archive date
+- [x] An archived key cannot be assigned (phase 2 rule, tested here)
+- [x] Page: archive / restore dialogs, archives toggle
 
 ---
 
@@ -130,7 +130,8 @@ field map) are removed; existing caches lose the columns.
 
 ### Acceptance criteria
 
-- [ ] No `hid_proxkey` left in `src/` nor `frontend/src/` (outside generated files, regenerated)
-- [ ] Record view shows the current key with its link, nothing for a member without one
-- [ ] Existing caches no longer carry the columns after startup
-- [ ] All checks green (back + front, OpenAPI contract)
+- [x] No `hid_proxkey` left in `src/` nor `frontend/src/` (outside generated files, regenerated), except the list of
+      former columns dropped at startup (`schema_v2.FORMER_USER_COLUMNS`)
+- [x] Record view shows the current key with its link, nothing for a member without one
+- [x] Existing caches no longer carry the columns after startup
+- [x] All checks green (back + front, OpenAPI contract)

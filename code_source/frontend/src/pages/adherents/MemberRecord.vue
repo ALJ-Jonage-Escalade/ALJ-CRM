@@ -129,7 +129,12 @@ const rows = computed(() => recordRows(props.member));
         :class="compact ? 'px-3 py-1.5' : 'grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)] gap-3 px-3 py-1.5'"
       >
         <dt :class="['font-semibold text-slate-500', compact && 'text-[11.5px]']">{{ row.icon }} {{ row.label }}</dt>
-        <dd class="wrap-break-word whitespace-pre-line text-slate-800">{{ row.value }}</dd>
+        <dd class="wrap-break-word whitespace-pre-line text-slate-800">
+          <RouterLink v-if="row.to" :to="row.to" data-testid="record-field-link" class="text-accent hover:underline">
+            {{ row.value }}
+          </RouterLink>
+          <template v-else>{{ row.value }}</template>
+        </dd>
       </div>
     </dl>
 

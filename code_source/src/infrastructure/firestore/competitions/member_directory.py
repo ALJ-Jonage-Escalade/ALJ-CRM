@@ -133,9 +133,6 @@ def rebuild_member_directory(season_filter: str = "") -> dict[str, Any]:
                 "emergency_phone": d.get("emergency1_phone") or "",
                 "badge_rouge": d.get("badge_rouge") or "Non",
                 "autonomie_bloc": d.get("autonomie_bloc") or "Non",
-                "hid_proxkey": d.get("hid_proxkey") or "Non",
-                "hid_proxkey_date": d.get("hid_proxkey_date") or "",
-                "hid_proxkey_comment": d.get("hid_proxkey_comment") or "",
                 "updated_at": now,
             },
         })
@@ -262,9 +259,6 @@ def _adherent_as_legacy_dict(doc: dict[str, Any]) -> dict[str, Any]:
         "sex": sex_code(doc),
         "badge_rouge": str(doc.get("badge_rouge") or ""),
         "autonomie_bloc": str(doc.get("autonomie_bloc") or ""),
-        "hid_proxkey": str(doc.get("hid_proxkey") or ""),
-        "hid_proxkey_date": str(doc.get("hid_proxkey_date") or ""),
-        "hid_proxkey_comment": str(doc.get("hid_proxkey_comment") or ""),
     }
 
 

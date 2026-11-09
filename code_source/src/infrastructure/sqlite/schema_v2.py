@@ -47,9 +47,6 @@ CREATE TABLE IF NOT EXISTS users (
     photo_auth TEXT, health_commitment TEXT,
     badge_rouge TEXT DEFAULT 'Non',
     autonomie_bloc TEXT DEFAULT 'Non',
-    hid_proxkey TEXT DEFAULT 'Non',
-    hid_proxkey_date TEXT DEFAULT '',
-    hid_proxkey_comment TEXT DEFAULT '',
     raw_passports TEXT DEFAULT '',
     raw_diplomas TEXT DEFAULT '',
     parental_auth_autonomous TEXT DEFAULT 'Non',
@@ -124,9 +121,6 @@ USER_FIELD_MAP = {
     "champ_Numéro de Licence FFME (6 chiffres)": "licence_ffme",
     "badge_rouge": "badge_rouge",
     "autonomie_bloc": "autonomie_bloc",
-    "hid_proxkey": "hid_proxkey",
-    "hid_proxkey_date": "hid_proxkey_date",
-    "hid_proxkey_comment": "hid_proxkey_comment",
     "raw_passports": "raw_passports",
     "raw_diplomas": "raw_diplomas",
     "parental_auth_autonomous": "parental_auth_autonomous",
@@ -582,9 +576,6 @@ SELECT
       WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Option Trail' LIMIT 1) AS "opt_Montant Assurance Option Trail",
     u.badge_rouge AS "badge_rouge",
     u.autonomie_bloc AS "autonomie_bloc",
-    u.hid_proxkey AS "hid_proxkey",
-    u.hid_proxkey_date AS "hid_proxkey_date",
-    u.hid_proxkey_comment AS "hid_proxkey_comment",
     u.raw_passports AS "raw_passports",
     u.raw_diplomas AS "raw_diplomas",
     u.parental_auth_autonomous AS "parental_auth_autonomous",
@@ -611,6 +602,25 @@ JOIN users u ON u.id = p.user_id
 JOIN orders o ON o.id = p.order_id
 JOIN seasons s ON s.id = o.season_id
 """
+
+
+# The key on the member record, replaced by Outils › Clés (plans/club-keys.md): dropped from existing caches
+FORMER_USER_COLUMNS = ("hid_proxkey", "hid_proxkey_date", "hid_proxkey_comment")
+
+
+def drop_former_user_columns(cur: sqlite3.Cursor) -> None:
+    """Drops the users columns no longer used. DDL fires no tracking trigger: nothing is sent to Firestore, whose
+    documents keep the fields (the cache only reads its own columns). The member views reading them are dropped
+    first; recreate_member_flat_view() creates the current one again."""
+    columns = {r[1] for r in cur.execute("PRAGMA table_info(users)")}
+    former = [c for c in FORMER_USER_COLUMNS if c in columns]
+    if not former:
+        return
+    cur.execute("DROP VIEW IF EXISTS v_adherents_legacy")
+    cur.execute("DROP VIEW IF EXISTS v_member_flat")
+    for column in former:
+        logger.info(f"[SQLITE] Suppression de la colonne users.{column} (clés : Outils › Clés)")
+        cur.execute(f"ALTER TABLE users DROP COLUMN {column}")  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query - column names from FORMER_USER_COLUMNS
 
 
 def recreate_member_flat_view(cur: sqlite3.Cursor) -> None:
