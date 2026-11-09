@@ -34,6 +34,7 @@ from domain.club_emails import DEFAULT_SENDER_EMAIL
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import documents
 from infrastructure.mycompet.scraper import (
     ArchiveEntry,
@@ -264,7 +265,7 @@ class CompetitionResultsBatchService:
         window = window_days if window_days is not None else cls.get_window_days()
         oldest = today - datetime.timedelta(days=max(window, FORCED_WINDOW_DAYS) if force else window)
         try:
-            docs = CompetitionRepository.list_competition_docs()
+            docs = competitions.list_competition_docs()
         except FirestoreError as e:
             raise ResultsBatchError(f"Lecture des compétitions impossible : {e}") from e
 
@@ -337,7 +338,7 @@ class CompetitionResultsBatchService:
         NotFound (code needs_url when no page is found: the coach gives it), UpstreamUnavailable (MyCompet),
         StorageUnavailable (Firestore)."""
         try:
-            comp = CompetitionRepository.get_stored_competition_doc(competition_id)
+            comp = competitions.get_stored_competition_doc(competition_id)
         except FirestoreError as e:
             raise StorageUnavailable("Lecture de la compétition impossible (détails dans les journaux).") from e
         if not comp:

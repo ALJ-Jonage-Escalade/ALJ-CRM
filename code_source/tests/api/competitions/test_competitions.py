@@ -7,6 +7,7 @@ from support.api_case import ApiTestCase
 from api.competitions.schemas.views import Competition as CompetitionView, CompetitionParticipant
 from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.client import FirestoreError
 
 
@@ -108,7 +109,7 @@ class TestCompetitions(ApiTestCase):
         self.fake.before_conditional_write = batch_writes_results
         r = self.client.patch(f"/api/competitions/{doc['id']}", json={"nom": "Coupe du Rhône"})
         self.assertEqual(r.status_code, 200, r.text)
-        stored = CompetitionRepository.get_competition_doc(doc["id"])
+        stored = competitions.get_competition_doc(doc["id"])
         self.assertEqual((stored["nom"], stored["prix"], stored["url_resultats"], stored["resultats_synced_at"]),
                          ("Coupe du Rhône", 15.0, "https://mycompet.ffme.fr/resultat/42", "2026-10-18T07:00:00"))
 
@@ -121,7 +122,7 @@ class TestCompetitions(ApiTestCase):
             CompetitionRepository.add_participant(doc["id"], 1)
         self.fake.before_conditional_write = coach_adds_participant
         self.assertEqual(self.client.patch(f"/api/competitions/{doc['id']}", json={"prix": 20}).status_code, 200)
-        stored = CompetitionRepository.get_competition_doc(doc["id"])
+        stored = competitions.get_competition_doc(doc["id"])
         self.assertEqual(([p["adherent_id"] for p in stored["participants"]], stored["nb_participants"], stored["prix"]),
                          ([1], 1, 20.0))
 
@@ -141,18 +142,18 @@ class TestCompetitions(ApiTestCase):
 
     def test_archive_past(self):
         # Explicit ids: new ids are millisecond timestamps, equal within one test
-        past = CompetitionRepository.save_competition(Competition(id=1, nom="Passée", date_competition="2020-01-10"))
-        two_days = CompetitionRepository.save_competition(Competition(id=2, nom="Longue", date_competition="2020-01-10",
+        past = competitions.save_competition(Competition(id=1, nom="Passée", date_competition="2020-01-10"))
+        two_days = competitions.save_competition(Competition(id=2, nom="Longue", date_competition="2020-01-10",
                                                      date_fin="2999-01-11"))
-        undated = CompetitionRepository.save_competition(Competition(id=3, nom="Sans date"))
+        undated = competitions.save_competition(Competition(id=3, nom="Sans date"))
         r = self.client.post("/api/competitions/archive-past")
         self.assertEqual(r.json()["archived"], [past])
-        self.assertEqual(CompetitionRepository.get_competition(past).statut, "close")
-        self.assertEqual(CompetitionRepository.get_competition(two_days).statut, "en_preparation")
-        self.assertEqual(CompetitionRepository.get_competition(undated).statut, "en_preparation")
+        self.assertEqual(competitions.get_competition(past).statut, "close")
+        self.assertEqual(competitions.get_competition(two_days).statut, "en_preparation")
+        self.assertEqual(competitions.get_competition(undated).statut, "en_preparation")
 
     def test_firestore_failure(self):
-        with patch.object(CompetitionRepository, "list_competition_docs", side_effect=FirestoreError("down")):
+        with patch.object(competitions, "list_competition_docs", side_effect=FirestoreError("down")):
             r = self.client.get("/api/competitions")
         self.assertEqual(r.status_code, 503)
         self.assertEqual(r.json()["code"], "unavailable")

@@ -318,8 +318,7 @@ def build_sqlite(path, fake, rng, coach_names):
 def seed_competitions(coach_ids):
     from domain.competitions.models import STATUT_CLOSE, STATUT_EN_COURS, STATUT_EN_PREPARATION, Competition
     from infrastructure.firestore.competition_repository import CompetitionRepository
-    from infrastructure.firestore.competitions import coaches
-    from infrastructure.firestore.competitions import member_directory
+    from infrastructure.firestore.competitions import competitions, member_directory
 
     snape, mcgonagall, flitwick = coach_ids[0], coach_ids[1], coach_ids[2]
     today = datetime.date.today()
@@ -336,15 +335,15 @@ def seed_competitions(coach_ids):
     competitors = [a["id"] for a in member_directory.list_members(competition_only=True, statuses=["Terminé"])]
     rng = random.Random(SEED)
     base_id = int(datetime.datetime(today.year, today.month, today.day).timestamp() * 1000)
-    competitions = []
+    seeded = []
     for i, (name, number, date, price, status, coach1, coach2) in enumerate(specs):
         comp = Competition(id=base_id + i, id_ffme=number, nom=name, date_competition=date.isoformat(), prix=price,
                            statut=status, coach_ids=[c for c in (coach1, coach2) if c is not None])
-        comp.id = CompetitionRepository.save_competition(comp)
-        competitions.append(comp)
+        comp.id = competitions.save_competition(comp)
+        seeded.append(comp)
         for member_id in rng.sample(competitors, k=min(len(competitors), rng.randint(4, 9))):
             CompetitionRepository.add_participant(comp.id, member_id, selectionne=rng.random() < 0.8)
-    return competitions, len(competitors)
+    return seeded, len(competitors)
 
 
 HELLOASSO_FORM = "competitions-2026-2027-dev"
@@ -390,6 +389,7 @@ def seed_helloasso_items(competitions):
     from domain.competitions import matching
     from hp_names import PARENTS
     from infrastructure.firestore.competition_repository import CompetitionRepository
+    from infrastructure.firestore.competitions import member_directory
 
     cup, lead_open, regional = competitions[0], competitions[1], competitions[2]
     members = [a for a in member_directory.list_members(competition_only=True) if a.get("num_licence")]
@@ -482,7 +482,7 @@ def main() -> int:
     from hp_names import COACHES
     from infrastructure.firestore.cloud_sync.bootstrap import import_database
     from infrastructure.firestore.cloud_sync.rest_store import RestStore
-    from infrastructure.firestore.competition_repository import CompetitionRepository
+    from infrastructure.firestore.competitions import coaches, member_directory
 
     Faker.seed(SEED)
     fake = Faker("en_GB")

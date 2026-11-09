@@ -32,6 +32,7 @@ from domain.competitions.matching import auto_link_items, parse_campaign_identif
 from domain.competitions.models import PAIEMENT_PAYE
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import member_directory
 from infrastructure.helloasso import api as helloasso_api
 from infrastructure.security.api_auth import auth_enforced, constant_time_equals
@@ -261,7 +262,7 @@ class HelloAssoWebhookService:
         summarized = summarize_items(raw_items)
         computed_links = auto_link_items(
             items=summarized,
-            competitions=[c.to_dict() for c in CompetitionRepository.list_competitions()],
+            competitions=[c.to_dict() for c in competitions.list_competitions()],
             adherents=member_directory.list_members(),
             existing_links=CompetitionRepository.list_helloasso_links(),
         )

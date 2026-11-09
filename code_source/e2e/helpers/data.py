@@ -30,6 +30,7 @@ import json, sys, traceback
 sys.path.insert(0, "src")
 from domain.competitions.models import Competition
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import coaches
 from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.competitions import documents
@@ -37,7 +38,7 @@ for line in sys.stdin:
     request = json.loads(line)
     try:
         member_directory.invalidate_cache()
-        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "documents": documents, "member_directory": member_directory, "coaches": coaches, "Competition": Competition, "args": request["args"]}}
+        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "documents": documents, "member_directory": member_directory, "coaches": coaches, "competitions": competitions, "Competition": Competition, "args": request["args"]}}
         exec(request["body"], scope)
         print({_RESULT!r} + json.dumps(scope["result"], default=str), flush=True)
     except Exception:
@@ -171,7 +172,7 @@ result = len(set(collect.addresses))
         return self._run("""
 comp = Competition(nom=args['nom'], date_competition=args['date'], prix=args['prix'], id_ffme=args['id_ffme'],
                    coach_ids=list(args['coach_ids']))
-cid = CompetitionRepository.save_competition(comp)
+cid = competitions.save_competition(comp)
 for aid in args['participants']:
     CompetitionRepository.add_participant(cid, aid, selectionne=aid in args['selected'])
 result = cid

@@ -11,6 +11,7 @@ from domain.competitions import matching as competition_matching
 from domain.errors import Conflict, InvalidRequest, NotFound, UpstreamUnavailable
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.competitions import member_directory
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competition_repository import (
     CompetitionRepository,
     ItemAlreadyLinked,
@@ -58,9 +59,9 @@ class HelloAssoItemService:
 
         CompetitionRepository.update_helloasso_mirror(summarized, items, campaign["slug"])
 
-        competitions = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom} for c in CompetitionRepository.list_competitions()]
+        competition_refs = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom} for c in competitions.list_competitions()]
         existing_links = CompetitionRepository.list_helloasso_links()
-        links = competition_matching.auto_link_items(summarized, competitions, member_directory.list_members(), existing_links)
+        links = competition_matching.auto_link_items(summarized, competition_refs, member_directory.list_members(), existing_links)
         CompetitionRepository.replace_auto_links(links)
         applied_count = CompetitionRepository.apply_links_to_participants()
 
@@ -89,7 +90,7 @@ class HelloAssoItemService:
         item = CompetitionRepository.get_item(id_item)
         if item is None:
             raise _item_not_found()
-        if competition_id is not None and CompetitionRepository.get_competition(competition_id) is None:
+        if competition_id is not None and competitions.get_competition(competition_id) is None:
             raise competition_not_found()
         prev_comp, prev_adherent = item.get("competition_id"), item.get("adherent_id")
         CompetitionRepository.save_manual_link(id_item, competition_id, adherent_id, commentaire)

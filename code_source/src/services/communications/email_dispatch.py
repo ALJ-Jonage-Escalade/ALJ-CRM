@@ -18,7 +18,7 @@ from domain.competitions.models import Competition, default_deadline
 from domain.errors import InvalidRequest, UpstreamUnavailable
 from domain.email_personalization import apply_template_variables
 from domain.utils import format_amount, format_period, normalize_name
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import member_directory
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
 from infrastructure.mail.sender import EmailSender, MailError
@@ -114,7 +114,7 @@ class EmailDispatchService:
         if not competition_id:
             return {}
         # The document, not the domain model: the place is a pass-through field the model drops
-        doc = CompetitionRepository.get_competition_doc(competition_id)
+        doc = competitions.get_competition_doc(competition_id)
         if not doc:
             return {}
         comp = Competition.from_row(doc)

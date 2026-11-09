@@ -5,6 +5,7 @@ from unittest.mock import patch
 from support.api_case import ApiTestCase
 
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.competitions import documents
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
@@ -102,4 +103,4 @@ class TestWebhookPayments(ApiTestCase):
         self.assertEqual(r.status_code, 503, r.text)
         self.assertEqual(r.json()["status"], "error")
         self.assertEqual(self.fake.list_documents("helloasso_items"), [])
-        self.assertEqual(CompetitionRepository.get_competition_doc(self.comp)["participants"], [])
+        self.assertEqual(competitions.get_competition_doc(self.comp)["participants"], [])

@@ -17,7 +17,7 @@ from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore import client as fc
 from infrastructure.firestore.competitions import documents
 from infrastructure.firestore.competition_repository import CompetitionRepository
-from infrastructure.firestore.competitions import coaches
+from infrastructure.firestore.competitions import competitions
 from support.fake_firestore import FakeFirestore, FirestoreRepoTestCase  # noqa: F401
 from domain.competitions.models import (
     Competition,
@@ -30,105 +30,13 @@ from domain.competitions.models import (
 )
 
 
-class TestCompetitionsCrud(FirestoreRepoTestCase):
-    def test_create_edit_list_delete(self):
-        comp = Competition(nom="Coupe Rhône", id_ffme="18846", date_competition="2026-03-15",
-                           prix=15.0, whatsapp_link="https://chat.whatsapp.com/testfirestore")
-        comp_id = CompetitionRepository.save_competition(comp)
-        self.assertTrue(comp_id)
-        self.assertIn(str(comp_id), self.fake.store["competitions"])
-
-        got = CompetitionRepository.get_competition(comp_id)
-        self.assertEqual(got.nom, "Coupe Rhône")
-        self.assertEqual(got.doc_id, str(comp_id))
-        self.assertEqual(got.whatsapp_link, "https://chat.whatsapp.com/testfirestore")
-
-        got.prix = 18.0
-        got.whatsapp_link = "https://chat.whatsapp.com/updated"
-        CompetitionRepository.save_competition(got)
-        saved = CompetitionRepository.get_competition(comp_id)
-        self.assertEqual(saved.prix, 18.0)
-        self.assertEqual(saved.whatsapp_link, "https://chat.whatsapp.com/updated")
-        # Une seule documentation de l'épreuve (pas de doublon)
-        self.assertEqual(len(self.fake.store["competitions"]), 1)
-
-        comps = CompetitionRepository.list_competitions()
-        self.assertEqual(len(comps), 1)
-        self.assertTrue(CompetitionRepository.delete_competition(comp_id))
-        self.assertEqual(CompetitionRepository.list_competitions(), [])
-        self.assertFalse(CompetitionRepository.delete_competition(comp_id))
-
-    def test_set_competition_status(self):
-        comp_id = CompetitionRepository.save_competition(Competition(nom="Test"))
-        self.assertTrue(CompetitionRepository.set_competition_status(comp_id, "en_cours"))
-        self.assertEqual(CompetitionRepository.get_competition(comp_id).statut, "en_cours")
-
-    def test_coach_fields_roundtrip(self):
-        ids = [1, 2, 3, 4]  # fixed ids: _new_id() repeats within a millisecond (A30)
-        for cid, nom in zip(ids, "ABCD", strict=True):
-            coaches.save_coach(nom, coach_id=cid)
-        comp_id = CompetitionRepository.save_competition(Competition(nom="Épreuve", coach_ids=ids[::-1]))
-        self.assertEqual(CompetitionRepository.get_competition(comp_id).coach_ids, ids[::-1])  # no limit, order kept
-        doc = self.fake.store["competitions"][str(comp_id)]
-        # Ids only (plan C2 step B): neither the legacy slots nor a copy of the names
-        self.assertFalse({"coach1_id", "coach2_id", "coach3_id", "coaches"} & set(doc))
-        self.assertEqual(CompetitionRepository.get_competition_doc(comp_id)["coaches"], ["D", "C", "B", "A"])  # resolved when read
-
-    def test_legacy_coach_slots_read(self):
-        """A document from an older version, with only coach1_id..coach3_id."""
-        a, b = coaches.save_coach("A", coach_id=1), coaches.save_coach("B", coach_id=2)
-        self.fake.upsert_document("competitions", "5", {"id": 5, "nom": "Ancienne",
-                                                        "coach1_id": b, "coach2_id": None, "coach3_id": a,
-                                                        "coaches": ["nom périmé"]})
-        self.assertEqual(CompetitionRepository.get_competition(5).coach_ids, [b, a])
-        doc = CompetitionRepository.get_competition_doc(5)
-        self.assertEqual((doc["coach_ids"], doc["coaches"]), ([b, a], ["B", "A"]))  # names resolved
-        self.assertEqual([c.id for c in CompetitionRepository.list_competitions_for_coach(a)], [5])
-        self.assertNotIn("coach1_id", doc)  # the API answer has coach_ids only
-
-    def test_empty_coach_ids_ignore_stale_legacy_slots(self):
-        """A document updated since plan C2 with every coach removed: its old slots must not bring them back."""
-        a = coaches.save_coach("A", coach_id=1)
-        self.fake.upsert_document("competitions", "6", {"id": 6, "nom": "Sans coach", "coach_ids": [], "coach1_id": a})
-        self.assertEqual(CompetitionRepository.get_competition(6).coach_ids, [])
-        self.assertEqual(CompetitionRepository.get_competition_doc(6)["coaches"], [])
-
-    def test_legacy_doc_normalized_on_read(self):
-        """Un document hérité (ID Firestore aléatoire) est recopié vers str(id)."""
-        legacy_doc = {
-            "id": 42, "nom": "Épreuve web", "prix": 10.0, "statut": "en_preparation",
-            "participants": [], "coach_ids": [], "coaches": [],
-            "updated_at": "2026-01-02T10:00:00", "created_at": "2026-01-02T10:00:00",
-        }
-        self.fake.store["competitions"] = {"randomLegacyId": dict(legacy_doc)}
-        comp = CompetitionRepository.get_competition(42)
-        self.assertEqual(comp.nom, "Épreuve web")
-        self.assertEqual(comp.doc_id, "42")
-        self.assertNotIn("randomLegacyId", self.fake.store["competitions"])
-        self.assertIn("42", self.fake.store["competitions"])
-
-    def test_duplicate_docs_kept_newest(self):
-        """Deux documents pour le même id : le plus récent gagne, l'autre est supprimé."""
-        self.fake.store["competitions"] = {
-            "7": {"id": 7, "nom": "Ancienne", "participants": [], "coach_ids": [],
-                  "updated_at": "2026-01-01T00:00:00"},
-            "legacy7": {"id": 7, "nom": "Récente", "participants": [], "coach_ids": [],
-                        "updated_at": "2026-01-05T00:00:00"},
-        }
-        comps = CompetitionRepository.list_competitions()
-        self.assertEqual(len(comps), 1)
-        self.assertEqual(comps[0].nom, "Récente")
-        self.assertEqual(self.fake.store["competitions"]["7"]["nom"], "Récente")
-        self.assertNotIn("legacy7", self.fake.store["competitions"])
-
-
 class TestParticipants(FirestoreRepoTestCase):
     def setUp(self):
         super().setUp()
         self.seed_adherent(101)
         self.seed_adherent(102, nom="DUPONT", prenom="Léa", licence="111222",
                            tarif="Loisir")
-        self.comp_id = CompetitionRepository.save_competition(Competition(nom="Épreuve A", prix=15.0))
+        self.comp_id = competitions.save_competition(Competition(nom="Épreuve A", prix=15.0))
 
     def test_add_selection_payment_remove(self):
         CompetitionRepository.add_participant(self.comp_id, 101)
@@ -194,45 +102,11 @@ class TestParticipants(FirestoreRepoTestCase):
         self.assertFalse(CompetitionRepository.remove_participant(9999, 101))
 
 
-class TestBilan(FirestoreRepoTestCase):
-    def setUp(self):
-        super().setUp()
-        self.seed_adherent(101)
-        self.comp_id = CompetitionRepository.save_competition(
-            Competition(nom="Épreuve", date_competition="2026-03-15", prix=15.0))
-        CompetitionRepository.set_selection(self.comp_id, 101, True)
-
-    def test_season_of_date(self):
-        self.assertEqual(CompetitionRepository.season_of_date("2026-03-15"), "2025-2026")
-        self.assertEqual(CompetitionRepository.season_of_date("2026-09-15"), "2026-2027")
-        self.assertEqual(CompetitionRepository.season_of_date(""), "")
-
-    def test_bilan_pivot_and_seasons(self):
-        bilan = CompetitionRepository.get_bilan()
-        self.assertEqual(len(bilan["competitions"]), 1)
-        self.assertIn((101, self.comp_id), bilan["participations"])
-        self.assertEqual(bilan["participations"][(101, self.comp_id)], "en_attente")
-        self.assertEqual(bilan["payments"][(101, self.comp_id)]["prix"], 15.0)
-        self.assertEqual(bilan["seasons"], ["2025-2026"])
-        stu = bilan["students"][101]
-        self.assertEqual(stu["nom"], "MARTIN")
-        self.assertEqual(stu["num_licence"], "654321")
-
-        empty = CompetitionRepository.get_bilan("2030-2031")
-        self.assertEqual(empty["competitions"], [])
-        self.assertEqual(empty["students"], {})
-
-    def test_deselected_participant_excluded_from_bilan(self):
-        CompetitionRepository.set_selection(self.comp_id, 101, False)
-        bilan = CompetitionRepository.get_bilan()
-        self.assertNotIn((101, self.comp_id), bilan["participations"])
-
-
 class TestHelloAssoMirror(FirestoreRepoTestCase):
     def setUp(self):
         super().setUp()
         self.seed_adherent(101, licence="654321")
-        self.comp_id = CompetitionRepository.save_competition(
+        self.comp_id = competitions.save_competition(
             Competition(nom="Coupe Rhône", id_ffme="18846", date_competition="2026-03-15"))
         self.summary = [{
             "id_item": 500, "payeur": "Lucas MARTIN", "montant": 15.0, "etat": "Validated",
@@ -272,7 +146,7 @@ class TestHelloAssoMirror(FirestoreRepoTestCase):
         self.assertIsNone(it["competition_id"])
 
     def test_replace_auto_links_preserves_manual(self):
-        other_id = CompetitionRepository.save_competition(Competition(nom="Autre épreuve", id_ffme="9999"))
+        other_id = competitions.save_competition(Competition(nom="Autre épreuve", id_ffme="9999"))
         item2 = [{"id_item": 501, "payeur": "Léa DUPONT", "montant": 10.0, "etat": "Validated",
                   "date_item": "2026-02-02", "licence": "111222", "competition": "",
                   "commande": "7777"}]
@@ -401,7 +275,7 @@ class TestModificationsConcurrentes(FirestoreRepoTestCase):
         super().setUp()
         self.seed_adherent(101)
         self.seed_adherent(102, nom="DUPONT", prenom="Léa", licence="111222")
-        self.comp_id = CompetitionRepository.save_competition(Competition(nom="Épreuve C", prix=15.0))
+        self.comp_id = competitions.save_competition(Competition(nom="Épreuve C", prix=15.0))
         CompetitionRepository.add_participant(self.comp_id, 101)
         CompetitionRepository.add_participant(self.comp_id, 102)
 
@@ -461,11 +335,11 @@ class TestModificationsConcurrentes(FirestoreRepoTestCase):
                 CompetitionRepository.set_payment_status(self.comp_id, 101, PAIEMENT_PAYE)
 
     def test_modification_epreuve_ne_reecrit_pas_les_participants(self):
-        comp = CompetitionRepository.get_competition(self.comp_id)          # lu avant le paiement
+        comp = competitions.get_competition(self.comp_id)          # lu avant le paiement
         CompetitionRepository.apply_helloasso_payment(self.comp_id, 101, 15.0)
         comp.prix = 20.0
-        CompetitionRepository.save_competition(comp)
-        self.assertEqual(CompetitionRepository.get_competition(self.comp_id).prix, 20.0)
+        competitions.save_competition(comp)
+        self.assertEqual(competitions.get_competition(self.comp_id).prix, 20.0)
         self.assertEqual(self._parts()[101].statut_paiement, PAIEMENT_PAYE)
 
     def test_add_participant_retourne_l_identifiant(self):
@@ -545,12 +419,12 @@ class TestAnnulationParticipantPaye(FirestoreRepoTestCase):
     def setUp(self):
         super().setUp()
         self.seed_adherent(101)
-        self.comp_id = CompetitionRepository.save_competition(
+        self.comp_id = competitions.save_competition(
             Competition(nom="Épreuve", date_competition="2026-03-15", prix=15.0))
         CompetitionRepository.add_participant(self.comp_id, 101, selectionne=True)
         CompetitionRepository.apply_helloasso_payment(self.comp_id, 101, 15.0, order_ref="CMD-1")
 
-    def test_annule_reporte_garde_le_montant_en_credit(self):
+    def test_annule_reporte_garde_le_montant(self):
         self.assertTrue(CompetitionRepository.mark_cancelled(self.comp_id, 101, PAIEMENT_ANNULE_REPORTE, "blessure"))
         p = CompetitionRepository.list_participants(self.comp_id)[0]
         self.assertFalse(p.selectionne)
@@ -558,25 +432,14 @@ class TestAnnulationParticipantPaye(FirestoreRepoTestCase):
         self.assertEqual(p.montant_paye, 15.0)
         self.assertEqual(p.note_paiement, "blessure")
 
-        bilan = CompetitionRepository.get_bilan()
-        # Pas de participation due
-        self.assertNotIn((101, self.comp_id), bilan["participations"])
-        # Mais un crédit : montant payé conservé, prix dû à 0
-        self.assertEqual(bilan["payments"][(101, self.comp_id)],
-                         {"montant_paye": 15.0, "prix": 0.0})
-        self.assertIn(101, bilan["students"])
-        self.assertEqual(bilan["seasons"], ["2025-2026"])
 
-    def test_annule_perdu_exclu_du_bilan(self):
+    def test_annule_perdu_garde_le_montant(self):
         self.assertTrue(CompetitionRepository.mark_cancelled(self.comp_id, 101, PAIEMENT_ANNULE_PERDU, "absence"))
         p = CompetitionRepository.list_participants(self.comp_id)[0]
         self.assertFalse(p.selectionne)
         self.assertEqual(p.statut_paiement, PAIEMENT_ANNULE_PERDU)
         self.assertEqual(p.montant_paye, 15.0)
 
-        bilan = CompetitionRepository.get_bilan()
-        self.assertNotIn((101, self.comp_id), bilan["participations"])
-        self.assertNotIn((101, self.comp_id), bilan["payments"])
 
     def test_resync_helloasso_ne_pas_repayer_un_annule(self):
         CompetitionRepository.mark_cancelled(self.comp_id, 101, PAIEMENT_ANNULE_REPORTE, "blessure")

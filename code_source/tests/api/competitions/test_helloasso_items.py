@@ -4,6 +4,7 @@ from support.api_case import ApiTestCase
 
 from api.competitions.schemas.views import HelloAssoItem
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 
 
 class TestHelloAssoItems(ApiTestCase):
@@ -111,7 +112,7 @@ class TestHelloAssoItems(ApiTestCase):
         self.assertEqual(self.link(competition_id=self.comp).status_code, 200)
         item = CompetitionRepository.get_item(55)
         self.assertEqual((item["competition_id"], item["adherent_id"], item["source"]), (self.comp, None, None))
-        self.assertEqual(CompetitionRepository.get_competition_doc(self.comp)["participants"], [])
+        self.assertEqual(competitions.get_competition_doc(self.comp)["participants"], [])
         self.assertEqual(self.link(competition_id=999, adherent_id=1).status_code, 404)
         self.assertEqual(self.client.put("/api/helloasso/items/77/link", json={}).status_code, 404)
 

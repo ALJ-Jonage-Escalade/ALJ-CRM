@@ -49,7 +49,7 @@ class TestEmailDispatchService(unittest.TestCase):
             "id": 12, "nom": "Coupe Bugey", "id_ffme": "12345", "prix": 15.0,
             "date_competition": "2026-10-03", "whatsapp_link": "https://chat.whatsapp.com/abc",
         }
-        with patch("services.communications.email_dispatch.CompetitionRepository.get_competition_doc", return_value=fake_doc):
+        with patch("services.communications.email_dispatch.competitions.get_competition_doc", return_value=fake_doc):
             ctx = EmailDispatchService.get_competition_context(12)
             self.assertNotIn("whatapp_Id", ctx)
             self.assertEqual(ctx["whatsapp_link"], "https://chat.whatsapp.com/abc")
@@ -58,7 +58,7 @@ class TestEmailDispatchService(unittest.TestCase):
     def test_get_competition_context_includes_place(self):
         """The place is a pass-through field of the document (not in the domain model)."""
         fake_doc = {"id": 12, "nom": "Coupe Bugey", "lieu": " CUSSET "}
-        with patch("services.communications.email_dispatch.CompetitionRepository.get_competition_doc", return_value=fake_doc):
+        with patch("services.communications.email_dispatch.competitions.get_competition_doc", return_value=fake_doc):
             ctx = EmailDispatchService.get_competition_context(12)
             self.assertEqual(ctx["lieu"], "CUSSET")
             self.assertEqual(ctx["competition_lieu"], "CUSSET")

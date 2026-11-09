@@ -8,6 +8,7 @@ from services.competitions import store as competition_store
 
 from domain.competitions.models import PAIEMENT_PAYE
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import member_directory
 from infrastructure.firestore.competitions import documents
 from infrastructure.firestore.client import FirestoreClient
@@ -93,7 +94,7 @@ class TestParticipants(ApiTestCase):
                 r, comp_reads, coach_reads = self.reads_during(method, url, body)
                 self.assertEqual(r.status_code, 200, r.text)
                 self.assertEqual((comp_reads, coach_reads), (1, 1))
-                stored = CompetitionRepository.get_competition_doc(self.comp)
+                stored = competitions.get_competition_doc(self.comp)
                 for key in ("participants", "nb_participants", "nb_selectionnes", "nb_payes", "total_collecte", "updated_at"):
                     self.assertEqual(r.json()[key], stored[key], key)
 
@@ -142,7 +143,7 @@ class TestParticipants(ApiTestCase):
         self.assertEqual(self.client.patch(self.url("/2"), json={"present": True}).status_code, 404)
 
         self.assertEqual(self.client.delete(self.url("/1")).status_code, 200)
-        self.assertEqual(CompetitionRepository.get_competition_doc(self.comp)["participants"], [])
+        self.assertEqual(competitions.get_competition_doc(self.comp)["participants"], [])
         self.assertEqual(self.client.delete(self.url("/1")).status_code, 404)
 
     def test_manual_payment_and_restore(self):

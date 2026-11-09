@@ -11,6 +11,7 @@ from unittest.mock import patch
 from support.fake_firestore import FirestoreRepoTestCase
 
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competitions import documents
 
 _SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts",
@@ -101,7 +102,7 @@ class TestMigrateCompetitionsAndDirectory(FirestoreRepoTestCase):
 
     def create_competition(self) -> int:
         from domain.competitions.models import Competition
-        return CompetitionRepository.save_competition(Competition(nom="Coupe Rhône"))
+        return competitions.save_competition(Competition(nom="Coupe Rhône"))
 
     def comp_doc(self) -> Dict[str, Any]:
         return self.fake.list_documents(documents.COLLECTION_COMPETITIONS)[0]

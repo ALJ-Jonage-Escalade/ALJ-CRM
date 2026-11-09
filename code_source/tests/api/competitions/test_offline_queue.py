@@ -10,6 +10,7 @@ from support.api_case import ApiTestCase
 
 from domain.competitions.models import PAIEMENT_PAYE
 from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 
 
 class TestQueuedFlagChanges(ApiTestCase):
@@ -41,10 +42,10 @@ class TestQueuedFlagChanges(ApiTestCase):
 
     def test_k2_same_value_set_meanwhile_is_accepted_without_write(self):
         self.other_device_changes(selectionne=False)
-        before = CompetitionRepository.get_competition_doc(self.comp)["updated_at"]
+        before = competitions.get_competition_doc(self.comp)["updated_at"]
         r = self.queued(selectionne=False)
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(CompetitionRepository.get_competition_doc(self.comp)["updated_at"], before)
+        self.assertEqual(competitions.get_competition_doc(self.comp)["updated_at"], before)
 
     def test_k3_participant_changed_meanwhile_is_refused(self):
         """Coach B unselected then selected again: the value is back to what A saw, but A's
@@ -88,7 +89,7 @@ class TestQueuedFlagChanges(ApiTestCase):
         CompetitionRepository.remove_participant_doc(self.comp, 1)
         for flag in ({"selectionne": False}, {"selectionne": True}, {"present": True}):
             self.assertEqual(self.queued(**flag).status_code, 404, flag)
-        self.assertEqual(CompetitionRepository.get_competition_doc(self.comp)["participants"], [])  # never re-added
+        self.assertEqual(competitions.get_competition_doc(self.comp)["participants"], [])  # never re-added
         self.assertEqual(self.queued(comp=999, selectionne=False).status_code, 404)
 
     def test_k6_archived_competition_is_refused(self):

@@ -65,7 +65,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
     @patch("infrastructure.firestore.competition_repository.CompetitionRepository.known_helloasso_item_ids", new=lambda: set())
     @patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_helloasso_links", return_value={})
     @patch("infrastructure.firestore.competitions.member_directory.list_members")
-    @patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_competitions")
+    @patch("infrastructure.firestore.competitions.competitions.list_competitions")
     def test_process_webhook_match_successful(
         self,
         mock_list_comps,
@@ -125,7 +125,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         repository_path = "infrastructure.firestore.competition_repository.CompetitionRepository"
         with patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=url), \
              patch(f"{repository_path}.update_helloasso_mirror") as mirror, \
-             patch(f"{repository_path}.list_competitions", return_value=[]), \
+             patch("infrastructure.firestore.competitions.competitions.list_competitions", return_value=[]), \
              patch("infrastructure.firestore.competitions.member_directory.list_members", return_value=[]), \
              patch(f"{repository_path}.list_helloasso_links", return_value={}), \
              patch(f"{repository_path}.known_helloasso_item_ids", return_value=set()):
@@ -195,7 +195,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
             settings_store[key] = value
             return True
 
-        with patch(f"{repository_path}.get_competition", return_value=comp), \
+        with patch("infrastructure.firestore.competitions.competitions.get_competition", return_value=comp), \
              patch(f"{repository_path}.list_participants", return_value=[p1, p2, p3]), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", side_effect=mock_get_setting), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.save", side_effect=mock_save_setting), \
@@ -227,7 +227,7 @@ class TestHelloAssoWebhookService(unittest.TestCase):
         p2 = Participant(competition_id=11, adherent_id=2, nom="MARTIN", prenom="Bob", selectionne=True, statut_paiement="en_attente")
 
         repository_path = "infrastructure.firestore.competition_repository.CompetitionRepository"
-        with patch(f"{repository_path}.get_competition", return_value=comp), \
+        with patch("infrastructure.firestore.competitions.competitions.get_competition", return_value=comp), \
              patch(f"{repository_path}.list_participants", return_value=[p1, p2]), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=""), \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.save"), \

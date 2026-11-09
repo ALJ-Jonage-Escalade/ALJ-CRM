@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Optional, Sequence, Tuple
 
 from domain.competitions.models import STATUT_CLOSE
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.competition_repository import (
     CompetitionRepository,
     ParticipantAlreadyPaid,
@@ -21,7 +22,7 @@ from domain.errors import Conflict, NotFound
 def _written(competition_id: int, doc: Optional[dict]) -> dict:
     """The competition as the write left it. `doc` None (nothing written): the competition is
     read, which also raises NotFound when it does not exist."""
-    return CompetitionRepository.competition_api_doc(doc) if doc is not None else require_competition(competition_id)
+    return competitions.competition_api_doc(doc) if doc is not None else require_competition(competition_id)
 
 
 def _require_open(competition_id: int) -> None:
@@ -88,7 +89,7 @@ class ParticipantService:
         doc = CompetitionRepository.record_manual_payment_doc(competition_id, adherent_id, montant)
         if doc is None:
             raise NotFound("Compétition ou compétiteur introuvable.")
-        return CompetitionRepository.competition_api_doc(doc)
+        return competitions.competition_api_doc(doc)
 
     @staticmethod
     @write
@@ -98,7 +99,7 @@ class ParticipantService:
         doc = CompetitionRepository.mark_cancelled_doc(competition_id, adherent_id, payment_status, note)
         if doc is None:
             raise NotFound("Compétition ou compétiteur introuvable.")
-        return CompetitionRepository.competition_api_doc(doc)
+        return competitions.competition_api_doc(doc)
 
     @staticmethod
     @write
@@ -106,7 +107,7 @@ class ParticipantService:
         doc = CompetitionRepository.remove_participant_doc(competition_id, adherent_id)
         if doc is None:
             raise NotFound("Compétition ou compétiteur introuvable.")
-        return CompetitionRepository.competition_api_doc(doc)
+        return competitions.competition_api_doc(doc)
 
     @staticmethod
     @write

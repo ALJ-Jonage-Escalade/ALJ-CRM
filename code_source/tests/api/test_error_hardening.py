@@ -119,7 +119,7 @@ def test_repository_read_error_is_not_an_empty_list(client: TestClient) -> None:
 
 def test_mycompet_scraping_error_is_generic(client: TestClient) -> None:
     with patch("services.competitions.results_batch.fetch_and_parse_mycompet_results", side_effect=UpstreamUnavailable(SECRET_DETAIL)), \
-            patch("infrastructure.firestore.competition_repository.CompetitionRepository.get_stored_competition_doc",
+            patch("infrastructure.firestore.competitions.competitions.get_stored_competition_doc",
                   return_value={"id": 1, "nom": "Open"}):
         resp = client.post("/api/competitions/1/fetch-results", json={"url": "https://mycompet.ffme.fr/resultat/resultat_1"})
     assert resp.status_code == 502
