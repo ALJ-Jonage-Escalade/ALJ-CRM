@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import unicodedata
+from typing import Any
 from urllib.parse import quote
 
 from fastapi import APIRouter
@@ -25,7 +26,8 @@ from services.members.members import MemberService
 router = APIRouter()
 logger = logging.getLogger("alj")
 
-_PDF = {200: {"content": {"application/pdf": {}}, "description": "The certificate (PDF)"}}
+_PDF: dict[int | str, dict[str, Any]] = {  # Any: FastAPI's `responses` format
+    200: {"content": {"application/pdf": {}}, "description": "The certificate (PDF)"}}
 
 
 def _filename(member: Doc) -> str:

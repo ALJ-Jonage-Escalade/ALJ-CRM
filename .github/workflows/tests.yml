@@ -60,10 +60,6 @@ jobs:
       working-directory: code_source
       run: uv run --no-sync mypy
 
-    - name: Type check ratchet over the whole src/ tree (mypy)
-      working-directory: code_source
-      run: uv run --no-sync python dev/mypy_ratchet.py
-
     - name: Run Unit Tests (pytest)
       working-directory: code_source
       # Coverage report without a threshold (as the frontend job); -rs lists the reasons of skipped tests

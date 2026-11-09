@@ -232,7 +232,7 @@ class FirestoreClient:
         """The `limit` documents with the highest `field` value, highest first (Firestore's automatic
         single-field index); documents without that field are left out."""
         url = f"{cls.database_url(project_id)}:runQuery"
-        body = {"structuredQuery": {
+        body: Dict[str, Any] = {"structuredQuery": {
             "from": [{"collectionId": collection_name}],
             "orderBy": [{"field": {"fieldPath": field}, "direction": "DESCENDING"}],
             "limit": limit,
@@ -314,7 +314,7 @@ class FirestoreClient:
                 # Firestore emulator, which then rejects every write.
                 pid = project_id or cls.get_project_id()
                 name = f"{DATABASE_PATH.format(pid=pid)}/{collection_name}/{doc_id}"
-                body = {"writes": [{
+                body: Dict[str, Any] = {"writes": [{
                     "update": {"name": name, "fields": fields},
                     "updateMask": {"fieldPaths": field_paths},
                     "currentDocument": {"updateTime": expected_update_time},
@@ -367,7 +367,9 @@ class FirestoreClient:
         pid = project_id or cls.get_project_id()
         url = f"{runtime_env.firestore_base_url()}/{DATABASE_PATH.format(pid=pid)}:commit"
         headers = cls._headers(access_token)
-        report = {"written": 0, "errors_count": 0, "errors": []}
+        written = 0
+        errors_count = 0
+        errors: List[str] = []
         for chunk_start in range(0, len(writes), BATCH_WRITE_LIMIT):
             chunk = writes[chunk_start:chunk_start + BATCH_WRITE_LIMIT]
             body = []
@@ -382,12 +384,12 @@ class FirestoreClient:
             try:
                 resp = requests.post(url, headers=headers, json={"writes": body}, timeout=60)
             except requests.RequestException as e:
-                report["errors_count"] += len(chunk)
-                report["errors"].append(f"Firestore injoignable (commit) : {e}")
+                errors_count += len(chunk)
+                errors.append(f"Firestore injoignable (commit) : {e}")
                 continue
             if resp.status_code in (200, 201):
-                report["written"] += len(chunk)
+                written += len(chunk)
             else:
-                report["errors_count"] += len(chunk)
-                report["errors"].append(f"commit HTTP {resp.status_code} - {resp.text[:200]}")
-        return report
+                errors_count += len(chunk)
+                errors.append(f"commit HTTP {resp.status_code} - {resp.text[:200]}")
+        return {"written": written, "errors_count": errors_count, "errors": errors}
