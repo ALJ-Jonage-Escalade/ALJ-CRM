@@ -237,7 +237,7 @@ def directory_outdated() -> bool:
 
 def adherent_map() -> dict[int, dict[str, Any]]:
     """{adherent id -> directory document}."""
-    return {a.get("id"): a for a in adherents_raw() if a.get("id") is not None}
+    return {a["id"]: a for a in adherents_raw() if a.get("id") is not None}
 
 
 def _adherent_as_legacy_dict(doc: dict[str, Any]) -> dict[str, Any]:
