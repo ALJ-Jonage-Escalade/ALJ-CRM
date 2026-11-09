@@ -10,7 +10,7 @@ from infrastructure.security.role_directory import RoleDirectory
 from services.access import invitations
 from services.access.rules import AccessRules
 from domain.errors import Conflict
-from infrastructure.mail.repository import MailError
+from infrastructure.mail.sender import MailError
 from support.fake_access import FakeClock, InMemoryAccessStore, role_entry
 
 ADMIN = "albus@alj.example"
@@ -19,10 +19,10 @@ PAGE = "https://bureau.alj.example"
 
 
 class FakeSender:
-    """EmailRepository.send_email: records the e-mail, raises `failure` when given."""
+    """EmailSender.send_email: records the e-mail, raises `failure` when given."""
     def __init__(self, failure: Exception | None = None) -> None:
         self.failure = failure
-        self.sent: list[dict[str, Any]] = []  # Any: the keyword arguments of EmailRepository.send_email
+        self.sent: list[dict[str, Any]] = []  # Any: the keyword arguments of EmailSender.send_email
 
     def __call__(self, **mail: Any) -> None:  # Any: as above
         self.sent.append(mail)

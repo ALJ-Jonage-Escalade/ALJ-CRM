@@ -11,7 +11,7 @@ from domain.competitions import matching as competition_matching
 from domain.errors import Conflict, InvalidRequest, NotFound, UpstreamUnavailable
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.competition_repository import (
-    CompetitionFirestoreRepository as Repo,
+    CompetitionRepository,
     ItemAlreadyLinked,
 )
 from infrastructure.helloasso.api import HelloAssoApiError, fetch_form_items
@@ -55,26 +55,26 @@ class HelloAssoItemService:
             raise UpstreamUnavailable(f"{e.message} Rien n'a été modifié.", e.code) from e
         summarized = competition_matching.summarize_items(items)
 
-        Repo.sync_helloasso_mirror(summarized, items, campaign["slug"])
+        CompetitionRepository.update_helloasso_mirror(summarized, items, campaign["slug"])
 
-        competitions = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom} for c in Repo.list_competitions()]
-        existing_links = Repo.list_helloasso_links()
-        links = competition_matching.auto_link_items(summarized, competitions, Repo.list_adherents(), existing_links)
-        Repo.replace_auto_links(links)
-        applied_count = Repo.apply_links_to_participants()
+        competitions = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom} for c in CompetitionRepository.list_competitions()]
+        existing_links = CompetitionRepository.list_helloasso_links()
+        links = competition_matching.auto_link_items(summarized, competitions, CompetitionRepository.list_members(), existing_links)
+        CompetitionRepository.replace_auto_links(links)
+        applied_count = CompetitionRepository.apply_links_to_participants()
 
         return CampaignSyncStats(
             nb_items=len(items),
             nb_auto=len([link for link in (links or {}).values() if link]),
             nb_manual=len([link for link in existing_links.values() if link.get("source") == "manuel"]),
             nb_applied=applied_count,
-            nb_unlinked=len(Repo.list_unlinked_items()),
+            nb_unlinked=len(CompetitionRepository.list_unlinked_items()),
         )
 
     @staticmethod
     @storage
     def list_items() -> List[Doc]:
-        return Repo.list_item_docs()
+        return CompetitionRepository.list_item_docs()
 
     @staticmethod
     @write
@@ -85,21 +85,21 @@ class HelloAssoItemService:
         items linked to them (a refunded or pending item adds nothing). The participant the
         item was linked to before has theirs recomputed too: the item no longer pays for them.
         Returns whether the item is now linked to a participant."""
-        item = Repo.get_item(id_item)
+        item = CompetitionRepository.get_item(id_item)
         if item is None:
             raise _item_not_found()
-        if competition_id is not None and Repo.get_competition(competition_id) is None:
+        if competition_id is not None and CompetitionRepository.get_competition(competition_id) is None:
             raise competition_not_found()
         prev_comp, prev_adherent = item.get("competition_id"), item.get("adherent_id")
-        Repo.save_manual_link(id_item, competition_id, adherent_id, commentaire)
+        CompetitionRepository.save_manual_link(id_item, competition_id, adherent_id, commentaire)
         linked = False
         if competition_id is not None and adherent_id is not None:
             linked = True
-            Repo.add_participant(competition_id, adherent_id, selectionne=True)
-            Repo.refresh_helloasso_payment(competition_id, adherent_id)
+            CompetitionRepository.add_participant(competition_id, adherent_id, selectionne=True)
+            CompetitionRepository.refresh_helloasso_payment(competition_id, adherent_id)
         if (prev_comp is not None and prev_adherent is not None
                 and (prev_comp, prev_adherent) != (competition_id, adherent_id)):
-            Repo.refresh_helloasso_payment(prev_comp, prev_adherent)
+            CompetitionRepository.refresh_helloasso_payment(prev_comp, prev_adherent)
         return linked
 
     @staticmethod
@@ -110,7 +110,7 @@ class HelloAssoItemService:
         if ignore and not motif:
             raise InvalidRequest("Indiquez un motif pour ignorer cette ligne.", "motif_required")
         try:
-            found = Repo.set_item_ignored(id_item, ignore, motif, commentaire, by=by)
+            found = CompetitionRepository.set_item_ignored(id_item, ignore, motif, commentaire, by=by)
         except ItemAlreadyLinked as e:
             raise Conflict("Cette ligne vient d'être rattachée à un compétiteur : "
                            "elle ne peut pas être ignorée.", "already_linked") from e

@@ -12,7 +12,7 @@ Fully resets the emulator database, then follows the production path:
    plus fake coordinates in the geocache (members map, never geocoded through Nominatim);
 2. push to Firestore with `cloud_database.import_database` (real `crm_*` format);
 3. PWA `adherents` / `planning` projection, coaches and competitions through
-   `CompetitionFirestoreRepository`.
+   `CompetitionRepository`.
 
 Refuses to run outside dev mode (ALJ_ENV=dev + emulator + demo-alj project).
 """
@@ -317,7 +317,7 @@ def build_sqlite(path, fake, rng, coach_names):
 
 def seed_competitions(coach_ids):
     from domain.competitions.models import STATUT_CLOSE, STATUT_EN_COURS, STATUT_EN_PREPARATION, Competition
-    from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+    from infrastructure.firestore.competition_repository import CompetitionRepository
 
     snape, mcgonagall, flitwick = coach_ids[0], coach_ids[1], coach_ids[2]
     today = datetime.date.today()
@@ -331,17 +331,17 @@ def seed_competitions(coach_ids):
         # publishes its results on the fake MyCompet
         ("Gringotts Bouldering Open", "1688", today - datetime.timedelta(days=5), 12.0, STATUT_CLOSE, flitwick, None),
     ]
-    competitors = [a["id"] for a in Repo.list_adherents(competition_only=True, statuses=["Terminé"])]
+    competitors = [a["id"] for a in CompetitionRepository.list_members(competition_only=True, statuses=["Terminé"])]
     rng = random.Random(SEED)
     base_id = int(datetime.datetime(today.year, today.month, today.day).timestamp() * 1000)
     competitions = []
     for i, (name, number, date, price, status, coach1, coach2) in enumerate(specs):
         comp = Competition(id=base_id + i, id_ffme=number, nom=name, date_competition=date.isoformat(), prix=price,
                            statut=status, coach_ids=[c for c in (coach1, coach2) if c is not None])
-        comp.id = Repo.save_competition(comp)
+        comp.id = CompetitionRepository.save_competition(comp)
         competitions.append(comp)
         for member_id in rng.sample(competitors, k=min(len(competitors), rng.randint(4, 9))):
-            Repo.add_participant(comp.id, member_id, selectionne=rng.random() < 0.8)
+            CompetitionRepository.add_participant(comp.id, member_id, selectionne=rng.random() < 0.8)
     return competitions, len(competitors)
 
 
@@ -387,10 +387,10 @@ def seed_helloasso_items(competitions):
     (test payment, refunded duplicate). Goes through the same steps as POST /api/helloasso/sync."""
     from domain.competitions import matching
     from hp_names import PARENTS
-    from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+    from infrastructure.firestore.competition_repository import CompetitionRepository
 
     cup, lead_open, regional = competitions[0], competitions[1], competitions[2]
-    members = [a for a in Repo.list_adherents(competition_only=True) if a.get("num_licence")]
+    members = [a for a in CompetitionRepository.list_members(competition_only=True) if a.get("num_licence")]
     if len(members) < 8:
         print(f"⚠️  HelloAsso items skipped: {len(members)} competitors with a licence (8 needed)")
         return 0
@@ -450,13 +450,13 @@ def seed_helloasso_items(competitions):
                                "date": f"{days_ago(59)}T11:00:00+02:00", "paymentMeans": "Card"}])
 
     summarized = matching.summarize_items(items)
-    Repo.sync_helloasso_mirror(summarized, items, HELLOASSO_FORM)
+    CompetitionRepository.update_helloasso_mirror(summarized, items, HELLOASSO_FORM)
     comps = [{"id": c.id, "id_ffme": c.id_ffme, "nom": c.nom} for c in competitions]
-    Repo.replace_auto_links(matching.auto_link_items(summarized, comps, Repo.list_adherents(), {}))
-    Repo.save_manual_link(manual, lead_open.id, members[5]["id"], "Mistyped competition number on the form")
-    Repo.set_item_ignored(test_payment, True, "Test payment", by=DEV_ACCOUNTS[0][1])
-    Repo.set_item_ignored(duplicate, True, "Duplicate payment, refunded", by=DEV_ACCOUNTS[1][1])
-    Repo.apply_links_to_participants()
+    CompetitionRepository.replace_auto_links(matching.auto_link_items(summarized, comps, CompetitionRepository.list_members(), {}))
+    CompetitionRepository.save_manual_link(manual, lead_open.id, members[5]["id"], "Mistyped competition number on the form")
+    CompetitionRepository.set_item_ignored(test_payment, True, "Test payment", by=DEV_ACCOUNTS[0][1])
+    CompetitionRepository.set_item_ignored(duplicate, True, "Duplicate payment, refunded", by=DEV_ACCOUNTS[1][1])
+    CompetitionRepository.apply_links_to_participants()
     return len(items)
 
 
@@ -480,7 +480,7 @@ def main() -> int:
     from hp_names import COACHES
     from infrastructure.firestore.cloud_sync.bootstrap import import_database
     from infrastructure.firestore.cloud_sync.rest_store import RestStore
-    from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+    from infrastructure.firestore.competition_repository import CompetitionRepository
 
     Faker.seed(SEED)
     fake = Faker("en_GB")
@@ -501,11 +501,11 @@ def main() -> int:
     # Coaches: fixed ids, Snape first (id 1)
     coach_ids = []
     for i, name in enumerate(COACHES, start=1):
-        coach_ids.append(Repo.save_coach(name, coach_id=i))
+        coach_ids.append(CompetitionRepository.save_coach(name, coach_id=i))
     print(f"🧑‍🏫 Coaches: {', '.join(COACHES)}")
 
     # Projection read by the PWA (adherents / planning), from the seed SQLite database
-    report = Repo.sync_adherents_from_main(SEASON)
+    report = CompetitionRepository.rebuild_member_directory(SEASON)
     if report.get("errors"):
         print(f"⚠️  adherents projection: {report['errors']}")
 

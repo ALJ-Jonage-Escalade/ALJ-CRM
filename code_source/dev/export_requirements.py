@@ -15,7 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # code_sourc
 # fichier -> arguments de `uv export` (la sortie est toujours sans hash : parité avec l'existant,
 # pip passerait sinon en mode strict --require-hashes)
 TARGETS = {
-    "requirements-docker.txt": ["--no-dev", "--group", "web"],
+    "requirements-docker.txt": ["--no-dev"],
     "requirements-dev.txt": ["--only-dev"],
 }
 COMMON = ["--frozen", "--no-hashes", "--no-emit-project"]

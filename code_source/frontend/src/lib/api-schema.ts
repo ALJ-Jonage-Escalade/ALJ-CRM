@@ -373,26 +373,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/competitions/{comp_id}/check-all-paid": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Check Competition All Paid Api
-         * @description Vérifie si tous les compétiteurs ont payé et envoie l'e-mail récapitulatif si applicable.
-         */
-        post: operations["check_competition_all_paid_api_api_competitions__comp_id__check_all_paid_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/members": {
         parameters: {
             query?: never;
@@ -609,26 +589,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/preview-email": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Preview Email
-         * @description Génère un aperçu fidèle d'un e-mail personnalisé pour un destinataire et une compétition.
-         */
-        post: operations["preview_email_api_preview_email_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/email-status": {
         parameters: {
             query?: never;
@@ -747,11 +707,7 @@ export interface paths {
          */
         get: operations["get_planning_api_planning_get"];
         put?: never;
-        /**
-         * Update Planning
-         * @description Remplace le planning complet (administrateurs) ; un créneau d'id 0 reçoit un nouvel identifiant.
-         */
-        post: operations["update_planning_api_planning_post"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -998,7 +954,7 @@ export interface paths {
          *     Réconcilie en temps réel le paiement avec les participants de la compétition.
          *
          *     Authenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles
-         *     auprès de l'API HelloAsso (voir HelloAssoWebhookService.handle_notification).
+         *     auprès de l'API HelloAsso (voir HelloAssoWebhookService.verify_and_reconcile_notification).
          */
         post: operations["webhook_helloasso_webhooks_helloasso_post"];
         delete?: never;
@@ -1550,21 +1506,6 @@ export interface components {
             email_error: string | null;
         };
         /**
-         * AllPaidChecked
-         * @description notified: every selected participant has paid and the summary e-mail was sent now.
-         */
-        AllPaidChecked: {
-            /**
-             * Status
-             * @constant
-             */
-            status: "success";
-            /** Competition Id */
-            competition_id: number;
-            /** Notified */
-            notified: boolean;
-        };
-        /**
          * ApiErrorBody
          * @description Body of error(): what the frontend's API client turns into an ApiError.
          */
@@ -1721,6 +1662,11 @@ export interface components {
             /** Details */
             details: components["schemas"]["BatchCompetition"][];
         };
+        /**
+         * Bucket
+         * @enum {string}
+         */
+        Bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
         /** BucketCounts */
         BucketCounts: {
             /** Already Imported */
@@ -2224,57 +2170,6 @@ export interface components {
              * @default []
              */
             details?: components["schemas"]["EmailSendDetail"][];
-        };
-        /** EmailPreview */
-        EmailPreview: {
-            /**
-             * Status
-             * @constant
-             */
-            status: "success";
-            preview: components["schemas"]["EmailPreviewContent"];
-        };
-        /** EmailPreviewContent */
-        EmailPreviewContent: {
-            /** Subject */
-            subject: string;
-            /** Body Plain */
-            body_plain: string;
-            /** Body Html */
-            body_html: string;
-            /** Sender Email */
-            sender_email: string;
-            /** Sender Name */
-            sender_name: string;
-        };
-        /**
-         * EmailPreviewRequest
-         * @description recipient: whose values fill the variables (an example member when absent).
-         */
-        EmailPreviewRequest: {
-            /**
-             * Template Name
-             * @default
-             */
-            template_name?: string;
-            /**
-             * Subject
-             * @default
-             */
-            subject?: string;
-            /**
-             * Body
-             * @default
-             */
-            body?: string;
-            recipient?: components["schemas"]["EmailRecipient"] | null;
-            /** Competition Id */
-            competition_id?: number | null;
-            /**
-             * Add Signature
-             * @default true
-             */
-            add_signature?: boolean;
         };
         /**
          * EmailRecipient
@@ -3399,11 +3294,7 @@ export interface components {
          *     required). bucket: the bucket the preview showed the row in (a row that changed since is refused).
          */
         MembershipDecision: {
-            /**
-             * Bucket
-             * @enum {string}
-             */
-            bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
+            bucket: components["schemas"]["Bucket"];
             /** Choice */
             choice: string;
             /**
@@ -3535,11 +3426,7 @@ export interface components {
         MembershipRow: {
             /** Item Id */
             item_id: number;
-            /**
-             * Bucket
-             * @enum {string}
-             */
-            bucket: "already_imported" | "new" | "renewal" | "updated" | "to_review" | "blocked";
+            bucket: components["schemas"]["Bucket"];
             /** Reason */
             reason: string;
             /** Order Ref */
@@ -3783,21 +3670,6 @@ export interface components {
             season: string;
             /** Records */
             records: components["schemas"]["PivotRecord"][];
-        };
-        /**
-         * PlanningReplaced
-         * @description The whole planning replaced; count: its slots.
-         */
-        PlanningReplaced: {
-            /**
-             * Status
-             * @constant
-             */
-            status: "success";
-            /** Message */
-            message: string;
-            /** Count */
-            count: number;
         };
         /**
          * PlanningSlot
@@ -5570,55 +5442,6 @@ export interface operations {
             };
         };
     };
-    check_competition_all_paid_api_api_competitions__comp_id__check_all_paid_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                comp_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AllPaidChecked"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
     list_members_api_members_get: {
         parameters: {
             query?: {
@@ -5637,6 +5460,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemberList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Not Found */
@@ -5801,6 +5633,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SeasonTarifs"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */
@@ -6079,48 +5920,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
-    preview_email_api_preview_email_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EmailPreviewRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmailPreview"];
                 };
             };
             /** @description Validation Error */
@@ -6497,48 +6296,6 @@ export interface operations {
             };
         };
     };
-    update_planning_api_planning_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PlanningSlotUpdate"][];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PlanningReplaced"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
     save_planning_item_api_api_planning_item_post: {
         parameters: {
             query?: never;
@@ -6772,6 +6529,15 @@ export interface operations {
                     "application/json": components["schemas"]["MapPoints"];
                 };
             };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6810,6 +6576,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PivotRecords"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */

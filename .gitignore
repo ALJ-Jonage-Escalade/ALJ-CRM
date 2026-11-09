@@ -54,3 +54,9 @@ code_source/frontend/coverage/
 
 # desloppify local state
 .desloppify/
+
+# ===== Couverture des tests (pytest-cov) =====
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from api.members.schemas import Seasons, SeasonTarifs
 from api.responses import error_responses, json_with_etag
 from services.members.seasons import SeasonService as Service
-from domain.constants import get_active_season
+from domain.constants import resolve_season
 from infrastructure.sqlite.seasons import SeasonRepository
 
 # No prefix: the tariffs route predates /api/seasons and keeps its URL (/api/season-tarifs)
@@ -22,9 +22,9 @@ def list_seasons(request: Request) -> Response:
     return json_with_etag(request, Service.list_seasons())
 
 
-@router.get("/api/season-tarifs", response_model=SeasonTarifs, responses=error_responses(500))
+@router.get("/api/season-tarifs", response_model=SeasonTarifs, responses=error_responses(400, 500))
 def get_season_tarifs_api(season: Optional[str] = None) -> Union[SeasonTarifs, JSONResponse]:
     """Retourne la liste des tarifs HelloAsso (groupes disponibles) d'une saison pour l'édition de créneau."""
-    target_season = season or get_active_season()
+    target_season = resolve_season(season)
     tarifs = SeasonRepository.get_season_tarifs(target_season)
     return SeasonTarifs(status="success", season=target_season, tarifs=tarifs)

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore import client as fc
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionRepository
 
 
 class FakeFirestore:
@@ -109,13 +109,13 @@ class FirestoreRepoTestCase(unittest.TestCase):
     def setUp(self):
         self.fake = use_fake_firestore(self)
         # Cache adhérents remis à zéro entre les tests
-        Repo._invalidate_adherents_cache()
-        self.addCleanup(Repo._invalidate_adherents_cache)
+        CompetitionRepository._invalidate_adherents_cache()
+        self.addCleanup(CompetitionRepository._invalidate_adherents_cache)
 
     def seed_adherent(self, aid, nom="MARTIN", prenom="Lucas", licence="654321",
                       tarif="Compétition U18", email="lucas.martin@test.fr", statut="Terminé", **extra):
-        Repo.COLLECTION_ADHERENTS and self.fake.upsert_document(
-            Repo.COLLECTION_ADHERENTS, str(aid),
+        CompetitionRepository.COLLECTION_ADHERENTS and self.fake.upsert_document(
+            CompetitionRepository.COLLECTION_ADHERENTS, str(aid),
             {
                 "id": aid, "nom": nom, "prenom": prenom, "licence_ffme": licence,
                 "num_licence": licence, "email": email, "phone": "0600000000",
@@ -123,4 +123,4 @@ class FirestoreRepoTestCase(unittest.TestCase):
                 "emergency_phone": "0611111111", **extra,
             },
         )
-        Repo._invalidate_adherents_cache()
+        CompetitionRepository._invalidate_adherents_cache()

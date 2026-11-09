@@ -4,11 +4,11 @@ from unittest.mock import patch
 
 from support.api_case import ApiTestCase
 
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from services.competitions.helloasso_webhook import HelloAssoWebhookService
 
-REPO = "infrastructure.firestore.competition_repository.CompetitionFirestoreRepository"
+REPO = "infrastructure.firestore.competition_repository.CompetitionRepository"
 
 
 def payment_item(id_item: int, order_id: int, cents: int, state: str = "Processed") -> dict:
@@ -37,7 +37,7 @@ class TestWebhookPayments(ApiTestCase):
             self.addCleanup(p.stop)
 
     def receive(self, *items: dict) -> dict:
-        report = HelloAssoWebhookService.process_webhook({"eventType": "Payment"}, items=list(items))
+        report = HelloAssoWebhookService.reconcile_payment_items({"eventType": "Payment"}, items=list(items))
         self.assertEqual(report["matched_count"], len(items), report)
         return report
 
@@ -59,14 +59,14 @@ class TestWebhookPayments(ApiTestCase):
     def test_cancellation_reactivated_as_before(self):
         """Unchanged rule: a new HelloAsso payment for a cancelled participant reactivates them."""
         self.receive(payment_item(7777, 9999, 1500))
-        Repo.mark_cancelled(self.comp, 101, "annule_reporte")
+        CompetitionRepository.mark_cancelled(self.comp, 101, "annule_reporte")
         self.receive(payment_item(7778, 10000, 500))
         self.assertEqual(self.payment(), (True, "paye", 20.0, ["10000", "9999"]))
 
     def test_redelivered_payment_keeps_the_cancellation(self):
         """HelloAsso redelivers a notification already received: the coach's later cancellation is kept."""
         self.receive(payment_item(7777, 9999, 1500))
-        Repo.mark_cancelled(self.comp, 101, "annule_reporte")
+        CompetitionRepository.mark_cancelled(self.comp, 101, "annule_reporte")
         before = self.payment()
         self.receive(payment_item(7777, 9999, 1500))
         self.assertEqual(self.payment(), before)
@@ -75,13 +75,13 @@ class TestWebhookPayments(ApiTestCase):
     def test_redelivered_payment_lists_a_member_removed_meanwhile(self):
         """A known item whose member is no longer listed: listed again, selected and paid (nothing to undo)."""
         self.receive(payment_item(7777, 9999, 1500))
-        Repo.remove_participant(self.comp, 101)
+        CompetitionRepository.remove_participant(self.comp, 101)
         self.receive(payment_item(7777, 9999, 1500))
         self.assertEqual(self.payment(), (True, "paye", 15.0, ["9999"]))
 
     def test_item_missing_from_the_mirror_records_its_own_amount(self):
         """Mirror write failed: the item cannot be added up with the others, its amount is kept."""
-        with patch(f"{REPO}.sync_helloasso_mirror", side_effect=RuntimeError("Firestore indisponible")):
+        with patch(f"{REPO}.update_helloasso_mirror", side_effect=RuntimeError("Firestore indisponible")):
             self.receive(payment_item(7777, 9999, 1500))
         self.assertEqual(self.payment(), (True, "paye", 15.0, ["9999"]))
 
@@ -91,13 +91,13 @@ class TestWebhookPayments(ApiTestCase):
         real = FirestoreClient.list_documents
 
         def adherents_down(collection, *args, **kwargs):
-            if collection == Repo.COLLECTION_ADHERENTS:
+            if collection == CompetitionRepository.COLLECTION_ADHERENTS:
                 raise FirestoreError("down")
             return real(collection, *args, **kwargs)
-        Repo._invalidate_adherents_cache()  # no copy of the list yet (the competition read in setUp keeps one)
+        CompetitionRepository._invalidate_adherents_cache()  # no copy of the list yet (the competition read in setUp keeps one)
         with patch.object(FirestoreClient, "list_documents", side_effect=adherents_down):
             r = self.client.post("/webhooks/helloasso", json={"eventType": "Payment", "data": payment_item(7777, 9999, 1500)})
         self.assertEqual(r.status_code, 503, r.text)
         self.assertEqual(r.json()["status"], "error")
         self.assertEqual(self.fake.list_documents("helloasso_items"), [])
-        self.assertEqual(Repo.get_competition_doc(self.comp)["participants"], [])
+        self.assertEqual(CompetitionRepository.get_competition_doc(self.comp)["participants"], [])

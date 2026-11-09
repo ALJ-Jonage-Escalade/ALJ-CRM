@@ -41,10 +41,10 @@ def webhook_helloasso(payload: Dict[str, Any] = Body(...),  # Any: HelloAsso's n
     Réconcilie en temps réel le paiement avec les participants de la compétition.
 
     Authenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles
-    auprès de l'API HelloAsso (voir HelloAssoWebhookService.handle_notification).
+    auprès de l'API HelloAsso (voir HelloAssoWebhookService.verify_and_reconcile_notification).
     """
     try:
-        return HelloAssoWebhookService.handle_notification(payload, token=token)
+        return HelloAssoWebhookService.verify_and_reconcile_notification(payload, token=token)
     except WebhookRejected as e:
         logger.warning("[WEBHOOK_HELLOASSO] Notification refusée (%s) : %s", e.status_code, e.message)
         return JSONResponse({"status": "rejected", "message": e.message}, status_code=e.status_code)

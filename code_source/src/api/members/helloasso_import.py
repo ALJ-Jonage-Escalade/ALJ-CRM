@@ -23,7 +23,7 @@ from api.members.helloasso_import_schemas import (
 )
 from api.auth.me import author_of
 from api.responses import error_responses
-from domain.members.membership_import import Bucket, Decision, ImportPlan, KnownMember, PlanEntry, WriteAction, season_membership
+from domain.members.membership_import import Decision, ImportPlan, KnownMember, PlanEntry, WriteAction, season_membership
 from infrastructure.sqlite.membership_import import AppliedWrite
 from services.members.helloasso_import import ImportResult
 from services.members.helloasso_import import MembershipImportService as Service
@@ -39,7 +39,7 @@ def _candidate(member: KnownMember) -> MembershipCandidate:
 def _row(entry: PlanEntry) -> MembershipRow:
     record = entry.record
     return MembershipRow(
-        item_id=record.item_id, bucket=entry.bucket.value, reason=entry.reason, order_ref=record.order_ref,
+        item_id=record.item_id, bucket=entry.bucket, reason=entry.reason, order_ref=record.order_ref,
         order_date=record.order_date, payment_date=record.payment_date,
         refund_date=record.refund_date, last_name=record.last_name, first_name=record.first_name,
         birth_date=record.birth_date or record.birth_date_raw, licence=record.licence, tarif_name=record.tarif_name,
@@ -95,7 +95,7 @@ def _result(result: ImportResult) -> MembershipImportResult:
 def import_memberships(request: Request, data: MembershipImportRequest) -> MembershipImportResult:
     """Reads HelloAsso again and applies the admin's decisions to the recomputed plan, recorded in the history.
     Sends no e-mail."""
-    decisions = {item_id: Decision(Bucket(decision.bucket), decision.choice, decision.comment)
+    decisions = {item_id: Decision(decision.bucket, decision.choice, decision.comment)
                  for item_id, decision in data.decisions.items()}
     return _result(Service.import_(data.season, decisions, author_of(request), data.campaign))
 

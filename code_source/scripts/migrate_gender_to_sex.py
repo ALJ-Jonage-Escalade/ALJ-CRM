@@ -34,7 +34,7 @@ from infrastructure import runtime_env  # noqa: E402
 from infrastructure.firestore.client import FirestoreClient  # noqa: E402
 from infrastructure.firestore.cloud_sync.common import COMMIT_CHUNK, collection_for  # noqa: E402
 from infrastructure.firestore.cloud_sync.rest_store import RestStore  # noqa: E402
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo  # noqa: E402
+from infrastructure.firestore.competition_repository import CompetitionRepository  # noqa: E402
 
 LEGACY = "gender"
 NOT_GIVEN = "(non renseigné)"
@@ -117,7 +117,7 @@ def migrate_users(store: RestStore, apply: bool, report: Report) -> None:
 
 
 def migrate_competitions(apply: bool, report: Report) -> None:
-    for doc in FirestoreClient.list_documents(Repo.COLLECTION_COMPETITIONS):
+    for doc in FirestoreClient.list_documents(CompetitionRepository.COLLECTION_COMPETITIONS):
         participants = doc.get("participants") or []
         if without_gender(participants) is None:
             continue
@@ -127,17 +127,17 @@ def migrate_competitions(apply: bool, report: Report) -> None:
             if doc.get("id") is None:
                 raise SystemExit(f"Compétition sans identifiant (document {doc.get('_doc_id')}) : ouvrez-la dans l'application puis relancez.")
             # Re-read and retried on a concurrent write; participant `updated_at` untouched (offline guards)
-            Repo._mutate_participants(doc["id"], without_gender)
+            CompetitionRepository._mutate_participants(doc["id"], without_gender)
 
 
 def migrate_directory(apply: bool, report: Report) -> None:
     writes = []
-    for doc in FirestoreClient.list_documents(Repo.COLLECTION_ADHERENTS):
+    for doc in FirestoreClient.list_documents(CompetitionRepository.COLLECTION_ADHERENTS):
         if LEGACY not in doc:
             continue
         report.directory += 1
-        writes.append({"path": f"{Repo.COLLECTION_ADHERENTS}/{doc['_doc_id']}",
-                       "data": {"sex": Repo._sex_code(doc)}, "update_fields": ["sex", LEGACY]})
+        writes.append({"path": f"{CompetitionRepository.COLLECTION_ADHERENTS}/{doc['_doc_id']}",
+                       "data": {"sex": CompetitionRepository._sex_code(doc)}, "update_fields": ["sex", LEGACY]})
     if apply and writes:
         result = FirestoreClient.batch_upsert(writes)
         if result["errors_count"]:

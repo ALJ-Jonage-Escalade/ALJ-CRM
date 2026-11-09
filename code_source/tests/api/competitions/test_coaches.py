@@ -2,7 +2,7 @@
 
 from support.api_case import ApiTestCase
 
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionRepository
 
 
 class TestCoaches(ApiTestCase):
@@ -14,11 +14,11 @@ class TestCoaches(ApiTestCase):
         comp = self.create(coach_ids=[coach])["id"]
 
         self.assertEqual(self.client.put(f"/api/coaches/{coach}", json={"nom": "Alicia"}).status_code, 200)
-        self.assertEqual(Repo.get_competition_doc(comp)["coaches"], ["Alicia"])
+        self.assertEqual(CompetitionRepository.get_competition_doc(comp)["coaches"], ["Alicia"])
         self.assertEqual(self.client.get("/api/coaches").json(), [{"id": coach, "nom": "Alicia"}])
 
         self.assertEqual(self.client.delete(f"/api/coaches/{coach}").status_code, 200)
-        doc = Repo.get_competition_doc(comp)
+        doc = CompetitionRepository.get_competition_doc(comp)
         self.assertEqual((doc["coach_ids"], doc["coaches"]), ([], []))
         self.assertNotIn("coach1_id", doc)
         self.assertEqual(self.client.delete(f"/api/coaches/{coach}").status_code, 404)

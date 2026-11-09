@@ -7,8 +7,8 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 from api.request_body import RequestBody
+from domain.members.membership_import import Bucket, ChangedField, MembershipKind
 
-BucketName = Literal["already_imported", "new", "renewal", "updated", "to_review", "blocked"]
 
 
 class BucketCounts(BaseModel):
@@ -32,7 +32,7 @@ class MembershipCandidate(BaseModel):
 class MembershipChange(BaseModel):
     """A value HelloAsso changed since the last import: in the CRM now (crm), as HelloAsso gave it last time (before),
     as HelloAsso gives it now (after). Amounts in euros, two decimals."""
-    field: Literal["status", "tarif_name", "amount"]
+    field: ChangedField
     crm: str
     before: str
     after: str
@@ -44,7 +44,7 @@ class MembershipRow(BaseModel):
     "" when missing: order_date the registration, payment_date the first payment, refund_date the refund (status
     Refunded / Refunding)."""
     item_id: int
-    bucket: BucketName
+    bucket: Bucket
     reason: str
     order_ref: str
     order_date: str
@@ -71,7 +71,7 @@ class MembershipMember(BaseModel):
     first_name: str
     birth_date: str
     licence: str
-    membership: Literal["none", "manual", "several_manual", "helloasso"]
+    membership: MembershipKind
 
 
 class MembershipPreview(BaseModel):
@@ -90,7 +90,7 @@ class MembershipDecision(RequestBody):
     """The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>
     (rows to review), attach:<member id> (new, renewal and to-review rows: given by hand to any member, `comment`
     required). bucket: the bucket the preview showed the row in (a row that changed since is refused)."""
-    bucket: BucketName
+    bucket: Bucket
     choice: str
     comment: str = Field(default="", max_length=1000)
 

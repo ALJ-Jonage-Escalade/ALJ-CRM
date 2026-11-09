@@ -33,7 +33,7 @@ class TestMemberView(unittest.TestCase):
         self.assertNotIn("orphelin", slots)                            # row without group
 
     def test_creneaux(self):
-        groups = member_view.creneaux(PLANNING)
+        groups = member_view.slot_groups(PLANNING)
         self.assertEqual([g["groupe"] for g in groups], ["Adultes", "Enfants 2015-2016"])
         self.assertEqual(groups[0]["tarifs"], ["Adulte lundi", "Commun"])
         self.assertEqual(groups[1]["categorie_age"], "U11")

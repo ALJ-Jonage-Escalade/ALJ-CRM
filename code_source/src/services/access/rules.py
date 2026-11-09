@@ -22,10 +22,10 @@ from typing import Dict, List, Optional
 
 from domain.validators import validate_email
 from infrastructure import runtime_env
-from infrastructure.firestore.access_store import AccessStore, HistoryEntry, RoleEntry
+from infrastructure.firestore.access_store import AccessStore, HistoryAction, HistoryEntry, RoleEntry
 from infrastructure.security import role_directory
 from infrastructure.security.role_directory import Clock, RoleDirectory, invitation_expired, normalized_email, parsed
-from infrastructure.security.roles import ROLES_BY_NAME, RoleName
+from infrastructure.security.roles import ADMIN, RoleName, is_role_name
 from domain.errors import Conflict, InvalidRequest, NotFound
 
 logger = logging.getLogger("alj")
@@ -53,9 +53,9 @@ def checked_email(email: object) -> str:
 
 
 def checked_role(role: str) -> RoleName:
-    if role not in ROLES_BY_NAME:
+    if not is_role_name(role):
         raise InvalidRequest(f"Rôle inconnu : « {role} ».", "invalid_role")
-    return role  # type: ignore[return-value]  # checked against the role names just above
+    return role
 
 
 def clean_display_name(name: object) -> str:
@@ -136,9 +136,9 @@ class AccessRules:
         new_role = checked_role(role)
         if entry["role"] == new_role:
             return entry
-        if self._is_self(author, entry) and new_role != "admin":
+        if self._is_self(author, entry) and new_role != ADMIN:
             raise Conflict("Vous ne pouvez pas retirer votre propre rôle d'administrateur.", "self_demotion")
-        if entry["role"] == "admin":
+        if entry["role"] == ADMIN:
             self._keep_an_admin(entry, "Impossible de retirer le rôle d'administrateur : c'est le dernier administrateur de la liste.")
         changed = self._updated(author, entry, role=new_role)
         self._history(author, "role_changed", entry["email"], entry["role"], new_role)
@@ -157,7 +157,7 @@ class AccessRules:
         entry = self.entry_of(email)
         if self._is_self(author, entry):
             raise Conflict("Vous ne pouvez pas retirer votre propre accès.", "self_removal")
-        if entry["role"] == "admin":
+        if entry["role"] == ADMIN:
             self._keep_an_admin(entry, "Impossible de retirer cet accès : c'est le dernier administrateur de la liste.")
         self.store.delete_role(entry["email"])
         self._history(author, "removed", entry["email"], entry["role"], None)
@@ -201,11 +201,11 @@ class AccessRules:
         return RoleEntry(**{**entry, **fields})  # type: ignore[typeddict-item]  # fields are RoleEntry keys
 
     def _keep_an_admin(self, entry: RoleEntry, message: str) -> None:
-        admins = [other for other in self.store.list_roles() if other["role"] == "admin"]
+        admins = [other for other in self.store.list_roles() if other["role"] == ADMIN]
         if all(normalized_email(other["email"]) == entry["email"] for other in admins):
             raise Conflict(message, "last_admin")
 
-    def _history(self, author: str, action: str, email: str, old_role: Optional[str], new_role: Optional[str]) -> None:
+    def _history(self, author: str, action: HistoryAction, email: str, old_role: Optional[str], new_role: Optional[str]) -> None:
         self.store.add_history(HistoryEntry(at=iso(self.clock()), author=author, action=action, target_email=email,
                                             old_role=old_role, new_role=new_role))
 

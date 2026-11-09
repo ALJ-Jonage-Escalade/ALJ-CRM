@@ -25,7 +25,7 @@ SPA_SUB_PAGES = {
     "outils": frozenset({"pivot", "stats", "presence", "ffme", "ffme-import", "helloasso-import"}),
     "parametres": frozenset({"campagnes"}),
 }
-# Former addresses of the competitions management pages (phone and office, until plan phase 11): now the competitions
+# Former addresses of the competitions management pages (phone and office): now the competitions
 # screen itself, where coaches change everything
 FORMER_MANAGEMENT_PAGES = {"/competitions/gestion": "/competitions", "/bureau/competitions-gestion": "/bureau/competitions"}
 

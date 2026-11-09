@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import Literal, Optional
+from typing import Literal, Optional, TypeGuard
 
 
 class Role(IntEnum):
@@ -16,6 +16,11 @@ class Role(IntEnum):
 RoleName = Literal["admin", "coach", "readonly"]
 ROLE_NAMES: dict[Role, RoleName] = {Role.ADMIN: "admin", Role.COACH: "coach", Role.READONLY: "readonly"}
 ROLES_BY_NAME: dict[str, Role] = {name: role for role, name in ROLE_NAMES.items()}
+ADMIN: RoleName = "admin"
+
+
+def is_role_name(value: object) -> TypeGuard[RoleName]:
+    return value in ROLES_BY_NAME
 
 
 def role_named(name: object) -> Optional[Role]:

@@ -45,7 +45,7 @@ class TestRepositoryQueries(unittest.TestCase):
     def _seed(self, ref, first_name, last_name, tarif, payer_email):
         member = dict(BASE_MEMBER, order_ref=ref, user_firstName=first_name, user_lastName=last_name,
                       tarif_name=tarif, payer_email=payer_email)
-        MemberRepository.upsert_members([member])
+        MemberRepository.upsert_members([member], "2026-2027")
 
     def _user_id(self, first_name):
         conn = SqliteDatabase.get_connection()

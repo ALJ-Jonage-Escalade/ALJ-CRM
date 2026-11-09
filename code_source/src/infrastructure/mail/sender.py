@@ -87,7 +87,7 @@ def build_message(to_email: str, subject: str, body: str, sender: str, sender_na
     return msg
 
 
-class EmailRepository:
+class EmailSender:
     """Delivery of the messages and the audit log of the sends."""
 
     @staticmethod

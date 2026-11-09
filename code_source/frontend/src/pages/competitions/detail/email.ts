@@ -36,7 +36,7 @@ export function defaultTemplate(templates: readonly Template[]): Template | unde
   );
 }
 
-/** 15 -> « 15 », 15.5 -> « 15,50 » (domain/utils.format_montant). */
+/** 15 -> « 15 », 15.5 -> « 15,50 » (domain/utils.format_amount). */
 export function amountText(prix: number | null | undefined): string {
   if (prix == null) {
     return "";
@@ -45,10 +45,13 @@ export function amountText(prix: number | null | undefined): string {
   return t.endsWith(",00") ? t.slice(0, -3) : t;
 }
 
+/** The WhatsApp link variable and its historical spellings (including the "whatapp" typo). */
+const WHATSAPP_LINK_KEYS = ["whatsapp_link", "whatsapp_id", "whatapp_id", "whatapp_link"];
+
 export function variables(c: Competition, r: Row | undefined): Record<string, string> {
   const start = formatDayText(c.date_competition ?? "");
   const end = formatDayText(c.date_fin ?? "");
-  const wa = (c.whatsapp_link ?? "").trim();
+  const whatsappLink = (c.whatsapp_link ?? "").trim();
   const dateFormatted = !end || end === start || !start ? start : `${start} au ${end}`;
   const deadlineFormatted = formatDayText(deadlineOf(c));
   const lieu = (c.lieu ?? "").trim();
@@ -69,9 +72,9 @@ export function variables(c: Competition, r: Row | undefined): Record<string, st
     deadline: deadlineFormatted,
     lieu,
     competition_lieu: lieu,
-    whatapp_id: wa,
-    whatsapp_link: wa,
-    bloc_whatsapp: wa ? `Voici le lien du groupe WhatApp dédié à cette compétition : ${wa}` : "",
+    // Other spellings that saved templates may use (lower case: names are not case sensitive)
+    ...Object.fromEntries(WHATSAPP_LINK_KEYS.map((key) => [key, whatsappLink])),
+    bloc_whatsapp: whatsappLink ? `Voici le lien du groupe WhatsApp dédié à cette compétition : ${whatsappLink}` : "",
   };
 }
 

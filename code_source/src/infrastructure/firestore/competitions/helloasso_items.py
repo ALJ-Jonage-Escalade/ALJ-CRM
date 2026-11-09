@@ -44,7 +44,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         items = {}
         for d in FirestoreClient.list_documents(cls.COLLECTION_ITEMS):
             try:
-                iid = int(d.get("id_item"))
+                iid = int(d.get("id_item") or "")  # missing: ValueError, skipped below
             except (TypeError, ValueError):
                 continue
             items[iid] = d
@@ -56,7 +56,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         return set(cls._items_map())
 
     @classmethod
-    def sync_helloasso_mirror(cls, summarized: list, raw_items: list,
+    def update_helloasso_mirror(cls, summarized: list, raw_items: list,
                               campagne_slug: str) -> int:
         """Upsert du miroir : ce que dit HelloAsso remplace la copie, en préservant
         le commentaire et le rattachement (liens) de chaque article."""
@@ -224,7 +224,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         return True
 
     @classmethod
-    def _participant_montant(cls, comp_doc: Optional[Dict[str, Any]], adherent_id) -> Optional[float]:
+    def _participant_amount(cls, comp_doc: Optional[Dict[str, Any]], adherent_id) -> Optional[float]:
         for p in (comp_doc or {}).get("participants") or []:
             if p.get("adherent_id") == adherent_id:
                 return float(p.get("montant_paye") or 0.0)
@@ -242,7 +242,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
             comp_id = doc.get("competition_id")
             adh_id = doc.get("adherent_id")
             comp_doc = comps.get(comp_id) if comp_id is not None else None
-            a_doc = adh.get(adh_id) or {}
+            a_doc = (adh.get(adh_id) if adh_id is not None else None) or {}
             rows.append({
                 "id_item": iid,
                 "order_id": doc.get("order_id"),
@@ -265,7 +265,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
                 "competition_nom": (comp_doc or {}).get("nom") or "",
                 "adherent_nom": (a_doc.get("nom") or ""),
                 "adherent_prenom": (a_doc.get("prenom") or ""),
-                "participant_montant_paye": cls._participant_montant(comp_doc, adh_id)
+                "participant_montant_paye": cls._participant_amount(comp_doc, adh_id)
                 if comp_id is not None and adh_id is not None else None,
             })
         rows.sort(key=lambda r: (r["date_item"], r["id_item"]), reverse=True)
@@ -273,7 +273,7 @@ class HelloAssoItemsMixin(ParticipantsMixin):
 
     @classmethod
     def list_unlinked_items(cls) -> list:
-        adh = {a["id"]: a for a in cls.list_adherents()}
+        adh = {a["id"]: a for a in cls.list_members()}
         result = []
         for it in cls.list_mirror_items():
             if not cls._is_paid_item(it):
@@ -379,16 +379,16 @@ class HelloAssoItemsMixin(ParticipantsMixin):
         montant = round(sum(float(it.get("montant") or 0.0) for it in linked), 2)
         orders = ", ".join(str(it["order_id"]) for it in linked if it.get("order_id"))
 
-        def change(p):
-            statut = p.get("statut_paiement") or ""
+        def change(participant):
+            statut = participant.get("statut_paiement") or ""
             if statut in PAIEMENT_STATUTS_ANNULES:
                 return False  # the coach's cancellation is never overwritten
             if linked:
-                p.update(statut_paiement=PAIEMENT_PAYE, montant_paye=montant, commande_helloasso=orders)
+                participant.update(statut_paiement=PAIEMENT_PAYE, montant_paye=montant, commande_helloasso=orders)
                 return None
-            if statut != PAIEMENT_PAYE or (p.get("commande_helloasso") or "") in ("", MANUAL_PAYMENT_REF):
+            if statut != PAIEMENT_PAYE or (participant.get("commande_helloasso") or "") in ("", MANUAL_PAYMENT_REF):
                 return False
-            p.update(statut_paiement=PAIEMENT_EN_ATTENTE if p.get("selectionne") else PAIEMENT_NON_INVITE,
+            participant.update(statut_paiement=PAIEMENT_EN_ATTENTE if participant.get("selectionne") else PAIEMENT_NON_INVITE,
                      montant_paye=0.0, commande_helloasso="")
             return None
         return cls._update_participant(competition_id, adherent_id, change) is not None

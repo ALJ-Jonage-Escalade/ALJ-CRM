@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import sqlite3
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional
 
-
+from domain.errors import InvalidRequest
 from domain.members.sex import parse_sex
 from domain.utils import normalize_name
 from infrastructure.sqlite import schema_v2
 from infrastructure.sqlite.connection import SqliteDatabase
+
+logger = logging.getLogger("alj")
+
+HIGHER_PRIORITY_REGISTRATION = ("Une inscription plus prioritaire existe déjà pour cet adhérent "
+                                "cette saison (statut/montant supérieurs).")
+DUPLICATE_MEMBER = "Un autre adhérent avec les mêmes nom, prénom et date de naissance existe déjà."
 
 EXTRA_COLUMNS = {
     "is_modified": "TEXT DEFAULT 'Non'",
@@ -24,27 +31,28 @@ EXTRA_COLUMNS = {
 }
 
 
+# A row of a member read: column -> value. Any: SQLite values (text, number or None) of many columns
+MemberRow = Dict[str, Any]
+# A flat member record to write (HelloAsso export keys, or the fields of a manual addition). Any: as above
+MemberRecord = Mapping[str, Any]
+
+
 class MemberRepository:
     @classmethod
-    def load_direct_data(cls, season: Optional[str]) -> list:
-        """Purchases of `season` (None: every season) from the compatibility view v_adherents_legacy, with its flat
-        historical keys, newest first."""
+    def list_flat_member_rows(cls, season: Optional[str]) -> List[MemberRow]:
+        """Purchases of `season` (None: every season) from the flat member view, newest members first. Callers that
+        need an order of their own sort the rows themselves (the FFME export, the attendance sheets)."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
             if season is None:
-                rows = conn.execute('SELECT * FROM v_adherents_legacy ORDER BY "id" DESC').fetchall()
+                rows = conn.execute('SELECT * FROM v_member_flat ORDER BY "user_id" DESC').fetchall()
             else:
-                rows = conn.execute('SELECT * FROM v_adherents_legacy WHERE season_name = ? ORDER BY "id" DESC',
+                rows = conn.execute('SELECT * FROM v_member_flat WHERE season_name = ? ORDER BY "user_id" DESC',
                                     (season,)).fetchall()
         finally:
             conn.close()
-        members = []
-        for row in rows:
-            member = dict(row)
-            member.pop("id", None)  # the view's internal row id
-            members.append(member)
-        return members
+        return [dict(row) for row in rows]
 
 
     # One row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), the fields of the web member pages
@@ -67,7 +75,7 @@ class MemberRepository:
     """
 
     @classmethod
-    def _query_member_rows(cls, where: str, params: tuple) -> list:
+    def _query_member_rows(cls, where: str, params: tuple) -> List[MemberRow]:
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
@@ -76,14 +84,14 @@ class MemberRepository:
             conn.close()
 
     @classmethod
-    def list_member_rows(cls, season_name: str) -> list:
+    def list_member_rows(cls, season_name: str) -> List[MemberRow]:
         """One row per purchase of the season (users ⨝ orders ⨝ purchases), with the fields of
-        the web member pages. Unlike v_adherents_legacy, carries `purchase_id` (needed by
+        the web member pages. Unlike the flat member view, carries `purchase_id` (needed by
         /api/members/update) and skips the insurance-option subqueries."""
         return cls._query_member_rows("s.name = ?", (season_name,))
 
     @classmethod
-    def list_member_rows_of_users(cls, user_ids: Iterable[int]) -> list:
+    def list_member_rows_of_users(cls, user_ids: Iterable[int]) -> List[MemberRow]:
         """Rows of list_member_rows for these users only, every season."""
         ids = tuple(user_ids)
         if not ids:
@@ -91,17 +99,17 @@ class MemberRepository:
         return cls._query_member_rows(f"u.id IN ({', '.join('?' * len(ids))})", ids)
 
     @classmethod
-    def upsert_members(cls, members: list, season_name: str = "2026-2027") -> int:
+    def upsert_members(cls, members: List[MemberRecord], season_name: str) -> int:
         """Insère ou met à jour un lot d'adhérents dans le schéma v2 (users / orders / purchases / purchase_options).
         Returns the number of purchases written; a database failure is rolled back and raised."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
             cursor = conn.cursor()
-            stats = schema_v2.sync_members_to_v2(cursor, members, season_name)
+            stats = schema_v2.write_members_to_v2(cursor, members, season_name)
             inserted_count = stats["purchases"]
             conn.commit()
-            print(f"[SQLITE] Synchro reussie : {inserted_count} adhesions enregistrees/mises a jour "
+            logger.info(f"[SQLITE] Synchro reussie : {inserted_count} adhesions enregistrees/mises a jour "
                   f"pour la saison {season_name}. (v2: {stats})")
         except Exception:
             conn.rollback()
@@ -112,14 +120,14 @@ class MemberRepository:
 
 
     @classmethod
-    def add_manual_member(cls, fields: dict, season_name: str = "2026-2027") -> Tuple[bool, str]:
+    def add_manual_member(cls, fields: dict, season_name: str) -> str:
         """
         Ajoute manuellement un adhérent dans le schéma v2 (users + orders + purchases),
         en synthétisant une commande « MANUEL-... » équivalente à une inscription HelloAsso.
         Champs attendus : last_name, first_name, birth_date ('JJ/MM/AAAA' ou ISO), sex,
         phone, email_primary, address, zip_code, city, tarif_name, status, amount.
-        Retourne (True, order_ref) ou (False, message) quand une inscription prioritaire existe déjà ;
-        une erreur de base de données est annulée (rollback) et propagée.
+        Returns the order reference. InvalidRequest when a registration with a higher priority already exists;
+        a database error is rolled back and raised.
         """
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
@@ -180,17 +188,14 @@ class MemberRepository:
                 rec["commentaires_correctif"] = str(comment).strip()
 
             cursor = conn.cursor()
-            stats = schema_v2.sync_members_to_v2(cursor, [rec], season_name)
+            stats = schema_v2.write_members_to_v2(cursor, [rec], season_name)
             if not stats.get("purchases"):
                 conn.rollback()
-                msg = ("Une inscription plus prioritaire existe déjà pour cet adhérent "
-                       "cette saison (statut/montant supérieurs).")
-                print(f"[SQLITE] Ajout manuel refusé : {msg}")
-                return False, msg
+                raise InvalidRequest(HIGHER_PRIORITY_REGISTRATION)
             conn.commit()
-            print(f"[SQLITE] Adhérent manuel ajouté : {rec['user_lastName']} {rec['user_firstName']} "
-                  f"({order_ref}, saison {season_name}).")
-            return True, order_ref
+            # Personal data (names) never goes to the logs: the order reference identifies the purchase
+            logger.info(f"[SQLITE] Manual member added ({order_ref}, season {season_name}).")
+            return order_ref
         except Exception:
             conn.rollback()
             raise
@@ -198,12 +203,12 @@ class MemberRepository:
             conn.close()
 
     @classmethod
-    def list_contact_emails(cls) -> set:
+    def list_contact_emails(cls) -> set[str]:
         """Every member and payer address in the database (lower-cased)."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
-            emails = set()
+            emails: set[str] = set()
             for sql in ("SELECT email_primary, email_secondary FROM users", "SELECT payer_email FROM orders"):
                 for row in conn.execute(sql).fetchall():
                     emails.update(str(v).strip().lower() for v in tuple(row) if v)
@@ -248,7 +253,7 @@ class MemberRepository:
                 """, (date_str, int(purchase_id)))
                 if cursor.rowcount > 0:
                     conn.commit()
-                    print(f"[SQLITE] Date d'envoi d'e-mail enregistree pour l'achat #{purchase_id} : {date_str}")
+                    logger.debug(f"[SQLITE] Date d'envoi d'e-mail enregistree pour l'achat #{purchase_id} : {date_str}")
                     return True
 
             cursor.execute("""
@@ -271,9 +276,9 @@ class MemberRepository:
                 rows_affected = cursor.rowcount
             conn.commit()
             if rows_affected > 0:
-                print(f"[SQLITE] Date d'envoi d'e-mail enregistree pour la commande {order_ref} : {date_str}")
+                logger.debug(f"[SQLITE] Date d'envoi d'e-mail enregistree pour la commande {order_ref} : {date_str}")
                 return True
-            print(f"[SQLITE] Aucun achat trouve pour la commande {order_ref} (achat #{purchase_id})")
+            logger.info(f"[SQLITE] Aucun achat trouve pour la commande {order_ref} (achat #{purchase_id})")
             return False
         except Exception:
             conn.rollback()
@@ -288,16 +293,16 @@ class MemberRepository:
         fields: Optional[dict] = None,
         purchase_id: Optional[int] = None,
         order_ref: Optional[str] = None
-    ) -> Tuple[bool, str]:
+    ) -> None:
         """
         Met à jour de manière ciblée les informations d'un adhérent :
         - Table users : badge_rouge, autonomie_bloc, email_primary, email_secondary, phone, sex…
         - Table purchases : tarif_name.
-        Retourne (succès: bool, message: str) ; (False, message) pour un doublon d'adhérent, une autre erreur
-        de base de données est annulée (rollback) et propagée.
+        InvalidRequest when nothing is given or when the change would duplicate another member; any other
+        database error is rolled back and raised.
         """
         if not fields:
-            return False, "Aucun champ à mettre à jour."
+            raise InvalidRequest("Aucun champ à mettre à jour.")
 
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
@@ -348,11 +353,10 @@ class MemberRepository:
                     """, (*status_params, int(purchase_id)))
 
             conn.commit()
-            print(f"[SQLITE] Adhérent #{resolved_uid} mis à jour avec succès : {list(fields.keys())}")
-            return True, ""
+            logger.debug(f"[SQLITE] Adhérent #{resolved_uid} mis à jour avec succès : {list(fields.keys())}")
         except sqlite3.IntegrityError:
             conn.rollback()
-            return False, "Un autre adhérent avec les mêmes nom, prénom et date de naissance existe déjà."
+            raise InvalidRequest(DUPLICATE_MEMBER) from None
         except Exception:
             conn.rollback()
             raise
@@ -382,7 +386,7 @@ def _user_column_updates(fields: Dict[str, object]) -> Dict[str, Optional[str]]:
         updates["first_name_key"] = normalize_name(first_name).lower()
     if "birth_date" in fields:
         raw_birth_date = str(fields["birth_date"] or "").strip()
-        updates["birth_date"] = schema_v2.parse_iso_date(raw_birth_date) if raw_birth_date else ""
+        updates["birth_date"] = schema_v2.legacy_date_to_iso(raw_birth_date) if raw_birth_date else ""
         updates["birth_date_raw"] = raw_birth_date
     for column, default in _USER_YES_NO_DEFAULTS.items():
         if column in fields:

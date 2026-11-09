@@ -16,8 +16,8 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from domain.email_personalization import apply_template_variables  # noqa: E402
-from infrastructure.mail.repository import sanitize_email_header  # noqa: E402
-from services.communications.email_dispatch import EmailDispatchService  # noqa: E402
+from infrastructure.mail.sender import sanitize_email_header  # noqa: E402
+from services.communications.email_dispatch import EmailDispatchService, render_email  # noqa: E402
 from support.fake_access import grant_roles  # noqa: E402
 
 EVIL_NAME = '<a href="https://evil.example">Pay here</a>'
@@ -26,11 +26,8 @@ EVIL_NAME = '<a href="https://evil.example">Pay here</a>'
 class TestPersonalisedHtml(unittest.TestCase):
 
     def _preview(self, body, first_name):
-        with patch.object(EmailDispatchService, "get_competition_context", return_value={}):
-            return EmailDispatchService.preview(
-                subject="Hello {first_name}", body=body,
-                recipient={"first_name": first_name, "last_name": "X", "email": "x@example.com"},
-                add_signature=False)
+        return render_email("Hello {first_name}", body, {"first_name": first_name, "last_name": "X", "email": "x@example.com"},
+                            {}, add_signature=False)
 
     def test_member_value_cannot_add_markup(self):
         html = self._preview("Hello {first_name}", EVIL_NAME)["body_html"]
@@ -67,13 +64,13 @@ class TestHeaders(unittest.TestCase):
         self.assertEqual(sanitize_email_header(None), "")
 
     def test_smtp_message_has_no_injected_header(self):
-        from infrastructure.mail.repository import EmailRepository
+        from infrastructure.mail.sender import EmailSender
         secrets = {"SMTP_HOST": "localhost", "SMTP_PORT": "1025", "SMTP_USER": "u", "SMTP_PASSWORD": "p",
                    "SMTP_FROM_EMAIL": "office@example.com"}
         smtp = MagicMock()
-        with patch("infrastructure.mail.repository.SecretStore.get_secret", side_effect=lambda k: secrets.get(k, "")), \
-             patch("smtplib.SMTP", return_value=smtp), patch.object(EmailRepository, "log_audit"):
-            EmailRepository.send_email(
+        with patch("infrastructure.mail.sender.SecretStore.get_secret", side_effect=lambda k: secrets.get(k, "")), \
+             patch("smtplib.SMTP", return_value=smtp), patch.object(EmailSender, "log_audit"):
+            EmailSender.send_email(
                 to_email="victim@example.com\r\nBcc: spy@example.com",
                 subject="Hi\r\nBcc: spy@example.com", body="body",
                 from_name="Club\r\nReply-To: spy@example.com")
@@ -91,11 +88,11 @@ class TestSmtpEncryption(unittest.TestCase):
                "SMTP_FROM_EMAIL": "office@example.com"}
 
     def _send(self, smtp, dev=False):
-        from infrastructure.mail.repository import EmailRepository
-        with patch("infrastructure.mail.repository.SecretStore.get_secret", side_effect=lambda k: self.SECRETS.get(k, "")), \
-             patch("smtplib.SMTP", return_value=smtp), patch.object(EmailRepository, "log_audit"), \
-             patch("infrastructure.mail.repository.runtime_env.is_dev", return_value=dev):
-            EmailRepository.send_email(to_email="harry.potter@hogwarts.example", subject="s", body="b")
+        from infrastructure.mail.sender import EmailSender
+        with patch("infrastructure.mail.sender.SecretStore.get_secret", side_effect=lambda k: self.SECRETS.get(k, "")), \
+             patch("smtplib.SMTP", return_value=smtp), patch.object(EmailSender, "log_audit"), \
+             patch("infrastructure.mail.sender.runtime_env.is_dev", return_value=dev):
+            EmailSender.send_email(to_email="harry.potter@hogwarts.example", subject="s", body="b")
 
     def test_starttls_used_when_offered(self):
         smtp = MagicMock()
@@ -106,7 +103,7 @@ class TestSmtpEncryption(unittest.TestCase):
 
     def test_starttls_failure_is_raised_before_login(self):
         import smtplib
-        from infrastructure.mail.repository import MailError
+        from infrastructure.mail.sender import MailError
         smtp = MagicMock()
         smtp.has_extn.return_value = True
         smtp.starttls.side_effect = smtplib.SMTPException("handshake failed")
@@ -116,7 +113,7 @@ class TestSmtpEncryption(unittest.TestCase):
         smtp.sendmail.assert_not_called()
 
     def test_server_without_starttls_refused_in_production(self):
-        from infrastructure.mail.repository import MailError
+        from infrastructure.mail.sender import MailError
         smtp = MagicMock()
         smtp.has_extn.return_value = False
         with self.assertRaises(MailError) as raised:
@@ -132,19 +129,42 @@ class TestSmtpEncryption(unittest.TestCase):
         smtp.sendmail.assert_called_once()
 
 
+class TestSmtpAttachment(unittest.TestCase):
+    """Over SMTP too, the PDF made in memory reaches the message, with an ASCII file name, to every recipient."""
+
+    SECRETS = {"SMTP_HOST": "smtp.example.com", "SMTP_PORT": "587", "SMTP_USER": "u", "SMTP_PASSWORD": "p",
+               "SMTP_FROM_EMAIL": "office@example.com"}
+
+    def test_pdf_attachment_and_recipients(self):
+        from infrastructure.mail.sender import EmailSender
+        smtp = MagicMock()
+        smtp.has_extn.return_value = True
+        with patch("infrastructure.mail.sender.SecretStore.get_secret", side_effect=lambda k: self.SECRETS.get(k, "")), \
+             patch("smtplib.SMTP", return_value=smtp), patch.object(EmailSender, "log_audit"):
+            EmailSender.send_email(to_email="harry.potter@hogwarts.example, lily.potter@hogwarts.example", subject="Attestation",
+                                   body="Bonjour", attachment_bytes=b"%PDF-1.7", attachment_filename="Attestation Élève.pdf")
+        sender, recipients, text = smtp.sendmail.call_args.args
+        self.assertEqual(sender, "office@example.com")
+        self.assertEqual(recipients, ["harry.potter@hogwarts.example", "lily.potter@hogwarts.example"])
+        attachment = next(part for part in message_from_string(text).walk() if part.get_content_disposition() == "attachment")
+        self.assertEqual(attachment.get_filename(), "Attestation Eleve.pdf")
+        self.assertEqual(attachment.get_content_type(), "application/pdf")
+        self.assertEqual(attachment.get_payload(decode=True), b"%PDF-1.7")
+
+
 class TestGmailDelivery(unittest.TestCase):
     """With the club's OAuth account configured, e-mails go through the Gmail API, attachments included."""
 
     SECRETS = {"GMAIL_USER_EMAIL": "club@alj.example", "GMAIL_CLIENT_ID": "cid", "GMAIL_REFRESH_TOKEN": "refresh"}
 
     def _send(self, status_code=200):
-        from infrastructure.mail.repository import EmailRepository
+        from infrastructure.mail.sender import EmailSender
         answer = MagicMock(status_code=status_code, text="quota exceeded")
-        with patch("infrastructure.mail.repository.SecretStore.get_secret", side_effect=lambda k: self.SECRETS.get(k, "")), \
+        with patch("infrastructure.mail.sender.SecretStore.get_secret", side_effect=lambda k: self.SECRETS.get(k, "")), \
              patch("infrastructure.google.drive.GoogleDriveClient.get_access_token", return_value="access"), \
-             patch("infrastructure.mail.repository.requests.post", return_value=answer) as post, \
-             patch("smtplib.SMTP") as smtp, patch.object(EmailRepository, "log_audit") as audit:
-            EmailRepository.send_email(to_email="harry.potter@hogwarts.example", subject="Attestation", body="Bonjour",
+             patch("infrastructure.mail.sender.requests.post", return_value=answer) as post, \
+             patch("smtplib.SMTP") as smtp, patch.object(EmailSender, "log_audit") as audit:
+            EmailSender.send_email(to_email="harry.potter@hogwarts.example", subject="Attestation", body="Bonjour",
                                        html_body="<p>Bonjour</p>", attachment_bytes=b"%PDF-1.7",
                                        attachment_filename="Attestation Élève.pdf")
         smtp.assert_not_called()
@@ -164,7 +184,7 @@ class TestGmailDelivery(unittest.TestCase):
         self.assertEqual(audit.call_args.args[2], "SUCCESS")
 
     def test_gmail_refusal_is_a_mail_error(self):
-        from infrastructure.mail.repository import MailError
+        from infrastructure.mail.sender import MailError
         with self.assertRaises(MailError) as raised:
             self._send(status_code=429)
         self.assertIn("429", str(raised.exception))

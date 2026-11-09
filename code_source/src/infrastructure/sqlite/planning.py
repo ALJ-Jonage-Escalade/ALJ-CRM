@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from infrastructure.sqlite.connection import SqliteDatabase
+
+logger = logging.getLogger("alj")
 
 
 class PlanningRepository:
@@ -54,7 +57,7 @@ class PlanningRepository:
         """Agrège le planning par groupe de créneau unique (un groupe peut posséder
         plusieurs créneaux horaires et plusieurs tarifs HelloAsso).
         Retourne une liste de dicts {groupe, tarifs, slots} triée par nom de groupe."""
-        creneaux = {}
+        creneaux: dict[str, dict] = {}
         order = []
         for item in cls.load_planning_data():
             g_name = str(item.get("groupe") or "").strip()
@@ -104,7 +107,7 @@ class PlanningRepository:
                     str(item.get("naissance_max") or "")
                 ))
             conn.commit()
-            print("💾 [SQLITE] Planning enregistré avec succès dans SQLite.")
+            logger.debug("[SQLITE] Planning enregistré avec succès dans SQLite.")
         except Exception:
             conn.rollback()
             raise
@@ -144,7 +147,7 @@ class PlanningRepository:
                 str(item.get("naissance_max") or "").strip()
             ))
             conn.commit()
-            print(f"💾 [SQLITE] Créneau #{item_id} ({item.get('groupe')}) enregistré avec succès.")
+            logger.debug(f"[SQLITE] Créneau #{item_id} ({item.get('groupe')}) enregistré avec succès.")
             return item
         except Exception:
             conn.rollback()
@@ -163,7 +166,7 @@ class PlanningRepository:
             conn.commit()
             deleted = cursor.rowcount > 0
             if deleted:
-                print(f"🗑️ [SQLITE] Créneau #{item_id} supprimé avec succès.")
+                logger.debug(f"[SQLITE] Créneau #{item_id} supprimé avec succès.")
             return deleted
         except Exception:
             conn.rollback()

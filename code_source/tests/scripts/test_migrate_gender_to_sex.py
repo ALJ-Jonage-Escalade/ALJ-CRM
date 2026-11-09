@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from support.fake_firestore import FirestoreRepoTestCase
 
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionRepository
 
 _SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts",
                        "migrate_gender_to_sex.py")
@@ -96,19 +96,19 @@ class TestMigrateCompetitionsAndDirectory(FirestoreRepoTestCase):
         super().setUp()
         self.seed_adherent(1, gender="Femme")
         self.seed_adherent(2, sex="H")
-        Repo.add_participant(self.create_competition(), 1)
+        CompetitionRepository.add_participant(self.create_competition(), 1)
 
     def create_competition(self) -> int:
         from domain.competitions.models import Competition
-        return Repo.save_competition(Competition(nom="Coupe Rhône"))
+        return CompetitionRepository.save_competition(Competition(nom="Coupe Rhône"))
 
     def comp_doc(self) -> Dict[str, Any]:
-        return self.fake.list_documents(Repo.COLLECTION_COMPETITIONS)[0]
+        return self.fake.list_documents(CompetitionRepository.COLLECTION_COMPETITIONS)[0]
 
     def add_legacy_copy(self) -> None:
         doc = self.comp_doc()
         doc["participants"][0]["gender"] = "Femme"
-        self.fake.upsert_document(Repo.COLLECTION_COMPETITIONS, doc["_doc_id"],
+        self.fake.upsert_document(CompetitionRepository.COLLECTION_COMPETITIONS, doc["_doc_id"],
                                   {k: v for k, v in doc.items() if not k.startswith("_")})
 
     def test_dry_run_counts(self):
@@ -128,7 +128,7 @@ class TestMigrateCompetitionsAndDirectory(FirestoreRepoTestCase):
         participant = self.comp_doc()["participants"][0]
         self.assertNotIn("gender", participant)
         self.assertEqual(participant["updated_at"], stamp)  # offline changes queued on this row still apply
-        directory = {d["id"]: d for d in self.fake.list_documents(Repo.COLLECTION_ADHERENTS)}
+        directory = {d["id"]: d for d in self.fake.list_documents(CompetitionRepository.COLLECTION_ADHERENTS)}
         self.assertEqual((directory[1].get("sex"), "gender" in directory[1]), ("F", False))
         self.assertEqual(directory[2]["sex"], "H")
 

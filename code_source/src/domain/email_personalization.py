@@ -33,7 +33,8 @@ _COMPETITION_KEYS = (
     "no_competition", "name_competition", "competition_nom", "montant_competition", "date_competition",
     "competition_date", "competition_deadline", "deadline", "lieu", "competition_lieu",
 )
-# Spellings of the WhatsApp variables found in the club's templates (including the historical "whatapp")
+# Spellings of the WhatsApp variables that saved templates may use (including the historical "whatapp" typo);
+# the context itself only carries "whatsapp_link"
 _WHATSAPP_BLOCK_KEYS = ("bloc_whatsapp", "bloc_whatapp", "whatsapp_bloc")
 _WHATSAPP_LINK_KEYS = ("whatapp_Id", "whatsapp_id", "whatapp_id", "whatsapp_Id", "whatsapp_link", "whatapp_link")
 
@@ -45,7 +46,7 @@ def apply_template_variables(text: Optional[str], recipient: TemplateRecipient,
     - {Prénom}/{Nom}/{first_name}/{last_name}/{prenom}/{nom}: the recipient's names; {num_licence}: their FFME licence;
       {tarif} and {season}: their group and season, when known;
     - competition variables ({no_competition}, {name_competition}, {montant_competition}, {date_competition}…,
-      {whatapp_Id}, {bloc_whatsapp}), left as they are when missing from the context.
+      {whatsapp_link} and its other spellings, {bloc_whatsapp}), left as they are when missing from the context.
 
     escape_html=True: values are HTML-escaped, for a template already converted to HTML
     (member data comes from the public HelloAsso form and must never add markup).
@@ -79,16 +80,9 @@ def apply_template_variables(text: Optional[str], recipient: TemplateRecipient,
             out = out.replace("{" + key + "}", encode(value))
             out = out.replace("{" + key.title() + "}", encode(value))
 
-    whatsapp_link = str(
-        context.get("whatapp_Id")
-        or context.get("whatsapp_link")
-        or context.get("whatsapp_id")
-        or context.get("whatapp_id")
-        or context.get("whatsappLink")
-        or ""
-    ).strip()
+    whatsapp_link = str(context.get("whatsapp_link") or "").strip()
     if whatsapp_link:
-        block = encode(f"Voici le lien du groupe WhatApp dédié à cette compétition : {whatsapp_link}")
+        block = encode(f"Voici le lien du groupe WhatsApp dédié à cette compétition : {whatsapp_link}")
         for key in _WHATSAPP_BLOCK_KEYS:
             out = out.replace("{" + key + "}", block)
         for key in _WHATSAPP_LINK_KEYS:

@@ -8,14 +8,17 @@ from __future__ import annotations
 
 import datetime
 import glob
+import logging
 import os
 import sqlite3
 import time
 from typing import Optional
 
-from paths import ROOT_DIR, data_root
 from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.sqlite import schema_v2
+from paths import ROOT_DIR, data_root
+
+logger = logging.getLogger("alj")
 
 _DEFAULT_EMAIL_TEMPLATES = [
     ("Attestation standard", "Attestation de paiement escalade - Amicale Laïque de Jonage",
@@ -57,7 +60,7 @@ def _add_missing_column(conn: sqlite3.Connection, cursor: sqlite3.Cursor, table:
     try:
         cursor.execute(f"SELECT {column} FROM {table} LIMIT 1")  # noqa: S608 - noms de table/colonne littéraux du code
     except sqlite3.OperationalError:
-        print(f"🔧 [SQLITE] Ajout de la colonne '{column}' à la table {table}...")
+        logger.info(f"[SQLITE] Ajout de la colonne '{column}' à la table {table}...")
         cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
         conn.commit()
 
@@ -102,7 +105,7 @@ def _ensure_email_templates(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
             """, _ATTESTATION_ECHEANCE_TEMPLATE)
             conn.commit()
     except Exception as e:
-        print(f"⚠️ [SQLITE] Impossible de s'assurer de la présence du modèle d'email 'Attestation échéance' : {e}")
+        logger.warning(f"[SQLITE] Impossible de s'assurer de la présence du modèle d'email 'Attestation échéance' : {e}")
 
     # S'assurer de la présence des modèles d'e-mails de compétition
     for template in _COMPETITION_EMAIL_TEMPLATES:
@@ -116,7 +119,7 @@ def _ensure_email_templates(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
                 """, template)
                 conn.commit()
         except Exception as e:
-            print(f"⚠️ [SQLITE] Impossible d'assurer la présence du modèle '{cname}' : {e}")
+            logger.warning(f"[SQLITE] Impossible d'assurer la présence du modèle '{cname}' : {e}")
 
 
 class SqliteDatabase:
@@ -159,7 +162,7 @@ class SqliteDatabase:
     def apply_schema(cls, path: str) -> None:
         """Creates or upgrades the tables of the SQLite file at `path` (the cache, a new cache being built, a copy),
         without changing the file the application uses."""
-        print(f"🔧 [SQLITE] Initialisation de la BDD à l'emplacement : {path}")
+        logger.debug(f"[SQLITE] Initialisation de la BDD à l'emplacement : {path}")
         conn = cls.get_connection(path)
         cursor = conn.cursor()
 
@@ -248,14 +251,13 @@ class SqliteDatabase:
                                "le cache est reconstruit depuis Firestore.")
         if current_version == 0:
             cursor.execute(f"PRAGMA user_version = {schema_v2.SCHEMA_TARGET_VERSION}")
-            print(f"🔖 [SQLITE] Base neuve taguée en version {schema_v2.SCHEMA_TARGET_VERSION} (schéma v2 natif).")
-        # Vue de compatibilité : recréée à chaque démarrage pour suivre la définition du code
-        schema_v2.recreate_compat_view(cursor)
-        print("🔗 [SQLITE] Vue de compatibilité v_adherents_legacy vérifiée.")
+            logger.info(f"[SQLITE] Base neuve taguée en version {schema_v2.SCHEMA_TARGET_VERSION} (schéma v2 natif).")
+        # Flat member view: created again on every start to follow the code's definition
+        schema_v2.recreate_member_flat_view(cursor)
 
         conn.commit()
         conn.close()
-        print("✅ [SQLITE] Initialisation et vérification du schéma d'adhérents accomplies.")
+        logger.debug("[SQLITE] Initialisation et vérification du schéma d'adhérents accomplies.")
 
     @classmethod
     def check_readable(cls) -> Optional[str]:
@@ -309,7 +311,7 @@ class SqliteDatabase:
             src_conn.backup(dst_conn)
             dst_conn.close()
             src_conn.close()
-            print(f"💾 [SQLITE] Sauvegarde de BDD créée : {os.path.basename(backup_path)}")
+            logger.info(f"[SQLITE] Sauvegarde de BDD créée : {os.path.basename(backup_path)}")
 
             # Gérer la rétention : conserver toutes les sauvegardes des 10 derniers jours
             backups = glob.glob(os.path.join(backup_dir, "database_backup_*.db"))
@@ -321,9 +323,9 @@ class SqliteDatabase:
                     file_date = datetime.datetime.fromtimestamp(mtime)
                     if file_date < cutoff_date:
                         os.remove(bk)
-                        print(f"🗑️ [SQLITE] Sauvegarde BDD expirée (>10 jours) purgée : {os.path.basename(bk)}")
+                        logger.info(f"[SQLITE] Sauvegarde BDD expirée (>10 jours) purgée : {os.path.basename(bk)}")
                 except Exception as pe:
-                    print(f"⚠️ [SQLITE] Impossible de purger l'ancien backup {bk} : {pe}")
+                    logger.warning(f"[SQLITE] Impossible de purger l'ancien backup {bk} : {pe}")
 
         except Exception as e:
-            print(f"⚠️ [SQLITE] Impossible de créer la sauvegarde de BDD : {e}")
+            logger.warning(f"[SQLITE] Impossible de créer la sauvegarde de BDD : {e}")
