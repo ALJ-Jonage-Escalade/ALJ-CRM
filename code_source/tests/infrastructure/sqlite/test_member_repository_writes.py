@@ -56,7 +56,7 @@ class TestMemberRepositoryWrites(unittest.TestCase):
         self.assertEqual(inserted, 1)
         
         # 3. Chargement des membres (Read)
-        loaded = MemberRepository.load_direct_data("2026-2027")
+        loaded = MemberRepository.list_flat_member_rows("2026-2027")
         self.assertEqual(len(loaded), 1)
         self.assertEqual(loaded[0]["last_name"], "DUPONT")
         self.assertEqual(loaded[0]["first_name"], "Jean")
@@ -105,7 +105,7 @@ class TestMemberRepositoryWrites(unittest.TestCase):
         MemberRepository.upsert_members([member_unique], "2026-2027")
         
         # Charger les données pour la saison active 2026-2027
-        loaded_raw = MemberRepository.load_direct_data("2026-2027")
+        loaded_raw = MemberRepository.list_flat_member_rows("2026-2027")
         self.assertEqual(len(loaded_raw), 2)
         
         carlos = next(row for row in loaded_raw if row["last_name"] == "MARTINEZ")
@@ -132,7 +132,7 @@ class TestMemberRepositoryWrites(unittest.TestCase):
         MemberRepository.upsert_members([member_active], "2026-2027")
         
         # Charger et vérifier que c'est bien actif
-        loaded = MemberRepository.load_direct_data("2026-2027")
+        loaded = MemberRepository.list_flat_member_rows("2026-2027")
         match = next(m for m in loaded if m["last_name"] == "CLAPET_TEST")
         self.assertEqual(match["status"], "Processed")
         self.assertEqual(match["order_ref"], "ORD-ACTIVE-123")
@@ -150,7 +150,7 @@ class TestMemberRepositoryWrites(unittest.TestCase):
         MemberRepository.upsert_members([member_canceled], "2026-2027")
         
         # Vérifier que la commande active a été CONSERVÉE (priorité supérieure)
-        loaded = MemberRepository.load_direct_data("2026-2027")
+        loaded = MemberRepository.list_flat_member_rows("2026-2027")
         match = next(m for m in loaded if m["last_name"] == "CLAPET_TEST")
         self.assertEqual(match["status"], "Processed")
         self.assertEqual(match["order_ref"], "ORD-ACTIVE-123")
@@ -170,7 +170,7 @@ class TestMemberRepositoryWrites(unittest.TestCase):
         MemberRepository.upsert_members([m_canceled], "2026-2027")
         
         # Vérifier qu'il est bien Canceled
-        loaded = MemberRepository.load_direct_data("2026-2027")
+        loaded = MemberRepository.list_flat_member_rows("2026-2027")
         match = next(m for m in loaded if m["last_name"] == "CLAPET_TEST2")
         self.assertEqual(match["status"], "Canceled")
         
@@ -187,7 +187,7 @@ class TestMemberRepositoryWrites(unittest.TestCase):
         MemberRepository.upsert_members([m_active], "2026-2027")
         
         # Vérifier qu'il a bien été mis à jour à Processed
-        loaded = MemberRepository.load_direct_data("2026-2027")
+        loaded = MemberRepository.list_flat_member_rows("2026-2027")
         match = next(m for m in loaded if m["last_name"] == "CLAPET_TEST2")
         self.assertEqual(match["status"], "Processed")
         self.assertEqual(match["order_ref"], "ORD-ACTIVE-888")

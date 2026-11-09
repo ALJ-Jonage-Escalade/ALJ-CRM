@@ -516,15 +516,12 @@ def write_members_to_v2(cur: sqlite3.Cursor, members: Iterable[MemberRecord], se
 
 
 
-# Vue de compatibilité : reproduit le format plat legacy (colonnes champ_* / opt_*)
-# à partir du schéma cible users / orders / purchases / purchase_options.
-# Stratégie strangler : le code existant lit cette vue sans modification.
-# Les options d'assurance sont exposées au niveau user (achat porteur de la saison active),
-# reproduisant l'emplacement legacy (colonnes opt_* de la table adherents).
-COMPAT_VIEW_SQL = """
-CREATE VIEW IF NOT EXISTS v_adherents_legacy AS
+# Flat member view: one row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), with the insurance options as
+# opt_* columns. Read by the FFME export, the attendance sheets, the reports and the competitions' member directory.
+# The insurance options are read at user level (any purchase of the member carrying them).
+MEMBER_FLAT_VIEW_SQL = """
+CREATE VIEW IF NOT EXISTS v_member_flat AS
 SELECT
-    u.legacy_adherent_id AS "id",
     u.id AS "user_id",
     u.last_name AS "last_name",
     u.first_name AS "first_name",
@@ -616,8 +613,9 @@ JOIN seasons s ON s.id = o.season_id
 """
 
 
-def recreate_compat_view(cur: sqlite3.Cursor) -> None:
-    """Recree la vue de compatibilite avec la definition du code courant
-    (CREATE VIEW IF NOT EXISTS ne met pas a jour une definition existante)."""
-    cur.execute("DROP VIEW IF EXISTS v_adherents_legacy")
-    cur.execute(COMPAT_VIEW_SQL)
+def recreate_member_flat_view(cur: sqlite3.Cursor) -> None:
+    """Creates the flat member view again with the current definition (CREATE VIEW IF NOT EXISTS does not update an
+    existing one)."""
+    cur.execute("DROP VIEW IF EXISTS v_adherents_legacy")  # its former name, in existing cache files
+    cur.execute("DROP VIEW IF EXISTS v_member_flat")
+    cur.execute(MEMBER_FLAT_VIEW_SQL)

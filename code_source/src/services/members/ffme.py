@@ -84,7 +84,7 @@ class ExportStats(TypedDict):
 # Export
 # --------------------------------------------------------------------------
 def export_csv(season: str, include_termine: bool) -> bytes:
-    return ffme_csv_bytes(MemberRepository.load_direct_data(season), include_termine=include_termine)
+    return ffme_csv_bytes(MemberRepository.list_flat_member_rows(season), include_termine=include_termine)
 
 
 def export_stats(season: str) -> ExportStats:
@@ -95,7 +95,7 @@ def export_stats(season: str) -> ExportStats:
     ignored_details: List[str] = []
     now = datetime.datetime.now()
 
-    for member in MemberRepository.load_direct_data(season):
+    for member in MemberRepository.list_flat_member_rows(season):
         tariff_name = str(member.get("tarif_name") or "").lower()
         status = str(member.get("status") or "").lower()
         added_by_hand = "ajout manuel" in str(member.get("commentaires_correctif") or "").lower()

@@ -47,7 +47,7 @@ def presence_overview() -> PresenceOverview:
     """The groups of the active season: the autonomous ones with the headcount of their sheet, and each course."""
     season = get_active_season()
     creneaux = PlanningRepository.load_creneaux_groups()
-    members = MemberRepository.load_direct_data(season)
+    members = MemberRepository.list_flat_member_rows(season)
 
     autonomous_creneaux = [c for c in creneaux if is_autonome_creneau(c)]
     autonomous_tarifs = {str(t).strip() for c in autonomous_creneaux for t in c.get("tarifs") or []}
@@ -96,7 +96,7 @@ def export_presence_sheets(variant: Variant, season: str, start_date: str, end_d
 
     files = generate_presence_sheets(
         [c["groupe"] for c in creneaux],
-        MemberRepository.load_direct_data(season),
+        MemberRepository.list_flat_member_rows(season),
         PlanningRepository.load_planning_data(),
         variant=variant,
         first_day=first_day,

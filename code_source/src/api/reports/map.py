@@ -27,7 +27,7 @@ def map_points(season: str, background_tasks: Optional[BackgroundTasks] = None) 
     seen: Set[Tuple[str, str, str]] = set()  # (point, name, group): a member of several seasons is listed once
     missing_addresses: Set[str] = set()
 
-    for row in MemberRepository.load_direct_data(season_read(season)):
+    for row in MemberRepository.list_flat_member_rows(season_read(season)):
         if is_cancelled(row.get("status")):
             continue
 

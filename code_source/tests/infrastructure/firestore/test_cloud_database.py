@@ -113,7 +113,7 @@ def _seed(path):
 
 def _load(path, season):
     SqliteDatabase.set_db_path(path)
-    return MemberRepository.load_direct_data(season)
+    return MemberRepository.list_flat_member_rows(season)
 
 
 class CloudDatabaseTest(unittest.TestCase):

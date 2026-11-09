@@ -55,7 +55,7 @@ def test_presence_export_rejects_bad_season(client: TestClient, season: str) -> 
     ({"start_date": "30/06/2027", "end_date": "01/09/2026"}, "date de début"),
 ])
 def test_presence_export_rejects_bad_dates(client: TestClient, dates: dict, message: str) -> None:
-    with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data") as load:
+    with patch("infrastructure.sqlite.members.MemberRepository.list_flat_member_rows") as load:
         resp = client.post("/api/presence/export", json=dates)
     assert resp.status_code == 400
     assert message in resp.json()["message"]
@@ -65,7 +65,7 @@ def test_presence_export_rejects_bad_dates(client: TestClient, dates: dict, mess
 def test_presence_export_error_is_generic(client: TestClient) -> None:
     course = {"groupe": "Cours", "tarifs": ["Cours"], "slots": []}
     with patch("infrastructure.sqlite.planning.PlanningRepository.load_creneaux_groups", return_value=[course]), \
-            patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", side_effect=RuntimeError(SECRET_DETAIL)):
+            patch("infrastructure.sqlite.members.MemberRepository.list_flat_member_rows", side_effect=RuntimeError(SECRET_DETAIL)):
         body = client.post("/api/presence/export", json={}).json()
     assert SECRET_DETAIL not in str(body)
     assert "journaux" in body["message"]

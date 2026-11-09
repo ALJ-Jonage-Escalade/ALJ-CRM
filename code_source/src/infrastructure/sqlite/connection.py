@@ -252,8 +252,8 @@ class SqliteDatabase:
         if current_version == 0:
             cursor.execute(f"PRAGMA user_version = {schema_v2.SCHEMA_TARGET_VERSION}")
             logger.info(f"[SQLITE] Base neuve taguée en version {schema_v2.SCHEMA_TARGET_VERSION} (schéma v2 natif).")
-        # Vue de compatibilité : recréée à chaque démarrage pour suivre la définition du code
-        schema_v2.recreate_compat_view(cursor)
+        # Flat member view: created again on every start to follow the code's definition
+        schema_v2.recreate_member_flat_view(cursor)
 
         conn.commit()
         conn.close()

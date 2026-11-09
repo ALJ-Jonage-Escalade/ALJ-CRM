@@ -11,7 +11,7 @@ ALL_SEASONS = "Toutes les saisons"  # the pages' choice for every season
 
 
 def season_read(season: str) -> Optional[str]:
-    """MemberRepository.load_direct_data's argument for a resolved season: None for ALL_SEASONS."""
+    """MemberRepository.list_flat_member_rows's argument for a resolved season: None for ALL_SEASONS."""
     return None if season == ALL_SEASONS else season
 
 

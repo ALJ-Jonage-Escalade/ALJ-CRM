@@ -57,12 +57,12 @@ class MemberDirectoryMixin(CompetitionStoreBase):
             rows = []
             if season:
                 rows = main_conn.execute(
-                    'SELECT * FROM v_adherents_legacy WHERE season_name = ? '
+                    'SELECT * FROM v_member_flat WHERE season_name = ? '
                     'ORDER BY "user_id" ASC', (season,)
                 ).fetchall()
             if not rows:
                 rows = main_conn.execute(
-                    'SELECT * FROM v_adherents_legacy ORDER BY "user_id" ASC'
+                    'SELECT * FROM v_member_flat ORDER BY "user_id" ASC'
                 ).fetchall()
 
             # Groupes de créneaux (planning -> tarifs) pour le champ creneau_groupe
@@ -160,7 +160,7 @@ class MemberDirectoryMixin(CompetitionStoreBase):
 
     @staticmethod
     def _best_purchase_rows(rows: List[Any]) -> List[Dict[str, Any]]:
-        """One row per member (`v_adherents_legacy` has one per purchase): the highest-priority purchase, by the
+        """One row per member (the flat member view has one per purchase): the highest-priority purchase, by the
         import's rule (purchase_priority_score); on a tie the last row, as when every row was written in turn."""
         # adherent id -> (score, purchase row); Any: the ids come from SQLite rows
         best: Dict[Any, Tuple[int, Dict[str, Any]]] = {}

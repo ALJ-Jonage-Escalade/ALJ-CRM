@@ -7,7 +7,7 @@ réglages, cache de géocodage) est Firestore : une collection `crm_<table>` par
 table, un document par ligne (ID = clé primaire SQLite).
 
 Le fichier `database.db` local devient un **cache** reconstruit depuis Firestore :
-tout le code existant (repositories de infrastructure/sqlite, vue `v_adherents_legacy`, SQL brut des
+tout le code existant (repositories de infrastructure/sqlite, vue `v_member_flat`, SQL brut des
 pages) continue de lire et d'écrire en SQL, sans modification.
 
 Mécanisme :

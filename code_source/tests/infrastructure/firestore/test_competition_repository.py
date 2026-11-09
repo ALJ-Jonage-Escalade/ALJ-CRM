@@ -430,7 +430,7 @@ class TestSyncAdherentsFromMain(MemberDbTestCase, FirestoreRepoTestCase):
                          "FROM purchases WHERE tarif_name = 'Compétition - U13/U15' AND order_id = "
                          "(SELECT id FROM orders WHERE order_ref = 'CMD1')")
             conn.commit()
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM v_adherents_legacy WHERE last_name = 'DUPONT'").fetchone()[0], 2)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM v_member_flat WHERE last_name = 'DUPONT'").fetchone()[0], 2)
         finally:
             conn.close()
         report = CompetitionRepository.rebuild_member_directory("2026-2027")

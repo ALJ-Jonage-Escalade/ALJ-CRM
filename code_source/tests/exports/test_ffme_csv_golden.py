@@ -53,13 +53,13 @@ MEMBERS = [
 ]
 
 EXPECTED_ROWS = [
-    '636947;POTTER;Harry;31/07/2010;H;FR;4 Privet Drive;;01234;JONAGE;FR;;0612345678;harry.potter@hogwarts.example;hp@owl.example;POTTER;Lily;0698765432;;;;;J;B++;OUI;NON;OUI;OUI;NON;NON',
     ';GRANGER;Hermione;19/09/1979;F;FR;ADRESSE NON COMMUNIQUEE;;69330;JONAGE;FR;;0612345678;parent.granger@example.org;;DUMBLEDORE;;;;;;;A;B+;NON;NON;NON;NON;NON;NON',
-    '1234567;WEASLEY;Ron;01/03/1980;H;;Le Terrier;;1000;BRUXELLES;BE;;;ron@burrow.example;;;;;;;;;F;B;NON;NON;NON;NON;NON;NON',
-    ';LOVEGOOD;Luna;13/02/2011;F;IE;ADRESSE NON COMMUNIQUEE;;;JONAGE;IR;;33612345678;contact@alj-escalade.fr;;;;;;;;;J;RC;NON;NON;NON;NON;NON;NON',
     '98765;INCONNU;INCONNU;02/05/2009;;FR;;;;;FR;;;;;;;;;;;;A;RC;NON;NON;NON;NON;NON;NON',
+    ';LOVEGOOD;Luna;13/02/2011;F;IE;ADRESSE NON COMMUNIQUEE;;;JONAGE;IR;;33612345678;contact@alj-escalade.fr;;;;;;;;;J;RC;NON;NON;NON;NON;NON;NON',
+    '636947;POTTER;Harry;31/07/2010;H;FR;4 Privet Drive;;01234;JONAGE;FR;;0612345678;harry.potter@hogwarts.example;hp@owl.example;POTTER;Lily;0698765432;;;;;J;B++;OUI;NON;OUI;OUI;NON;NON',
+    '1234567;WEASLEY;Ron;01/03/1980;H;;Le Terrier;;1000;BRUXELLES;BE;;;ron@burrow.example;;;;;;;;;F;B;NON;NON;NON;NON;NON;NON',
 ]
-# include_termine adds the member already declared ('Terminé'), in the same order
+# include_termine adds the member already declared ('Terminé'), in its place by name
 DONE_ROW = '765432;LONDUBAT;Neville;30/07/1980;H;FR;;;;;FR;;;;;;;;;;;;A;RC;NON;NON;NON;NON;NON;NON'
 EXPECTED_IGNORED = [
     "⚠️ [IGNORÉ] MALEFOY Drago (Commande CMD-6) : date de naissance absente ou invalide ('')",
@@ -76,8 +76,12 @@ def test_ffme_csv_bytes_matches_the_golden_rows() -> None:
 
 
 def test_ffme_csv_bytes_with_done_members() -> None:
-    expected = EXPECTED_ROWS[:4] + [DONE_ROW] + EXPECTED_ROWS[4:]
+    expected = EXPECTED_ROWS[:2] + [DONE_ROW] + EXPECTED_ROWS[2:]
     assert ffme_csv_bytes(MEMBERS, include_termine=True) == _csv(expected)
+
+
+def test_ffme_csv_bytes_does_not_depend_on_the_order_of_the_members_read() -> None:
+    assert ffme_csv_bytes(list(reversed(MEMBERS))) == _csv(EXPECTED_ROWS)
 
 
 def test_ffme_csv_rows_lists_the_members_left_out() -> None:

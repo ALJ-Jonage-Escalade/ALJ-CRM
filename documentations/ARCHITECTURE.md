@@ -91,9 +91,9 @@ ALJ-CRM/                         ← racine du dépôt
   FFME), `activities/presence.py`. Quelques routeurs plus anciens gardent encore de la logique ; elle rejoint un
   service quand le routeur est modifié.
 - **`infrastructure/`** — adaptateurs, un sous-dossier par système externe. Les plus structurants :
-  - `sqlite/schema_v2.py` : DDL SQLite, normalisations, vue de compatibilité `v_adherents_legacy` (**source unique**, recréée à chaque démarrage).
+  - `sqlite/schema_v2.py` : DDL SQLite, normalisations, vue plate des adhérents `v_member_flat` (une ligne par achat, recréée à chaque démarrage).
   - `sqlite/connection.py` (`SqliteDatabase` : chemin, connexion, schéma, sauvegarde) et un repository par domaine :
-    `members.py` (`load_direct_data()`, lignes de la vue `v_adherents_legacy`), `seasons.py`, `planning.py`,
+    `members.py` (`list_flat_member_rows()`, lignes de la vue `v_member_flat` ; `list_member_rows()` pour les pages), `seasons.py`, `planning.py`,
     `email_templates.py`, `geocache.py`, `ffme_import.py`.
   - `firestore/cloud_database.py` : réplication SQLite ⇄ Firestore (collections `crm_<table>`, triggers `_fs_*`, merge champ par champ) : pull avant une route de données si le dernier date de plus de 30 s, flush après chaque écriture (middleware de `server.py`) ; façade `CloudDatabase` s'appuyant sur `firestore/cloud_sync/` : `common` (constantes), `rest_store` (requêtes de la réplication), `cache` (SQLite, déclencheurs), `sync` (pull / flush / fusion), `bootstrap` (reconstruction du cache, import initial).
   - `firestore/client.py` : client REST Firestore (sans gRPC), dont le projet, le jeton, la conversion des valeurs et les erreurs (`FirestoreError`, `FirestoreConflictError`) partagés avec la réplication ; `firestore/competition_repository.py` : compétitions (façade `CompetitionRepository` composant les mixins de `firestore/competitions/` : adhérents, épreuves, participants, miroir HelloAsso, coachs) ;

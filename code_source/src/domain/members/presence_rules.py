@@ -19,7 +19,7 @@ from typing import Any
 from domain.members.age_rules import ADULT_AGE, age_at, parse_birth_date
 from domain.members.view import is_cancelled
 
-# A row of the flat member view (MemberRepository.load_direct_data): values are text, numbers or None.
+# A row of the flat member view (MemberRepository.list_flat_member_rows): values are text, numbers or None.
 MemberRow = Mapping[str, Any]
 
 IdentityKey = tuple[str, str, str]

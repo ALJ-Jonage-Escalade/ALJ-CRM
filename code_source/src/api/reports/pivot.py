@@ -85,7 +85,7 @@ def pivot_record(row: Dict[str, Any], season: str) -> PivotRecord:  # Any: a row
 
 def pivot_records(season: str) -> List[PivotRecord]:
     """Every member of the season (cancelled ones included: the table filters them out by default)."""
-    return [pivot_record(row, season) for row in MemberRepository.load_direct_data(season_read(season))]
+    return [pivot_record(row, season) for row in MemberRepository.list_flat_member_rows(season_read(season))]
 
 
 @router.get("/api/reports/pivot-records", response_model=PivotRecords, responses=error_responses(400, 500))

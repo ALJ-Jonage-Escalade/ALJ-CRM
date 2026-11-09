@@ -39,25 +39,20 @@ MemberRecord = Mapping[str, Any]
 
 class MemberRepository:
     @classmethod
-    def load_direct_data(cls, season: Optional[str]) -> List[MemberRow]:
-        """Purchases of `season` (None: every season) from the compatibility view v_adherents_legacy, with its flat
-        historical keys, newest first."""
+    def list_flat_member_rows(cls, season: Optional[str]) -> List[MemberRow]:
+        """Purchases of `season` (None: every season) from the flat member view, newest members first. Callers that
+        need an order of their own sort the rows themselves (the FFME export, the attendance sheets)."""
         SqliteDatabase.setup_database()
         conn = SqliteDatabase.get_connection()
         try:
             if season is None:
-                rows = conn.execute('SELECT * FROM v_adherents_legacy ORDER BY "id" DESC').fetchall()
+                rows = conn.execute('SELECT * FROM v_member_flat ORDER BY "user_id" DESC').fetchall()
             else:
-                rows = conn.execute('SELECT * FROM v_adherents_legacy WHERE season_name = ? ORDER BY "id" DESC',
+                rows = conn.execute('SELECT * FROM v_member_flat WHERE season_name = ? ORDER BY "user_id" DESC',
                                     (season,)).fetchall()
         finally:
             conn.close()
-        members: List[MemberRow] = []
-        for row in rows:
-            member = dict(row)
-            member.pop("id", None)  # the view's internal row id
-            members.append(member)
-        return members
+        return [dict(row) for row in rows]
 
 
     # One row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), the fields of the web member pages
@@ -91,7 +86,7 @@ class MemberRepository:
     @classmethod
     def list_member_rows(cls, season_name: str) -> List[MemberRow]:
         """One row per purchase of the season (users ⨝ orders ⨝ purchases), with the fields of
-        the web member pages. Unlike v_adherents_legacy, carries `purchase_id` (needed by
+        the web member pages. Unlike the flat member view, carries `purchase_id` (needed by
         /api/members/update) and skips the insurance-option subqueries."""
         return cls._query_member_rows("s.name = ?", (season_name,))
 

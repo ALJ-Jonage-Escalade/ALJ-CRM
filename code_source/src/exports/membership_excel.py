@@ -82,7 +82,8 @@ def _is_yes(value: object) -> bool:
 
 
 def _ffme_csv_rows(participants_data, include_termine: bool) -> tuple[list[list[str]], list[str]]:
-    """The CSV rows of the members to declare, and a line per member left out (missing birth date or sex)."""
+    """The CSV rows of the members to declare, sorted by name, and a line per member left out (missing birth date
+    or sex)."""
     csv_rows: list[list[str]] = []
     ignored_members: list[str] = []
     for member in participants_data:
@@ -96,7 +97,15 @@ def _ffme_csv_rows(participants_data, include_termine: bool) -> tuple[list[list[
             ignored_members.append(row)
         else:
             csv_rows.append(row)
+    # The file's own order, whatever the order of the member rows read: by name, then birth date and licence
+    csv_rows.sort(key=_ffme_row_order)
     return csv_rows, ignored_members
+
+
+def _ffme_row_order(row: list[str]) -> tuple[str, str, str, str]:
+    licence, last_name, first_name, birth_date = row[:4]
+    day, month, year = birth_date.split("/")
+    return last_name, first_name, f"{year}{month}{day}", licence
 
 
 def _is_declared(member: dict, include_termine: bool) -> bool:
