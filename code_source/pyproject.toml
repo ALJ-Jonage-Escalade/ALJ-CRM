@@ -121,6 +121,8 @@ files = [
     "src/api/ffme/schemas.py",
     "src/api/ffme/ffme.py",
     "src/api/activities/presence.py",
+    "src/exports/presence_sheets.py",
+    "src/domain/members/presence_rules.py",
     "src/api/reports/schemas.py",
     "src/api/reports/map.py",
     "src/api/reports/pivot.py",

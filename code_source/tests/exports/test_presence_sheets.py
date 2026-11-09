@@ -13,7 +13,7 @@ if _src_dir not in sys.path:
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.members import MemberRepository
 from infrastructure.sqlite.planning import PlanningRepository
-from exports.presence_sheets import clean_filename, format_encadrants
+from exports.presence_sheets import clean_filename
 
 
 def _member(order_ref, last, first, tarif):
@@ -56,18 +56,6 @@ class TestPresenceSheetGenerator(unittest.TestCase):
         self.assertEqual(clean_filename("Adultes autonomes"), "Adultes_autonomes")
         self.assertEqual(clean_filename("Loisir lycée / jeunes"), "Loisir_lycée_jeunes")
         self.assertEqual(clean_filename("Compétition - U15-U19"), "Compétition_-_U15-U19")
-
-    def test_format_encadrants(self):
-        """Vérifie le formatage des encadrants séparé en Prénom et Nom."""
-        self.assertEqual(format_encadrants([]), ("-", "-"))
-        
-        last, first = format_encadrants(["Camille DIDIER"])
-        self.assertEqual(last, "DIDIER")
-        self.assertEqual(first, "Camille")
-        
-        last, first = format_encadrants(["Antoine GAUTHIER", "Rodolphe JULLIEN-MOUTELON"])
-        self.assertEqual(last, "GAUTHIER / JULLIEN-MOUTELON")
-        self.assertEqual(first, "Antoine / Rodolphe")
 
     def test_presence_api_config(self):
         """Vérifie que /api/presence/config renvoie la structure attendue pour l'IHM."""
@@ -123,8 +111,7 @@ class TestPresenceSheetGenerator(unittest.TestCase):
         with open(unwritable_root, "w", encoding="utf-8"):
             pass
         client = TestClient(app, base_url="http://localhost")
-        with mock.patch("exports.presence_sheets.ROOT_DIR", unwritable_root), \
-                mock.patch("paths.ROOT_DIR", unwritable_root), \
+        with mock.patch("paths.ROOT_DIR", unwritable_root), \
                 mock.patch("tempfile.tempdir", self._tmpdir), \
                 mock.patch("requests.get") as http_get:
             resp = client.post("/api/presence/export", json={"variant": "cours", "selected_groups": ["Loisir WhatsApp"]})

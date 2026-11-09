@@ -13,15 +13,13 @@ from typing import List
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from api.responses import STORAGE_ERRORS, SUCCESS, document_responses, error_responses, json_with_etag
+from api.responses import STORAGE_ERRORS, SUCCESS, XLSX, document_responses, error_responses, json_with_etag
 from api.competitions.schemas.competitions import CompetitionCreate, CompetitionFfmeLookup, CompetitionUpdate
 from api.competitions.schemas.views import Competition, Done, PastArchived
 from services.competitions.competitions import CompetitionService as Service
 from services.documents import Doc
 
 router = APIRouter(prefix="/api/competitions")
-
-XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 @router.get("", response_model=List[Competition], responses=error_responses(*STORAGE_ERRORS))

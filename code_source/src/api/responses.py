@@ -39,6 +39,17 @@ def json_with_etag(request: Request, payload: Any) -> Response:  # Any: any JSON
 # Body of a write that has nothing else to return
 SUCCESS: Dict[str, str] = {"status": "success"}
 
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def file_download(content: bytes, filename: str, media_type: str) -> Response:
+    """A generated file sent as a download; the web app reads its name from Content-Disposition."""
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"', "Access-Control-Expose-Headers": "Content-Disposition"},
+    )
+
 
 class ApiErrorBody(BaseModel):
     """Body of error(): what the frontend's API client turns into an ApiError."""
