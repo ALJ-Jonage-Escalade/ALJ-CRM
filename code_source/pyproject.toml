@@ -184,4 +184,11 @@ files = [
     "src/infrastructure/sqlite/members.py",
     "src/infrastructure/sqlite/seasons.py",
     "src/domain/competitions/models.py",
+    "src/infrastructure/firestore/competitions/__init__.py",
+    "src/infrastructure/firestore/competitions/documents.py",
+    "src/infrastructure/firestore/competitions/member_directory.py",
+    "src/infrastructure/firestore/competitions/coaches.py",
+    "src/infrastructure/firestore/competitions/competitions.py",
+    "src/infrastructure/firestore/competitions/participants.py",
+    "src/infrastructure/firestore/competitions/helloasso_items.py",
 ]

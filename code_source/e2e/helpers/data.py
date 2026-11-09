@@ -1,6 +1,6 @@
 """
-Test data set up through the application's own repository (CompetitionRepository, the
-code path of the desktop app and the HelloAsso webhook), run in a dev-mode subprocess like the
+Test data set up through the application's own Firestore modules (infrastructure.firestore.competitions,
+the code path of the API and the HelloAsso webhook), run in a dev-mode subprocess like the
 seed: the pytest process never talks to Firestore itself.
 
 The subprocess is started once and serves every request (JSON lines on stdin / stdout): a fresh
@@ -23,18 +23,20 @@ _RESULT, _ERROR = "__RESULT__", "__ERROR__"
 _TIMEOUT = 60   # seconds per request
 EVENTUALLY_TIMEOUT = 5.0   # seconds, as Playwright's expect (shortened by conftest.known_bug_timeouts)
 
-# Each request line is {"body", "args"}: `body` runs with `args`, `CompetitionRepository` and `Competition` in scope and sets
+# Each request line is {"body", "args"}: `body` runs with `args`, `Competition` and the competitions modules in scope and sets
 # `result`. The adherents cache is dropped first, so that every request reads Firestore as a fresh process would.
 _WORKER = f"""
 import json, sys, traceback
 sys.path.insert(0, "src")
 from domain.competitions.models import Competition
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import coaches, competitions, documents, helloasso_items, member_directory, participants
 for line in sys.stdin:
     request = json.loads(line)
     try:
-        CompetitionRepository._invalidate_adherents_cache()
-        scope = {{"json": json, "sys": sys, "CompetitionRepository": CompetitionRepository, "Competition": Competition, "args": request["args"]}}
+        member_directory.invalidate_cache()
+        scope = {{"json": json, "sys": sys, "Competition": Competition, "args": request["args"], "documents": documents,
+                  "member_directory": member_directory, "coaches": coaches, "competitions": competitions,
+                  "participants": participants, "helloasso_items": helloasso_items}}
         exec(request["body"], scope)
         print({_RESULT!r} + json.dumps(scope["result"], default=str), flush=True)
     except Exception:
@@ -116,7 +118,7 @@ class TestData:
     def members(self, competition_only: bool = False, statuses: list | None = None) -> list:
         """Members of the `adherents` projection (id, nom, prenom, tarif, statut, email…); `statuses`: only those
         at one of these membership statuses."""
-        return self._run("result = CompetitionRepository.list_members(competition_only=args['only'], statuses=args['statuses'])",
+        return self._run("result = member_directory.list_members(competition_only=args['only'], statuses=args['statuses'])",
                          only=competition_only, statuses=statuses)
 
     def competition_group(self) -> list:
@@ -125,7 +127,7 @@ class TestData:
         return self.members(competition_only=True, statuses=["Terminé"])
 
     def coaches(self) -> list:
-        return self._run("result = CompetitionRepository.list_coaches()")
+        return self._run("result = coaches.list_coaches()")
 
     def save_setting(self, key: str, value: str) -> None:
         """Firestore app setting (e.g. HELLOASSO_ANNUAL_CAMPAIGN), as the bureau pages save it."""
@@ -134,7 +136,7 @@ class TestData:
 
     def helloasso_item(self, id_item: int):
         """Mirror document of a HelloAsso item (link, ignore flag, comment), or None."""
-        return self._run("result = CompetitionRepository.get_item(args['id'])", id=id_item)
+        return self._run("result = helloasso_items.get_item(args['id'])", id=id_item)
 
     def fill_geocache(self) -> int:
         """Fake coordinates (around Jonage) for every address the map would geocode, so that it
@@ -160,7 +162,7 @@ result = len(set(collect.addresses))
 """)
 
     def create_coach(self, nom: str) -> int:
-        return self._run("result = CompetitionRepository.save_coach(args['nom'])", nom=nom)
+        return self._run("result = coaches.save_coach(args['nom'])", nom=nom)
 
     def create_competition(self, nom: str, date: str = "", prix: float = 10.0, participants=(),
                            selected=(), coach_ids=(), id_ffme: str = "") -> int:
@@ -168,27 +170,27 @@ result = len(set(collect.addresses))
         return self._run("""
 comp = Competition(nom=args['nom'], date_competition=args['date'], prix=args['prix'], id_ffme=args['id_ffme'],
                    coach_ids=list(args['coach_ids']))
-cid = CompetitionRepository.save_competition(comp)
+cid = competitions.save_competition(comp)
 for aid in args['participants']:
-    CompetitionRepository.add_participant(cid, aid, selectionne=aid in args['selected'])
+    participants.add_participant(cid, aid, selectionne=aid in args['selected'])
 result = cid
 """, nom=nom, date=date, prix=prix, participants=list(participants), selected=list(selected),
             coach_ids=list(coach_ids), id_ffme=id_ffme)
 
     def mark_paid(self, competition_id: int, adherent_id: int, amount: float, order_ref: str = "E2E-ORDER") -> None:
         """Records a HelloAsso payment (same call as the webhook)."""
-        self._run("CompetitionRepository.apply_helloasso_payment(args['cid'], args['aid'], args['amount'], order_ref=args['ref'])\n"
+        self._run("participants.apply_helloasso_payment(args['cid'], args['aid'], args['amount'], order_ref=args['ref'])\n"
                   "result = True", cid=competition_id, aid=adherent_id, amount=amount, ref=order_ref)
 
     def set_selection(self, competition_id: int, adherent_id: int, selectionne: bool) -> None:
         """« Participe » changed elsewhere (desktop app, another coach): same repository call."""
-        self._run("CompetitionRepository.set_selection(args['cid'], args['aid'], args['value'])\nresult = True",
+        self._run("participants.set_selection_doc(args['cid'], args['aid'], args['value'])\nresult = True",
                   cid=competition_id, aid=adherent_id, value=selectionne)
 
     def competition(self, competition_id: int):
         """The competition document as stored (participants embedded), or None."""
-        return self._run("result = CompetitionRepository._load_comp_doc(args['cid'])", cid=competition_id)
+        return self._run("result = documents.load_comp_doc(args['cid'])", cid=competition_id)
 
     def competition_by_name(self, nom: str):
-        return self._run("result = next((d for d in CompetitionRepository._list_comp_docs() if d.get('nom') == args['nom']), None)",
+        return self._run("result = next((d for d in documents.list_comp_docs() if d.get('nom') == args['nom']), None)",
                          nom=nom)

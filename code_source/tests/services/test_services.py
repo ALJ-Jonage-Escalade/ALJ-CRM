@@ -5,7 +5,7 @@ from unittest.mock import patch
 from support.fake_firestore import FirestoreRepoTestCase
 
 from domain.competitions.models import Competition
-from infrastructure.firestore.competition_repository import CompetitionRepository
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.client import FirestoreConflictError, FirestoreError
 from services.competitions import store as competition_store
 from services.competitions.competitions import CompetitionService as Service
@@ -21,11 +21,11 @@ class TestCompetitionService(FirestoreRepoTestCase):
         self.addCleanup(competition_store.invalidate_cache)
 
     def test_firestore_errors_become_service_errors(self):
-        with patch.object(CompetitionRepository, "list_competition_docs", side_effect=FirestoreError("down")):
+        with patch.object(competitions, "list_competition_docs", side_effect=FirestoreError("down")):
             with self.assertRaises(StorageUnavailable), self.assertLogs("alj", "ERROR") as logs:
                 Service.list_competitions()
         self.assertIn("CompetitionService.list_competitions", logs.output[0])
-        with patch.object(CompetitionRepository, "delete_competition", side_effect=FirestoreConflictError("race")):
+        with patch.object(competitions, "delete_competition", side_effect=FirestoreConflictError("race")):
             with self.assertRaises(Conflict) as ctx:
                 Service.delete_competition(1)
         self.assertEqual(ctx.exception.code, "conflict")
@@ -39,16 +39,16 @@ class TestCompetitionService(FirestoreRepoTestCase):
 
     def test_list_is_cached_until_a_write(self):
         self.assertEqual(Service.list_competitions(), [])
-        CompetitionRepository.save_competition(Competition(id=1, nom="Hors service"))
+        competitions.save_competition(Competition(id=1, nom="Hors service"))
         self.assertEqual(Service.list_competitions(), [])  # cached: written behind its back
         Service.create_competition({"nom": "Coupe"})
         self.assertEqual(len(Service.list_competitions()), 2)
 
     def test_failed_write_still_drops_the_cache(self):
         Service.list_competitions()
-        with patch.object(CompetitionRepository, "delete_competition", side_effect=FirestoreError("down")):
+        with patch.object(competitions, "delete_competition", side_effect=FirestoreError("down")):
             with self.assertRaises(StorageUnavailable):
                 Service.delete_competition(1)
-        with patch.object(CompetitionRepository, "list_competition_docs", return_value=[]) as read:
+        with patch.object(competitions, "list_competition_docs", return_value=[]) as read:
             Service.list_competitions()
         read.assert_called_once()

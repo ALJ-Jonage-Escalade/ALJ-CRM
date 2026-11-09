@@ -9,11 +9,7 @@ from __future__ import annotations
 from typing import Optional, Sequence, Tuple
 
 from domain.competitions.models import STATUT_CLOSE
-from infrastructure.firestore.competition_repository import (
-    CompetitionRepository,
-    ParticipantAlreadyPaid,
-    ParticipantChanged,
-)
+from infrastructure.firestore.competitions import competitions, participants
 from services.competitions.store import require_competition, write
 from domain.errors import Conflict, NotFound
 
@@ -21,7 +17,7 @@ from domain.errors import Conflict, NotFound
 def _written(competition_id: int, doc: Optional[dict]) -> dict:
     """The competition as the write left it. `doc` None (nothing written): the competition is
     read, which also raises NotFound when it does not exist."""
-    return CompetitionRepository.competition_api_doc(doc) if doc is not None else require_competition(competition_id)
+    return competitions.competition_api_doc(doc) if doc is not None else require_competition(competition_id)
 
 
 def _require_open(competition_id: int) -> None:
@@ -43,7 +39,7 @@ class ParticipantService:
     @staticmethod
     @write
     def add_participant(competition_id: int, adherent_id: int, selectionne: bool) -> dict:
-        return _written(competition_id, CompetitionRepository.add_participant_doc(competition_id, adherent_id, selectionne))
+        return _written(competition_id, participants.add_participant_doc(competition_id, adherent_id, selectionne))
 
     @staticmethod
     @write
@@ -65,16 +61,16 @@ class ParticipantService:
         doc = None
         try:
             if selectionne is not None:
-                doc = CompetitionRepository.set_selection_doc(competition_id, adherent_id, selectionne, refuse_unselect_paid=True,
+                doc = participants.set_selection_doc(competition_id, adherent_id, selectionne, refuse_unselect_paid=True,
                                              unchanged_since=unchanged_since)
             if present is not None:
-                doc = CompetitionRepository.set_present_doc(competition_id, adherent_id, present, unchanged_since=unchanged_since)
+                doc = participants.set_present_doc(competition_id, adherent_id, present, unchanged_since=unchanged_since)
                 if doc is None and not queued:
                     raise _participant_not_found(competition_id)
-        except ParticipantAlreadyPaid as e:
+        except participants.ParticipantAlreadyPaid as e:
             raise Conflict("Ce compétiteur a déjà payé : choisissez le sort de son paiement.",
                            "already_paid") from e
-        except ParticipantChanged as e:
+        except participants.ParticipantChanged as e:
             raise Conflict("Modifié entre-temps sur un autre appareil : modification refusée.", "changed") from e
         written = _written(competition_id, doc)
         if queued and not any(p.get("adherent_id") == adherent_id for p in written.get("participants") or []):
@@ -85,33 +81,33 @@ class ParticipantService:
     @write
     def record_manual_payment(competition_id: int, adherent_id: int, montant: float) -> dict:
         """Cheque or cash: the participant becomes selected and paid."""
-        doc = CompetitionRepository.record_manual_payment_doc(competition_id, adherent_id, montant)
+        doc = participants.record_manual_payment_doc(competition_id, adherent_id, montant)
         if doc is None:
             raise NotFound("Compétition ou compétiteur introuvable.")
-        return CompetitionRepository.competition_api_doc(doc)
+        return competitions.competition_api_doc(doc)
 
     @staticmethod
     @write
     def cancel_participant(competition_id: int, adherent_id: int, payment_status: str,
                            note: str) -> dict:
         """`payment_status`: PAIEMENT_ANNULE_PERDU or PAIEMENT_ANNULE_REPORTE."""
-        doc = CompetitionRepository.mark_cancelled_doc(competition_id, adherent_id, payment_status, note)
+        doc = participants.mark_cancelled_doc(competition_id, adherent_id, payment_status, note)
         if doc is None:
             raise NotFound("Compétition ou compétiteur introuvable.")
-        return CompetitionRepository.competition_api_doc(doc)
+        return competitions.competition_api_doc(doc)
 
     @staticmethod
     @write
     def remove_participant(competition_id: int, adherent_id: int) -> dict:
-        doc = CompetitionRepository.remove_participant_doc(competition_id, adherent_id)
+        doc = participants.remove_participant_doc(competition_id, adherent_id)
         if doc is None:
             raise NotFound("Compétition ou compétiteur introuvable.")
-        return CompetitionRepository.competition_api_doc(doc)
+        return competitions.competition_api_doc(doc)
 
     @staticmethod
     @write
     def load_competition_group(competition_id: int, statuses: Optional[Sequence[str]] = None) -> Tuple[int, dict]:
         """Adds every member of the « Compétition » tariff not already listed (not invited), only those at one of
         `statuses` when given. Returns (number added, competition)."""
-        added, doc = CompetitionRepository.load_competition_group_doc(competition_id, statuses)
+        added, doc = participants.load_competition_group_doc(competition_id, statuses)
         return added, _written(competition_id, doc)

@@ -396,7 +396,7 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
     def test_readonly_role_end_to_end(self):
         """Readonly can read competitions, and nothing else."""
         readonly = make_token(email=READONLY)
-        with patch("infrastructure.firestore.competition_repository.CompetitionRepository.list_competition_docs", return_value=[]):
+        with patch("infrastructure.firestore.competitions.competitions.list_competition_docs", return_value=[]):
             self.assertEqual(self.get("/api/competitions", readonly).status_code, 200)
         self.assertEqual(self.get("/api/email-status", readonly).status_code, 403)
         r = self.client.post("/api/competitions", json={}, headers={"Authorization": f"Bearer {readonly}"})
@@ -501,10 +501,13 @@ class TestWebhookVerification(unittest.TestCase):
         """Avec des articles vérifiés, le contenu du payload n'est pas utilisé."""
         with patch.object(HelloAssoWebhookService, "extract_items_from_payload") as extract, \
              patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", return_value=""), \
-             patch("services.competitions.helloasso_webhook.CompetitionRepository") as repo:
-            repo.list_competitions.return_value = []
-            repo.list_members.return_value = []
-            repo.list_helloasso_links.return_value = {}
+             patch("services.competitions.helloasso_webhook.competitions") as competition_store, \
+             patch("services.competitions.helloasso_webhook.member_directory") as directory, \
+             patch("services.competitions.helloasso_webhook.helloasso_items") as mirror:
+            competition_store.list_competitions.return_value = []
+            directory.list_members.return_value = []
+            mirror.list_helloasso_links.return_value = {}
+            mirror.known_helloasso_item_ids.return_value = set()
             report = HelloAssoWebhookService.reconcile_payment_items({"eventType": "Order"}, items=[VERIFIED_ITEM])
             extract.assert_not_called()
             self.assertEqual(report["processed_count"], 1)
