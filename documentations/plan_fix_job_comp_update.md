@@ -76,10 +76,9 @@ Only the manual "Trouver les résultats" action per competition works (`POST /ap
 4. **Document key.** The batch takes `cid = comp.get("id") or comp.get("doc_id")` (`results_batch.py:131` and `:436`)
    and writes with `FirestoreClient.update_fields("competitions", cid, …)`. Raw `list_documents` returns the Firestore
    key as `_doc_id` (not `doc_id`), and legacy competitions may live under a random key different from `str(id)`.
-   `_list_comp_docs()` (`src/infrastructure/firestore/competitions/base.py:80`, inherited by
-   `CompetitionRepository`, `src/infrastructure/firestore/competition_repository.py:46`) already deduplicates
-   and moves them to the canonical key `str(id)` (it writes and deletes documents to do so), so use it rather than
-   the raw listing.
+   `documents.list_comp_docs()` (`src/infrastructure/firestore/competitions/documents.py`; `_list_comp_docs()` of the
+   former `CompetitionRepository` when this was written) already deduplicates and moves them to the canonical key
+   `str(id)` (it writes and deletes documents to do so), so use it rather than the raw listing.
 5. **Lost updates.** The batch rewrites the whole `participants` array (`results_batch.py:218`), read at the start of
    the run. A participant edited on the web during the run (can take minutes) is overwritten. Re-read the document just
    before writing, or only patch the ranking fields of the matched participants.
@@ -100,8 +99,8 @@ Only the manual "Trouver les résultats" action per competition works (`POST /ap
 
 ### a. Read the competitions correctly
 - In `CompetitionResultsBatchService.list_pending_competitions`, replace `FirestoreClient.get_collection("competitions")` with
-  `CompetitionRepository._list_comp_docs()` (or add a public wrapper; it is private today), and use its
-  canonical key (`str(id)`) for writes.
+  the deduplicated listing (today `competitions.list_competition_docs()`, built on `documents.list_comp_docs()` in
+  `infrastructure/firestore/competitions/`), and use its canonical key (`str(id)`) for writes.
 - Stop swallowing the error: catch `FirestoreError` only, log at error level (`logger.error`, not `print`), and let the
   endpoint return a non-2xx status (e.g. 503 through `api.responses.error()` + `error_responses()`), so Scheduler shows
   the failure. (The SQLite fallback itself is already gone.)
