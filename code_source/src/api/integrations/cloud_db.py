@@ -68,7 +68,7 @@ def sync_cloud_db_api(force: bool = Query(False)) -> CloudDbSync | JSONResponse:
     errors = report.get("errors") or []
     if errors:
         for err in errors:
-            print(f"❌ [CLOUD_DB] Synchronisation : {err}")
+            logger.warning(f"[CLOUD_DB] Synchronisation : {err}")
         return JSONResponse(status_code=500, content={
             "status": "error",
             "message": f"Erreur de synchronisation ({len(errors)} erreur(s), détails dans les journaux).",

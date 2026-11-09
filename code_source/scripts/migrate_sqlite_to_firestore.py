@@ -11,7 +11,7 @@ Migration de database.db (SQLite) vers Firestore (collections crm_<table>). Outi
   doublon. Refuse d'écrire si les collections contiennent déjà des données
   (sauf --force).
 - --verify reconstruit un cache depuis Firestore et le compare à la source :
-  chaque table ligne à ligne, puis la liste des adhérents (load_direct_data)
+  chaque table ligne à ligne, puis la liste des adhérents (list_flat_member_rows)
   pour chaque saison.
 
 Jeton : variable ALJ_FIRESTORE_ACCESS_TOKEN (ex. `gcloud auth print-access-token`),
@@ -60,7 +60,7 @@ def load_view(path: str, season: str) -> list:
     saved = SqliteDatabase.get_db_path()
     try:
         SqliteDatabase.set_db_path(path)
-        return MemberRepository.load_direct_data(season)
+        return MemberRepository.list_flat_member_rows(season)
     finally:
         SqliteDatabase.set_db_path(saved)
 
@@ -96,7 +96,7 @@ def compare(source: str, cache: str) -> list:
         if va != vb:
             problems.append(f"Adhérents {season} : {len(va)} vs {len(vb)} lignes, contenu différent")
         else:
-            print(f"   ✅ Adhérents {season} : {len(va)} lignes identiques (load_direct_data)")
+            print(f"   ✅ Adhérents {season} : {len(va)} lignes identiques (list_flat_member_rows)")
     return problems
 
 

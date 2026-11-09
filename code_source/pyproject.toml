@@ -1,24 +1,26 @@
 [project]
 name = "alj-escalade-manager"
 version = "2.0.5"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi==0.162.0",
     "uvicorn==0.54.0",
     "requests==2.34.2",
     "PyJWT[crypto]==2.15.1",
-    "pandas==3.1.0",
+    # Imported directly (x509 certificates of the Firebase tokens), not only through PyJWT[crypto]
+    "cryptography==50.0.2",
+    # API contract models: imported directly, not only through fastapi
+    "pydantic==2.14.2",
     "openpyxl==3.1.5",
     "python-dotenv==1.2.4",
-    "geopy==2.5.0",
     "pillow==13.0.0",
     "lxml==6.1.3",
     "segno==1.6.6",
+    # Attestation PDFs (needs Pango from the system, installed by the Dockerfile)
+    "weasyprint==70.0",
 ]
 
 [dependency-groups]
-# Génération des attestations PDF sur Cloud Run (nécessite Pango côté système).
-web = ["weasyprint==70.0"]
 dev = [
     "pytest==9.1.1",
     "pytest-timeout==2.4.0",
@@ -27,6 +29,7 @@ dev = [
     "httpx==0.28.1",
     # Fake data for the development environment (dev/seed)
     "Faker==40.39.0",
+    "pytest-cov==7.1.0",
 ]
 
 [tool.uv]
@@ -165,4 +168,20 @@ files = [
     "src/api/admin/__init__.py",
     "src/api/admin/schemas.py",
     "src/api/admin/access.py",
+    # Fully annotated in desloppify batch 6
+    "src/api/communications/email.py",
+    "src/api/integrations/google_auth.py",
+    "src/domain/validators.py",
+    "src/exports/competitors_excel.py",
+    "src/exports/competitors_pdf.py",
+    "src/infrastructure/firestore/cloud_sync/common.py",
+    "src/infrastructure/firestore/cloud_sync/rest_store.py",
+    "src/infrastructure/mail/sender.py",
+    "src/infrastructure/qrcodes/cache.py",
+    "src/infrastructure/security/secret_store.py",
+    "src/infrastructure/sqlite/email_templates.py",
+    "src/infrastructure/sqlite/ffme_import.py",
+    "src/infrastructure/sqlite/members.py",
+    "src/infrastructure/sqlite/seasons.py",
+    "src/domain/competitions/models.py",
 ]

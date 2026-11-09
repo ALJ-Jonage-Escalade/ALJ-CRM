@@ -13,30 +13,20 @@ Aucune dépendance à infrastructure.sqlite.connection pour éviter toute import
 import datetime
 import logging
 import sqlite3
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple, Union
 
 from domain.members.purchase_priority import purchase_priority_score, status_score
 from domain.members.sex import parse_sex
+from domain.members.view import normalize_status
 from domain.utils import normalize_name
 
 logger = logging.getLogger("alj")
 
-SCHEMA_TARGET_VERSION = 2
-SEASON_ACTIVE = "2026-2027"
+# A member record: a flat HelloAsso export row (dict) or a SQLite row. Any: values of many columns and types
+MemberRecord = Union[Mapping[str, Any], sqlite3.Row]
 
-STATUS_NORMALIZATION = {
-    "processed": "Traité",
-    "validated": "Validé",
-    "validé": "Validé",
-    "valide": "Validé",
-    "terminé": "Terminé",
-    "termine": "Terminé",
-    "annulé": "Annulé",
-    "annule": "Annulé",
-    "canceled": "Annulé",
-    "en cours": "En cours",
-    "refunded": "Annulé",  # a refund on HelloAsso counts as a cancellation
-    "refunding": "Annulé",
-}
+SCHEMA_TARGET_VERSION = 2
+
 
 V2_DDL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -162,7 +152,7 @@ OPTION_PAIRS = [
 ]
 
 
-def clean_legacy_text(val):
+def clean_legacy_text(val: object) -> Optional[str]:
     """
     Préserve la distinction NULL / chaîne vide du legacy : le générateur CSV historique
     applique str(None) ('None') sur les valeurs NULL — les restituer telles quelles
@@ -183,7 +173,7 @@ def sex_code(raw: object, order_ref: object) -> str | None:
     return sex.value if sex else None
 
 
-def parse_iso_date(val):
+def legacy_date_to_iso(val: object) -> str:
     """Normalise une date legacy ('20/08/2012', '2012-08-20T00:00:00', ...) en ISO '2012-08-20'."""
     s = str(val or "").strip()
     if not s:
@@ -197,15 +187,11 @@ def parse_iso_date(val):
     return ""
 
 
-def normalize_status(status):
-    return STATUS_NORMALIZATION.get(str(status or "").strip().lower(), str(status or "").strip())
-
-
-def is_true(val):
+def is_true(val: object) -> bool:
     return str(val or "").strip().lower() in ("oui", "true", "vrai", "1", "yes")
 
 
-def _get(rec, key):
+def _get(rec: MemberRecord, key: str) -> Any:  # Any: a stored or HelloAsso value of any column
     """Accès tolérant : fonctionne avec les dict HelloAsso et les sqlite3.Row."""
     try:
         return rec[key]
@@ -213,12 +199,12 @@ def _get(rec, key):
         return None
 
 
-def build_user_field_map(cur=None):
+def build_user_field_map(cur: Optional[sqlite3.Cursor] = None) -> Dict[str, str]:
     """Map legacy->users (map statique : la table legacy n'existe plus)."""
     return dict(USER_FIELD_MAP)
 
 
-def _dynamic_field_values(rec):
+def _dynamic_field_values(rec: MemberRecord) -> Dict[str, Optional[str]]:
     """Résout sur l'enregistrement les champs à longs libellés (photo / questionnaire de santé),
     dont la clé exacte dépend du formulaire HelloAsso."""
     out = {}
@@ -234,7 +220,7 @@ def _dynamic_field_values(rec):
     return out
 
 
-def ensure_v2_schema(cur):
+def ensure_v2_schema(cur: sqlite3.Cursor) -> None:
     """Crée les tables v2 si absentes (idempotent)."""
     cur.executescript(V2_DDL)
     rename_gender_column(cur)
@@ -256,16 +242,25 @@ def rename_gender_column(cur: sqlite3.Cursor) -> None:
         cur.execute("UPDATE users SET sex = ? WHERE id = ?", (sex.value if sex else None, user_id))
 
 
-def resolve_season_id(cur, season_name):
-    cur.execute("SELECT id FROM seasons WHERE name=?", (season_name,))
-    row = cur.fetchone()
-    if row:
-        return row["id"] if isinstance(row, sqlite3.Row) else row[0]
-    cur.execute("INSERT INTO seasons (name, is_active) VALUES (?, 0)", (season_name,))
+def _inserted_id(cur: sqlite3.Cursor) -> int:
+    """Id of the row the cursor just inserted (always set after a successful INSERT)."""
+    if cur.lastrowid is None:
+        raise sqlite3.DatabaseError("INSERT did not return a row id")
     return cur.lastrowid
 
 
-def fill_blank_user_fields(cur, user_id, rec, now_iso, field_map):
+def resolve_season_id(cur: sqlite3.Cursor, season_name: str) -> int:
+    """Id of the season, created (inactive) when missing."""
+    cur.execute("SELECT id FROM seasons WHERE name=?", (season_name,))
+    row = cur.fetchone()
+    if row:
+        return int(row["id"] if isinstance(row, sqlite3.Row) else row[0])
+    cur.execute("INSERT INTO seasons (name, is_active) VALUES (?, 0)", (season_name,))
+    return _inserted_id(cur)
+
+
+def fill_blank_user_fields(cur: sqlite3.Cursor, user_id: int, rec: MemberRecord, now_iso: str,
+                           field_map: Mapping[str, str]) -> None:
     """Copies the fields of `rec` into the user's columns that are still blank: a value of the base is never overwritten."""
     dyn = _dynamic_field_values(rec)
     for src_col, dst_col in field_map.items():
@@ -289,13 +284,14 @@ def fill_blank_user_fields(cur, user_id, rec, now_iso, field_map):
             )
 
 
-def upsert_user_v2(cur, rec, now_iso, field_map):
+def upsert_user_v2(cur: sqlite3.Cursor, rec: MemberRecord, now_iso: str,
+                   field_map: Mapping[str, str]) -> Tuple[int, bool]:
     """Crée ou complète un user. rec = dict HelloAsso ou ligne legacy (adherents JOIN seasons).
     Retourne (user_id, created)."""
     last = str(_get(rec, "user_lastName") or "").strip()
     first = str(_get(rec, "user_firstName") or "").strip()
     dob_raw = str(_get(rec, DOB_COLUMN) or "").strip()
-    dob_iso = parse_iso_date(dob_raw)
+    dob_iso = legacy_date_to_iso(dob_raw)
     k_last = normalize_name(last).upper()
     k_first = normalize_name(first).lower()
 
@@ -334,7 +330,7 @@ def upsert_user_v2(cur, rec, now_iso, field_map):
             f'VALUES ({", ".join("?" for _ in cols)})',
             [values[c] for c in cols],
         )
-        user_id = cur.lastrowid
+        user_id = _inserted_id(cur)
     except sqlite3.IntegrityError:
         cur.execute(
             "SELECT id FROM users WHERE last_name_key=? AND first_name_key=? AND birth_date=?",
@@ -347,9 +343,9 @@ def upsert_user_v2(cur, rec, now_iso, field_map):
     return user_id, True
 
 
-def upsert_order_v2(cur, order_ref, order_date, status,
-                    payer_last="", payer_first="", payer_email="",
-                    season_id=None, now_iso=None):
+def upsert_order_v2(cur: sqlite3.Cursor, order_ref: str, order_date: object, status: object,
+                    payer_last: object = "", payer_first: object = "", payer_email: object = "",
+                    season_id: Optional[int] = None, now_iso: Optional[str] = None) -> Optional[int]:
     """Crée ou met à jour la commande (statut le plus actif conservé, payeur complété)."""
     cur.execute("SELECT id, status, payer_last_name, payer_first_name, payer_email, season_id "
                 "FROM orders WHERE order_ref=?", (order_ref,))
@@ -381,7 +377,7 @@ def upsert_order_v2(cur, order_ref, order_date, status,
     return cur.lastrowid
 
 
-def _has_better_sibling_purchase(cur, user_id, order_id, score):
+def _has_better_sibling_purchase(cur: sqlite3.Cursor, user_id: Optional[int], order_id: Optional[int], score: int) -> bool:
     """Vrai si une autre purchase du même user dans la même saison a un score de statut
     strictement supérieur. Reproduit la sémantique legacy : une inscription moins
     prioritaire (annulée / liste d'attente) ne doit jamais masquer une inscription active."""
@@ -392,16 +388,17 @@ def _has_better_sibling_purchase(cur, user_id, order_id, score):
           AND p.id != ?
     """, (user_id, order_id, order_id))
     for r in cur.fetchall():
-        ex_s = r["status"] if isinstance(r, sqlite3.Row) else r[0]
-        ex_t = r["tarif_name"] if isinstance(r, sqlite3.Row) else r[1]
-        ex_a = r["amount"] if isinstance(r, sqlite3.Row) else r[2]
-        if purchase_priority_score(ex_s, ex_t, ex_a) > score:
+        sibling_status = r["status"] if isinstance(r, sqlite3.Row) else r[0]
+        sibling_tarif = r["tarif_name"] if isinstance(r, sqlite3.Row) else r[1]
+        sibling_amount = r["amount"] if isinstance(r, sqlite3.Row) else r[2]
+        if purchase_priority_score(sibling_status, sibling_tarif, sibling_amount) > score:
             return True
     return False
 
 
-def insert_purchase_v2(cur, order_id, user_id, rec, now_iso,
-                       legacy_adherent_id=None, legacy_season_id=None):
+def insert_purchase_v2(cur: sqlite3.Cursor, order_id: Optional[int], user_id: Optional[int], rec: MemberRecord,
+                       now_iso: str, legacy_adherent_id: Optional[int] = None,
+                       legacy_season_id: Optional[int] = None) -> Optional[int]:
     """Insère ou met à jour l'achat avec la règle de priorité de statut centralisée.
     Retourne purchase_id, ou None si une inscription plus prioritaire existe déjà."""
     try:
@@ -469,7 +466,7 @@ def insert_purchase_v2(cur, order_id, user_id, rec, now_iso,
     return cur.lastrowid
 
 
-def insert_options_v2(cur, purchase_id, rec):
+def insert_options_v2(cur: sqlite3.Cursor, purchase_id: Optional[int], rec: MemberRecord) -> int:
     """Insère les options d'assurance souscrites (1 ligne par option). Retourne le nombre ajouté."""
     added = 0
     for opt_name, col_has, col_amount in OPTION_PAIRS:
@@ -487,7 +484,7 @@ def insert_options_v2(cur, purchase_id, rec):
     return added
 
 
-def sync_members_to_v2(cur, members, season_name=SEASON_ACTIVE):
+def write_members_to_v2(cur: sqlite3.Cursor, members: Iterable[MemberRecord], season_name: str) -> Dict[str, int]:
     """Écrit un lot d'adhésions dans le schéma v2, payeurs (payer_*) compris.
     Appelé par MemberRepository.upsert_members (même transaction)."""
     ensure_v2_schema(cur)
@@ -519,15 +516,12 @@ def sync_members_to_v2(cur, members, season_name=SEASON_ACTIVE):
 
 
 
-# Vue de compatibilité : reproduit le format plat legacy (colonnes champ_* / opt_*)
-# à partir du schéma cible users / orders / purchases / purchase_options.
-# Stratégie strangler : le code existant lit cette vue sans modification.
-# Les options d'assurance sont exposées au niveau user (achat porteur de la saison active),
-# reproduisant l'emplacement legacy (colonnes opt_* de la table adherents).
-COMPAT_VIEW_SQL = """
-CREATE VIEW IF NOT EXISTS v_adherents_legacy AS
+# Flat member view: one row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), with the insurance options as
+# opt_* columns. Read by the FFME export, the attendance sheets, the reports and the competitions' member directory.
+# The insurance options are read at user level (any purchase of the member carrying them).
+MEMBER_FLAT_VIEW_SQL = """
+CREATE VIEW IF NOT EXISTS v_member_flat AS
 SELECT
-    u.legacy_adherent_id AS "id",
     u.id AS "user_id",
     u.last_name AS "last_name",
     u.first_name AS "first_name",
@@ -619,8 +613,9 @@ JOIN seasons s ON s.id = o.season_id
 """
 
 
-def recreate_compat_view(cur):
-    """Recree la vue de compatibilite avec la definition du code courant
-    (CREATE VIEW IF NOT EXISTS ne met pas a jour une definition existante)."""
-    cur.execute("DROP VIEW IF EXISTS v_adherents_legacy")
-    cur.execute(COMPAT_VIEW_SQL)
+def recreate_member_flat_view(cur: sqlite3.Cursor) -> None:
+    """Creates the flat member view again with the current definition (CREATE VIEW IF NOT EXISTS does not update an
+    existing one)."""
+    cur.execute("DROP VIEW IF EXISTS v_adherents_legacy")  # its former name, in existing cache files
+    cur.execute("DROP VIEW IF EXISTS v_member_flat")
+    cur.execute(MEMBER_FLAT_VIEW_SQL)

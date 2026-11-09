@@ -33,7 +33,7 @@ def clock() -> FakeClock:
 
 @pytest.fixture
 def sent() -> MagicMock:
-    """The invitation e-mails: EmailRepository.send_email, faked."""
+    """The invitation e-mails: EmailSender.send_email, faked."""
     return MagicMock(return_value=None)
 
 
@@ -45,7 +45,7 @@ def client(store: InMemoryAccessStore, clock: FakeClock, sent: MagicMock, monkey
     # The token's claims: the e-mail is the bearer token itself (signatures are tested in test_api_security)
     with patch("infrastructure.security.api_auth.verify_firebase_token",
                side_effect=lambda token: {"sub": token, "email": token, "email_verified": True, "name": "Google Name"}), \
-         patch("services.access.invitations.EmailRepository.send_email", sent):
+         patch("services.access.invitations.EmailSender.send_email", sent):
         yield TestClient(app)
 
 

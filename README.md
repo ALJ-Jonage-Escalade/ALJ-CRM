@@ -19,7 +19,7 @@ e-mails capturés par Mailpit. **Aucun accès aux données ni aux services de pr
 sudo apt install libpango-1.0-0 libpangoft2-1.0-0   # + Docker
 # uv : https://docs.astral.sh/uv/getting-started/installation/  (Windows : winget install astral-sh.uv)
 cd code_source
-uv sync --group web          # crée .venv/ aux versions exactes de uv.lock (profil web + outils de dev)
+uv sync                      # crée .venv/ aux versions exactes de uv.lock (avec les outils de dev)
 # Node (application Vue) : version de code_source/frontend/.nvmrc, par exemple avec nvm
 cd frontend && nvm install && npm ci   # node_modules/ aux versions exactes de package-lock.json
 ```
@@ -111,7 +111,7 @@ dans le bon répertoire de travail.
 
 ```bash
 cd code_source
-uv run pytest tests                               # après uv sync --group web (comme la CI)
+uv run pytest tests                               # après uv sync (comme la CI)
 uv run ruff check src tests
 uv run mypy                                       # fichiers listés dans [tool.mypy] de pyproject.toml
 cd frontend && npm run lint && npm run format:check && npm run typecheck && npm test   # application Vue (ESLint, Prettier, vue-tsc, Vitest)

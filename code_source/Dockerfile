@@ -44,13 +44,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # 2. Installation des dépendances Python conteneurisées, versions exactes de uv.lock
 #    (--frozen : le build échoue si uv.lock est périmé, jamais de résolution à la volée).
-#    Groupes : dépendances communes + « web » ; ni le client lourd (Qt, pywin32) ni les outils de dev.
+#    Dépendances du projet seulement, sans les outils de dev.
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_PYTHON_PREFERENCE=only-system \
     PATH=/opt/venv/bin:$PATH
 COPY pyproject.toml uv.lock ./
 RUN pip install --no-cache-dir uv==0.13.1 && \
-    uv sync --frozen --no-dev --group web --no-install-project && \
+    uv sync --frozen --no-dev --no-install-project && \
     pip uninstall -y uv
 
 # 3. Copie du code source, des ressources web / templates et de l'application Vue compilée

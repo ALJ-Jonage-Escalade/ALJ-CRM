@@ -1,5 +1,6 @@
 """
-Tests unitaires pour le Lot 4 : Déploiement Cloud Run, Dockerfile, et routes de production.
+Deployment artifacts (pyproject, requirements, Dockerfile, .dockerignore, scripts) and the production routes
+the deploy relies on (health check, HelloAsso webhook ping, root redirect).
 """
 
 import os
@@ -18,7 +19,7 @@ from api.web.pages import root_route
 from api.integrations.helloasso import webhook_helloasso_ping
 
 
-class TestCloudRunLot4(unittest.TestCase):
+class TestDeploymentArtifacts(unittest.TestCase):
     """Vérifie la conformité des artefacts conteneurisés et des routes de production."""
 
     def test_web_profile_excludes_desktop_dependencies(self):
@@ -32,7 +33,7 @@ class TestCloudRunLot4(unittest.TestCase):
         def names(requirements):
             return {re.split(r"[\[<>=!~; ]", r, maxsplit=1)[0].lower() for r in requirements}
 
-        web_profile = names(pyproject["project"]["dependencies"]) | names(pyproject["dependency-groups"]["web"])
+        web_profile = names(pyproject["project"]["dependencies"])
         for backend in ("fastapi", "uvicorn", "requests", "python-dotenv", "weasyprint"):
             self.assertIn(backend, web_profile)
         self.assertNotIn("desktop", pyproject["dependency-groups"])

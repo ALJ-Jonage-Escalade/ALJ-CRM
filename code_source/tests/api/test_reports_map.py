@@ -28,10 +28,10 @@ def client():
 
 
 def _get(client, rows, season="active"):
-    with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", return_value=rows) as load, \
+    with patch("infrastructure.sqlite.members.MemberRepository.list_flat_member_rows", return_value=rows) as load, \
          patch("infrastructure.sqlite.geocache.GeocacheRepository.get_geocache", return_value=GEOCACHE), \
          patch("api.reports.map.geocode_missing_addresses") as geocode, \
-         patch("api.reports.get_active_season", return_value="2026-2027"):
+         patch("domain.constants.get_active_season", return_value="2026-2027"):
         response = client.get("/api/reports/map-points", params={"season": season})
     return response, load, geocode
 
@@ -73,7 +73,7 @@ def test_map_points_every_season_lists_a_member_once(client):
 
 
 def test_map_points_failure_is_a_generic_error(client):
-    with patch("infrastructure.sqlite.members.MemberRepository.load_direct_data", side_effect=RuntimeError("disk")), \
+    with patch("infrastructure.sqlite.members.MemberRepository.list_flat_member_rows", side_effect=RuntimeError("disk")), \
          patch("infrastructure.sqlite.geocache.GeocacheRepository.get_geocache", return_value=GEOCACHE):
         response = client.get("/api/reports/map-points")
     assert response.status_code == 500

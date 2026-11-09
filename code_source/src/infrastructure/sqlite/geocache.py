@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from infrastructure.sqlite.connection import SqliteDatabase
+
+logger = logging.getLogger("alj")
 
 
 class GeocacheRepository:
@@ -19,7 +22,7 @@ class GeocacheRepository:
             rows = cursor.fetchall()
             return {row["address"]: [row["lat"], row["lon"]] for row in rows}
         except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors du chargement du geocache : {e}")
+            logger.warning(f"[SQLITE] Erreur lors du chargement du geocache : {e}")
             return {}
         finally:
             conn.close()
@@ -40,7 +43,7 @@ class GeocacheRepository:
             """, (address, lat, lon))
             conn.commit()
         except Exception as e:
-            print(f"❌ [SQLITE] Erreur lors de la sauvegarde du géocodage de '{address}' : {e}")
+            logger.warning(f"[SQLITE] Erreur lors de la sauvegarde du géocodage de '{address}' : {e}")
             conn.rollback()
         finally:
             conn.close()

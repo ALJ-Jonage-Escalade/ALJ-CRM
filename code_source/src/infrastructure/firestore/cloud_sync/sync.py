@@ -2,7 +2,7 @@
 import datetime
 import json
 import sqlite3
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NamedTuple, Optional
 
 from infrastructure.firestore.client import FirestoreConflictError
 from infrastructure.firestore.cloud_sync.cache import (
@@ -118,140 +118,149 @@ def apply_remote_docs(conn, store, table: str, docs: List[Dict[str, Any]], repor
 def pull(conn, store, report: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Récupère les documents modifiés depuis la dernière synchronisation."""
     report = report if report is not None else {}
-    for t in tracked_tables(conn):
-        coll = collection_for(t)
-        wm = get_state(conn, f"wm:{t}") or "1970-01-01T00:00:00Z"
-        docs = store.list_modified_since(coll, ts_minus(wm, PULL_MARGIN_SECONDS))
-        apply_remote_docs(conn, store, t, docs, report)
+    for table in tracked_tables(conn):
+        watermark = get_state(conn, f"wm:{table}") or "1970-01-01T00:00:00Z"
+        docs = store.list_modified_since(collection_for(table), ts_minus(watermark, PULL_MARGIN_SECONDS))
+        apply_remote_docs(conn, store, table, docs, report)
         if docs:
-            newest = max((d["modified_at"] for d in docs if d.get("modified_at")), key=ts_key, default=wm)
-            if ts_key(newest) > ts_key(wm):
-                set_state(conn, f"wm:{t}", newest)
+            newest = max((d["modified_at"] for d in docs if d.get("modified_at")), key=ts_key, default=watermark)
+            if ts_key(newest) > ts_key(watermark):
+                set_state(conn, f"wm:{table}", newest)
     set_state(conn, "last_pull", datetime.datetime.now().isoformat(timespec="seconds"))
     return report
 
 
-def _build_write(conn, table: str, cols: List[str], pk: List[str], pk_str: str, by: str):
-    """Prépare l'écriture d'une ligne modifiée : (write, row) — row None pour une suppression, write {"noop": True}
-    quand rien n'a changé depuis la base — ou None (ligne supprimée jamais envoyée)."""
+class PendingWrite(NamedTuple):
+    """A local change ready to be sent: its row in _fs_changes and the store write built from it."""
+    table: str
+    pk_str: str
+    seq: int
+    write: Dict[str, Any]  # Any: a store write (collection, doc_id, fields, mask, precondition…)
+    row: Optional[Dict[str, Any]]  # Any: the cached row; None for a deletion
+
+
+def _build_write(conn, table: str, pk: List[str], pk_str: str, author: str
+                 ) -> Optional[tuple[Dict[str, Any], Optional[Dict[str, Any]]]]:
+    """The store write of a changed row and the row itself (None for a deletion), or None when there is nothing to
+    send: a row deleted before it was ever sent, or a row unchanged since the last synchronised version."""
     vals = json.loads(pk_str)
     row = _read_row(conn, table, pk, vals)
     base, base_ut = _get_base(conn, table, pk_str)
-    w = {"collection": collection_for(table), "doc_id": doc_id_for(vals), "by": by}
+    write: Dict[str, Any] = {"collection": collection_for(table), "doc_id": doc_id_for(vals), "by": author}
     if row is None:
         if base is None:
             return None
-        w.update(fields={c: v for c, v in zip(pk, vals, strict=False)}, mask=None, deleted=True,
-                 precondition={"updateTime": base_ut} if base_ut else None)
-        return w, None
+        write.update(fields={c: v for c, v in zip(pk, vals, strict=False)}, mask=None, deleted=True,
+                     precondition={"updateTime": base_ut} if base_ut else None)
+        return write, None
     if base is None:
-        w.update(fields=row, mask=None, deleted=False, precondition=None, create=True)
-        return w, row
+        write.update(fields=row, mask=None, deleted=False, precondition=None, create=True)
+        return write, row
     diff = {c: v for c, v in row.items() if c not in base or not _same(v, base.get(c))}
     if not diff:
-        return {"noop": True}, row
-    w.update(fields=diff, mask=list(diff.keys()), deleted=False,
-             precondition={"updateTime": base_ut} if base_ut else {"exists": True})
-    return w, row
+        return None
+    write.update(fields=diff, mask=list(diff.keys()), deleted=False,
+                 precondition={"updateTime": base_ut} if base_ut else {"exists": True})
+    return write, row
 
 
-def flush(conn, store, by: str = "", report: Optional[Dict[str, Any]] = None,
+MAX_FLUSH_RETRIES = 3
+
+
+def flush(conn, store, author: str = "", report: Optional[Dict[str, Any]] = None,
           _depth: int = 0) -> Dict[str, Any]:
     """Envoie les lignes modifiées localement vers Firestore."""
     report = report if report is not None else {}
     changes = conn.execute("SELECT tbl, pk, seq FROM _fs_changes ORDER BY seq").fetchall()
     if not changes:
         return report
-    meta = {}
-    items = []  # (table, pk_str, seq, write, row)
-    for ch in changes:
-        t, pk_str, seq = ch["tbl"], ch["pk"], ch["seq"]
-        if t not in meta:
-            if not table_exists(conn, t):
-                conn.execute("DELETE FROM _fs_changes WHERE tbl = ?", (t,))
+    primary_keys: Dict[str, List[str]] = {}
+    pending: List[PendingWrite] = []
+    for change in changes:
+        table, pk_str, seq = change["tbl"], change["pk"], change["seq"]
+        if table not in primary_keys:
+            if not table_exists(conn, table):
+                conn.execute("DELETE FROM _fs_changes WHERE tbl = ?", (table,))
                 continue
-            meta[t] = (table_columns(conn, t), table_pk(conn, t))
-        cols, pk = meta[t]
-        built = _build_write(conn, t, cols, pk, pk_str, by)
-        if built is None or built[0].get("noop"):
-            conn.execute("DELETE FROM _fs_changes WHERE tbl = ? AND pk = ? AND seq <= ?", (t, pk_str, seq))
+            primary_keys[table] = table_pk(conn, table)
+        built = _build_write(conn, table, primary_keys[table], pk_str, author)
+        if built is None:
+            conn.execute("DELETE FROM _fs_changes WHERE tbl = ? AND pk = ? AND seq <= ?", (table, pk_str, seq))
             continue
-        items.append((t, pk_str, seq, built[0], built[1]))
+        pending.append(PendingWrite(table, pk_str, seq, built[0], built[1]))
+
+    def retry_or_give_up(error: str) -> Dict[str, Any]:
+        if _depth < MAX_FLUSH_RETRIES:
+            return flush(conn, store, author, report, _depth + 1)
+        report.setdefault("errors", []).append(error)
+        return report
 
     # Créations : vérifier que l'ID n'est pas déjà pris (tombe => on écrase la tombe)
-    collisions = []
-    by_table: Dict[str, List[int]] = {}
-    for i, it in enumerate(items):
-        if it[3].get("create"):
-            by_table.setdefault(it[0], []).append(i)
-    for t, idxs in by_table.items():
-        found = store.get_many(collection_for(t), [items[i][3]["doc_id"] for i in idxs])
-        for i in idxs:
-            w = items[i][3]
-            remote = found.get(w["doc_id"])
+    collisions: List[PendingWrite] = []
+    creations_by_table: Dict[str, List[PendingWrite]] = {}
+    for item in pending:
+        if item.write.get("create"):
+            creations_by_table.setdefault(item.table, []).append(item)
+    for table, creations in creations_by_table.items():
+        found = store.get_many(collection_for(table), [item.write["doc_id"] for item in creations])
+        for item in creations:
+            remote = found.get(item.write["doc_id"])
             if remote is None:
-                w["precondition"] = {"exists": False}
+                item.write["precondition"] = {"exists": False}
             elif remote["deleted"]:
-                w["precondition"] = {"updateTime": remote["update_time"]}
+                item.write["precondition"] = {"updateTime": remote["update_time"]}
             else:
-                same = all(_same(remote["fields"].get(c), v) for c, v in items[i][4].items())
-                if same or len(meta[t][1]) != 1 or not isinstance(json.loads(items[i][1])[0], int):
+                same = all(_same(remote["fields"].get(c), v) for c, v in (item.row or {}).items())
+                if same or len(primary_keys[table]) != 1 or not isinstance(json.loads(item.pk_str)[0], int):
                     # Contenu identique, ou clé « métier » (texte) : on adopte / écrase.
-                    w["precondition"] = {"updateTime": remote["update_time"]}
+                    item.write["precondition"] = {"updateTime": remote["update_time"]}
                 else:
-                    collisions.append(i)
+                    collisions.append(item)
     if collisions:
         conn.execute("BEGIN IMMEDIATE")
         try:
-            for i in collisions:
-                renumber_row(conn, store, items[i][0], json.loads(items[i][1])[0], report)
+            for item in collisions:
+                renumber_row(conn, store, item.table, json.loads(item.pk_str)[0], report)
             conn.execute("COMMIT")
         except Exception:
             conn.execute("ROLLBACK")
             raise
-        if _depth < 3:
-            return flush(conn, store, by, report, _depth + 1)
-        report.setdefault("errors", []).append("Conflits d'identifiants non résolus")
-        return report
+        return retry_or_give_up("Conflits d'identifiants non résolus")
 
-    def done(it, res):
-        t, pk_str, seq, w, row = it
-        if row is None:
-            conn.execute("DELETE FROM _fs_base WHERE tbl = ? AND pk = ?", (t, pk_str))
+    def record_pushed_write(item: PendingWrite, result: Dict[str, Any]) -> None:
+        if item.row is None:
+            conn.execute("DELETE FROM _fs_base WHERE tbl = ? AND pk = ?", (item.table, item.pk_str))
             report["deleted"] = report.get("deleted", 0) + 1
         else:
-            base, _ = _get_base(conn, t, pk_str)
+            base, _ = _get_base(conn, item.table, item.pk_str)
             new_base = dict(base or {})
-            new_base.update(row if w.get("mask") is None else w["fields"])
-            _set_base(conn, t, pk_str, new_base, res.get("update_time"))
+            new_base.update(item.row if item.write.get("mask") is None else item.write["fields"])
+            _set_base(conn, item.table, item.pk_str, new_base, result.get("update_time"))
             report["pushed"] = report.get("pushed", 0) + 1
-        conn.execute("DELETE FROM _fs_changes WHERE tbl = ? AND pk = ? AND seq <= ?", (t, pk_str, seq))
+        conn.execute("DELETE FROM _fs_changes WHERE tbl = ? AND pk = ? AND seq <= ?", (item.table, item.pk_str, item.seq))
         touched = report.setdefault("tables", [])
-        if t not in touched:
-            touched.append(t)
+        if item.table not in touched:
+            touched.append(item.table)
 
-    conflicts = []
-    for start in range(0, len(items), COMMIT_CHUNK):
-        chunk = items[start:start + COMMIT_CHUNK]
+    conflicts: List[PendingWrite] = []
+    for start in range(0, len(pending), COMMIT_CHUNK):
+        chunk = pending[start:start + COMMIT_CHUNK]
         try:
-            results = store.commit([it[3] for it in chunk])
-            for it, res in zip(chunk, results, strict=False):
-                done(it, res)
+            results = store.commit([item.write for item in chunk])
+            for item, result in zip(chunk, results, strict=False):
+                record_pushed_write(item, result)
         except FirestoreConflictError:
-            for it in chunk:
+            for item in chunk:
                 try:
-                    res = store.commit([it[3]])[0]
-                    done(it, res)
+                    record_pushed_write(item, store.commit([item.write])[0])
                 except FirestoreConflictError:
-                    conflicts.append(it)
+                    conflicts.append(item)
     if conflicts:
         report["conflicts"] = report.get("conflicts", 0) + len(conflicts)
         # Relire les documents en conflit, fusionner, puis renvoyer.
-        for t in {it[0] for it in conflicts}:
-            ids = [it[3]["doc_id"] for it in conflicts if it[0] == t]
-            found = store.get_many(collection_for(t), ids)
-            apply_remote_docs(conn, store, t, [d for d in found.values() if d], report)
-        if _depth < 3:
-            return flush(conn, store, by, report, _depth + 1)
-        report.setdefault("errors", []).append(f"{len(conflicts)} écriture(s) en conflit non résolue(s)")
+        for table in {item.table for item in conflicts}:
+            ids = [item.write["doc_id"] for item in conflicts if item.table == table]
+            found = store.get_many(collection_for(table), ids)
+            apply_remote_docs(conn, store, table, [d for d in found.values() if d], report)
+        return retry_or_give_up(f"{len(conflicts)} écriture(s) en conflit non résolue(s)")
     return report

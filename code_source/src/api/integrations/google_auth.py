@@ -14,7 +14,7 @@ import json
 import logging
 import time
 import urllib.parse
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 import requests
 from fastapi import APIRouter, Query, Request
@@ -81,7 +81,8 @@ def get_google_auth_status() -> GoogleStatus:
             
     db_ready = CloudDatabase.cache_ready() if CloudDatabase.is_enabled() else False
 
-    status = "connected" if valid else ("expired" if refresh_token else "disconnected")
+    status: Literal["connected", "expired", "disconnected"] = (
+        "connected" if valid else ("expired" if refresh_token else "disconnected"))
 
     return GoogleStatus(
         status=status,

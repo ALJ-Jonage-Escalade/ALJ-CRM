@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from domain.competitions.models import STATUT_CLOSE
-from domain.constants import get_active_season
+from domain.constants import resolve_season
 from domain.errors import InvalidRequest, NotFound
 from domain.members import view as member_view
 from infrastructure.sqlite.members import MemberRepository
@@ -26,7 +26,7 @@ class MemberService:
     def list_members(season: Optional[str] = None) -> Doc:
         """{season, members, creneaux} for `season` (the active season when not given)."""
         seasons = SeasonService.list_seasons()
-        name = (season or "").strip() or seasons["active"]
+        name = resolve_season(season) if (season or "").strip() else seasons["active"]
         if name not in seasons["seasons"]:
             raise NotFound(f"Saison inconnue : {name}.")
         planning = PlanningRepository.load_planning_data()
@@ -34,7 +34,7 @@ class MemberService:
         return {
             "season": name,
             "members": member_view.build_members(rows, planning, name),
-            "creneaux": member_view.creneaux(planning),
+            "creneaux": member_view.slot_groups(planning),
         }
 
     @staticmethod
@@ -49,7 +49,7 @@ class MemberService:
     @staticmethod
     def list_competitors() -> List[Doc]:
         """Contacts of the participants of the competitions that are not archived, the only
-        member data a coach's phone keeps offline (plan phase 5). Taken from the active season,
+        member data a coach's phone keeps offline. Taken from the active season,
         else from the participant's latest season (not registered again yet)."""
         ids = {p.get("adherent_id")
                for c in CompetitionService.list_competitions() if c.get("statut") != STATUT_CLOSE
@@ -72,10 +72,7 @@ class MemberService:
             raise InvalidRequest("Identifiant d'adhérent manquant (user_id, purchase_id ou order_ref).")
         if not fields:
             raise InvalidRequest("Aucune modification à enregistrer.")
-        saved, message = MemberRepository.update_member_fields(
-            user_id=user_id, fields=fields, purchase_id=purchase_id, order_ref=order_ref or None)
-        if not saved:
-            raise InvalidRequest(message)
+        MemberRepository.update_member_fields(user_id=user_id, fields=fields, purchase_id=purchase_id, order_ref=order_ref or None)
 
     @staticmethod
     def add_member(fields: Dict[str, Any], season: Optional[str] = None) -> tuple[str, str]:  # Any: as above
@@ -86,8 +83,5 @@ class MemberService:
             raise InvalidRequest("La date de naissance est obligatoire.")
         if not fields.get("tarif_name"):
             raise InvalidRequest("Le groupe (tarif) est obligatoire.")
-        target_season = season or get_active_season()
-        added, order_ref_or_message = MemberRepository.add_manual_member(fields, season_name=target_season)
-        if not added:
-            raise InvalidRequest(order_ref_or_message)
-        return order_ref_or_message, target_season
+        target_season = resolve_season(season)
+        return MemberRepository.add_manual_member(fields, season_name=target_season), target_season

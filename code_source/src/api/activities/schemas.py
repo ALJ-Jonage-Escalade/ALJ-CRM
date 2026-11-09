@@ -49,13 +49,6 @@ class PlanningSlotSaved(BaseModel):
     item: PlanningSlot
 
 
-class PlanningReplaced(BaseModel):
-    """The whole planning replaced; count: its slots."""
-    status: Literal["success"]
-    message: str
-    count: int
-
-
 class PlanningSlotDeleted(BaseModel):
     status: Literal["success"]
     message: str

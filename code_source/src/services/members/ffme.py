@@ -12,14 +12,12 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 import openpyxl
-import pandas as pd
 
-from domain.constants import get_active_season, is_valid_season
 from domain.errors import InvalidRequest
 from domain.members.sex import parse_sex
 from domain.members.view import is_cancelled
-from domain.utils import normalize_name
-from exports.membership_excel import clean_digits_only, ffme_csv_bytes, parse_date_to_datetime
+from domain.utils import clean_digits_only, is_missing, normalize_name
+from exports.membership_excel import ffme_csv_bytes, parse_date_to_datetime
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.ffme_import import FfmeImportRepository, FfmeMatch, MemberForMatching
@@ -27,7 +25,6 @@ from infrastructure.sqlite.members import MemberRepository
 
 logger = logging.getLogger("alj")
 
-INVALID_SEASON = "Saison invalide (format attendu : AAAA-AAAA)."
 # Shown to the office (the cause goes to the logs only)
 UNREADABLE_EXCEL = "Fichier Excel illisible : vérifiez qu'il s'agit bien de l'export .xlsx des licenciés MyFFME."
 MATCHING_FAILED = "Erreur lors du rapprochement FFME (détails dans les journaux)."
@@ -37,6 +34,15 @@ LAST_NAME, FIRST_NAME, LICENCE = "Nom", "Prénom", "N° de licence"
 REQUIRED_COLUMNS = (LAST_NAME, FIRST_NAME, LICENCE)
 HEALTH_DOCUMENT = "Document de santé"
 STATUS_DONE = "Terminé"
+
+
+# One row of the licensee sheet: column header -> cell value (text, number, date or None)
+LicenseeRow = Dict[str, object]
+
+
+class LicenseeSheet(TypedDict):
+    columns: List[str]
+    rows: List[LicenseeRow]
 
 
 class MatchStats(TypedDict):
@@ -74,19 +80,11 @@ class ExportStats(TypedDict):
     ignored_details: List[str]
 
 
-def resolve_season(season: Optional[str]) -> str:
-    """The season asked for, the active one when empty. InvalidRequest when it is not a season name."""
-    target = (season or "").strip() or get_active_season()
-    if not is_valid_season(target):
-        raise InvalidRequest(INVALID_SEASON)
-    return target
-
-
 # --------------------------------------------------------------------------
 # Export
 # --------------------------------------------------------------------------
 def export_csv(season: str, include_termine: bool) -> bytes:
-    return ffme_csv_bytes(MemberRepository.load_direct_data(season), include_termine=include_termine)
+    return ffme_csv_bytes(MemberRepository.list_flat_member_rows(season), include_termine=include_termine)
 
 
 def export_stats(season: str) -> ExportStats:
@@ -97,7 +95,7 @@ def export_stats(season: str) -> ExportStats:
     ignored_details: List[str] = []
     now = datetime.datetime.now()
 
-    for member in MemberRepository.load_direct_data(season):
+    for member in MemberRepository.list_flat_member_rows(season):
         tariff_name = str(member.get("tarif_name") or "").lower()
         status = str(member.get("status") or "").lower()
         added_by_hand = "ajout manuel" in str(member.get("commentaires_correctif") or "").lower()
@@ -160,11 +158,11 @@ def prepare_licensees(excel_content: bytes) -> FfmePreparation:
     stats = preparation["stats"]
     try:
         sheet = _read_licensee_sheet(excel_content)
-    except Exception:  # pandas and openpyxl raise many types on a damaged or foreign file
+    except Exception:  # openpyxl and zipfile raise many types on a damaged or foreign file
         logger.exception("FFME import: Excel file unreadable")
         stats["errors"].append(UNREADABLE_EXCEL)
         return preparation
-    missing = [column for column in REQUIRED_COLUMNS if column not in sheet.columns]
+    missing = [column for column in REQUIRED_COLUMNS if column not in sheet["columns"]]
     if missing:
         stats["errors"].append(f"Colonne requise manquante dans le fichier Excel : {missing[0]}")
         return preparation
@@ -176,22 +174,21 @@ def prepare_licensees(excel_content: bytes) -> FfmePreparation:
         members_by_licence = {}
         members_by_name = {}
         for member in members:
-            licence = _clean_licence(member["licence_ffme"])
+            licence = clean_digits_only(member["licence_ffme"])
             if licence:
                 members_by_licence[licence] = member
             name_key = (normalize_name(member["last_name"]), normalize_name(member["first_name"]))
             if all(name_key):
                 members_by_name[name_key] = member
 
-        has_health_column = HEALTH_DOCUMENT in sheet.columns
-        for _, row in sheet.iterrows():
+        has_health_column = HEALTH_DOCUMENT in sheet["columns"]
+        for row in sheet["rows"]:
             stats["total_processed"] += 1
-            last_name = str(row[LAST_NAME] or "").strip()
-            first_name = str(row[FIRST_NAME] or "").strip()
-            raw_licence = row[LICENCE]
-            licence = "" if pd.isna(raw_licence) else _clean_licence(raw_licence)
+            last_name = _cell_text(row, LAST_NAME)
+            first_name = _cell_text(row, FIRST_NAME)
+            licence = clean_digits_only(row.get(LICENCE))
             if not licence:
-                licence = _clean_licence(formula_licences.get((last_name, first_name), ""))
+                licence = clean_digits_only(formula_licences.get((last_name, first_name), ""))
 
             matched: Optional[MemberForMatching] = members_by_licence.get(licence) if licence else None
             if matched:
@@ -204,11 +201,9 @@ def prepare_licensees(excel_content: bytes) -> FfmePreparation:
             health_document = _cell_text(row, HEALTH_DOCUMENT) if has_health_column else ""
             if matched:
                 # The file's (cleaned) licence number wins; the member's is kept only when the file has none
-                final_licence = licence or _clean_licence(matched["licence_ffme"])
+                final_licence = licence or clean_digits_only(matched["licence_ffme"])
                 preparation["updates"].append((
-                    STATUS_DONE, final_licence, _blank_if_missing(_cell_text(row, "Passeports")),
-                    _blank_if_missing(_cell_text(row, "Diplômes")),
-                    "" if health_document.lower() in ("nan", "none") else health_document, matched["id"]))
+                    STATUS_DONE, final_licence, _cell_text(row, "Passeports"), _cell_text(row, "Diplômes"), health_document, matched["id"]))
             else:
                 preparation["unmatched"].append(UnmatchedLicensee(
                     nom=last_name, prenom=first_name, licence=licence,
@@ -240,27 +235,39 @@ def apply_import(season: str, excel_content: Optional[bytes], manual_matches: Li
     return len(updates), stats
 
 
-def _read_licensee_sheet(excel_content: bytes) -> pd.DataFrame:
-    """The licensee table; MyFFME exports sometimes put a title row above the header."""
-    sheet = pd.read_excel(io.BytesIO(excel_content))
-    if all(column in sheet.columns for column in REQUIRED_COLUMNS):
-        return sheet
+def _read_licensee_sheet(excel_content: bytes) -> LicenseeSheet:
+    """The licensee table (cached values, not formulas); MyFFME exports sometimes put a title row above the header."""
+    workbook = openpyxl.load_workbook(io.BytesIO(excel_content), read_only=True, data_only=True)
     try:
-        second_row_header = pd.read_excel(io.BytesIO(excel_content), header=1)
-    except Exception:  # keep the first reading, whose missing column is reported
-        logger.debug("Lecture de l'export FFME avec l'en-tête en ligne 2 impossible", exc_info=True)
-        return sheet
-    return second_row_header if all(column in second_row_header.columns for column in REQUIRED_COLUMNS) else sheet
+        values = [list(row) for row in workbook.active.iter_rows(values_only=True)]
+    finally:
+        workbook.close()
+    first_row_header = _sheet_from_rows(values, header_index=0)
+    if all(column in first_row_header["columns"] for column in REQUIRED_COLUMNS):
+        return first_row_header
+    second_row_header = _sheet_from_rows(values, header_index=1)
+    if all(column in second_row_header["columns"] for column in REQUIRED_COLUMNS):
+        return second_row_header
+    return first_row_header  # its missing column is reported
+
+
+def _sheet_from_rows(values: List[List[object]], header_index: int) -> LicenseeSheet:
+    if len(values) <= header_index:
+        return LicenseeSheet(columns=[], rows=[])
+    columns = [str(header).strip() if header is not None else "" for header in values[header_index]]
+    # strict=False: a row may stop before the last column (empty trailing cells)
+    rows = [dict(zip(columns, row, strict=False)) for row in values[header_index + 1:] if any(not is_missing(cell) for cell in row)]
+    return LicenseeSheet(columns=columns, rows=rows)
 
 
 def _formula_licences(excel_content: bytes) -> Dict[Tuple[str, str], str]:
     """Licence numbers by (last name, first name), read as formula text. Recent MyFFME exports store the licence
-    column as a formula ('="636947"') without a cached value, which pandas reads as NaN."""
+    column as a formula ('="636947"') without a cached value, which the cached-value reading sees as empty."""
     try:
         workbook = openpyxl.load_workbook(io.BytesIO(excel_content), read_only=True, data_only=False)
         rows = list(workbook.active.iter_rows(values_only=True))
         workbook.close()
-    except Exception:  # only a fallback: the pandas reading stands alone
+    except Exception:  # only a fallback: the cached-value reading stands alone
         logger.debug("Relecture des formules de l'export FFME impossible", exc_info=True)
         return {}
     if not rows:
@@ -278,21 +285,8 @@ def _formula_licences(excel_content: bytes) -> Dict[Tuple[str, str], str]:
     return licences
 
 
-def _clean_licence(value: Any) -> str:  # Any: a cell or a stored value (text, number, formula)
-    """The licence's digits: without the Excel formula wrapping ('="636947"'), the float suffix ('636947.0') and any
-    other character. Used both for the members' index and for the number written."""
-    text = str(value or "").strip()
-    if text.endswith(".0"):
-        text = text[:-2]
-    return "".join(c for c in text if c.isdigit())
-
-
-def _cell_text(row: pd.Series, column: str) -> str:
+def _cell_text(row: LicenseeRow, column: str) -> str:
     value = row.get(column)
-    if value is None or (isinstance(value, float) and pd.isna(value)):
+    if is_missing(value):
         return ""
     return value.strftime("%d/%m/%Y") if hasattr(value, "strftime") else str(value).strip()
-
-
-def _blank_if_missing(text: str) -> str:
-    return "" if text.lower() in ("nan", "none", "") else text

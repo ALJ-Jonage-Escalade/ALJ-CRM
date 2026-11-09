@@ -20,8 +20,7 @@ class TestMembersMapShowsText(unittest.TestCase):
                 source = f.read()
             for sink in _SINKS:
                 self.assertNotIn(sink, source, name)
-        with open(os.path.join(_outils, "membersMapView.ts"), encoding="utf-8") as f:
-            self.assertIn("bindPopup(() => popup(p))", f.read())
+        # The popup itself is checked by behaviour in frontend/src/pages/outils/membersMapView.test.ts
 
 
 

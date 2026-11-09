@@ -7,7 +7,7 @@ le mode dev sur Cloud Run. Détails et architecture : `documentations/ARCHITECTU
 
 ## Démarrage
 
-Prérequis : Docker et [uv](https://docs.astral.sh/uv/) (`uv sync --group web` crée `.venv/` depuis `uv.lock`).
+Prérequis : Docker et [uv](https://docs.astral.sh/uv/) (`uv sync` crée `.venv/` depuis `uv.lock`).
 
 ```bash
 cd code_source

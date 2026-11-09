@@ -39,15 +39,6 @@ def neutralize_formulas(workbook, keep: FrozenSet[Tuple[str, str]] = frozenset()
             cell.data_type = "s"
 
 
-def safe_to_excel(df, path, **kwargs) -> None:
-    """DataFrame.to_excel without formula evaluation (openpyxl engine)."""
-    import pandas as pd
-
-    with pd.ExcelWriter(path, engine="openpyxl") as writer:
-        df.to_excel(writer, **kwargs)
-        neutralize_formulas(writer.book)
-
-
 def csv_safe(value: Any) -> Any:
     """Prefixes a CSV value with an apostrophe when a spreadsheet would evaluate it."""
     if not isinstance(value, str) or not value.startswith(_CSV_TRIGGERS):

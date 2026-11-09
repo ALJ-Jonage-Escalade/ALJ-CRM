@@ -113,7 +113,7 @@ def _seed(path):
 
 def _load(path, season):
     SqliteDatabase.set_db_path(path)
-    return MemberRepository.load_direct_data(season)
+    return MemberRepository.list_flat_member_rows(season)
 
 
 class CloudDatabaseTest(unittest.TestCase):
@@ -241,6 +241,24 @@ class CloudDatabaseTest(unittest.TestCase):
                 "SELECT u.last_name FROM purchases pu JOIN users u ON u.id = pu.user_id "
                 "WHERE pu.order_id = 10 AND u.first_name = 'Max' ORDER BY 1").fetchall()
             self.assertEqual([g[0] for g in got], ["GRAND", "PETIT"])
+
+    def test_create_collision_found_by_flush_is_renumbered(self):
+        """The remote document appears between this post's last pull and its flush: flush itself renumbers."""
+        for p, name in ((self.a, "PETIT"), (self.b, "GRAND")):
+            self.write(p, "INSERT INTO users (last_name, first_name, last_name_key, first_name_key) "
+                          f"VALUES ('{name}', 'Max', '{name}', 'MAX')")
+        self.sync(self.a)
+        conn = connect(self.b)
+        try:
+            rep = flush(conn, self.store, "test")  # no pull first
+        finally:
+            conn.close()
+        self.assertTrue(rep.get("renumbered"))
+        petit_id = self.row(self.a, "SELECT id FROM users WHERE last_name = 'PETIT'")[0]
+        grand_id = self.row(self.b, "SELECT id FROM users WHERE last_name = 'GRAND'")[0]
+        self.assertNotEqual(petit_id, grand_id)
+        remote = {d["fields"].get("last_name") for (c, _), d in self.store.docs.items() if c == collection_for("users")}
+        self.assertTrue({"PETIT", "GRAND"} <= remote)
 
     def test_repository_write_path_is_tracked(self):
         SqliteDatabase.set_db_path(self.a)

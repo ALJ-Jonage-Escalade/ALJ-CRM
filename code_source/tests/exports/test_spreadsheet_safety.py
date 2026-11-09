@@ -17,12 +17,10 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 import openpyxl  # noqa: E402
-import pandas as pd  # noqa: E402
 
 from exports.spreadsheet_safety import (  # noqa: E402
     csv_safe,
     neutralize_formulas,
-    safe_to_excel,
     template_formulas,
 )
 
@@ -58,14 +56,6 @@ class TestWorkbooks(unittest.TestCase):
         reloaded = self._reload(wb)
         self.assertEqual(reloaded["A1"].data_type, "f")
         self.assertEqual(reloaded["A2"].data_type, "s")
-
-    def test_safe_to_excel(self):
-        path = os.path.join(self.tmp.name, "df.xlsx")
-        safe_to_excel(pd.DataFrame([{"Nom": INJECTION, "Tel": "+33 6 12 34 56 78"}]), path, index=False)
-        ws = openpyxl.load_workbook(path).active
-        self.assertEqual(ws["A2"].data_type, "s")
-        self.assertEqual(ws["A2"].value, INJECTION)
-        self.assertEqual(ws["B2"].value, "+33 6 12 34 56 78")
 
     def test_presence_template_formulas_survive(self):
         path = os.path.join(_code_root, "src", "assets", "templates", "Template Export liste adhérents à imprimer.xlsx")

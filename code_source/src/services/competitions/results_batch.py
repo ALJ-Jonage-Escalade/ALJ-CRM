@@ -29,11 +29,11 @@ if _src_dir not in sys.path:
 
 
 from domain.utils import normalize_name
-from infrastructure.mail.repository import EmailRepository, MailError
+from infrastructure.mail.sender import EmailSender, MailError
 from domain.club_emails import DEFAULT_SENDER_EMAIL
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from infrastructure.mycompet.scraper import (
     ArchiveEntry,
     fetch_and_parse_mycompet_results,
@@ -182,7 +182,7 @@ class CompetitionResultsBatchService:
             AppSettingsRepository.save(SETTING_NOTIFICATION_EMAIL, clean)
             return True
         except FirestoreError as e:
-            print(f"⚠️ [BATCH_RESULTATS] Enregistrement de l'e-mail de notification impossible : {e}")
+            logger.warning(f"[BATCH_RESULTATS] Enregistrement de l'e-mail de notification impossible : {e}")
             return False
 
     @classmethod
@@ -263,7 +263,7 @@ class CompetitionResultsBatchService:
         window = window_days if window_days is not None else cls.get_window_days()
         oldest = today - datetime.timedelta(days=max(window, FORCED_WINDOW_DAYS) if force else window)
         try:
-            docs = CompetitionFirestoreRepository.list_competition_docs()
+            docs = CompetitionRepository.list_competition_docs()
         except FirestoreError as e:
             raise ResultsBatchError(f"Lecture des compétitions impossible : {e}") from e
 
@@ -321,7 +321,7 @@ class CompetitionResultsBatchService:
             return len(athletes)
 
         try:
-            matched = CompetitionFirestoreRepository.record_results(
+            matched = CompetitionRepository.record_results(
                 comp["id"], rank, {"url_resultats": canonical_url, "resultats_synced_at": now_iso})
         except FirestoreError:  # this competition only: the others are still searched, the next run retries it
             logger.error("[BATCH_RESULTATS] Enregistrement des résultats de « %s » impossible", nom, exc_info=True)
@@ -336,7 +336,7 @@ class CompetitionResultsBatchService:
         NotFound (code needs_url when no page is found: the coach gives it), UpstreamUnavailable (MyCompet),
         StorageUnavailable (Firestore)."""
         try:
-            comp = CompetitionFirestoreRepository.get_stored_competition_doc(competition_id)
+            comp = CompetitionRepository.get_stored_competition_doc(competition_id)
         except FirestoreError as e:
             raise StorageUnavailable("Lecture de la compétition impossible (détails dans les journaux).") from e
         if not comp:
@@ -361,7 +361,7 @@ class CompetitionResultsBatchService:
         canonical_url = normalize_result_url(url)
         try:
             # The URL is kept even when nobody matched: the coach gave it, the next try starts from it
-            matched = CompetitionFirestoreRepository.record_results(
+            matched = CompetitionRepository.record_results(
                 competition_id, lambda parts: len(apply_rankings(parts, scraped, now_iso)),
                 {"url_resultats": canonical_url, "resultats_synced_at": now_iso}, save_fields_without_match=True)
         except FirestoreError as e:
@@ -574,7 +574,7 @@ class CompetitionResultsBatchService:
         plain_body = "\n".join(lines)
 
         try:
-            EmailRepository.send_email(
+            EmailSender.send_email(
                 to_email=recipient,
                 subject=subject,
                 body=plain_body,
@@ -602,7 +602,7 @@ class CompetitionResultsBatchService:
     @classmethod
     def _mark_url_requested(cls, comp: Dict[str, Any], at: str) -> None:
         try:
-            FirestoreClient.update_fields(CompetitionFirestoreRepository.COLLECTION_COMPETITIONS,
+            FirestoreClient.update_fields(CompetitionRepository.COLLECTION_COMPETITIONS,
                                           comp.get("_doc_id") or str(comp["id"]), {FIELD_NEEDS_URL_NOTIFIED: at})
         except FirestoreError:
             logger.warning("[BATCH_RESULTATS] Mémorisation de la demande d'URL impossible (#%s)", comp.get("id"), exc_info=True)
@@ -625,14 +625,14 @@ class CompetitionResultsBatchService:
         notification_email = (to_email or cls.get_notification_email()).strip()
         window = window_days if window_days is not None else cls.get_window_days()
 
-        print(f"🚀 [BATCH_RESULTATS] Démarrage du batch quotidien ({now_iso}) — Notif: {notification_email}")
+        logger.info(f"[BATCH_RESULTATS] Démarrage du batch quotidien ({now_iso}) — Notif: {notification_email}")
 
         try:
             pending = cls.list_pending_competitions(force=force, window_days=window, today=today)
         except ResultsBatchError:
             logger.exception("[BATCH_RESULTATS] Lecture des compétitions impossible : rien n'a été fait")
             raise
-        print(f"🔍 [BATCH_RESULTATS] {len(pending)} compétition(s) éligible(s) sans résultats détectée(s) "
+        logger.info(f"[BATCH_RESULTATS] {len(pending)} compétition(s) éligible(s) sans résultats détectée(s) "
               f"(terminées depuis {window} jours au plus{', forcé' if force else ''}).")
 
         archive = cls._load_archive(pending)
@@ -648,7 +648,7 @@ class CompetitionResultsBatchService:
             checked += 1
             cid = str(comp.get("id"))
             nom = comp.get("nom") or "Compétition"
-            print(f"⏳ [BATCH_RESULTATS] Recherche des résultats pour #{cid} « {nom} »...")
+            logger.debug(f"[BATCH_RESULTATS] Recherche des résultats pour #{cid} « {nom} »...")
 
             outcome = cls.sync_results_for_competition(comp, archive)
             item = {
@@ -662,7 +662,7 @@ class CompetitionResultsBatchService:
             }
             details.append(item)
             if outcome["status"] == "found":
-                print(f"🎉 [BATCH_RESULTATS] {outcome['matched_count']} athlète(s) classé(s) trouvé(s) pour « {nom} » !")
+                logger.info(f"[BATCH_RESULTATS] {outcome['matched_count']} athlète(s) classé(s) trouvé(s) pour « {nom} » !")
                 results_found_list.append(item)
             elif outcome["status"] == "needs_url":
                 if not comp.get(FIELD_NEEDS_URL_NOTIFIED):  # asked once, not every morning
@@ -671,23 +671,22 @@ class CompetitionResultsBatchService:
             elif outcome["status"] == "error":
                 logger.warning("[BATCH_RESULTATS] « %s » : résultats illisibles ou non enregistrés, nouvel essai au prochain passage", nom)
             else:
-                print(f"ℹ️ [BATCH_RESULTATS] Aucun résultat officiel disponible pour le moment pour « {nom} ».")
+                logger.debug(f"[BATCH_RESULTATS] Aucun résultat officiel disponible pour le moment pour « {nom} ».")
 
         remaining = len(pending) - checked
         if remaining:
             logger.warning("[BATCH_RESULTATS] Temps imparti (%ss) écoulé : %s compétition(s) laissée(s) au prochain passage",
                            time_budget_s, remaining)
 
-        # Envoi de l'e-mail si des résultats ont été trouvés
         email_sent = False
         if results_found_list or needs_url:
-            print(f"📧 [BATCH_RESULTATS] Envoi de l'e-mail récapitulatif pour {len(results_found_list)} compétition(s)...")
+            logger.info(f"[BATCH_RESULTATS] Envoi de l'e-mail récapitulatif pour {len(results_found_list)} compétition(s)...")
             email_sent = cls.send_notification_email(results_found_list, to_email=notification_email, needs_url=needs_url)
             if email_sent:
                 for comp in needs_url_comps:
                     cls._mark_url_requested(comp, now_iso)
         else:
-            print("ℹ️ [BATCH_RESULTATS] Aucun nouveau résultat à notifier aujourd'hui.")
+            logger.info("[BATCH_RESULTATS] Aucun nouveau résultat à notifier aujourd'hui.")
 
         # Enregistrement des statuts d'exécution
         status_msg = f"{checked} vérifiée(s), {len(results_found_list)} résultat(s) trouvé(s)"

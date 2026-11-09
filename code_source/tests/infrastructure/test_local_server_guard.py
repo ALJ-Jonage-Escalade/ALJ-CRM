@@ -61,12 +61,13 @@ class TestServerGuard(unittest.TestCase):
     def test_local_mode(self):
         with patch.dict(os.environ, {"ALJ_API_AUTH": "off"}):
             self.assertEqual(self.client.get("/health", headers={"Host": "evil.example"}).status_code, 403)
-            resp = self.client.post("/api/preview-email", json={"subject": "x", "body": "y"},
+            # A slot without a group: refused by the route itself (400) once the guard lets the write through
+            resp = self.client.post("/api/planning/item", json={"groupe": ""},
                                     headers={"Host": LOCAL, "Origin": "https://evil.example"})
             self.assertEqual(resp.status_code, 403)
-            resp = self.client.post("/api/preview-email", json={"subject": "x", "body": "y"},
+            resp = self.client.post("/api/planning/item", json={"groupe": ""},
                                     headers={"Host": LOCAL, "Origin": f"http://{LOCAL}"})
-            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.status_code, 400)
 
     def test_cloud_run_mode_unaffected(self):
         with patch.dict(os.environ, {"ALJ_API_AUTH": "required"}):

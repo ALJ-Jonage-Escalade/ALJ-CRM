@@ -133,29 +133,6 @@ class EmailSendRequest(RequestBody):
     add_signature: bool = True
 
 
-class EmailPreviewRequest(RequestBody):
-    """recipient: whose values fill the variables (an example member when absent)."""
-    template_name: str = ""
-    subject: str = ""
-    body: str = ""
-    recipient: Optional[EmailRecipient] = None
-    competition_id: Optional[int] = None
-    add_signature: bool = True
-
-
-class EmailPreviewContent(BaseModel):
-    subject: str
-    body_plain: str
-    body_html: str
-    sender_email: str
-    sender_name: str
-
-
-class EmailPreview(BaseModel):
-    status: Literal["success"]
-    preview: EmailPreviewContent
-
-
 class EmailDispatch(BaseModel):
     """Outcome of /api/send-email when at least one e-mail left: status "partial" when some recipients failed (see
     details). A refused request is a 400, and a sending where every e-mail failed a 502."""

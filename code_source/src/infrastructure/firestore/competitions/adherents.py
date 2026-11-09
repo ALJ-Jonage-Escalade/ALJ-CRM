@@ -1,23 +1,26 @@
 """`adherents` directory: snapshot of the members of database.db, read through a short cache."""
 import json
-from typing import Dict, Any, List, Optional, Sequence, Tuple
+import logging
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from domain.constants import get_active_season
-from domain.members.age_rules import parse_birth_date, age_at, get_season_start_date
 from domain.members import view as member_view
+from domain.members.age_rules import age_at, get_season_start_date, parse_birth_date
+from domain.members.purchase_priority import purchase_priority_score
 from domain.members.sex import parse_sex
 from domain.utils import normalize_string
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions.base import CompetitionStoreBase
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.timed_cache import TimedCache
-from domain.members.purchase_priority import purchase_priority_score
+
+logger = logging.getLogger("alj")
 
 _ADHERENTS_CACHE_SECONDS = 30.0
 _ADHERENTS_CACHE_KEY = "adherents"
 
 
-class AdherentsMixin(CompetitionStoreBase):
+class MemberDirectoryMixin(CompetitionStoreBase):
     """Member directory: sync from the main database, cached reads, search."""
 
     _adherents_cache: TimedCache[str, List[Dict[str, Any]]] = TimedCache(_ADHERENTS_CACHE_SECONDS)
@@ -32,7 +35,7 @@ class AdherentsMixin(CompetitionStoreBase):
     # Instantané des adhérents (source : database.db principale -> Firestore)
     # ------------------------------------------------------------------
     @classmethod
-    def sync_adherents_from_main(cls, season_filter: str = "") -> dict:
+    def rebuild_member_directory(cls, season_filter: str = "") -> dict:
         """Recalcule l'annuaire Firestore `adherents` depuis la base principale.
 
         Le miroir est intégralement réécrit (l'annuaire Firestore reflète
@@ -54,12 +57,12 @@ class AdherentsMixin(CompetitionStoreBase):
             rows = []
             if season:
                 rows = main_conn.execute(
-                    'SELECT * FROM v_adherents_legacy WHERE season_name = ? '
+                    'SELECT * FROM v_member_flat WHERE season_name = ? '
                     'ORDER BY "user_id" ASC', (season,)
                 ).fetchall()
             if not rows:
                 rows = main_conn.execute(
-                    'SELECT * FROM v_adherents_legacy ORDER BY "user_id" ASC'
+                    'SELECT * FROM v_member_flat ORDER BY "user_id" ASC'
                 ).fetchall()
 
             # Groupes de créneaux (planning -> tarifs) pour le champ creneau_groupe
@@ -157,7 +160,7 @@ class AdherentsMixin(CompetitionStoreBase):
 
     @staticmethod
     def _best_purchase_rows(rows: List[Any]) -> List[Dict[str, Any]]:
-        """One row per member (`v_adherents_legacy` has one per purchase): the highest-priority purchase, by the
+        """One row per member (the flat member view has one per purchase): the highest-priority purchase, by the
         import's rule (purchase_priority_score); on a tie the last row, as when every row was written in turn."""
         # adherent id -> (score, purchase row); Any: the ids come from SQLite rows
         best: Dict[Any, Tuple[int, Dict[str, Any]]] = {}
@@ -210,7 +213,7 @@ class AdherentsMixin(CompetitionStoreBase):
         try:
             docs = FirestoreClient.list_documents(cls.COLLECTION_ADHERENTS)
         except Exception as e:
-            print(f"⚠️ [FIRESTORE] Lecture de l'annuaire adhérents impossible : {e}")
+            logger.warning(f"[FIRESTORE] Lecture de l'annuaire adhérents impossible : {e}")
             if cls._adherents_last_read is not None:
                 return cls._adherents_last_read
             if isinstance(e, FirestoreError):
@@ -275,7 +278,7 @@ class AdherentsMixin(CompetitionStoreBase):
         return sex.value if sex else None
 
     @classmethod
-    def list_adherents(cls, search: str = "", competition_only: bool = False, statuses: Optional[Sequence[str]] = None) -> list:
+    def list_members(cls, search: str = "", competition_only: bool = False, statuses: Optional[Sequence[str]] = None) -> list:
         """Liste les adhérents de l'annuaire Firestore (recherche insensible aux accents).
         `statuses`: only the members at one of these membership statuses (« Terminé »…); None: every status."""
         q = normalize_string(search) if search else ""

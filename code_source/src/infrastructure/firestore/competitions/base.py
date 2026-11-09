@@ -1,15 +1,16 @@
 """Shared base of the competition repository mixins: collection names, time and retry
 helpers, and the competition documents (read, normalization, building, participant writes)."""
-import time
 import datetime
-from typing import Dict, Any, List, Optional
+import logging
+import time
+from typing import Any, Dict, List, Optional
 
 from domain.competitions.models import (
     LEGACY_COACH_SLOTS,
+    PAIEMENT_PAYE,
     Competition,
     coach_ids_of,
     default_deadline,
-    PAIEMENT_PAYE,
 )
 from infrastructure.firestore.client import (
     META_KEYS,
@@ -17,6 +18,8 @@ from infrastructure.firestore.client import (
     FirestoreConflictError,
     FirestoreError,
 )
+
+logger = logging.getLogger("alj")
 
 # Verrouillage optimiste des participants : nombre de tentatives (relecture +
 # ré-application de la modification) quand un autre poste, la page web ou le
@@ -67,7 +70,7 @@ class CompetitionStoreBase:
             except FirestoreConflictError:
                 if n == _MAX_WRITE_ATTEMPTS - 1:
                     raise
-                print(f"🔁 [FIRESTORE] {what} modifié(e) entre-temps : "
+                logger.info(f"[FIRESTORE] {what} modifié(e) entre-temps : "
                       f"nouvelle tentative ({n + 2}/{_MAX_WRITE_ATTEMPTS})")
                 time.sleep(0.2 * (n + 1))
         return None
@@ -89,8 +92,7 @@ class CompetitionStoreBase:
         kept: Dict[str, Dict[str, Any]] = {}
         for d in docs:
             if d.get("id") is None:
-                key = d.get("_doc_id")
-                kept.setdefault(key, d)
+                kept.setdefault(str(d.get("_doc_id") or ""), d)
                 continue
             key = str(d.get("id"))
             current = kept.get(key)
@@ -107,7 +109,7 @@ class CompetitionStoreBase:
                 FirestoreClient.delete_document(cls.COLLECTION_COMPETITIONS, doc_id)
                 doc["_doc_id"] = key
             except FirestoreError as e:
-                print(f"⚠️ [FIRESTORE] Normalisation de l'épreuve #{key} impossible : {e}")
+                logger.warning(f"[FIRESTORE] Normalisation de l'épreuve #{key} impossible : {e}")
         return list(kept.values())
 
     @classmethod
@@ -216,4 +218,4 @@ class CompetitionStoreBase:
             docs = FirestoreClient.list_documents(cls.COLLECTION_COACHES)
         except Exception:
             return {}
-        return {d.get("id"): str(d.get("nom") or "") for d in docs if d.get("id") is not None}
+        return {d["id"]: str(d.get("nom") or "") for d in docs if d.get("id") is not None}

@@ -6,9 +6,9 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from infrastructure.firestore.access_store import HistoryAction
 from infrastructure.security.roles import RoleName
 
-HistoryAction = Literal["invited", "invitation_resent", "added", "role_changed", "name_changed", "removed", "bootstrap"]
 
 
 class AccessEntry(BaseModel):

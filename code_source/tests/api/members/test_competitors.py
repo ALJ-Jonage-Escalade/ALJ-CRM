@@ -6,7 +6,7 @@ from support.member_db import MemberDbTestCase
 
 from api.members.schemas import CompetitorContact
 from domain.members.view import COMPETITOR_FIELDS
-from infrastructure.firestore.competition_repository import CompetitionFirestoreRepository as Repo
+from infrastructure.firestore.competition_repository import CompetitionRepository
 from infrastructure.sqlite.members import MemberRepository
 
 EMERGENCY = {
@@ -34,9 +34,9 @@ class TestCompetitors(MemberDbTestCase, ApiTestCase):
     def test_contacts_of_participants_of_open_competitions_only(self):
         open_comp = self.create()["id"]
         closed_comp = self.create(nom="Coupe passée", statut="close")["id"]
-        Repo.add_participant(open_comp, self.leo)
-        Repo.add_participant(open_comp, self.max, selectionne=False)
-        Repo.add_participant(closed_comp, self.zoe)
+        CompetitionRepository.add_participant(open_comp, self.leo)
+        CompetitionRepository.add_participant(open_comp, self.max, selectionne=False)
+        CompetitionRepository.add_participant(closed_comp, self.zoe)
 
         r = self.client.get("/api/members/competitors")
         self.assertEqual(r.status_code, 200, r.text)
@@ -54,7 +54,7 @@ class TestCompetitors(MemberDbTestCase, ApiTestCase):
 
     def test_only_the_agreed_fields(self):
         """No health, address or e-mail data leaves the server for the phone (plan O2)."""
-        Repo.add_participant(self.create()["id"], self.leo)
+        CompetitionRepository.add_participant(self.create()["id"], self.leo)
         (contact,) = self.client.get("/api/members/competitors").json()
         self.assertEqual(set(contact), {"adherent_id", *COMPETITOR_FIELDS})
         # The body is built by hand (json_with_etag): it must match the declared contract, field for field
@@ -65,7 +65,7 @@ class TestCompetitors(MemberDbTestCase, ApiTestCase):
     def test_participant_not_registered_again_keeps_last_season_contacts(self):
         self.seed("9", "Inès", "ROUX", "Compétition U18", season="2025-2026", **EMERGENCY)
         (ines,) = [r["user_id"] for r in MemberRepository.list_member_rows("2025-2026")]
-        Repo.add_participant(self.create()["id"], ines)
+        CompetitionRepository.add_participant(self.create()["id"], ines)
         (contact,) = self.client.get("/api/members/competitors").json()
         self.assertEqual((contact["adherent_id"], contact["first_name"], contact["emergency2_phone"]),
                          (ines, "Inès", "06 22 22 22 22"))
@@ -74,7 +74,7 @@ class TestCompetitors(MemberDbTestCase, ApiTestCase):
         self.seed("10", "Léo", "MARTIN", "Ancien tarif", season="2025-2026", **EMERGENCY)
         rows = MemberRepository.list_member_rows_of_users([self.leo])
         self.assertEqual({r["season_name"] for r in rows}, {"2025-2026", "2026-2027"})
-        Repo.add_participant(self.create()["id"], self.leo)
+        CompetitionRepository.add_participant(self.create()["id"], self.leo)
         (contact,) = self.client.get("/api/members/competitors").json()
         self.assertEqual(contact["creneau_groupe"], "Compétition U18")
 

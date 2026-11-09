@@ -1,7 +1,6 @@
+import math
 import unicodedata
 from urllib.parse import urlparse
-
-import pandas as pd
 
 
 def is_helloasso_url(value: str) -> bool:
@@ -14,12 +13,30 @@ def is_helloasso_url(value: str) -> bool:
     return host == "helloasso.com" or host.endswith(".helloasso.com")
 
 
+def is_missing(value: object) -> bool:
+    """True for None and for a float NaN (an empty spreadsheet cell)."""
+    return value is None or (isinstance(value, float) and math.isnan(value))
+
+
+def clean_digits_only(value: object) -> str:
+    """The digits of a licence, phone or postcode cell: a number loses its float suffix (636947.0 -> "636947"),
+    text keeps only its digits, without a trailing ".0" or the Excel formula wrapping ('="636947"')."""
+    if is_missing(value):
+        return ""
+    if isinstance(value, (int, float)):
+        return str(int(value))
+    text = str(value).strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return "".join(c for c in text if c.isdigit())
+
+
 def normalize_string(s) -> str:
     """
     Normalisation générale d'une chaîne : conversion en minuscules, 
     retrait des accents (NFD/Mn) et suppression des espaces superflus.
     """
-    if s is None or pd.isna(s):
+    if is_missing(s):
         return ""
     s = str(s).strip().lower()
     # Retrait des accents
@@ -46,34 +63,34 @@ def normalize_key_part(s) -> str:
     s = normalize_string(s)
     return s.replace("-", "").replace(" ", "").replace(":", "")
 
-def format_periode(debut, fin=None) -> str:
+def format_period(start: object, end: object = None) -> str:
     """Période d'une compétition pour les e-mails : « 12/03/2026 » ou
     « 12/03/2026 au 13/03/2026 » (fin vide ou identique au début = un seul jour)."""
-    def fr(v):
-        parts = str(v or "").strip().split("-")
-        return f"{parts[2][:2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else str(v or "").strip()
-    d, f = fr(debut), fr(fin)
-    return d if (not f or f == d or not d) else f"{d} au {f}"
+    def to_french_date(value: object) -> str:
+        parts = str(value or "").strip().split("-")
+        return f"{parts[2][:2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else str(value or "").strip()
+    start_text, end_text = to_french_date(start), to_french_date(end)
+    return start_text if (not end_text or end_text == start_text or not start_text) else f"{start_text} au {end_text}"
 
 
-def format_montant(prix) -> str:
+def format_amount(price: float | int | str | None) -> str:
     """Formate un montant en euros pour les e-mails : 15 -> « 15 », 15.5 -> « 15,50 »
     (séparateur décimal français, centimes nuls omis). None / vide / invalide -> « »."""
-    if prix is None or (isinstance(prix, str) and not prix.strip()):
+    if price is None or (isinstance(price, str) and not price.strip()):
         return ""
     try:
-        p = round(float(prix), 2)
+        rounded = round(float(price), 2)
     except (TypeError, ValueError):
         return ""
-    txt = f"{p:.2f}".replace(".", ",")
-    return txt[:-3] if txt.endswith(",00") else txt
+    text = f"{rounded:.2f}".replace(".", ",")
+    return text[:-3] if text.endswith(",00") else text
 
 
 def clean_city_name(city_raw) -> str:
     """
     Harmonise et nettoie les noms de villes pour éviter les doublons (ex: Villette d'Anthon).
     """
-    if city_raw is None or pd.isna(city_raw):
+    if is_missing(city_raw):
         return "Inconnue"
     c = str(city_raw).replace("’", "'").replace("‘", "'").replace("-", " ").strip()
     c = c.upper()
