@@ -1,9 +1,14 @@
 /* API of the members theme (server: api/members/): member records, seasons and the HelloAsso membership import.
    Conventions of every service: frontend/AGENTS.md § API services. */
-import { unwrap, type ApiClient, type Schemas } from "../lib/client";
+import { unwrap, type ApiClient, type ApiRead, type Schemas } from "../lib/client";
 
 /** A membership status (« Validé », « Terminé »…), as the contract types it. */
 export type MemberStatus = NonNullable<Schemas["NewMember"]["status"]>;
+
+/** The members of a season (useSyncedResource), the active one for an empty season. */
+export function membersRead(season: string): ApiRead<"/api/members"> {
+  return season ? { path: "/api/members", query: { season } } : { path: "/api/members" };
+}
 
 /** Return type inferred on purpose: each method answers the body type of its route in the contract. */
 export function createMembersApi(client: ApiClient) {

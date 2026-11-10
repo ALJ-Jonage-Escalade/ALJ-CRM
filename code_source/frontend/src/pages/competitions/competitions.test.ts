@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   athleteContactCards,
   coachChoices,
-  competitionMembersPath,
+  competitionMembersRead,
   competitorStatusesLabel,
   counts,
   defaultDeadline,
@@ -222,7 +222,7 @@ describe("participants", () => {
   });
 
   it("asks the server for the members at the competitor statuses only", () => {
-    expect(new URL(competitionMembersPath(), "http://alj.test").searchParams.getAll("status")).toEqual(["Terminé"]);
+    expect(competitionMembersRead()).toEqual({ path: "/api/competition-members", query: { status: ["Terminé"] } });
     expect(competitorStatusesLabel).toBe("« Terminé »");
   });
 

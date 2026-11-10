@@ -1,29 +1,31 @@
-/* Data of a screen kept up to date by polling the API (lib/sync.ts): useSyncedResource(name, url, { offline }),
-   plan decision D2.
+/* Data of a screen kept up to date by polling the API (lib/sync.ts): useSyncedResource(name, read, { offline }),
+   plan decision D2. read: a GET route of the contract and its query ({ path: "/api/members", query: { season } }); the
+   data is typed by the route's answer (or by `select`).
    - Online mode: nothing is kept on the device, the data lives as long as the screen.
    - Offline mode (the directory): the last answer is kept in IndexedDB (lib/store.ts) for its user; the copy is shown
      at once, before the first poll (which sends its ETag, so an unchanged copy costs a 304), and while the network is
      down. One copy per name: the copy of another url (another season) is not shown. A 401 or 403 wipes the store
      (role lost); logout and the 30-day limit are handled by the store and offline.ts.
 
-   url may change (another season): the poll of the former url is stopped, its late answers dropped, and data goes back
+   The read may change (another season): the poll of the former url is stopped, its late answers dropped, and data goes back
    to null (or the offline copy of the new url) until the new one answers. A null url polls nothing. The poll stops with
    the component (or effect scope), and on a 401 (signed out). */
 import { getCurrentScope, inject, onScopeDispose, readonly, ref, shallowRef, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue";
 import { API_KEY, type ApiFetch } from "../lib/api";
+import { readUrl, type ApiRead, type ReadAnswer, type ReadPath } from "../lib/client";
 import { offlineStore, STORE_KEY, type OfflineStore } from "../lib/store";
 import { poll, type Poll, type PollInfo, type PollStatus } from "../lib/sync";
 
 /** loading: no answer yet for this url; the others: the last poll's outcome (lib/sync.ts PollStatus). */
 export type SyncState = "loading" | PollStatus;
 
-export interface SyncedResourceOptions<T> {
+export interface SyncedResourceOptions<Answer, T> {
   /** false: member data that must not stay on the device (plan D2); true: the copy is kept (needs uid). */
   offline: boolean;
   /** Offline mode: the signed-in user, owner of the copy; null keeps nothing (signed out, not known yet). */
   uid?: MaybeRefOrGetter<string | null>;
   /** Applied to every answer before it is shown and kept: only what the screen needs stays on the device. */
-  select?: (answer: unknown) => T;
+  select?: (answer: Answer) => T;
   intervalMs?: number;
   /** Defaults to the app's apiFetch (API_KEY), with the user's token. */
   fetch?: ApiFetch;
@@ -48,16 +50,27 @@ export interface SyncedResource<T> {
   stop(): void;
 }
 
-export function useSyncedResource<T>(
+type Read<P extends ReadPath> = MaybeRefOrGetter<ApiRead<P> | null>;
+
+/** The route's answer as it comes. */
+export function useSyncedResource<P extends ReadPath>(
   name: string,
-  url: MaybeRefOrGetter<string | null>,
-  options: SyncedResourceOptions<T>,
-): SyncedResource<T> {
+  read: Read<P>,
+  options: SyncedResourceOptions<ReadAnswer<P>, ReadAnswer<P>> & { select?: undefined },
+): SyncedResource<ReadAnswer<P>>;
+/** What `select` keeps of the route's answer. */
+export function useSyncedResource<P extends ReadPath, T>(
+  name: string,
+  read: Read<P>,
+  options: SyncedResourceOptions<ReadAnswer<P>, T> & { select: (answer: ReadAnswer<P>) => T },
+): SyncedResource<T>;
+export function useSyncedResource<T>(name: string, read: Read<ReadPath>, options: SyncedResourceOptions<unknown, T>): SyncedResource<T> {
   const fetchFn = options.fetch ?? inject(API_KEY);
   if (!fetchFn) {
     throw new Error(`useSyncedResource(${name}): no API fetch provided`);
   }
   const store = options.offline ? (options.store ?? inject(STORE_KEY, null) ?? offlineStore()) : null;
+  // The answer is trusted to match the contract, as openapi-fetch does for the services; without select, T is the answer
   const select = options.select ?? ((answer: unknown) => answer as T);
   const data = shallowRef<T | null>(null);
   const state = ref<SyncState>("loading");
@@ -140,7 +153,10 @@ export function useSyncedResource<T>(
 
   // The same url and user again (the session answered once more): the poll goes on
   watch(
-    () => [toValue(url), store ? (toValue(options.uid) ?? null) : null] as const,
+    () => {
+      const target = toValue(read);
+      return [target ? readUrl(target) : null, store ? (toValue(options.uid) ?? null) : null] as const;
+    },
     (next, previous) => {
       if (!previous || next[0] !== previous[0] || next[1] !== previous[1]) {
         void start(next);

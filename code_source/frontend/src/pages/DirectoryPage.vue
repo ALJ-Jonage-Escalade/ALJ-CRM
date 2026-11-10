@@ -14,7 +14,6 @@ import { AUTH_KEY } from "../composables/auth";
 import { useSyncedResource } from "../composables/syncedResource";
 import { pageVerdict } from "../lib/access";
 import { formatDateTime } from "../lib/format";
-import type { Schemas } from "../lib/client";
 import {
   allowedTarifs,
   checkAll,
@@ -39,10 +38,10 @@ import {
   EMERGENCY_MIN_LETTERS,
   seasonCounts,
   toDirectory,
-  type Directory,
   type DirectoryMember,
 } from "./annuaire/directory";
 import { plural, telHref } from "../lib/text";
+import { membersRead } from "../services/members";
 
 const auth = inject(AUTH_KEY)!;
 
@@ -56,18 +55,16 @@ const uid = computed(() => {
   return open.value && (s.status === "signedIn" || s.status === "error") ? s.user.uid : null;
 });
 
-const seasons = useSyncedResource<Schemas["Seasons"]>("seasons", () => (open.value ? "/api/seasons" : null), {
+const seasons = useSyncedResource("seasons", () => (open.value ? { path: "/api/seasons" } : null), {
   offline: true,
   uid,
   intervalMs: 60_000,
 });
-const membersUrl = computed(() => {
-  if (!open.value) {
-    return null;
-  }
-  return filters.value.season ? `/api/members?${new URLSearchParams({ season: filters.value.season })}` : "/api/members";
+const directory = useSyncedResource("directory", () => (open.value ? membersRead(filters.value.season) : null), {
+  offline: true,
+  uid,
+  select: toDirectory,
 });
-const directory = useSyncedResource<Directory>("directory", membersUrl, { offline: true, uid, select: toDirectory });
 // A season that no longer exists (remembered from an earlier visit): back to the active one
 watch(directory.httpStatus, (status) => {
   if (status === 404 && filters.value.season) {

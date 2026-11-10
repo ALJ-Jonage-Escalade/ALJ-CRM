@@ -15,16 +15,7 @@ import { CLIENT_KEY } from "../lib/client";
 import { createCompetitionsApi } from "../services/competitions";
 import { isStaff } from "../lib/roles";
 import { offlineStore, STORE_KEY } from "../lib/store";
-import {
-  competitionMembersPath,
-  sortCompetitions,
-  toMemberSlots,
-  type Coach,
-  type Competition,
-  type CompetitorContact,
-  type MemberSlot,
-} from "./competitions/competitions";
-import type { HelloAssoItem } from "./competitions/helloasso/helloasso";
+import { competitionMembersRead, sortCompetitions, toMemberSlots } from "./competitions/competitions";
 import { createOutbox, pendingLine, replayMessage } from "./competitions/outbox";
 import { createWriter, WRITER_KEY } from "./competitions/writer";
 import { COMPETITIONS_KEY } from "./competitions/context";
@@ -46,34 +37,30 @@ const signedIn = computed(() => auth.state.value.status === "signedIn");
 const staff = computed(() => auth.state.value.status === "signedIn" && isStaff(auth.state.value.role));
 const contactsShown = computed(() => staff.value || access.value === "offline");
 
-const competitions = useSyncedResource<Competition[]>("competitions", () => (open.value ? "/api/competitions" : null), {
+const competitions = useSyncedResource("competitions", () => (open.value ? { path: "/api/competitions" } : null), {
   offline: true,
   uid,
 });
-const competitors = useSyncedResource<CompetitorContact[]>(
+const competitors = useSyncedResource(
   "competitors",
-  () => (open.value && contactsShown.value ? "/api/members/competitors" : null),
+  () => (open.value && contactsShown.value ? { path: "/api/members/competitors" } : null),
   { offline: true, uid },
 );
 // Offline the role cannot be checked: a device keeping the contacts is a coach's (they are never kept for others)
 const canWrite = computed(() => staff.value || (access.value === "offline" && competitors.data.value !== null));
 // Tariffs and slot groups to group the participants, names and e-mails to add or write to them: online only
-const members = useSyncedResource<MemberSlot[]>(
-  "competition-members",
-  () => (open.value && signedIn.value ? competitionMembersPath() : null),
-  {
-    offline: false,
-    select: toMemberSlots,
-    intervalMs: 60_000,
-  },
-);
-const coaches = useSyncedResource<Coach[]>("coaches", () => (staff.value ? "/api/coaches" : null), { offline: false, intervalMs: 60_000 });
+const members = useSyncedResource("competition-members", () => (open.value && signedIn.value ? competitionMembersRead() : null), {
+  offline: false,
+  select: toMemberSlots,
+  intervalMs: 60_000,
+});
+const coaches = useSyncedResource("coaches", () => (staff.value ? { path: "/api/coaches" } : null), { offline: false, intervalMs: 60_000 });
 
 // The open sub-page (router.ts): its id, as AppShell lists it
 const sub = computed(() => route.meta.sub ?? "competitions");
-const items = useSyncedResource<HelloAssoItem[]>(
+const items = useSyncedResource(
   "helloasso-items",
-  () => (staff.value && sub.value === "helloasso" ? "/api/helloasso/items" : null),
+  () => (staff.value && sub.value === "helloasso" ? { path: "/api/helloasso/items" } : null),
   { offline: false },
 );
 

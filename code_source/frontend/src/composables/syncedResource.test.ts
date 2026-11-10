@@ -2,6 +2,7 @@ import { flushPromises } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { effectScope, nextTick, ref, type Ref } from "vue";
 import type { ApiFetch } from "../lib/api";
+import type { ApiRead, ReadAnswer } from "../lib/client";
 import type { OfflineStore, Stored } from "../lib/store";
 import { useSyncedResource } from "./syncedResource";
 
@@ -59,10 +60,17 @@ afterEach(() => {
   setHidden(false);
 });
 
-function start(server: ReturnType<typeof fakeServer>, url: Ref<string | null> | string = "/api/members") {
+type MembersRead = ApiRead<"/api/members">;
+const MEMBERS: MembersRead = { path: "/api/members" };
+const SEASON_2025: MembersRead = { path: "/api/members", query: { season: "2025-2026" } };
+/** The fake server answers small { n } bodies instead of real member lists. */
+type Counter = { n: number };
+const asCounter = (answer: ReadAnswer<"/api/members">): Counter => answer as unknown as Counter;
+
+function start(server: ReturnType<typeof fakeServer>, read: Ref<MembersRead | null> | MembersRead = MEMBERS) {
   const scope = effectScope();
   const resource = scope.run(() =>
-    useSyncedResource<{ n: number }>("members", url, { offline: false, intervalMs: 1000, fetch: server.fetch }),
+    useSyncedResource("members", read, { offline: false, select: asCounter, intervalMs: 1000, fetch: server.fetch }),
   )!;
   return { scope, resource };
 }
@@ -153,10 +161,10 @@ describe("useSyncedResource (online)", () => {
     const server = fakeServer();
     server.set("/api/members", { n: 1 });
     server.set("/api/members?season=2025-2026", { n: 25 });
-    const url = ref<string | null>("/api/members");
+    const read = ref<MembersRead | null>(MEMBERS);
     server.holdAnswers();
-    const { resource } = start(server, url);
-    url.value = "/api/members?season=2025-2026";
+    const { resource } = start(server, read);
+    read.value = SEASON_2025;
     await nextTick();
     expect(resource.data.value).toBeNull();
     server.releaseAnswers();
@@ -165,7 +173,7 @@ describe("useSyncedResource (online)", () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(server.calls.map((c) => c.url)).toEqual(["/api/members", "/api/members?season=2025-2026", "/api/members?season=2025-2026"]);
 
-    url.value = null;
+    read.value = null;
     await nextTick();
     await vi.advanceTimersByTimeAsync(5000);
     expect(server.calls).toHaveLength(3);
@@ -216,11 +224,11 @@ function startOffline(
   server: ReturnType<typeof fakeServer>,
   store: OfflineStore,
   uid: Ref<string | null> | string | null = "u1",
-  select?: (answer: unknown) => { n: number },
+  select: (answer: ReadAnswer<"/api/members">) => Counter = asCounter,
 ) {
   const scope = effectScope();
   const resource = scope.run(() =>
-    useSyncedResource<{ n: number }>("directory", "/api/members", {
+    useSyncedResource("directory", MEMBERS, {
       offline: true,
       uid,
       select,
@@ -260,7 +268,7 @@ describe("useSyncedResource (offline)", () => {
     const server = fakeServer();
     server.set("/api/members", { n: 2, secret: "x" });
     const { store, copies } = memoryStore();
-    const { resource } = startOffline(server, store, "u1", (answer) => ({ n: (answer as { n: number }).n }));
+    const { resource } = startOffline(server, store, "u1", (answer) => ({ n: asCounter(answer).n }));
     await flushPromises();
     expect(resource.data.value).toEqual({ n: 2 });
     expect(copies.get("directory")).toMatchObject({ uid: "u1", data: { n: 2 }, url: "/api/members" });

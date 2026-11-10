@@ -20,9 +20,9 @@ import UiSidePanel from "../components/ui/UiSidePanel.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
-import { CLIENT_KEY, errorText, type Schemas } from "../lib/client";
+import { CLIENT_KEY, errorText } from "../lib/client";
 import { createCommunicationsApi } from "../services/communications";
-import { createMembersApi } from "../services/members";
+import { createMembersApi, membersRead } from "../services/members";
 import { csvBlob } from "../lib/csv";
 import { saveFile } from "../lib/download";
 import { formatDayText } from "../lib/format";
@@ -57,7 +57,6 @@ import {
   tarifCounts,
   type CreneauItem,
   type Member,
-  type MemberList,
 } from "./adherents/members";
 import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft, type Template } from "./adherents/record";
 import { dialogs } from "../composables/dialogs";
@@ -74,11 +73,8 @@ const filters = ref(loadFilters());
 watch(filters, (f) => saveFilters(f), { deep: true });
 
 // Data: the seasons, and the members of the chosen season (the active one when none is chosen)
-const seasons = useSyncedResource<Schemas["Seasons"]>("seasons", "/api/seasons", { offline: false, intervalMs: 60_000 });
-const membersUrl = computed(() =>
-  filters.value.season ? `/api/members?${new URLSearchParams({ season: filters.value.season })}` : "/api/members",
-);
-const members = useSyncedResource<MemberList>("members", membersUrl, { offline: false });
+const seasons = useSyncedResource("seasons", { path: "/api/seasons" }, { offline: false, intervalMs: 60_000 });
+const members = useSyncedResource("members", () => membersRead(filters.value.season), { offline: false });
 // A season that no longer exists (remembered from an earlier visit): back to the active one
 watch(members.httpStatus, (status) => {
   if (status === 404 && filters.value.season) {

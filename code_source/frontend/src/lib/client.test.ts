@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApiFetch } from "./api";
-import { ApiError, createApiClient, errorFromBody, NETWORK_MESSAGE, unwrap } from "./client";
+import { ApiError, createApiClient, errorFromBody, NETWORK_MESSAGE, readUrl, unwrap } from "./client";
 
 const BASE = "http://alj.test";
 
@@ -88,5 +88,16 @@ describe("errorFromBody", () => {
     ["texte", 500, null, "Le serveur ne répond pas correctement (erreur 500)."],
   ])("%j (%i)", (body, status, code, message) => {
     expect(errorFromBody(status, body)).toMatchObject({ status, code, message });
+  });
+});
+
+describe("readUrl", () => {
+  it("writes the query of a read as the url the offline copies are keyed by", () => {
+    expect(readUrl({ path: "/api/members" })).toBe("/api/members");
+    expect(readUrl({ path: "/api/members", query: { season: "2025-2026" } })).toBe("/api/members?season=2025-2026");
+    expect(readUrl({ path: "/api/members", query: { season: null } })).toBe("/api/members");
+    expect(readUrl({ path: "/api/competition-members", query: { status: ["Terminé", "Validé"] } })).toBe(
+      "/api/competition-members?status=Termin%C3%A9&status=Valid%C3%A9",
+    );
   });
 });

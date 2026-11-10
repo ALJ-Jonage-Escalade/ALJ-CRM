@@ -2,7 +2,7 @@
    former pages web/competitions.html and web/bureau/competitions.html, merged). The server checks every change. */
 import type { BadgeColor } from "../../components/ui/palette";
 import type { Cell } from "../../lib/csv";
-import type { Schemas } from "../../lib/client";
+import type { ApiRead, Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
 import { normKey, plural } from "../../lib/text";
 import { ARCHIVED } from "../../services/competitions";
@@ -27,14 +27,13 @@ export const COMPETITOR_STATUSES: readonly MemberStatus[] = ["Terminé"];
 export const competitorStatusesLabel = COMPETITOR_STATUSES.map((status) => `« ${status} »`).join(" ou ");
 
 /** GET /api/competition-members limited to COMPETITOR_STATUSES. */
-export function competitionMembersPath(): string {
-  const query = new URLSearchParams(COMPETITOR_STATUSES.map((status) => ["status", status]));
-  return `/api/competition-members?${query.toString()}`;
+export function competitionMembersRead(): ApiRead<"/api/competition-members"> {
+  return { path: "/api/competition-members", query: { status: [...COMPETITOR_STATUSES] } };
 }
 
 /** The answer of GET /api/competition-members reduced to the fields above (phones and emergency contacts stay on the server). */
-export function toMemberSlots(answer: unknown): MemberSlot[] {
-  return (answer as Schemas["CompetitionMember"][]).map((m) => ({
+export function toMemberSlots(answer: readonly Schemas["CompetitionMember"][]): MemberSlot[] {
+  return answer.map((m) => ({
     id: m.id,
     nom: m.nom ?? "",
     prenom: m.prenom ?? "",

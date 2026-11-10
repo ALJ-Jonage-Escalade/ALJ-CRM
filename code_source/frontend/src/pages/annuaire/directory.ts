@@ -45,8 +45,7 @@ export interface Directory {
 }
 
 /** The answer of GET /api/members reduced to what the directory shows (and keeps on the device). */
-export function toDirectory(answer: unknown): Directory {
-  const list = answer as MemberList;
+export function toDirectory(list: MemberList): Directory {
   return {
     season: list.season,
     creneaux: list.creneaux,
