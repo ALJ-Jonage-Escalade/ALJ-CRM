@@ -24,7 +24,7 @@ import CompetitionsPage from "./pages/CompetitionsPage.vue";
 import CompetitionsBalancePage from "./pages/competitions/CompetitionsBalancePage.vue";
 import CompetitionsCoachesPage from "./pages/competitions/CompetitionsCoachesPage.vue";
 import CompetitionsListPage from "./pages/competitions/CompetitionsListPage.vue";
-import DirectoryPage from "./pages/DirectoryPage.vue";
+import AnnuairePage from "./pages/AnnuairePage.vue";
 import NotFoundPage from "./pages/NotFoundPage.vue";
 
 // Loaded when opened: Accueil (the most opened page) does not wait for them
@@ -107,7 +107,7 @@ export const routes: RouteRecordRaw[] = [
     meta: { access: pageAccess("competitions") },
     children: subRoutes("competitions", "competitions"),
   },
-  { path: "/index", name: "annuaire", component: DirectoryPage, meta: { access: pageAccess("annuaire") } },
+  { path: "/index", name: "annuaire", component: AnnuairePage, meta: { access: pageAccess("annuaire") } },
   { path: "/bureau/communications", name: "communications", component: CommunicationsPage, meta: { access: pageAccess("communications") } },
   { path: "/bureau/planning", name: "planning", component: PlanningPage, meta: { access: pageAccess("planning") } },
   {

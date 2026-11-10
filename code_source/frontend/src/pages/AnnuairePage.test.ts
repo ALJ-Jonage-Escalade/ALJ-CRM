@@ -5,7 +5,7 @@ import { ref } from "vue";
 import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { createOfflineStore, STORE_KEY, type OfflineStore } from "../lib/store";
-import DirectoryPage from "./DirectoryPage.vue";
+import AnnuairePage from "./AnnuairePage.vue";
 import type { MemberList } from "./adherents/members";
 import { member } from "./adherents/members.fixture";
 
@@ -64,7 +64,7 @@ function fakeApi(offline = false) {
 
 function render(state: AuthState, api: ApiFetch, store: OfflineStore) {
   const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
-  const wrapper = mount(DirectoryPage, {
+  const wrapper = mount(AnnuairePage, {
     global: {
       provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: store },
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
@@ -94,7 +94,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const coach: AuthState = { status: "signedIn", user: USER, role: "coach" };
 
-describe("DirectoryPage", () => {
+describe("AnnuairePage", () => {
   it("lists the season without the waiting list, sorted, with its counts", async () => {
     const { byId, names, wrapper } = render(coach, fakeApi().api, store);
     await settle();

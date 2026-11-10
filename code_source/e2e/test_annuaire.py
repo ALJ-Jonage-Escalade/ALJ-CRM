@@ -1,4 +1,4 @@
-"""Members directory (/index, Vue app: frontend/src/pages/DirectoryPage.vue), on phones and desktop: search, member
+"""Members directory (/index, Vue app: frontend/src/pages/AnnuairePage.vue), on phones and desktop: search, member
 cards, emergency contacts, filters, roles; and its offline copy (IndexedDB, frontend/src/lib/store.ts): shown with its
 date when the network is down, wiped on logout, on a 403, for another account and after 30 days.
 
