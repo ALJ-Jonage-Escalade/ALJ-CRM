@@ -22,7 +22,7 @@ import { useCompetitionFilters, type ViewMode } from "./list/filters";
 import ViewSwitcher from "./list/ViewSwitcher.vue";
 import { competitionItself, WRITER_KEY } from "./writer";
 
-const { all, competitions, competitors, members, coaches, canWrite, staff, contactsShown, online, outbox, uid } = inject(COMPETITIONS_KEY)!;
+const { all, competitions, competitors, members, coaches, canWrite, contactsShown, online, outbox } = inject(COMPETITIONS_KEY)!;
 const writer = inject(WRITER_KEY)!;
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const route = useRoute();
@@ -238,11 +238,6 @@ const listLine = computed(() => {
       :rows="rows"
       :members="members.data.value ?? []"
       :coaches="coaches.data.value ?? []"
-      :can-write="canWrite"
-      :staff="staff"
-      :contacts-shown="contactsShown"
-      :outbox="outbox"
-      :uid="uid"
       class="order-1 min-w-0 md:order-2 md:col-start-2 md:row-start-1"
     />
     <div

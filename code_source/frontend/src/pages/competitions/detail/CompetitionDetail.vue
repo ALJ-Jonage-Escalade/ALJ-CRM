@@ -43,7 +43,8 @@ import {
   type Row,
 } from "../competitions";
 import EmailForm from "./EmailForm.vue";
-import type { Outbox, QueuedFlag } from "../outbox";
+import { COMPETITIONS_KEY } from "../context";
+import type { QueuedFlag } from "../outbox";
 import AthleteContactDialog from "./AthleteContactDialog.vue";
 import ParticipantCard from "./ParticipantCard.vue";
 import ParticipantRow from "./ParticipantRow.vue";
@@ -59,13 +60,9 @@ const props = defineProps<{
   rows: readonly Row[];
   members: readonly MemberSlot[];
   coaches: readonly Coach[];
-  /** Coaches and admins (offline: a device that keeps the contacts, i.e. a coach's) */
-  canWrite: boolean;
-  staff: boolean;
-  contactsShown: boolean;
-  outbox: Outbox;
-  uid: string | null;
 }>();
+// Who may write, the outbox and the account: shared by the competitions page with all its sub-pages
+const { canWrite, staff, contactsShown, outbox, uid } = inject(COMPETITIONS_KEY)!;
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const writer = inject(WRITER_KEY)!;
 const router = useRouter();
@@ -83,7 +80,7 @@ const FILTERS = computed(() => [
   { id: "all" as const, label: "📋 Tous", n: kpis.value.all },
   { id: "selected" as const, label: "✅ Participe : Oui", n: kpis.value.selected },
   { id: "unpaid" as const, label: "⏳ Paiement en attente", n: kpis.value.unpaid },
-  ...(props.canWrite ? [{ id: "notInvited" as const, label: "🔘 Non invités", n: notInvited.value.length }] : []),
+  ...(canWrite.value ? [{ id: "notInvited" as const, label: "🔘 Non invités", n: notInvited.value.length }] : []),
 ]);
 const server = (r: Row): Participant | undefined => c.value.participants?.find((p) => p.adherent_id === r.adherent_id);
 const named = (r: Participant) => `${r.prenom ?? ""} ${r.nom ?? ""}`.trim();
@@ -258,7 +255,8 @@ const paying = ref<Participant | null>(null);
    or when the network drops during the request, the change waits in the outbox. */
 async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
   const p = server(r);
-  if (!p || p.adherent_id == null || !props.uid) {
+  const owner = uid.value;
+  if (!p || p.adherent_id == null || !owner) {
     return;
   }
   if (flag === "selectionne" && !value && p.statut_paiement === "paye") {
@@ -266,14 +264,14 @@ async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
     return;
   }
   const queue = async () => {
-    await props.outbox.queue(props.uid!, c.value, p, flag, value);
+    await outbox.queue(owner, c.value, p, flag, value);
     writer.toast("⏳ Hors ligne : modification gardée sur l'appareil, envoyée au retour du réseau.", 6000);
   };
   if (!writer.online()) {
     return queue();
   }
-  if (props.outbox.pending(c.value.id, p.adherent_id, flag)) {
-    await props.outbox.cancel(c.value.id, p.adherent_id, flag); // superseded by the change sent now
+  if (outbox.pending(c.value.id, p.adherent_id, flag)) {
+    await outbox.cancel(c.value.id, p.adherent_id, flag); // superseded by the change sent now
   }
   let lost = false;
   await writer.run(() => competitionsApi.updateParticipant(c.value.id, p.adherent_id!, { [flag]: value }), {
