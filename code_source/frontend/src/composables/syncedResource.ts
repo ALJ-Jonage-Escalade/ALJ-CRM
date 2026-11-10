@@ -13,7 +13,7 @@
 import { getCurrentScope, inject, onScopeDispose, readonly, ref, shallowRef, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { readUrl, type ApiRead, type ReadAnswer, type ReadPath } from "../lib/client";
-import { offlineStore, STORE_KEY, type OfflineStore } from "../lib/store";
+import { STORE_KEY, type OfflineStore } from "../lib/store";
 import { poll, type Poll, type PollInfo, type PollStatus } from "../lib/sync";
 
 /** loading: no answer yet for this url; the others: the last poll's outcome (lib/sync.ts PollStatus). */
@@ -29,7 +29,7 @@ export interface SyncedResourceOptions<Answer, T> {
   intervalMs?: number;
   /** Defaults to the app's apiFetch (API_KEY), with the user's token. */
   fetch?: ApiFetch;
-  /** Defaults to the provided store (STORE_KEY), else the app's. */
+  /** Defaults to the provided store (STORE_KEY, main.ts). */
   store?: OfflineStore;
 }
 
@@ -69,7 +69,10 @@ export function useSyncedResource<T>(name: string, read: Read<ReadPath>, options
   if (!fetchFn) {
     throw new Error(`useSyncedResource(${name}): no API fetch provided`);
   }
-  const store = options.offline ? (options.store ?? inject(STORE_KEY, null) ?? offlineStore()) : null;
+  const store = options.offline ? (options.store ?? inject(STORE_KEY)) : null;
+  if (store === undefined) {
+    throw new Error(`useSyncedResource(${name}): no offline store provided`);
+  }
   // The answer is trusted to match the contract, as openapi-fetch does for the services; without select, T is the answer
   const select = options.select ?? ((answer: unknown) => answer as T);
   const data = shallowRef<T | null>(null);
@@ -100,7 +103,8 @@ export function useSyncedResource<T>(name: string, read: Read<ReadPath>, options
       if (mine !== generation || stopped) {
         return;
       }
-      // No url: written by the former competitions page (alj-store.js), for the same fixed url
+      // No url: written by the former competitions page (alj-store.js), for the same fixed url. Remove after 2026-11-24
+      // (with lib/store.ts LEGACY_PREFIX): those copies have expired by then
       if (copy && (copy.url === target || copy.url === null)) {
         data.value = copy.data;
         dataAt.value = new Date(copy.savedAt);

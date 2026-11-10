@@ -27,7 +27,7 @@ import { CLIENT_KEY, errorText } from "../lib/client";
 import { formatDate, parseDate } from "../lib/format";
 import { isAdmin, isStaff, roleLabel } from "../lib/roles";
 import { isEmulator } from "../lib/runtime";
-import { logoutWarning, offlineStore, STORE_KEY } from "../lib/store";
+import { logoutWarning, STORE_KEY } from "../lib/store";
 import { createIntegrationsApi } from "../services/integrations";
 import AppBrand from "./AppBrand.vue";
 import PageLink from "./PageLink.vue";
@@ -43,7 +43,7 @@ const props = defineProps<{ page: PageId; title: string; sync?: string; sub?: st
 
 const auth = inject(AUTH_KEY)!;
 const integrationsApi = createIntegrationsApi(inject(CLIENT_KEY)!);
-const store = inject(STORE_KEY, null) ?? offlineStore();
+const store = inject(STORE_KEY)!; // provided by main.ts
 const state = auth.state;
 /** « 06/11/2026 » when the signed-in address was invited but did not sign in in time; empty otherwise. */
 const invitationExpiredOn = computed(() => {

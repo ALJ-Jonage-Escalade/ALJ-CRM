@@ -14,7 +14,8 @@ declare const self: ServiceWorkerGlobalScope;
 
 /** Entry page of the app, as precached (Vite base /spa/, api/web/pages.py). */
 const ENTRY_PAGE = "/spa/index.html";
-/** Prefix of the caches of the former web/sw.js ("alj-escalade-v26"…). */
+/** Prefix of the caches of the former web/sw.js ("alj-escalade-v26"…). Remove with their cleanup after 2026-11-24, with the
+    store's legacy snapshots (lib/store.ts LEGACY_PREFIX): by then every device that ran the former pages has opened the app. */
 const LEGACY_CACHE_PREFIX = "alj-escalade-v";
 /** Page addresses answered by the app's entry page (api/web/pages.py, src/router.ts). */
 const APP_PAGES = [/^\/$/, /^\/competitions(\/|$)/, /^\/index$/, /^\/bureau(\/|$)/];

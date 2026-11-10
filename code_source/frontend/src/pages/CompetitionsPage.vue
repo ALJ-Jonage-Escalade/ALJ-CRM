@@ -14,7 +14,7 @@ import { formatDateTime } from "../lib/format";
 import { CLIENT_KEY } from "../lib/client";
 import { createCompetitionsApi } from "../services/competitions";
 import { isStaff } from "../lib/roles";
-import { offlineStore, STORE_KEY } from "../lib/store";
+import { STORE_KEY } from "../lib/store";
 import { competitionMembersRead, sortCompetitions, toMemberSlots } from "./competitions/competitions";
 import { createOutbox, pendingLine, replayMessage } from "./competitions/outbox";
 import { createWriter, WRITER_KEY } from "./competitions/writer";
@@ -22,7 +22,7 @@ import { COMPETITIONS_KEY } from "./competitions/context";
 
 const auth = inject(AUTH_KEY)!;
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
-const store = inject(STORE_KEY, null) ?? offlineStore();
+const store = inject(STORE_KEY)!; // provided by main.ts
 const route = useRoute();
 const toast = useToast();
 
