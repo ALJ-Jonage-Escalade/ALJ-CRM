@@ -30,7 +30,7 @@ Les collections `adherents` et `planning` (annuaire lu par la PWA et le webhook)
 - Hors connexion : l'application travaille sur la copie locale ; les modifications
   partent au retour du réseau (pied de page : « ⏳ N modification(s) à envoyer »).
 
-## Annuaire web (application Vue, `frontend/src/pages/DirectoryPage.vue`, URL `/index`)
+## Annuaire web (application Vue, `frontend/src/pages/AnnuairePage.vue`, URL `/index`)
 
 - Lit `GET /api/seasons` et `GET /api/members?season=` (une saison à la fois). La liste
   est calculée sur le serveur (`domain/member_view.py`) depuis son cache SQLite des
