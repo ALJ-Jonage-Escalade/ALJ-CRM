@@ -4,7 +4,7 @@ import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import { plural } from "../../../lib/text";
-import { counts, discipline, disciplineColor, formatCompetitionPeriod, hasResults, type Competition } from "../competitions";
+import { counts, discipline, disciplineColor, period, hasResults, type Competition } from "../competitions";
 
 const props = defineProps<{
   competition: Competition;
@@ -39,9 +39,7 @@ const count = computed(() => counts(props.competition.participants ?? []));
         {{ discipline(competition) }}
       </UiBadge>
     </div>
-    <span class="block text-xs font-semibold text-slate-600 pb-1.5" data-testid="comp-period">
-      📅 {{ formatCompetitionPeriod(competition) }}
-    </span>
+    <span class="block text-xs font-semibold text-slate-600 pb-1.5" data-testid="comp-period">📅 {{ period(competition) }}</span>
     <span class="block text-xs text-slate-500">
       🏃 {{ competition.coaches?.length ? `Coachs : ${competition.coaches.join(", ")}` : "Aucun coach" }}
     </span>

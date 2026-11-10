@@ -55,13 +55,13 @@ import {
   statusChips,
   statusColor,
   tarifCounts,
-  telHref,
   type CreneauItem,
   type Member,
   type MemberList,
 } from "./adherents/members";
 import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft, type Template } from "./adherents/record";
 import { dialogs } from "../composables/dialogs";
+import { telHref } from "../lib/text";
 
 const client = inject(CLIENT_KEY)!;
 const membersApi = createMembersApi(client);

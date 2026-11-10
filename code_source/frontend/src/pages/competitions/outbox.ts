@@ -89,11 +89,6 @@ function isValid(entry: QueuedChange, uid: string): boolean {
   return entry.uid === uid && QUEUED_URL.test(String(entry.url)) && QUEUED_FLAGS.includes(entry.flag) && typeof entry.value === "boolean";
 }
 
-/** Confirmation asked before signing out with changes not sent yet (they are lost with the store). */
-export function logoutWarning(n: number): string {
-  return `${n} modification${plural(n)} faite${plural(n)} hors ligne pas encore envoyée${plural(n)} ser${plural(n, "ont", "a")} perdue${plural(n)}. Se déconnecter ?`;
-}
-
 export function pendingLine(n: number): string {
   return n ? ` · ⏳ ${n} modification${plural(n)} à envoyer` : "";
 }

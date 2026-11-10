@@ -2,7 +2,8 @@
    reading (plan D2). Only the fields shown here are kept: contacts, emergency contacts and diplomas. No health data
    and no payment (amount, order): they stay online, in the member record of Adhérents.
    Filters, search and display helpers are the ones of Adhérents (adherents/members.ts). */
-import { normKey, type Creneau, type Member, type MemberList } from "../adherents/members";
+import { normKey } from "../../lib/text";
+import type { Creneau, Member, MemberList } from "../adherents/members";
 import { formatDayText } from "../../lib/format";
 
 const FIELDS = [

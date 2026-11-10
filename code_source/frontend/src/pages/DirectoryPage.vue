@@ -29,7 +29,6 @@ import {
   statusChips,
   statusColor,
   tarifCounts,
-  telHref,
   type CreneauItem,
 } from "./adherents/members";
 import {
@@ -43,7 +42,7 @@ import {
   type Directory,
   type DirectoryMember,
 } from "./annuaire/directory";
-import { plural } from "../lib/text";
+import { plural, telHref } from "../lib/text";
 
 const auth = inject(AUTH_KEY)!;
 

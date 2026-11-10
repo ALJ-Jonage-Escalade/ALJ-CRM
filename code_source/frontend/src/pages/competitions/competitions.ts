@@ -4,8 +4,9 @@ import type { BadgeColor } from "../../components/ui/palette";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
-import { normKey, type MemberStatus } from "../adherents/members";
-import { plural } from "../../lib/text";
+import { normKey, plural } from "../../lib/text";
+import { ARCHIVED } from "../../services/competitions";
+import type { MemberStatus } from "../../services/members";
 
 export type Competition = Schemas["Competition"];
 export type Participant = Schemas["CompetitionParticipant"];
@@ -30,9 +31,6 @@ export function competitionMembersPath(): string {
   const query = new URLSearchParams(COMPETITOR_STATUSES.map((status) => ["status", status]));
   return `/api/competition-members?${query.toString()}`;
 }
-
-export const ARCHIVED = "close";
-export const PREPARING = "en_preparation";
 
 /** The answer of GET /api/competition-members reduced to the fields above (phones and emergency contacts stay on the server). */
 export function toMemberSlots(answer: unknown): MemberSlot[] {
@@ -79,54 +77,35 @@ export function filterCompetitions(list: readonly Competition[], search: string,
   });
 }
 
-/** « 15/03/2026 », « 15/03/2026 → 16/03/2026 » or « sans date ». */
-export function period(c: Competition): string {
-  const start = c.date_competition ?? "";
+/** « 15/03/2026 », « 15/03 au 16/03/2026 » (the year once when both days share it), « 31/12/2026 au 01/01/2027 » or
+    « sans date ». */
+export function period(competition: Competition): string {
+  const start = competition.date_competition ?? "";
   if (!start) {
     return "sans date";
   }
-  const end = c.date_fin ?? "";
-  return end && end > start ? `${formatDayText(start)} → ${formatDayText(end)}` : formatDayText(start);
-}
-
-/** « 31/10/2026 » ou « 31/10 au 01/11/2026 » si sur deux jours. */
-export function formatCompetitionPeriod(c: Competition): string {
-  const start = c.date_competition ?? "";
-  if (!start) {
-    return "sans date";
-  }
-  const end = c.date_fin ?? "";
+  const end = competition.date_fin ?? "";
   const startText = formatDayText(start);
   if (!end || end <= start) {
     return startText;
   }
   const endText = formatDayText(end);
-  if (startText.length === 10 && endText.length === 10 && startText.slice(6) === endText.slice(6)) {
-    return `${startText.slice(0, 5)} au ${endText}`;
-  }
-  return `${startText} au ${endText}`;
+  const sameYear = start.slice(0, 4) === end.slice(0, 4) && startText.length === 10;
+  return `${sameYear ? startText.slice(0, 5) : startText} au ${endText}`;
 }
 
-/** Calcule la saison sportive (ex. 2026-2027) à partir d'une date ISO. */
-export function competitionSeason(dateStr?: string): string {
-  if (!dateStr) {
+/** The first month of a sports season: September, as on the server (domain/members/age_rules.py SEASON_START_MONTH). */
+const SEASON_START_MONTH = 9;
+
+/** « 2026-2027 » for an ISO date from September 2026 to August 2027; empty for a missing or unreadable date. */
+export function seasonOf(iso: string | null | undefined): string {
+  const match = /^(\d{4})-(\d{2})/.exec(iso ?? "");
+  if (!match) {
     return "";
   }
-  const parts = dateStr.slice(0, 10).split("-");
-  if (parts.length < 3) {
-    return "";
-  }
-  const yearStr = parts[0];
-  const monthStr = parts[1];
-  if (!yearStr || !monthStr) {
-    return "";
-  }
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(monthStr, 10);
-  if (isNaN(year) || isNaN(month)) {
-    return "";
-  }
-  return month >= 9 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+  const year = Number(match[1]);
+  const start = Number(match[2]) >= SEASON_START_MONTH ? year : year - 1;
+  return `${start}-${start + 1}`;
 }
 
 /** The discipline, when it says more than « escalade » (pass-through field of the office page). */
@@ -299,13 +278,17 @@ export function filterRows(rows: readonly Row[], filter: ParticipantFilter, sear
   });
 }
 
+/** By last name then first name, French order. */
+export function byName(a: Pick<Participant, "nom" | "prenom">, b: Pick<Participant, "nom" | "prenom">): number {
+  return (a.nom ?? "").localeCompare(b.nom ?? "", "fr") || (a.prenom ?? "").localeCompare(b.prenom ?? "", "fr");
+}
+
 /** By slot group (French order, « Non identifiés » last), each sorted by name. */
 export function groupRows(rows: readonly Row[]): [string, Row[]][] {
   const groups = new Map<string, Row[]>();
   for (const r of rows) {
     groups.set(r.group, [...(groups.get(r.group) ?? []), r]);
   }
-  const byName = (a: Row, b: Row) => (a.nom ?? "").localeCompare(b.nom ?? "", "fr") || (a.prenom ?? "").localeCompare(b.prenom ?? "", "fr");
   return [...groups.entries()]
     .sort(([a], [b]) => Number(a === UNIDENTIFIED) - Number(b === UNIDENTIFIED) || a.localeCompare(b, "fr"))
     .map(([g, list]) => [g, list.sort(byName)]);
@@ -337,7 +320,7 @@ export function memberMatches(members: readonly MemberSlot[], c: Competition, se
         !listed.has(m.id) &&
         (normKey(`${m.nom} ${m.prenom}`).includes(q) || normKey(`${m.prenom} ${m.nom}`).includes(q) || normKey(m.licence_ffme).includes(q)),
     )
-    .sort((a, b) => (a.nom ?? "").localeCompare(b.nom ?? "", "fr") || (a.prenom ?? "").localeCompare(b.prenom ?? "", "fr"))
+    .sort(byName)
     .slice(0, 15);
 }
 
@@ -374,9 +357,9 @@ export function defaultDeadline(start: string): string {
   if (!start || !/^\d{4}-\d{2}-\d{2}$/.test(start)) {
     return "";
   }
-  const deadline = new Date(start + "T00:00:00");
+  const deadline = new Date(`${start}T00:00:00`);
   deadline.setDate(deadline.getDate() - 7);
-  return `${deadline.getFullYear()}-${String(deadline.getMonth() + 1).padStart(2, "0")}-${String(deadline.getDate()).padStart(2, "0")}`;
+  return todayIso(deadline);
 }
 
 /** The registration deadline of a competition, the default one when none is stored (cached before the field existed). */

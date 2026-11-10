@@ -423,7 +423,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       >
         <UiButton variant="muted" small data-testid="edit-comp" @click="editing = true">✏️ Modifier</UiButton>
         <UiButton variant="muted" small data-testid="email-comp" @click="emailing = true">✉️ Envoyer un email aux compétiteurs</UiButton>
-        <!-- Actions secondaires -->
         <UiMenu label="⋯ Plus" small :busy="fetching && 'Recherche MyCompet…'" aria-label="Plus d'actions" data-testid="detail-more">
           <UiMenuItem data-testid="load-group" @select="loadGroup">🧗 Charger le groupe « Compétition »</UiMenuItem>
           <UiMenuItem data-testid="fetch-results" @select="fetchResults()">🏆 Trouver les résultats</UiMenuItem>
@@ -448,7 +447,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
     </div>
 
     <div :class="wide ? 'order-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm' : ''">
-      <!-- En-tête avec boutons d'actions compétiteurs -->
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
         <h3 class="text-sm font-bold text-slate-800">Compétiteurs ({{ rows.length }})</h3>
         <div v-if="canWrite" class="flex flex-wrap items-center gap-1.5" data-testid="table-header-actions">
@@ -667,7 +665,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       />
     </UiDialog>
 
-    <!-- Modal Ajouter un compétiteur -->
     <!-- Wide: long tariff names (« Compétition U15 U17 - nés en 2008, … ») stay on one line on a computer -->
     <UiDialog v-model:open="addMemberDialogOpen" title="➕ Ajouter un compétiteur" wide data-testid="add-competitor-dialog">
       <div class="flex flex-col gap-3">
@@ -703,7 +700,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       </div>
     </UiDialog>
 
-    <!-- Modal Fiche contact athlète -->
     <AthleteContactDialog v-model:open="contactDialogOpen" :athlete="contactAthlete" />
   </section>
 </template>

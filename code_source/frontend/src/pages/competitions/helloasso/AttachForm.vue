@@ -6,7 +6,7 @@ import { computed, ref } from "vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
 import { formatDateTime, formatEuros, parseDate } from "../../../lib/format";
-import { sortCompetitions, isArchived, type Competition, type MemberSlot } from "../competitions";
+import { byName, isArchived, sortCompetitions, type Competition, type MemberSlot } from "../competitions";
 import {
   displayName,
   isIgnored,
@@ -43,11 +43,7 @@ const missingReason = ref(false);
 
 const current = computed(() => sortCompetitions(props.competitions).filter((c) => !isArchived(c)));
 const archived = computed(() => sortCompetitions(props.competitions).filter(isArchived));
-const members = computed(() =>
-  props.members
-    .slice()
-    .sort((a, b) => (a.nom ?? "").localeCompare(b.nom ?? "", "fr") || (a.prenom ?? "").localeCompare(b.prenom ?? "", "fr")),
-);
+const members = computed(() => props.members.slice().sort(byName));
 function when(text: string): string {
   const date = parseDate(text);
   return date ? formatDateTime(date) : text;

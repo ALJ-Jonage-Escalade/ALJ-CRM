@@ -1,6 +1,6 @@
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createOfflineStore, MAX_AGE_DAYS, type OfflineStore } from "./store";
+import { createOfflineStore, logoutWarning, MAX_AGE_DAYS, type OfflineStore } from "./store";
 
 const DAY = 24 * 3600 * 1000;
 
@@ -127,5 +127,12 @@ describe("offline store", () => {
     await none.save("directory", "u1", { n: 1 }, null);
     expect(await none.load("directory", "u1")).toBeNull();
     expect(await none.queued("u1")).toEqual([]);
+  });
+});
+
+describe("logoutWarning", () => {
+  it("counts the changes that would be lost", () => {
+    expect(logoutWarning(1)).toBe("1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?");
+    expect(logoutWarning(2)).toBe("2 modifications faites hors ligne pas encore envoyées seront perdues. Se déconnecter ?");
   });
 });

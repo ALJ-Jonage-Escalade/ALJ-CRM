@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceCsv, balanceLabel, balances, searchBalances, seasonOf, seasons, totals } from "./balance";
+import { balanceCsv, balanceLabel, balances, searchBalances, seasons, totals } from "./balance";
 import type { Competition } from "../competitions";
 
 const TODAY = "2026-11-15";
@@ -36,8 +36,7 @@ const LIST: Competition[] = [
 ];
 
 describe("balance", () => {
-  it("runs a season from August to July", () => {
-    expect([seasonOf("2026-08-01"), seasonOf("2026-07-31")]).toEqual(["2026-2027", "2025-2026"]);
+  it("lists the seasons with competitions and the current one", () => {
     expect(seasons(LIST, TODAY)).toEqual(["2026-2027", "2025-2026"]);
   });
 

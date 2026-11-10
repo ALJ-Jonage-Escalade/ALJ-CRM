@@ -3,7 +3,7 @@
    former phone page's HelloAsso tab. HelloAsso custom fields carry the answer in `answer` or `value`: both are read. */
 import type { Schemas } from "../../../lib/client";
 import { plural } from "../../../lib/text";
-import { normKey } from "../../adherents/members";
+import { normKey } from "../../../lib/text";
 import { sortCompetitions, type Competition, type MemberSlot } from "../competitions";
 
 export type HelloAssoItem = Schemas["HelloAssoItem"];

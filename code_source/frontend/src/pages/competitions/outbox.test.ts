@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../lib/client";
 import { createOfflineStore, type OfflineStore } from "../../lib/store";
 import type { Competition, Participant } from "./competitions";
-import { createOutbox, logoutWarning, outboxKey, pendingLine, refusalText, replayMessage, type SendChange } from "./outbox";
+import { createOutbox, outboxKey, pendingLine, refusalText, replayMessage, type SendChange } from "./outbox";
 
 const UID = "u1";
 const LEO: Participant = { adherent_id: 1, nom: "MARTIN", prenom: "Léo", selectionne: true, present: false, updated_at: "t1" };
@@ -225,7 +225,6 @@ describe("outbox", () => {
     expect(refusalText(new ApiError(404, null, "x"))).toBe("n'est plus inscrit à cette compétition");
     expect(refusalText(new ApiError(409, "competition_closed", "x"))).toBe("compétition archivée");
     expect(refusalText(new ApiError(400, null, "Refusé"))).toBe("Refusé");
-    expect(logoutWarning(1)).toBe("1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?");
     expect(pendingLine(0)).toBe("");
     expect(pendingLine(3)).toBe(" · ⏳ 3 modifications à envoyer");
     expect(replayMessage({ done: 1, refused: [], denied: false })).toBe("☁️ Modifications faites hors ligne envoyées.");

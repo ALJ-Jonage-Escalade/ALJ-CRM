@@ -4,22 +4,15 @@
    - cancelled, money carried over (annule_reporte): nothing due, the amount paid stays as a credit;
    - cancelled, money lost (annule_perdu): kept by the club, neither due nor credit (shown, balanced);
    - neither selected nor paid: not counted.
-   A season runs from August to July. */
+   A season runs from September to August (seasonOf). */
 import type { Cell } from "../../../lib/csv";
 import { formatEuros } from "../../../lib/format";
-import { normKey } from "../../adherents/members";
-import { isPast, ranking, todayIso, type Competition, type Participant } from "../competitions";
-
-/** « 2026-2027 » for a date from August 2026 to July 2027. */
-export function seasonOf(iso: string): string {
-  const [y, m] = iso.split("-").map(Number);
-  const start = (m ?? 1) >= 8 ? y! : y! - 1;
-  return `${start}-${start + 1}`;
-}
+import { normKey } from "../../../lib/text";
+import { isPast, ranking, seasonOf, todayIso, type Competition, type Participant } from "../competitions";
 
 /** Seasons with competitions, and the current one; most recent first. Undated competitions count in the current one. */
 export function seasons(list: readonly Competition[], today: string = todayIso()): string[] {
-  const all = new Set([seasonOf(today), ...list.filter((c) => c.date_competition).map((c) => seasonOf(c.date_competition!))]);
+  const all = new Set([seasonOf(today), ...list.map((c) => seasonOf(c.date_competition)).filter(Boolean)]);
   return [...all].sort().reverse();
 }
 
@@ -80,7 +73,7 @@ export function balances(list: readonly Competition[], season: string, today: st
   const current = seasonOf(today);
   const byMember = new Map<string, Balance>();
   for (const c of list) {
-    if ((c.date_competition ? seasonOf(c.date_competition) : current) !== season) {
+    if ((seasonOf(c.date_competition) || current) !== season) {
       continue;
     }
     for (const p of c.participants ?? []) {

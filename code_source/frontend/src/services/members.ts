@@ -2,6 +2,9 @@
    Conventions of every service: frontend/AGENTS.md § API services. */
 import { unwrap, type ApiClient, type Schemas } from "../lib/client";
 
+/** A membership status (« Validé », « Terminé »…), as the contract types it. */
+export type MemberStatus = NonNullable<Schemas["NewMember"]["status"]>;
+
 /** Return type inferred on purpose: each method answers the body type of its route in the contract. */
 export function createMembersApi(client: ApiClient) {
   return {

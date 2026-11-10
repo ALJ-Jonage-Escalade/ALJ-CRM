@@ -23,12 +23,12 @@ import {
   subVerdict,
   type PageId,
 } from "../lib/access";
-import { API_KEY } from "../lib/api";
+import { CLIENT_KEY, errorText } from "../lib/client";
 import { formatDate, parseDate } from "../lib/format";
 import { isStaff, roleLabel } from "../lib/roles";
 import { isEmulator } from "../lib/runtime";
-import { offlineStore, STORE_KEY } from "../lib/store";
-import { logoutWarning } from "../pages/competitions/outbox";
+import { logoutWarning, offlineStore, STORE_KEY } from "../lib/store";
+import { createIntegrationsApi } from "../services/integrations";
 import AppBrand from "./AppBrand.vue";
 import PageLink from "./PageLink.vue";
 import SubNav, { type SubNavItem } from "./SubNav.vue";
@@ -42,7 +42,7 @@ import { dialogs } from "../composables/dialogs";
 const props = defineProps<{ page: PageId; title: string; sync?: string; sub?: string; staffCopy?: boolean | null }>();
 
 const auth = inject(AUTH_KEY)!;
-const api = inject(API_KEY)!;
+const integrationsApi = createIntegrationsApi(inject(CLIENT_KEY)!);
 const store = inject(STORE_KEY, null) ?? offlineStore();
 const state = auth.state;
 /** « 06/11/2026 » when the signed-in address was invited but did not sign in in time; empty otherwise. */
@@ -149,19 +149,11 @@ async function renewGoogle(): Promise<void> {
   renewing.value = true;
   renewError.value = "";
   try {
-    const res = await api("/api/auth/google/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ return_to: location.pathname }),
-    });
-    const body = res.ok ? ((await res.json()) as { url?: unknown }) : null;
-    if (typeof body?.url !== "string") {
-      throw new Error(`HTTP ${res.status}`);
-    }
-    window.open(body.url, "_self"); // same tab: Google comes back to this site
-  } catch {
+    const { url } = await integrationsApi.googleLoginUrl(location.pathname);
+    window.open(url, "_self"); // same tab: Google comes back to this site
+  } catch (e) {
     renewing.value = false;
-    renewError.value = "❌ Impossible d'ouvrir la page de connexion Google (réseau ou droits) : réessayez en ligne.";
+    renewError.value = `❌ Impossible d'ouvrir la page de connexion Google : ${errorText(e)}`;
   }
 }
 watch(
@@ -172,11 +164,9 @@ watch(
       return;
     }
     try {
-      const res = await api("/api/auth/google/status");
-      const body = res.ok ? ((await res.json()) as { status?: unknown }) : null;
-      googleExpired.value = body?.status === "expired";
+      googleExpired.value = (await integrationsApi.googleStatus()).status === "expired";
     } catch {
-      // offline: no warning
+      // offline or refused: no warning, the Paramètres page tells why
     }
   },
   { immediate: true },

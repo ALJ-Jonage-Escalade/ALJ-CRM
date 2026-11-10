@@ -164,7 +164,7 @@ const listLine = computed(() => {
 </script>
 
 <template>
-  <!-- View mode and creation (masqués sur téléphone quand une fiche est ouverte) -->
+  <!-- View mode and creation (hidden on phones while a competition is open) -->
   <div :class="['mb-3 flex flex-wrap items-center justify-between gap-2', selected ? 'hidden md:flex' : '']">
     <ViewSwitcher v-model="viewMode" />
     <UiButton
@@ -203,7 +203,6 @@ const listLine = computed(() => {
       />
       <p class="pt-1 pb-1 mb-2 text-xs text-slate-500" data-testid="comp-count">{{ listLine }}</p>
 
-      <!-- Vue Tableau -->
       <div v-if="viewMode === 'table'" class="mb-3">
         <CompetitionTable
           :competitions="current"
@@ -214,12 +213,10 @@ const listLine = computed(() => {
         />
       </div>
 
-      <!-- Vue Calendrier -->
       <div v-else-if="viewMode === 'calendar'" class="mb-3">
         <CompetitionCalendar :competitions="calendarCompetitions" :selected-id="selectedId" @open="openFromCalendar" />
       </div>
 
-      <!-- Vue Cartes (par défaut) -->
       <CompetitionCards
         v-else
         :competitions="current"

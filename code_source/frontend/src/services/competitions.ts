@@ -1,8 +1,11 @@
 /* API of the competitions theme (server: api/competitions/): competitions, their participants, coaches, HelloAsso
    payments and MyCompet results. Conventions of every service: frontend/AGENTS.md § API services. */
 import { unwrap, type ApiClient, type Schemas } from "../lib/client";
-import type { MemberStatus } from "../pages/adherents/members";
-import { ARCHIVED, PREPARING } from "../pages/competitions/competitions";
+import type { MemberStatus } from "./members";
+
+/** Statut of an archived competition (« close »), and of one being prepared, the state it goes back to. */
+export const ARCHIVED = "close";
+export const PREPARING = "en_preparation";
 
 /** Club searched on the MyCompet results pages. */
 const RESULTS_CLUB = "JONAGE";
@@ -16,6 +19,8 @@ export function createCompetitionsApi(client: ApiClient) {
 
   return {
     // ------------------------------------------------------------ Competitions
+    /** Every competition with its participants (the screens that only read them; the Compétitions page polls them). */
+    list: () => unwrap(client.GET("/api/competitions")),
     create: (body: Schemas["CompetitionCreate"]) => unwrap(client.POST("/api/competitions", { body })),
     update: (competitionId: number, body: Schemas["CompetitionUpdate"]) =>
       unwrap(client.PATCH("/api/competitions/{competition_id}", { ...competition(competitionId), body })),

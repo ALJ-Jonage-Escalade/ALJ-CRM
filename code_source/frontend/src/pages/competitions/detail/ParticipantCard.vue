@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* A competitor of the competition. */
 import UiBadge from "../../../components/ui/UiBadge.vue";
-import { telHref } from "../../adherents/members";
+import { telHref } from "../../../lib/text";
 import { hasPaid, isCancelled, payment, ranking, type Row } from "../competitions";
 
 const props = defineProps<{ row: Row; canWrite: boolean; staff: boolean; contactsShown: boolean }>();

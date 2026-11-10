@@ -21,6 +21,7 @@ import {
   participantRows,
   period,
   ranking,
+  seasonOf,
   sortCompetitions,
   toMemberSlots,
   UNIDENTIFIED,
@@ -40,10 +41,22 @@ describe("competitions", () => {
   it.each([
     [{}, "sans date"],
     [{ date_competition: "2026-03-15" }, "15/03/2026"],
-    [{ date_competition: "2026-03-15", date_fin: "2026-03-16" }, "15/03/2026 → 16/03/2026"],
+    [{ date_competition: "2026-03-15", date_fin: "2026-03-16" }, "15/03 au 16/03/2026"],
+    [{ date_competition: "2026-12-31", date_fin: "2027-01-01" }, "31/12/2026 au 01/01/2027"],
     [{ date_competition: "2026-03-15", date_fin: "2026-03-15" }, "15/03/2026"],
   ])("period %j", (change, expected) => {
     expect(period(comp(change))).toBe(expected);
+  });
+
+  it.each([
+    ["2026-09-01", "2026-2027"],
+    ["2027-08-31", "2026-2027"],
+    ["2026-08-31T10:00:00", "2025-2026"],
+    [undefined, ""],
+    ["", ""],
+    ["31/08/2026", ""],
+  ])("seasonOf %s", (iso, expected) => {
+    expect(seasonOf(iso)).toBe(expected);
   });
 
   it("badges the disciplines, not « escalade »", () => {

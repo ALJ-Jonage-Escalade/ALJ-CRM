@@ -6,6 +6,7 @@ import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
 import type { PageId } from "../lib/access";
 import type { Role } from "../lib/roles";
 import { API_KEY, type ApiFetch } from "../lib/api";
+import { CLIENT_KEY, createApiClient } from "../lib/client";
 import { STORE_KEY, type OfflineStore } from "../lib/store";
 import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
 import AppShell from "./AppShell.vue";
@@ -21,7 +22,13 @@ function render(state: AuthState, googleStatus = "ok", page: PageId = "accueil",
     props: { page, title: "Titre" },
     slots: { default: '<p id="page-body">contenu</p>' },
     global: {
-      provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: storeWith(queued), [SIGN_IN_ERROR_KEY]: ref(signInError) },
+      provide: {
+        [AUTH_KEY]: auth,
+        [API_KEY]: api,
+        [CLIENT_KEY]: createApiClient(api, "http://alj.test"),
+        [STORE_KEY]: storeWith(queued),
+        [SIGN_IN_ERROR_KEY]: ref(signInError),
+      },
       stubs: { VersionBadge: true },
     },
   });
@@ -160,7 +167,7 @@ describe("AppShell", () => {
   it("warns staff when the club's Google token has expired", async () => {
     const { wrapper, api } = render({ status: "signedIn", user: USER, role: "admin" }, "expired");
     await flushPromises();
-    expect(api).toHaveBeenCalledWith("/api/auth/google/status");
+    expect(api).toHaveBeenCalledWith("http://alj.test/api/auth/google/status", expect.anything());
     expect(wrapper.find("#google-auth-warning").isVisible()).toBe(true);
   });
 
@@ -171,7 +178,7 @@ describe("AppShell", () => {
     vi.mocked(api).mockResolvedValueOnce(new Response(JSON.stringify({ status: "success", url: "https://accounts.google.com/x" })));
     await wrapper.find('[data-testid="google-renew"]').trigger("click");
     await flushPromises();
-    expect(api).toHaveBeenLastCalledWith("/api/auth/google/login", expect.objectContaining({ method: "POST" }));
+    expect(api).toHaveBeenLastCalledWith("http://alj.test/api/auth/google/login", expect.objectContaining({ method: "POST" }));
     expect(open).toHaveBeenCalledWith("https://accounts.google.com/x", "_self");
     open.mockRestore();
   });
@@ -257,7 +264,13 @@ describe("AppShell sub-menu", () => {
       slots: { default: '<p id="page-body">contenu</p>' },
       global: {
         plugins: [router],
-        provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: storeWith(0), [SIGN_IN_ERROR_KEY]: ref(null) },
+        provide: {
+          [AUTH_KEY]: auth,
+          [API_KEY]: api,
+          [CLIENT_KEY]: createApiClient(api, "http://alj.test"),
+          [STORE_KEY]: storeWith(0),
+          [SIGN_IN_ERROR_KEY]: ref(null),
+        },
         stubs: { VersionBadge: true },
       },
     });

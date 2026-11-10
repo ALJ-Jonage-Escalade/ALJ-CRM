@@ -6,20 +6,12 @@ import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
 import { SEX_LABELS } from "../../lib/sex";
-import { plural } from "../../lib/text";
+import { normKey, plural } from "../../lib/text";
+import type { MemberStatus } from "../../services/members";
 
 export type Member = Schemas["Member"];
 export type Creneau = Schemas["Creneau"];
 export type MemberList = Schemas["MemberList"];
-
-/** Lower case, without accents nor surrounding spaces: the key of every comparison. */
-export function normKey(s: string | null | undefined): string {
-  return (s ?? "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
 
 /** Indique si un adhérent appartient à un groupe ou tarif compétition. */
 export function isCompetitor(member: Member): boolean {
@@ -255,8 +247,8 @@ export function filterMembers<M extends FilteredMember>(members: readonly M[], f
 
 // ---------------------------------------------------------------- Display
 
-export const STATUSES = ["Validé", "Traité", "Terminé", "En cours", "Annulé"] as const;
-export type MemberStatus = (typeof STATUSES)[number];
+/** The membership statuses, in display order (the contract's status union: a new server status breaks the build). */
+export const STATUSES = ["Validé", "Traité", "Terminé", "En cours", "Annulé"] as const satisfies readonly MemberStatus[];
 
 /** Status chips: « Tous » then the statuses some member has, with their counts. */
 export function statusChips(members: readonly Pick<Member, "status_norm">[]): { value: string; label: string; count: number }[] {
@@ -281,7 +273,8 @@ const STATUS_COLOR: Record<string, BadgeColor> = {
 /** Colour of a status badge. */
 export const statusColor = (status: string): BadgeColor => STATUS_COLOR[status] ?? "slate";
 
-const yes = (v: string) => ["oui", "x", "true", "1"].includes(v.trim().toLowerCase());
+/** A yes/no column of the membership file read as a flag: « oui », « x », « true » or « 1 ». */
+export const isYes = (v: string): boolean => ["oui", "x", "true", "1"].includes(v.trim().toLowerCase());
 
 export interface Diplome {
   type: "badge_rouge" | "autonomie_bloc" | "passeport_orange";
@@ -292,10 +285,10 @@ export interface Diplome {
 /** Badges of the Diplôme column: red badge, bouldering autonomy, orange passport. */
 export function diplomes(m: Pick<Member, "badge_rouge" | "autonomie_bloc" | "raw_passports" | "passeport_orange">): Diplome[] {
   const items: Diplome[] = [];
-  if (yes(m.badge_rouge)) {
+  if (isYes(m.badge_rouge)) {
     items.push({ type: "badge_rouge", label: "Badge rouge diff", icon: "🔴" });
   }
-  if (yes(m.autonomie_bloc)) {
+  if (isYes(m.autonomie_bloc)) {
     items.push({ type: "autonomie_bloc", label: "Autonomie bloc", icon: "🧗" });
   }
   const passports = `${m.raw_passports} ${m.passeport_orange}`.toLowerCase();
@@ -332,11 +325,6 @@ export function dateValue(s: string): number {
 
 /** Text comparison of the columns: French, case and accents ignored, numbers in order ("U9" before "U11"). */
 export const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
-
-/** The tel: link of a formatted phone number. */
-export function telHref(phone: string): string {
-  return `tel:${phone.replace(/[^\d+]/g, "")}`;
-}
 
 /** Query of Adhérents opening the member's record on its season: ?id=<user_id>&saison=…&achat=<purchase_id>
     (id and saison are the links of the former page, which still open the member; achat picks the membership when a

@@ -13,8 +13,8 @@ import { useMediaQuery } from "../../../composables/media";
 import { csvBlob } from "../../../lib/csv";
 import { saveFile } from "../../../lib/download";
 import { formatEuros } from "../../../lib/format";
-import { balanceCsv, balanceLabel, balances, searchBalances, seasonOf, seasons, totals, type Balance } from "./balance";
-import { discipline, disciplineColor, payment, period, todayIso, type Competition } from "../competitions";
+import { balanceCsv, balanceLabel, balances, searchBalances, seasons, totals, type Balance } from "./balance";
+import { discipline, disciplineColor, payment, period, seasonOf, todayIso, type Competition } from "../competitions";
 import { plural } from "../../../lib/text";
 
 /** listPath: address of the competitions list (the page's index route), where a competition opens. */

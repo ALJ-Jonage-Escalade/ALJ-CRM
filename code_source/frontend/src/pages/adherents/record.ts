@@ -5,7 +5,8 @@ import type { Schemas } from "../../lib/client";
 import { looksLikeEmail } from "../../lib/email";
 import { formatDate, formatDayText } from "../../lib/format";
 import { SEX_LABELS, sexLabel, type Sex } from "../../lib/sex";
-import { diplomes, normKey, type Creneau, type Member } from "./members";
+import { normKey } from "../../lib/text";
+import { diplomes, isYes, type Creneau, type Member } from "./members";
 
 export type MemberChanges = Schemas["MemberChanges"];
 export type NewMember = Schemas["NewMember"];
@@ -142,8 +143,6 @@ export interface MemberDraft {
 export type DraftField = keyof MemberDraft;
 export type DraftErrors = Partial<Record<DraftField, string>>;
 
-const yes = (v: string) => ["oui", "x", "true", "1"].includes(v.trim().toLowerCase());
-
 /** The form of an existing member, or of a new one (first tariff chosen, as before). */
 export function draftOf(m?: Member, firstTarif = ""): MemberDraft {
   return {
@@ -155,9 +154,9 @@ export function draftOf(m?: Member, firstTarif = ""): MemberDraft {
     amount: m ? (m.amount != null ? String(m.amount) : "") : "0.00",
     tarif_name: m ? m.tarif_name : firstTarif,
     licence_ffme: m?.licence_ffme ?? "",
-    badge_rouge: m && yes(m.badge_rouge) ? "Oui" : "Non",
-    autonomie_bloc: m && yes(m.autonomie_bloc) ? "Oui" : "Non",
-    photo_auth: m ? (yes(m.photo_auth) ? "Oui" : "Non") : "Oui",
+    badge_rouge: m && isYes(m.badge_rouge) ? "Oui" : "Non",
+    autonomie_bloc: m && isYes(m.autonomie_bloc) ? "Oui" : "Non",
+    photo_auth: m ? (isYes(m.photo_auth) ? "Oui" : "Non") : "Oui",
     email_primary: m?.email_primary ?? "",
     email_secondary: m?.email_secondary ?? "",
     phone: m?.phone ?? "",

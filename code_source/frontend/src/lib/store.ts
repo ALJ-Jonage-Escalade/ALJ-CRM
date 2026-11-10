@@ -17,6 +17,7 @@
    Every failure (IndexedDB missing or blocked, private window, quota) only means "no offline copy": the page then
    behaves as online only. Calls never reject. */
 import type { InjectionKey } from "vue";
+import { plural } from "./text";
 
 const DB_NAME = "alj-offline";
 const DB_VERSION = 2; // 2: outbox
@@ -295,4 +296,9 @@ export function offlineStore(): OfflineStore {
     persist: () => void navigator.storage?.persist?.().catch(() => {}),
   });
   return shared;
+}
+
+/** Confirmation asked before signing out with changes not sent yet (they are lost with the store). */
+export function logoutWarning(n: number): string {
+  return `${n} modification${plural(n)} faite${plural(n)} hors ligne pas encore envoyée${plural(n)} ser${plural(n, "ont", "a")} perdue${plural(n)}. Se déconnecter ?`;
 }
