@@ -20,7 +20,7 @@ import CompetitionFilters from "./list/CompetitionFilters.vue";
 import CompetitionTable from "./list/CompetitionTable.vue";
 import { useCompetitionFilters, type ViewMode } from "./list/filters";
 import ViewSwitcher from "./list/ViewSwitcher.vue";
-import { WRITER_KEY } from "./writer";
+import { competitionItself, WRITER_KEY } from "./writer";
 
 const { all, competitions, competitors, members, coaches, canWrite, staff, contactsShown, online, outbox, uid } = inject(COMPETITIONS_KEY)!;
 const writer = inject(WRITER_KEY)!;
@@ -101,6 +101,7 @@ async function saveFromTable(body: Schemas["CompetitionCreate"]): Promise<void> 
   }
   const id = editingCompetition.value.id;
   const ok = await writer.run(() => competitionsApi.update(id, body), {
+    competition: competitionItself,
     done: "✅ Compétition mise à jour.",
   });
   if (ok) {
@@ -124,7 +125,10 @@ async function removeFromTable(c: Competition): Promise<void> {
 }
 
 async function create(body: Schemas["CompetitionCreate"]): Promise<void> {
-  const created = await writer.run(() => competitionsApi.create(body), { done: "✅ Compétition créée." });
+  const created = await writer.run(() => competitionsApi.create(body), {
+    competition: competitionItself,
+    done: "✅ Compétition créée.",
+  });
   if (!created) {
     return;
   }

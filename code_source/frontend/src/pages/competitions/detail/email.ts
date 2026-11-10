@@ -84,7 +84,7 @@ export function render(text: string, values: Record<string, string>): string {
 }
 
 /** Body of POST /api/send-email; the server checks a coach writes to known members only. */
-export function sendBody(c: Competition, recipients: readonly Row[], subject: string, body: string) {
+export function sendBody(c: Competition, recipients: readonly Row[], subject: string, body: string): Schemas["EmailSendRequest"] {
   return {
     subject: subject.trim(),
     body: body.trim(),

@@ -48,9 +48,9 @@ function invalidFields(detail: unknown[]): string {
 
 /**
  * The API's error bodies: {status: "error", message, code?} (api/responses.py error()), FastAPI's {detail: string}
- * and {detail: [...]} (validation), or anything else (proxy page, empty body).
+ * and {detail: [...]} (validation), or anything else (proxy page, empty body), then worded by `fallback`.
  */
-export function errorFromBody(status: number, body: unknown): ApiError {
+export function errorFromBody(status: number, body: unknown, fallback: string = defaultMessage(status)): ApiError {
   if (body && typeof body === "object") {
     const { message, code, detail } = body as { message?: unknown; code?: unknown; detail?: unknown };
     const codeText = typeof code === "string" ? code : null;
@@ -65,7 +65,7 @@ export function errorFromBody(status: number, body: unknown): ApiError {
       return new ApiError(status, "validation", `Données refusées par le serveur${fields ? ` (${fields})` : ""}.`);
     }
   }
-  return new ApiError(status, null, defaultMessage(status));
+  return new ApiError(status, null, fallback);
 }
 
 export function createApiClient(api: ApiFetch, baseUrl: string = location.origin): ApiClient {

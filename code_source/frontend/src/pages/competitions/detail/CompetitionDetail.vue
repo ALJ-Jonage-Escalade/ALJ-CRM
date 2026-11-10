@@ -49,7 +49,7 @@ import ParticipantCard from "./ParticipantCard.vue";
 import ParticipantRow from "./ParticipantRow.vue";
 import PaymentForm from "./PaymentForm.vue";
 import WithdrawForm from "./WithdrawForm.vue";
-import { WRITER_KEY } from "../writer";
+import { competitionItself, WRITER_KEY } from "../writer";
 import { formatDayText } from "../../../lib/format";
 import { plural } from "../../../lib/text";
 import { dialogs } from "../../../composables/dialogs";
@@ -95,6 +95,7 @@ const editing = ref(false);
 async function save(body: Schemas["CompetitionCreate"]): Promise<void> {
   if (
     await writer.run(() => competitionsApi.update(c.value.id, body), {
+      competition: competitionItself,
       done: "✅ Compétition mise à jour.",
     })
   ) {
@@ -128,6 +129,7 @@ async function remove(): Promise<void> {
 async function archive(archived: boolean): Promise<void> {
   const nom = c.value.nom;
   await writer.run(() => competitionsApi.setArchived(c.value.id, archived), {
+    competition: competitionItself,
     done: archived ? `📦 « ${nom} » archivée.` : `♻️ « ${nom} » désarchivée.`,
   });
 }
@@ -204,6 +206,7 @@ function openAddMember(): void {
 /** The dialog stays open, search cleared, to add several competitors in a row. */
 async function add(m: MemberSlot): Promise<void> {
   const ok = await writer.run(() => competitionsApi.addParticipant(c.value.id, m.id!), {
+    competition: competitionItself,
     done: `➕ ${m.prenom} ${m.nom} ajouté(e) à la compétition.`,
   });
   if (ok) {
@@ -213,6 +216,7 @@ async function add(m: MemberSlot): Promise<void> {
 
 async function loadGroup(): Promise<void> {
   await writer.run(() => competitionsApi.loadGroup(c.value.id, COMPETITOR_STATUSES), {
+    competition: (answer) => answer.competition,
     done: (r) =>
       r.added
         ? `🧗 ${r.added} compétiteur(s) du groupe « Compétition » ajouté(s) à la liste.`
@@ -236,7 +240,7 @@ async function removeNotInvited(): Promise<void> {
   }
   let done = 0;
   for (const p of list) {
-    const ok = await writer.run(() => competitionsApi.removeParticipant(c.value.id, p.adherent_id!));
+    const ok = await writer.run(() => competitionsApi.removeParticipant(c.value.id, p.adherent_id!), { competition: competitionItself });
     if (!ok) {
       return;
     }
@@ -269,10 +273,11 @@ async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
     return queue();
   }
   if (props.outbox.pending(c.value.id, p.adherent_id, flag)) {
-    await props.outbox.queue(props.uid, c.value, p, flag, !!p[flag]);
-  } // superseded
+    await props.outbox.cancel(c.value.id, p.adherent_id, flag); // superseded by the change sent now
+  }
   let lost = false;
   await writer.run(() => competitionsApi.updateParticipant(c.value.id, p.adherent_id!, { [flag]: value }), {
+    competition: competitionItself,
     refused: (e) => {
       if (e.code === "already_paid") {
         withdrawing.value = p; // paid meanwhile (HelloAsso): the coach decides what happens to the money
@@ -290,6 +295,7 @@ async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
 async function withdraw(mode: "reporte" | "perdu", note: string): Promise<void> {
   const p = withdrawing.value!;
   const ok = await writer.run(() => competitionsApi.withdraw(c.value.id, p.adherent_id!, { mode, note }), {
+    competition: competitionItself,
     done: mode === "reporte" ? `🔄 Désistement de ${named(p)} : paiement reporté.` : `🚫 Désistement de ${named(p)} : paiement perdu.`,
   });
   if (ok) {
@@ -300,6 +306,7 @@ async function withdraw(mode: "reporte" | "perdu", note: string): Promise<void> 
 async function pay(amount: number): Promise<void> {
   const p = paying.value!;
   const ok = await writer.run(() => competitionsApi.payManually(c.value.id, p.adherent_id!, amount), {
+    competition: competitionItself,
     done: `✅ Paiement manuel de ${amount} € enregistré pour ${named(p)}.`,
   });
   if (ok) {
@@ -319,6 +326,7 @@ async function removeOne(r: Row): Promise<void> {
     return;
   }
   await writer.run(() => competitionsApi.removeParticipant(c.value.id, r.adherent_id!), {
+    competition: competitionItself,
     done: `🗑 ${named(r)} supprimé(e) de l'épreuve.`,
   });
 }
@@ -334,6 +342,7 @@ async function restore(r: Row): Promise<void> {
     return;
   }
   await writer.run(() => competitionsApi.addParticipant(c.value.id, r.adherent_id!), {
+    competition: competitionItself,
     done: `✅ ${named(r)} rétabli(e) en compétiteur actif.`,
   });
 }

@@ -18,7 +18,7 @@ function server(answers: Record<string, (body: object) => unknown> = {}) {
     const url = `/api/competitions/${competitionId}/participants/${adherentId}`;
     sent.push({ url, body });
     const answer = answers[url]?.(body);
-    if (answer instanceof ApiError) {
+    if (answer instanceof Error) {
       throw answer;
     }
     return { id: competitionId, participants: [{ adherent_id: adherentId, updated_at: `t${clock++}` }] };
@@ -53,6 +53,14 @@ describe("outbox", () => {
     await outbox.queue(UID, COMP, ZOE, "selectionne", true);
     await outbox.queue(UID, COMP, LEO, "selectionne", false); // again: keeps its place in the queue
     expect(outbox.pending(10, 1, "selectionne")!.queuedAt).toBe(1000);
+  });
+
+  it("cancels a waiting change", async () => {
+    const outbox = createOutbox(store, server().send, clock);
+    await outbox.queue(UID, COMP, LEO, "selectionne", false);
+    await outbox.cancel(10, 1, "selectionne");
+    expect(outbox.pending(10, 1, "selectionne")).toBeUndefined();
+    expect(await store.queued(UID)).toEqual([]);
   });
 
   it("reads what the former page queued and sends it oldest first", async () => {
@@ -142,6 +150,18 @@ describe("outbox", () => {
     expect(sent).toHaveLength(2); // stopped at the failure
     expect([...outbox.changes.value.keys()]).toEqual(["10:2:selectionne", "10:1:present"]);
     expect((await store.queued(UID)).length).toBe(2);
+  });
+
+  it("drops a change whose sending hit a bug, instead of retrying it forever", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { send } = server({ "/api/competitions/10/participants/1": () => new RangeError("bug") });
+    const outbox = createOutbox(store, send, clock);
+    await outbox.queue(UID, COMP, LEO, "selectionne", false);
+    await outbox.queue(UID, COMP, ZOE, "selectionne", true);
+    expect(await outbox.replay(UID)).toEqual({ done: 2, refused: ["MARTIN Léo (Coupe) : erreur inattendue"], denied: false });
+    expect(await store.queued(UID)).toEqual([]);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it("stops on a lost role (401/403) and says so", async () => {

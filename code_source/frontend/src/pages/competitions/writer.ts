@@ -3,19 +3,24 @@
    outbox, outbox.ts); every other change is refused at once. The competition a write answers is shown at once, then
    the data is reloaded: others' changes come with it. */
 import { ref, type InjectionKey, type Ref } from "vue";
-import { ApiError } from "../../lib/client";
+import { ApiError, errorText } from "../../lib/client";
 import type { Competition } from "./competitions";
 
 export const OFFLINE_MESSAGE =
   "📴 Hors ligne : seules les cases « Participe » et « Présent » d'un compétiteur inscrit peuvent être modifiées.";
-export const NETWORK_MESSAGE = "📴 Réseau indisponible : modification non enregistrée.";
+export const WRITE_NOT_SENT_MESSAGE = "📴 Réseau indisponible : modification non enregistrée.";
 
 export interface RunOptions<T> {
   /** Toast after success. */
   done?: string | ((answer: T) => string);
   /** A refusal the caller handles itself (true: no toast). */
   refused?: (error: ApiError) => boolean;
+  /** The competition the answer carries, shown at once (the reload then brings the others' changes). */
+  competition?: (answer: T) => Competition;
 }
+
+/** RunOptions.competition of the writes that answer the competition itself. */
+export const competitionItself = (competition: Competition): Competition => competition;
 
 export interface Writer {
   /** A change in progress (buttons wait). */
@@ -39,18 +44,6 @@ export interface WriterDeps {
   toast(message: string, ms?: number): void;
 }
 
-/** The competition carried by a write's answer: the competition itself, or { competition } (load-group). */
-export function answeredCompetition(answer: unknown): Competition | null {
-  const a = answer as { id?: unknown; participants?: unknown; competition?: unknown } | null;
-  if (a && typeof a.id === "number" && Array.isArray(a.participants)) {
-    return a as Competition;
-  }
-  if (a && a.competition) {
-    return answeredCompetition(a.competition);
-  }
-  return null;
-}
-
 export function createWriter(deps: WriterDeps): Writer {
   const busy = ref(false);
   let running = 0;
@@ -64,9 +57,8 @@ export function createWriter(deps: WriterDeps): Writer {
     busy.value = true;
     try {
       const answer = await call();
-      const competition = answeredCompetition(answer);
-      if (competition) {
-        deps.apply(competition);
+      if (options.competition) {
+        deps.apply(options.competition(answer));
       }
       deps.reload();
       const done = typeof options.done === "function" ? options.done(answer) : options.done;
@@ -75,9 +67,13 @@ export function createWriter(deps: WriterDeps): Writer {
       }
       return answer;
     } catch (e) {
-      const error = e instanceof ApiError ? e : new ApiError(0, null, "Erreur inattendue.");
-      if (!options.refused?.(error)) {
-        deps.toast(error.status === 0 && error.code === "network" ? NETWORK_MESSAGE : `❌ ${error.message}`, 9000);
+      if (!(e instanceof ApiError)) {
+        console.error("Modification de compétition :", e); // a bug, not a refusal: kept for the console
+        deps.toast(`❌ ${errorText(e)}`, 9000);
+        return undefined;
+      }
+      if (!options.refused?.(e)) {
+        deps.toast(e.status === 0 && e.code === "network" ? WRITE_NOT_SENT_MESSAGE : `❌ ${e.message}`, 9000);
       }
       return undefined;
     } finally {

@@ -7,6 +7,7 @@
 import { onAuthStateChanged, signOut } from "@firebase/auth";
 import { readonly, ref, type InjectionKey, type Ref } from "vue";
 import { apiFetch } from "../lib/api";
+import { ApiError, errorFromBody, NETWORK_MESSAGE } from "../lib/client";
 import { firebaseAuth } from "../lib/firebase";
 import { isRole, type Role } from "../lib/roles";
 
@@ -47,25 +48,19 @@ export interface Auth {
 export const LOGIN_URL = "/competitions?login=1";
 export const AFTER_LOGIN_KEY = "alj_after_login";
 
-/** A refusal or an unexpected answer of /api/me, with the message shown to the user. */
-class MeError extends Error {}
+const UNEXPECTED_ANSWER = "Réponse inattendue du serveur.";
 
+/** The account of GET /api/me; an ApiError (the client's messages) for a refusal or an unexpected answer. */
 async function readMe(res: Response): Promise<{ email: string; role: Role; invitationExpiredAt?: string }> {
-  if (res.status === 401) {
-    throw new MeError("Session refusée par le serveur : reconnectez-vous.");
-  }
-  if (res.status === 503) {
-    // The access list could not be read: the role stays unchecked (never "no access"), the server says why
-    const body = (await res.json().catch(() => null)) as { message?: unknown } | null;
-    throw new MeError(typeof body?.message === "string" && body.message ? body.message : "Rôle non vérifiable pour le moment.");
-  }
   if (!res.ok) {
-    throw new MeError(`Le serveur ne répond pas correctement (erreur ${res.status}).`);
+    const body: unknown = await res.json().catch(() => null);
+    // 503: the access list could not be read: the role stays unchecked (never "no access"), the server says why
+    throw errorFromBody(res.status, body, res.status === 503 ? "Rôle non vérifiable pour le moment." : undefined);
   }
   const body = (await res.json()) as { email?: unknown; role?: unknown; invitation_expired_at?: unknown };
   const role = body.role;
   if (!isRole(role)) {
-    throw new MeError("Réponse inattendue du serveur.");
+    throw new ApiError(res.status, "unexpected", UNEXPECTED_ANSWER);
   }
   const email = typeof body.email === "string" ? body.email : "";
   return typeof body.invitation_expired_at === "string"
@@ -79,13 +74,13 @@ function isNetworkError(e: unknown): boolean {
 }
 
 function errorMessage(e: unknown): string {
-  if (e instanceof MeError) {
+  if (e instanceof ApiError) {
     return e.message;
   }
   if (isNetworkError(e)) {
-    return "Serveur injoignable : vérifiez la connexion réseau.";
+    return NETWORK_MESSAGE;
   }
-  return "Réponse inattendue du serveur."; // e.g. a body that is not JSON
+  return UNEXPECTED_ANSWER; // e.g. a body that is not JSON
 }
 
 export function createAuth(deps: AuthDeps): Auth {

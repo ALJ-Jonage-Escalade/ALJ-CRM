@@ -7,6 +7,7 @@
    Then the page that asked is opened again. The session itself is then followed by composables/auth.ts. */
 import type { InjectionKey, Ref } from "vue";
 import { AFTER_LOGIN_KEY } from "./auth";
+import { NETWORK_MESSAGE } from "../lib/client";
 import { authorizeUrl, CALLBACK_PATH, newState, readFragment, STATE_KEY } from "../lib/oauth";
 
 export interface SignInDeps {
@@ -22,7 +23,8 @@ export interface SignInDeps {
   completeDevSignIn(): Promise<boolean>;
 }
 
-function errorText(e: unknown): string {
+/** The message of a failed sign-in: Firebase's configuration errors worded for the admin, the network, or Firebase's own. */
+function signInErrorText(e: unknown): string {
   const code = (e as { code?: unknown } | null)?.code;
   if (code === "auth/unauthorized-domain") {
     return "Domaine non autorisé : ajoutez l'adresse de ce site dans Firebase Authentication → Paramètres → Domaines autorisés.";
@@ -31,7 +33,7 @@ function errorText(e: unknown): string {
     return "Le fournisseur Google n'est pas activé dans Firebase Authentication.";
   }
   if (code === "auth/network-request-failed") {
-    return "Serveur injoignable : vérifiez la connexion réseau.";
+    return NETWORK_MESSAGE;
   }
   return e instanceof Error && e.message ? e.message : "Connexion impossible.";
 }
@@ -83,7 +85,7 @@ export async function handleSignIn(deps: SignInDeps): Promise<string | null> {
     }
   } catch (e) {
     console.error("Connexion :", e);
-    return errorText(e);
+    return signInErrorText(e);
   }
   return null;
 }
