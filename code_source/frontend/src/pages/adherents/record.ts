@@ -115,6 +115,15 @@ export function tarifChoices(creneaux: readonly Creneau[], members: readonly Mem
   return [...detail].map(([tarif, text]) => ({ tarif, detail: text })).sort((a, b) => a.tarif.localeCompare(b.tarif, "fr"));
 }
 
+// ---------------------------------------------------------------- Actions on a record (MemberActionsDialog)
+
+export type RecordAction = "edit" | "email" | "attestation";
+
+/** What MemberActionsDialog exposes to the page. */
+export interface RecordActions {
+  open(action: RecordAction): Promise<void>;
+}
+
 // ---------------------------------------------------------------- Edit / add form
 
 export const STATUS_CHOICES = [

@@ -7,7 +7,7 @@
    collapsed. A record can be linked and the former page's links still open it; ?ajout=1 opens the add form. Online
    only: the list is polled every 20 s (ETag, 304 when unchanged) and the record is read from it; nothing is kept on
    the device, only the filters (without the search) and whether the panel is open are remembered. */
-import { computed, inject, ref, watch } from "vue";
+import { computed, ref, useTemplateRef, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import DataTable from "../components/DataTable.vue";
@@ -15,21 +15,17 @@ import type { DataColumn } from "../components/dataTable";
 import UiBadge from "../components/ui/UiBadge.vue";
 import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
-import UiDialog from "../components/ui/UiDialog.vue";
 import UiSidePanel from "../components/ui/UiSidePanel.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
-import { CLIENT_KEY, errorText } from "../lib/client";
-import { createCommunicationsApi, type EmailTemplate } from "../services/communications";
-import { createMembersApi, membersRead } from "../services/members";
+import { membersRead } from "../services/members";
 import { csvBlob } from "../lib/csv";
 import { saveFile } from "../lib/download";
 import { formatDayText } from "../lib/format";
 import { isAdmin } from "../lib/roles";
-import MemberAttestation from "./adherents/MemberAttestation.vue";
-import MemberEmail from "./adherents/MemberEmail.vue";
-import MemberForm from "./adherents/MemberForm.vue";
+import MemberActionsDialog from "./adherents/MemberActionsDialog.vue";
+import MemberAddDialog from "./adherents/MemberAddDialog.vue";
 import MemberRecord from "./adherents/MemberRecord.vue";
 import {
   allowedTarifs,
@@ -59,13 +55,9 @@ import {
   type CreneauItem,
   type Member,
 } from "./adherents/members";
-import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft } from "./adherents/record";
-import { dialogs } from "../composables/dialogs";
+import { tarifChoices, type RecordAction, type RecordActions } from "./adherents/record";
 import { telHref } from "../lib/text";
 
-const client = inject(CLIENT_KEY)!;
-const membersApi = createMembersApi(client);
-const communicationsApi = createCommunicationsApi(client);
 const toast = useToast();
 const route = useRoute();
 const router = useRouter();
@@ -240,154 +232,34 @@ function select(m: Member): void {
   void router.push({ query: recordQuery(m) });
 }
 
-// The record's actions open a dialog over the page; "none": only the panel
-type Mode = "none" | "edit" | "email" | "attestation";
-const mode = ref<Mode>("none");
-watch(selectedKey, () => (mode.value = "none"));
-const TITLES: Record<Exclude<Mode, "none">, string> = {
-  edit: "✏️ Modifier la fiche",
-  email: "✉️ E-mail à l'adhérent",
-  attestation: "📄 Attestation de paiement",
-};
-const actionOpen = computed({
-  get: () => mode.value !== "none" && !!record.value,
-  set: (open) => {
-    if (!open) {
-      mode.value = "none";
-    }
-  },
-});
-
-function closeAdd(): void {
-  const rest = Object.fromEntries(Object.entries(route.query).filter(([k]) => k !== "ajout"));
-  void router.replace({ query: rest });
-}
-
-// Email templates, for the e-mail (coaches and admins) and the certificate (admins), loaded once
-const templates = ref<EmailTemplate[]>([]);
-const clubContactEmail = ref("");
-let templatesLoaded = false;
-async function loadTemplates(): Promise<void> {
-  if (templatesLoaded) {
-    return;
-  }
-  templatesLoaded = true;
-  try {
-    const answer = await communicationsApi.emailTemplates();
-    templates.value = answer.templates;
-    clubContactEmail.value = answer.club_contact_email;
-  } catch (e) {
-    templatesLoaded = false;
-    console.warn("Modèles d'e-mails :", e);
-  }
-}
-
-async function open(next: Mode): Promise<void> {
+// The record's actions open a dialog over the page (MemberActionsDialog)
+const actions = useTemplateRef<RecordActions>("actions");
+async function openAction(next: RecordAction): Promise<void> {
   // The first row shown by default is pinned in the URL first: a member added by a poll and sorted above it would
   // otherwise change the record, which closes the form and loses what was typed
   if (!recordId.value && record.value) {
     await router.replace({ query: { ...route.query, ...recordQuery(record.value) } });
   }
-  if (next === "email" || next === "attestation") {
-    await loadTemplates();
-  }
-  if (next === "edit" && record.value) {
-    draft.value = draftOf(record.value);
-  }
-  mode.value = next;
+  await actions.value?.open(next);
 }
 
-function sent(message: string): void {
-  toast.show(message);
-  mode.value = "none";
-  void members.refresh(); // the certificate's sent date
-}
-
-// Edit and add
 const tarifs = computed(() => tarifChoices(membersList.value?.creneaux ?? [], all.value));
-const draft = ref<MemberDraft>(draftOf());
-const saving = ref(false);
 
-async function saveEdit(m: Member): Promise<void> {
-  const { fields, lines } = changesOf(m, draft.value);
-  if (!lines.length) {
-    toast.show("ℹ️ Aucune modification détectée.");
-    mode.value = "none";
-    return;
-  }
-  if (
-    !(await dialogs.confirm({
-      title: "Valider les modifications",
-      message: `Valider les modifications pour ${m.first_name} ${m.last_name} ?\n\n• ${lines.join("\n• ")}`,
-      confirmLabel: "Valider",
-    }))
-  ) {
-    return;
-  }
-  saving.value = true;
-  try {
-    await membersApi.update({ user_id: m.user_id, purchase_id: m.purchase_id, order_ref: m.order_ref, fields });
-    await members.refresh();
-    mode.value = "none";
-    toast.show(`✅ Fiche de ${m.first_name} ${m.last_name} mise à jour avec succès !`);
-  } catch (e) {
-    toast.show(`❌ Échec de la mise à jour : ${errorText(e)}`, 9000);
-  } finally {
-    saving.value = false;
-  }
-}
-
+// Add (?ajout=1)
 const adding = computed({
   get: () => queryText("ajout") === "1",
   set: (open) => {
     if (!open) {
-      closeAdd();
+      const rest = Object.fromEntries(Object.entries(route.query).filter(([k]) => k !== "ajout"));
+      void router.replace({ query: rest });
     }
   },
 });
-watch(
-  adding,
-  (now) => {
-    if (now) {
-      draft.value = draftOf(undefined, tarifs.value[0]?.tarif ?? "");
-    }
-  },
-  { immediate: true },
-);
-// Tariffs arrive with the list: the first one is chosen when the form opened before
-watch(tarifs, (now) => {
-  if (adding.value && !draft.value.tarif_name && now[0]) {
-    draft.value.tarif_name = now[0].tarif;
-  }
-});
-
-async function saveNew(): Promise<void> {
-  const d = draft.value;
-  const twin = sameName(all.value, d);
-  if (
-    twin &&
-    !(await dialogs.confirm({
-      title: "Adhérent déjà existant",
-      message: `Un adhérent « ${twin.last_name} ${twin.first_name} » existe déjà pour la saison ${season.value}.\n\nVoulez-vous quand même créer cette nouvelle fiche ?`,
-      confirmLabel: "Créer quand même",
-      variant: "warning",
-    }))
-  ) {
-    return;
-  }
-  saving.value = true;
-  try {
-    const created = await membersApi.create({ season: season.value, fields: newMemberOf(d) });
-    toast.show(`✅ ${created.message}`);
-    await members.refresh();
-    // Selects the new member in the panel (its membership is the one of the new order)
-    const added = all.value.find((m) => m.order_ref === created.order_ref);
-    void router.replace({ query: added ? recordQuery(added) : {} });
-  } catch (e) {
-    toast.show(`❌ Échec de la création : ${errorText(e)}`, 9000);
-  } finally {
-    saving.value = false;
-  }
+/** Selects the new member in the panel (its membership is the one of the new order). */
+async function added(orderRef: string): Promise<void> {
+  await members.refresh();
+  const member = all.value.find((m) => m.order_ref === orderRef);
+  void router.replace({ query: member ? recordQuery(member) : {} });
 }
 
 const chip = (active: boolean) => [
@@ -634,9 +506,9 @@ const linkButton =
           :member="record"
           :admin="isAdmin(role)"
           compact
-          @email="open('email')"
-          @attestation="open('attestation')"
-          @edit="open('edit')"
+          @email="openAction('email')"
+          @attestation="openAction('attestation')"
+          @edit="openAction('edit')"
         >
           <template #status>
             <UiBadge :color="statusColor(record.status_norm)">{{ record.status_norm || "—" }}</UiBadge>
@@ -645,54 +517,24 @@ const linkButton =
       </UiSidePanel>
     </div>
 
-    <UiDialog
-      v-if="record && mode !== 'none'"
-      v-model:open="actionOpen"
-      :title="TITLES[mode]"
-      :wide="mode !== 'attestation'"
-      :xl="mode === 'attestation'"
-      data-testid="record-dialog"
-    >
-      <MemberEmail
-        v-if="mode === 'email'"
-        :member="record"
-        :templates="templates"
-        :club-contact-email="clubContactEmail"
-        @sent="sent"
-        @failed="(m) => toast.show(m, 9000)"
-        @cancel="mode = 'none'"
-      />
-      <template v-else-if="isAdmin(role)">
-        <MemberForm
-          v-if="mode === 'edit'"
-          v-model="draft"
-          :adding="false"
-          :tarifs="tarifs"
-          :saving="saving"
-          @save="saveEdit(record)"
-          @cancel="mode = 'none'"
-        />
-        <MemberAttestation
-          v-else
-          :member="record"
-          :templates="templates"
-          @sent="sent"
-          @failed="(m) => toast.show(m, 9000)"
-          @cancel="mode = 'none'"
-        />
-      </template>
-    </UiDialog>
-
-    <UiDialog
+    <MemberActionsDialog
+      v-if="record"
+      ref="actions"
+      :member="record"
+      :admin="isAdmin(role)"
+      :tarifs="tarifs"
+      @changed="members.refresh()"
+      @notify="toast.show"
+    />
+    <MemberAddDialog
       v-if="isAdmin(role)"
       v-model:open="adding"
-      title="➕ Ajouter un adhérent"
-      :description="`Saisie manuelle d'un adhérent pour la saison ${season}. Les champs marqués d'un astérisque (*) sont obligatoires.`"
-      wide
-      data-testid="add-dialog"
-    >
-      <MemberForm v-model="draft" adding :tarifs="tarifs" :saving="saving" @save="saveNew" @cancel="adding = false" />
-    </UiDialog>
+      :season="season"
+      :members="all"
+      :tarifs="tarifs"
+      @created="added"
+      @notify="toast.show"
+    />
     <UiToast :message="toast.message.value" />
   </AppShell>
 </template>
