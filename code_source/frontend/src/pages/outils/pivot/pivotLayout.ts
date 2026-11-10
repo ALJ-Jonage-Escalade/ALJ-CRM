@@ -3,9 +3,9 @@
    name values of a season). */
 import { PivotUtilities, Renderer } from "vue-pivottable";
 import { h, useAttrs, type Component, type VNode } from "vue";
-import { localStorageOrNone } from "../../lib/localStorage";
-import type { Schemas } from "../../lib/client";
-import { sexLabel } from "../../lib/sex";
+import { localStorageOrNone } from "../../../lib/localStorage";
+import type { Schemas } from "../../../lib/client";
+import { sexLabel } from "../../../lib/sex";
 
 type PivotRecord = Schemas["PivotRecord"];
 export type PivotField = keyof PivotRecord;

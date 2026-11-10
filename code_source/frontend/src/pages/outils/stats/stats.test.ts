@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Competition, Participant } from "../competitions/competitions";
+import type { Competition, Participant } from "../../competitions/competitions";
 import { competitorGrowthText, participationRateText, seasonStats } from "./stats";
 
 const entrant = (adherentId: number, change: Partial<Participant> = {}): Participant => ({

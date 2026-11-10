@@ -20,7 +20,7 @@ class TestMembersMapShowsText(unittest.TestCase):
                 source = f.read()
             for sink in _SINKS:
                 self.assertNotIn(sink, source, name)
-        # The popup itself is checked by behaviour in frontend/src/pages/outils/membersMapView.test.ts
+        # The popup itself is checked by behaviour in frontend/src/pages/outils/map/membersMapView.test.ts
 
 
 

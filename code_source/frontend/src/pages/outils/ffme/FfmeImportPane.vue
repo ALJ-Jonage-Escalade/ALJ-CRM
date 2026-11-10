@@ -3,14 +3,14 @@
    passports, diplomas and health document, and marks their membership « Terminé ». Preview first (nothing written,
    rows left unmatched can be linked by hand), or import straight away with the automatic matches only. */
 import { computed, inject, ref } from "vue";
-import UiBadge from "../../components/ui/UiBadge.vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import UiCard from "../../components/ui/UiCard.vue";
-import UiTile from "../../components/ui/UiTile.vue";
-import { CLIENT_KEY, errorText, type Schemas } from "../../lib/client";
-import { createFfmeApi } from "../../services/ffme";
+import UiBadge from "../../../components/ui/UiBadge.vue";
+import UiButton from "../../../components/ui/UiButton.vue";
+import UiCard from "../../../components/ui/UiCard.vue";
+import UiTile from "../../../components/ui/UiTile.vue";
+import { CLIENT_KEY, errorText, type Schemas } from "../../../lib/client";
+import { createFfmeApi } from "../../../services/ffme";
 import { applyConfirmation, fileLabel, isXlsx, manualMatches, memberLabel, readBase64, sortedMembers } from "./ffme";
-import { dialogs } from "../../composables/dialogs";
+import { dialogs } from "../../../composables/dialogs";
 
 const emit = defineEmits<{ toast: [message: string, ms?: number] }>();
 const ffmeApi = createFfmeApi(inject(CLIENT_KEY)!);

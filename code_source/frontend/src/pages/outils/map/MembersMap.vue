@@ -3,9 +3,9 @@
    groups (HelloAsso tariffs). The points come from /api/reports/map-points; Leaflet is loaded on first display. */
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui";
 import { computed, inject, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import { CLIENT_KEY, errorText } from "../../lib/client";
-import { createReportsApi } from "../../services/reports";
+import UiButton from "../../../components/ui/UiButton.vue";
+import { CLIENT_KEY, errorText } from "../../../lib/client";
+import { createReportsApi } from "../../../services/reports";
 import { filterLabel, groupsOf, mapSummaryText, visiblePoints, type MapPoint } from "./membersMap";
 import type { MembersMapView } from "./membersMapView";
 

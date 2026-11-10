@@ -3,12 +3,12 @@
    them on their competitions, deleting one takes them off (server side). */
 import { computed, inject, ref } from "vue";
 import { RouterLink } from "vue-router";
-import UiButton from "../../components/ui/UiButton.vue";
-import { CLIENT_KEY } from "../../lib/client";
-import { createCompetitionsApi } from "../../services/competitions";
-import { coachedBy, periodText, sortCompetitions, type Coach, type Competition } from "./competitions";
-import { WRITER_KEY } from "./writer";
-import { dialogs } from "../../composables/dialogs";
+import UiButton from "../../../components/ui/UiButton.vue";
+import { CLIENT_KEY } from "../../../lib/client";
+import { createCompetitionsApi } from "../../../services/competitions";
+import { coachedBy, periodText, sortCompetitions, type Coach, type Competition } from "../competitions";
+import { WRITER_KEY } from "../writer";
+import { dialogs } from "../../../composables/dialogs";
 
 /** listPath: address of the competitions list (the page's index route), where a competition opens. */
 const props = defineProps<{ coaches: readonly Coach[] | null; competitions: readonly Competition[]; listPath: string }>();

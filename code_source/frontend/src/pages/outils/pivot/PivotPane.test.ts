@@ -1,9 +1,9 @@
-import { json } from "../../test/harness";
+import { json } from "../../../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { VuePivottableUi } from "vue-pivottable";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { API_KEY, type ApiFetch } from "../../lib/api";
-import { CLIENT_KEY, createApiClient, type Schemas } from "../../lib/client";
+import { API_KEY, type ApiFetch } from "../../../lib/api";
+import { CLIENT_KEY, createApiClient, type Schemas } from "../../../lib/client";
 import PivotPane from "./PivotPane.vue";
 import { DEFAULT_LAYOUT, PIVOT_LAYOUT_STORAGE, restoreLayout } from "./pivotLayout";
 

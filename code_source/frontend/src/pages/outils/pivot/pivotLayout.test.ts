@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Schemas } from "../../lib/client";
+import type { Schemas } from "../../../lib/client";
 import {
   AGGREGATORS,
   clearLayout,

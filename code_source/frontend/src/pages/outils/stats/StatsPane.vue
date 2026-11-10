@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /* Outils › Statistiques: presence, podiums and competitors of the last seasons, from the competitions on the server. */
 import { computed, inject, onMounted, ref } from "vue";
-import UiCard from "../../components/ui/UiCard.vue";
-import { ApiError, CLIENT_KEY, errorText } from "../../lib/client";
-import { plural } from "../../lib/text";
-import { createCompetitionsApi } from "../../services/competitions";
-import type { Competition } from "../competitions/competitions";
+import UiCard from "../../../components/ui/UiCard.vue";
+import { ApiError, CLIENT_KEY, errorText } from "../../../lib/client";
+import { plural } from "../../../lib/text";
+import { createCompetitionsApi } from "../../../services/competitions";
+import type { Competition } from "../../competitions/competitions";
 import { competitorGrowthText, participationRateText, seasonStats } from "./stats";
 
 /** Seasons compared on the tiles and the two lists. */

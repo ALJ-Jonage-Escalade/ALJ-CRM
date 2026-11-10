@@ -2,7 +2,7 @@
 /* Outils › Carte (index sub-page): the members' addresses on a map, by season. */
 import { inject, ref, useTemplateRef, watch } from "vue";
 import { OUTILS_KEY, type ReloadablePage } from "./context";
-import MembersMap from "./MembersMap.vue";
+import MembersMap from "./map/MembersMap.vue";
 import SeasonSelect from "./SeasonSelect.vue";
 
 const { seasons, initialSeason } = inject(OUTILS_KEY)!;

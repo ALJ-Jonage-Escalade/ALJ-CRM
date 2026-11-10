@@ -1,7 +1,7 @@
 /* Members map of the Outils page, without Leaflet: the groups of the points, the group filter and the texts of the
    summary. The map itself is in membersMapView.ts. */
-import type { Schemas } from "../../lib/client";
-import { plural } from "../../lib/text";
+import type { Schemas } from "../../../lib/client";
+import { plural } from "../../../lib/text";
 
 export type MapPoint = Schemas["MapPoint"];
 

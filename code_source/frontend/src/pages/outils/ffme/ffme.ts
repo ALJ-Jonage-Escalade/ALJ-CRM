@@ -1,7 +1,7 @@
 /* Import of the licensee list exported from MyFFME (.xlsx): the file goes to the server base64 encoded; the server
    matches its rows with the members (license number, then name). The rows it could not match are shown with a list
    of members to pick from; the picked ones are sent with the file when applying. */
-import type { Schemas } from "../../lib/client";
+import type { Schemas } from "../../../lib/client";
 
 export type Licensee = Schemas["FfmeLicensee"];
 export type Member = Schemas["FfmeMember"];

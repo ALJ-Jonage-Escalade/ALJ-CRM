@@ -5,9 +5,9 @@
 import "vue-pivottable/dist/vue-pivottable.css";
 import { VuePivottableUi } from "vue-pivottable";
 import { inject, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import { CLIENT_KEY, errorText } from "../../lib/client";
-import { createReportsApi } from "../../services/reports";
+import UiButton from "../../../components/ui/UiButton.vue";
+import { CLIENT_KEY, errorText } from "../../../lib/client";
+import { createReportsApi } from "../../../services/reports";
 import {
   AGGREGATORS,
   clearLayout,

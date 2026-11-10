@@ -1,5 +1,5 @@
 """Office portal, Outils › Import HelloAsso: the membership campaign of the (fake) HelloAsso imported as members, with
-a preview, per-row checkboxes, a row to review and the result screen (frontend/src/pages/outils/HelloAssoImportPane.vue).
+a preview, per-row checkboxes, a row to review and the result screen (frontend/src/pages/outils/helloasso/HelloAssoImportPane.vue).
 
 Only people made up by the test are written: a first import creates one of them (another is left unchecked), a second
 one brings a renewal and an ambiguous registration of that same person, linked to them by hand."""

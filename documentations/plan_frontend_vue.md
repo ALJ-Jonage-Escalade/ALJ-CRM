@@ -134,9 +134,9 @@ Done 2026-10-23 (plan phase 12): `frontend/src/sw.ts` in `injectManifest` mode, 
   unpkg) and `/pivot` (`src/api/reports/pivot.py`, jQuery 3.6 + jQuery UI 1.12.1 + pivottable 2.23 from cdnjs) in
   sandboxed iframes, as today. They work, are isolated, and are not a priority on phones.
 - **First follow-up after step 5**: rebuild the map as a Vue component with `leaflet` from npm and a JSON endpoint
-  (`/api/reports/map-points`). Done (#25): `pages/outils/MembersMap.vue`, Leaflet + markercluster from npm loaded on
+  (`/api/reports/map-points`). Done (#25): `pages/outils/map/MembersMap.vue`, Leaflet + markercluster from npm loaded on
   first display, popups built as text (no HTML), a season selector; `/map` is removed.
-- Pivot rebuilt as a Vue component too (plan `plans/vue-pivot-table.md`): `pages/outils/PivotPane.vue` with
+- Pivot rebuilt as a Vue component too (plan `plans/vue-pivot-table.md`): `pages/outils/pivot/PivotPane.vue` with
   `vue-pivottable` from npm (MIT, no jQuery), loaded with its tab, on `/api/reports/pivot-records` (the rows shaped in
   Python, French field names as keys); French aggregators and renderers, the layout kept in `localStorage` (never the
   value filters). `/pivot`, jQuery / jQuery UI 1.12.1 / the cdnjs scripts and the sandboxed iframe are removed.

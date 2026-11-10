@@ -1,6 +1,6 @@
 /* Statistics of the competitions (Outils › Statistiques), computed from the competitions the server returns: podiums
    and competitors per season, presence of the selected competitors. Nothing is shown that the data does not hold. */
-import { seasonOf, type Competition } from "../competitions/competitions";
+import { seasonOf, type Competition } from "../../competitions/competitions";
 
 /** The medal counted for a podium rank. */
 const MEDAL_OF_RANK = { 1: "gold", 2: "silver", 3: "bronze" } as const;

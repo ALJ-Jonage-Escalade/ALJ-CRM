@@ -1,9 +1,9 @@
 /* Import of the HelloAsso membership campaign (server: api/members/helloasso_import.py): the server sorts every
    registration of the campaign into a bucket; the preview shows one section per bucket. */
-import type { BadgeColor } from "../../components/ui/palette";
-import type { Schemas } from "../../lib/client";
-import { formatDateTime, formatDayText, parseDate } from "../../lib/format";
-import { normKey } from "../../lib/text";
+import type { BadgeColor } from "../../../components/ui/palette";
+import type { Schemas } from "../../../lib/client";
+import { formatDateTime, formatDayText, parseDate } from "../../../lib/format";
+import { normKey } from "../../../lib/text";
 
 export type MembershipPreview = Schemas["MembershipPreview"];
 export type MembershipRow = Schemas["MembershipRow"];
