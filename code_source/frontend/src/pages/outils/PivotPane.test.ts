@@ -1,3 +1,4 @@
+import { json } from "../../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { VuePivottableUi } from "vue-pivottable";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -33,10 +34,6 @@ const RECORDS = [
   record({ Statut: "Annulé" }), // hidden by default
   record({ "Groupe / Tarif": "Liste d'attente cours" }), // hidden by default
 ];
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
 
 async function render(answer: (season: string) => Response | Promise<Response> = (season) => json({ season, records: RECORDS })) {
   const seasons: string[] = [];

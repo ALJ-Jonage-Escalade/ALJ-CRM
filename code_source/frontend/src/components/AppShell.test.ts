@@ -1,8 +1,9 @@
+import { fakeAuth } from "../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
-import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
+import { AUTH_KEY, type AuthState } from "../composables/auth";
 import type { PageId } from "../lib/access";
 import type { Role } from "../lib/roles";
 import { API_KEY, type ApiFetch } from "../lib/api";
@@ -16,7 +17,7 @@ const USER = { uid: "u1", email: "albus@alj-escalade.fr" };
 const signedIn = (role: Role): AuthState => ({ status: "signedIn", user: USER, role });
 
 function render(state: AuthState, googleStatus = "ok", page: PageId = "accueil", queued = 0, signInError: string | null = null) {
-  const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
+  const auth = fakeAuth(state);
   const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: googleStatus })));
   const wrapper = mount(AppShell, {
     props: { page, title: "Titre" },
@@ -257,7 +258,7 @@ describe("AppShell sub-menu", () => {
   async function renderSub(state: AuthState, sub: string, staffCopy: boolean | null = false, path = `/bureau/competitions/${sub}`) {
     const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/:any(.*)*", component: { render: () => null } }] });
     await router.push(path);
-    const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
+    const auth = fakeAuth(state);
     const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: "ok" })));
     const wrapper = mount(AppShell, {
       props: { page: "competitions", title: "Compétitions", sub, staffCopy },

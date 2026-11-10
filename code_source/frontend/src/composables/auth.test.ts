@@ -1,12 +1,9 @@
+import { json } from "../test/harness";
 import { describe, expect, it, vi } from "vitest";
 import { AFTER_LOGIN_STORAGE, createAuth, LOGIN_URL, type AuthDeps, type SessionUser } from "./auth";
 
 const ALBUS: SessionUser = { uid: "u-albus", email: "albus@alj-escalade.fr" };
 const FILCH: SessionUser = { uid: "u-filch", email: "argus.filch@hogwarts.example" };
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
 
 /** Fake Firebase session: emit(user) plays onAuthStateChanged. */
 function setup(fetchMe: AuthDeps["fetchMe"], onNetworkBack?: AuthDeps["onNetworkBack"]) {

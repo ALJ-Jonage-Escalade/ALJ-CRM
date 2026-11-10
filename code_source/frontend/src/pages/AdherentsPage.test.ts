@@ -1,23 +1,14 @@
+import { fakeAuth, json, provided } from "../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, ref } from "vue";
+import { defineComponent } from "vue";
 import { createMemoryHistory, createRouter, type Router } from "vue-router";
-import { AUTH_KEY, type Auth } from "../composables/auth";
-import { API_KEY, type ApiFetch } from "../lib/api";
-import { CLIENT_KEY, createApiClient } from "../lib/client";
+import { type ApiFetch } from "../lib/api";
 import type { Role } from "../lib/roles";
 import AdherentsPage from "./AdherentsPage.vue";
 import { ADHERENTS_FILTERS_STORAGE, ADHERENTS_PANEL_STORAGE, type MemberList } from "./adherents/members";
 import { member } from "./adherents/members.fixture";
 import { dialogs } from "../composables/dialogs";
-
-function json(body: unknown, status = 200, etag?: string): Response {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (etag) {
-    headers.ETag = etag;
-  }
-  return new Response(JSON.stringify(body), { status, headers });
-}
 
 const CRENEAUX = [
   { groupe: "Loisir adultes", tarifs: ["Adulte loisir"], categorie_age: "", type: "" },
@@ -92,18 +83,12 @@ async function render(role: Role = "admin", answers: Record<string, Answer> = AN
     ],
   });
   await router.push(path);
-  const auth: Auth = {
-    state: ref({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role }),
-    login: vi.fn(),
-    logout: vi.fn(async () => {}),
-    retry: vi.fn(async () => {}),
-    stop: vi.fn(),
-  };
+  const auth = fakeAuth({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role });
   const wrapper = mount(AdherentsPage, {
     attachTo: document.body,
     global: {
       plugins: [router],
-      provide: { [AUTH_KEY]: auth, [API_KEY]: api, [CLIENT_KEY]: createApiClient(api, "http://alj.test") },
+      provide: provided(auth, api),
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
     },
   });

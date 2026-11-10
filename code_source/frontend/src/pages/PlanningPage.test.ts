@@ -1,17 +1,11 @@
+import { fakeAuth, json, provided } from "../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
-import { AUTH_KEY, type Auth } from "../composables/auth";
-import { API_KEY, type ApiFetch } from "../lib/api";
-import { CLIENT_KEY, createApiClient } from "../lib/client";
+import { type ApiFetch } from "../lib/api";
 import type { Role } from "../lib/roles";
 import PlanningPage from "./PlanningPage.vue";
 import type { Slot } from "./planning/slots";
 import { dialogs } from "../composables/dialogs";
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
 
 const SLOT = (change: Partial<Slot>): Slot => ({
   id: 1,
@@ -51,17 +45,11 @@ function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS)
     const answer = answers[`${method} ${u.pathname}`];
     return answer ? answer(body) : json({}, 404);
   });
-  const auth: Auth = {
-    state: ref({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role }),
-    login: vi.fn(),
-    logout: vi.fn(async () => {}),
-    retry: vi.fn(async () => {}),
-    stop: vi.fn(),
-  };
+  const auth = fakeAuth({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role });
   const wrapper = mount(PlanningPage, {
     attachTo: document.body,
     global: {
-      provide: { [AUTH_KEY]: auth, [API_KEY]: api, [CLIENT_KEY]: createApiClient(api, "http://alj.test") },
+      provide: provided(auth, api),
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
     },
   });

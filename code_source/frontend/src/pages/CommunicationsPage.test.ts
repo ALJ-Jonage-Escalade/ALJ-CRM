@@ -1,15 +1,9 @@
+import { fakeAuth, json, provided } from "../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
-import { AUTH_KEY, type Auth } from "../composables/auth";
-import { API_KEY, type ApiFetch } from "../lib/api";
-import { CLIENT_KEY, createApiClient } from "../lib/client";
+import { type ApiFetch } from "../lib/api";
 import CommunicationsPage from "./CommunicationsPage.vue";
 import { dialogs } from "../composables/dialogs";
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
 
 const RELANCE = { name: "Relance", subject: "Rappel {first_name}", body: "Bonjour", sender_email: "a@alj.example", sender_name: "ALJ" };
 const ECHEANCE = { name: "Rappel echeance", subject: "Échéance", body: "Payez", sender_email: "b@alj.example", sender_name: "ALJ" };
@@ -43,17 +37,11 @@ function render(answers: Record<string, Answer> = ANSWERS) {
       answers[`${method} ${u.pathname}`] ?? (method === "DELETE" ? () => json({ status: "success", message: "ok" }) : undefined);
     return answer ? answer(body) : json({}, 404);
   });
-  const auth: Auth = {
-    state: ref({ status: "signedIn", user: { uid: "u1", email: "admin@alj.example" }, role: "admin" }),
-    login: vi.fn(),
-    logout: vi.fn(async () => {}),
-    retry: vi.fn(async () => {}),
-    stop: vi.fn(),
-  };
+  const auth = fakeAuth({ status: "signedIn", user: { uid: "u1", email: "admin@alj.example" }, role: "admin" });
   const wrapper = mount(CommunicationsPage, {
     attachTo: document.body,
     global: {
-      provide: { [AUTH_KEY]: auth, [API_KEY]: api, [CLIENT_KEY]: createApiClient(api, "http://alj.test") },
+      provide: provided(auth, api),
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
     },
   });

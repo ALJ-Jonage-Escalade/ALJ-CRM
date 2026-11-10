@@ -1,9 +1,9 @@
+import { fakeAuth, json as jsonAnswer, settle } from "../test/harness";
 import { flushPromises, mount, type DOMWrapper } from "@vue/test-utils";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
-import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
+import { AUTH_KEY, type AuthState } from "../composables/auth";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import type { Role } from "../lib/roles";
@@ -51,11 +51,9 @@ const CONTACTS = [
   },
 ];
 
+/** An answer with an ETag, as the server sends them (the polls send it back). */
 function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ETag: `"${status}-${JSON.stringify(body).length}"` },
-  });
+  return jsonAnswer(body, status, `"${status}-${JSON.stringify(body).length}"`);
 }
 
 /** The server: the competitions as they change, writes recorded; `down` makes every call fail like a lost network. */
@@ -127,7 +125,7 @@ async function render(state: AuthState, api: ApiFetch, store: OfflineStore, path
   // The app's routes: the page renders its sub-pages (router.ts)
   const router = createRouter({ history: createMemoryHistory(), routes });
   await router.push(path);
-  const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
+  const auth = fakeAuth(state);
   const wrapper = mount(RouterView, {
     attachTo: document.body,
     global: {
@@ -147,16 +145,6 @@ async function render(state: AuthState, api: ApiFetch, store: OfflineStore, path
   // Dialogs are rendered at the end of <body>
   const inBody = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
   return { wrapper, byId, all, card, inBody, router, auth };
-}
-
-/** Waits for IndexedDB and the renders that follow. fake-indexeddb answers through setImmediate: waiting on that queue
-    keeps the steps in a fixed order (setTimeout(0) runs before or after it depending on the machine's load). 8 rounds
-    are needed, 12 for margin. */
-async function settle(): Promise<void> {
-  for (let i = 0; i < 12; i++) {
-    await flushPromises();
-    await new Promise((r) => setImmediate(r));
-  }
 }
 
 /** Opens the competition's « Plus » menu: Reka UI opens it on pointerdown or the keyboard, not on a bare click. */

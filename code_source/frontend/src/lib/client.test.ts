@@ -1,3 +1,4 @@
+import { json } from "../test/harness";
 import { describe, expect, it, vi } from "vitest";
 import { createApiFetch } from "./api";
 import { ApiError, createApiClient, errorFromBody, NETWORK_MESSAGE, readUrl, unwrap } from "./client";
@@ -6,10 +7,6 @@ const BASE = "http://alj.test";
 
 /** The URL a fetch was called with, whatever its form. */
 const href = (url: RequestInfo | URL): string => (url instanceof Request ? url.url : url.toString());
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
 
 /** The client over the real apiFetch (token, retry) over a fake network. */
 function setup(answer: (url: string, init: RequestInit) => Response | Promise<Response>) {

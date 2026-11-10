@@ -1,17 +1,11 @@
+import { fakeAuth, json, provided } from "../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
-import { AUTH_KEY, type Auth } from "../composables/auth";
-import { API_KEY, type ApiFetch } from "../lib/api";
-import { CLIENT_KEY, createApiClient } from "../lib/client";
+import { type ApiFetch } from "../lib/api";
 import type { Role } from "../lib/roles";
 import { routes } from "../router";
 import { dialogs } from "../composables/dialogs";
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
 
 function file(name: string): Response {
   return new Response(new Blob(["x"]), { headers: { "Content-Disposition": `attachment; filename="${name}"` } });
@@ -209,13 +203,7 @@ async function render(role: Role = "admin", path = "/bureau/outils") {
     const answer = ANSWERS[`${method} ${u.pathname}`];
     return answer ? answer(body, u) : json({}, 404);
   });
-  const auth: Auth = {
-    state: ref({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role }),
-    login: vi.fn(),
-    logout: vi.fn(async () => {}),
-    retry: vi.fn(async () => {}),
-    stop: vi.fn(),
-  };
+  const auth = fakeAuth({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role });
   // The app's routes: the page renders its sub-pages (router.ts)
   const router = createRouter({ history: createMemoryHistory(), routes });
   await router.push(path);
@@ -223,7 +211,7 @@ async function render(role: Role = "admin", path = "/bureau/outils") {
     attachTo: document.body,
     global: {
       plugins: [router],
-      provide: { [AUTH_KEY]: auth, [API_KEY]: api, [CLIENT_KEY]: createApiClient(api, "http://alj.test") },
+      provide: provided(auth, api),
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
     },
   });
