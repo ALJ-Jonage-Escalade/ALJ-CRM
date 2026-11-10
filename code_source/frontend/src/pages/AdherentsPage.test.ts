@@ -220,16 +220,12 @@ describe("AdherentsPage", () => {
     expect(lines[2]).toContain('"+33 6 12 34 56 78"');
   });
 
-  it("shows a coach no admin action", async () => {
+  it("shows a coach no admin action, but the FFME export coaches may open", async () => {
     const { byId, wrapper } = await render("coach");
     await flushPromises();
     expect(byId("member-add").exists()).toBe(false);
     expect(wrapper.find('a[href="/bureau/outils/ffme-import"]').exists()).toBe(false);
-    expect(wrapper.find('a[href="/bureau/outils/ffme"]').exists()).toBe(false);
-    const ffmeBtn = wrapper.find('button[data-testid="export-ffme"]');
-    expect(ffmeBtn.exists()).toBe(true);
-    expect(ffmeBtn.attributes("disabled")).toBeDefined();
-    expect(ffmeBtn.attributes("title")).toBe("Réservé aux administrateurs");
+    expect(byId("export-ffme").attributes("href")).toBe("/bureau/outils/ffme");
   });
 
   it("opens the record of a member from the list: a coach can e-mail but not edit", async () => {

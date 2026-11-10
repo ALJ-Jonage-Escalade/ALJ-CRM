@@ -6,7 +6,8 @@ import { looksLikeEmail } from "../../lib/email";
 import { formatDate, formatDayText } from "../../lib/format";
 import { SEX_LABELS, sexLabel, type Sex } from "../../lib/sex";
 import { normKey } from "../../lib/text";
-import { diplomes, isYes, type Creneau, type Member } from "./members";
+import type { MemberStatus } from "../../services/members";
+import { diplomes, isYes, STATUSES, type Creneau, type Member } from "./members";
 
 export type MemberChanges = Schemas["MemberChanges"];
 export type NewMember = Schemas["NewMember"];
@@ -110,7 +111,7 @@ export const STATUS_CHOICES = [
   ["En cours", "🟠 En cours / En attente"],
   ["Terminé", "🟣 Terminé"],
   ["Annulé", "🔴 Annulé"],
-] as const;
+] as const satisfies readonly (readonly [MemberStatus, string])[];
 
 /** Values of the form, as typed. All fields can be edited or filled when adding. */
 export interface MemberDraft {
@@ -233,7 +234,8 @@ export function newMemberOf(d: MemberDraft): NewMember {
     birth_date: d.birth_date,
     sex: d.sex || null,
     tarif_name: d.tarif_name.trim(),
-    status: d.status as NewMember["status"], // the add form offers STATUS_CHOICES only
+    // The add form offers STATUS_CHOICES only; anything else leaves the server default
+    status: STATUSES.find((status) => status === d.status),
     amount: Number(d.amount.replace(",", ".")) || 0,
     licence_ffme: d.licence_ffme.trim(),
     badge_rouge: d.badge_rouge,

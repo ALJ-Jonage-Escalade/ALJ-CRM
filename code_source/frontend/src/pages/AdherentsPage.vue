@@ -26,6 +26,7 @@ import { createMembersApi, membersRead } from "../services/members";
 import { csvBlob } from "../lib/csv";
 import { saveFile } from "../lib/download";
 import { formatDayText } from "../lib/format";
+import { isAdmin } from "../lib/roles";
 import MemberAttestation from "./adherents/MemberAttestation.vue";
 import MemberEmail from "./adherents/MemberEmail.vue";
 import MemberForm from "./adherents/MemberForm.vue";
@@ -433,26 +434,8 @@ const linkButton =
         <UiButton variant="muted" small data-testid="export-csv" title="Télécharger la liste affichée en fichier CSV" @click="exportCsv">
           📥 Export CSV
         </UiButton>
-        <a
-          v-if="role === 'admin'"
-          href="/bureau/outils/ffme"
-          :class="linkButton"
-          data-testid="export-ffme"
-          title="Ouvrir l'export officiel FFME"
-        >
-          🇫🇷 Export FFME
-        </a>
-        <button
-          v-else
-          type="button"
-          disabled
-          :class="[linkButton, 'cursor-not-allowed opacity-50']"
-          data-testid="export-ffme"
-          title="Réservé aux administrateurs"
-        >
-          🇫🇷 Export FFME
-        </button>
-        <a v-if="role === 'admin'" href="/bureau/outils/ffme-import" :class="linkButton" title="Importer la liste Excel des licenciés FFME">
+        <a href="/bureau/outils/ffme" :class="linkButton" data-testid="export-ffme" title="Ouvrir l'export officiel FFME">🇫🇷 Export FFME</a>
+        <a v-if="isAdmin(role)" href="/bureau/outils/ffme-import" :class="linkButton" title="Importer la liste Excel des licenciés FFME">
           📥 Import FFME
         </a>
         <UiButton
@@ -468,7 +451,7 @@ const linkButton =
           ⇤ Fiche
         </UiButton>
         <RouterLink
-          v-if="role === 'admin'"
+          v-if="isAdmin(role)"
           :to="{ query: { ...route.query, ajout: '1' } }"
           data-testid="member-add"
           class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-bold text-white no-underline hover:bg-accent-dark"
@@ -649,7 +632,7 @@ const linkButton =
         <MemberRecord
           v-else
           :member="record"
-          :admin="role === 'admin'"
+          :admin="isAdmin(role)"
           compact
           @email="open('email')"
           @attestation="open('attestation')"
@@ -679,7 +662,7 @@ const linkButton =
         @failed="(m) => toast.show(m, 9000)"
         @cancel="mode = 'none'"
       />
-      <template v-else-if="role === 'admin'">
+      <template v-else-if="isAdmin(role)">
         <MemberForm
           v-if="mode === 'edit'"
           v-model="draft"
@@ -701,7 +684,7 @@ const linkButton =
     </UiDialog>
 
     <UiDialog
-      v-if="role === 'admin'"
+      v-if="isAdmin(role)"
       v-model:open="adding"
       title="➕ Ajouter un adhérent"
       :description="`Saisie manuelle d'un adhérent pour la saison ${season}. Les champs marqués d'un astérisque (*) sont obligatoires.`"

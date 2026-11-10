@@ -2,17 +2,16 @@
 import { looksLikeEmail } from "../../lib/email";
 import { formatDate, formatDateTime, parseDate } from "../../lib/format";
 import type { Schemas } from "../../lib/client";
+import { ROLE_NAME } from "../../lib/roles";
 
 export type AccessEntry = Schemas["AccessEntry"];
 export type AccessRole = AccessEntry["role"];
 export type HistoryAction = Schemas["AccessHistoryEntry"]["action"];
 
-const ROLE_NAMES: Record<AccessRole, string> = { admin: "Administrateur", coach: "Coach", readonly: "Lecture seule" };
-
 /** The roles an admin may give, highest first. */
 export const ROLE_OPTIONS: readonly { value: AccessRole; label: string }[] = (["admin", "coach", "readonly"] as const).map((role) => ({
   value: role,
-  label: ROLE_NAMES[role],
+  label: ROLE_NAME[role],
 }));
 
 const ACTION_LABELS: Record<HistoryAction, string> = {
@@ -31,7 +30,7 @@ export function accessRole(value: string): AccessRole | null {
 }
 
 export function roleName(role: AccessRole | null | undefined): string {
-  return role ? ROLE_NAMES[role] : "—";
+  return role ? ROLE_NAME[role] : "—";
 }
 
 export function actionLabel(action: HistoryAction): string {

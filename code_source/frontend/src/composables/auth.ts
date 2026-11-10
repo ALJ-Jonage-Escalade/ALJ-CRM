@@ -8,7 +8,7 @@ import { onAuthStateChanged, signOut } from "@firebase/auth";
 import { readonly, ref, type InjectionKey, type Ref } from "vue";
 import { apiFetch } from "../lib/api";
 import { firebaseAuth } from "../lib/firebase";
-import type { Role } from "../lib/roles";
+import { isRole, type Role } from "../lib/roles";
 
 export interface SessionUser {
   uid: string;
@@ -46,7 +46,6 @@ export interface Auth {
 
 export const LOGIN_URL = "/competitions?login=1";
 export const AFTER_LOGIN_KEY = "alj_after_login";
-const ROLES: readonly Role[] = ["admin", "coach", "readonly", null];
 
 /** A refusal or an unexpected answer of /api/me, with the message shown to the user. */
 class MeError extends Error {}
@@ -64,8 +63,8 @@ async function readMe(res: Response): Promise<{ email: string; role: Role; invit
     throw new MeError(`Le serveur ne répond pas correctement (erreur ${res.status}).`);
   }
   const body = (await res.json()) as { email?: unknown; role?: unknown; invitation_expired_at?: unknown };
-  const role = ROLES.find((r) => r === body.role);
-  if (role === undefined) {
+  const role = body.role;
+  if (!isRole(role)) {
     throw new MeError("Réponse inattendue du serveur.");
   }
   const email = typeof body.email === "string" ? body.email : "";

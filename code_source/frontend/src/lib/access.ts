@@ -1,7 +1,7 @@
 /* Which role may open which page. The server stays the judge of every API call (api_auth.py): this table
    only keeps a role away from screens it cannot use (navigation, Accueil cards, router guards). */
 import type { AuthState } from "../composables/auth";
-import { isStaff, type Role } from "./roles";
+import { isAdmin, isStaff, type Role } from "./roles";
 
 /** public: anyone, signed in or not; viewer: any role, read-only accounts too (the competitions, as on the former
     phone page); staff: coaches and admins; admin: admins only. */
@@ -209,7 +209,7 @@ export function canOpen(role: Role, access: Access): boolean {
     return true;
   }
   if (access === "admin") {
-    return role === "admin";
+    return isAdmin(role);
   }
   if (access === "viewer") {
     return role !== null;

@@ -25,7 +25,7 @@ import {
 } from "../lib/access";
 import { CLIENT_KEY, errorText } from "../lib/client";
 import { formatDate, parseDate } from "../lib/format";
-import { isStaff, roleLabel } from "../lib/roles";
+import { isAdmin, isStaff, roleLabel } from "../lib/roles";
 import { isEmulator } from "../lib/runtime";
 import { logoutWarning, offlineStore, STORE_KEY } from "../lib/store";
 import { createIntegrationsApi } from "../services/integrations";
@@ -321,7 +321,7 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
           le jeton de connexion Google du club a expiré ou a été révoqué.
         </span>
         <UiButton
-          v-if="role === 'admin'"
+          v-if="isAdmin(role)"
           variant="danger"
           small
           :busy="renewing && 'Ouverture…'"

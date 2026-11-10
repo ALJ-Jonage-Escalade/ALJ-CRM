@@ -6,6 +6,7 @@ import UiBadge from "../components/ui/UiBadge.vue";
 import { PAGES, REFUSED_QUERY } from "../lib/access";
 import { CLIENT_KEY, ApiError, errorText } from "../lib/client";
 import { formatDayText } from "../lib/format";
+import { isAdmin } from "../lib/roles";
 import { createCompetitionsApi } from "../services/competitions";
 import { isArchived, isPast, todayIso, type Competition, type Participant } from "./competitions/competitions";
 
@@ -138,8 +139,8 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
         class="mt-5.5 max-h-[480px] w-full rounded-2xl border border-slate-200 object-cover shadow-md"
       />
       <p class="mt-4.5 text-slate-500">
-        Connecté en tant que {{ role === "admin" ? "administrateur" : "coach" }}. Les données sont lues depuis la base du club et
-        actualisées automatiquement.
+        Connecté en tant que {{ isAdmin(role) ? "administrateur" : "coach" }}. Les données sont lues depuis la base du club et actualisées
+        automatiquement.
       </p>
     </template>
   </AppShell>
