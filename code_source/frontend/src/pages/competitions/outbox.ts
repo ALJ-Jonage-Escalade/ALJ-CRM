@@ -67,20 +67,20 @@ export interface Outbox {
 export const outboxKey = (competitionId: number | string, adherentId: number | string, flag: string): string =>
   `${competitionId}:${adherentId}:${flag}`;
 
-export function refusalText(e: ApiError): string {
-  if (e.code === "changed") {
+export function refusalText(error: ApiError): string {
+  if (error.code === "changed") {
     return "modifié entre-temps sur un autre appareil";
   }
-  if (e.code === "already_paid") {
+  if (error.code === "already_paid") {
     return "a payé entre-temps : passez par l'annulation";
   }
-  if (e.code === "competition_closed") {
+  if (error.code === "competition_closed") {
     return "compétition archivée";
   }
-  if (e.status === 404) {
+  if (error.status === 404) {
     return "n'est plus inscrit à cette compétition";
   }
-  return e.message || `HTTP ${e.status}`;
+  return error.message || `HTTP ${error.status}`;
 }
 
 /** Network down, server down or busy: kept for the next try. */
@@ -91,17 +91,17 @@ function isValid(entry: QueuedChange, uid: string): boolean {
   return entry.uid === uid && QUEUED_URL.test(String(entry.url)) && QUEUED_FLAGS.includes(entry.flag) && typeof entry.value === "boolean";
 }
 
-export function pendingLine(n: number): string {
-  return n ? ` · ⏳ ${n} modification${plural(n)} à envoyer` : "";
+export function pendingLine(count: number): string {
+  return count ? ` · ⏳ ${count} modification${plural(count)} à envoyer` : "";
 }
 
 /** The toast after a replay. */
-export function replayMessage(r: ReplayResult): string {
-  const n = r.refused.length;
+export function replayMessage(result: ReplayResult): string {
+  const n = result.refused.length;
   if (!n) {
     return "☁️ Modifications faites hors ligne envoyées.";
   }
-  return `⚠️ ${n} modification${plural(n)} faite${plural(n)} hors ligne refusée${plural(n)} : ${r.refused.join(" ; ")}`;
+  return `⚠️ ${n} modification${plural(n)} faite${plural(n)} hors ligne refusée${plural(n)} : ${result.refused.join(" ; ")}`;
 }
 
 export function createOutbox(store: OfflineStore, send: SendChange, now: () => number = Date.now): Outbox {

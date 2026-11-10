@@ -6,10 +6,10 @@ import { computed, inject, ref, watch } from "vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
 import { CLIENT_KEY, errorText } from "../../../lib/client";
-import { createCommunicationsApi } from "../../../services/communications";
+import { createCommunicationsApi, type EmailTemplate } from "../../../services/communications";
 import type { Competition, Row } from "../competitions";
-import { audience, AUDIENCES, defaultTemplate, hasEmail, render, sendBody, variables, type Audience, type Template } from "./email";
-import { plural } from "../../../lib/text";
+import { audience, AUDIENCES, defaultTemplate, hasEmail, sendBody, variables, type Audience } from "./email";
+import { fillTemplate, plural } from "../../../lib/text";
 import { dialogs } from "../../../composables/dialogs";
 
 const props = defineProps<{ competition: Competition; rows: readonly Row[] }>();
@@ -22,7 +22,7 @@ const recipients = computed(() => audience(props.rows, who.value).filter((r) => 
 const reachable = computed(() => recipients.value.filter(hasEmail));
 watch(who, () => (removed.value = new Set()));
 
-const templates = ref<Template[]>([]);
+const templates = ref<EmailTemplate[]>([]);
 const templateName = ref("");
 const subject = ref("");
 const body = ref("");
@@ -80,7 +80,7 @@ const preview = computed(() => {
     return "";
   }
   const values = variables(props.competition, first);
-  return `Sujet : ${render(subject.value, values)}\n\n${render(body.value, values)}`;
+  return `Sujet : ${fillTemplate(subject.value, values)}\n\n${fillTemplate(body.value, values)}`;
 });
 
 function take(id: number | null | undefined): void {

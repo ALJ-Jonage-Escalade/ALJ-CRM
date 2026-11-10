@@ -7,14 +7,15 @@ import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { CLIENT_KEY, errorText } from "../../lib/client";
-import { createCommunicationsApi } from "../../services/communications";
+import { createCommunicationsApi, type EmailTemplate } from "../../services/communications";
 import { saveFile } from "../../lib/download";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
-import { attestationFileName, attestationProblem, attestationRecipient, attestationTemplates, renderFor, type Template } from "./record";
+import { fillTemplate } from "../../lib/text";
+import { attestationFileName, attestationProblem, attestationRecipient, attestationTemplates, memberVariables } from "./record";
 import { dialogs } from "../../composables/dialogs";
 
-const props = defineProps<{ member: Member; templates: readonly Template[] }>();
+const props = defineProps<{ member: Member; templates: readonly EmailTemplate[] }>();
 const emit = defineEmits<{ sent: [message: string]; failed: [message: string]; cancel: [] }>();
 const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 
@@ -27,8 +28,8 @@ const signature = ref(true);
 
 function useTemplate(): void {
   const t = choices.value.list.find((x) => x.name === templateName.value) ?? choices.value.initial;
-  subject.value = renderFor(t.subject, props.member);
-  body.value = renderFor(t.body, props.member);
+  subject.value = fillTemplate(t.subject, memberVariables(props.member));
+  body.value = fillTemplate(t.body, memberVariables(props.member));
 }
 useTemplate();
 

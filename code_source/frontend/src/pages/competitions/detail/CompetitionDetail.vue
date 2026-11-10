@@ -25,7 +25,7 @@ import {
   competitorStatusesLabel,
   csvName,
   deadlineOf,
-  discipline,
+  shownDiscipline,
   disciplineColor,
   filterRows,
   groupRows,
@@ -33,7 +33,7 @@ import {
   isNotInvited,
   memberMatches,
   participantCsv,
-  period,
+  periodText,
   resultsUrlHint,
   type Coach,
   type Competition,
@@ -386,13 +386,19 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       <div class="min-w-0">
         <h2 class="m-0 text-[17px] font-bold lg:text-lg lg:font-extrabold" data-testid="detail-name">{{ c.nom }}</h2>
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-1 lg:text-[12.5px]" data-testid="detail-meta">
-          🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }}
+          🪪 {{ c.id_ffme || "—" }} · 📅 {{ periodText(c) }}
           <template v-if="deadlineOf(c)">· ⏳ Date limite : {{ formatDayText(deadlineOf(c)) }}</template>
           · 💶 {{ formatEuros(c.prix) }}
           <template v-if="c.lieu">· 📍 {{ c.lieu }}</template>
           <template v-if="isArchived(c)">· 📦 Archivée</template>
-          <UiBadge v-if="discipline(c)" :color="disciplineColor(discipline(c))" variant="soft" class="ml-1" data-testid="discipline">
-            {{ discipline(c) }}
+          <UiBadge
+            v-if="shownDiscipline(c)"
+            :color="disciplineColor(shownDiscipline(c))"
+            variant="soft"
+            class="ml-1"
+            data-testid="discipline"
+          >
+            {{ shownDiscipline(c) }}
           </UiBadge>
         </p>
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-2 lg:flex lg:flex-wrap lg:items-center lg:gap-1.5" data-testid="detail-coaches">

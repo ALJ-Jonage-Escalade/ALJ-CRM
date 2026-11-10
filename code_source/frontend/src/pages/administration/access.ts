@@ -51,13 +51,13 @@ export function authorLabel(author: string): string {
 }
 
 /** « 30/10/2026 » or « Jamais ». */
-export function lastSignIn(at: string | null | undefined): string {
+export function lastSignInText(at: string | null | undefined): string {
   const date = parseDate(at);
   return date ? formatDate(date) : "Jamais";
 }
 
 /** « 30/10/2026 09:15 », or the text as is when it is not a date. */
-export function dateTime(at: string): string {
+export function dateTimeText(at: string): string {
   const date = parseDate(at);
   return date ? formatDateTime(date) : at;
 }

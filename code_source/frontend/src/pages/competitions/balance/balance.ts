@@ -8,7 +8,7 @@
 import type { Cell } from "../../../lib/csv";
 import { formatEuros } from "../../../lib/format";
 import { normKey } from "../../../lib/text";
-import { isPast, ranking, seasonOf, todayIso, type Competition, type Participant } from "../competitions";
+import { isPast, rankingText, seasonOf, todayIso, type Competition, type Participant } from "../competitions";
 
 /** Seasons with competitions, and the current one; most recent first. Undated competitions count in the current one. */
 export function seasons(list: readonly Competition[], today: string = todayIso()): string[] {
@@ -53,7 +53,7 @@ function line(c: Competition, p: Participant, today: string): BalanceLine | null
   const status = p.statut_paiement || "non_invite";
   const paid = Number(p.montant_paye ?? 0);
   const absent = isPast(c, today) && paid > 0 && status === "paye" && !p.present;
-  const base = { competition: c, participant: p, status, present: !!p.present, absent, ranking: ranking(p) };
+  const base = { competition: c, participant: p, status, present: !!p.present, absent, ranking: rankingText(p) };
   if (status === "annule_reporte") {
     return { ...base, due: 0, paid, carriedOver: true };
   }
@@ -131,12 +131,12 @@ export function totals(list: readonly Balance[]): { due: number; paid: number; r
 }
 
 /** « ✅ Équilibré », « ⚠️ Reste dû 15,00 € » or « Crédit 12,00 € ». */
-export function balanceLabel(b: Pick<Balance, "remaining">): { text: string; tone: "ok" | "due" | "credit" } {
-  if (b.remaining > 0.005) {
-    return { text: `⚠️ Reste dû ${formatEuros(b.remaining)}`, tone: "due" };
+export function balanceLabel(balance: Pick<Balance, "remaining">): { text: string; tone: "ok" | "due" | "credit" } {
+  if (balance.remaining > 0.005) {
+    return { text: `⚠️ Reste dû ${formatEuros(balance.remaining)}`, tone: "due" };
   }
-  if (b.remaining < -0.005) {
-    return { text: `💜 Crédit ${formatEuros(-b.remaining)}`, tone: "credit" };
+  if (balance.remaining < -0.005) {
+    return { text: `💜 Crédit ${formatEuros(-balance.remaining)}`, tone: "credit" };
   }
   return { text: "✅ Équilibré", tone: "ok" };
 }

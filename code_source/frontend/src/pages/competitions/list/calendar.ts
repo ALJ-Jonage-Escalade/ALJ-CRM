@@ -2,7 +2,7 @@
    overlapping ones on separate lanes) and the month's list for phones. Dates are local "YYYY-MM-DD" strings, compared
    as text; never toISOString(), which is UTC and shifts the day in the evening. */
 import type { BadgeColor } from "../../../components/ui/palette";
-import { discipline, DISCIPLINE_COLOR, disciplineColor, isArchived, todayIso, type Competition } from "../competitions";
+import { shownDiscipline, DISCIPLINE_COLOR, disciplineColor, isArchived, todayIso, type Competition } from "../competitions";
 
 /** A month; `month` from 0 (January) to 11, as in Date. */
 export interface YearMonth {
@@ -47,13 +47,13 @@ const ISO_DAY = /^\d{4}-\d{2}-\d{2}/;
 
 /** First and last day of a competition: no end date, or one before the start, means a single day; null without a
     readable start date (it has no place on the calendar). */
-export function competitionDays(c: Competition): [string, string] | null {
-  const start = c.date_competition ?? "";
+export function competitionDays(competition: Competition): [string, string] | null {
+  const start = competition.date_competition ?? "";
   if (!ISO_DAY.test(start)) {
     return null;
   }
   const first = start.slice(0, 10);
-  const end = (c.date_fin ?? "").slice(0, 10);
+  const end = (competition.date_fin ?? "").slice(0, 10);
   return [first, ISO_DAY.test(end) && end > first ? end : first];
 }
 
@@ -124,9 +124,9 @@ export function monthAgenda(competitions: readonly Competition[], { year, month 
 }
 
 /** A bar's colour: its discipline's (as its badge); slate without one (blue is « difficulté ») and once archived. */
-export function calendarColor(c: Competition): BadgeColor {
-  const name = discipline(c).toLowerCase();
-  return !isArchived(c) && name ? disciplineColor(name) : "slate";
+export function calendarColor(competition: Competition): BadgeColor {
+  const name = shownDiscipline(competition).toLowerCase();
+  return !isArchived(competition) && name ? disciplineColor(name) : "slate";
 }
 
 /** The legend: the known disciplines, then the others. */
@@ -155,8 +155,8 @@ export function monthTitle({ year, month }: YearMonth): string {
 export const WEEKDAYS = Array.from({ length: 7 }, (_, i) => WEEKDAY.format(new Date(2024, 0, 1 + i)));
 
 /** « sam. 15 nov. », « sam. 15 nov. – dim. 16 nov. » (a competition without a readable date: « sans date »). */
-export function agendaDays(c: Competition): string {
-  const days = competitionDays(c);
+export function agendaDays(competition: Competition): string {
+  const days = competitionDays(competition);
   if (!days) {
     return "sans date";
   }

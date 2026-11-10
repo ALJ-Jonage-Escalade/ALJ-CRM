@@ -12,7 +12,7 @@ import { plural } from "../../lib/text";
 import { createCompetitionsApi } from "../../services/competitions";
 import CompetitionDetail from "./detail/CompetitionDetail.vue";
 import CompetitionForm from "./CompetitionForm.vue";
-import { participantRows, period, todayIso, type Competition } from "./competitions";
+import { participantRows, periodText, todayIso, type Competition } from "./competitions";
 import { COMPETITIONS_KEY } from "./context";
 import CompetitionCalendar from "./list/CompetitionCalendar.vue";
 import CompetitionCards from "./list/CompetitionCards.vue";
@@ -145,7 +145,7 @@ async function archivePastCompetitions(): Promise<void> {
   if (
     !(await dialogs.confirm({
       title: "Archiver les compétitions passées",
-      message: `Archiver ${nbPastCompetitions} compétition${plural(nbPastCompetitions)} passée${plural(nbPastCompetitions)} ?\n\n${pastCompetitionsList.map((competition) => `• ${competition.nom} (${period(competition)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`,
+      message: `Archiver ${nbPastCompetitions} compétition${plural(nbPastCompetitions)} passée${plural(nbPastCompetitions)} ?\n\n${pastCompetitionsList.map((competition) => `• ${competition.nom} (${periodText(competition)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`,
       confirmLabel: "Archiver",
     }))
   ) {

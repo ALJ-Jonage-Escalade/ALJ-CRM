@@ -2,6 +2,9 @@
    payment attestations. Conventions of every service: frontend/AGENTS.md § API services. */
 import { unwrap, type ApiClient, type Schemas } from "../lib/client";
 
+/** A saved e-mail template: name, subject, body and sender. */
+export type EmailTemplate = Schemas["EmailTemplate"];
+
 /** Return type inferred on purpose: each method answers the body type of its route in the contract. */
 export function createCommunicationsApi(client: ApiClient) {
   return {

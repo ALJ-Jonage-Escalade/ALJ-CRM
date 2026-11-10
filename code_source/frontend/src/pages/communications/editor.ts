@@ -1,15 +1,14 @@
 /* The e-mail template editor of the Communications page: checks before saving, live preview with a demo member,
    insertion of variables and HTML tags in the body (texts of the former web/bureau/communications.html). */
-import type { Schemas } from "../../lib/client";
+import type { EmailTemplate } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
-
-export type Template = Schemas["EmailTemplate"];
+import { fillTemplate } from "../../lib/text";
 
 /** The club's default sender, sent by the server (infrastructure/mail/senders.py). */
-export type Sender = Pick<Template, "sender_email" | "sender_name">;
+export type Sender = Pick<EmailTemplate, "sender_email" | "sender_name">;
 
 /** Contents of a new template; the sender is the one being edited (empty: the server puts the club's default). */
-export function newTemplate(name: string, sender: Sender): Template {
+export function newTemplate(name: string, sender: Sender): EmailTemplate {
   return {
     name,
     subject: "Sujet du courriel",
@@ -38,13 +37,8 @@ export const PREVIEW_TO = "Alex MARTIN <alex.martin@example.com>";
 // Former names of the first two variables, still found in old templates
 const ALIASES: Record<string, string> = { prénom: DEMO_MEMBER.first_name!, nom: DEMO_MEMBER.last_name! };
 
-/** The text as the demo member would receive it (variable names are not case sensitive). */
-export function renderDemo(text: string): string {
-  return text.replace(/\{([^{}]+)\}/g, (whole, name: string) => {
-    const key = name.toLowerCase();
-    return DEMO_MEMBER[key] ?? ALIASES[key] ?? whole;
-  });
-}
+/** The values the preview fills a template with: the demo member, under the current and the former names. */
+export const DEMO_VALUES: Readonly<Record<string, string>> = { ...ALIASES, ...DEMO_MEMBER };
 
 export interface Preview {
   from: string;
@@ -52,28 +46,32 @@ export interface Preview {
   body: string;
 }
 
-export function preview(t: Template, defaultSender: Sender): Preview {
-  const name = t.sender_name.trim() || defaultSender.sender_name;
-  const email = t.sender_email.trim() || defaultSender.sender_email;
-  return { from: `${name} <${email}>`, subject: renderDemo(t.subject) || "(Sans objet)", body: renderDemo(t.body) || "(Message vide)" };
+export function preview(template: EmailTemplate, defaultSender: Sender): Preview {
+  const name = template.sender_name.trim() || defaultSender.sender_name;
+  const email = template.sender_email.trim() || defaultSender.sender_email;
+  return {
+    from: `${name} <${email}>`,
+    subject: fillTemplate(template.subject, DEMO_VALUES) || "(Sans objet)",
+    body: fillTemplate(template.body, DEMO_VALUES) || "(Message vide)",
+  };
 }
 
 /** Why the template cannot be saved, or null. */
-export function templateError(t: Template): string | null {
-  if (!t.name.trim()) {
+export function templateError(template: EmailTemplate): string | null {
+  if (!template.name.trim()) {
     return "⚠️ Le titre du modèle ne peut pas être vide.";
   }
-  if (!t.subject.trim() || !t.body.trim()) {
+  if (!template.subject.trim() || !template.body.trim()) {
     return "⚠️ Le sujet et le corps du message sont obligatoires.";
   }
-  if (!looksLikeEmail(t.sender_email.trim())) {
+  if (!looksLikeEmail(template.sender_email.trim())) {
     return "⚠️ L'adresse d'expédition doit être une adresse e-mail valide.";
   }
   return null;
 }
 
 /** Why a new template cannot take this name, or null (the server checks again). */
-export function newNameError(name: string, templates: readonly Template[]): string | null {
+export function newNameError(name: string, templates: readonly EmailTemplate[]): string | null {
   if (!name) {
     return "⚠️ Veuillez renseigner le nom du modèle.";
   }
@@ -85,7 +83,7 @@ export function newNameError(name: string, templates: readonly Template[]): stri
 }
 
 /** The template shown first: the requested one, else the instalment reminder, else the first. */
-export function initialTemplate(templates: readonly Template[], wanted?: string): Template | undefined {
+export function initialTemplate(templates: readonly EmailTemplate[], wanted?: string): EmailTemplate | undefined {
   return templates.find((t) => t.name === wanted) ?? templates.find((t) => t.name.toLowerCase().includes("echeance")) ?? templates[0];
 }
 

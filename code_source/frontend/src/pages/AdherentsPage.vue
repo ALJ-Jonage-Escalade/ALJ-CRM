@@ -21,7 +21,7 @@ import UiToast from "../components/ui/UiToast.vue";
 import { useSyncedResource } from "../composables/syncedResource";
 import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText } from "../lib/client";
-import { createCommunicationsApi } from "../services/communications";
+import { createCommunicationsApi, type EmailTemplate } from "../services/communications";
 import { createMembersApi, membersRead } from "../services/members";
 import { csvBlob } from "../lib/csv";
 import { saveFile } from "../lib/download";
@@ -59,7 +59,7 @@ import {
   type CreneauItem,
   type Member,
 } from "./adherents/members";
-import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft, type Template } from "./adherents/record";
+import { changesOf, draftOf, newMemberOf, sameName, tarifChoices, type MemberDraft } from "./adherents/record";
 import { dialogs } from "../composables/dialogs";
 import { telHref } from "../lib/text";
 
@@ -264,7 +264,7 @@ function closeAdd(): void {
 }
 
 // Email templates, for the e-mail (coaches and admins) and the certificate (admins), loaded once
-const templates = ref<Template[]>([]);
+const templates = ref<EmailTemplate[]>([]);
 const clubContactEmail = ref("");
 let templatesLoaded = false;
 async function loadTemplates(): Promise<void> {

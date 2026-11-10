@@ -14,7 +14,7 @@ import { csvBlob } from "../../../lib/csv";
 import { saveFile } from "../../../lib/download";
 import { formatEuros } from "../../../lib/format";
 import { balanceCsv, balanceLabel, balances, searchBalances, seasons, totals, type Balance } from "./balance";
-import { discipline, disciplineColor, payment, period, seasonOf, todayIso, type Competition } from "../competitions";
+import { shownDiscipline, disciplineColor, paymentBadge, periodText, seasonOf, todayIso, type Competition } from "../competitions";
 import { plural } from "../../../lib/text";
 
 /** listPath: address of the competitions list (the page's index route), where a competition opens. */
@@ -140,14 +140,14 @@ const TONE_COLOR = { ok: "green", due: "red", credit: "violet" } satisfies Recor
                 class="font-semibold text-slate-700 no-underline hover:text-accent"
               >
                 🏆 {{ l.competition.nom }}
-                <span class="font-normal text-slate-500">· {{ period(l.competition) }}</span>
+                <span class="font-normal text-slate-500">· {{ periodText(l.competition) }}</span>
               </RouterLink>
               <span>
                 Dû :
                 <b>{{ formatEuros(l.due) }}</b>
                 · Payé :
                 <b>{{ formatEuros(l.paid) }}</b>
-                · {{ payment(l.status).label }}
+                · {{ paymentBadge(l.status).label }}
                 <template v-if="l.present">· ✓ Présent</template>
               </span>
             </li>
@@ -213,15 +213,15 @@ const TONE_COLOR = { ok: "green", due: "red", credit: "violet" } satisfies Recor
               <div class="min-w-60 flex-1">
                 <div class="flex flex-wrap items-center gap-1.5">
                   <b class="text-sm text-slate-800">{{ l.competition.nom }}</b>
-                  <UiBadge v-if="discipline(l.competition)" :color="disciplineColor(discipline(l.competition))" variant="soft">
-                    {{ discipline(l.competition) }}
+                  <UiBadge v-if="shownDiscipline(l.competition)" :color="disciplineColor(shownDiscipline(l.competition))" variant="soft">
+                    {{ shownDiscipline(l.competition) }}
                   </UiBadge>
                   <UiBadge v-if="l.carriedOver" color="violet" variant="soft">🔄 Report</UiBadge>
                   <UiBadge v-if="l.absent" color="red" variant="soft">⚠️ Absent</UiBadge>
                   <UiBadge v-else-if="l.present && !l.ranking" color="green" variant="soft">✓ Présent</UiBadge>
                 </div>
                 <div class="mt-1 flex flex-wrap gap-x-2.5 text-xs text-slate-500">
-                  <span>📅 {{ period(l.competition) }}</span>
+                  <span>📅 {{ periodText(l.competition) }}</span>
                   <span v-if="l.competition.lieu">📍 {{ l.competition.lieu }}</span>
                   <span>
                     💰 Tarif :
@@ -241,8 +241,8 @@ const TONE_COLOR = { ok: "green", due: "red", credit: "violet" } satisfies Recor
                   </span>
                 </span>
                 <span class="flex min-w-32 flex-col items-end">
-                  <UiBadge :color="payment(l.status).color" variant="soft">
-                    {{ payment(l.status).label }} · {{ formatEuros(l.paid) }}
+                  <UiBadge :color="paymentBadge(l.status).color" variant="soft">
+                    {{ paymentBadge(l.status).label }} · {{ formatEuros(l.paid) }}
                   </UiBadge>
                   <span v-if="l.participant.commande_helloasso" class="mt-0.5 text-[11px] text-slate-500">
                     Cde :

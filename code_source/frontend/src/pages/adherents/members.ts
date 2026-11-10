@@ -209,26 +209,26 @@ export type FilteredMember = Pick<
   Partial<Pick<Member, "commentaires_correctif">>;
 
 /** The search finds names (both orders), tariff, licence, e-mail, phone (4 digits at least, any spacing), city, comment. */
-export function matchesSearch(m: FilteredMember, search: string): boolean {
+export function matchesSearch(member: FilteredMember, search: string): boolean {
   const q = normKey(search);
   if (!q) {
     return true;
   }
   const qDigits = digits(q);
-  if (qDigits.length >= 4 && digits(m.phone).includes(qDigits)) {
+  if (qDigits.length >= 4 && digits(member.phone).includes(qDigits)) {
     return true;
   }
   return [
-    m.last_name,
-    m.first_name,
-    `${m.first_name} ${m.last_name}`,
-    `${m.last_name} ${m.first_name}`,
-    m.tarif_name,
-    m.licence_ffme,
-    m.email_primary,
-    m.phone,
-    m.city,
-    m.commentaires_correctif,
+    member.last_name,
+    member.first_name,
+    `${member.first_name} ${member.last_name}`,
+    `${member.last_name} ${member.first_name}`,
+    member.tarif_name,
+    member.licence_ffme,
+    member.email_primary,
+    member.phone,
+    member.city,
+    member.commentaires_correctif,
   ].some((field) => field && normKey(field).includes(q));
 }
 
@@ -275,7 +275,7 @@ const STATUS_COLOR: Record<string, BadgeColor> = {
 export const statusColor = (status: string): BadgeColor => STATUS_COLOR[status] ?? "slate";
 
 /** A yes/no column of the membership file read as a flag: « oui », « x », « true » or « 1 ». */
-export const isYes = (v: string): boolean => ["oui", "x", "true", "1"].includes(v.trim().toLowerCase());
+export const isYes = (value: string): boolean => ["oui", "x", "true", "1"].includes(value.trim().toLowerCase());
 
 export interface Diplome {
   type: "badge_rouge" | "autonomie_bloc" | "passeport_orange";
@@ -284,30 +284,30 @@ export interface Diplome {
 }
 
 /** Badges of the Diplôme column: red badge, bouldering autonomy, orange passport. */
-export function diplomes(m: Pick<Member, "badge_rouge" | "autonomie_bloc" | "raw_passports" | "passeport_orange">): Diplome[] {
+export function diplomes(member: Pick<Member, "badge_rouge" | "autonomie_bloc" | "raw_passports" | "passeport_orange">): Diplome[] {
   const items: Diplome[] = [];
-  if (isYes(m.badge_rouge)) {
+  if (isYes(member.badge_rouge)) {
     items.push({ type: "badge_rouge", label: "Badge rouge diff", icon: "🔴" });
   }
-  if (isYes(m.autonomie_bloc)) {
+  if (isYes(member.autonomie_bloc)) {
     items.push({ type: "autonomie_bloc", label: "Autonomie bloc", icon: "🧗" });
   }
-  const passports = `${m.raw_passports} ${m.passeport_orange}`.toLowerCase();
-  if (passports.includes("orange") || m.passeport_orange.toLowerCase() === "oui") {
+  const passports = `${member.raw_passports} ${member.passeport_orange}`.toLowerCase();
+  if (passports.includes("orange") || member.passeport_orange.toLowerCase() === "oui") {
     items.push({ type: "passeport_orange", label: "Passeport orange", icon: "🟠" });
   }
   return items;
 }
 
 /** Sort weight of the Diplôme column: red badge 4, autonomy 2, orange passport 1. */
-export function diplomeWeight(m: Member): number {
+export function diplomeWeight(member: Member): number {
   const weights = { badge_rouge: 4, autonomie_bloc: 2, passeport_orange: 1 };
-  return diplomes(m).reduce((sum, d) => sum + weights[d.type], 0);
+  return diplomes(member).reduce((sum, d) => sum + weights[d.type], 0);
 }
 
 /** Milliseconds of an ISO or French date, 0 when empty or unreadable (sorted first). */
-export function dateValue(s: string): number {
-  const str = s.trim();
+export function dateValue(text: string): number {
+  const str = text.trim();
   if (!str) {
     return 0;
   }
@@ -332,8 +332,8 @@ export const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: 
     member has several in a season). ?ajout=1 opens the add form. */
 export type RecordQuery = { id: string; saison: string; achat?: string } | { ajout: "1" };
 
-export function recordQuery(m: Member): RecordQuery {
-  return { id: String(m.user_id), saison: m.season_name, achat: String(m.purchase_id) };
+export function recordQuery(member: Member): RecordQuery {
+  return { id: String(member.user_id), saison: member.season_name, achat: String(member.purchase_id) };
 }
 
 /** The member a record query names, among the members of its season (undefined: not, or not yet, loaded). */

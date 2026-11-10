@@ -1,6 +1,7 @@
 /* Member record of Adhérents: what the record shows, the edit / add form (draft, checks, changes sent), the e-mail and
    the payment certificate (texts of the former web/bureau/adherents.html). Writes and sends are for admins; the server
    checks the role and the fields again (api/members/schemas.py). */
+import type { EmailTemplate } from "../../services/communications";
 import type { Schemas } from "../../lib/client";
 import { looksLikeEmail } from "../../lib/email";
 import { formatDate, formatDayText } from "../../lib/format";
@@ -11,7 +12,6 @@ import { diplomes, isYes, STATUSES, type Creneau, type Member } from "./members"
 
 export type MemberChanges = Schemas["MemberChanges"];
 export type NewMember = Schemas["NewMember"];
-export type Template = Schemas["EmailTemplate"];
 
 // ---------------------------------------------------------------- Record
 
@@ -24,7 +24,7 @@ export interface RecordRow {
 }
 
 /** Lines of the record, empty ones left out. */
-export function recordRows(m: Member): RecordRow[] {
+export function recordRows(member: Member): RecordRow[] {
   const rows: RecordRow[] = [];
   const add = (icon: string, label: string, value: string) => {
     if (value) {
@@ -32,44 +32,56 @@ export function recordRows(m: Member): RecordRow[] {
     }
   };
   const join = (sep: string, ...parts: string[]) => parts.filter(Boolean).join(sep);
-  add("🎂", "Date de naissance", m.birth_date ? `${formatDayText(m.birth_date)}${m.age != null ? ` (${m.age} ans)` : ""}` : "");
-  add("⚧", "Sexe", m.sex ? SEX_LABELS[m.sex] : "");
-  add("📍", "Adresse", join(", ", m.address, join(" ", m.zip_code, m.city)));
-  add("📞", "Téléphone", m.phone);
-  add("✉️", "E-mail principal", m.email_primary);
-  add("✉️", "E-mail secondaire", m.email_secondary);
-  add("🪪", "Licence FFME", m.licence_ffme);
-  add("🚨", "Urgence 1", join(" · ", m.emergency1_name, m.emergency1_phone));
-  add("🚨", "Urgence 2", join(" · ", m.emergency2_name, m.emergency2_phone));
+  add(
+    "🎂",
+    "Date de naissance",
+    member.birth_date ? `${formatDayText(member.birth_date)}${member.age != null ? ` (${member.age} ans)` : ""}` : "",
+  );
+  add("⚧", "Sexe", member.sex ? SEX_LABELS[member.sex] : "");
+  add("📍", "Adresse", join(", ", member.address, join(" ", member.zip_code, member.city)));
+  add("📞", "Téléphone", member.phone);
+  add("✉️", "E-mail principal", member.email_primary);
+  add("✉️", "E-mail secondaire", member.email_secondary);
+  add("🪪", "Licence FFME", member.licence_ffme);
+  add("🚨", "Urgence 1", join(" · ", member.emergency1_name, member.emergency1_phone));
+  add("🚨", "Urgence 2", join(" · ", member.emergency2_name, member.emergency2_phone));
   add(
     "🩺",
     "Santé & Engagement",
-    join(" · ", m.health_commitment && `engagement : ${m.health_commitment}`, m.document_sante && `document : ${m.document_sante}`),
+    join(
+      " · ",
+      member.health_commitment && `engagement : ${member.health_commitment}`,
+      member.document_sante && `document : ${member.document_sante}`,
+    ),
   );
-  add("📷", "Droit à l'image", m.photo_auth);
-  add("🔴", "Badge rouge", m.badge_rouge);
-  add("🧗", "Autonomie bloc", m.autonomie_bloc);
-  if (m.key) {
+  add("📷", "Droit à l'image", member.photo_auth);
+  add("🔴", "Badge rouge", member.badge_rouge);
+  add("🧗", "Autonomie bloc", member.autonomie_bloc);
+  if (member.key) {
     // Held keys are managed in Outils › Clés (plans/club-keys.md): the line opens the key there
     rows.push({
       icon: "🔑",
       label: "Clé de la salle",
-      value: `n° ${m.key.code} depuis le ${formatDayText(m.key.given_on)}`,
-      to: `/bureau/outils/cles?cle=${m.key.id}`,
+      value: `n° ${member.key.code} depuis le ${formatDayText(member.key.given_on)}`,
+      to: `/bureau/outils/cles?cle=${member.key.id}`,
     });
   }
-  if (diplomes(m).some((d) => d.type === "passeport_orange")) {
+  if (diplomes(member).some((d) => d.type === "passeport_orange")) {
     add("🟠", "Passeport orange", "Oui");
   }
-  add("🎓", "Passeports FFME", m.raw_passports);
-  if (m.payer && normKey(m.payer) !== normKey(`${m.first_name} ${m.last_name}`)) {
-    add("💳", "Payeur", m.payer + (m.payer_email ? ` (${m.payer_email})` : ""));
+  add("🎓", "Passeports FFME", member.raw_passports);
+  if (member.payer && normKey(member.payer) !== normKey(`${member.first_name} ${member.last_name}`)) {
+    add("💳", "Payeur", member.payer + (member.payer_email ? ` (${member.payer_email})` : ""));
   }
-  add("🧾", "Commande HelloAsso", join(" · ", formatDayText(m.order_date), m.order_ref));
-  add("💶", "Montant réglé", m.amount != null ? `${m.amount} €` : "");
-  add("📧", "Attestation envoyée", m.email_sent_date ? formatDayText(m.email_sent_date) : "");
-  add("🧗", "Créneau", m.creneau_groupe ? `${m.creneau_groupe}${m.creneau_details ? ` (${m.creneau_details})` : ""}` : "");
-  add("💬", "Commentaire", m.commentaires_correctif);
+  add("🧾", "Commande HelloAsso", join(" · ", formatDayText(member.order_date), member.order_ref));
+  add("💶", "Montant réglé", member.amount != null ? `${member.amount} €` : "");
+  add("📧", "Attestation envoyée", member.email_sent_date ? formatDayText(member.email_sent_date) : "");
+  add(
+    "🧗",
+    "Créneau",
+    member.creneau_groupe ? `${member.creneau_groupe}${member.creneau_details ? ` (${member.creneau_details})` : ""}` : "",
+  );
+  add("💬", "Commentaire", member.commentaires_correctif);
   return rows;
 }
 
@@ -145,30 +157,30 @@ export type DraftField = keyof MemberDraft;
 export type DraftErrors = Partial<Record<DraftField, string>>;
 
 /** The form of an existing member, or of a new one (first tariff chosen, as before). */
-export function draftOf(m?: Member, firstTarif = ""): MemberDraft {
+export function draftOf(member?: Member, firstTarif = ""): MemberDraft {
   return {
-    last_name: m?.last_name ?? "",
-    first_name: m?.first_name ?? "",
-    birth_date: m?.birth_date ?? "",
-    sex: m?.sex ?? "",
-    status: m?.status_norm || "Validé",
-    amount: m ? (m.amount != null ? String(m.amount) : "") : "0.00",
-    tarif_name: m ? m.tarif_name : firstTarif,
-    licence_ffme: m?.licence_ffme ?? "",
-    badge_rouge: m && isYes(m.badge_rouge) ? "Oui" : "Non",
-    autonomie_bloc: m && isYes(m.autonomie_bloc) ? "Oui" : "Non",
-    photo_auth: m ? (isYes(m.photo_auth) ? "Oui" : "Non") : "Oui",
-    email_primary: m?.email_primary ?? "",
-    email_secondary: m?.email_secondary ?? "",
-    phone: m?.phone ?? "",
-    address: m?.address ?? "",
-    zip_code: m?.zip_code ?? "",
-    city: m?.city ?? "",
-    emergency1_name: m?.emergency1_name ?? "",
-    emergency1_phone: m?.emergency1_phone ?? "",
-    emergency2_name: m?.emergency2_name ?? "",
-    emergency2_phone: m?.emergency2_phone ?? "",
-    commentaires_correctif: m?.commentaires_correctif ?? "",
+    last_name: member?.last_name ?? "",
+    first_name: member?.first_name ?? "",
+    birth_date: member?.birth_date ?? "",
+    sex: member?.sex ?? "",
+    status: member?.status_norm || "Validé",
+    amount: member ? (member.amount != null ? String(member.amount) : "") : "0.00",
+    tarif_name: member ? member.tarif_name : firstTarif,
+    licence_ffme: member?.licence_ffme ?? "",
+    badge_rouge: member && isYes(member.badge_rouge) ? "Oui" : "Non",
+    autonomie_bloc: member && isYes(member.autonomie_bloc) ? "Oui" : "Non",
+    photo_auth: member ? (isYes(member.photo_auth) ? "Oui" : "Non") : "Oui",
+    email_primary: member?.email_primary ?? "",
+    email_secondary: member?.email_secondary ?? "",
+    phone: member?.phone ?? "",
+    address: member?.address ?? "",
+    zip_code: member?.zip_code ?? "",
+    city: member?.city ?? "",
+    emergency1_name: member?.emergency1_name ?? "",
+    emergency1_phone: member?.emergency1_phone ?? "",
+    emergency2_name: member?.emergency2_name ?? "",
+    emergency2_phone: member?.emergency2_phone ?? "",
+    commentaires_correctif: member?.commentaires_correctif ?? "",
   };
 }
 
@@ -190,71 +202,71 @@ function validBirthDate(value: string, today: Date): boolean {
 
 /** Problems of the form, by field (empty when it can be sent). adding: the add form, which asks more. amountBefore:
     the amount the edit form opened with (the server keeps an amount once set: it cannot be emptied). */
-export function draftErrors(d: MemberDraft, adding: boolean, today: Date = new Date(), amountBefore = ""): DraftErrors {
+export function draftErrors(draft: MemberDraft, adding: boolean, today: Date = new Date(), amountBefore = ""): DraftErrors {
   const errors: DraftErrors = {};
-  if (!d.last_name.trim()) {
+  if (!draft.last_name.trim()) {
     errors.last_name = "Le nom est obligatoire.";
   }
-  if (!d.first_name.trim()) {
+  if (!draft.first_name.trim()) {
     errors.first_name = "Le prénom est obligatoire.";
   }
-  if (adding && !d.birth_date) {
+  if (adding && !draft.birth_date) {
     errors.birth_date = "La date de naissance est obligatoire.";
-  } else if (d.birth_date && !validBirthDate(d.birth_date, today)) {
+  } else if (draft.birth_date && !validBirthDate(draft.birth_date, today)) {
     errors.birth_date = "Date de naissance invalide.";
   }
-  const amount = Number(d.amount.replace(",", "."));
-  if (d.amount.trim() && (!Number.isFinite(amount) || amount < 0)) {
+  const amount = Number(draft.amount.replace(",", "."));
+  if (draft.amount.trim() && (!Number.isFinite(amount) || amount < 0)) {
     errors.amount = "Montant invalide (nombre positif).";
-  } else if (!adding && amountBefore.trim() && !d.amount.trim()) {
+  } else if (!adding && amountBefore.trim() && !draft.amount.trim()) {
     errors.amount = "Le montant ne peut pas être vidé : indiquez 0 si rien n'a été réglé.";
   }
-  if (d.emergency1_phone.trim() && !looksLikePhone(d.emergency1_phone.trim())) {
+  if (draft.emergency1_phone.trim() && !looksLikePhone(draft.emergency1_phone.trim())) {
     errors.emergency1_phone = "Numéro de téléphone invalide.";
   }
-  if (d.emergency2_phone.trim() && !looksLikePhone(d.emergency2_phone.trim())) {
+  if (draft.emergency2_phone.trim() && !looksLikePhone(draft.emergency2_phone.trim())) {
     errors.emergency2_phone = "Numéro de téléphone invalide.";
   }
-  if (!d.tarif_name.trim()) {
+  if (!draft.tarif_name.trim()) {
     errors.tarif_name = "Choisissez un groupe (tarif).";
   }
   for (const field of ["email_primary", "email_secondary"] as const) {
-    if (d[field].trim() && !looksLikeEmail(d[field].trim())) {
+    if (draft[field].trim() && !looksLikeEmail(draft[field].trim())) {
       errors[field] = "Adresse e-mail invalide.";
     }
   }
-  if (d.phone.trim() && !looksLikePhone(d.phone.trim())) {
+  if (draft.phone.trim() && !looksLikePhone(draft.phone.trim())) {
     errors.phone = "Numéro de téléphone invalide.";
   }
   return errors;
 }
 
 /** The new member sent to /api/members/create. */
-export function newMemberOf(d: MemberDraft): NewMember {
+export function newMemberOf(draft: MemberDraft): NewMember {
   return {
-    last_name: d.last_name.trim().toUpperCase(),
-    first_name: d.first_name.trim(),
-    birth_date: d.birth_date,
-    sex: d.sex || null,
-    tarif_name: d.tarif_name.trim(),
+    last_name: draft.last_name.trim().toUpperCase(),
+    first_name: draft.first_name.trim(),
+    birth_date: draft.birth_date,
+    sex: draft.sex || null,
+    tarif_name: draft.tarif_name.trim(),
     // The add form offers STATUS_CHOICES only; anything else leaves the server default
-    status: STATUSES.find((status) => status === d.status),
-    amount: Number(d.amount.replace(",", ".")) || 0,
-    licence_ffme: d.licence_ffme.trim(),
-    badge_rouge: d.badge_rouge,
-    autonomie_bloc: d.autonomie_bloc,
-    photo_auth: d.photo_auth,
-    email_primary: d.email_primary.trim(),
-    email_secondary: d.email_secondary.trim(),
-    phone: d.phone.trim(),
-    address: d.address.trim(),
-    zip_code: d.zip_code.trim(),
-    city: d.city.trim(),
-    emergency1_name: d.emergency1_name.trim(),
-    emergency1_phone: d.emergency1_phone.trim(),
-    emergency2_name: d.emergency2_name.trim(),
-    emergency2_phone: d.emergency2_phone.trim(),
-    commentaires_correctif: d.commentaires_correctif.trim(),
+    status: STATUSES.find((status) => status === draft.status),
+    amount: Number(draft.amount.replace(",", ".")) || 0,
+    licence_ffme: draft.licence_ffme.trim(),
+    badge_rouge: draft.badge_rouge,
+    autonomie_bloc: draft.autonomie_bloc,
+    photo_auth: draft.photo_auth,
+    email_primary: draft.email_primary.trim(),
+    email_secondary: draft.email_secondary.trim(),
+    phone: draft.phone.trim(),
+    address: draft.address.trim(),
+    zip_code: draft.zip_code.trim(),
+    city: draft.city.trim(),
+    emergency1_name: draft.emergency1_name.trim(),
+    emergency1_phone: draft.emergency1_phone.trim(),
+    emergency2_name: draft.emergency2_name.trim(),
+    emergency2_phone: draft.emergency2_phone.trim(),
+    commentaires_correctif: draft.commentaires_correctif.trim(),
   };
 }
 
@@ -287,34 +299,34 @@ const EDITED: [keyof MemberChanges & DraftField, string][] = [
 ];
 
 /** What the edit form changes on the member (only those fields are sent). */
-export function changesOf(m: Member, d: MemberDraft): Changes {
-  const before = draftOf(m);
+export function changesOf(member: Member, draft: MemberDraft): Changes {
+  const before = draftOf(member);
   const fields: MemberChanges = {};
   const lines: string[] = [];
   for (const [field, label] of EDITED) {
     const was = before[field].trim();
-    const now = field === "last_name" ? d.last_name.trim().toUpperCase() : d[field].trim();
+    const now = field === "last_name" ? draft.last_name.trim().toUpperCase() : draft[field].trim();
     if (now === was) {
       continue;
     }
     (fields as Record<string, string | number | null>)[field] = now;
     lines.push(`${label} : ${was || "vide"} ➔ ${now || "vide"}`);
   }
-  const amountBefore = m.amount != null ? m.amount : null;
-  const amountTrimmed = d.amount.trim();
+  const amountBefore = member.amount != null ? member.amount : null;
+  const amountTrimmed = draft.amount.trim();
   const amountNow = amountTrimmed !== "" ? Number(amountTrimmed.replace(",", ".")) : null;
   if (amountNow !== null && Number.isFinite(amountNow) && amountNow !== amountBefore) {
     fields.amount = amountNow;
     lines.push(`Montant : ${amountBefore != null ? `${amountBefore} €` : "vide"} ➔ ${amountNow} €`);
   }
-  const sexWas = m.sex ?? null;
-  const sexNow = d.sex || null;
+  const sexWas = member.sex ?? null;
+  const sexNow = draft.sex || null;
   if (sexNow !== sexWas) {
     fields.sex = sexNow;
     lines.push(`Sexe : ${sexLabel(sexWas)} ➔ ${sexLabel(sexNow)}`);
   }
-  const was = m.commentaires_correctif.trim();
-  const now = d.commentaires_correctif.trim();
+  const was = member.commentaires_correctif.trim();
+  const now = draft.commentaires_correctif.trim();
   if (now !== was) {
     fields.commentaires_correctif = now;
     lines.push(now ? (was ? "Commentaire mis à jour" : "Commentaire ajouté") : "Commentaire effacé");
@@ -323,9 +335,9 @@ export function changesOf(m: Member, d: MemberDraft): Changes {
 }
 
 /** Another member of the season with the same name (asked before adding). */
-export function sameName(members: readonly Member[], d: MemberDraft): Member | undefined {
-  const last = normKey(d.last_name);
-  const first = normKey(d.first_name);
+export function sameName(members: readonly Member[], draft: MemberDraft): Member | undefined {
+  const last = normKey(draft.last_name);
+  const first = normKey(draft.first_name);
   return members.find((m) => normKey(m.last_name) === last && normKey(m.first_name) === first);
 }
 
@@ -338,27 +350,21 @@ export function withDateTag(comment: string, today: Date = new Date()): string {
 // ---------------------------------------------------------------- E-mail and certificate
 
 /** Values of the template variables for the member (domain/utils.apply_template_variables). */
-export function memberVariables(m: Member): Record<string, string> {
-  const first = m.first_name.toLowerCase().replace(/(^|[\s\-'’])(\p{L})/gu, (_, sep: string, l: string) => sep + l.toUpperCase());
-  const last = m.last_name.toUpperCase();
+export function memberVariables(member: Member): Record<string, string> {
+  const first = member.first_name.toLowerCase().replace(/(^|[\s\-'’])(\p{L})/gu, (_, sep: string, l: string) => sep + l.toUpperCase());
+  const last = member.last_name.toUpperCase();
   return {
     first_name: first,
     last_name: last,
     prénom: first,
     nom: last,
-    num_licence: m.licence_ffme,
-    tarif: m.tarif_name,
-    season: m.season_name,
-    saison: m.season_name,
-    amount: m.amount != null ? `${m.amount} €` : "",
-    montant: m.amount != null ? `${m.amount} €` : "",
+    num_licence: member.licence_ffme,
+    tarif: member.tarif_name,
+    season: member.season_name,
+    saison: member.season_name,
+    amount: member.amount != null ? `${member.amount} €` : "",
+    montant: member.amount != null ? `${member.amount} €` : "",
   };
-}
-
-/** The text with the member's values (variable names are not case sensitive; unknown ones are kept). */
-export function renderFor(text: string, m: Member): string {
-  const values = memberVariables(m);
-  return text.replace(/\{([^{}]+)\}/g, (whole, name: string) => values[name.toLowerCase()] ?? whole);
 }
 
 /** Signature shown in the preview; the address comes from the server (empty if the templates could not be loaded, e.g. offline). */
@@ -367,7 +373,7 @@ export function signatureText(clubContactEmail: string): string {
 }
 
 /** Default template of the certificate e-mail, when the club has none named « échéance » (the server picks the sender). */
-export const DEFAULT_ATTESTATION_TEMPLATE: Template = {
+export const DEFAULT_ATTESTATION_TEMPLATE: EmailTemplate = {
   name: "Attestation échéance",
   subject: "Attestation de paiement et d'échéance - Amicale Laïque de Jonage",
   body: "Bonjour {first_name},\n\nNous avons le plaisir de vous transmettre en pièce jointe l'attestation de paiement pour votre adhésion ou celle de votre enfant à la section escalade de l'Amicale Laïque de Jonage.\n\nSportivement,\nL'équipe ALJ Escalade",
@@ -376,35 +382,35 @@ export const DEFAULT_ATTESTATION_TEMPLATE: Template = {
 };
 
 /** Templates offered for the certificate e-mail, the « échéance » one first chosen. */
-export function attestationTemplates(templates: readonly Template[]): { list: Template[]; initial: Template } {
-  const isEcheance = (t: Template) => normKey(t.name).includes("echeance");
+export function attestationTemplates(templates: readonly EmailTemplate[]): { list: EmailTemplate[]; initial: EmailTemplate } {
+  const isEcheance = (t: EmailTemplate) => normKey(t.name).includes("echeance");
   const list = templates.some(isEcheance) ? [...templates] : [DEFAULT_ATTESTATION_TEMPLATE, ...templates];
   return { list, initial: list.find(isEcheance) ?? list[0]! };
 }
 
 /** Why no certificate can be made for this membership, or null (the server checks again). */
-export function attestationProblem(m: Member): string | null {
-  if (normKey(m.status_norm).includes("annul")) {
+export function attestationProblem(member: Member): string | null {
+  if (normKey(member.status_norm).includes("annul")) {
     return "la commande est annulée";
   }
-  if (!(Number(m.amount) > 0)) {
+  if (!(Number(member.amount) > 0)) {
     return "le montant est nul (0 €)";
   }
   return null;
 }
 
 /** Where the certificate goes by default: the payer, else the member. */
-export function attestationRecipient(m: Member): string {
-  return m.payer_email.trim() || m.email_primary.trim();
+export function attestationRecipient(member: Member): string {
+  return member.payer_email.trim() || member.email_primary.trim();
 }
 
 /** File name of the downloaded certificate: Attestation_DUPONT_Lea.pdf. */
-export function attestationFileName(m: Member): string {
+export function attestationFileName(member: Member): string {
   const clean = (s: string) =>
     s
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^\w-]+/g, "_");
-  const first = m.first_name ? m.first_name.charAt(0).toUpperCase() + m.first_name.slice(1).toLowerCase() : "Adherent";
-  return `Attestation_${clean(m.last_name.toUpperCase() || "ADHERENT")}_${clean(first)}.pdf`;
+  const first = member.first_name ? member.first_name.charAt(0).toUpperCase() + member.first_name.slice(1).toLowerCase() : "Adherent";
+  return `Attestation_${clean(member.last_name.toUpperCase() || "ADHERENT")}_${clean(first)}.pdf`;
 }

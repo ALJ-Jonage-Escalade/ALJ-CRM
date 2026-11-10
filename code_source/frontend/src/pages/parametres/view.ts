@@ -12,15 +12,15 @@ export interface Status {
 export const CHECKING: Status = { color: "slate", label: "Vérification…", text: "" };
 export const UNAVAILABLE: Status = { color: "slate", label: "Indisponible", text: "" };
 
-export function googleStatus(s: Schemas["GoogleStatus"]): Status {
-  if (s.status === "connected") {
+export function googleStatus(google: Schemas["GoogleStatus"]): Status {
+  if (google.status === "connected") {
     return {
       color: "green",
       label: "🟢 Connecté & Opérationnel",
       text: "Le jeton Google OAuth2 est valide. L'accès à la BDD et aux envois d'e-mails est pleinement fonctionnel.",
     };
   }
-  if (s.status === "expired") {
+  if (google.status === "expired") {
     return {
       color: "red",
       label: "🔴 Jeton expiré ou révoqué",
@@ -36,8 +36,8 @@ export interface CheckLine {
   message: string;
 }
 
-export function googleChecks(t: Schemas["GoogleTest"]): CheckLine[] {
-  const { oauth_token, database, gmail } = t.results;
+export function googleChecks(test: Schemas["GoogleTest"]): CheckLine[] {
+  const { oauth_token, database, gmail } = test.results;
   return [
     { ok: oauth_token.ok, label: "Jeton Google OAuth2", message: oauth_token.message },
     { ok: database.ok, label: "Base de Données", message: database.message },
@@ -45,8 +45,8 @@ export function googleChecks(t: Schemas["GoogleTest"]): CheckLine[] {
   ];
 }
 
-export function cacheStatus(s: Schemas["CloudDbStatus"]): Status {
-  if (s.db_exists) {
+export function cacheStatus(status: Schemas["CloudDbStatus"]): Status {
+  if (status.db_exists) {
     return {
       color: "green",
       label: "🟢 Cache opérationnel",
@@ -60,8 +60,10 @@ export function cacheStatus(s: Schemas["CloudDbStatus"]): Status {
   };
 }
 
-export function cacheFile(s: Schemas["CloudDbStatus"]): string {
-  return s.db_exists ? `${s.db_filename || "database.db"} (${s.db_size_kb} Ko · ${s.member_count} adhérents)` : "Non initialisé";
+export function cacheFileText(status: Schemas["CloudDbStatus"]): string {
+  return status.db_exists
+    ? `${status.db_filename || "database.db"} (${status.db_size_kb} Ko · ${status.member_count} adhérents)`
+    : "Non initialisé";
 }
 
 export function pendingText(pending: number): string {
@@ -69,12 +71,12 @@ export function pendingText(pending: number): string {
 }
 
 /** Last cache sync (Unix time in seconds; 0 or null: never). */
-export function lastSync(seconds: number | null | undefined): string {
+export function lastSyncText(seconds: number | null | undefined): string {
   return seconds ? formatDateTimeSeconds(new Date(seconds * 1000)) : "Non renseignée";
 }
 
 /** Last run of the results batch (ISO date written by the server; shown as is when it is not one). */
-export function lastRun(iso: string): string {
+export function lastRunText(iso: string): string {
   if (!iso) {
     return "Jamais exécuté";
   }
@@ -86,27 +88,27 @@ export function timeNow(now: Date = new Date()): string {
   return formatTime(now);
 }
 
-export function syncReport(r: Schemas["SyncCounters"] | null | undefined, now?: Date): string[] {
+export function syncReport(report: Schemas["SyncCounters"] | null | undefined, now?: Date): string[] {
   return [
-    `🟢 Synchronisation réussie à ${timeNow(now)}${r?.full ? " (reconstruction complète)" : ""}`,
-    `• Documents reçus depuis Firestore : ${r?.pulled ?? 0}`,
-    `• Modifications envoyées à Firestore : ${r?.pushed ?? 0}`,
+    `🟢 Synchronisation réussie à ${timeNow(now)}${report?.full ? " (reconstruction complète)" : ""}`,
+    `• Documents reçus depuis Firestore : ${report?.pulled ?? 0}`,
+    `• Modifications envoyées à Firestore : ${report?.pushed ?? 0}`,
   ];
 }
 
-export function batchReport(b: Schemas["BatchReport"], now?: Date): string[] {
-  const email = b.email_sent
-    ? `Oui (à ${b.notification_email})`
-    : b.competitions_updated > 0
+export function batchReport(batch: Schemas["BatchReport"], now?: Date): string[] {
+  const email = batch.email_sent
+    ? `Oui (à ${batch.notification_email})`
+    : batch.competitions_updated > 0
       ? "Erreur envoi"
       : "Non (aucun nouveau résultat)";
   return [
     `🟢 Analyse MyCompet terminée à ${timeNow(now)}`,
-    `• Compétitions passées vérifiées : ${b.competitions_checked}`,
-    `• Résultats officiels trouvés : ${b.competitions_updated}`,
+    `• Compétitions passées vérifiées : ${batch.competitions_checked}`,
+    `• Résultats officiels trouvés : ${batch.competitions_updated}`,
     `• E-mail récapitulatif expédié : ${email}`,
-    ...(b.partial ? [`⏱️ Temps imparti écoulé : ${b.competitions_remaining} compétition(s) reportée(s) au prochain passage`] : []),
-    ...b.details.map((c) => DETAIL_LINES[c.status](c)),
+    ...(batch.partial ? [`⏱️ Temps imparti écoulé : ${batch.competitions_remaining} compétition(s) reportée(s) au prochain passage`] : []),
+    ...batch.details.map((c) => DETAIL_LINES[c.status](c)),
   ];
 }
 

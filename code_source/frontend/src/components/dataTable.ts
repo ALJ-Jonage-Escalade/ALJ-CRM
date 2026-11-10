@@ -43,11 +43,11 @@ export interface DataColumn<T> {
 const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
 
 /** Numbers by value (empty first), anything else as text. */
-export function compareValues(a: CellValue, b: CellValue): number {
-  if (typeof a === "number" || typeof b === "number") {
-    return (typeof a === "number" ? a : -Infinity) - (typeof b === "number" ? b : -Infinity) || 0;
+export function compareValues(left: CellValue, right: CellValue): number {
+  if (typeof left === "number" || typeof right === "number") {
+    return (typeof left === "number" ? left : -Infinity) - (typeof right === "number" ? right : -Infinity) || 0;
   }
-  return collator.compare(String(a ?? ""), String(b ?? ""));
+  return collator.compare(String(left ?? ""), String(right ?? ""));
 }
 
 export function columnDefs<T extends RowData>(columns: readonly DataColumn<T>[]): ColumnDef<Features, T>[] {

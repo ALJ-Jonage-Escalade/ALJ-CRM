@@ -26,8 +26,8 @@ export async function readBase64(file: Blob): Promise<string> {
   return btoa(binary);
 }
 
-export function memberLabel(m: Member): string {
-  return `${m.last_name} ${m.first_name} (${m.birth_date || "—"})`;
+export function memberLabel(member: Member): string {
+  return `${member.last_name} ${member.first_name} (${member.birth_date || "—"})`;
 }
 
 /** Members in alphabetical order (last name, then first name), for the pickers. */

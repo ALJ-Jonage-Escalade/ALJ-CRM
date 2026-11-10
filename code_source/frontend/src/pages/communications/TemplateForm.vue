@@ -2,16 +2,17 @@
 /* Edits an e-mail template: name, sender, subject and body, with the variables and the bold / italic / underline / link
    tags inserted at the cursor. Submitting checks the template first: "save" when it can be saved, else "invalid"
    with the reason. */
+import type { EmailTemplate } from "../../services/communications";
 import { nextTick, ref, useTemplateRef } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
-import { insertText, linkTags, linkTarget, templateError, VARIABLES, wrapSelection, type Edit, type Sender, type Template } from "./editor";
+import { insertText, linkTags, linkTarget, templateError, VARIABLES, wrapSelection, type Edit, type Sender } from "./editor";
 import { dialogs } from "../../composables/dialogs";
 
 /** defaultSender: what the server puts when the sender is left empty, shown as placeholder. */
 defineProps<{ saving?: boolean; defaultSender: Sender; senderSuggestions: readonly string[] }>();
 const emit = defineEmits<{ save: []; invalid: [message: string] }>();
-const draft = defineModel<Template>({ required: true });
+const draft = defineModel<EmailTemplate>({ required: true });
 const signature = defineModel<boolean>("signature", { default: true });
 
 const showVariables = ref(false);

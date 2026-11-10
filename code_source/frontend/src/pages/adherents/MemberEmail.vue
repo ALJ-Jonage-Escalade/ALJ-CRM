@@ -5,13 +5,15 @@ import { computed, inject, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { CLIENT_KEY, errorText } from "../../lib/client";
-import { createCommunicationsApi } from "../../services/communications";
+import { createCommunicationsApi, type EmailTemplate } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
-import { renderFor, signatureText, type Template } from "./record";
+import { fillTemplate } from "../../lib/text";
+import { memberVariables, signatureText } from "./record";
 import { dialogs } from "../../composables/dialogs";
 
-const props = defineProps<{ member: Member; templates: readonly Template[]; clubContactEmail: string }>();
+const props = defineProps<{ member: Member; templates: readonly EmailTemplate[]; clubContactEmail: string }>();
+const values = computed(() => memberVariables(props.member));
 const emit = defineEmits<{ sent: [message: string]; failed: [message: string]; cancel: [] }>();
 const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 
@@ -35,7 +37,7 @@ function useTemplate(): void {
 
 const preview = computed(
   () =>
-    `Sujet : ${renderFor(subject.value, props.member)}\n\n${renderFor(body.value, props.member)}${signature.value ? `\n\n---\n${signatureText(props.clubContactEmail)}` : ""}`,
+    `Sujet : ${fillTemplate(subject.value, values.value)}\n\n${fillTemplate(body.value, values.value)}${signature.value ? `\n\n---\n${signatureText(props.clubContactEmail)}` : ""}`,
 );
 
 async function send(): Promise<void> {

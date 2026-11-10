@@ -45,15 +45,16 @@ export function toMemberSlots(answer: readonly Schemas["CompetitionMember"][]): 
   }));
 }
 
-export const isArchived = (c: Competition): boolean => c.statut === ARCHIVED;
+export const isArchived = (competition: Competition): boolean => competition.statut === ARCHIVED;
 
 /** Today as YYYY-MM-DD, local time. */
-export function todayIso(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+export function todayIso(date: Date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 /** Over: ended before today (undated ones never are). */
-export const isPast = (c: Competition, today: string): boolean => !!c.date_competition && (c.date_fin || c.date_competition) < today;
+export const isPast = (competition: Competition, today: string): boolean =>
+  !!competition.date_competition && (competition.date_fin || competition.date_competition) < today;
 
 /** Most recent first; undated ones last, then by id (newest first). */
 export function sortCompetitions(list: readonly Competition[]): Competition[] {
@@ -78,7 +79,7 @@ export function filterCompetitions(list: readonly Competition[], search: string,
 
 /** « 15/03/2026 », « 15/03 au 16/03/2026 » (the year once when both days share it), « 31/12/2026 au 01/01/2027 » or
     « sans date ». */
-export function period(competition: Competition): string {
+export function periodText(competition: Competition): string {
   const start = competition.date_competition ?? "";
   if (!start) {
     return "sans date";
@@ -108,8 +109,8 @@ export function seasonOf(iso: string | null | undefined): string {
 }
 
 /** The discipline, when it says more than « escalade » (pass-through field of the office page). */
-export function discipline(c: Competition): string {
-  const t = (c.type ?? "").trim();
+export function shownDiscipline(competition: Competition): string {
+  const t = (competition.type ?? "").trim();
   return t && t.toLowerCase() !== "escalade" ? t : "";
 }
 
@@ -136,8 +137,8 @@ export function counts(parts: readonly Pick<Participant, "selectionne" | "statut
   };
 }
 
-export function hasResults(c: Competition): boolean {
-  return !!c.resultats_synced_at || (c.participants ?? []).some((p) => p.resultat_ffme || p.classement);
+export function hasResults(competition: Competition): boolean {
+  return !!competition.resultats_synced_at || (competition.participants ?? []).some((p) => p.resultat_ffme || p.classement);
 }
 
 export const PAYMENT: Record<string, { label: string; color: BadgeColor }> = {
@@ -148,26 +149,28 @@ export const PAYMENT: Record<string, { label: string; color: BadgeColor }> = {
   annule_reporte: { label: "Annulé — report", color: "violet" },
 };
 
-export function payment(status: string | undefined): { label: string; color: BadgeColor } {
+export function paymentBadge(status: string | undefined): { label: string; color: BadgeColor } {
   return PAYMENT[status ?? ""] ?? { label: status || "—", color: "slate" };
 }
 
-export const isCancelled = (p: Participant): boolean => p.statut_paiement === "annule_reporte" || p.statut_paiement === "annule_perdu";
+export const isCancelled = (participant: Participant): boolean =>
+  participant.statut_paiement === "annule_reporte" || participant.statut_paiement === "annule_perdu";
 /** Money received (HelloAsso or by hand), not cancelled since: the competitor cannot be removed, only withdrawn. */
-export const hasPaid = (p: Participant): boolean =>
-  !isCancelled(p) && (p.statut_paiement === "paye" || Number(p.montant_paye ?? 0) > 0 || !!p.commande_helloasso);
+export const hasPaid = (participant: Participant): boolean =>
+  !isCancelled(participant) &&
+  (participant.statut_paiement === "paye" || Number(participant.montant_paye ?? 0) > 0 || !!participant.commande_helloasso);
 /** Listed but never invited and nothing paid: the office may remove them all at once. */
-export const isNotInvited = (p: Participant): boolean =>
-  !p.selectionne && (!p.statut_paiement || p.statut_paiement === "non_invite") && !hasPaid(p);
+export const isNotInvited = (participant: Participant): boolean =>
+  !participant.selectionne && (!participant.statut_paiement || participant.statut_paiement === "non_invite") && !hasPaid(participant);
 
 /** « 🥇 1er », « 🏅 4 / 23 »… of a MyCompet result, empty without one. */
-export function ranking(p: Participant): string {
-  const r = String(p.classement ?? "").trim();
+export function rankingText(participant: Participant): string {
+  const r = String(participant.classement ?? "").trim();
   if (!r) {
-    return p.resultat_ffme ? `🏅 ${p.resultat_ffme}` : "";
+    return participant.resultat_ffme ? `🏅 ${participant.resultat_ffme}` : "";
   }
   const icon = r === "1" ? "🥇" : r === "2" ? "🥈" : r === "3" ? "🥉" : "🏅";
-  const total = Number(p.total_categorie ?? 0);
+  const total = Number(participant.total_categorie ?? 0);
   return `${icon} ${r}${total > 0 ? ` / ${total}` : r === "1" ? "er" : "e"}`;
 }
 
@@ -181,20 +184,20 @@ export interface ContactCard {
 
 /** The 3 contact cards of an athlete: the athlete (with the e-mail of the member list), emergency contacts 1 and 2
     (name and phone only: no e-mail is kept offline about a competitor's contacts). */
-export function athleteContactCards(p: Participant, member?: MemberSlot, contact?: CompetitorContact): ContactCard[] {
+export function athleteContactCards(participant: Participant, member?: MemberSlot, contact?: CompetitorContact): ContactCard[] {
   return [
     {
       role: "athlete",
       title: "🧗 Athlète",
-      name: `${p.prenom} ${p.nom}`.trim() || `${member?.prenom ?? ""} ${member?.nom ?? ""}`.trim(),
-      phone: contact?.phone || p.phone || "",
-      email: member?.email || p.email || "",
+      name: `${participant.prenom} ${participant.nom}`.trim() || `${member?.prenom ?? ""} ${member?.nom ?? ""}`.trim(),
+      phone: contact?.phone || participant.phone || "",
+      email: member?.email || participant.email || "",
     },
     {
       role: "emergency1",
       title: "🚨 Contact d'urgence 1",
-      name: contact?.emergency1_name || p.urgence_nom || "",
-      phone: contact?.emergency1_phone || p.urgence_tel || "",
+      name: contact?.emergency1_name || participant.urgence_nom || "",
+      phone: contact?.emergency1_phone || participant.urgence_tel || "",
       email: "",
     },
     {
@@ -225,14 +228,14 @@ export type PendingValue = (adherentId: number | null | undefined, flag: "select
 /** The participants of a competition with what the other lists know of them. contacts: coaches only (kept offline);
     without them, the emergency contact copied when the member was added. */
 export function participantRows(
-  c: Competition,
+  competition: Competition,
   members: readonly MemberSlot[],
   contacts: readonly CompetitorContact[],
   pending: PendingValue = () => undefined,
 ): Row[] {
   const memberOf = new Map(members.map((m) => [m.id, m]));
   const contactOf = new Map(contacts.map((k) => [k.adherent_id, k]));
-  return (c.participants ?? []).map((p) => {
+  return (competition.participants ?? []).map((p) => {
     const member = p.adherent_id != null ? memberOf.get(p.adherent_id) : undefined;
     const contact = p.adherent_id != null ? contactOf.get(p.adherent_id) : undefined;
     const tarif = member?.tarif || p.tarif || "";
@@ -278,8 +281,8 @@ export function filterRows(rows: readonly Row[], filter: ParticipantFilter, sear
 }
 
 /** By last name then first name, French order. */
-export function byName(a: Pick<Participant, "nom" | "prenom">, b: Pick<Participant, "nom" | "prenom">): number {
-  return (a.nom ?? "").localeCompare(b.nom ?? "", "fr") || (a.prenom ?? "").localeCompare(b.prenom ?? "", "fr");
+export function byName(left: Pick<Participant, "nom" | "prenom">, right: Pick<Participant, "nom" | "prenom">): number {
+  return (left.nom ?? "").localeCompare(right.nom ?? "", "fr") || (left.prenom ?? "").localeCompare(right.prenom ?? "", "fr");
 }
 
 /** By slot group (French order, « Non identifiés » last), each sorted by name. */
@@ -293,26 +296,26 @@ export function groupRows(rows: readonly Row[]): [string, Row[]][] {
     .map(([g, list]) => [g, list.sort(byName)]);
 }
 
-export function countLine(c: Counts, filter: ParticipantFilter, shown: number): string {
+export function countLine(counts: Counts, filter: ParticipantFilter, shown: number): string {
   if (filter === "selected") {
-    return `${c.selected} compétiteur${plural(c.selected)} sélectionné${plural(c.selected)}`;
+    return `${counts.selected} compétiteur${plural(counts.selected)} sélectionné${plural(counts.selected)}`;
   }
   if (filter === "unpaid") {
-    return `${c.unpaid} compétiteur${plural(c.unpaid)} avec paiement en attente`;
+    return `${counts.unpaid} compétiteur${plural(counts.unpaid)} avec paiement en attente`;
   }
   if (filter === "notInvited") {
     return `${shown} compétiteur${plural(shown)} non invité${plural(shown)}`;
   }
-  return `${c.selected} compétiteur${plural(c.selected)} sélectionné${plural(c.selected)} sur ${c.all}`;
+  return `${counts.selected} compétiteur${plural(counts.selected)} sélectionné${plural(counts.selected)} sur ${counts.all}`;
 }
 
 /** Members matching the search (name, first name, licence; 2 letters at least), not listed yet, 15 at most. */
-export function memberMatches(members: readonly MemberSlot[], c: Competition, search: string): MemberSlot[] {
+export function memberMatches(members: readonly MemberSlot[], competition: Competition, search: string): MemberSlot[] {
   const q = normKey(search);
   if (q.length < 2) {
     return [];
   }
-  const listed = new Set((c.participants ?? []).map((p) => p.adherent_id));
+  const listed = new Set((competition.participants ?? []).map((p) => p.adherent_id));
   return members
     .filter(
       (m) =>
@@ -334,9 +337,9 @@ export function participantCsv(rows: readonly Row[]): Cell[][] {
         p.prenom,
         p.num_licence,
         p.group === UNIDENTIFIED ? "" : p.group,
-        ranking(p).replace(/^\S+ /, ""),
+        rankingText(p).replace(/^\S+ /, ""),
         p.selectionne ? "Oui" : "Non",
-        payment(p.statut_paiement).label,
+        paymentBadge(p.statut_paiement).label,
         p.montant_paye ? `${p.montant_paye} €` : "",
         p.commande_helloasso,
         p.present ? "Présent" : "Absent",
@@ -345,7 +348,7 @@ export function participantCsv(rows: readonly Row[]): Cell[][] {
   ];
 }
 
-export const csvName = (c: Competition): string => `competition_${String(c.nom || "export").replace(/\W+/g, "_")}.csv`;
+export const csvName = (competition: Competition): string => `competition_${String(competition.nom || "export").replace(/\W+/g, "_")}.csv`;
 
 // ---------------------------------------------------------------- Create / edit form
 
@@ -362,8 +365,8 @@ export function defaultDeadline(start: string): string {
 }
 
 /** The registration deadline of a competition, the default one when none is stored (cached before the field existed). */
-export function deadlineOf(c: Competition): string {
-  return c.deadline || defaultDeadline(c.date_competition ?? "");
+export function deadlineOf(competition: Competition): string {
+  return competition.deadline || defaultDeadline(competition.date_competition ?? "");
 }
 
 export interface CompetitionDraft {
@@ -380,53 +383,53 @@ export interface CompetitionDraft {
   coach_ids: number[];
 }
 
-export function draftOf(c?: Competition): CompetitionDraft {
-  const start = c?.date_competition ?? "";
+export function draftOf(competition?: Competition): CompetitionDraft {
+  const start = competition?.date_competition ?? "";
   return {
-    nom: c?.nom ?? "",
-    id_ffme: c?.id_ffme ?? "",
+    nom: competition?.nom ?? "",
+    id_ffme: competition?.id_ffme ?? "",
     date_competition: start,
-    date_fin: c?.date_fin && c.date_fin !== c.date_competition ? c.date_fin : "",
-    deadline: c?.deadline || defaultDeadline(start),
-    lieu: c?.lieu ?? "",
-    type: c?.type ?? "",
-    prix: c ? String(c.prix ?? 0) : "",
-    url_resultats: c?.url_resultats ?? "",
-    whatsapp_link: c?.whatsapp_link ?? "",
-    coach_ids: [...(c?.coach_ids ?? [])],
+    date_fin: competition?.date_fin && competition.date_fin !== competition.date_competition ? competition.date_fin : "",
+    deadline: competition?.deadline || defaultDeadline(start),
+    lieu: competition?.lieu ?? "",
+    type: competition?.type ?? "",
+    prix: competition ? String(competition.prix ?? 0) : "",
+    url_resultats: competition?.url_resultats ?? "",
+    whatsapp_link: competition?.whatsapp_link ?? "",
+    coach_ids: [...(competition?.coach_ids ?? [])],
   };
 }
 
-export function draftErrors(d: CompetitionDraft): Partial<Record<keyof CompetitionDraft, string>> {
+export function draftErrors(draft: CompetitionDraft): Partial<Record<keyof CompetitionDraft, string>> {
   const errors: Partial<Record<keyof CompetitionDraft, string>> = {};
-  if (!d.nom.trim()) {
+  if (!draft.nom.trim()) {
     errors.nom = "Le nom de l'épreuve est obligatoire.";
   }
-  if (d.prix.trim() && !(Number(d.prix.replace(",", ".")) >= 0)) {
+  if (draft.prix.trim() && !(Number(draft.prix.replace(",", ".")) >= 0)) {
     errors.prix = "Montant invalide.";
   }
-  if (d.date_fin && !d.date_competition) {
+  if (draft.date_fin && !draft.date_competition) {
     errors.date_fin = "Indiquez d'abord la date de début.";
   }
   return errors;
 }
 
 /** Body of POST /api/competitions and PATCH /api/competitions/{id}: an end before the start (or none) is the start. */
-export function draftBody(d: CompetitionDraft): Schemas["CompetitionCreate"] {
-  const start = d.date_competition;
+export function draftBody(draft: CompetitionDraft): Schemas["CompetitionCreate"] {
+  const start = draft.date_competition;
   return {
-    nom: d.nom.trim(),
-    id_ffme: d.id_ffme.trim(),
+    nom: draft.nom.trim(),
+    id_ffme: draft.id_ffme.trim(),
     date_competition: start,
-    date_fin: start && d.date_fin > start ? d.date_fin : start,
+    date_fin: start && draft.date_fin > start ? draft.date_fin : start,
     // Only a deadline set by hand is stored: the default one follows the start date
-    deadline: d.deadline === defaultDeadline(start) ? "" : d.deadline,
-    lieu: d.lieu.trim(),
-    type: d.type,
-    prix: Number(d.prix.replace(",", ".")) || 0,
-    url_resultats: d.url_resultats.trim(),
-    whatsapp_link: d.whatsapp_link.trim(),
-    coach_ids: d.coach_ids,
+    deadline: draft.deadline === defaultDeadline(start) ? "" : draft.deadline,
+    lieu: draft.lieu.trim(),
+    type: draft.type,
+    prix: Number(draft.prix.replace(",", ".")) || 0,
+    url_resultats: draft.url_resultats.trim(),
+    whatsapp_link: draft.whatsapp_link.trim(),
+    coach_ids: draft.coach_ids,
   };
 }
 

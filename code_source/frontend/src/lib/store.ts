@@ -294,6 +294,6 @@ export function offlineStore(): OfflineStore {
 }
 
 /** Confirmation asked before signing out with changes not sent yet (they are lost with the store). */
-export function logoutWarning(n: number): string {
-  return `${n} modification${plural(n)} faite${plural(n)} hors ligne pas encore envoyée${plural(n)} ser${plural(n, "ont", "a")} perdue${plural(n)}. Se déconnecter ?`;
+export function logoutWarning(count: number): string {
+  return `${count} modification${plural(count)} faite${plural(count)} hors ligne pas encore envoyée${plural(count)} ser${plural(count, "ont", "a")} perdue${plural(count)}. Se déconnecter ?`;
 }

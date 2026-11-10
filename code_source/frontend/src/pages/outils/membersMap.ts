@@ -30,7 +30,7 @@ export function filterLabel(groupCount: number, shownCount: number): string {
 }
 
 /** Members and addresses on the map, and the number of groups shown when some are hidden. */
-export function summary(visible: readonly MapPoint[], groupCount: number, shownCount: number): string {
+export function mapSummaryText(visible: readonly MapPoint[], groupCount: number, shownCount: number): string {
   const memberCount = visible.reduce((total, p) => total + p.members.length, 0);
   const filter = shownCount === groupCount ? "" : ` (filtre : ${shownCount} groupe${plural(shownCount)})`;
   return `${memberCount} adhérent${plural(memberCount)} réparti${plural(memberCount)} sur ${visible.length} adresse${plural(visible.length)}${filter}`;

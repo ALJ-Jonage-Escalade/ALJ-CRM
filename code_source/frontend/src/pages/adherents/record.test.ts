@@ -1,3 +1,4 @@
+import { fillTemplate } from "../../lib/text";
 import { describe, expect, it } from "vitest";
 import { member } from "./members.fixture";
 import {
@@ -10,7 +11,7 @@ import {
   draftOf,
   newMemberOf,
   recordRows,
-  renderFor,
+  memberVariables,
   signatureText,
   sameName,
   tarifChoices,
@@ -182,7 +183,7 @@ describe("e-mail and certificate", () => {
   const m = member({ first_name: "LÉA-MARIE", last_name: "dupont", licence_ffme: "123456", amount: 180, season_name: "2026-2027" });
 
   it("replaces the variables, names case-insensitive, unknown ones kept", () => {
-    expect(renderFor("{Prénom} {NOM} {num_licence} {montant} {saison} {inconnue}", m)).toBe(
+    expect(fillTemplate("{Prénom} {NOM} {num_licence} {montant} {saison} {inconnue}", memberVariables(m))).toBe(
       "Léa-Marie DUPONT 123456 180 € 2026-2027 {inconnue}",
     );
   });

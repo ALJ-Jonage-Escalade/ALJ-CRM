@@ -2,7 +2,7 @@
 /* The cards view of the competition list, with the archives on demand. */
 import { ref } from "vue";
 import { RouterLink } from "vue-router";
-import { period, type Competition } from "../competitions";
+import { periodText, type Competition } from "../competitions";
 import CompetitionCard from "./CompetitionCard.vue";
 
 defineProps<{
@@ -51,7 +51,7 @@ const showArchived = ref(false);
         class="block rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-slate-700 no-underline hover:border-accent"
       >
         <b class="block text-[14px]" data-testid="comp-name">{{ c.nom }}</b>
-        <span class="block text-xs text-slate-500">📅 {{ period(c) }} · 📦 Archivée</span>
+        <span class="block text-xs text-slate-500">📅 {{ periodText(c) }} · 📦 Archivée</span>
       </RouterLink>
     </li>
   </ul>

@@ -97,8 +97,8 @@ export async function unwrap<T>(call: Promise<{ data?: T; error?: unknown; respo
 }
 
 /** Message of any error caught around an API call. */
-export function errorText(e: unknown): string {
-  return e instanceof ApiError ? e.message : "Erreur inattendue.";
+export function errorText(error: unknown): string {
+  return error instanceof ApiError ? error.message : "Erreur inattendue.";
 }
 
 // ---------------------------------------------------------------- Polled reads (useSyncedResource)

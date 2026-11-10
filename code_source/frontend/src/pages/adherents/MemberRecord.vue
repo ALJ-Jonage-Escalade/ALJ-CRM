@@ -10,7 +10,7 @@ import { ApiError, CLIENT_KEY, errorText } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
 import { telHref } from "../../lib/text";
 import { isCompetitor, type Member } from "./members";
-import { payment, type Competition, type Participant } from "../competitions/competitions";
+import { paymentBadge, type Competition, type Participant } from "../competitions/competitions";
 import { recordRows } from "./record";
 import { createCompetitionsApi } from "../../services/competitions";
 
@@ -169,8 +169,8 @@ const rows = computed(() => recordRows(props.member));
           >
             {{ c.participant.selectionne ? "✓ Sélectionné" : "🔘 Non invité" }}
           </span>
-          <UiBadge variant="soft" :color="payment(c.participant.statut_paiement).color" class="text-[11px]">
-            {{ payment(c.participant.statut_paiement).label }}
+          <UiBadge variant="soft" :color="paymentBadge(c.participant.statut_paiement).color" class="text-[11px]">
+            {{ paymentBadge(c.participant.statut_paiement).label }}
           </UiBadge>
           <span v-if="c.participant.classement" class="rounded bg-violet-50 px-1.5 py-0.5 font-bold text-violet-700">
             🏅 Rang : {{ c.participant.classement }}
