@@ -7,7 +7,7 @@ import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import type { Role } from "../lib/roles";
 import AdherentsPage from "./AdherentsPage.vue";
-import { FILTER_KEY, PANEL_KEY, type MemberList } from "./adherents/members";
+import { ADHERENTS_FILTERS_STORAGE, ADHERENTS_PANEL_STORAGE, type MemberList } from "./adherents/members";
 import { member } from "./adherents/members.fixture";
 import { dialogs } from "../composables/dialogs";
 
@@ -171,7 +171,7 @@ describe("AdherentsPage", () => {
     expect(wrapper.find('[data-testid="data-empty"]').text()).toBe("Aucun adhérent ne correspond aux filtres actifs.");
 
     await byId("member-search").setValue("dupont");
-    const saved = JSON.parse(localStorage.getItem(FILTER_KEY)!);
+    const saved = JSON.parse(localStorage.getItem(ADHERENTS_FILTERS_STORAGE)!);
     expect(saved.groups).toEqual({ "Liste d'attente": false, "Loisir adultes": false });
     expect(saved.search).toBe("");
   });
@@ -194,7 +194,7 @@ describe("AdherentsPage", () => {
     expect(byId("member-count").text()).toContain("(saison 2025-2026)");
     expect(calls.map((c) => c.path)).toContain("/api/members?season=2025-2026");
 
-    localStorage.setItem(FILTER_KEY, JSON.stringify({ season: "1999-2000" }));
+    localStorage.setItem(ADHERENTS_FILTERS_STORAGE, JSON.stringify({ season: "1999-2000" }));
     const again = await render();
     await flushPromises();
     expect(again.names()).toEqual(["DUPONT", "MARTIN"]);
@@ -289,7 +289,7 @@ describe("AdherentsPage", () => {
     await flushPromises();
     expect(inBody("record-panel")).toBeNull();
     expect(byId("sort-city").exists()).toBe(true);
-    expect(localStorage.getItem(PANEL_KEY)).toBe("closed");
+    expect(localStorage.getItem(ADHERENTS_PANEL_STORAGE)).toBe("closed");
     wrapper.unmount();
 
     const again = await render();
@@ -299,7 +299,7 @@ describe("AdherentsPage", () => {
     await flushPromises();
     expect(again.inBody("record-name")!.textContent).toBe("Max MARTIN");
     expect(again.byId("sort-city").exists()).toBe(false);
-    expect(localStorage.getItem(PANEL_KEY)).toBe("open");
+    expect(localStorage.getItem(ADHERENTS_PANEL_STORAGE)).toBe("open");
     await again.byId("side-panel-collapse").trigger("click");
     await again.byId("panel-open").trigger("click");
     expect(again.inBody("record-name")!.textContent).toBe("Max MARTIN");

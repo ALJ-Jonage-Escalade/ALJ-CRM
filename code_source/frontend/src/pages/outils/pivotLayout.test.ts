@@ -4,7 +4,7 @@ import {
   AGGREGATORS,
   clearLayout,
   DEFAULT_LAYOUT,
-  LAYOUT_KEY,
+  PIVOT_LAYOUT_STORAGE,
   loadLayout,
   pivotRow,
   RENDERERS,
@@ -62,10 +62,10 @@ describe("stored layout", () => {
   it("is saved without the value filters, then read back", () => {
     const model = { ...LAYOUT, valueFilter: { Statut: { Annulé: true } } };
     saveLayout(model);
-    expect(JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "")).toEqual(LAYOUT);
+    expect(JSON.parse(localStorage.getItem(PIVOT_LAYOUT_STORAGE) ?? "")).toEqual(LAYOUT);
     expect(loadLayout()).toEqual(LAYOUT);
     clearLayout();
-    expect(localStorage.getItem(LAYOUT_KEY)).toBeNull();
+    expect(localStorage.getItem(PIVOT_LAYOUT_STORAGE)).toBeNull();
     expect(loadLayout()).toEqual(DEFAULT_LAYOUT);
   });
 

@@ -12,6 +12,7 @@ import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
 import { AUTH_KEY } from "../composables/auth";
 import { useSyncedResource } from "../composables/syncedResource";
+import { localStorageOrNone } from "../lib/localStorage";
 import { pageVerdict } from "../lib/access";
 import { formatDateTime } from "../lib/format";
 import {
@@ -32,7 +33,7 @@ import {
 } from "./adherents/members";
 import {
   detailRows,
-  DIRECTORY_FILTER_KEY,
+  DIRECTORY_FILTERS_STORAGE,
   emergencyMatches,
   emergencyRows,
   EMERGENCY_MIN_LETTERS,
@@ -45,8 +46,8 @@ import { membersRead } from "../services/members";
 
 const auth = inject(AUTH_KEY)!;
 
-const filters = ref(loadFilters(globalThis.localStorage, DIRECTORY_FILTER_KEY));
-watch(filters, (f) => saveFilters(f, globalThis.localStorage, DIRECTORY_FILTER_KEY), { deep: true });
+const filters = ref(loadFilters(localStorageOrNone(), DIRECTORY_FILTERS_STORAGE));
+watch(filters, (f) => saveFilters(f, localStorageOrNone(), DIRECTORY_FILTERS_STORAGE), { deep: true });
 
 // Nothing is asked (nor read from the device) for an account the page does not open to
 const open = computed(() => ["allow", "offline"].includes(pageVerdict(auth.state.value, "annuaire")));

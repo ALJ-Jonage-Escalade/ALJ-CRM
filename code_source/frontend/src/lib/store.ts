@@ -17,6 +17,7 @@
    Every failure (IndexedDB missing or blocked, private window, quota) only means "no offline copy": the page then
    behaves as online only. Calls never reject. */
 import type { InjectionKey } from "vue";
+import { localStorageOrNone } from "./localStorage";
 import { plural } from "./text";
 
 const DB_NAME = "alj-offline";
@@ -273,14 +274,6 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
   }
 
   return { start, load, save, touch, queue, queued, unqueue, clearAll };
-}
-
-function localStorageOrNone(): Storage | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined; // blocked storage
-  }
 }
 
 /** Provided by the components' tests; the app uses offlineStore(). */

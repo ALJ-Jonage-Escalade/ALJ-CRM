@@ -6,7 +6,7 @@
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 export const OAUTH_CLIENT_ID = "796572126711-npcue84vd52prmtjik0bdp6ng6ggpie8.apps.googleusercontent.com";
 const SCOPES = "openid email profile";
-export const STATE_KEY = "alj_oauth_state";
+export const OAUTH_STATE_STORAGE = "alj_oauth_state";
 export const CALLBACK_PATH = "/competitions";
 
 /** A random state, checked on the way back (CSRF). */

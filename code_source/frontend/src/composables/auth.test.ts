@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AFTER_LOGIN_KEY, createAuth, LOGIN_URL, type AuthDeps, type SessionUser } from "./auth";
+import { AFTER_LOGIN_STORAGE, createAuth, LOGIN_URL, type AuthDeps, type SessionUser } from "./auth";
 
 const ALBUS: SessionUser = { uid: "u-albus", email: "albus@alj-escalade.fr" };
 const FILCH: SessionUser = { uid: "u-filch", email: "argus.filch@hogwarts.example" };
@@ -161,7 +161,7 @@ describe("createAuth", () => {
   it("signs in through the competitions page and comes back to the current page", () => {
     const { auth, deps } = setup(async () => json({}));
     auth.login();
-    expect(deps.storage.setItem).toHaveBeenCalledWith(AFTER_LOGIN_KEY, "/bureau/?x=1");
+    expect(deps.storage.setItem).toHaveBeenCalledWith(AFTER_LOGIN_STORAGE, "/bureau/?x=1");
     expect(deps.navigate).toHaveBeenCalledWith(LOGIN_URL);
   });
 

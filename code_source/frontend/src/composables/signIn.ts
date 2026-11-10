@@ -6,9 +6,9 @@
    - ?login=1: the sign-in starts (Google, or the emulator's picker in dev).
    Then the page that asked is opened again. The session itself is then followed by composables/auth.ts. */
 import type { InjectionKey, Ref } from "vue";
-import { AFTER_LOGIN_KEY } from "./auth";
+import { AFTER_LOGIN_STORAGE } from "./auth";
 import { NETWORK_MESSAGE } from "../lib/client";
-import { authorizeUrl, CALLBACK_PATH, newState, readFragment, STATE_KEY } from "../lib/oauth";
+import { authorizeUrl, CALLBACK_PATH, newState, readFragment, OAUTH_STATE_STORAGE } from "../lib/oauth";
 
 export interface SignInDeps {
   url: Pick<Location, "origin" | "pathname" | "search" | "hash">;
@@ -48,8 +48,8 @@ export async function handleSignIn(deps: SignInDeps): Promise<string | null> {
 
   // The page that asked for the sign-in (a path of this site only), unless it is this one
   const comeBack = (): void => {
-    const back = storage.getItem(AFTER_LOGIN_KEY) ?? "";
-    storage.removeItem(AFTER_LOGIN_KEY);
+    const back = storage.getItem(AFTER_LOGIN_STORAGE) ?? "";
+    storage.removeItem(AFTER_LOGIN_STORAGE);
     if (/^\/[^/\\]/.test(back) && back !== here) {
       deps.navigate(back);
     }
@@ -57,10 +57,10 @@ export async function handleSignIn(deps: SignInDeps): Promise<string | null> {
 
   try {
     if (url.hash.length > 1) {
-      const back = readFragment(url.hash, storage.getItem(STATE_KEY));
+      const back = readFragment(url.hash, storage.getItem(OAUTH_STATE_STORAGE));
       if (back) {
         deps.replaceUrl(here); // the token does not stay in the address (history, bookmarks)
-        storage.removeItem(STATE_KEY);
+        storage.removeItem(OAUTH_STATE_STORAGE);
         if ("error" in back) {
           return back.error;
         }
@@ -79,7 +79,7 @@ export async function handleSignIn(deps: SignInDeps): Promise<string | null> {
         await deps.devSignIn();
       } else {
         const state = newState();
-        storage.setItem(STATE_KEY, state);
+        storage.setItem(OAUTH_STATE_STORAGE, state);
         deps.navigate(authorizeUrl(url.origin, state));
       }
     }

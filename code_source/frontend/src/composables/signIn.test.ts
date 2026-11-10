@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authorizeUrl, readFragment } from "../lib/oauth";
-import { AFTER_LOGIN_KEY } from "./auth";
+import { AFTER_LOGIN_STORAGE } from "./auth";
 import { handleSignIn, type SignInDeps } from "./signIn";
 
 function setup(address: string, options: { emulator?: boolean; devResult?: boolean } = {}) {
@@ -65,19 +65,19 @@ describe("handleSignIn", () => {
 
   it("signs in with the token Google sent back, then opens the page that asked", async () => {
     sessionStorage.setItem("alj_oauth_state", "s1");
-    sessionStorage.setItem(AFTER_LOGIN_KEY, "/bureau/adherents?id=3");
+    sessionStorage.setItem(AFTER_LOGIN_STORAGE, "/bureau/adherents?id=3");
     const deps = setup("/competitions#access_token=tok&state=s1&token_type=Bearer");
     expect(await handleSignIn(deps)).toBeNull();
     expect(deps.replaceUrl).toHaveBeenCalledWith("/competitions"); // token out of the address
     expect(deps.signInWithToken).toHaveBeenCalledWith("tok");
     expect(deps.navigate).toHaveBeenCalledWith("/bureau/adherents?id=3");
-    expect(sessionStorage.getItem(AFTER_LOGIN_KEY)).toBeNull();
+    expect(sessionStorage.getItem(AFTER_LOGIN_STORAGE)).toBeNull();
     expect(sessionStorage.getItem("alj_oauth_state")).toBeNull();
   });
 
   it.each(["https://evil.example/", "//evil.example/x", "/competitions"])("stays on the page for a return address %s", async (back) => {
     sessionStorage.setItem("alj_oauth_state", "s1");
-    sessionStorage.setItem(AFTER_LOGIN_KEY, back);
+    sessionStorage.setItem(AFTER_LOGIN_STORAGE, back);
     const deps = setup("/competitions#access_token=tok&state=s1");
     await handleSignIn(deps);
     expect(deps.navigate).not.toHaveBeenCalled();
@@ -104,7 +104,7 @@ describe("handleSignIn", () => {
     expect(start.devSignIn).toHaveBeenCalledOnce();
     expect(start.navigate).not.toHaveBeenCalled();
 
-    sessionStorage.setItem(AFTER_LOGIN_KEY, "/bureau/");
+    sessionStorage.setItem(AFTER_LOGIN_STORAGE, "/bureau/");
     const back = setup("/competitions", { emulator: true, devResult: true });
     await handleSignIn(back);
     expect(back.navigate).toHaveBeenCalledWith("/bureau/");

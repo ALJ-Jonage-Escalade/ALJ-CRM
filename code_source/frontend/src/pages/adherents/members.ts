@@ -2,6 +2,7 @@
    web/shared/alj-filters.js and alj-members.js).
    The members come formatted by the server (GET /api/members, domain/members/view.py). */
 import type { BadgeColor } from "../../components/ui/palette";
+import { localStorageOrNone } from "../../lib/localStorage";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
@@ -416,11 +417,14 @@ export function csvName(season: string): string {
 // ---------------------------------------------------------------- Saved filters
 
 /** Same key and shape as the former page (web/shared/alj-filters.js): the filters of earlier visits are kept. */
-export const FILTER_KEY = "alj_bureau_adherents_filters";
+export const ADHERENTS_FILTERS_STORAGE = "alj_bureau_adherents_filters";
 
 /** The filters of the last visit on this browser (key: another page's filters). The search is not kept: it often
     holds a member's name. */
-export function loadFilters(storage: Pick<Storage, "getItem"> | undefined = globalThis.localStorage, key = FILTER_KEY): Filters {
+export function loadFilters(
+  storage: Pick<Storage, "getItem"> | undefined = localStorageOrNone(),
+  key = ADHERENTS_FILTERS_STORAGE,
+): Filters {
   const filters = emptyFilters();
   try {
     const saved: unknown = JSON.parse(storage?.getItem(key) || "{}");
@@ -451,8 +455,8 @@ function booleans(value: unknown): Record<string, boolean> {
 
 export function saveFilters(
   filters: Filters,
-  storage: Pick<Storage, "setItem"> | undefined = globalThis.localStorage,
-  key = FILTER_KEY,
+  storage: Pick<Storage, "setItem"> | undefined = localStorageOrNone(),
+  key = ADHERENTS_FILTERS_STORAGE,
 ): void {
   try {
     storage?.setItem(key, JSON.stringify({ ...filters, search: "" }));
@@ -463,20 +467,20 @@ export function saveFilters(
 
 // ---------------------------------------------------------------- Record panel
 
-export const PANEL_KEY = "alj_bureau_adherents_panel";
+export const ADHERENTS_PANEL_STORAGE = "alj_bureau_adherents_panel";
 
 /** Whether the record panel was left open on this browser (open by default). */
-export function loadPanelOpen(storage: Pick<Storage, "getItem"> | undefined = globalThis.localStorage): boolean {
+export function loadPanelOpen(storage: Pick<Storage, "getItem"> | undefined = localStorageOrNone()): boolean {
   try {
-    return storage?.getItem(PANEL_KEY) !== "closed";
+    return storage?.getItem(ADHERENTS_PANEL_STORAGE) !== "closed";
   } catch {
     return true; // blocked storage: open
   }
 }
 
-export function savePanelOpen(open: boolean, storage: Pick<Storage, "setItem"> | undefined = globalThis.localStorage): void {
+export function savePanelOpen(open: boolean, storage: Pick<Storage, "setItem"> | undefined = localStorageOrNone()): void {
   try {
-    storage?.setItem(PANEL_KEY, open ? "open" : "closed");
+    storage?.setItem(ADHERENTS_PANEL_STORAGE, open ? "open" : "closed");
   } catch {
     // blocked storage: the choice lasts for this visit only
   }

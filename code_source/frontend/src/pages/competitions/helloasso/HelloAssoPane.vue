@@ -6,6 +6,7 @@ import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialog from "../../../components/ui/UiDialog.vue";
 import { useMediaQuery } from "../../../composables/media";
+import { localStorageOrNone } from "../../../lib/localStorage";
 import { CLIENT_KEY } from "../../../lib/client";
 import { createCompetitionsApi } from "../../../services/competitions";
 import { createIntegrationsApi } from "../../../services/integrations";
@@ -47,10 +48,10 @@ const integrationsApi = createIntegrationsApi(client);
 const writer = inject(WRITER_KEY)!;
 const wide = useMediaQuery("(min-width: 1280px)");
 
-const HIDE_KEY = "alj_ha_hide_ignored"; // same choice as on the former page
+const HELLOASSO_HIDE_IGNORED_STORAGE = "alj_ha_hide_ignored"; // same choice as on the former page
 function readHide(): boolean {
   try {
-    return localStorage.getItem(HIDE_KEY) !== "0";
+    return localStorageOrNone()?.getItem(HELLOASSO_HIDE_IGNORED_STORAGE) !== "0";
   } catch {
     return true;
   }
@@ -59,7 +60,7 @@ const filter = ref<ItemFilter>("all");
 const hideIgnored = ref(readHide());
 watch(hideIgnored, (v) => {
   try {
-    localStorage.setItem(HIDE_KEY, v ? "1" : "0");
+    localStorageOrNone()?.setItem(HELLOASSO_HIDE_IGNORED_STORAGE, v ? "1" : "0");
   } catch {
     // blocked storage: the choice lasts as long as the page
   }

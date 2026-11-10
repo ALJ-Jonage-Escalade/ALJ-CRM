@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { API_KEY, type ApiFetch } from "../../lib/api";
 import { CLIENT_KEY, createApiClient, type Schemas } from "../../lib/client";
 import PivotPane from "./PivotPane.vue";
-import { DEFAULT_LAYOUT, LAYOUT_KEY, restoreLayout } from "./pivotLayout";
+import { DEFAULT_LAYOUT, PIVOT_LAYOUT_STORAGE, restoreLayout } from "./pivotLayout";
 
 const HOSTILE = `<img src=x onerror="window.hacked=1"><b>`;
 
@@ -103,7 +103,7 @@ describe("PivotPane", () => {
     const first = await render();
     const layout = { ...DEFAULT_LAYOUT, rows: ["Tranche d'Âge"], rendererName: "Carte de chaleur" };
     first.table().vm.$emit("update:pivotModel", { ...layout, valueFilter: { Sexe: { Femme: true } } });
-    expect(JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "")).toEqual(layout);
+    expect(JSON.parse(localStorage.getItem(PIVOT_LAYOUT_STORAGE) ?? "")).toEqual(layout);
     first.wrapper.unmount();
 
     const second = await render();
@@ -112,7 +112,7 @@ describe("PivotPane", () => {
       valueFilter: { "Groupe / Tarif": { "Liste d'attente cours": true }, Statut: { Annulé: true } },
     });
     await second.wrapper.get('[data-testid="pivot-reset"]').trigger("click");
-    expect(restoreLayout(localStorage.getItem(LAYOUT_KEY))).toEqual(DEFAULT_LAYOUT);
+    expect(restoreLayout(localStorage.getItem(PIVOT_LAYOUT_STORAGE))).toEqual(DEFAULT_LAYOUT);
     expect(second.table().props("pivotModel")).toMatchObject(DEFAULT_LAYOUT);
   });
 

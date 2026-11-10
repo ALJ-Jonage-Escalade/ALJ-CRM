@@ -46,7 +46,7 @@ export interface Auth {
 }
 
 export const LOGIN_URL = "/competitions?login=1";
-export const AFTER_LOGIN_KEY = "alj_after_login";
+export const AFTER_LOGIN_STORAGE = "alj_after_login";
 
 const UNEXPECTED_ANSWER = "Réponse inattendue du serveur.";
 
@@ -120,7 +120,7 @@ export function createAuth(deps: AuthDeps): Auth {
   return {
     state: readonly(state),
     login() {
-      deps.storage.setItem(AFTER_LOGIN_KEY, deps.currentPath());
+      deps.storage.setItem(AFTER_LOGIN_STORAGE, deps.currentPath());
       deps.navigate(LOGIN_URL);
     },
     async logout() {

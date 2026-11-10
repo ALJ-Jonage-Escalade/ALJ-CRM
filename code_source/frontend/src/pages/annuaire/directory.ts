@@ -108,4 +108,4 @@ export function emergencyMatches<M extends Pick<Member, "first_name" | "last_nam
 }
 
 /** Same key as the former directory page (web/index.html): the filters of earlier visits are kept. */
-export const DIRECTORY_FILTER_KEY = "alj_annuaire_filters";
+export const DIRECTORY_FILTERS_STORAGE = "alj_annuaire_filters";
