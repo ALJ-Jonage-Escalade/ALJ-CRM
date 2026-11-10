@@ -188,8 +188,9 @@ function validBirthDate(value: string, today: Date): boolean {
   return d.getMonth() === +m[2]! - 1 && d.getDate() === +m[3]! && d <= today && +m[1]! >= 1900;
 }
 
-/** Problems of the form, by field (empty when it can be sent). adding: the add form, which asks more. */
-export function draftErrors(d: MemberDraft, adding: boolean, today: Date = new Date()): DraftErrors {
+/** Problems of the form, by field (empty when it can be sent). adding: the add form, which asks more. amountBefore:
+    the amount the edit form opened with (the server keeps an amount once set: it cannot be emptied). */
+export function draftErrors(d: MemberDraft, adding: boolean, today: Date = new Date(), amountBefore = ""): DraftErrors {
   const errors: DraftErrors = {};
   if (!d.last_name.trim()) {
     errors.last_name = "Le nom est obligatoire.";
@@ -205,6 +206,8 @@ export function draftErrors(d: MemberDraft, adding: boolean, today: Date = new D
   const amount = Number(d.amount.replace(",", "."));
   if (d.amount.trim() && (!Number.isFinite(amount) || amount < 0)) {
     errors.amount = "Montant invalide (nombre positif).";
+  } else if (!adding && amountBefore.trim() && !d.amount.trim()) {
+    errors.amount = "Le montant ne peut pas être vidé : indiquez 0 si rien n'a été réglé.";
   }
   if (d.emergency1_phone.trim() && !looksLikePhone(d.emergency1_phone.trim())) {
     errors.emergency1_phone = "Numéro de téléphone invalide.";

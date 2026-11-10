@@ -14,11 +14,12 @@ const props = defineProps<{ adding: boolean; tarifs: readonly TarifChoice[]; sav
 const emit = defineEmits<{ save: []; cancel: [] }>();
 
 const errors = ref<DraftErrors>({});
+const initialAmount = draft.value.amount;
 // A corrected field loses its message at once; the others wait for the next submit
 watch(
   draft,
   (d) => {
-    const now = draftErrors(d, props.adding, props.today);
+    const now = draftErrors(d, props.adding, props.today, initialAmount);
     for (const field of Object.keys(errors.value) as DraftField[]) {
       if (!now[field]) {
         delete errors.value[field];
@@ -43,7 +44,7 @@ const sexes = Object.entries(SEX_LABELS) as [Sex, string][];
 
 const root = ref<HTMLFormElement | null>(null);
 async function submit(): Promise<void> {
-  errors.value = draftErrors(draft.value, props.adding, props.today);
+  errors.value = draftErrors(draft.value, props.adding, props.today, initialAmount);
   const first = Object.keys(errors.value)[0];
   if (!first) {
     emit("save");

@@ -69,6 +69,19 @@ describe("MemberForm validation", () => {
     wrapper.unmount();
   });
 
+  it("editing: refuses to empty an amount already recorded, which the server would keep", async () => {
+    const d = reactive(draftOf(member({ last_name: "DUPONT", first_name: "Léa", tarif_name: "Adulte loisir", amount: 120 })));
+    const { wrapper, error } = render(d, false);
+    d.amount = "";
+    await wrapper.find("form").trigger("submit");
+    expect(error("amount").text()).toBe("Le montant ne peut pas être vidé : indiquez 0 si rien n'a été réglé.");
+    expect(wrapper.emitted("save")).toBeUndefined();
+    d.amount = "0";
+    await wrapper.find("form").trigger("submit");
+    expect(wrapper.emitted("save")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
   it("keeps a status and a tariff that are not among the choices", () => {
     const d = draftOf(member({ status_norm: "Payé", tarif_name: "Tarif 2024" }));
     const { field, wrapper } = render(d, false);
