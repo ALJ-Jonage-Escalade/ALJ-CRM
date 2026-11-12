@@ -168,6 +168,13 @@ describe("OutilsKeysPage", () => {
     expect(all("assign-member").map((m) => m.textContent.trim())).toEqual(["WEASLEY Ron"]);
     all("assign-member")[0]!.click();
     await flushPromises();
+    expect((byId("assign-search") as HTMLInputElement).value).toBe("WEASLEY Ron");
+    expect(all("assign-member")).toEqual([]);
+    await typeIn(byId("assign-search"), "WEASLEY");
+    expect(all("assign-member").map((m) => m.textContent.trim())).toEqual(["WEASLEY Ron"]);
+    expect(byId("assign-submit")!.hasAttribute("disabled")).toBe(true);
+    all("assign-member")[0]!.click();
+    await flushPromises();
     await typeIn(byId("assign-date"), "2026-10-01");
     await typeIn(byId("assign-comment"), "Caution");
     byId("assign-submit")!.click();

@@ -33,6 +33,18 @@ const shown = computed(() => {
   return (members.value ?? []).filter((m) => !needle || m.name.toLowerCase().includes(needle));
 });
 
+/* Picking a member writes their name into the search box and closes the list; editing the box again drops the choice. */
+function pick(member: Candidate): void {
+  chosen.value = member;
+  search.value = member.name;
+}
+
+watch(search, (text) => {
+  if (chosen.value && text !== chosen.value.name) {
+    chosen.value = null;
+  }
+});
+
 watch(
   () => props.keyToAssign,
   async (key) => {
@@ -84,7 +96,7 @@ const field = "w-full rounded-lg border border-slate-300 px-2.5 py-2 text-[13px]
         placeholder="Rechercher un nom…"
         :class="field"
       />
-      <ul class="mt-2 max-h-56 overflow-y-auto rounded-lg border border-slate-200">
+      <ul v-if="!chosen" class="mt-2 max-h-56 overflow-y-auto rounded-lg border border-slate-200">
         <li v-if="!members" class="px-2.5 py-2 text-xs text-slate-500">Chargement des adhérents…</li>
         <li v-else-if="!shown.length" class="px-2.5 py-2 text-xs text-slate-500">Aucun adhérent trouvé.</li>
         <li v-for="m in shown" :key="m.user_id">
@@ -92,27 +104,21 @@ const field = "w-full rounded-lg border border-slate-300 px-2.5 py-2 text-[13px]
             type="button"
             data-testid="assign-member"
             :disabled="m.heldCode !== null"
-            :aria-pressed="chosen?.user_id === m.user_id"
-            :class="[
-              'w-full cursor-pointer px-2.5 py-1.5 text-left text-[13px] disabled:cursor-not-allowed disabled:text-slate-400',
-              chosen?.user_id === m.user_id ? 'bg-accent/10 font-bold' : 'hover:bg-slate-50',
-            ]"
-            @click="chosen = m"
+            class="w-full cursor-pointer px-2.5 py-1.5 text-left text-[13px] hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+            @click="pick(m)"
           >
             {{ m.name }}
             <template v-if="m.heldCode">— détient déjà la clé {{ m.heldCode }}</template>
           </button>
         </li>
       </ul>
-      <div class="mt-3 grid gap-3 sm:grid-cols-2">
-        <div>
-          <label for="assign-date" :class="label">Remise le *</label>
-          <input id="assign-date" v-model="givenOn" type="date" required data-testid="assign-date" :class="field" />
-        </div>
-        <div>
-          <label for="assign-comment" :class="label">Commentaire</label>
-          <input id="assign-comment" v-model="comment" type="text" maxlength="500" data-testid="assign-comment" :class="field" />
-        </div>
+      <div class="mt-3">
+        <label for="assign-date" :class="label">Remise le *</label>
+        <input id="assign-date" v-model="givenOn" type="date" required data-testid="assign-date" :class="field" />
+      </div>
+      <div class="mt-3">
+        <label for="assign-comment" :class="label">Commentaire</label>
+        <textarea id="assign-comment" v-model="comment" rows="3" maxlength="500" data-testid="assign-comment" :class="field" />
       </div>
       <UiDialogActions class="mt-4">
         <UiButton variant="muted" @click="open = false">Annuler</UiButton>
