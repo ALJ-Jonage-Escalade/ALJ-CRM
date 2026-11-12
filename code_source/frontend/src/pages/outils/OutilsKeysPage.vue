@@ -93,7 +93,6 @@ async function done(message: string): Promise<void> {
 }
 
 onMounted(reload);
-defineExpose({ reload });
 </script>
 
 <template>

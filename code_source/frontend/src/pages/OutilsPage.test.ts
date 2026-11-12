@@ -332,6 +332,20 @@ describe("OutilsPage", () => {
     expect(byId("toast")!.textContent).toBe("🔄 Carte réactualisée.");
   });
 
+  it("offers the reload only on the sub-pages showing data that can go stale", async () => {
+    const { byId, open } = await render("admin");
+    expect(byId("tools-refresh")).not.toBeNull();
+    for (const sub of ["ffme-import", "helloasso-import", "cles"]) {
+      await open(sub);
+      expect(byId(`pane-${sub}`), sub).not.toBeNull();
+      expect(byId("tools-refresh"), sub).toBeNull();
+    }
+    for (const sub of ["pivot", "stats", "presence", "ffme", "map"]) {
+      await open(sub);
+      expect(byId("tools-refresh"), sub).not.toBeNull();
+    }
+  });
+
   it("says when the map or the pivot table fails", async () => {
     const mapPoints = ANSWERS["GET /api/reports/map-points"]!;
     const pivot = ANSWERS["GET /api/reports/pivot-records"]!;
