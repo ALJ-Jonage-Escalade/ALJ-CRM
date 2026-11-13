@@ -66,14 +66,14 @@ const field = "w-full rounded-lg border border-slate-300 px-2.5 py-2 text-[13px]
     data-testid="assignment-edit-dialog"
   >
     <form novalidate @submit.prevent="submit">
-      <div class="grid gap-3 sm:grid-cols-2">
+      <div class="grid gap-3">
         <div>
           <label for="edit-given-on" :class="label">Remise le *</label>
           <input id="edit-given-on" v-model="givenOn" type="date" required data-testid="edit-given-on" :class="field" />
         </div>
         <div>
           <label for="edit-comment" :class="label">Commentaire de remise</label>
-          <input id="edit-comment" v-model="comment" type="text" maxlength="500" data-testid="edit-comment" :class="field" />
+          <textarea id="edit-comment" v-model="comment" rows="3" maxlength="500" data-testid="edit-comment" :class="field" />
         </div>
         <template v-if="assignment?.returned_on">
           <div>
@@ -82,10 +82,10 @@ const field = "w-full rounded-lg border border-slate-300 px-2.5 py-2 text-[13px]
           </div>
           <div>
             <label for="edit-return-comment" :class="label">Commentaire de retour</label>
-            <input
+            <textarea
               id="edit-return-comment"
               v-model="returnComment"
-              type="text"
+              rows="3"
               maxlength="500"
               data-testid="edit-return-comment"
               :class="field"
