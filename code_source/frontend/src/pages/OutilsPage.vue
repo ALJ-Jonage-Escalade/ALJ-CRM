@@ -40,16 +40,15 @@ onMounted(async () => {
 
 provide(OUTILS_KEY, { seasons, initialSeason, toast });
 
-// Reload of the open sub-page
+// Reload of the open sub-page: only the sub-pages listed here show the card (the imports and the keys have no use for it)
 const REFRESHED: Record<string, string> = {
   map: "🔄 Carte réactualisée.",
   pivot: "🔄 Tableau croisé dynamique réactualisé.",
   stats: "🔄 Statistiques des compétitions réactualisées.",
   presence: "🔄 Effectifs et créneaux réactualisés.",
   ffme: "🔄 Statistiques FFME réactualisées.",
-  "ffme-import": "🔄 Formulaire d'import FFME réinitialisé.",
-  "helloasso-import": "🔄 Import HelloAsso réinitialisé.",
 };
+const reloadable = computed(() => sub.value in REFRESHED);
 const openPage = ref<ReloadablePage | null>(null);
 
 function refresh(): void {
@@ -63,7 +62,7 @@ function refresh(): void {
 
 <template>
   <AppShell page="outils" title="Outils" :sub="sub">
-    <UiCard class="mb-3">
+    <UiCard v-if="reloadable" class="mb-3">
       <div class="flex flex-wrap items-center justify-between gap-2.5">
         <div class="min-w-0">
           <h2 class="text-base font-bold">🛠️ Outils d'analyse & exports</h2>

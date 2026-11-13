@@ -130,8 +130,6 @@ async function apply(): Promise<void> {
     busy.value = null;
   }
 }
-
-defineExpose({ reload: reset });
 </script>
 
 <template>

@@ -171,7 +171,7 @@ const COLUMNS: DataColumn<Member>[] = [
   {
     id: "diplome",
     label: "Diplôme",
-    title: "Diplômes & autonomie (🔴 Badge rouge, 🧗 Autonomie bloc, 🟠 Passeport orange, 🔑 Clé HID ProxKey)",
+    title: "Diplômes & autonomie (🔴 Badge rouge, 🧗 Autonomie bloc, 🟠 Passeport orange)",
     value: (m) => diplomeWeight(m),
     compare: (a, b) => diplomeWeight(a) - diplomeWeight(b) || collator.compare(a.last_name, b.last_name),
     descFirst: true,

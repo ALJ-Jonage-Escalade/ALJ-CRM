@@ -17,6 +17,8 @@ export interface RecordRow {
   icon: string;
   label: string;
   value: string;
+  /** The value links there (in the app). */
+  to?: string;
 }
 
 /** Lines of the record, empty ones left out. */
@@ -45,14 +47,14 @@ export function recordRows(m: Member): RecordRow[] {
   add("📷", "Droit à l'image", m.photo_auth);
   add("🔴", "Badge rouge", m.badge_rouge);
   add("🧗", "Autonomie bloc", m.autonomie_bloc);
-  const keyHas = yes(m.hid_proxkey);
-  if (keyHas || m.hid_proxkey_comment || m.hid_proxkey_date) {
-    const parts = [
-      keyHas ? "Possède la clé" : "Pas de clé",
-      m.hid_proxkey_date && `du ${formatDayText(m.hid_proxkey_date)}`,
-      m.hid_proxkey_comment,
-    ].filter(Boolean);
-    add("🔑", "Clé HID ProxKey", parts.join(" · "));
+  if (m.key) {
+    // Held keys are managed in Outils › Clés (plans/club-keys.md): the line opens the key there
+    rows.push({
+      icon: "🔑",
+      label: "Clé de la salle",
+      value: `n° ${m.key.code} depuis le ${formatDayText(m.key.given_on)}`,
+      to: `/bureau/outils/cles?cle=${m.key.id}`,
+    });
   }
   if (diplomes(m).some((d) => d.type === "passeport_orange")) {
     add("🟠", "Passeport orange", "Oui");
@@ -124,9 +126,6 @@ export interface MemberDraft {
   badge_rouge: "Oui" | "Non";
   autonomie_bloc: "Oui" | "Non";
   photo_auth: "Oui" | "Non";
-  hid_proxkey: "Oui" | "Non";
-  hid_proxkey_date: string;
-  hid_proxkey_comment: string;
   email_primary: string;
   email_secondary: string;
   phone: string;
@@ -159,9 +158,6 @@ export function draftOf(m?: Member, firstTarif = ""): MemberDraft {
     badge_rouge: m && yes(m.badge_rouge) ? "Oui" : "Non",
     autonomie_bloc: m && yes(m.autonomie_bloc) ? "Oui" : "Non",
     photo_auth: m ? (yes(m.photo_auth) ? "Oui" : "Non") : "Oui",
-    hid_proxkey: m && yes(m.hid_proxkey) ? "Oui" : "Non",
-    hid_proxkey_date: m?.hid_proxkey_date ?? "",
-    hid_proxkey_comment: m?.hid_proxkey_comment ?? "",
     email_primary: m?.email_primary ?? "",
     email_secondary: m?.email_secondary ?? "",
     phone: m?.phone ?? "",
@@ -244,9 +240,6 @@ export function newMemberOf(d: MemberDraft): NewMember {
     badge_rouge: d.badge_rouge,
     autonomie_bloc: d.autonomie_bloc,
     photo_auth: d.photo_auth,
-    hid_proxkey: d.hid_proxkey,
-    hid_proxkey_date: d.hid_proxkey_date.trim(),
-    hid_proxkey_comment: d.hid_proxkey_comment.trim(),
     email_primary: d.email_primary.trim(),
     email_secondary: d.email_secondary.trim(),
     phone: d.phone.trim(),
@@ -276,9 +269,6 @@ const EDITED: [keyof MemberChanges & DraftField, string][] = [
   ["badge_rouge", "Badge rouge"],
   ["autonomie_bloc", "Autonomie bloc"],
   ["photo_auth", "Droit à l'image"],
-  ["hid_proxkey", "Clé HID ProxKey"],
-  ["hid_proxkey_date", "Date clé HID ProxKey"],
-  ["hid_proxkey_comment", "Commentaire clé HID ProxKey"],
   ["email_primary", "E-mail principal"],
   ["email_secondary", "E-mail secondaire"],
   ["phone", "Téléphone"],

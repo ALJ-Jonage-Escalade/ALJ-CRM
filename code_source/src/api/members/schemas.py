@@ -32,6 +32,13 @@ class Creneau(BaseModel):
     type: str
 
 
+class MemberKey(BaseModel):
+    """The club key a member holds, since when."""
+    id: int
+    code: str
+    given_on: str
+
+
 class Member(BaseModel):
     """One member of a season (one purchase), as domain/members/view.py member_row() builds it.
     Names, city and phones are already formatted; status_norm is the French status label."""
@@ -59,9 +66,7 @@ class Member(BaseModel):
     photo_auth: str
     badge_rouge: str
     autonomie_bloc: str
-    hid_proxkey: str
-    hid_proxkey_date: str
-    hid_proxkey_comment: str
+    key: Optional[MemberKey] = None  # the club key they hold (Outils › Clés)
     passeport_orange: str
     raw_passports: str
     raw_diplomas: str
@@ -127,9 +132,6 @@ class MemberChanges(RequestBody):
     badge_rouge: Optional[YesNo] = None
     autonomie_bloc: Optional[YesNo] = None
     photo_auth: Optional[YesNo] = None
-    hid_proxkey: Optional[YesNo] = None
-    hid_proxkey_date: Optional[str] = None
-    hid_proxkey_comment: Optional[str] = None
     email_primary: Optional[str] = None
     email_secondary: Optional[str] = None
     phone: Optional[str] = None
@@ -172,9 +174,6 @@ class NewMember(RequestBody):
     badge_rouge: YesNo = "Non"
     autonomie_bloc: YesNo = "Non"
     photo_auth: YesNo = "Oui"
-    hid_proxkey: YesNo = "Non"
-    hid_proxkey_date: str = ""
-    hid_proxkey_comment: str = ""
     email_primary: str = ""
     email_secondary: str = ""
     phone: str = ""

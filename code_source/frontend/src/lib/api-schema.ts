@@ -935,6 +935,144 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Keys */
+        get: operations["list_keys_api_keys_get"];
+        put?: never;
+        /** Add Key */
+        post: operations["add_key_api_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/keys/{key_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Key */
+        post: operations["assign_key_api_keys__key_id__assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/keys/{key_id}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Return Key */
+        post: operations["return_key_api_keys__key_id__return_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/keys/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Key */
+        patch: operations["rename_key_api_keys__key_id__patch"];
+        trace?: never;
+    };
+    "/api/keys/{key_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Key History */
+        get: operations["key_history_api_keys__key_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/key-assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Assignment */
+        delete: operations["delete_assignment_api_key_assignments__assignment_id__delete"];
+        options?: never;
+        head?: never;
+        /** Correct Assignment */
+        patch: operations["correct_assignment_api_key_assignments__assignment_id__patch"];
+        trace?: never;
+    };
+    "/api/keys/{key_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Key */
+        post: operations["archive_key_api_keys__key_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/keys/{key_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Key */
+        post: operations["restore_key_api_keys__key_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/webhooks/helloasso": {
         parameters: {
             query?: never;
@@ -2992,6 +3130,214 @@ export interface components {
             linked: boolean;
         };
         /**
+         * Key
+         * @description A club key, its status, its current holder and, archived, when and why.
+         */
+        Key: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "available" | "assigned" | "archived";
+            holder?: components["schemas"]["KeyHolder"] | null;
+            archive?: components["schemas"]["KeyArchive"] | null;
+        };
+        /**
+         * KeyArchive
+         * @description When and why a key was archived.
+         */
+        KeyArchive: {
+            /** Date */
+            date: string;
+            /** Comment */
+            comment: string;
+        };
+        /**
+         * KeyArchiveIn
+         * @description A key archived (lost, broken): the reason is required.
+         */
+        KeyArchiveIn: {
+            /**
+             * Archived On
+             * Format: date
+             */
+            archived_on: string;
+            /** Comment */
+            comment: string;
+        };
+        /**
+         * KeyAssignmentEntry
+         * @description Who held the key, from given_on to returned_on (None: still held), who handed it over (by).
+         */
+        KeyAssignmentEntry: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "assignment";
+            /** Id */
+            id: number;
+            /** User Id */
+            user_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Given On */
+            given_on: string;
+            /** Returned On */
+            returned_on: string | null;
+            /** Comment */
+            comment: string;
+            /** Return Comment */
+            return_comment: string;
+            /** By */
+            by: string;
+        };
+        /**
+         * KeyAssignmentIn
+         * @description A key handed over to a member of the active season.
+         */
+        KeyAssignmentIn: {
+            /** User Id */
+            user_id: number;
+            /**
+             * Given On
+             * Format: date
+             */
+            given_on: string;
+            /**
+             * Comment
+             * @default
+             */
+            comment?: string;
+        };
+        /**
+         * KeyAssignmentPatch
+         * @description Corrected dates and comments of an assignment; returned_on only on a key given back.
+         */
+        KeyAssignmentPatch: {
+            /**
+             * Given On
+             * Format: date
+             */
+            given_on: string;
+            /** Returned On */
+            returned_on?: string | null;
+            /**
+             * Comment
+             * @default
+             */
+            comment?: string;
+            /**
+             * Return Comment
+             * @default
+             */
+            return_comment?: string;
+        };
+        /**
+         * KeyDone
+         * @description A key write with nothing else to return.
+         */
+        KeyDone: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+        };
+        /**
+         * KeyEventEntry
+         * @description Something else that happened to the key, and the admin who did it.
+         */
+        KeyEventEntry: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "event";
+            /** Id */
+            id: number;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "archived" | "restored" | "renamed" | "assignment_deleted";
+            /** Date */
+            date: string;
+            /** Comment */
+            comment: string;
+            /** By */
+            by: string;
+        };
+        /**
+         * KeyHolder
+         * @description Who holds a key, since when; member_this_season false: no membership of the active season (to chase up).
+         */
+        KeyHolder: {
+            /** User Id */
+            user_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Given On */
+            given_on: string;
+            /** Comment */
+            comment: string;
+            /** Member This Season */
+            member_this_season: boolean;
+            /** Season */
+            season: string;
+        };
+        /**
+         * KeyIn
+         * @description A new key: its code (engraved number or club number), unique whatever its case.
+         */
+        KeyIn: {
+            /** Code */
+            code: string;
+        };
+        /**
+         * KeyRename
+         * @description A key's new code (a placeholder replaced, a typo fixed).
+         */
+        KeyRename: {
+            /** Code */
+            code: string;
+        };
+        /**
+         * KeyRestoreIn
+         * @description An archive undone (the key found again).
+         */
+        KeyRestoreIn: {
+            /**
+             * Comment
+             * @default
+             */
+            comment?: string;
+        };
+        /**
+         * KeyReturnIn
+         * @description A key given back (not before it was handed over).
+         */
+        KeyReturnIn: {
+            /**
+             * Returned On
+             * Format: date
+             */
+            returned_on: string;
+            /**
+             * Comment
+             * @default
+             */
+            comment?: string;
+        };
+        /**
          * ManualPayment
          * @description Payment received outside HelloAsso (cheque, cash).
          */
@@ -3097,12 +3443,7 @@ export interface components {
             badge_rouge: string;
             /** Autonomie Bloc */
             autonomie_bloc: string;
-            /** Hid Proxkey */
-            hid_proxkey: string;
-            /** Hid Proxkey Date */
-            hid_proxkey_date: string;
-            /** Hid Proxkey Comment */
-            hid_proxkey_comment: string;
+            key?: components["schemas"]["MemberKey"] | null;
             /** Passeport Orange */
             passeport_orange: string;
             /** Raw Passports */
@@ -3161,12 +3502,6 @@ export interface components {
             autonomie_bloc?: ("Oui" | "Non") | null;
             /** Photo Auth */
             photo_auth?: ("Oui" | "Non") | null;
-            /** Hid Proxkey */
-            hid_proxkey?: ("Oui" | "Non") | null;
-            /** Hid Proxkey Date */
-            hid_proxkey_date?: string | null;
-            /** Hid Proxkey Comment */
-            hid_proxkey_comment?: string | null;
             /** Email Primary */
             email_primary?: string | null;
             /** Email Secondary */
@@ -3217,6 +3552,18 @@ export interface components {
             order_ref: string;
             /** Season */
             season: string;
+        };
+        /**
+         * MemberKey
+         * @description The club key a member holds, since when.
+         */
+        MemberKey: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Given On */
+            given_on: string;
         };
         /**
          * MemberList
@@ -3519,22 +3866,6 @@ export interface components {
              * @enum {string}
              */
             photo_auth?: "Oui" | "Non";
-            /**
-             * Hid Proxkey
-             * @default Non
-             * @enum {string}
-             */
-            hid_proxkey?: "Oui" | "Non";
-            /**
-             * Hid Proxkey Date
-             * @default
-             */
-            hid_proxkey_date?: string;
-            /**
-             * Hid Proxkey Comment
-             * @default
-             */
-            hid_proxkey_comment?: string;
             /**
              * Email Primary
              * @default
@@ -6754,6 +7085,493 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_keys_api_keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Key"][];
+                };
+            };
+        };
+    };
+    add_key_api_keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Key"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_key_api_keys__key_id__assignments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyAssignmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    return_key_api_keys__key_id__return_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyReturnIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_key_api_keys__key_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    key_history_api_keys__key_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": (components["schemas"]["KeyAssignmentEntry"] | components["schemas"]["KeyEventEntry"])[];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_assignment_api_key_assignments__assignment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_assignment_api_key_assignments__assignment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyAssignmentPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_key_api_keys__key_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyArchiveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_key_api_keys__key_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyRestoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyDone"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

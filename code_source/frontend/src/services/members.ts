@@ -7,6 +7,8 @@ export function createMembersApi(client: ApiClient) {
   return {
     create: (body: Schemas["MemberCreate"]) => unwrap(client.POST("/api/members/create", { body })),
     update: (body: Schemas["MemberUpdate"]) => unwrap(client.POST("/api/members/update", { body })),
+    /** Members of the active season (one row per membership). */
+    list: () => unwrap(client.GET("/api/members")),
     seasons: () => unwrap(client.GET("/api/seasons")),
     /** Tariff names of the current season. */
     seasonTarifs: () => unwrap(client.GET("/api/season-tarifs")),

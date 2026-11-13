@@ -3336,6 +3336,625 @@
         }
       }
     },
+    "/api/keys": {
+      "get": {
+        "summary": "List Keys",
+        "operationId": "list_keys_api_keys_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Key"
+                  },
+                  "type": "array",
+                  "title": "Response List Keys Api Keys Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Add Key",
+        "operationId": "add_key_api_keys_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Key"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{key_id}/assignments": {
+      "post": {
+        "summary": "Assign Key",
+        "operationId": "assign_key_api_keys__key_id__assignments_post",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyAssignmentIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{key_id}/return": {
+      "post": {
+        "summary": "Return Key",
+        "operationId": "return_key_api_keys__key_id__return_post",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyReturnIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{key_id}": {
+      "patch": {
+        "summary": "Rename Key",
+        "operationId": "rename_key_api_keys__key_id__patch",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyRename"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{key_id}/history": {
+      "get": {
+        "summary": "Key History",
+        "operationId": "key_history_api_keys__key_id__history_get",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/KeyAssignmentEntry"
+                      },
+                      {
+                        "$ref": "#/components/schemas/KeyEventEntry"
+                      }
+                    ]
+                  },
+                  "title": "Response Key History Api Keys  Key Id  History Get"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/key-assignments/{assignment_id}": {
+      "patch": {
+        "summary": "Correct Assignment",
+        "operationId": "correct_assignment_api_key_assignments__assignment_id__patch",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyAssignmentPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Assignment",
+        "operationId": "delete_assignment_api_key_assignments__assignment_id__delete",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{key_id}/archive": {
+      "post": {
+        "summary": "Archive Key",
+        "operationId": "archive_key_api_keys__key_id__archive_post",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyArchiveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{key_id}/restore": {
+      "post": {
+        "summary": "Restore Key",
+        "operationId": "restore_key_api_keys__key_id__restore_post",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyRestoreIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyDone"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/webhooks/helloasso": {
       "get": {
         "summary": "Webhook Helloasso Ping",
@@ -7387,6 +8006,406 @@
         ],
         "title": "ItemLinked"
       },
+      "Key": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "assigned",
+              "archived"
+            ],
+            "title": "Status"
+          },
+          "holder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyHolder"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archive": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyArchive"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "status"
+        ],
+        "title": "Key",
+        "description": "A club key, its status, its current holder and, archived, when and why."
+      },
+      "KeyArchive": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "comment"
+        ],
+        "title": "KeyArchive",
+        "description": "When and why a key was archived."
+      },
+      "KeyArchiveIn": {
+        "properties": {
+          "archived_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Archived On"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Comment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "archived_on",
+          "comment"
+        ],
+        "title": "KeyArchiveIn",
+        "description": "A key archived (lost, broken): the reason is required."
+      },
+      "KeyAssignmentEntry": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "assignment",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "given_on": {
+            "type": "string",
+            "title": "Given On"
+          },
+          "returned_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned On"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "return_comment": {
+            "type": "string",
+            "title": "Return Comment"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "user_id",
+          "last_name",
+          "first_name",
+          "given_on",
+          "returned_on",
+          "comment",
+          "return_comment",
+          "by"
+        ],
+        "title": "KeyAssignmentEntry",
+        "description": "Who held the key, from given_on to returned_on (None: still held), who handed it over (by)."
+      },
+      "KeyAssignmentIn": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "given_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Given On"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Comment",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id",
+          "given_on"
+        ],
+        "title": "KeyAssignmentIn",
+        "description": "A key handed over to a member of the active season."
+      },
+      "KeyAssignmentPatch": {
+        "properties": {
+          "given_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Given On"
+          },
+          "returned_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned On"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Comment",
+            "default": ""
+          },
+          "return_comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Return Comment",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "given_on"
+        ],
+        "title": "KeyAssignmentPatch",
+        "description": "Corrected dates and comments of an assignment; returned_on only on a key given back."
+      },
+      "KeyDone": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "KeyDone",
+        "description": "A key write with nothing else to return."
+      },
+      "KeyEventEntry": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "event",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "archived",
+              "restored",
+              "renamed",
+              "assignment_deleted"
+            ],
+            "title": "Type"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "type",
+          "date",
+          "comment",
+          "by"
+        ],
+        "title": "KeyEventEntry",
+        "description": "Something else that happened to the key, and the admin who did it."
+      },
+      "KeyHolder": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "given_on": {
+            "type": "string",
+            "title": "Given On"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "member_this_season": {
+            "type": "boolean",
+            "title": "Member This Season"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "last_name",
+          "first_name",
+          "given_on",
+          "comment",
+          "member_this_season",
+          "season"
+        ],
+        "title": "KeyHolder",
+        "description": "Who holds a key, since when; member_this_season false: no membership of the active season (to chase up)."
+      },
+      "KeyIn": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "KeyIn",
+        "description": "A new key: its code (engraved number or club number), unique whatever its case."
+      },
+      "KeyRename": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "KeyRename",
+        "description": "A key's new code (a placeholder replaced, a typo fixed)."
+      },
+      "KeyRestoreIn": {
+        "properties": {
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Comment",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "KeyRestoreIn",
+        "description": "An archive undone (the key found again)."
+      },
+      "KeyReturnIn": {
+        "properties": {
+          "returned_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Returned On"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Comment",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "returned_on"
+        ],
+        "title": "KeyReturnIn",
+        "description": "A key given back (not before it was handed over)."
+      },
       "ManualPayment": {
         "properties": {
           "montant": {
@@ -7629,17 +8648,15 @@
             "type": "string",
             "title": "Autonomie Bloc"
           },
-          "hid_proxkey": {
-            "type": "string",
-            "title": "Hid Proxkey"
-          },
-          "hid_proxkey_date": {
-            "type": "string",
-            "title": "Hid Proxkey Date"
-          },
-          "hid_proxkey_comment": {
-            "type": "string",
-            "title": "Hid Proxkey Comment"
+          "key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemberKey"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "passeport_orange": {
             "type": "string",
@@ -7739,9 +8756,6 @@
           "photo_auth",
           "badge_rouge",
           "autonomie_bloc",
-          "hid_proxkey",
-          "hid_proxkey_date",
-          "hid_proxkey_comment",
           "passeport_orange",
           "raw_passports",
           "raw_diplomas",
@@ -7896,43 +8910,6 @@
               }
             ],
             "title": "Photo Auth"
-          },
-          "hid_proxkey": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "Oui",
-                  "Non"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hid Proxkey"
-          },
-          "hid_proxkey_date": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hid Proxkey Date"
-          },
-          "hid_proxkey_comment": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hid Proxkey Comment"
           },
           "email_primary": {
             "anyOf": [
@@ -8120,6 +9097,30 @@
           "season"
         ],
         "title": "MemberCreated"
+      },
+      "MemberKey": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "given_on": {
+            "type": "string",
+            "title": "Given On"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "given_on"
+        ],
+        "title": "MemberKey",
+        "description": "The club key a member holds, since when."
       },
       "MemberList": {
         "properties": {
@@ -8766,25 +9767,6 @@
             ],
             "title": "Photo Auth",
             "default": "Oui"
-          },
-          "hid_proxkey": {
-            "type": "string",
-            "enum": [
-              "Oui",
-              "Non"
-            ],
-            "title": "Hid Proxkey",
-            "default": "Non"
-          },
-          "hid_proxkey_date": {
-            "type": "string",
-            "title": "Hid Proxkey Date",
-            "default": ""
-          },
-          "hid_proxkey_comment": {
-            "type": "string",
-            "title": "Hid Proxkey Comment",
-            "default": ""
           },
           "email_primary": {
             "type": "string",

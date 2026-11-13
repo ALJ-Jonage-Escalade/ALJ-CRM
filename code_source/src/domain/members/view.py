@@ -152,7 +152,7 @@ def member_row(row: Dict[str, Any], slots: Dict[str, Dict[str, str]],
     text = {k: row.get(k) or "" for k in (
         "address", "zip_code", "email_primary", "email_secondary", "licence_ffme",
         "health_commitment", "photo_auth", "badge_rouge", "autonomie_bloc",
-        "hid_proxkey", "hid_proxkey_date", "hid_proxkey_comment", "raw_passports",
+        "raw_passports",
         "raw_diplomas", "payer_email", "order_ref", "order_date", "status", "document_sante",
         "email_sent_date", "commentaires_correctif", "season_name")}
     return {

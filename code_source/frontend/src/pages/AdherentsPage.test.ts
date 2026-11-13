@@ -36,6 +36,7 @@ const ACTIVE: MemberList = {
       status_norm: "Validé",
       phone: "+33 6 12 34 56 78",
       email_primary: "lea@example.org",
+      key: { id: 4, code: "12", given_on: "2026-09-12" },
     }),
     member({
       user_id: 2,
@@ -239,6 +240,10 @@ describe("AdherentsPage", () => {
     expect(router.currentRoute.value.query).toEqual({ id: "1", saison: "2026-2027", achat: "11" });
     expect(inBody("record-name")!.textContent).toBe("Léa DUPONT");
     expect(inBody("record-fields")!.textContent).toContain("lea@example.org");
+    // Her key, managed in Outils › Clés
+    const keyLink = inBody("record-field-link")!;
+    expect(keyLink.textContent.trim()).toBe("n° 12 depuis le 12/09/2026");
+    expect(keyLink.getAttribute("href")).toBe("/bureau/outils/cles?cle=4");
     expect(inBody("record-readonly")).not.toBeNull();
     expect(inBody("record-edit")).toBeNull();
     expect(inBody("record-attestation")).toBeNull();

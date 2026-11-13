@@ -13,6 +13,7 @@ from domain.competitions.models import STATUT_CLOSE
 from domain.constants import resolve_season
 from domain.errors import InvalidRequest, NotFound
 from domain.members import view as member_view
+from infrastructure.sqlite.keys import KeyRepository
 from infrastructure.sqlite.members import MemberRepository
 from infrastructure.sqlite.planning import PlanningRepository
 from services.competitions.competitions import CompetitionService
@@ -31,9 +32,13 @@ class MemberService:
             raise NotFound(f"Saison inconnue : {name}.")
         planning = PlanningRepository.load_planning_data()
         rows = MemberRepository.list_member_rows(name)
+        members = member_view.build_members(rows, planning, name)
+        held = KeyRepository.held_keys()
+        for member in members:
+            member["key"] = held.get(member["user_id"])
         return {
             "season": name,
-            "members": member_view.build_members(rows, planning, name),
+            "members": members,
             "creneaux": member_view.slot_groups(planning),
         }
 

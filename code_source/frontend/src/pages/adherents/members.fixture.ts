@@ -24,9 +24,6 @@ export function member(change: Partial<Member>): Member {
     "photo_auth",
     "badge_rouge",
     "autonomie_bloc",
-    "hid_proxkey",
-    "hid_proxkey_date",
-    "hid_proxkey_comment",
     "passeport_orange",
     "raw_passports",
     "raw_diplomas",
@@ -50,6 +47,7 @@ export function member(change: Partial<Member>): Member {
     age: null,
     sex: null,
     amount: null,
+    key: null,
     season_name: "2026-2027",
     ...change,
   } as Member;

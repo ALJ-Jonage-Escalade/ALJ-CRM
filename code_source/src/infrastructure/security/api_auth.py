@@ -155,6 +155,8 @@ def required_role(method: str, path: str) -> Optional[Role]:
         return Role.ADMIN  # modification des paramètres généraux réservée aux administrateurs
     if path == "/api/helloasso/memberships" or path.startswith("/api/helloasso/memberships/"):
         return Role.ADMIN  # import des adhésions HelloAsso (aperçu, import, historique) réservé aux administrateurs
+    if path.startswith(("/api/keys", "/api/key-assignments")) and method not in ("GET", "HEAD"):
+        return Role.ADMIN  # club keys (Outils › Clés): handed over by the admins, coaches read
     if path.startswith("/api/ffme") and method not in ("GET", "HEAD"):
         return Role.ADMIN  # imports et modifications FFME réservés aux administrateurs
     if path in ("/api/auth/google/update-token", "/api/auth/google/login") and method not in ("GET", "HEAD"):

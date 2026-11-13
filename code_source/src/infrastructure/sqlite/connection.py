@@ -55,6 +55,42 @@ _COMPETITION_EMAIL_TEMPLATES = [
 ]
 
 
+# Club keys (HID ProxKey) of the climbing wall, plans/club-keys.md: replicated to Firestore (cloud_sync TRACKED_TABLES).
+# A code is unique whatever its case, archived keys included.
+KEYS_DDL = (
+    """CREATE TABLE IF NOT EXISTS keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        status TEXT NOT NULL DEFAULT 'available',
+        created_at TEXT, updated_at TEXT
+    )""",
+    # Who held a key and when; returned_on empty while held. One open assignment per key and per person.
+    """CREATE TABLE IF NOT EXISTS key_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_id INTEGER NOT NULL REFERENCES keys(id),
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        given_on TEXT NOT NULL,
+        returned_on TEXT,
+        comment TEXT NOT NULL DEFAULT '',
+        return_comment TEXT NOT NULL DEFAULT '',
+        by TEXT NOT NULL DEFAULT '',
+        created_at TEXT
+    )""",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_key_assignments_open_key ON key_assignments(key_id) WHERE returned_on IS NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_key_assignments_open_user ON key_assignments(user_id) WHERE returned_on IS NULL",
+    # What else happened to a key: archived, restored, renamed, assignment_deleted
+    """CREATE TABLE IF NOT EXISTS key_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_id INTEGER NOT NULL REFERENCES keys(id),
+        type TEXT NOT NULL,
+        date TEXT NOT NULL,
+        comment TEXT NOT NULL DEFAULT '',
+        by TEXT NOT NULL DEFAULT '',
+        created_at TEXT
+    )""",
+)
+
+
 def _add_missing_column(conn: sqlite3.Connection, cursor: sqlite3.Cursor, table: str, column: str, ddl: str) -> None:
     """Migration auto des BDD existantes : ajoute la colonne si elle manque."""
     try:
@@ -225,12 +261,9 @@ class SqliteDatabase:
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_purchases_helloasso_item ON purchases(helloasso_item_id)"
                        " WHERE helloasso_item_id IS NOT NULL")
 
-        # Clé d'accès salle d'escalade (HID ProxKey) : information associée à la personne (users).
-        _add_missing_column(conn, cursor, "users", "hid_proxkey", "TEXT DEFAULT 'Non'")
-        _add_missing_column(conn, cursor, "users", "hid_proxkey_date", "TEXT DEFAULT ''")
-        _add_missing_column(conn, cursor, "users", "hid_proxkey_comment", "TEXT DEFAULT ''")
-
         _ensure_email_templates(conn, cursor)
+        for statement in KEYS_DDL:
+            cursor.execute(statement)
 
         # Table de réglages clé/valeur, plus écrite par l'application (les réglages sont dans la
         # collection Firestore `app_settings`) : conservée pour la réplication de crm_app_settings.
@@ -252,6 +285,7 @@ class SqliteDatabase:
         if current_version == 0:
             cursor.execute(f"PRAGMA user_version = {schema_v2.SCHEMA_TARGET_VERSION}")
             logger.info(f"[SQLITE] Base neuve taguée en version {schema_v2.SCHEMA_TARGET_VERSION} (schéma v2 natif).")
+        schema_v2.drop_former_user_columns(cursor)
         # Flat member view: created again on every start to follow the code's definition
         schema_v2.recreate_member_flat_view(cursor)
 
