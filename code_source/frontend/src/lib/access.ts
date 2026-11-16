@@ -3,7 +3,7 @@
 import type { AuthState } from "../composables/auth";
 import { isAdmin, isStaff, type Role } from "./roles";
 
-/** public: anyone, signed in or not; viewer: any role, read-only accounts too (the competitions, as on the former
+/** public: anyone, signed in or not; viewer: every role, read-only accounts too (the competitions, as on the former
     phone page); staff: coaches and admins; admin: admins only. */
 export type Access = "public" | "viewer" | "staff" | "admin";
 

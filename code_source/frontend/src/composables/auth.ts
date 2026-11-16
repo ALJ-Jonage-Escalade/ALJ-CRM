@@ -50,8 +50,15 @@ export const AFTER_LOGIN_STORAGE = "alj_after_login";
 
 const UNEXPECTED_ANSWER = "Réponse inattendue du serveur.";
 
+/** The signed-in account as GET /api/me describes it. */
+interface MeAnswer {
+  email: string;
+  role: Role;
+  invitationExpiredAt?: string;
+}
+
 /** The account of GET /api/me; an ApiError (the client's messages) for a refusal or an unexpected answer. */
-async function readMe(res: Response): Promise<{ email: string; role: Role; invitationExpiredAt?: string }> {
+async function readMe(res: Response): Promise<MeAnswer> {
   if (!res.ok) {
     const body: unknown = await res.json().catch(() => null);
     // 503: the access list could not be read: the role stays unchecked (never "no access"), the server says why
