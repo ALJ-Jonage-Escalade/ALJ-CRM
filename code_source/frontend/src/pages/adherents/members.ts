@@ -2,24 +2,17 @@
    web/shared/alj-filters.js and alj-members.js).
    The members come formatted by the server (GET /api/members, domain/members/view.py). */
 import type { BadgeColor } from "../../components/ui/palette";
+import { localStorageOrNone } from "../../lib/localStorage";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
 import { SEX_LABELS } from "../../lib/sex";
-import { plural } from "../../lib/text";
+import { normKey, plural } from "../../lib/text";
+import type { MemberStatus } from "../../services/members";
 
 export type Member = Schemas["Member"];
 export type Creneau = Schemas["Creneau"];
 export type MemberList = Schemas["MemberList"];
-
-/** Lower case, without accents nor surrounding spaces: the key of every comparison. */
-export function normKey(s: string | null | undefined): string {
-  return (s ?? "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
 
 /** Indique si un adhérent appartient à un groupe ou tarif compétition. */
 export function isCompetitor(member: Member): boolean {
@@ -216,26 +209,26 @@ export type FilteredMember = Pick<
   Partial<Pick<Member, "commentaires_correctif">>;
 
 /** The search finds names (both orders), tariff, licence, e-mail, phone (4 digits at least, any spacing), city, comment. */
-export function matchesSearch(m: FilteredMember, search: string): boolean {
+export function matchesSearch(member: FilteredMember, search: string): boolean {
   const q = normKey(search);
   if (!q) {
     return true;
   }
   const qDigits = digits(q);
-  if (qDigits.length >= 4 && digits(m.phone).includes(qDigits)) {
+  if (qDigits.length >= 4 && digits(member.phone).includes(qDigits)) {
     return true;
   }
   return [
-    m.last_name,
-    m.first_name,
-    `${m.first_name} ${m.last_name}`,
-    `${m.last_name} ${m.first_name}`,
-    m.tarif_name,
-    m.licence_ffme,
-    m.email_primary,
-    m.phone,
-    m.city,
-    m.commentaires_correctif,
+    member.last_name,
+    member.first_name,
+    `${member.first_name} ${member.last_name}`,
+    `${member.last_name} ${member.first_name}`,
+    member.tarif_name,
+    member.licence_ffme,
+    member.email_primary,
+    member.phone,
+    member.city,
+    member.commentaires_correctif,
   ].some((field) => field && normKey(field).includes(q));
 }
 
@@ -255,8 +248,8 @@ export function filterMembers<M extends FilteredMember>(members: readonly M[], f
 
 // ---------------------------------------------------------------- Display
 
-export const STATUSES = ["Validé", "Traité", "Terminé", "En cours", "Annulé"] as const;
-export type MemberStatus = (typeof STATUSES)[number];
+/** The membership statuses, in display order (the contract's status union: a new server status breaks the build). */
+export const STATUSES = ["Validé", "Traité", "Terminé", "En cours", "Annulé"] as const satisfies readonly MemberStatus[];
 
 /** Status chips: « Tous » then the statuses some member has, with their counts. */
 export function statusChips(members: readonly Pick<Member, "status_norm">[]): { value: string; label: string; count: number }[] {
@@ -281,7 +274,8 @@ const STATUS_COLOR: Record<string, BadgeColor> = {
 /** Colour of a status badge. */
 export const statusColor = (status: string): BadgeColor => STATUS_COLOR[status] ?? "slate";
 
-const yes = (v: string) => ["oui", "x", "true", "1"].includes(v.trim().toLowerCase());
+/** A yes/no column of the membership file read as a flag: « oui », « x », « true » or « 1 ». */
+export const isYes = (value: string): boolean => ["oui", "x", "true", "1"].includes(value.trim().toLowerCase());
 
 export interface Diplome {
   type: "badge_rouge" | "autonomie_bloc" | "passeport_orange";
@@ -290,30 +284,30 @@ export interface Diplome {
 }
 
 /** Badges of the Diplôme column: red badge, bouldering autonomy, orange passport. */
-export function diplomes(m: Pick<Member, "badge_rouge" | "autonomie_bloc" | "raw_passports" | "passeport_orange">): Diplome[] {
+export function diplomes(member: Pick<Member, "badge_rouge" | "autonomie_bloc" | "raw_passports" | "passeport_orange">): Diplome[] {
   const items: Diplome[] = [];
-  if (yes(m.badge_rouge)) {
+  if (isYes(member.badge_rouge)) {
     items.push({ type: "badge_rouge", label: "Badge rouge diff", icon: "🔴" });
   }
-  if (yes(m.autonomie_bloc)) {
+  if (isYes(member.autonomie_bloc)) {
     items.push({ type: "autonomie_bloc", label: "Autonomie bloc", icon: "🧗" });
   }
-  const passports = `${m.raw_passports} ${m.passeport_orange}`.toLowerCase();
-  if (passports.includes("orange") || m.passeport_orange.toLowerCase() === "oui") {
+  const passports = `${member.raw_passports} ${member.passeport_orange}`.toLowerCase();
+  if (passports.includes("orange") || member.passeport_orange.toLowerCase() === "oui") {
     items.push({ type: "passeport_orange", label: "Passeport orange", icon: "🟠" });
   }
   return items;
 }
 
 /** Sort weight of the Diplôme column: red badge 4, autonomy 2, orange passport 1. */
-export function diplomeWeight(m: Member): number {
+export function diplomeWeight(member: Member): number {
   const weights = { badge_rouge: 4, autonomie_bloc: 2, passeport_orange: 1 };
-  return diplomes(m).reduce((sum, d) => sum + weights[d.type], 0);
+  return diplomes(member).reduce((sum, d) => sum + weights[d.type], 0);
 }
 
 /** Milliseconds of an ISO or French date, 0 when empty or unreadable (sorted first). */
-export function dateValue(s: string): number {
-  const str = s.trim();
+export function dateValue(text: string): number {
+  const str = text.trim();
   if (!str) {
     return 0;
   }
@@ -333,18 +327,13 @@ export function dateValue(s: string): number {
 /** Text comparison of the columns: French, case and accents ignored, numbers in order ("U9" before "U11"). */
 export const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
 
-/** The tel: link of a formatted phone number. */
-export function telHref(phone: string): string {
-  return `tel:${phone.replace(/[^\d+]/g, "")}`;
-}
-
 /** Query of Adhérents opening the member's record on its season: ?id=<user_id>&saison=…&achat=<purchase_id>
     (id and saison are the links of the former page, which still open the member; achat picks the membership when a
     member has several in a season). ?ajout=1 opens the add form. */
 export type RecordQuery = { id: string; saison: string; achat?: string } | { ajout: "1" };
 
-export function recordQuery(m: Member): RecordQuery {
-  return { id: String(m.user_id), saison: m.season_name, achat: String(m.purchase_id) };
+export function recordQuery(member: Member): RecordQuery {
+  return { id: String(member.user_id), saison: member.season_name, achat: String(member.purchase_id) };
 }
 
 /** The member a record query names, among the members of its season (undefined: not, or not yet, loaded). */
@@ -428,11 +417,14 @@ export function csvName(season: string): string {
 // ---------------------------------------------------------------- Saved filters
 
 /** Same key and shape as the former page (web/shared/alj-filters.js): the filters of earlier visits are kept. */
-export const FILTER_KEY = "alj_bureau_adherents_filters";
+export const ADHERENTS_FILTERS_STORAGE = "alj_bureau_adherents_filters";
 
 /** The filters of the last visit on this browser (key: another page's filters). The search is not kept: it often
     holds a member's name. */
-export function loadFilters(storage: Pick<Storage, "getItem"> | undefined = globalThis.localStorage, key = FILTER_KEY): Filters {
+export function loadFilters(
+  storage: Pick<Storage, "getItem"> | undefined = localStorageOrNone(),
+  key = ADHERENTS_FILTERS_STORAGE,
+): Filters {
   const filters = emptyFilters();
   try {
     const saved: unknown = JSON.parse(storage?.getItem(key) || "{}");
@@ -463,8 +455,8 @@ function booleans(value: unknown): Record<string, boolean> {
 
 export function saveFilters(
   filters: Filters,
-  storage: Pick<Storage, "setItem"> | undefined = globalThis.localStorage,
-  key = FILTER_KEY,
+  storage: Pick<Storage, "setItem"> | undefined = localStorageOrNone(),
+  key = ADHERENTS_FILTERS_STORAGE,
 ): void {
   try {
     storage?.setItem(key, JSON.stringify({ ...filters, search: "" }));
@@ -475,20 +467,20 @@ export function saveFilters(
 
 // ---------------------------------------------------------------- Record panel
 
-export const PANEL_KEY = "alj_bureau_adherents_panel";
+export const ADHERENTS_PANEL_STORAGE = "alj_bureau_adherents_panel";
 
 /** Whether the record panel was left open on this browser (open by default). */
-export function loadPanelOpen(storage: Pick<Storage, "getItem"> | undefined = globalThis.localStorage): boolean {
+export function loadPanelOpen(storage: Pick<Storage, "getItem"> | undefined = localStorageOrNone()): boolean {
   try {
-    return storage?.getItem(PANEL_KEY) !== "closed";
+    return storage?.getItem(ADHERENTS_PANEL_STORAGE) !== "closed";
   } catch {
     return true; // blocked storage: open
   }
 }
 
-export function savePanelOpen(open: boolean, storage: Pick<Storage, "setItem"> | undefined = globalThis.localStorage): void {
+export function savePanelOpen(open: boolean, storage: Pick<Storage, "setItem"> | undefined = localStorageOrNone()): void {
   try {
-    storage?.setItem(PANEL_KEY, open ? "open" : "closed");
+    storage?.setItem(ADHERENTS_PANEL_STORAGE, open ? "open" : "closed");
   } catch {
     // blocked storage: the choice lasts for this visit only
   }

@@ -48,9 +48,9 @@ function invalidFields(detail: unknown[]): string {
 
 /**
  * The API's error bodies: {status: "error", message, code?} (api/responses.py error()), FastAPI's {detail: string}
- * and {detail: [...]} (validation), or anything else (proxy page, empty body).
+ * and {detail: [...]} (validation), or anything else (proxy page, empty body), then worded by `fallback`.
  */
-export function errorFromBody(status: number, body: unknown): ApiError {
+export function errorFromBody(status: number, body: unknown, fallback: string = defaultMessage(status)): ApiError {
   if (body && typeof body === "object") {
     const { message, code, detail } = body as { message?: unknown; code?: unknown; detail?: unknown };
     const codeText = typeof code === "string" ? code : null;
@@ -65,7 +65,7 @@ export function errorFromBody(status: number, body: unknown): ApiError {
       return new ApiError(status, "validation", `Données refusées par le serveur${fields ? ` (${fields})` : ""}.`);
     }
   }
-  return new ApiError(status, null, defaultMessage(status));
+  return new ApiError(status, null, fallback);
 }
 
 export function createApiClient(api: ApiFetch, baseUrl: string = location.origin): ApiClient {
@@ -97,8 +97,39 @@ export async function unwrap<T>(call: Promise<{ data?: T; error?: unknown; respo
 }
 
 /** Message of any error caught around an API call. */
-export function errorText(e: unknown): string {
-  return e instanceof ApiError ? e.message : "Erreur inattendue.";
+export function errorText(error: unknown): string {
+  return error instanceof ApiError ? error.message : "Erreur inattendue.";
+}
+
+// ---------------------------------------------------------------- Polled reads (useSyncedResource)
+
+type JsonAnswer<P extends keyof paths> = paths[P] extends { get: { responses: { 200: { content: { "application/json": infer Body } } } } }
+  ? Body
+  : never;
+/** The GET routes of the contract answering JSON. */
+export type ReadPath = { [P in keyof paths]: [JsonAnswer<P>] extends [never] ? never : P }[keyof paths];
+/** The answer of a GET route, as the contract types it. */
+export type ReadAnswer<P extends ReadPath> = JsonAnswer<P>;
+type ReadQuery<P extends ReadPath> = paths[P] extends { get: { parameters: { query?: infer Query } } } ? NonNullable<Query> : never;
+
+/** A GET route of the contract and its query parameters (an array value repeats the parameter). */
+export interface ApiRead<P extends ReadPath> {
+  path: P;
+  query?: ReadQuery<P>;
+}
+
+/** The url of a read, e.g. "/api/members?season=2025-2026": also the key of the offline copy, so its format stays. */
+export function readUrl(read: ApiRead<ReadPath>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries((read.query ?? {}) as Record<string, unknown>)) {
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (item !== null && item !== undefined) {
+        params.append(key, String(item));
+      }
+    }
+  }
+  const query = params.toString();
+  return query ? `${read.path}?${query}` : read.path;
 }
 
 /** Provided by main.ts; the pages' tests provide one built on a fake ApiFetch. */

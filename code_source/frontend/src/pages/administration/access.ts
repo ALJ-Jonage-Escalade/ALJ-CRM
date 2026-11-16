@@ -2,17 +2,16 @@
 import { looksLikeEmail } from "../../lib/email";
 import { formatDate, formatDateTime, parseDate } from "../../lib/format";
 import type { Schemas } from "../../lib/client";
+import { ROLE_NAME } from "../../lib/roles";
 
 export type AccessEntry = Schemas["AccessEntry"];
 export type AccessRole = AccessEntry["role"];
 export type HistoryAction = Schemas["AccessHistoryEntry"]["action"];
 
-const ROLE_NAMES: Record<AccessRole, string> = { admin: "Administrateur", coach: "Coach", readonly: "Lecture seule" };
-
 /** The roles an admin may give, highest first. */
 export const ROLE_OPTIONS: readonly { value: AccessRole; label: string }[] = (["admin", "coach", "readonly"] as const).map((role) => ({
   value: role,
-  label: ROLE_NAMES[role],
+  label: ROLE_NAME[role],
 }));
 
 const ACTION_LABELS: Record<HistoryAction, string> = {
@@ -31,7 +30,7 @@ export function accessRole(value: string): AccessRole | null {
 }
 
 export function roleName(role: AccessRole | null | undefined): string {
-  return role ? ROLE_NAMES[role] : "—";
+  return role ? ROLE_NAME[role] : "—";
 }
 
 export function actionLabel(action: HistoryAction): string {
@@ -52,13 +51,13 @@ export function authorLabel(author: string): string {
 }
 
 /** « 30/10/2026 » or « Jamais ». */
-export function lastSignIn(at: string | null | undefined): string {
+export function lastSignInText(at: string | null | undefined): string {
   const date = parseDate(at);
   return date ? formatDate(date) : "Jamais";
 }
 
 /** « 30/10/2026 09:15 », or the text as is when it is not a date. */
-export function dateTime(at: string): string {
+export function dateTimeText(at: string): string {
   const date = parseDate(at);
   return date ? formatDateTime(date) : at;
 }

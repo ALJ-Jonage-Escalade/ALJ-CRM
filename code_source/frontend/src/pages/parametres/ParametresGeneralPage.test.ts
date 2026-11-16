@@ -1,16 +1,9 @@
+import { fakeAuth, json, provided } from "../../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
-import type { Auth } from "../../composables/auth";
-import { AUTH_KEY } from "../../composables/auth";
-import { API_KEY, type ApiFetch } from "../../lib/api";
-import { CLIENT_KEY, createApiClient } from "../../lib/client";
+import { type ApiFetch } from "../../lib/api";
 import ParametresGeneralPage from "./ParametresGeneralPage.vue";
 import { dialogs } from "../../composables/dialogs";
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
 
 const ANSWERS: Record<string, () => Response> = {
   "GET /api/auth/google/status": () =>
@@ -58,16 +51,10 @@ function render(answers = ANSWERS) {
     const answer = answers[`${method} ${u.pathname}`];
     return answer ? answer() : json({ status: "ok" });
   });
-  const auth: Auth = {
-    state: ref({ status: "signedIn", user: { uid: "u1", email: "admin@alj.example" }, role: "admin" }),
-    login: vi.fn(),
-    logout: vi.fn(async () => {}),
-    retry: vi.fn(async () => {}),
-    stop: vi.fn(),
-  };
+  const auth = fakeAuth({ status: "signedIn", user: { uid: "u1", email: "admin@alj.example" }, role: "admin" });
   const wrapper = mount(ParametresGeneralPage, {
     global: {
-      provide: { [AUTH_KEY]: auth, [API_KEY]: api, [CLIENT_KEY]: createApiClient(api, "http://alj.test") },
+      provide: provided(auth, api),
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
     },
   });

@@ -3,12 +3,12 @@
    them on their competitions, deleting one takes them off (server side). */
 import { computed, inject, ref } from "vue";
 import { RouterLink } from "vue-router";
-import UiButton from "../../components/ui/UiButton.vue";
-import { CLIENT_KEY } from "../../lib/client";
-import { createCompetitionsApi } from "../../services/competitions";
-import { coachedBy, period, sortCompetitions, type Coach, type Competition } from "./competitions";
-import { WRITER_KEY } from "./writer";
-import { dialogs } from "../../composables/dialogs";
+import UiButton from "../../../components/ui/UiButton.vue";
+import { CLIENT_KEY } from "../../../lib/client";
+import { createCompetitionsApi } from "../../../services/competitions";
+import { coachedBy, periodText, sortCompetitions, type Coach, type Competition } from "../competitions";
+import { WRITER_KEY } from "../writer";
+import { dialogs } from "../../../composables/dialogs";
 
 /** listPath: address of the competitions list (the page's index route), where a competition opens. */
 const props = defineProps<{ coaches: readonly Coach[] | null; competitions: readonly Competition[]; listPath: string }>();
@@ -108,7 +108,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
               data-testid="coach-competition"
               class="text-slate-700 no-underline hover:text-accent"
             >
-              🏆 {{ comp.nom }} · {{ period(comp) }}
+              🏆 {{ comp.nom }} · {{ periodText(comp) }}
             </RouterLink>
           </li>
           <li v-if="!coachedBy(competitions, c).length" class="text-slate-400">Aucune épreuve assignée.</li>

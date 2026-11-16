@@ -1,11 +1,13 @@
+import { fakeAuth } from "../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
-import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
+import { AUTH_KEY, type AuthState } from "../composables/auth";
 import type { PageId } from "../lib/access";
 import type { Role } from "../lib/roles";
 import { API_KEY, type ApiFetch } from "../lib/api";
+import { CLIENT_KEY, createApiClient } from "../lib/client";
 import { STORE_KEY, type OfflineStore } from "../lib/store";
 import { SIGN_IN_ERROR_KEY } from "../composables/signIn";
 import AppShell from "./AppShell.vue";
@@ -15,13 +17,19 @@ const USER = { uid: "u1", email: "albus@alj-escalade.fr" };
 const signedIn = (role: Role): AuthState => ({ status: "signedIn", user: USER, role });
 
 function render(state: AuthState, googleStatus = "ok", page: PageId = "accueil", queued = 0, signInError: string | null = null) {
-  const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
+  const auth = fakeAuth(state);
   const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: googleStatus })));
   const wrapper = mount(AppShell, {
     props: { page, title: "Titre" },
     slots: { default: '<p id="page-body">contenu</p>' },
     global: {
-      provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: storeWith(queued), [SIGN_IN_ERROR_KEY]: ref(signInError) },
+      provide: {
+        [AUTH_KEY]: auth,
+        [API_KEY]: api,
+        [CLIENT_KEY]: createApiClient(api, "http://alj.test"),
+        [STORE_KEY]: storeWith(queued),
+        [SIGN_IN_ERROR_KEY]: ref(signInError),
+      },
       stubs: { VersionBadge: true },
     },
   });
@@ -160,7 +168,7 @@ describe("AppShell", () => {
   it("warns staff when the club's Google token has expired", async () => {
     const { wrapper, api } = render({ status: "signedIn", user: USER, role: "admin" }, "expired");
     await flushPromises();
-    expect(api).toHaveBeenCalledWith("/api/auth/google/status");
+    expect(api).toHaveBeenCalledWith("http://alj.test/api/auth/google/status", expect.anything());
     expect(wrapper.find("#google-auth-warning").isVisible()).toBe(true);
   });
 
@@ -171,7 +179,7 @@ describe("AppShell", () => {
     vi.mocked(api).mockResolvedValueOnce(new Response(JSON.stringify({ status: "success", url: "https://accounts.google.com/x" })));
     await wrapper.find('[data-testid="google-renew"]').trigger("click");
     await flushPromises();
-    expect(api).toHaveBeenLastCalledWith("/api/auth/google/login", expect.objectContaining({ method: "POST" }));
+    expect(api).toHaveBeenLastCalledWith("http://alj.test/api/auth/google/login", expect.objectContaining({ method: "POST" }));
     expect(open).toHaveBeenCalledWith("https://accounts.google.com/x", "_self");
     open.mockRestore();
   });
@@ -250,14 +258,20 @@ describe("AppShell sub-menu", () => {
   async function renderSub(state: AuthState, sub: string, staffCopy: boolean | null = false, path = `/bureau/competitions/${sub}`) {
     const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/:any(.*)*", component: { render: () => null } }] });
     await router.push(path);
-    const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
+    const auth = fakeAuth(state);
     const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: "ok" })));
     const wrapper = mount(AppShell, {
       props: { page: "competitions", title: "Compétitions", sub, staffCopy },
       slots: { default: '<p id="page-body">contenu</p>' },
       global: {
         plugins: [router],
-        provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: storeWith(0), [SIGN_IN_ERROR_KEY]: ref(null) },
+        provide: {
+          [AUTH_KEY]: auth,
+          [API_KEY]: api,
+          [CLIENT_KEY]: createApiClient(api, "http://alj.test"),
+          [STORE_KEY]: storeWith(0),
+          [SIGN_IN_ERROR_KEY]: ref(null),
+        },
         stubs: { VersionBadge: true },
       },
     });

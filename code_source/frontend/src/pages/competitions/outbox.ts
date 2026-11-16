@@ -55,6 +55,8 @@ export interface Outbox {
   /** Reads the changes this user left in the store (null: signed out, nothing). */
   load(uid: string | null): Promise<void>;
   queue(uid: string, competition: Competition, participant: Participant, flag: QueuedFlag, value: boolean): Promise<void>;
+  /** Drops the change waiting for this flag, if any (a newer one is being sent online). */
+  cancel(competitionId: number, adherentId: number, flag: QueuedFlag): Promise<void>;
   pending(competitionId: number, adherentId: number | null | undefined, flag: QueuedFlag): QueuedChange | undefined;
   /** null: nothing to send, or already sending. */
   replay(uid: string): Promise<ReplayResult | null>;
@@ -65,20 +67,20 @@ export interface Outbox {
 export const outboxKey = (competitionId: number | string, adherentId: number | string, flag: string): string =>
   `${competitionId}:${adherentId}:${flag}`;
 
-export function refusalText(e: ApiError): string {
-  if (e.code === "changed") {
+export function refusalText(error: ApiError): string {
+  if (error.code === "changed") {
     return "modifié entre-temps sur un autre appareil";
   }
-  if (e.code === "already_paid") {
+  if (error.code === "already_paid") {
     return "a payé entre-temps : passez par l'annulation";
   }
-  if (e.code === "competition_closed") {
+  if (error.code === "competition_closed") {
     return "compétition archivée";
   }
-  if (e.status === 404) {
+  if (error.status === 404) {
     return "n'est plus inscrit à cette compétition";
   }
-  return e.message || `HTTP ${e.status}`;
+  return error.message || `HTTP ${error.status}`;
 }
 
 /** Network down, server down or busy: kept for the next try. */
@@ -89,22 +91,17 @@ function isValid(entry: QueuedChange, uid: string): boolean {
   return entry.uid === uid && QUEUED_URL.test(String(entry.url)) && QUEUED_FLAGS.includes(entry.flag) && typeof entry.value === "boolean";
 }
 
-/** Confirmation asked before signing out with changes not sent yet (they are lost with the store). */
-export function logoutWarning(n: number): string {
-  return `${n} modification${plural(n)} faite${plural(n)} hors ligne pas encore envoyée${plural(n)} ser${plural(n, "ont", "a")} perdue${plural(n)}. Se déconnecter ?`;
-}
-
-export function pendingLine(n: number): string {
-  return n ? ` · ⏳ ${n} modification${plural(n)} à envoyer` : "";
+export function pendingLine(count: number): string {
+  return count ? ` · ⏳ ${count} modification${plural(count)} à envoyer` : "";
 }
 
 /** The toast after a replay. */
-export function replayMessage(r: ReplayResult): string {
-  const n = r.refused.length;
+export function replayMessage(result: ReplayResult): string {
+  const n = result.refused.length;
   if (!n) {
     return "☁️ Modifications faites hors ligne envoyées.";
   }
-  return `⚠️ ${n} modification${plural(n)} faite${plural(n)} hors ligne refusée${plural(n)} : ${r.refused.join(" ; ")}`;
+  return `⚠️ ${n} modification${plural(n)} faite${plural(n)} hors ligne refusée${plural(n)} : ${result.refused.join(" ; ")}`;
 }
 
 export function createOutbox(store: OfflineStore, send: SendChange, now: () => number = Date.now): Outbox {
@@ -135,9 +132,7 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
     const adherentId = Number(participant.adherent_id);
     const key = outboxKey(competition.id, adherentId, flag);
     if (value === !!participant[flag]) {
-      set((m) => m.delete(key));
-      await store.unqueue(key);
-      return;
+      return cancel(competition.id, adherentId, flag);
     }
     const change: QueuedChange = {
       key,
@@ -151,6 +146,12 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
     };
     set((m) => m.set(key, change));
     await store.queue(uid, { ...change });
+  }
+
+  async function cancel(competitionId: number, adherentId: number, flag: QueuedFlag): Promise<void> {
+    const key = outboxKey(competitionId, adherentId, flag);
+    set((m) => m.delete(key));
+    await store.unqueue(key);
   }
 
   function pending(competitionId: number, adherentId: number | null | undefined, flag: QueuedFlag): QueuedChange | undefined {
@@ -193,15 +194,18 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
               written.set(entry.url, { from: entry.unchanged_since, to: String(after) });
             }
           } catch (e) {
-            const error = e instanceof ApiError ? e : new ApiError(0, null, "Erreur inattendue.");
-            if (retryLater(error)) {
+            if (!(e instanceof ApiError)) {
+              // A bug, not an outage: the change is dropped and named, rather than retried forever
+              console.error("Envoi différé :", e);
+              result.refused.push(`${entry.label} : erreur inattendue`);
+            } else if (retryLater(e)) {
               break;
-            }
-            if (error.status === 401 || error.status === 403) {
+            } else if (e.status === 401 || e.status === 403) {
               result.denied = true;
               return result;
+            } else {
+              result.refused.push(`${entry.label} : ${refusalText(e)}`);
             }
-            result.refused.push(`${entry.label} : ${refusalText(error)}`);
           }
         }
         if (mine !== generation) {
@@ -221,5 +225,5 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
     changes.value = new Map();
   }
 
-  return { changes, load, queue, pending, replay, forget };
+  return { changes, load, queue, cancel, pending, replay, forget };
 }

@@ -7,7 +7,7 @@ import { API_KEY, apiFetch } from "./lib/api";
 import { CLIENT_KEY, createApiClient } from "./lib/client";
 import { completeDevSignIn, devSignIn, signInWithGoogleAccessToken } from "./lib/firebase";
 import { isEmulator } from "./lib/runtime";
-import { offlineStore } from "./lib/store";
+import { offlineStore, STORE_KEY } from "./lib/store";
 import { registerServiceWorker } from "./lib/version";
 import { createAppRouter } from "./router";
 import "./styles.css";
@@ -15,7 +15,8 @@ import "./styles.css";
 // Older browsers: index.html shows its message instead
 if (!window.ALJ_UNSUPPORTED) {
   const auth = sharedAuth();
-  bindOfflineStore(auth.state, offlineStore());
+  const store = offlineStore();
+  bindOfflineStore(auth.state, store);
   // Google sign-in, on /competitions: run before the router reads the address (the token leaves it at once)
   const signInError = ref<string | null>(null);
   void handleSignIn({
@@ -32,6 +33,7 @@ if (!window.ALJ_UNSUPPORTED) {
     .provide(SIGN_IN_ERROR_KEY, signInError)
     .use(createAppRouter(auth))
     .provide(AUTH_KEY, auth)
+    .provide(STORE_KEY, store)
     .provide(API_KEY, apiFetch)
     .provide(CLIENT_KEY, createApiClient(apiFetch))
     .mount("#app");

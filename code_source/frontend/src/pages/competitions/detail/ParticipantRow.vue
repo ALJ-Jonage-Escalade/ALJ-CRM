@@ -3,8 +3,8 @@
    events and rules as the card, but no « Présent » column: the « Participe » switch, then the action allowed by the payment
    (« Sur place » once checked in). */
 import UiBadge from "../../../components/ui/UiBadge.vue";
-import { telHref } from "../../adherents/members";
-import { hasPaid, isCancelled, payment, ranking, type Row } from "../competitions";
+import { telHref } from "../../../lib/text";
+import { hasPaid, isCancelled, paymentBadge, rankingText, type Row } from "../competitions";
 
 const props = defineProps<{ row: Row; canWrite: boolean; staff: boolean; contactsShown: boolean }>();
 const emit = defineEmits<{
@@ -49,9 +49,9 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       </span>
     </td>
     <td class="px-2.5 py-2 text-center">
-      <UiBadge v-if="ranking(row)" color="amber" variant="soft" data-testid="ranking">{{ ranking(row) }}</UiBadge>
+      <UiBadge v-if="rankingText(row)" color="amber" variant="soft" data-testid="ranking">{{ rankingText(row) }}</UiBadge>
       <span v-else class="text-xs text-slate-400">—</span>
-      <span v-if="ranking(row) && row.categorie_ffme" class="block text-[10.5px] text-slate-500">{{ row.categorie_ffme }}</span>
+      <span v-if="rankingText(row) && row.categorie_ffme" class="block text-[10.5px] text-slate-500">{{ row.categorie_ffme }}</span>
     </td>
     <td class="px-2.5 py-2 text-center">
       <input
@@ -77,8 +77,8 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       </span>
     </td>
     <td class="px-2.5 py-2">
-      <UiBadge :color="payment(row.statut_paiement).color" data-testid="payment-badge" title="Statut de paiement">
-        {{ payment(row.statut_paiement).label }}
+      <UiBadge :color="paymentBadge(row.statut_paiement).color" data-testid="payment-badge" title="Statut de paiement">
+        {{ paymentBadge(row.statut_paiement).label }}
         <template v-if="row.montant_paye">({{ row.montant_paye }} €)</template>
       </UiBadge>
     </td>

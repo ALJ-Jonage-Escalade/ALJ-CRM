@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* Compétitions › Coachs (coaches and admins, offline too on a coach's device): the coaches and their competitions. */
 import { inject } from "vue";
-import CoachesPane from "./CoachesPane.vue";
+import CoachesPane from "./coaches/CoachesPane.vue";
 import { COMPETITIONS_KEY } from "./context";
 
 const { coaches, competitions, all, listPath } = inject(COMPETITIONS_KEY)!;

@@ -17,12 +17,16 @@
    Every failure (IndexedDB missing or blocked, private window, quota) only means "no offline copy": the page then
    behaves as online only. Calls never reject. */
 import type { InjectionKey } from "vue";
+import { localStorageOrNone } from "./localStorage";
+import { plural } from "./text";
 
 const DB_NAME = "alj-offline";
 const DB_VERSION = 2; // 2: outbox
 export const MAX_AGE_DAYS = 30; // limits what a lost phone exposes
 const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 3600 * 1000;
-const LEGACY_PREFIX = "alj_snapshot:"; // snapshots of the first phone pages, in localStorage
+/* Snapshots of the first phone pages, in localStorage. Remove LEGACY_PREFIX, legacyKeys and migrateLegacy after
+   2026-11-24: the former pages were removed on 2026-10-25 and every copy expires after MAX_AGE_DAYS (30), so none is left to move. */
+const LEGACY_PREFIX = "alj_snapshot:";
 const OPEN_TIMEOUT_MS = 3000; // some WebKit versions never answer indexedDB.open
 
 export interface Stored<T = unknown> {
@@ -274,20 +278,12 @@ export function createOfflineStore(deps: StoreDeps = {}): OfflineStore {
   return { start, load, save, touch, queue, queued, unqueue, clearAll };
 }
 
-function localStorageOrNone(): Storage | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined; // blocked storage
-  }
-}
-
-/** Provided by the components' tests; the app uses offlineStore(). */
+/** Provided by main.ts (offlineStore()) and by the components' tests. */
 export const STORE_KEY: InjectionKey<OfflineStore> = Symbol("offline-store");
 
 let shared: OfflineStore | null = null;
 
-/** The app's store, opened on first use. */
+/** The app's store, opened on first use (main.ts provides it). */
 export function offlineStore(): OfflineStore {
   shared ??= createOfflineStore({
     indexedDB: globalThis.indexedDB,
@@ -295,4 +291,9 @@ export function offlineStore(): OfflineStore {
     persist: () => void navigator.storage?.persist?.().catch(() => {}),
   });
   return shared;
+}
+
+/** Confirmation asked before signing out with changes not sent yet (they are lost with the store). */
+export function logoutWarning(count: number): string {
+  return `${count} modification${plural(count)} faite${plural(count)} hors ligne pas encore envoyée${plural(count)} ser${plural(count, "ont", "a")} perdue${plural(count)}. Se déconnecter ?`;
 }

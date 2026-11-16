@@ -1,5 +1,5 @@
-/* Routes migrated to the Vue app. FastAPI serves the app's entry page for these paths only
-   (api/web/pages.py); links to the other pages are plain <a href> (full page load).
+/* The app's routes. FastAPI serves the app's entry page for these paths only (api/web/pages.py); any other address
+   is a plain <a href> (full page load).
    Every route declares meta.access (lib/access.ts); the guards send a coach who opens an admin page back to
    Accueil. Signed-out, unverified and non-staff visitors stay on the page, which shows the sign-in gate.
    Sub-pages (lib/access.ts subPages) are child routes: they carry their page's access (the guards check the page);
@@ -24,7 +24,7 @@ import CompetitionsPage from "./pages/CompetitionsPage.vue";
 import CompetitionsBalancePage from "./pages/competitions/CompetitionsBalancePage.vue";
 import CompetitionsCoachesPage from "./pages/competitions/CompetitionsCoachesPage.vue";
 import CompetitionsListPage from "./pages/competitions/CompetitionsListPage.vue";
-import DirectoryPage from "./pages/DirectoryPage.vue";
+import AnnuairePage from "./pages/AnnuairePage.vue";
 import NotFoundPage from "./pages/NotFoundPage.vue";
 
 // Loaded when opened: Accueil (the most opened page) does not wait for them
@@ -107,7 +107,7 @@ export const routes: RouteRecordRaw[] = [
     meta: { access: pageAccess("competitions") },
     children: subRoutes("competitions", "competitions"),
   },
-  { path: "/index", name: "annuaire", component: DirectoryPage, meta: { access: pageAccess("annuaire") } },
+  { path: "/index", name: "annuaire", component: AnnuairePage, meta: { access: pageAccess("annuaire") } },
   { path: "/bureau/communications", name: "communications", component: CommunicationsPage, meta: { access: pageAccess("communications") } },
   { path: "/bureau/planning", name: "planning", component: PlanningPage, meta: { access: pageAccess("planning") } },
   {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* Outils › Import HelloAsso (admins only): the registrations of the HelloAsso membership campaign, imported as members. */
-import HelloAssoImportPane from "./HelloAssoImportPane.vue";
+import HelloAssoImportPane from "./helloasso/HelloAssoImportPane.vue";
 </script>
 
 <template>

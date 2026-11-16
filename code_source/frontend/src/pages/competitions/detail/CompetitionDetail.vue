@@ -1,40 +1,31 @@
 <script setup lang="ts">
 /* One competition: its details, counters and competitors by slot group (a table on wide screens, cards elsewhere). Coaches and admins change it here (plan phase
-   11): the competition itself (edit, archive, delete), its list (add a member, load the competition group, remove the
-   ones never invited), each competitor (ParticipantCard), its MyCompet results, an e-mail to its competitors and a
-   spreadsheet export. « Participe » and « Présent » also change offline (the outbox, sent when the network comes back). */
+   11): the competition itself, its results and exports (CompetitionActions), its list (add a member, load the
+   competition group, remove the ones never invited), each competitor (ParticipantCard) and an e-mail to its competitors. « Participe » and « Présent » also change offline (the outbox, sent when the network comes back). */
 import { computed, inject, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink } from "vue-router";
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
 import UiDialog from "../../../components/ui/UiDialog.vue";
-import UiMenu from "../../../components/ui/UiMenu.vue";
-import UiMenuItem from "../../../components/ui/UiMenuItem.vue";
 import { useMediaQuery } from "../../../composables/media";
-import { CLIENT_KEY, errorText, type Schemas } from "../../../lib/client";
+import { CLIENT_KEY } from "../../../lib/client";
 import { createCompetitionsApi } from "../../../services/competitions";
-import { csvBlob } from "../../../lib/csv";
-import { saveExport, saveFile } from "../../../lib/download";
 import { formatEuros } from "../../../lib/format";
-import CompetitionForm from "../CompetitionForm.vue";
 import {
   countLine,
   counts,
   COMPETITOR_STATUSES,
   competitorStatusesLabel,
-  csvName,
   deadlineOf,
-  discipline,
+  shownDiscipline,
   disciplineColor,
   filterRows,
   groupRows,
   isArchived,
   isNotInvited,
   memberMatches,
-  participantCsv,
-  period,
-  resultsUrlHint,
+  periodText,
   type Coach,
   type Competition,
   type MemberSlot,
@@ -42,14 +33,16 @@ import {
   type ParticipantFilter,
   type Row,
 } from "../competitions";
+import CompetitionActions from "./CompetitionActions.vue";
 import EmailForm from "./EmailForm.vue";
-import type { Outbox, QueuedFlag } from "../outbox";
+import { COMPETITIONS_KEY } from "../context";
+import type { QueuedFlag } from "../outbox";
 import AthleteContactDialog from "./AthleteContactDialog.vue";
 import ParticipantCard from "./ParticipantCard.vue";
 import ParticipantRow from "./ParticipantRow.vue";
 import PaymentForm from "./PaymentForm.vue";
 import WithdrawForm from "./WithdrawForm.vue";
-import { WRITER_KEY } from "../writer";
+import { competitionItself, WRITER_KEY } from "../writer";
 import { formatDayText } from "../../../lib/format";
 import { plural } from "../../../lib/text";
 import { dialogs } from "../../../composables/dialogs";
@@ -59,16 +52,11 @@ const props = defineProps<{
   rows: readonly Row[];
   members: readonly MemberSlot[];
   coaches: readonly Coach[];
-  /** Coaches and admins (offline: a device that keeps the contacts, i.e. a coach's) */
-  canWrite: boolean;
-  staff: boolean;
-  contactsShown: boolean;
-  outbox: Outbox;
-  uid: string | null;
 }>();
+// Who may write, the outbox and the account: shared by the competitions page with all its sub-pages
+const { canWrite, staff, contactsShown, outbox, uid } = inject(COMPETITIONS_KEY)!;
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const writer = inject(WRITER_KEY)!;
-const router = useRouter();
 
 const c = computed(() => props.competition);
 const kpis = computed(() => counts(props.rows));
@@ -83,114 +71,14 @@ const FILTERS = computed(() => [
   { id: "all" as const, label: "📋 Tous", n: kpis.value.all },
   { id: "selected" as const, label: "✅ Participe : Oui", n: kpis.value.selected },
   { id: "unpaid" as const, label: "⏳ Paiement en attente", n: kpis.value.unpaid },
-  ...(props.canWrite ? [{ id: "notInvited" as const, label: "🔘 Non invités", n: notInvited.value.length }] : []),
+  ...(canWrite.value ? [{ id: "notInvited" as const, label: "🔘 Non invités", n: notInvited.value.length }] : []),
 ]);
 const server = (r: Row): Participant | undefined => c.value.participants?.find((p) => p.adherent_id === r.adherent_id);
 const named = (r: Participant) => `${r.prenom ?? ""} ${r.nom ?? ""}`.trim();
 
-// ---------------------------------------------------------------- The competition
-
-const editing = ref(false);
-
-async function save(body: Schemas["CompetitionCreate"]): Promise<void> {
-  if (
-    await writer.run(() => competitionsApi.update(c.value.id, body), {
-      done: "✅ Compétition mise à jour.",
-    })
-  ) {
-    editing.value = false;
-  }
-}
-
-async function remove(): Promise<void> {
-  if (
-    !(await dialogs.confirm({
-      title: "Supprimer la compétition",
-      message: `Supprimer définitivement « ${c.value.nom} » et sa liste de compétiteurs ?`,
-      confirmLabel: "Supprimer",
-      variant: "danger",
-    }))
-  ) {
-    return;
-  }
-  const id = c.value.id;
-  if (
-    await writer.run(() => competitionsApi.remove(id), {
-      done: "🗑 Compétition supprimée.",
-    })
-  ) {
-    editing.value = false;
-    writer.dropped(id);
-    await router.push({ query: {} });
-  }
-}
-
-async function archive(archived: boolean): Promise<void> {
-  const nom = c.value.nom;
-  await writer.run(() => competitionsApi.setArchived(c.value.id, archived), {
-    done: archived ? `📦 « ${nom} » archivée.` : `♻️ « ${nom} » désarchivée.`,
-  });
-}
-
-const addMemberDialogOpen = ref(false);
-
-function exportCsv(): void {
-  saveFile(csvBlob(participantCsv(props.rows)), csvName(c.value));
-}
-
-/* Generated by the server, which needs the sign-in token: fetched through the API client, then saved. */
-async function exportFile(kind: "excel" | "pdf"): Promise<void> {
-  if (!writer.online()) {
-    writer.toast("📴 Hors ligne : export impossible, utilisez l'export CSV.");
-    return;
-  }
-  const id = c.value.id;
-  writer.toast("⏳ Génération du fichier en cours…", 60_000);
-  try {
-    const name =
-      kind === "excel"
-        ? await saveExport(competitionsApi.competitorsExcel(id), `competiteurs_${id}.xlsx`)
-        : await saveExport(competitionsApi.competitorsPdf(id), `competiteurs_${id}.pdf`);
-    writer.toast(`✅ Fichier « ${name} » téléchargé.`);
-  } catch (e) {
-    writer.toast(`❌ Échec de l'export : ${errorText(e)}`, 8000);
-  }
-}
-
-// ---------------------------------------------------------------- MyCompet results
-
-const fetching = ref(false);
-const askUrl = ref(false);
-const resultsUrl = ref("");
-
-async function fetchResults(url = ""): Promise<void> {
-  fetching.value = true;
-  askUrl.value = false;
-  writer.toast(
-    url || c.value.url_resultats
-      ? `⏳ Recherche des résultats de « ${c.value.nom} »…`
-      : `🔍 Recherche automatique des résultats MyCompet de « ${c.value.nom} »…`,
-    6000,
-  );
-  try {
-    await writer.run(() => competitionsApi.fetchResults(c.value.id, url), {
-      done: (r) => `🏆 ${r.matched_count} résultat(s) associé(s) sur ${r.total_scraped} compétiteur(s) ALJ trouvé(s).`,
-      refused: (e) => {
-        if (e.code !== "needs_url") {
-          return false;
-        }
-        resultsUrl.value = "";
-        askUrl.value = true; // not found on MyCompet: the coach gives the page
-        return true;
-      },
-    });
-  } finally {
-    fetching.value = false;
-  }
-}
-
 // ---------------------------------------------------------------- The list
 
+const addMemberDialogOpen = ref(false);
 const memberSearch = ref("");
 const matches = computed(() => memberMatches(props.members, c.value, memberSearch.value));
 const statusHint = `Adhérents au statut ${competitorStatusesLabel} uniquement`;
@@ -204,6 +92,7 @@ function openAddMember(): void {
 /** The dialog stays open, search cleared, to add several competitors in a row. */
 async function add(m: MemberSlot): Promise<void> {
   const ok = await writer.run(() => competitionsApi.addParticipant(c.value.id, m.id!), {
+    competition: competitionItself,
     done: `➕ ${m.prenom} ${m.nom} ajouté(e) à la compétition.`,
   });
   if (ok) {
@@ -213,6 +102,7 @@ async function add(m: MemberSlot): Promise<void> {
 
 async function loadGroup(): Promise<void> {
   await writer.run(() => competitionsApi.loadGroup(c.value.id, COMPETITOR_STATUSES), {
+    competition: (answer) => answer.competition,
     done: (r) =>
       r.added
         ? `🧗 ${r.added} compétiteur(s) du groupe « Compétition » ajouté(s) à la liste.`
@@ -236,7 +126,7 @@ async function removeNotInvited(): Promise<void> {
   }
   let done = 0;
   for (const p of list) {
-    const ok = await writer.run(() => competitionsApi.removeParticipant(c.value.id, p.adherent_id!));
+    const ok = await writer.run(() => competitionsApi.removeParticipant(c.value.id, p.adherent_id!), { competition: competitionItself });
     if (!ok) {
       return;
     }
@@ -254,7 +144,8 @@ const paying = ref<Participant | null>(null);
    or when the network drops during the request, the change waits in the outbox. */
 async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
   const p = server(r);
-  if (!p || p.adherent_id == null || !props.uid) {
+  const owner = uid.value;
+  if (!p || p.adherent_id == null || !owner) {
     return;
   }
   if (flag === "selectionne" && !value && p.statut_paiement === "paye") {
@@ -262,17 +153,18 @@ async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
     return;
   }
   const queue = async () => {
-    await props.outbox.queue(props.uid!, c.value, p, flag, value);
+    await outbox.queue(owner, c.value, p, flag, value);
     writer.toast("⏳ Hors ligne : modification gardée sur l'appareil, envoyée au retour du réseau.", 6000);
   };
   if (!writer.online()) {
     return queue();
   }
-  if (props.outbox.pending(c.value.id, p.adherent_id, flag)) {
-    await props.outbox.queue(props.uid, c.value, p, flag, !!p[flag]);
-  } // superseded
+  if (outbox.pending(c.value.id, p.adherent_id, flag)) {
+    await outbox.cancel(c.value.id, p.adherent_id, flag); // superseded by the change sent now
+  }
   let lost = false;
   await writer.run(() => competitionsApi.updateParticipant(c.value.id, p.adherent_id!, { [flag]: value }), {
+    competition: competitionItself,
     refused: (e) => {
       if (e.code === "already_paid") {
         withdrawing.value = p; // paid meanwhile (HelloAsso): the coach decides what happens to the money
@@ -290,6 +182,7 @@ async function toggle(r: Row, flag: QueuedFlag, value: boolean): Promise<void> {
 async function withdraw(mode: "reporte" | "perdu", note: string): Promise<void> {
   const p = withdrawing.value!;
   const ok = await writer.run(() => competitionsApi.withdraw(c.value.id, p.adherent_id!, { mode, note }), {
+    competition: competitionItself,
     done: mode === "reporte" ? `🔄 Désistement de ${named(p)} : paiement reporté.` : `🚫 Désistement de ${named(p)} : paiement perdu.`,
   });
   if (ok) {
@@ -300,6 +193,7 @@ async function withdraw(mode: "reporte" | "perdu", note: string): Promise<void> 
 async function pay(amount: number): Promise<void> {
   const p = paying.value!;
   const ok = await writer.run(() => competitionsApi.payManually(c.value.id, p.adherent_id!, amount), {
+    competition: competitionItself,
     done: `✅ Paiement manuel de ${amount} € enregistré pour ${named(p)}.`,
   });
   if (ok) {
@@ -319,6 +213,7 @@ async function removeOne(r: Row): Promise<void> {
     return;
   }
   await writer.run(() => competitionsApi.removeParticipant(c.value.id, r.adherent_id!), {
+    competition: competitionItself,
     done: `🗑 ${named(r)} supprimé(e) de l'épreuve.`,
   });
 }
@@ -334,6 +229,7 @@ async function restore(r: Row): Promise<void> {
     return;
   }
   await writer.run(() => competitionsApi.addParticipant(c.value.id, r.adherent_id!), {
+    competition: competitionItself,
     done: `✅ ${named(r)} rétabli(e) en compétiteur actif.`,
   });
 }
@@ -377,13 +273,19 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       <div class="min-w-0">
         <h2 class="m-0 text-[17px] font-bold lg:text-lg lg:font-extrabold" data-testid="detail-name">{{ c.nom }}</h2>
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-1 lg:text-[12.5px]" data-testid="detail-meta">
-          🪪 {{ c.id_ffme || "—" }} · 📅 {{ period(c) }}
+          🪪 {{ c.id_ffme || "—" }} · 📅 {{ periodText(c) }}
           <template v-if="deadlineOf(c)">· ⏳ Date limite : {{ formatDayText(deadlineOf(c)) }}</template>
           · 💶 {{ formatEuros(c.prix) }}
           <template v-if="c.lieu">· 📍 {{ c.lieu }}</template>
           <template v-if="isArchived(c)">· 📦 Archivée</template>
-          <UiBadge v-if="discipline(c)" :color="disciplineColor(discipline(c))" variant="soft" class="ml-1" data-testid="discipline">
-            {{ discipline(c) }}
+          <UiBadge
+            v-if="shownDiscipline(c)"
+            :color="disciplineColor(shownDiscipline(c))"
+            variant="soft"
+            class="ml-1"
+            data-testid="discipline"
+          >
+            {{ shownDiscipline(c) }}
           </UiBadge>
         </p>
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-2 lg:flex lg:flex-wrap lg:items-center lg:gap-1.5" data-testid="detail-coaches">
@@ -416,39 +318,19 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           </a>
         </div>
       </div>
-      <div
+      <CompetitionActions
         v-if="canWrite"
-        class="mt-2.5 flex flex-wrap gap-1.5 lg:mt-0 lg:max-w-[45%] lg:shrink-0 lg:justify-end"
-        data-testid="detail-actions"
-      >
-        <UiButton variant="muted" small data-testid="edit-comp" @click="editing = true">✏️ Modifier</UiButton>
-        <UiButton variant="muted" small data-testid="email-comp" @click="emailing = true">✉️ Envoyer un email aux compétiteurs</UiButton>
-        <!-- Actions secondaires -->
-        <UiMenu label="⋯ Plus" small :busy="fetching && 'Recherche MyCompet…'" aria-label="Plus d'actions" data-testid="detail-more">
-          <UiMenuItem data-testid="load-group" @select="loadGroup">🧗 Charger le groupe « Compétition »</UiMenuItem>
-          <UiMenuItem data-testid="fetch-results" @select="fetchResults()">🏆 Trouver les résultats</UiMenuItem>
-          <UiMenuItem data-testid="export-csv" :disabled="!rows.length" @select="exportCsv">📥 Export CSV</UiMenuItem>
-          <UiMenuItem data-testid="export-excel-menu" :disabled="!rows.length" @select="exportFile('excel')">📊 Export Excel</UiMenuItem>
-          <UiMenuItem data-testid="export-pdf-menu" :disabled="!rows.length" @select="exportFile('pdf')">📄 Export PDF</UiMenuItem>
-          <UiMenuItem :data-testid="isArchived(c) ? 'unarchive-comp' : 'archive-comp'" @select="archive(!isArchived(c))">
-            {{ isArchived(c) ? "♻️ Désarchiver" : "📦 Archiver" }}
-          </UiMenuItem>
-          <UiMenuItem
-            danger
-            data-testid="remove-not-invited"
-            :disabled="!notInvited.length || writer.busy.value"
-            title="Retirer de cette compétition tous les athlètes jamais invités (ils restent dans la base du club)"
-            @select="removeNotInvited"
-          >
-            🗑️ Retirer les non invités ({{ notInvited.length }})
-          </UiMenuItem>
-          <UiMenuItem danger data-testid="delete-comp" :disabled="writer.busy.value" @select="remove">🗑️ Supprimer</UiMenuItem>
-        </UiMenu>
-      </div>
+        :competition="c"
+        :rows="rows"
+        :coaches="coaches"
+        :not-invited-count="notInvited.length"
+        @email="emailing = true"
+        @load-group="loadGroup"
+        @remove-not-invited="removeNotInvited"
+      />
     </div>
 
     <div :class="wide ? 'order-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm' : ''">
-      <!-- En-tête avec boutons d'actions compétiteurs -->
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
         <h3 class="text-sm font-bold text-slate-800">Compétiteurs ({{ rows.length }})</h3>
         <div v-if="canWrite" class="flex flex-wrap items-center gap-1.5" data-testid="table-header-actions">
@@ -611,16 +493,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       </template>
     </div>
 
-    <UiDialog v-model:open="editing" :title="`✏️ Modifier : ${c.nom}`" wide data-testid="edit-dialog">
-      <CompetitionForm
-        v-if="editing"
-        :competition="c"
-        :coaches="coaches"
-        :busy="writer.busy.value"
-        @save="save"
-        @cancel="editing = false"
-      />
-    </UiDialog>
     <UiDialog v-model:open="withdrawOpen" title="⚠️ Désistement d'un compétiteur qui a payé" data-testid="withdraw-dialog">
       <WithdrawForm
         v-if="withdrawing"
@@ -640,18 +512,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         @cancel="paying = null"
       />
     </UiDialog>
-    <UiDialog v-model:open="askUrl" title="🏆 Résultats introuvables sur MyCompet" data-testid="results-dialog">
-      <form class="flex flex-col gap-3" @submit.prevent="resultsUrl.trim() && fetchResults(resultsUrl.trim())">
-        <p class="text-[13px]">
-          Si les résultats de « {{ c.nom }} » sont publiés, donnez l'adresse ou le numéro de leur page ({{ resultsUrlHint }}).
-        </p>
-        <input v-model="resultsUrl" data-testid="results-url" :class="field" :placeholder="resultsUrlHint" />
-        <UiDialogActions>
-          <UiButton variant="muted" @click="askUrl = false">Annuler</UiButton>
-          <UiButton type="submit" data-testid="results-ok" :disabled="!resultsUrl.trim()">🔍 Chercher</UiButton>
-        </UiDialogActions>
-      </form>
-    </UiDialog>
     <UiDialog v-model:open="emailing" :title="`✉️ E-mail aux compétiteurs : ${c.nom}`" wide data-testid="email-dialog">
       <EmailForm
         v-if="emailing"
@@ -667,7 +527,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       />
     </UiDialog>
 
-    <!-- Modal Ajouter un compétiteur -->
     <!-- Wide: long tariff names (« Compétition U15 U17 - nés en 2008, … ») stay on one line on a computer -->
     <UiDialog v-model:open="addMemberDialogOpen" title="➕ Ajouter un compétiteur" wide data-testid="add-competitor-dialog">
       <div class="flex flex-col gap-3">
@@ -703,7 +562,6 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       </div>
     </UiDialog>
 
-    <!-- Modal Fiche contact athlète -->
     <AthleteContactDialog v-model:open="contactDialogOpen" :athlete="contactAthlete" />
   </section>
 </template>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { participantRows, type Competition } from "../competitions";
-import { amountText, audience, defaultTemplate, render, sendBody, variables } from "./email";
+import { fillTemplate } from "../../../lib/text";
+import { amountText, audience, defaultTemplate, sendBody, variables } from "./email";
 
 const COMP: Competition = {
   id: 10,
@@ -29,7 +30,7 @@ describe("competition e-mail", () => {
   it("fills the competition's variables as the server does", () => {
     const values = variables(COMP, ROWS[0]);
     expect(
-      render(
+      fillTemplate(
         "{First_Name} {last_name} : {name_competition} n°{no_competition} du {date_competition}, deadline {competition_deadline}, {montant_competition} €. {bloc_whatsapp} {inconnu}",
         values,
       ),

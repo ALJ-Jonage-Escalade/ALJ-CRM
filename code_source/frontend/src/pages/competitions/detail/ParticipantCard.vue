@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /* A competitor of the competition. */
 import UiBadge from "../../../components/ui/UiBadge.vue";
-import { telHref } from "../../adherents/members";
-import { hasPaid, isCancelled, payment, ranking, type Row } from "../competitions";
+import { telHref } from "../../../lib/text";
+import { hasPaid, isCancelled, paymentBadge, rankingText, type Row } from "../competitions";
 
 const props = defineProps<{ row: Row; canWrite: boolean; staff: boolean; contactsShown: boolean }>();
 const emit = defineEmits<{
@@ -47,8 +47,8 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
           <template v-if="staff && row.note_paiement">· 📝 {{ row.note_paiement }}</template>
         </span>
       </span>
-      <UiBadge :color="payment(row.statut_paiement).color" class="shrink-0" data-testid="payment-badge" title="Statut de paiement">
-        {{ payment(row.statut_paiement).label }}
+      <UiBadge :color="paymentBadge(row.statut_paiement).color" class="shrink-0" data-testid="payment-badge" title="Statut de paiement">
+        {{ paymentBadge(row.statut_paiement).label }}
         <template v-if="row.montant_paye">({{ row.montant_paye }} €)</template>
       </UiBadge>
     </div>
@@ -98,8 +98,8 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       >
         ⏳ à envoyer
       </span>
-      <UiBadge v-if="ranking(row)" color="amber" variant="soft" data-testid="ranking">
-        {{ ranking(row) }}
+      <UiBadge v-if="rankingText(row)" color="amber" variant="soft" data-testid="ranking">
+        {{ rankingText(row) }}
         <template v-if="row.categorie_ffme">· {{ row.categorie_ffme }}</template>
       </UiBadge>
       <template v-if="contactsShown">

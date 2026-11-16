@@ -2,7 +2,7 @@
 /* Outils › TCD: pivot table of the members, by season (vue-pivottable, in this sub-page's chunk). */
 import { inject, ref, useTemplateRef, watch } from "vue";
 import { OUTILS_KEY, type ReloadablePage } from "./context";
-import PivotPane from "./PivotPane.vue";
+import PivotPane from "./pivot/PivotPane.vue";
 import SeasonSelect from "./SeasonSelect.vue";
 
 const { seasons, initialSeason } = inject(OUTILS_KEY)!;

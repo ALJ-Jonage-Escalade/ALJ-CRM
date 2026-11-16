@@ -12,9 +12,9 @@ import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
 import { AUTH_KEY } from "../composables/auth";
 import { useSyncedResource } from "../composables/syncedResource";
+import { localStorageOrNone } from "../lib/localStorage";
 import { pageVerdict } from "../lib/access";
 import { formatDateTime } from "../lib/format";
-import type { Schemas } from "../lib/client";
 import {
   allowedTarifs,
   checkAll,
@@ -29,26 +29,25 @@ import {
   statusChips,
   statusColor,
   tarifCounts,
-  telHref,
   type CreneauItem,
 } from "./adherents/members";
 import {
   detailRows,
-  DIRECTORY_FILTER_KEY,
+  DIRECTORY_FILTERS_STORAGE,
   emergencyMatches,
   emergencyRows,
   EMERGENCY_MIN_LETTERS,
   seasonCounts,
   toDirectory,
-  type Directory,
   type DirectoryMember,
 } from "./annuaire/directory";
-import { plural } from "../lib/text";
+import { plural, telHref } from "../lib/text";
+import { membersRead } from "../services/members";
 
 const auth = inject(AUTH_KEY)!;
 
-const filters = ref(loadFilters(globalThis.localStorage, DIRECTORY_FILTER_KEY));
-watch(filters, (f) => saveFilters(f, globalThis.localStorage, DIRECTORY_FILTER_KEY), { deep: true });
+const filters = ref(loadFilters(localStorageOrNone(), DIRECTORY_FILTERS_STORAGE));
+watch(filters, (f) => saveFilters(f, localStorageOrNone(), DIRECTORY_FILTERS_STORAGE), { deep: true });
 
 // Nothing is asked (nor read from the device) for an account the page does not open to
 const open = computed(() => ["allow", "offline"].includes(pageVerdict(auth.state.value, "annuaire")));
@@ -57,18 +56,16 @@ const uid = computed(() => {
   return open.value && (s.status === "signedIn" || s.status === "error") ? s.user.uid : null;
 });
 
-const seasons = useSyncedResource<Schemas["Seasons"]>("seasons", () => (open.value ? "/api/seasons" : null), {
+const seasons = useSyncedResource("seasons", () => (open.value ? { path: "/api/seasons" } : null), {
   offline: true,
   uid,
   intervalMs: 60_000,
 });
-const membersUrl = computed(() => {
-  if (!open.value) {
-    return null;
-  }
-  return filters.value.season ? `/api/members?${new URLSearchParams({ season: filters.value.season })}` : "/api/members";
+const directory = useSyncedResource("directory", () => (open.value ? membersRead(filters.value.season) : null), {
+  offline: true,
+  uid,
+  select: toDirectory,
 });
-const directory = useSyncedResource<Directory>("directory", membersUrl, { offline: true, uid, select: toDirectory });
 // A season that no longer exists (remembered from an earlier visit): back to the active one
 watch(directory.httpStatus, (status) => {
   if (status === 404 && filters.value.season) {

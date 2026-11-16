@@ -6,30 +6,28 @@ import { computed, inject, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
-import { API_KEY } from "../../lib/api";
+import { ApiError, CLIENT_KEY, errorText } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
-import { isCompetitor, telHref, type Member } from "./members";
-import { payment, type Competition, type Participant } from "../competitions/competitions";
+import { telHref } from "../../lib/text";
+import { isCompetitor, type Member } from "./members";
+import { paymentBadge, type Competition, type Participant } from "../competitions/competitions";
 import { recordRows } from "./record";
+import { createCompetitionsApi } from "../../services/competitions";
 
 const props = defineProps<{ member: Member; admin: boolean; compact?: boolean }>();
 const emit = defineEmits<{ email: []; attestation: []; edit: [] }>();
 
-const api = inject(API_KEY, null);
+const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const tab = ref<"general" | "competitions">("general");
 const competitions = ref<Competition[]>([]);
+/** Why the competitions tab is empty when the server refused or failed; offline, it just stays empty. */
+const competitionsError = ref("");
 
 onMounted(async () => {
-  if (!api) {
-    return;
-  }
   try {
-    const response = await api("/api/competitions");
-    if (response.ok) {
-      competitions.value = (await response.json()) as Competition[];
-    }
-  } catch {
-    // Offline
+    competitions.value = await competitionsApi.list();
+  } catch (e) {
+    competitionsError.value = e instanceof ApiError && e.status === 0 ? "" : errorText(e);
   }
 });
 
@@ -91,7 +89,6 @@ const rows = computed(() => recordRows(props.member));
       </a>
     </div>
 
-    <!-- Onglets de la fiche adhérent -->
     <div class="flex border-b border-slate-200 text-xs font-semibold" data-testid="record-tabs">
       <button
         type="button"
@@ -120,7 +117,6 @@ const rows = computed(() => recordRows(props.member));
       </button>
     </div>
 
-    <!-- Onglet 1 : Fiche générale -->
     <dl v-if="tab === 'general'" data-testid="record-fields" class="divide-y divide-slate-100 rounded-lg text-[12.5px]">
       <div
         v-for="row in rows"
@@ -138,9 +134,9 @@ const rows = computed(() => recordRows(props.member));
       </div>
     </dl>
 
-    <!-- Onglet 2 : Compétitions de l'adhérent -->
     <div v-else class="flex flex-col gap-2 text-xs" data-testid="record-competitions-list">
-      <div v-if="!memberCompetitions.length" class="text-xs text-slate-400 italic py-4 text-center">
+      <p v-if="competitionsError" data-testid="record-competitions-error" role="alert" class="text-red-700">⚠️ {{ competitionsError }}</p>
+      <div v-else-if="!memberCompetitions.length" class="text-xs text-slate-400 italic py-4 text-center">
         Cet adhérent n'est inscrit à aucune compétition.
       </div>
       <div
@@ -173,8 +169,8 @@ const rows = computed(() => recordRows(props.member));
           >
             {{ c.participant.selectionne ? "✓ Sélectionné" : "🔘 Non invité" }}
           </span>
-          <UiBadge variant="soft" :color="payment(c.participant.statut_paiement).color" class="text-[11px]">
-            {{ payment(c.participant.statut_paiement).label }}
+          <UiBadge variant="soft" :color="paymentBadge(c.participant.statut_paiement).color" class="text-[11px]">
+            {{ paymentBadge(c.participant.statut_paiement).label }}
           </UiBadge>
           <span v-if="c.participant.classement" class="rounded bg-violet-50 px-1.5 py-0.5 font-bold text-violet-700">
             🏅 Rang : {{ c.participant.classement }}

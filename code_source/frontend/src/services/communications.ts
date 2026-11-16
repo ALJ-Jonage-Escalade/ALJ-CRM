@@ -2,6 +2,9 @@
    payment attestations. Conventions of every service: frontend/AGENTS.md § API services. */
 import { unwrap, type ApiClient, type Schemas } from "../lib/client";
 
+/** A saved e-mail template: name, subject, body and sender. */
+export type EmailTemplate = Schemas["EmailTemplate"];
+
 /** Return type inferred on purpose: each method answers the body type of its route in the contract. */
 export function createCommunicationsApi(client: ApiClient) {
   return {
@@ -13,8 +16,8 @@ export function createCommunicationsApi(client: ApiClient) {
       unwrap(client.DELETE("/api/email-templates/{template_name}", { params: { path: { template_name: name } } })),
     /** Whether the server can send e-mails (SMTP configured). */
     emailStatus: () => unwrap(client.GET("/api/email-status")),
-    // The contract leaves this body open ({ [key: string]: unknown }): the server reads subject, body, recipients…
-    sendEmail: (body: Record<string, unknown>) => unwrap(client.POST("/api/send-email", { body })),
+    /** Sends each recipient the subject and body with their variables filled in (or a saved template's). */
+    sendEmail: (body: Schemas["EmailSendRequest"]) => unwrap(client.POST("/api/send-email", { body })),
 
     // ------------------------------------------------------------ WhatsApp
     whatsappTemplate: () => unwrap(client.GET("/api/whatsapp-template")),

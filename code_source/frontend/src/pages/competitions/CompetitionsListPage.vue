@@ -12,7 +12,7 @@ import { plural } from "../../lib/text";
 import { createCompetitionsApi } from "../../services/competitions";
 import CompetitionDetail from "./detail/CompetitionDetail.vue";
 import CompetitionForm from "./CompetitionForm.vue";
-import { participantRows, period, todayIso, type Competition } from "./competitions";
+import { participantRows, periodText, todayIso, type Competition } from "./competitions";
 import { COMPETITIONS_KEY } from "./context";
 import CompetitionCalendar from "./list/CompetitionCalendar.vue";
 import CompetitionCards from "./list/CompetitionCards.vue";
@@ -20,9 +20,9 @@ import CompetitionFilters from "./list/CompetitionFilters.vue";
 import CompetitionTable from "./list/CompetitionTable.vue";
 import { useCompetitionFilters, type ViewMode } from "./list/filters";
 import ViewSwitcher from "./list/ViewSwitcher.vue";
-import { WRITER_KEY } from "./writer";
+import { competitionItself, WRITER_KEY } from "./writer";
 
-const { all, competitions, competitors, members, coaches, canWrite, staff, contactsShown, online, outbox, uid } = inject(COMPETITIONS_KEY)!;
+const { all, competitions, competitors, members, coaches, canWrite, contactsShown, online, outbox } = inject(COMPETITIONS_KEY)!;
 const writer = inject(WRITER_KEY)!;
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const route = useRoute();
@@ -101,6 +101,7 @@ async function saveFromTable(body: Schemas["CompetitionCreate"]): Promise<void> 
   }
   const id = editingCompetition.value.id;
   const ok = await writer.run(() => competitionsApi.update(id, body), {
+    competition: competitionItself,
     done: "✅ Compétition mise à jour.",
   });
   if (ok) {
@@ -124,7 +125,10 @@ async function removeFromTable(c: Competition): Promise<void> {
 }
 
 async function create(body: Schemas["CompetitionCreate"]): Promise<void> {
-  const created = await writer.run(() => competitionsApi.create(body), { done: "✅ Compétition créée." });
+  const created = await writer.run(() => competitionsApi.create(body), {
+    competition: competitionItself,
+    done: "✅ Compétition créée.",
+  });
   if (!created) {
     return;
   }
@@ -141,7 +145,7 @@ async function archivePastCompetitions(): Promise<void> {
   if (
     !(await dialogs.confirm({
       title: "Archiver les compétitions passées",
-      message: `Archiver ${nbPastCompetitions} compétition${plural(nbPastCompetitions)} passée${plural(nbPastCompetitions)} ?\n\n${pastCompetitionsList.map((competition) => `• ${competition.nom} (${period(competition)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`,
+      message: `Archiver ${nbPastCompetitions} compétition${plural(nbPastCompetitions)} passée${plural(nbPastCompetitions)} ?\n\n${pastCompetitionsList.map((competition) => `• ${competition.nom} (${periodText(competition)})`).join("\n")}\n\nElles resteront consultables dans les archives et comptées dans le bilan.`,
       confirmLabel: "Archiver",
     }))
   ) {
@@ -164,7 +168,7 @@ const listLine = computed(() => {
 </script>
 
 <template>
-  <!-- View mode and creation (masqués sur téléphone quand une fiche est ouverte) -->
+  <!-- View mode and creation (hidden on phones while a competition is open) -->
   <div :class="['mb-3 flex flex-wrap items-center justify-between gap-2', selected ? 'hidden md:flex' : '']">
     <ViewSwitcher v-model="viewMode" />
     <UiButton
@@ -203,7 +207,6 @@ const listLine = computed(() => {
       />
       <p class="pt-1 pb-1 mb-2 text-xs text-slate-500" data-testid="comp-count">{{ listLine }}</p>
 
-      <!-- Vue Tableau -->
       <div v-if="viewMode === 'table'" class="mb-3">
         <CompetitionTable
           :competitions="current"
@@ -214,12 +217,10 @@ const listLine = computed(() => {
         />
       </div>
 
-      <!-- Vue Calendrier -->
       <div v-else-if="viewMode === 'calendar'" class="mb-3">
         <CompetitionCalendar :competitions="calendarCompetitions" :selected-id="selectedId" @open="openFromCalendar" />
       </div>
 
-      <!-- Vue Cartes (par défaut) -->
       <CompetitionCards
         v-else
         :competitions="current"
@@ -237,11 +238,6 @@ const listLine = computed(() => {
       :rows="rows"
       :members="members.data.value ?? []"
       :coaches="coaches.data.value ?? []"
-      :can-write="canWrite"
-      :staff="staff"
-      :contacts-shown="contactsShown"
-      :outbox="outbox"
-      :uid="uid"
       class="order-1 min-w-0 md:order-2 md:col-start-2 md:row-start-1"
     />
     <div

@@ -4,24 +4,22 @@ import { RouterLink, useRoute } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import UiBadge from "../components/ui/UiBadge.vue";
 import { PAGES, REFUSED_QUERY } from "../lib/access";
-import { API_KEY } from "../lib/api";
+import { CLIENT_KEY, ApiError, errorText } from "../lib/client";
 import { formatDayText } from "../lib/format";
-import { isPast, todayIso, type Competition, type Participant } from "./competitions/competitions";
+import { isAdmin } from "../lib/roles";
+import { createCompetitionsApi } from "../services/competitions";
+import { isArchived, isPast, todayIso, type Competition, type Participant } from "./competitions/competitions";
 
-const api = inject(API_KEY, null);
+const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const comps = ref<Competition[]>([]);
+/** Why the widgets are empty when the server refused or failed; offline, they just stay empty. */
+const loadError = ref("");
 
 onMounted(async () => {
-  if (!api) {
-    return;
-  }
   try {
-    const res = await api("/api/competitions");
-    if (res.ok) {
-      comps.value = (await res.json()) as Competition[];
-    }
-  } catch {
-    // Offline or network error
+    comps.value = await competitionsApi.list();
+  } catch (e) {
+    loadError.value = e instanceof ApiError && e.status === 0 ? "" : errorText(e);
   }
 });
 
@@ -29,7 +27,7 @@ onMounted(async () => {
 const today = todayIso();
 const upcomingComps = computed(() =>
   comps.value
-    .filter((c) => !isPast(c, today) && c.statut !== "close")
+    .filter((c) => !isPast(c, today) && !isArchived(c))
     // Soonest first, the undated ones (« Date à venir ») last
     .sort(
       (a, b) =>
@@ -40,9 +38,7 @@ const upcomingComps = computed(() =>
 
 const pastResultsComps = computed(() =>
   comps.value
-    .filter(
-      (c) => isPast(c, today) || c.statut === "close" || (c.participants || []).some((p: Participant) => p.classement || p.resultat_ffme),
-    )
+    .filter((c) => isPast(c, today) || isArchived(c) || (c.participants || []).some((p: Participant) => p.classement || p.resultat_ffme))
     .sort((a, b) => (b.date_competition || "").localeCompare(a.date_competition || ""))
     .slice(0, 3),
 );
@@ -67,9 +63,8 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
         ⛔ La page {{ refused }} est réservée aux administrateurs.
       </p>
 
-      <!-- Widgets Compétitions & Résultats -->
+      <p v-if="loadError" data-testid="home-load-error" role="alert" class="mb-3 text-[13px] text-red-700">⚠️ {{ loadError }}</p>
       <div class="grid gap-4 md:grid-cols-2" data-testid="home-widgets">
-        <!-- Widget 1 : Prochaines compétitions -->
         <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="upcoming-widget">
           <div class="mb-3 flex items-center justify-between">
             <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">📅 Prochaines compétitions</h3>
@@ -98,7 +93,6 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
           </div>
         </div>
 
-        <!-- Widget 2 : Derniers résultats -->
         <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="results-widget">
           <div class="mb-3 flex items-center justify-between">
             <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">🏆 Derniers résultats</h3>
@@ -145,8 +139,8 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
         class="mt-5.5 max-h-[480px] w-full rounded-2xl border border-slate-200 object-cover shadow-md"
       />
       <p class="mt-4.5 text-slate-500">
-        Connecté en tant que {{ role === "admin" ? "administrateur" : "coach" }}. Les données sont lues depuis la base du club et
-        actualisées automatiquement.
+        Connecté en tant que {{ isAdmin(role) ? "administrateur" : "coach" }}. Les données sont lues depuis la base du club et actualisées
+        automatiquement.
       </p>
     </template>
   </AppShell>

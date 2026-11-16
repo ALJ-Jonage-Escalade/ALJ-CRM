@@ -2,7 +2,8 @@
    reading (plan D2). Only the fields shown here are kept: contacts, emergency contacts and diplomas. No health data
    and no payment (amount, order): they stay online, in the member record of Adhérents.
    Filters, search and display helpers are the ones of Adhérents (adherents/members.ts). */
-import { normKey, type Creneau, type Member, type MemberList } from "../adherents/members";
+import { normKey } from "../../lib/text";
+import type { Creneau, Member, MemberList } from "../adherents/members";
 import { formatDayText } from "../../lib/format";
 
 const FIELDS = [
@@ -44,8 +45,7 @@ export interface Directory {
 }
 
 /** The answer of GET /api/members reduced to what the directory shows (and keeps on the device). */
-export function toDirectory(answer: unknown): Directory {
-  const list = answer as MemberList;
+export function toDirectory(list: MemberList): Directory {
   return {
     season: list.season,
     creneaux: list.creneaux,
@@ -62,33 +62,33 @@ export function seasonCounts(members: readonly Pick<Member, "status_norm">[]): {
 const joined = (parts: (string | null | undefined)[], sep: string) => parts.filter(Boolean).join(sep);
 
 /** Lines of a member's card, unfolded: the empty ones are left out. */
-export function detailRows(m: DirectoryMember): { label: string; value: string }[] {
+export function detailRows(member: DirectoryMember): { label: string; value: string }[] {
   const rows: [string, string][] = [
-    ["🎂 Naissance", formatDayText(m.birth_date)],
-    ["📍 Adresse", joined([m.address, joined([m.zip_code, m.city], " ")], ", ")],
-    ["📞 Téléphone", m.phone],
-    ["✉️ E-mail", m.email_primary],
-    ["✉️ E-mail 2", m.email_secondary],
-    ["🪪 Licence FFME", m.licence_ffme],
-    ["🚨 Urgence 1", joined([m.emergency1_name, m.emergency1_phone], " · ")],
-    ["🚨 Urgence 2", joined([m.emergency2_name, m.emergency2_phone], " · ")],
-    ["📷 Droit à l'image", m.photo_auth],
-    ["🔴 Badge rouge", m.badge_rouge],
-    ["🧗 Autonomie bloc", m.autonomie_bloc],
+    ["🎂 Naissance", formatDayText(member.birth_date)],
+    ["📍 Adresse", joined([member.address, joined([member.zip_code, member.city], " ")], ", ")],
+    ["📞 Téléphone", member.phone],
+    ["✉️ E-mail", member.email_primary],
+    ["✉️ E-mail 2", member.email_secondary],
+    ["🪪 Licence FFME", member.licence_ffme],
+    ["🚨 Urgence 1", joined([member.emergency1_name, member.emergency1_phone], " · ")],
+    ["🚨 Urgence 2", joined([member.emergency2_name, member.emergency2_phone], " · ")],
+    ["📷 Droit à l'image", member.photo_auth],
+    ["🔴 Badge rouge", member.badge_rouge],
+    ["🧗 Autonomie bloc", member.autonomie_bloc],
   ];
   // The payer when it is someone else (a parent): another contact
-  if (m.payer && normKey(m.payer) !== normKey(`${m.first_name} ${m.last_name}`)) {
-    rows.push(["💳 Payeur", m.payer + (m.payer_email ? ` (${m.payer_email})` : "")]);
+  if (member.payer && normKey(member.payer) !== normKey(`${member.first_name} ${member.last_name}`)) {
+    rows.push(["💳 Payeur", member.payer + (member.payer_email ? ` (${member.payer_email})` : "")]);
   }
   return rows.filter(([, value]) => value.trim() !== "").map(([label, value]) => ({ label, value }));
 }
 
 /** Phones to call for a member: their own, then the emergency contacts. */
-export function emergencyRows(m: DirectoryMember): { label: string; name: string; phone: string }[] {
+export function emergencyRows(member: DirectoryMember): { label: string; name: string; phone: string }[] {
   return [
-    { label: "👤 Adhérent", name: "", phone: m.phone },
-    { label: "🚨 Urgence 1", name: m.emergency1_name, phone: m.emergency1_phone },
-    { label: "🚨 Urgence 2", name: m.emergency2_name, phone: m.emergency2_phone },
+    { label: "👤 Adhérent", name: "", phone: member.phone },
+    { label: "🚨 Urgence 1", name: member.emergency1_name, phone: member.emergency1_phone },
+    { label: "🚨 Urgence 2", name: member.emergency2_name, phone: member.emergency2_phone },
   ].filter((r) => r.name || r.phone);
 }
 
@@ -108,4 +108,4 @@ export function emergencyMatches<M extends Pick<Member, "first_name" | "last_nam
 }
 
 /** Same key as the former directory page (web/index.html): the filters of earlier visits are kept. */
-export const DIRECTORY_FILTER_KEY = "alj_annuaire_filters";
+export const DIRECTORY_FILTERS_STORAGE = "alj_annuaire_filters";

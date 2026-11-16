@@ -7,17 +7,17 @@
    (a parent for their child) is attached by hand to a member, with a comment (the server reads HelloAsso again and refuses decisions that no longer match). The result lists the members
    written, linked to their record. Online only: disabled with an explanation when the device is offline. */
 import { computed, inject, onMounted, ref } from "vue";
-import UiBadge from "../../components/ui/UiBadge.vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import UiCard from "../../components/ui/UiCard.vue";
-import UiTile from "../../components/ui/UiTile.vue";
+import UiBadge from "../../../components/ui/UiBadge.vue";
+import UiButton from "../../../components/ui/UiButton.vue";
+import UiCard from "../../../components/ui/UiCard.vue";
+import UiTile from "../../../components/ui/UiTile.vue";
 import AttachPicker from "./AttachPicker.vue";
-import { useNetworkUp } from "../../composables/network";
-import { CLIENT_KEY, errorText } from "../../lib/client";
-import { formatDayText, formatEuros } from "../../lib/format";
-import { createIntegrationsApi } from "../../services/integrations";
-import { createMembersApi } from "../../services/members";
-import { dialogs } from "../../composables/dialogs";
+import { useNetworkUp } from "../../../composables/network";
+import { CLIENT_KEY, errorText } from "../../../lib/client";
+import { formatDayText, formatEuros } from "../../../lib/format";
+import { createIntegrationsApi } from "../../../services/integrations";
+import { createMembersApi } from "../../../services/members";
+import { dialogs } from "../../../composables/dialogs";
 import {
   ATTACH,
   attachedMemberId,

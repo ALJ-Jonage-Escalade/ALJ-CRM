@@ -10,9 +10,9 @@ import UiDialog from "../components/ui/UiDialog.vue";
 import UiToast from "../components/ui/UiToast.vue";
 import { useToast } from "../composables/toast";
 import { CLIENT_KEY, errorText } from "../lib/client";
-import { createCommunicationsApi } from "../services/communications";
+import { createCommunicationsApi, type EmailTemplate } from "../services/communications";
 import EmailPreview from "./communications/EmailPreview.vue";
-import { initialTemplate, newNameError, newTemplate, preview, type Sender, type Template } from "./communications/editor";
+import { initialTemplate, newNameError, newTemplate, preview, type Sender } from "./communications/editor";
 import TemplateForm from "./communications/TemplateForm.vue";
 import { dialogs } from "../composables/dialogs";
 
@@ -20,12 +20,12 @@ const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 const toast = useToast();
 
 // E-mail templates
-const templates = ref<Template[]>([]);
+const templates = ref<EmailTemplate[]>([]);
 const loaded = ref(false);
 const loadError = ref("");
 /** Saved name of the template being edited (the server renames it when the title changes). */
 const selected = ref("");
-const draft = ref<Template | null>(null);
+const draft = ref<EmailTemplate | null>(null);
 const signature = ref(true);
 const saving = ref(false);
 /** The club's default sender and the addresses offered, both from the server. */
@@ -33,7 +33,7 @@ const defaultSender = ref<Sender>({ sender_email: "", sender_name: "" });
 const senderSuggestions = ref<string[]>([]);
 const shown = computed(() => (draft.value ? preview(draft.value, defaultSender.value) : null));
 
-function select(template: Template | undefined): void {
+function select(template: EmailTemplate | undefined): void {
   selected.value = template?.name ?? "";
   draft.value = template ? { ...template } : null;
 }

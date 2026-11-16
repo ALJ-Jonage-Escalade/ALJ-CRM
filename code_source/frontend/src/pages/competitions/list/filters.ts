@@ -1,7 +1,7 @@
 /* The filters of the competition list (season, search, date chips) and the lists they give, shared by the cards, the
    table, the calendar and the statistics. */
 import { computed, ref, type ComputedRef, type Ref } from "vue";
-import { competitionSeason, filterCompetitions, isArchived, isPast, type Competition, type When } from "../competitions";
+import { seasonOf, filterCompetitions, isArchived, isPast, type Competition, type When } from "../competitions";
 
 export type ViewMode = "cards" | "table" | "calendar";
 
@@ -29,9 +29,9 @@ export function useCompetitionFilters(all: Readonly<Ref<readonly Competition[]>>
   const selectedSeason = ref("all");
 
   const seasons = computed(() => {
-    const set = new Set<string>([competitionSeason(today)]);
+    const set = new Set<string>([seasonOf(today)]);
     all.value.forEach((c) => {
-      const season = competitionSeason(c.date_competition);
+      const season = seasonOf(c.date_competition);
       if (season) {
         set.add(season);
       }
@@ -41,7 +41,7 @@ export function useCompetitionFilters(all: Readonly<Ref<readonly Competition[]>>
 
   const seasonCompetitions = computed(() => {
     const list = all.value.filter((c) => !isArchived(c));
-    return selectedSeason.value === "all" ? list : list.filter((c) => competitionSeason(c.date_competition) === selectedSeason.value);
+    return selectedSeason.value === "all" ? list : list.filter((c) => seasonOf(c.date_competition) === selectedSeason.value);
   });
   const current = computed(() => filterCompetitions(seasonCompetitions.value, search.value, when.value, today));
   const archived = computed(() => filterCompetitions(all.value.filter(isArchived), search.value, when.value, today));

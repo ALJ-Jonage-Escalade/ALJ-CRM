@@ -1,13 +1,10 @@
+import { json } from "../../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dialogs } from "../../composables/dialogs";
 import { API_KEY, type ApiFetch } from "../../lib/api";
 import { CLIENT_KEY, createApiClient, type Schemas } from "../../lib/client";
 import ParametresCampaignsPage from "./ParametresCampaignsPage.vue";
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
 
 const campaign = (slug: string, extra: Partial<Schemas["HelloAssoCampaign"]> = {}): Schemas["HelloAssoCampaign"] => ({
   form_type: "Event",

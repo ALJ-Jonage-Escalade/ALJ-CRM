@@ -1,3 +1,4 @@
+import { json } from "../../../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import type { ApiFetch } from "../../../lib/api";
@@ -17,10 +18,6 @@ const TEMPLATE = {
   sender_email: "",
   sender_name: "",
 };
-
-function json(body: unknown): Response {
-  return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
-}
 
 /** The form, with the templates answer held back until release() is called. */
 function mountForm() {

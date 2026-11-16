@@ -1,5 +1,6 @@
 <script setup lang="ts">
-/* Link to an office page: within the app (no reload) when the page is migrated, a plain link to the former page otherwise. */
+/* Link to an office page: a RouterLink (no reload) for a route of the app, a plain <a> for any other address and when
+   mounted without a router (the components' tests). */
 import { computed } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 

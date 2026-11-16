@@ -1,11 +1,11 @@
 /* E-mail to the competitors of a competition: the audience, a preview with the competition's variables (the server
    fills them again when sending: infrastructure/mail/dispatch.py get_competition_context), the request body. */
+import type { EmailTemplate } from "../../../services/communications";
 import type { Schemas } from "../../../lib/client";
 import { looksLikeEmail } from "../../../lib/email";
 import { formatDayText } from "../../../lib/format";
 import { deadlineOf, type Competition, type Row } from "../competitions";
 
-export type Template = Schemas["EmailTemplate"];
 export type Audience = "selected" | "unpaid" | "all";
 
 export const AUDIENCES: { id: Audience; label: string }[] = [
@@ -25,10 +25,10 @@ export function audience(rows: readonly Row[], who: Audience): Row[] {
   return known;
 }
 
-export const hasEmail = (r: Row): boolean => looksLikeEmail(r.email ?? "");
+export const hasEmail = (row: Row): boolean => looksLikeEmail(row.email ?? "");
 
 /** The template offered first: the club's « Compétition - 1er Inscription », else any about competitions, else the first. */
-export function defaultTemplate(templates: readonly Template[]): Template | undefined {
+export function defaultTemplate(templates: readonly EmailTemplate[]): EmailTemplate | undefined {
   return (
     templates.find((t) => t.name === "Compétition - 1er Inscription") ??
     templates.find((t) => /comp[ée]tition/i.test(t.name)) ??
@@ -48,24 +48,24 @@ export function amountText(prix: number | null | undefined): string {
 /** The WhatsApp link variable and its historical spellings (including the "whatapp" typo). */
 const WHATSAPP_LINK_KEYS = ["whatsapp_link", "whatsapp_id", "whatapp_id", "whatapp_link"];
 
-export function variables(c: Competition, r: Row | undefined): Record<string, string> {
-  const start = formatDayText(c.date_competition ?? "");
-  const end = formatDayText(c.date_fin ?? "");
-  const whatsappLink = (c.whatsapp_link ?? "").trim();
+export function variables(competition: Competition, row: Row | undefined): Record<string, string> {
+  const start = formatDayText(competition.date_competition ?? "");
+  const end = formatDayText(competition.date_fin ?? "");
+  const whatsappLink = (competition.whatsapp_link ?? "").trim();
   const dateFormatted = !end || end === start || !start ? start : `${start} au ${end}`;
-  const deadlineFormatted = formatDayText(deadlineOf(c));
-  const lieu = (c.lieu ?? "").trim();
+  const deadlineFormatted = formatDayText(deadlineOf(competition));
+  const lieu = (competition.lieu ?? "").trim();
   return {
-    first_name: (r?.prenom ?? "").trim(),
-    last_name: (r?.nom ?? "").trim().toUpperCase(),
-    prenom: (r?.prenom ?? "").trim(),
-    nom: (r?.nom ?? "").trim().toUpperCase(),
-    num_licence: r?.num_licence ?? "",
-    nom_competition: c.nom ?? "",
-    name_competition: c.nom ?? "",
-    competition_nom: c.nom ?? "",
-    no_competition: c.id_ffme ?? "",
-    montant_competition: amountText(c.prix),
+    first_name: (row?.prenom ?? "").trim(),
+    last_name: (row?.nom ?? "").trim().toUpperCase(),
+    prenom: (row?.prenom ?? "").trim(),
+    nom: (row?.nom ?? "").trim().toUpperCase(),
+    num_licence: row?.num_licence ?? "",
+    nom_competition: competition.nom ?? "",
+    name_competition: competition.nom ?? "",
+    competition_nom: competition.nom ?? "",
+    no_competition: competition.id_ffme ?? "",
+    montant_competition: amountText(competition.prix),
     date_competition: dateFormatted,
     competition_date: dateFormatted,
     competition_deadline: deadlineFormatted,
@@ -78,17 +78,12 @@ export function variables(c: Competition, r: Row | undefined): Record<string, st
   };
 }
 
-/** The text with the values (variable names are not case sensitive; unknown ones are kept). */
-export function render(text: string, values: Record<string, string>): string {
-  return text.replace(/\{([^{}]+)\}/g, (whole, name: string) => values[name.toLowerCase()] ?? whole);
-}
-
 /** Body of POST /api/send-email; the server checks a coach writes to known members only. */
-export function sendBody(c: Competition, recipients: readonly Row[], subject: string, body: string) {
+export function sendBody(competition: Competition, recipients: readonly Row[], subject: string, body: string): Schemas["EmailSendRequest"] {
   return {
     subject: subject.trim(),
     body: body.trim(),
-    competition_id: c.id,
+    competition_id: competition.id,
     recipients: recipients.filter(hasEmail).map((r) => ({
       id: r.adherent_id,
       first_name: r.prenom ?? "",

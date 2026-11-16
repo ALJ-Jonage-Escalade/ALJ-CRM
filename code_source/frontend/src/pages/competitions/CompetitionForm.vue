@@ -4,7 +4,7 @@
 import { computed, inject, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
-import { CLIENT_KEY, type Schemas } from "../../lib/client";
+import { CLIENT_KEY, errorText, type Schemas } from "../../lib/client";
 import { createCompetitionsApi } from "../../services/competitions";
 import {
   type Coach,
@@ -93,8 +93,7 @@ async function lookupFfme(): Promise<void> {
     }
     lookupSuccess.value = `Titre récupéré : ${info.nom}`;
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    lookupError.value = message || "Impossible de récupérer les informations de la compétition.";
+    lookupError.value = errorText(err);
   } finally {
     lookupBusy.value = false;
   }

@@ -1,11 +1,11 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { fakeAuth, json, settle } from "../test/harness";
+import { mount } from "@vue/test-utils";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
-import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
+import { AUTH_KEY, type AuthState } from "../composables/auth";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { createOfflineStore, STORE_KEY, type OfflineStore } from "../lib/store";
-import DirectoryPage from "./DirectoryPage.vue";
+import AnnuairePage from "./AnnuairePage.vue";
 import type { MemberList } from "./adherents/members";
 import { member } from "./adherents/members.fixture";
 
@@ -35,14 +35,6 @@ const ACTIVE: MemberList = {
   ],
 };
 
-function json(body: unknown, status = 200, etag?: string): Response {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (etag) {
-    headers.ETag = etag;
-  }
-  return new Response(JSON.stringify(body), { status, headers });
-}
-
 /** The API, or no network at all (offline). */
 function fakeApi(offline = false) {
   const calls: string[] = [];
@@ -63,8 +55,8 @@ function fakeApi(offline = false) {
 }
 
 function render(state: AuthState, api: ApiFetch, store: OfflineStore) {
-  const auth: Auth = { state: ref(state), login: vi.fn(), logout: vi.fn(async () => {}), retry: vi.fn(async () => {}), stop: vi.fn() };
-  const wrapper = mount(DirectoryPage, {
+  const auth = fakeAuth(state);
+  const wrapper = mount(AnnuairePage, {
     global: {
       provide: { [AUTH_KEY]: auth, [API_KEY]: api, [STORE_KEY]: store },
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
@@ -73,16 +65,6 @@ function render(state: AuthState, api: ApiFetch, store: OfflineStore) {
   const byId = (id: string) => wrapper.find(`[data-testid="${id}"]`);
   const names = () => wrapper.findAll('[data-testid="directory-card"] b').map((b) => b.text());
   return { wrapper, byId, names, auth };
-}
-
-/** Waits for IndexedDB and the renders that follow. fake-indexeddb answers through setImmediate: waiting on that queue
-    keeps the steps in a fixed order (setTimeout(0) runs before or after it depending on the machine's load). 8 rounds
-    are needed, 12 for margin. */
-async function settle(): Promise<void> {
-  for (let i = 0; i < 12; i++) {
-    await flushPromises();
-    await new Promise((r) => setImmediate(r));
-  }
 }
 
 let store: OfflineStore;
@@ -94,7 +76,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const coach: AuthState = { status: "signedIn", user: USER, role: "coach" };
 
-describe("DirectoryPage", () => {
+describe("AnnuairePage", () => {
   it("lists the season without the waiting list, sorted, with its counts", async () => {
     const { byId, names, wrapper } = render(coach, fakeApi().api, store);
     await settle();

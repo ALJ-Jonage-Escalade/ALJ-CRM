@@ -14,13 +14,13 @@ import { createIntegrationsApi } from "../../services/integrations";
 import { looksLikeEmail } from "../../lib/email";
 import {
   batchReport,
-  cacheFile,
+  cacheFileText,
   cacheStatus,
   CHECKING,
   googleChecks,
   googleStatus,
-  lastRun,
-  lastSync,
+  lastRunText,
+  lastSyncText,
   pendingText,
   syncReport,
   UNAVAILABLE,
@@ -352,10 +352,10 @@ onMounted(() => {
       </div>
       <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
         <UiTile label="Fichier du cache (serveur)">
-          <span data-testid="cache-file">{{ cacheInfo ? cacheFile(cacheInfo) : "—" }}</span>
+          <span data-testid="cache-file">{{ cacheInfo ? cacheFileText(cacheInfo) : "—" }}</span>
         </UiTile>
         <UiTile label="Dernière synchro cloud">
-          <span data-testid="cache-last-sync">{{ cacheInfo ? lastSync(cacheInfo.last_sync) : "—" }}</span>
+          <span data-testid="cache-last-sync">{{ cacheInfo ? lastSyncText(cacheInfo.last_sync) : "—" }}</span>
         </UiTile>
         <UiTile label="Modifications en attente d'envoi">
           <span data-testid="cache-pending" :class="cacheInfo && cacheInfo.pending > 0 && 'text-amber-600'">
@@ -434,7 +434,7 @@ onMounted(() => {
           </div>
         </form>
         <UiTile label="Dernière exécution du batch">
-          <span data-testid="results-last-run">{{ results ? lastRun(results.last_run) : "—" }}</span>
+          <span data-testid="results-last-run">{{ results ? lastRunText(results.last_run) : "—" }}</span>
           <span data-testid="results-last-status" class="mt-0.5 block text-[11.5px] font-normal text-slate-500">
             {{ results?.last_status || "En attente du prochain passage à 07h00" }}
           </span>

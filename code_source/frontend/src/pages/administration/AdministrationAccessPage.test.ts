@@ -1,15 +1,9 @@
+import { fakeAuth, json, provided } from "../../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
-import { AUTH_KEY, type Auth } from "../../composables/auth";
 import { dialogs } from "../../composables/dialogs";
-import { API_KEY, type ApiFetch } from "../../lib/api";
-import { CLIENT_KEY, createApiClient } from "../../lib/client";
+import { type ApiFetch } from "../../lib/api";
 import AdministrationAccessPage from "./AdministrationAccessPage.vue";
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
 
 const ME = "albus@alj.example";
 const entry = (email: string, role: string, extra: object = {}) => ({
@@ -73,15 +67,9 @@ function render(answers: Record<string, Answer> = {}) {
     const answer = all[`${method} ${path}`];
     return answer ? answer(body) : json({ status: "success" });
   });
-  const auth: Auth = {
-    state: ref({ status: "signedIn", user: { uid: "u1", email: ME }, role: "admin" }),
-    login: vi.fn(),
-    logout: vi.fn(async () => {}),
-    retry: vi.fn(async () => {}),
-    stop: vi.fn(),
-  };
+  const auth = fakeAuth({ status: "signedIn", user: { uid: "u1", email: ME }, role: "admin" });
   const wrapper = mount(AdministrationAccessPage, {
-    global: { provide: { [AUTH_KEY]: auth, [API_KEY]: api, [CLIENT_KEY]: createApiClient(api, "http://alj.test") } },
+    global: { provide: provided(auth, api) },
   });
   const writes = () => calls.filter((c) => c.method !== "GET");
   const row = (email: string) => wrapper.find(`[data-testid="access-table"] tr[data-email="${email}"]`);

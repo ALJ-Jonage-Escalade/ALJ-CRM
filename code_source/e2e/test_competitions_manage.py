@@ -42,7 +42,7 @@ def test_create_competition(mobile_page, test_data):
     expect(page.get_by_test_id("detail-name")).to_have_text(nom)
     expect(page).to_have_url(re.compile(r"/competitions\?id=\d+$"))
     meta = page.get_by_test_id("detail-meta")
-    for text in ("EVT-E2E-1", "14/03/2027 → 15/03/2027", "18,00 €", "Saint-Étienne", "Difficulté"):
+    for text in ("EVT-E2E-1", "14/03 au 15/03/2027", "18,00 €", "Saint-Étienne", "Difficulté"):
         expect(meta).to_contain_text(text)
     # Coaches saved by name
     expect(page.get_by_test_id("detail-coaches")).to_have_text("🏃 Coachs : Minerva McGonagall, Severus Snape")

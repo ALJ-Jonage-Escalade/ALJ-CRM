@@ -16,11 +16,11 @@ import {
   actionLabel,
   addFormError,
   authorLabel,
-  dateTime,
+  dateTimeText,
   emailNotSent,
   invitationMessage,
   isOwnEntry,
-  lastSignIn,
+  lastSignInText,
   roleChange,
   roleName,
   ROLE_OPTIONS,
@@ -257,7 +257,7 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
                     E-mail non envoyé
                   </span>
                 </td>
-                <td class="py-1.5 pr-3 whitespace-nowrap" data-testid="entry-last-sign-in">{{ lastSignIn(entry.last_sign_in_at) }}</td>
+                <td class="py-1.5 pr-3 whitespace-nowrap" data-testid="entry-last-sign-in">{{ lastSignInText(entry.last_sign_in_at) }}</td>
                 <td class="py-1.5 text-right whitespace-nowrap">
                   <UiButton
                     v-if="accessStatus(entry, now) !== 'active'"
@@ -308,7 +308,7 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
             </thead>
             <tbody>
               <tr v-for="(item, index) in history" :key="`${item.at}-${index}`" class="border-t border-slate-100">
-                <td class="py-1.5 pr-3 whitespace-nowrap">{{ dateTime(item.at) }}</td>
+                <td class="py-1.5 pr-3 whitespace-nowrap">{{ dateTimeText(item.at) }}</td>
                 <td class="py-1.5 pr-3 break-all">{{ authorLabel(item.author) }}</td>
                 <td class="py-1.5 pr-3">{{ actionLabel(item.action) }}</td>
                 <td class="py-1.5 pr-3 break-all">{{ item.target_email }}</td>

@@ -2,7 +2,7 @@
 /* Outils › Export FFME: the licences CSV for the MyFFME import (linked from Adhérents). */
 import { inject, useTemplateRef } from "vue";
 import { OUTILS_KEY, type ReloadablePage } from "./context";
-import FfmeExportPane from "./FfmeExportPane.vue";
+import FfmeExportPane from "./ffme/FfmeExportPane.vue";
 
 const { toast } = inject(OUTILS_KEY)!;
 const pane = useTemplateRef<ReloadablePage>("pane");

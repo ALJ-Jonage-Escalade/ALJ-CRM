@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Schemas } from "../../lib/client";
-import { batchReport, cacheFile, lastRun, lastSync, pendingText, syncReport } from "./view";
+import { batchReport, cacheFileText, lastRunText, lastSyncText, pendingText, syncReport } from "./view";
 
 const CACHE: Schemas["CloudDbStatus"] = {
   status: "success",
@@ -17,19 +17,19 @@ const AT = new Date(2026, 9, 22, 7, 5, 9);
 
 describe("Paramètres view", () => {
   it("describes the server cache", () => {
-    expect(cacheFile(CACHE)).toBe("database.db (812.5 Ko · 42 adhérents)");
-    expect(cacheFile({ ...CACHE, db_exists: false })).toBe("Non initialisé");
+    expect(cacheFileText(CACHE)).toBe("database.db (812.5 Ko · 42 adhérents)");
+    expect(cacheFileText({ ...CACHE, db_exists: false })).toBe("Non initialisé");
     expect(pendingText(0)).toBe("0 (à jour)");
     expect(pendingText(3)).toBe("⏳ 3 en attente");
   });
 
   it("formats dates in French", () => {
-    expect(lastSync(0)).toBe("Non renseignée");
-    expect(lastSync(null)).toBe("Non renseignée");
-    expect(lastSync(AT.getTime() / 1000)).toBe("22/10/2026 07:05:09");
-    expect(lastRun("")).toBe("Jamais exécuté");
-    expect(lastRun("2026-10-22T07:05:09.123")).toBe("22/10/2026 07:05");
-    expect(lastRun("hier")).toBe("hier");
+    expect(lastSyncText(0)).toBe("Non renseignée");
+    expect(lastSyncText(null)).toBe("Non renseignée");
+    expect(lastSyncText(AT.getTime() / 1000)).toBe("22/10/2026 07:05:09");
+    expect(lastRunText("")).toBe("Jamais exécuté");
+    expect(lastRunText("2026-10-22T07:05:09.123")).toBe("22/10/2026 07:05");
+    expect(lastRunText("hier")).toBe("hier");
   });
 
   it("reports a sync", () => {

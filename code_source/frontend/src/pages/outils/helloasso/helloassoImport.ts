@@ -1,9 +1,9 @@
 /* Import of the HelloAsso membership campaign (server: api/members/helloasso_import.py): the server sorts every
    registration of the campaign into a bucket; the preview shows one section per bucket. */
-import type { BadgeColor } from "../../components/ui/palette";
-import type { Schemas } from "../../lib/client";
-import { formatDateTime, formatDayText, parseDate } from "../../lib/format";
-import { normKey } from "../adherents/members";
+import type { BadgeColor } from "../../../components/ui/palette";
+import type { Schemas } from "../../../lib/client";
+import { formatDateTime, formatDayText, parseDate } from "../../../lib/format";
+import { normKey } from "../../../lib/text";
 
 export type MembershipPreview = Schemas["MembershipPreview"];
 export type MembershipRow = Schemas["MembershipRow"];
@@ -298,19 +298,20 @@ export const RESULT_GROUPS = [
   { key: "attached", icon: "🔗", testId: "ha-attached" },
 ] as const satisfies readonly { key: keyof MembershipImportResult["counts"]; icon: string; testId: string }[];
 
-function plural(count: number, one: string, many: string): string {
+/** « 1 adhérent créé », « 3 adhérents créés »: the count with the singular or plural wording. */
+function countLabel(count: number, one: string, many: string): string {
   return `${count} ${count > 1 ? many : one}`;
 }
 
 /** Headline of the result screen. */
 export function resultSummary(result: MembershipImportResult): string {
   const { created, renewed, updated, attached, skipped } = result.counts;
-  const attachedText = attached ? `${plural(attached, "inscription rattachée", "inscriptions rattachées")}, ` : "";
+  const attachedText = attached ? `${countLabel(attached, "inscription rattachée", "inscriptions rattachées")}, ` : "";
   return (
-    `🎉 Import terminé (saison ${result.season}) : ${plural(created, "adhérent créé", "adhérents créés")}, ` +
-    `${plural(renewed, "renouvellement", "renouvellements")}, ${plural(updated, "inscription mise à jour", "inscriptions mises à jour")}, ` +
+    `🎉 Import terminé (saison ${result.season}) : ${countLabel(created, "adhérent créé", "adhérents créés")}, ` +
+    `${countLabel(renewed, "renouvellement", "renouvellements")}, ${countLabel(updated, "inscription mise à jour", "inscriptions mises à jour")}, ` +
     attachedText +
-    `${plural(skipped, "inscription non importée", "inscriptions non importées")}.`
+    `${countLabel(skipped, "inscription non importée", "inscriptions non importées")}.`
   );
 }
 

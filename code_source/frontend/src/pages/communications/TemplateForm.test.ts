@@ -1,11 +1,11 @@
+import type { EmailTemplate } from "../../services/communications";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
-import type { Template } from "./editor";
 import TemplateForm from "./TemplateForm.vue";
 import { dialogs } from "../../composables/dialogs";
 
-const TEMPLATE: Template = {
+const TEMPLATE: EmailTemplate = {
   name: "Relance",
   subject: "Inscription",
   body: "Bonjour X !",
@@ -13,14 +13,14 @@ const TEMPLATE: Template = {
   sender_name: "ALJ Compétitions",
 };
 
-function render(template: Partial<Template> = {}) {
-  const draft = ref<Template>({ ...TEMPLATE, ...template });
+function render(template: Partial<EmailTemplate> = {}) {
+  const draft = ref<EmailTemplate>({ ...TEMPLATE, ...template });
   const wrapper = mount(TemplateForm, {
     props: {
       modelValue: draft.value,
       defaultSender: { sender_email: "club@alj.example", sender_name: "Club" },
       senderSuggestions: ["club@alj.example"],
-      "onUpdate:modelValue": (v: Template) => (draft.value = v),
+      "onUpdate:modelValue": (v: EmailTemplate) => (draft.value = v),
     },
     attachTo: document.body,
   });

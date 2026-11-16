@@ -1,23 +1,14 @@
+import { fakeAuth, json, provided } from "../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, ref } from "vue";
+import { defineComponent } from "vue";
 import { createMemoryHistory, createRouter, type Router } from "vue-router";
-import { AUTH_KEY, type Auth } from "../composables/auth";
-import { API_KEY, type ApiFetch } from "../lib/api";
-import { CLIENT_KEY, createApiClient } from "../lib/client";
+import { type ApiFetch } from "../lib/api";
 import type { Role } from "../lib/roles";
 import AdherentsPage from "./AdherentsPage.vue";
-import { FILTER_KEY, PANEL_KEY, type MemberList } from "./adherents/members";
+import { ADHERENTS_FILTERS_STORAGE, ADHERENTS_PANEL_STORAGE, type MemberList } from "./adherents/members";
 import { member } from "./adherents/members.fixture";
 import { dialogs } from "../composables/dialogs";
-
-function json(body: unknown, status = 200, etag?: string): Response {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (etag) {
-    headers.ETag = etag;
-  }
-  return new Response(JSON.stringify(body), { status, headers });
-}
 
 const CRENEAUX = [
   { groupe: "Loisir adultes", tarifs: ["Adulte loisir"], categorie_age: "", type: "" },
@@ -92,18 +83,12 @@ async function render(role: Role = "admin", answers: Record<string, Answer> = AN
     ],
   });
   await router.push(path);
-  const auth: Auth = {
-    state: ref({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role }),
-    login: vi.fn(),
-    logout: vi.fn(async () => {}),
-    retry: vi.fn(async () => {}),
-    stop: vi.fn(),
-  };
+  const auth = fakeAuth({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role });
   const wrapper = mount(AdherentsPage, {
     attachTo: document.body,
     global: {
       plugins: [router],
-      provide: { [AUTH_KEY]: auth, [API_KEY]: api, [CLIENT_KEY]: createApiClient(api, "http://alj.test") },
+      provide: provided(auth, api),
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
     },
   });
@@ -171,7 +156,7 @@ describe("AdherentsPage", () => {
     expect(wrapper.find('[data-testid="data-empty"]').text()).toBe("Aucun adhérent ne correspond aux filtres actifs.");
 
     await byId("member-search").setValue("dupont");
-    const saved = JSON.parse(localStorage.getItem(FILTER_KEY)!);
+    const saved = JSON.parse(localStorage.getItem(ADHERENTS_FILTERS_STORAGE)!);
     expect(saved.groups).toEqual({ "Liste d'attente": false, "Loisir adultes": false });
     expect(saved.search).toBe("");
   });
@@ -194,7 +179,7 @@ describe("AdherentsPage", () => {
     expect(byId("member-count").text()).toContain("(saison 2025-2026)");
     expect(calls.map((c) => c.path)).toContain("/api/members?season=2025-2026");
 
-    localStorage.setItem(FILTER_KEY, JSON.stringify({ season: "1999-2000" }));
+    localStorage.setItem(ADHERENTS_FILTERS_STORAGE, JSON.stringify({ season: "1999-2000" }));
     const again = await render();
     await flushPromises();
     expect(again.names()).toEqual(["DUPONT", "MARTIN"]);
@@ -220,16 +205,12 @@ describe("AdherentsPage", () => {
     expect(lines[2]).toContain('"+33 6 12 34 56 78"');
   });
 
-  it("shows a coach no admin action", async () => {
+  it("shows a coach no admin action, but the FFME export coaches may open", async () => {
     const { byId, wrapper } = await render("coach");
     await flushPromises();
     expect(byId("member-add").exists()).toBe(false);
     expect(wrapper.find('a[href="/bureau/outils/ffme-import"]').exists()).toBe(false);
-    expect(wrapper.find('a[href="/bureau/outils/ffme"]').exists()).toBe(false);
-    const ffmeBtn = wrapper.find('button[data-testid="export-ffme"]');
-    expect(ffmeBtn.exists()).toBe(true);
-    expect(ffmeBtn.attributes("disabled")).toBeDefined();
-    expect(ffmeBtn.attributes("title")).toBe("Réservé aux administrateurs");
+    expect(byId("export-ffme").attributes("href")).toBe("/bureau/outils/ffme");
   });
 
   it("opens the record of a member from the list: a coach can e-mail but not edit", async () => {
@@ -293,7 +274,7 @@ describe("AdherentsPage", () => {
     await flushPromises();
     expect(inBody("record-panel")).toBeNull();
     expect(byId("sort-city").exists()).toBe(true);
-    expect(localStorage.getItem(PANEL_KEY)).toBe("closed");
+    expect(localStorage.getItem(ADHERENTS_PANEL_STORAGE)).toBe("closed");
     wrapper.unmount();
 
     const again = await render();
@@ -303,7 +284,7 @@ describe("AdherentsPage", () => {
     await flushPromises();
     expect(again.inBody("record-name")!.textContent).toBe("Max MARTIN");
     expect(again.byId("sort-city").exists()).toBe(false);
-    expect(localStorage.getItem(PANEL_KEY)).toBe("open");
+    expect(localStorage.getItem(ADHERENTS_PANEL_STORAGE)).toBe("open");
     await again.byId("side-panel-collapse").trigger("click");
     await again.byId("panel-open").trigger("click");
     expect(again.inBody("record-name")!.textContent).toBe("Max MARTIN");

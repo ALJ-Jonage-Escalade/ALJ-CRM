@@ -3,8 +3,9 @@
    name values of a season). */
 import { PivotUtilities, Renderer } from "vue-pivottable";
 import { h, useAttrs, type Component, type VNode } from "vue";
-import type { Schemas } from "../../lib/client";
-import { sexLabel } from "../../lib/sex";
+import { localStorageOrNone } from "../../../lib/localStorage";
+import type { Schemas } from "../../../lib/client";
+import { sexLabel } from "../../../lib/sex";
 
 type PivotRecord = Schemas["PivotRecord"];
 export type PivotField = keyof PivotRecord;
@@ -121,7 +122,7 @@ export function defaultModel(): PivotModel {
   return { ...structuredClone(DEFAULT_LAYOUT), valueFilter: defaultValueFilter() };
 }
 
-export const LAYOUT_KEY = "alj.pivot.layout.v1";
+export const PIVOT_LAYOUT_STORAGE = "alj.pivot.layout.v1";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const isField = (value: unknown): value is PivotField => FIELDS.some((f) => f === value);
@@ -164,18 +165,9 @@ export function layoutOf(model: PivotLayout): PivotLayout {
   return { rows: [...rows], cols: [...cols], vals: [...vals], aggregatorName, rendererName, rowOrder, colOrder };
 }
 
-// localStorage can be missing or throw (private browsing, storage disabled): the layout is then not kept
-function storage(): Storage | null {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export function loadLayout(): PivotLayout {
   try {
-    return restoreLayout(storage()?.getItem(LAYOUT_KEY) ?? null);
+    return restoreLayout(localStorageOrNone()?.getItem(PIVOT_LAYOUT_STORAGE) ?? null);
   } catch {
     return structuredClone(DEFAULT_LAYOUT);
   }
@@ -183,7 +175,7 @@ export function loadLayout(): PivotLayout {
 
 export function saveLayout(model: PivotLayout): void {
   try {
-    storage()?.setItem(LAYOUT_KEY, JSON.stringify(layoutOf(model)));
+    localStorageOrNone()?.setItem(PIVOT_LAYOUT_STORAGE, JSON.stringify(layoutOf(model)));
   } catch (e) {
     console.warn("Disposition du TCD non enregistrée :", e);
   }
@@ -191,7 +183,7 @@ export function saveLayout(model: PivotLayout): void {
 
 export function clearLayout(): void {
   try {
-    storage()?.removeItem(LAYOUT_KEY);
+    localStorageOrNone()?.removeItem(PIVOT_LAYOUT_STORAGE);
   } catch (e) {
     console.warn("Disposition du TCD non effacée :", e);
   }

@@ -8,7 +8,7 @@ import {
   emailNotSent,
   invitationMessage,
   isOwnEntry,
-  lastSignIn,
+  lastSignInText,
   roleChange,
   statusLabel,
   type AccessEntry,
@@ -31,8 +31,8 @@ describe("Accès view", () => {
   });
 
   it("shows the last sign-in date, or never", () => {
-    expect(lastSignIn("2026-10-30T09:15:00+00:00")).toBe("30/10/2026");
-    expect(lastSignIn(null)).toBe("Jamais");
+    expect(lastSignInText("2026-10-30T09:15:00+00:00")).toBe("30/10/2026");
+    expect(lastSignInText(null)).toBe("Jamais");
   });
 
   it("tells an access in use from an open or expired invitation", () => {

@@ -18,7 +18,7 @@ import {
   WEEKDAYS,
   type CalendarBar,
 } from "./calendar";
-import { isArchived, period, todayIso, type Competition } from "../competitions";
+import { isArchived, periodText, todayIso, type Competition } from "../competitions";
 
 const props = defineProps<{
   competitions: readonly Competition[];
@@ -35,7 +35,7 @@ const weeks = computed(() => monthWeeks(shown.value, today).map((days) => ({ day
 const agenda = computed(() => monthAgenda(props.competitions, shown.value));
 
 function barText(c: Competition): string {
-  return [c.nom, c.lieu || "lieu non précisé", period(c)].join(" · ");
+  return [c.nom, c.lieu || "lieu non précisé", periodText(c)].join(" · ");
 }
 
 function barClass(bar: CalendarBar): string[] {

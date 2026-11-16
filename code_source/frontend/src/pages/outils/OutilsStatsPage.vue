@@ -2,7 +2,7 @@
 /* Outils › Statistiques: the competitions' figures. */
 import { useTemplateRef } from "vue";
 import type { ReloadablePage } from "./context";
-import StatsPane from "./StatsPane.vue";
+import StatsPane from "./stats/StatsPane.vue";
 
 const pane = useTemplateRef<ReloadablePage>("pane");
 defineExpose({ reload: () => pane.value?.reload() });

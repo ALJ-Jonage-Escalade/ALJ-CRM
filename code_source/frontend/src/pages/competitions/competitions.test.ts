@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   athleteContactCards,
   coachChoices,
-  competitionMembersPath,
+  competitionMembersRead,
   competitorStatusesLabel,
   counts,
   defaultDeadline,
-  discipline,
+  shownDiscipline,
   disciplineColor,
   draftBody,
   draftErrors,
@@ -19,8 +19,9 @@ import {
   memberMatches,
   participantCsv,
   participantRows,
-  period,
-  ranking,
+  periodText,
+  rankingText,
+  seasonOf,
   sortCompetitions,
   toMemberSlots,
   UNIDENTIFIED,
@@ -40,15 +41,27 @@ describe("competitions", () => {
   it.each([
     [{}, "sans date"],
     [{ date_competition: "2026-03-15" }, "15/03/2026"],
-    [{ date_competition: "2026-03-15", date_fin: "2026-03-16" }, "15/03/2026 → 16/03/2026"],
+    [{ date_competition: "2026-03-15", date_fin: "2026-03-16" }, "15/03 au 16/03/2026"],
+    [{ date_competition: "2026-12-31", date_fin: "2027-01-01" }, "31/12/2026 au 01/01/2027"],
     [{ date_competition: "2026-03-15", date_fin: "2026-03-15" }, "15/03/2026"],
   ])("period %j", (change, expected) => {
-    expect(period(comp(change))).toBe(expected);
+    expect(periodText(comp(change))).toBe(expected);
+  });
+
+  it.each([
+    ["2026-09-01", "2026-2027"],
+    ["2027-08-31", "2026-2027"],
+    ["2026-08-31T10:00:00", "2025-2026"],
+    [undefined, ""],
+    ["", ""],
+    ["31/08/2026", ""],
+  ])("seasonOf %s", (iso, expected) => {
+    expect(seasonOf(iso)).toBe(expected);
   });
 
   it("badges the disciplines, not « escalade »", () => {
-    expect(discipline({ id: 1, type: " Bloc " })).toBe("Bloc");
-    expect(discipline({ id: 1, type: "Escalade" })).toBe("");
+    expect(shownDiscipline({ id: 1, type: " Bloc " })).toBe("Bloc");
+    expect(shownDiscipline({ id: 1, type: "Escalade" })).toBe("");
     expect(disciplineColor("VITESSE")).toBe("amber");
     expect(disciplineColor("Paraescalade")).toBe("blue");
   });
@@ -192,9 +205,9 @@ describe("participants", () => {
     const [leo, zoe, max] = c.participants!;
     expect([hasPaid(leo!), hasPaid(zoe!), hasPaid({ ...leo!, statut_paiement: "annule_reporte" })]).toEqual([true, false, false]);
     expect([isNotInvited(max!), isNotInvited(zoe!)]).toEqual([true, false]);
-    expect(ranking(leo!)).toBe("🥇 1er");
-    expect(ranking({ classement: "4", total_categorie: 23 })).toBe("🏅 4 / 23");
-    expect(ranking({})).toBe("");
+    expect(rankingText(leo!)).toBe("🥇 1er");
+    expect(rankingText({ classement: "4", total_categorie: 23 })).toBe("🏅 4 / 23");
+    expect(rankingText({})).toBe("");
   });
 
   it("finds members to add, not listed yet", () => {
@@ -209,7 +222,7 @@ describe("participants", () => {
   });
 
   it("asks the server for the members at the competitor statuses only", () => {
-    expect(new URL(competitionMembersPath(), "http://alj.test").searchParams.getAll("status")).toEqual(["Terminé"]);
+    expect(competitionMembersRead()).toEqual({ path: "/api/competition-members", query: { status: ["Terminé"] } });
     expect(competitorStatusesLabel).toBe("« Terminé »");
   });
 

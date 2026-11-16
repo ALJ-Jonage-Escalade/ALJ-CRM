@@ -4,7 +4,7 @@ import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import { formatDayText } from "../../../lib/format";
 import { plural } from "../../../lib/text";
-import { counts, discipline, disciplineColor, hasResults, type Competition } from "../competitions";
+import { counts, shownDiscipline, disciplineColor, hasResults, type Competition } from "../competitions";
 
 defineProps<{
   competitions: readonly Competition[];
@@ -56,8 +56,8 @@ const emit = defineEmits<{
             <span v-if="competition.id_ffme" class="block text-[11px] text-slate-400">N° FFME : {{ competition.id_ffme }}</span>
           </td>
           <td class="px-3 py-2.5 whitespace-nowrap">
-            <UiBadge v-if="discipline(competition)" :color="disciplineColor(discipline(competition))" variant="soft">
-              {{ discipline(competition) }}
+            <UiBadge v-if="shownDiscipline(competition)" :color="disciplineColor(shownDiscipline(competition))" variant="soft">
+              {{ shownDiscipline(competition) }}
             </UiBadge>
             <span v-else class="text-slate-400">—</span>
           </td>

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../lib/client";
 import { createOfflineStore, type OfflineStore } from "../../lib/store";
 import type { Competition, Participant } from "./competitions";
-import { createOutbox, logoutWarning, outboxKey, pendingLine, refusalText, replayMessage, type SendChange } from "./outbox";
+import { createOutbox, outboxKey, pendingLine, refusalText, replayMessage, type SendChange } from "./outbox";
 
 const UID = "u1";
 const LEO: Participant = { adherent_id: 1, nom: "MARTIN", prenom: "Léo", selectionne: true, present: false, updated_at: "t1" };
@@ -18,7 +18,7 @@ function server(answers: Record<string, (body: object) => unknown> = {}) {
     const url = `/api/competitions/${competitionId}/participants/${adherentId}`;
     sent.push({ url, body });
     const answer = answers[url]?.(body);
-    if (answer instanceof ApiError) {
+    if (answer instanceof Error) {
       throw answer;
     }
     return { id: competitionId, participants: [{ adherent_id: adherentId, updated_at: `t${clock++}` }] };
@@ -53,6 +53,14 @@ describe("outbox", () => {
     await outbox.queue(UID, COMP, ZOE, "selectionne", true);
     await outbox.queue(UID, COMP, LEO, "selectionne", false); // again: keeps its place in the queue
     expect(outbox.pending(10, 1, "selectionne")!.queuedAt).toBe(1000);
+  });
+
+  it("cancels a waiting change", async () => {
+    const outbox = createOutbox(store, server().send, clock);
+    await outbox.queue(UID, COMP, LEO, "selectionne", false);
+    await outbox.cancel(10, 1, "selectionne");
+    expect(outbox.pending(10, 1, "selectionne")).toBeUndefined();
+    expect(await store.queued(UID)).toEqual([]);
   });
 
   it("reads what the former page queued and sends it oldest first", async () => {
@@ -144,6 +152,18 @@ describe("outbox", () => {
     expect((await store.queued(UID)).length).toBe(2);
   });
 
+  it("drops a change whose sending hit a bug, instead of retrying it forever", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { send } = server({ "/api/competitions/10/participants/1": () => new RangeError("bug") });
+    const outbox = createOutbox(store, send, clock);
+    await outbox.queue(UID, COMP, LEO, "selectionne", false);
+    await outbox.queue(UID, COMP, ZOE, "selectionne", true);
+    expect(await outbox.replay(UID)).toEqual({ done: 2, refused: ["MARTIN Léo (Coupe) : erreur inattendue"], denied: false });
+    expect(await store.queued(UID)).toEqual([]);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
   it("stops on a lost role (401/403) and says so", async () => {
     const { send } = server({ "/api/competitions/10/participants/1": () => new ApiError(403, null, "x") });
     const outbox = createOutbox(store, send, clock);
@@ -225,7 +245,6 @@ describe("outbox", () => {
     expect(refusalText(new ApiError(404, null, "x"))).toBe("n'est plus inscrit à cette compétition");
     expect(refusalText(new ApiError(409, "competition_closed", "x"))).toBe("compétition archivée");
     expect(refusalText(new ApiError(400, null, "Refusé"))).toBe("Refusé");
-    expect(logoutWarning(1)).toBe("1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?");
     expect(pendingLine(0)).toBe("");
     expect(pendingLine(3)).toBe(" · ⏳ 3 modifications à envoyer");
     expect(replayMessage({ done: 1, refused: [], denied: false })).toBe("☁️ Modifications faites hors ligne envoyées.");

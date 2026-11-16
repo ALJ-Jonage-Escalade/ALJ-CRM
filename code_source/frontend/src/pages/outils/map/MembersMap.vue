@@ -3,10 +3,10 @@
    groups (HelloAsso tariffs). The points come from /api/reports/map-points; Leaflet is loaded on first display. */
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui";
 import { computed, inject, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
-import UiButton from "../../components/ui/UiButton.vue";
-import { CLIENT_KEY, errorText } from "../../lib/client";
-import { createReportsApi } from "../../services/reports";
-import { filterLabel, groupsOf, summary, visiblePoints, type MapPoint } from "./membersMap";
+import UiButton from "../../../components/ui/UiButton.vue";
+import { CLIENT_KEY, errorText } from "../../../lib/client";
+import { createReportsApi } from "../../../services/reports";
+import { filterLabel, groupsOf, mapSummaryText, visiblePoints, type MapPoint } from "./membersMap";
 import type { MembersMapView } from "./membersMapView";
 
 const props = defineProps<{ season: string }>();
@@ -128,7 +128,7 @@ defineExpose({ reload: load });
       </PopoverPortal>
     </PopoverRoot>
     <span v-if="status === 'ready'" data-testid="map-stats" class="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-      {{ summary(visible, groups.length, shownCount) }}
+      {{ mapSummaryText(visible, groups.length, shownCount) }}
     </span>
   </div>
   <div
