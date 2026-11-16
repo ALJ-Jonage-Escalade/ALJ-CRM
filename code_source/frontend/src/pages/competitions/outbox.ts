@@ -91,6 +91,46 @@ function isValid(entry: QueuedChange, uid: string): boolean {
   return entry.uid === uid && QUEUED_URL.test(String(entry.url)) && QUEUED_FLAGS.includes(entry.flag) && typeof entry.value === "boolean";
 }
 
+/** Why a change was not sent: kept for the next try, the account lost its role (stop), or refused (dropped). */
+type SendFailure = { kind: "retry" } | { kind: "denied" } | { kind: "refused"; reason: string };
+
+const INVALID: SendFailure = { kind: "refused", reason: "modification non valide, non envoyée" };
+
+function sendFailure(error: unknown): SendFailure {
+  if (!(error instanceof ApiError)) {
+    // A bug, not an outage: the change is dropped and named, rather than retried forever
+    console.error("Envoi différé :", error);
+    return { kind: "refused", reason: "erreur inattendue" };
+  }
+  if (retryLater(error)) {
+    return { kind: "retry" };
+  }
+  if (error.status === 401 || error.status === 403) {
+    return { kind: "denied" };
+  }
+  return { kind: "refused", reason: refusalText(error) };
+}
+
+/** Competitor url -> the updated_at our own sent change replaced, and the one it produced. */
+type Written = Map<string, { from: string; to: string }>;
+
+/** Sends a valid change; a second change of the same competitor uses the updated_at the first one produced. */
+async function sendEntry(send: SendChange, entry: QueuedChange, written: Written): Promise<SendFailure | null> {
+  const [, competitionId, adherentId] = QUEUED_URL.exec(entry.url)!.map(Number);
+  const ours = written.get(entry.url);
+  const unchangedSince = ours && ours.from === entry.unchanged_since ? ours.to : String(entry.unchanged_since ?? "");
+  try {
+    const competition = await send(competitionId!, adherentId!, { [entry.flag]: entry.value, unchanged_since: unchangedSince });
+    const after = competition.participants?.find((p) => p.adherent_id === adherentId)?.updated_at;
+    if (after != null) {
+      written.set(entry.url, { from: entry.unchanged_since, to: String(after) });
+    }
+    return null;
+  } catch (error) {
+    return sendFailure(error);
+  }
+}
+
 export function pendingLine(count: number): string {
   return count ? ` · ⏳ ${count} modification${plural(count)} à envoyer` : "";
 }
@@ -174,39 +214,22 @@ export function createOutbox(store: OfflineStore, send: SendChange, now: () => n
     replaying = true;
     const mine = generation;
     const result: ReplayResult = { done: 0, refused: [], denied: false };
-    // Competitor url -> the updated_at our own sent change replaced, and the one it produced
-    const written = new Map<string, { from: string; to: string }>();
+    const written: Written = new Map();
     try {
       for (const entry of [...changes.value.values()].sort((a, b) => a.queuedAt - b.queuedAt)) {
         if (mine !== generation) {
           return null;
         }
-        if (!isValid(entry, uid)) {
-          result.refused.push(`${entry.label || "?"} : modification non valide, non envoyée`);
-        } else {
-          const [, competitionId, adherentId] = QUEUED_URL.exec(entry.url)!.map(Number);
-          const ours = written.get(entry.url);
-          const unchangedSince = ours && ours.from === entry.unchanged_since ? ours.to : String(entry.unchanged_since ?? "");
-          try {
-            const competition = await send(competitionId!, adherentId!, { [entry.flag]: entry.value, unchanged_since: unchangedSince });
-            const after = competition.participants?.find((p) => p.adherent_id === adherentId)?.updated_at;
-            if (after != null) {
-              written.set(entry.url, { from: entry.unchanged_since, to: String(after) });
-            }
-          } catch (e) {
-            if (!(e instanceof ApiError)) {
-              // A bug, not an outage: the change is dropped and named, rather than retried forever
-              console.error("Envoi différé :", e);
-              result.refused.push(`${entry.label} : erreur inattendue`);
-            } else if (retryLater(e)) {
-              break;
-            } else if (e.status === 401 || e.status === 403) {
-              result.denied = true;
-              return result;
-            } else {
-              result.refused.push(`${entry.label} : ${refusalText(e)}`);
-            }
-          }
+        const failure = isValid(entry, uid) ? await sendEntry(send, entry, written) : INVALID;
+        if (failure?.kind === "retry") {
+          break;
+        }
+        if (failure?.kind === "denied") {
+          result.denied = true;
+          return result;
+        }
+        if (failure) {
+          result.refused.push(`${entry.label || "?"} : ${failure.reason}`);
         }
         if (mine !== generation) {
           return null;

@@ -8,9 +8,9 @@ import { sortCompetitions, type Competition, type MemberSlot } from "../competit
 
 export type HelloAssoItem = Schemas["HelloAssoItem"];
 
-export const isLinked = (it: HelloAssoItem): boolean => it.competition_id != null && it.adherent_id != null;
+export const isLinked = (item: HelloAssoItem): boolean => item.competition_id != null && item.adherent_id != null;
 /** Set aside by a coach (test, purchase unrelated to a competition…). */
-export const isIgnored = (it: HelloAssoItem): boolean => it.ignore === true && !isLinked(it);
+export const isIgnored = (item: HelloAssoItem): boolean => item.ignore === true && !isLinked(item);
 
 export interface Field {
   name: string;
@@ -46,49 +46,49 @@ const fullName = (o: Raw) => [o.firstName, o.lastName].filter(Boolean).map(text)
 const fields = (v: unknown): Field[] =>
   list(v).map((c) => ({ name: text(obj(c).name).trim(), answer: text(obj(c).answer ?? obj(c).value) }));
 
-function parseRaw(it: HelloAssoItem): Raw {
+function parseRaw(item: HelloAssoItem): Raw {
   try {
-    return obj(it.raw_json ? JSON.parse(it.raw_json) : null);
+    return obj(item.raw_json ? JSON.parse(item.raw_json) : null);
   } catch {
     return {};
   }
 }
 
 /** Everything known of an item: the mirror's fields, completed by HelloAsso's raw item. */
-export function itemInfo(it: HelloAssoItem): ItemInfo {
-  const r = parseRaw(it);
-  const order = obj(r.order);
-  const payer = obj(r.payer);
-  const payments = list(r.payments).map(obj);
+export function itemInfo(item: HelloAssoItem): ItemInfo {
+  const rawItem = parseRaw(item);
+  const order = obj(rawItem.order);
+  const payer = obj(rawItem.payer);
+  const payments = list(rawItem.payments).map(obj);
   return {
-    beneficiary: fullName(obj(r.user)) || `${it.payer_prenom ?? ""} ${it.payer_nom ?? ""}`.trim(),
+    beneficiary: fullName(obj(rawItem.user)) || `${item.payer_prenom ?? ""} ${item.payer_nom ?? ""}`.trim(),
     payerName: fullName(payer),
     payerEmail: text(payer.email),
     payerCity: [payer.zipCode, payer.city].filter(Boolean).map(text).join(" "),
-    orderId: text(it.order_id ?? order.id),
-    date: it.date_item || text(order.date) || text(payments[0]?.date),
-    formName: text(order.formName || order.formSlug || it.campagne_slug),
-    itemName: text(r.name),
-    state: it.etat || text(r.state),
-    amount: Number(it.montant ?? 0),
-    initialAmount: cents(r.initialAmount),
-    payments: payments.map((p) => ({
-      id: text(p.id),
-      amount: cents(p.amount ?? p.shareAmount),
-      state: text(p.state),
-      date: text(p.date),
-      means: text(p.paymentMeans),
+    orderId: text(item.order_id ?? order.id),
+    date: item.date_item || text(order.date) || text(payments[0]?.date),
+    formName: text(order.formName || order.formSlug || item.campagne_slug),
+    itemName: text(rawItem.name),
+    state: item.etat || text(rawItem.state),
+    amount: Number(item.montant ?? 0),
+    initialAmount: cents(rawItem.initialAmount),
+    payments: payments.map((payment) => ({
+      id: text(payment.id),
+      amount: cents(payment.amount ?? payment.shareAmount),
+      state: text(payment.state),
+      date: text(payment.date),
+      means: text(payment.paymentMeans),
     })),
-    fields: fields(r.customFields),
-    options: list(r.options)
+    fields: fields(rawItem.customFields),
+    options: list(rawItem.options)
       .map(obj)
       .map((o) => ({ name: text(o.name), amount: cents(o.amount), fields: fields(o.customFields) })),
-    raw: r,
+    raw: rawItem,
   };
 }
 
-export function displayName(it: HelloAssoItem, info: ItemInfo = itemInfo(it)): string {
-  return info.beneficiary || info.payerName || `Article #${it.id_item}`;
+export function displayName(item: HelloAssoItem, info: ItemInfo = itemInfo(item)): string {
+  return info.beneficiary || info.payerName || `Article #${item.id_item}`;
 }
 
 const STATES: Record<string, string> = {
@@ -132,55 +132,55 @@ export function filterItems(
   competitions: readonly Competition[],
   members: readonly MemberSlot[],
 ): HelloAssoItem[] {
-  const q = normKey(search);
+  const wanted = normKey(search);
   const compName = new Map(competitions.map((c) => [c.id, c.nom ?? ""]));
   const member = new Map(members.map((m) => [m.id, `${m.nom} ${m.prenom}`]));
-  const shown = items.filter((it) => {
-    if (filter === "unlinked" && (isLinked(it) || isIgnored(it))) {
+  const shown = items.filter((item) => {
+    if (filter === "unlinked" && (isLinked(item) || isIgnored(item))) {
       return false;
     }
-    if (filter === "linked" && !isLinked(it)) {
+    if (filter === "linked" && !isLinked(item)) {
       return false;
     }
-    if (filter === "ignored" && !isIgnored(it)) {
+    if (filter === "ignored" && !isIgnored(item)) {
       return false;
     }
-    if (filter === "all" && hideIgnored && isIgnored(it)) {
+    if (filter === "all" && hideIgnored && isIgnored(item)) {
       return false;
     }
-    if (!q) {
+    if (!wanted) {
       return true;
     }
-    const h = itemInfo(it);
+    const info = itemInfo(item);
     return normKey(
       [
-        it.payer_nom,
-        it.payer_prenom,
-        h.beneficiary,
-        h.payerName,
-        h.payerEmail,
-        h.orderId,
-        it.id_item,
-        it.licence_saisie,
-        it.competition_saisie,
-        h.itemName,
-        h.formName,
-        it.commentaire,
-        it.ignore_motif,
-        compName.get(it.competition_id ?? -1),
-        member.get(it.adherent_id ?? -1),
-        ...h.fields.map((f) => f.answer),
+        item.payer_nom,
+        item.payer_prenom,
+        info.beneficiary,
+        info.payerName,
+        info.payerEmail,
+        info.orderId,
+        item.id_item,
+        item.licence_saisie,
+        item.competition_saisie,
+        info.itemName,
+        info.formName,
+        item.commentaire,
+        item.ignore_motif,
+        compName.get(item.competition_id ?? -1),
+        member.get(item.adherent_id ?? -1),
+        ...info.fields.map((f) => f.answer),
       ]
         .filter((v) => v != null)
         .join(" "),
-    ).includes(q);
+    ).includes(wanted);
   });
   const rank = (it: HelloAssoItem) => (isLinked(it) ? 1 : isIgnored(it) ? 2 : 0);
   const dates = new Map(shown.map((it) => [it, itemInfo(it).date]));
   return shown.sort((a, b) => rank(a) - rank(b) || (dates.get(b) ?? "").localeCompare(dates.get(a) ?? ""));
 }
 
-const isPending = (it: HelloAssoItem): boolean => !isLinked(it) && !isIgnored(it);
+const isPending = (item: HelloAssoItem): boolean => !isLinked(item) && !isIgnored(item);
 
 /** The items of a linking pass (« Rattacher les paiements en attente »): the pending ones of the list shown, in its order. */
 export function pendingIds(shown: readonly HelloAssoItem[]): number[] {
@@ -192,8 +192,8 @@ export function pendingIds(shown: readonly HelloAssoItem[]): number[] {
 export function nextPending(ids: readonly number[], after: number, items: readonly HelloAssoItem[]): number {
   const byId = new Map(items.map((it) => [it.id_item, it]));
   return ids.findIndex((id, position) => {
-    const it = byId.get(id);
-    return position > after && it != null && isPending(it);
+    const item = byId.get(id);
+    return position > after && item != null && isPending(item);
   });
 }
 
@@ -218,11 +218,11 @@ export function passSummary(tally: PassTally): string {
 }
 
 /** The competition an item is for: its link, else the one whose FFME number or name the payer typed. */
-export function suggestedCompetition(it: HelloAssoItem, competitions: readonly Competition[]): number | null {
-  if (it.competition_id != null && competitions.some((c) => c.id === it.competition_id)) {
-    return it.competition_id;
+export function suggestedCompetition(item: HelloAssoItem, competitions: readonly Competition[]): number | null {
+  if (item.competition_id != null && competitions.some((c) => c.id === item.competition_id)) {
+    return item.competition_id;
   }
-  const typed = normKey([it.competition_saisie, ...itemInfo(it).fields.map((f) => f.answer)].join(" "));
+  const typed = normKey([item.competition_saisie, ...itemInfo(item).fields.map((f) => f.answer)].join(" "));
   if (!typed) {
     return null;
   }
@@ -237,17 +237,17 @@ export function suggestedCompetition(it: HelloAssoItem, competitions: readonly C
 const digits = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
 
 /** The member an item is for: its link, else the licence number typed, else the beneficiary's name. */
-export function suggestedMember(it: HelloAssoItem, members: readonly MemberSlot[]): number | null {
-  if (it.adherent_id != null && members.some((m) => m.id === it.adherent_id)) {
-    return it.adherent_id;
+export function suggestedMember(item: HelloAssoItem, members: readonly MemberSlot[]): number | null {
+  if (item.adherent_id != null && members.some((m) => m.id === item.adherent_id)) {
+    return item.adherent_id;
   }
-  const info = itemInfo(it);
-  const licences = [it.licence_saisie, ...info.fields.map((f) => f.answer)].map(digits).filter((d) => d.length >= 5);
+  const info = itemInfo(item);
+  const licences = [item.licence_saisie, ...info.fields.map((f) => f.answer)].map(digits).filter((d) => d.length >= 5);
   const byLicence = members.find((m) => digits(m.licence_ffme) && licences.includes(digits(m.licence_ffme)));
   if (byLicence) {
     return byLicence.id ?? null;
   }
-  const name = normKey(`${info.beneficiary} ${it.payer_nom ?? ""} ${it.payer_prenom ?? ""}`);
+  const name = normKey(`${info.beneficiary} ${item.payer_nom ?? ""} ${item.payer_prenom ?? ""}`);
   const byName = members.find(
     (m) => normKey(m.nom) && name.includes(normKey(m.nom)) && (!normKey(m.prenom) || name.includes(normKey(m.prenom))),
   );

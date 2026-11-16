@@ -43,77 +43,89 @@ export interface Balance {
   absent: boolean;
 }
 
-function line(c: Competition, p: Participant, today: string): BalanceLine | null {
-  const status = p.statut_paiement || "non_invite";
-  const paid = Number(p.montant_paye ?? 0);
-  const absent = isPast(c, today) && paid > 0 && status === "paye" && !p.present;
-  const base = { competition: c, participant: p, status, present: !!p.present, absent, ranking: rankingText(p) };
+/** The competitor's line for one competition, null when it does not count (neither selected nor paid). */
+function line(competition: Competition, participant: Participant, today: string): BalanceLine | null {
+  const status = participant.statut_paiement || "non_invite";
+  const paid = Number(participant.montant_paye ?? 0);
+  const absent = isPast(competition, today) && paid > 0 && status === "paye" && !participant.present;
+  const base = { competition, participant, status, present: !!participant.present, absent, ranking: rankingText(participant) };
   if (status === "annule_reporte") {
     return { ...base, due: 0, paid, carriedOver: true };
   }
   if (status === "annule_perdu") {
     return { ...base, due: paid, paid, carriedOver: false };
   }
-  if (!p.selectionne && !paid) {
+  if (!participant.selectionne && !paid) {
     return null;
   }
-  return { ...base, due: p.selectionne ? Number(c.prix ?? 0) : 0, paid, carriedOver: false };
+  return { ...base, due: participant.selectionne ? Number(competition.prix ?? 0) : 0, paid, carriedOver: false };
 }
 
-const round = (n: number) => Math.round(n * 100) / 100;
+const round = (amount: number): number => Math.round(amount * 100) / 100;
+
+/** A competitor's balance before their first line; contact details are filled from the lines at the end. */
+function emptyBalance(participant: Participant): Balance {
+  return {
+    adherentId: participant.adherent_id ?? null,
+    nom: (participant.nom ?? "").toUpperCase(),
+    prenom: participant.prenom ?? "",
+    licence: participant.num_licence ?? "",
+    email: "",
+    phone: "",
+    group: "",
+    lines: [],
+    due: 0,
+    paid: 0,
+    remaining: 0,
+    absent: false,
+  };
+}
+
+/** The value of the most recent line that has one (lines sorted by date). */
+function latest(balance: Balance, field: "email" | "phone" | "tarif"): string {
+  return balance.lines.map((entry) => entry.participant[field]?.trim() ?? "").reduce((found, value) => value || found, "");
+}
 
 /** The competitors of the season's competitions, by name. */
 export function balances(list: readonly Competition[], season: string, today: string = todayIso()): Balance[] {
   const current = seasonOf(today);
   const byMember = new Map<string, Balance>();
-  for (const c of list) {
-    if ((seasonOf(c.date_competition) || current) !== season) {
+  for (const competition of list) {
+    if ((seasonOf(competition.date_competition) || current) !== season) {
       continue;
     }
-    for (const p of c.participants ?? []) {
-      const l = line(c, p, today);
-      if (!l) {
+    for (const participant of competition.participants ?? []) {
+      const entry = line(competition, participant, today);
+      if (!entry) {
         continue;
       }
-      const key = p.adherent_id != null ? String(p.adherent_id) : `${p.nom}|${p.prenom}`;
-      const b = byMember.get(key) ?? {
-        adherentId: p.adherent_id ?? null,
-        nom: (p.nom ?? "").toUpperCase(),
-        prenom: p.prenom ?? "",
-        licence: p.num_licence ?? "",
-        email: "",
-        phone: "",
-        group: "",
-        lines: [],
-        due: 0,
-        paid: 0,
-        remaining: 0,
-        absent: false,
-      };
-      b.lines.push(l);
-      b.due = round(b.due + l.due);
-      b.paid = round(b.paid + l.paid);
-      b.remaining = round(b.due - b.paid);
-      b.absent ||= l.absent;
-      byMember.set(key, b);
+      const key = participant.adherent_id != null ? String(participant.adherent_id) : `${participant.nom}|${participant.prenom}`;
+      const balance = byMember.get(key) ?? emptyBalance(participant);
+      balance.lines.push(entry);
+      balance.due = round(balance.due + entry.due);
+      balance.paid = round(balance.paid + entry.paid);
+      balance.remaining = round(balance.due - balance.paid);
+      balance.absent ||= entry.absent;
+      byMember.set(key, balance);
     }
   }
-  for (const b of byMember.values()) {
-    b.lines.sort((x, y) => (x.competition.date_competition ?? "").localeCompare(y.competition.date_competition ?? ""));
-    const latest = (field: "email" | "phone" | "tarif") =>
-      b.lines.map((l) => l.participant[field]?.trim() ?? "").reduce((found, value) => value || found, "");
-    b.email = latest("email");
-    b.phone = latest("phone");
-    b.group = latest("tarif");
+  for (const balance of byMember.values()) {
+    balance.lines.sort((x, y) => (x.competition.date_competition ?? "").localeCompare(y.competition.date_competition ?? ""));
+    balance.email = latest(balance, "email");
+    balance.phone = latest(balance, "phone");
+    balance.group = latest(balance, "tarif");
   }
   return [...byMember.values()].sort((a, b) => a.nom.localeCompare(b.nom, "fr") || a.prenom.localeCompare(b.prenom, "fr"));
 }
 
 export function searchBalances(list: readonly Balance[], search: string): Balance[] {
-  const q = normKey(search);
-  return q
+  const wanted = normKey(search);
+  return wanted
     ? list.filter(
-        (b) => normKey(`${b.nom} ${b.prenom}`).includes(q) || normKey(`${b.prenom} ${b.nom}`).includes(q) || normKey(b.licence).includes(q),
+        (b) =>
+          normKey(`${b.nom} ${b.prenom}`).includes(wanted) ||
+          normKey(`${b.prenom} ${b.nom}`).includes(wanted) ||
+          normKey(b.licence).includes(wanted),
       )
     : list.slice();
 }

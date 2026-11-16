@@ -209,6 +209,9 @@ function validBirthDate(value: string, today: Date): boolean {
   return d.getMonth() === +m[2]! - 1 && d.getDate() === +m[3]! && d <= today && +m[1]! >= 1900;
 }
 
+const PHONE_FIELDS = ["phone", "emergency1_phone", "emergency2_phone"] as const satisfies readonly DraftField[];
+const EMAIL_FIELDS = ["email_primary", "email_secondary"] as const satisfies readonly DraftField[];
+
 /** Problems of the form, by field (empty when it can be sent). adding: the add form, which asks more. amountBefore:
     the amount the edit form opened with (the server keeps an amount once set: it cannot be emptied). */
 export function draftErrors(draft: MemberDraft, adding: boolean, today: Date = new Date(), amountBefore = ""): DraftErrors {
@@ -230,22 +233,18 @@ export function draftErrors(draft: MemberDraft, adding: boolean, today: Date = n
   } else if (!adding && amountBefore.trim() && !draft.amount.trim()) {
     errors.amount = "Le montant ne peut pas être vidé : indiquez 0 si rien n'a été réglé.";
   }
-  if (draft.emergency1_phone.trim() && !looksLikePhone(draft.emergency1_phone.trim())) {
-    errors.emergency1_phone = "Numéro de téléphone invalide.";
-  }
-  if (draft.emergency2_phone.trim() && !looksLikePhone(draft.emergency2_phone.trim())) {
-    errors.emergency2_phone = "Numéro de téléphone invalide.";
-  }
   if (!draft.tarif_name.trim()) {
     errors.tarif_name = "Choisissez un groupe (tarif).";
   }
-  for (const field of ["email_primary", "email_secondary"] as const) {
+  for (const field of PHONE_FIELDS) {
+    if (draft[field].trim() && !looksLikePhone(draft[field].trim())) {
+      errors[field] = "Numéro de téléphone invalide.";
+    }
+  }
+  for (const field of EMAIL_FIELDS) {
     if (draft[field].trim() && !looksLikeEmail(draft[field].trim())) {
       errors[field] = "Adresse e-mail invalide.";
     }
-  }
-  if (draft.phone.trim() && !looksLikePhone(draft.phone.trim())) {
-    errors.phone = "Numéro de téléphone invalide.";
   }
   return errors;
 }
