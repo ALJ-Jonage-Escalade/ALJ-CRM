@@ -15,7 +15,7 @@ class TestMembersMapShowsText(unittest.TestCase):
 
     def test_no_html_from_member_data(self):
         """The map's popups and filter are built as text: no HTML string reaches Leaflet or the DOM."""
-        for name in ("MembersMap.vue", "membersMapView.ts"):
+        for name in ("map/MembersMap.vue", "map/membersMapView.ts"):
             with open(os.path.join(_outils, name), encoding="utf-8") as f:
                 source = f.read()
             for sink in _SINKS:
@@ -28,8 +28,8 @@ class TestPivotTableShowsText(unittest.TestCase):
 
     def test_no_html_from_member_data(self):
         """The pivot table renders the members through vue-pivottable (Vue text, no HTML string); our code adds none
-        (PivotPane.test.ts renders a hostile name)."""
-        for name in ("PivotPane.vue", "pivotLayout.ts"):
+        (pivot/PivotPane.test.ts renders a hostile name)."""
+        for name in ("pivot/PivotPane.vue", "pivot/pivotLayout.ts"):
             with open(os.path.join(_outils, name), encoding="utf-8") as f:
                 source = f.read()
             for sink in _SINKS:
