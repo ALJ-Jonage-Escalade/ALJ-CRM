@@ -90,7 +90,7 @@ export function creneauItems(creneaux: readonly Creneau[]): CreneauItem[] {
   const items: CreneauItem[] = groups(others);
   for (const section of SECTIONS) {
     if (section === "Enfants") {
-      const subs = Object.keys(children).sort();
+      const subs = Object.keys(children).sort((left, right) => left.localeCompare(right, "fr"));
       if (!subs.length) {
         continue;
       }

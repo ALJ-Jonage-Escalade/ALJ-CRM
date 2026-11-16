@@ -22,6 +22,7 @@ import {
   periodText,
   rankingText,
   seasonOf,
+  seasons,
   sortCompetitions,
   toMemberSlots,
   UNIDENTIFIED,
@@ -57,6 +58,12 @@ describe("competitions", () => {
     ["31/08/2026", ""],
   ])("seasonOf %s", (iso, expected) => {
     expect(seasonOf(iso)).toBe(expected);
+  });
+
+  it("lists the seasons with competitions and the current one, newest first; undated ones add none", () => {
+    const list = [comp({ date_competition: "2026-03-01" }), comp({ date_competition: "2024-10-12" }), comp({})];
+    expect(seasons(list, "2026-11-16")).toEqual(["2026-2027", "2025-2026", "2024-2025"]);
+    expect(seasons([], "2026-11-16")).toEqual(["2026-2027"]);
   });
 
   it("badges the disciplines, not « escalade »", () => {

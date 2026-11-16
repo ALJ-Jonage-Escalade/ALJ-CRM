@@ -108,6 +108,12 @@ export function seasonOf(iso: string | null | undefined): string {
   return `${start}-${start + 1}`;
 }
 
+/** Seasons with competitions, and the current one; most recent first. Undated competitions count in the current one. */
+export function seasons(list: readonly Competition[], today: string = todayIso()): string[] {
+  const found = new Set([seasonOf(today), ...list.map((c) => seasonOf(c.date_competition)).filter(Boolean)]);
+  return [...found].sort((left, right) => right.localeCompare(left));
+}
+
 /** The discipline, when it says more than « escalade » (pass-through field of the office page). */
 export function shownDiscipline(competition: Competition): string {
   const t = (competition.type ?? "").trim();

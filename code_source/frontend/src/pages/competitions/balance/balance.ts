@@ -10,12 +10,6 @@ import { formatEuros } from "../../../lib/format";
 import { normKey } from "../../../lib/text";
 import { isPast, rankingText, seasonOf, todayIso, type Competition, type Participant } from "../competitions";
 
-/** Seasons with competitions, and the current one; most recent first. Undated competitions count in the current one. */
-export function seasons(list: readonly Competition[], today: string = todayIso()): string[] {
-  const all = new Set([seasonOf(today), ...list.map((c) => seasonOf(c.date_competition)).filter(Boolean)]);
-  return [...all].sort().reverse();
-}
-
 export interface BalanceLine {
   competition: Competition;
   /** The competitor's entry in it: HelloAsso order, FFME category, contact details… */
