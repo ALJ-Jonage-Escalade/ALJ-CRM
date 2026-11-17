@@ -28,6 +28,11 @@ class InvalidRequest(ServiceError):
     code = "invalid"
 
 
+class Forbidden(ServiceError):
+    """The request is valid but this action is not allowed (a sender address outside the club)."""
+    code = "forbidden"
+
+
 class Conflict(ServiceError):
     """The current state of the data forbids the action (paid, already linked, concurrent write)."""
     code = "conflict"

@@ -64,9 +64,9 @@ class TestAttestationRoutes(unittest.TestCase):
         import shutil
         import tempfile
 
-        from api.communications.attestations import send_attestation_api
-        from api.communications.schemas import AttestationSend
         from infrastructure.sqlite.connection import SqliteDatabase
+        from services.communications import email_log
+        from services.communications.attestations import send_attestation
 
         temp_dir = tempfile.mkdtemp()
         db_path = os.path.join(temp_dir, "test_attestation.db")
@@ -93,13 +93,13 @@ class TestAttestationRoutes(unittest.TestCase):
             conn.close()
 
             # The member, its amount and payer are read from the database: only the purchase is sent
-            payload = AttestationSend(purchase_id=30, season="2026-2027", to_email="jean.dupont@example.com")
-
             with patch("infrastructure.mail.sender.EmailSender.send_email", return_value=True) as mock_send:
-                res = send_attestation_api(payload)
+                res = send_attestation("2026-2027", 30, "jean.dupont@example.com", "admin@alj.example")
 
-            self.assertEqual(res.status, "success")
-            self.assertTrue(res.email_sent_date)
+            self.assertTrue(res["email_sent_date"])
+            (entry,) = email_log.current_store().entries
+            self.assertEqual((entry["kind"], entry["author"], entry["member_ids"]), ("attestation", "admin@alj.example", [10]))
+            self.assertEqual([(r["email"], r["status"]) for r in entry["recipients"]], [("jean.dupont@example.com", "sent")])
 
             # Vérifier les paramètres de l'envoi d'e-mail (conforme desktop)
             mock_send.assert_called_once()
@@ -115,7 +115,7 @@ class TestAttestationRoutes(unittest.TestCase):
             row = conn.execute("SELECT email_sent_date FROM purchases WHERE id = 30").fetchone()
             conn.close()
             self.assertIsNotNone(row["email_sent_date"])
-            self.assertEqual(row["email_sent_date"], res.email_sent_date)
+            self.assertEqual(row["email_sent_date"], res["email_sent_date"])
         finally:
             SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)

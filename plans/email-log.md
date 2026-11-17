@@ -135,6 +135,6 @@ working.
 
 ### Acceptance criteria
 
-- [ ] Attestation send in a service, recorded
-- [ ] Invitation e-mails (invite and resend) recorded
-- [ ] Full checks pass (Python and frontend)
+- [x] Attestation send in a service, recorded
+- [x] Invitation e-mails (invite and resend) recorded
+- [x] Full checks pass (Python and frontend)
