@@ -11,10 +11,12 @@ import logging
 from typing import List
 
 from domain.club_emails import DEFAULT_SENDER_EMAIL
+from domain.email_log import SYSTEM_AUTHOR
 from domain.competitions.models import PAIEMENT_PAYE, Competition, Participant
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.competitions import competitions, participants
 from infrastructure.mail.sender import EmailSender, MailError
+from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
 from services.competitions.results_batch import CompetitionResultsBatchService
 
 logger = logging.getLogger("alj")
@@ -25,7 +27,7 @@ def notified_setting_key(competition_id: int) -> str:
     return f"COMP_ALL_PAID_NOTIFIED_{competition_id}"
 
 
-def check_and_notify_all_paid(competition_id: int) -> bool:
+def check_and_notify_all_paid(competition_id: int, author: str = SYSTEM_AUTHOR) -> bool:
     """Sends the club the summary e-mail once every selected competitor of the competition has paid, once:
     the setting COMP_ALL_PAID_NOTIFIED_<id> records the send, and is cleared as soon as one of them has not paid
     (so a later full payment notifies again). Returns whether the e-mail was sent now."""
@@ -50,10 +52,11 @@ def check_and_notify_all_paid(competition_id: int) -> bool:
         return False
 
     competition_name = competition.nom or "Compétition"
+    subject = f"✅ [ALJ Compétitions] Tous les paiements validés : {competition_name}"
     try:
         EmailSender.send_email(
             to_email=recipient,
-            subject=f"✅ [ALJ Compétitions] Tous les paiements validés : {competition_name}",
+            subject=subject,
             body=build_all_paid_email_text(competition, selected),
             html_body=build_all_paid_email_html(competition, selected),
             from_email=DEFAULT_SENDER_EMAIL,
@@ -61,7 +64,10 @@ def check_and_notify_all_paid(competition_id: int) -> bool:
         )
     except MailError:  # the payments are recorded; the e-mail is tried again on the next notification
         logger.exception("[WEBHOOK_HELLOASSO] E-mail 'Tous les paiements validés' non envoyé à %s", recipient)
+        record_send("competition_all_paid", author, [logged_recipient(recipient, error=SEND_FAILED)], subject,
+                    competition_ids=[competition_id])
         return False
+    record_send("competition_all_paid", author, [logged_recipient(recipient)], subject, competition_ids=[competition_id])
     AppSettingsRepository.save(setting_key, datetime.datetime.now().isoformat(timespec="seconds"))
     logger.info("[WEBHOOK_HELLOASSO] E-mail 'Tous les paiements validés' envoyé à %s pour « %s »", recipient, competition_name)
     return True

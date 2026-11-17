@@ -118,8 +118,8 @@ internal and never move the competitors' dates. The « all paid » setting still
 
 ### Acceptance criteria
 
-- [ ] Both senders record their entry
-- [ ] Summary test: internal kinds listed, ignored for dates; one batch entry covering several competitions
+- [x] Both senders record their entry
+- [x] Summary test: internal kinds listed, ignored for dates; one batch entry covering several competitions
 
 ---
 

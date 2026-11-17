@@ -31,6 +31,7 @@ if _src_dir not in sys.path:
 from domain.utils import normalize_name
 from infrastructure.mail.sender import EmailSender, MailError
 from domain.club_emails import DEFAULT_SENDER_EMAIL
+from domain.email_log import SYSTEM_AUTHOR
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions import competitions, documents, participants
@@ -42,6 +43,7 @@ from infrastructure.mycompet.scraper import (
     find_result_url_in_archives,
     normalize_result_url,
 )
+from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
 from services.competitions.store import invalidate_cache
 from domain.errors import InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
 
@@ -573,6 +575,7 @@ class CompetitionResultsBatchService:
 
         plain_body = "\n".join(lines)
 
+        competition_ids = [int(c["id"]) for c in [*comp_results_list, *needs_url] if str(c.get("id") or "").isdigit()]
         try:
             EmailSender.send_email(
                 to_email=recipient,
@@ -584,8 +587,12 @@ class CompetitionResultsBatchService:
             )
         except MailError:  # the results are saved, only the e-mail is lost
             logger.exception("[BATCH_RESULTATS] Erreur envoi e-mail notification à %s", recipient)
+            record_send("results_batch", SYSTEM_AUTHOR, [logged_recipient(address, error=SEND_FAILED) for address in recipients],
+                        subject, competition_ids=competition_ids)
             return False
         logger.info("[BATCH_RESULTATS] E-mail de notification envoyé à %s", recipient)
+        record_send("results_batch", SYSTEM_AUTHOR, [logged_recipient(address) for address in recipients], subject,
+                    competition_ids=competition_ids)
         return True
 
     @classmethod
