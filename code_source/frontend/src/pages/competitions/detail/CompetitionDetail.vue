@@ -47,7 +47,7 @@ import ParticipantRow from "./ParticipantRow.vue";
 import PaymentForm from "./PaymentForm.vue";
 import WithdrawForm from "./WithdrawForm.vue";
 import { competitionItself, WRITER_KEY } from "../writer";
-import { formatDayText } from "../../../lib/format";
+import { formatDateTime, formatDayText } from "../../../lib/format";
 import { plural } from "../../../lib/text";
 import { dialogs } from "../../../composables/dialogs";
 
@@ -242,7 +242,10 @@ const emailing = ref(false);
 
 // ---------------------------------------------------------------- E-mail history
 
-const emailLog = useCompetitionEmailLog(() => c.value.id);
+const emailLog = useCompetitionEmailLog(
+  () => c.value.id,
+  () => uid.value,
+);
 const logView = emailLog.view;
 /* The history dialog: every send of the competition ("all"), or those that included one competitor */
 const historyOf = ref<Row | "all" | null>(null);
@@ -327,6 +330,9 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-1.5" data-testid="detail-last-send">
           ✉️ Dernier envoi aux compétiteurs :
           <LastContact :state="lastSendState(logView)" :online="online" @open="historyOf = 'all'" />
+          <span v-if="emailLog.staleSince.value" data-testid="history-stale">
+            · 💾 historique du {{ formatDateTime(emailLog.staleSince.value) }}
+          </span>
         </p>
         <div class="mt-1.5 flex flex-wrap gap-1.5 lg:mt-2">
           <a
@@ -567,6 +573,9 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
     </UiDialog>
 
     <UiDialog v-model:open="historyOpen" :title="historyTitle" wide data-testid="history-dialog">
+      <p v-if="emailLog.staleSince.value" class="mb-2 text-xs text-amber-800">
+        💾 Historique du {{ formatDateTime(emailLog.staleSince.value) }} : les envois suivants n'y figurent pas.
+      </p>
       <EmailHistory :entries="historyEntries" />
     </UiDialog>
 

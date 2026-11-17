@@ -101,8 +101,8 @@ answer it says « historique indisponible hors ligne », in the header and on th
 
 ### Acceptance criteria
 
-- [ ] Per-competition cache, stale notice
-- [ ] « indisponible hors ligne » state (helper tested)
+- [x] Per-competition cache, stale notice
+- [x] « indisponible hors ligne » state (helper tested)
 
 ---
 
