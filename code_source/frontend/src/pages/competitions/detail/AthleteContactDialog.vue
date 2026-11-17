@@ -22,7 +22,7 @@ const emit = defineEmits<{
     :open="open"
     :title="athlete ? `📇 Fiche contact : ${athlete.prenom} ${athlete.nom}` : '📇 Fiche contact'"
     description="Coordonnées de l'athlète et de ses contacts d'urgence"
-    wide
+    xl
     data-testid="athlete-contact-dialog"
     @update:open="emit('update:open', $event)"
   >
@@ -65,7 +65,7 @@ const emit = defineEmits<{
                   v-if="c.phone"
                   :href="telHref(c.phone)"
                   data-testid="contact-phone-link"
-                  class="font-semibold text-blue-700 hover:underline"
+                  class="font-semibold whitespace-nowrap text-blue-700 hover:underline"
                 >
                   📞 {{ c.phone }}
                 </a>

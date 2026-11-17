@@ -7,6 +7,9 @@ then at once after it, for the members registered in between. Take a Firestore e
     uv run python scripts/migrate_emergency_contacts.py --apply         # writes (asks to type the project id)
     uv run python scripts/migrate_emergency_contacts.py --emulator      # same against the emulator (dev/dev.env loaded)
 
+Production access uses your own gcloud login (`gcloud auth login`, an account with Firestore access on the project),
+not the club's OAuth refresh token: no secret has to be copied to this computer.
+
 - For each member: contact 1 then contact 2, cleaned and without the same person twice; `position` 0, 1; ids after the
   highest in the collection. `crm_users` is never written.
 - A member with any document in the collection, tombstones included, is skipped: a second run cannot restore contacts
@@ -22,7 +25,10 @@ from __future__ import annotations
 import argparse
 import datetime
 import os
+import shutil
+import subprocess  # noqa: S404 - runs the gcloud CLI, fixed arguments
 import sys
+import time
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -40,6 +46,32 @@ from infrastructure.firestore.cloud_sync.rest_store import RestStore  # noqa: E4
 # Any in this script: fields and ids as read from Firestore documents, which RestStore does not type
 CONTACTS = collection_for("emergency_contacts")
 MAX_ATTEMPTS = 5
+GCLOUD_TOKEN_LIFETIME = 45 * 60  # seconds; gcloud's access tokens last 1 hour
+
+
+class GcloudToken:
+    """Access tokens of the account logged in with `gcloud auth login`, renewed before they expire."""
+
+    def __init__(self) -> None:
+        self._token = ""
+        self._fetched_at = 0.0
+
+    def __call__(self) -> str:
+        if not self._token or time.monotonic() - self._fetched_at > GCLOUD_TOKEN_LIFETIME:
+            self._token = gcloud_access_token()
+            self._fetched_at = time.monotonic()
+        return self._token
+
+
+def gcloud_access_token() -> str:
+    gcloud = shutil.which("gcloud")
+    if not gcloud:
+        sys.exit("gcloud introuvable : installez le Google Cloud CLI puis lancez `gcloud auth login`.")
+    result = subprocess.run([gcloud, "auth", "print-access-token"], capture_output=True, text=True, check=False)  # noqa: S603 - fixed arguments
+    token = result.stdout.strip()
+    if result.returncode != 0 or not token:
+        sys.exit(f"Jeton gcloud indisponible, lancez `gcloud auth login` : {result.stderr.strip()}")
+    return token
 
 
 @dataclass
@@ -166,7 +198,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.emulator and not emulator:
         print("--emulator sans FIRESTORE_EMULATOR_HOST : chargez dev/dev.env.", file=sys.stderr)
         return 2
-    store = RestStore()
+    store = RestStore() if emulator else RestStore(token_provider=GcloudToken())
     target = f"émulateur {emulator}" if emulator else "PRODUCTION"
     print(f"Projet Firestore : {store.project_id} ({target})")
     if args.apply and not emulator:

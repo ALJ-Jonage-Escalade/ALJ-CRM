@@ -188,3 +188,23 @@ def test_production_apply_needs_the_project_id_typed() -> None:
     with patch.object(migration, "RestStore", return_value=store), patch("builtins.input", return_value="wrong"):
         assert migration.main(["--apply"]) == 1
     assert store.commits == []
+
+
+def test_production_uses_the_gcloud_login() -> None:
+    store = FakeStore([user(1, "Marie", "01")])
+    with patch.object(migration, "RestStore", return_value=store) as rest_store:
+        assert migration.main([]) == 0
+    assert isinstance(rest_store.call_args.kwargs["token_provider"], migration.GcloudToken)
+
+
+def test_gcloud_token_is_fetched_once_then_renewed() -> None:
+    token = migration.GcloudToken()
+    clock = [0.0]
+    with patch.object(migration, "gcloud_access_token", side_effect=["first", "second"]) as fetch, \
+            patch.object(migration.time, "monotonic", side_effect=lambda: clock[0]):
+        assert token() == "first"
+        clock[0] = 60.0
+        assert token() == "first"
+        clock[0] = migration.GCLOUD_TOKEN_LIFETIME + 1.0
+        assert token() == "second"
+    assert fetch.call_count == 2
