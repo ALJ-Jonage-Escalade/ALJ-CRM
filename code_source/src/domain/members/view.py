@@ -12,6 +12,7 @@ import re
 from typing import Any, Dict, Iterable, List, Optional
 
 from domain.members.age_rules import age_at, get_season_start_date, parse_birth_date
+from domain.members.countries import parse_country
 from domain.members.sex import parse_sex
 from domain.utils import normalize_string
 
@@ -154,6 +155,17 @@ def _emergency_fields(row: Dict[str, Any]) -> Dict[str, Any]:
     return {"emergency_contacts": contacts, **flat}
 
 
+def _country_fields(row: Dict[str, Any]) -> Dict[str, str]:
+    """Country and nationality as the member form offers them ("FRANCE", "francaise" -> "France", "Française") when
+    the FFME export recognises them, else as stored: the form shows it as not recognised, for the office to correct."""
+    country, nationality = row.get("country") or "", row.get("nationality") or ""
+    country_parsed, nationality_parsed = parse_country(country), parse_country(nationality)
+    return {
+        "country": country_parsed.name if country_parsed else country,
+        "nationality": nationality_parsed.nationality if nationality_parsed else nationality,
+    }
+
+
 def member_row(row: Dict[str, Any], slots: Dict[str, Dict[str, str]],
                ref_date: datetime.date) -> Dict[str, Any]:
     """One member of a season (one purchase) as the pages use it."""
@@ -173,6 +185,7 @@ def member_row(row: Dict[str, Any], slots: Dict[str, Dict[str, str]],
         "last_name": fmt_last_name(row.get("last_name")),
         "first_name": fmt_first_name(row.get("first_name")),
         "city": fmt_city(row.get("city")),
+        **_country_fields(row),
         "phone": fmt_phone(row.get("phone")),
         **_emergency_fields(row),
         "passeport_orange": "",  # read by getMemberDiplomes; no such column in the database

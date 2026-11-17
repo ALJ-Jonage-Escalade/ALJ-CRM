@@ -107,6 +107,17 @@ const count = (n: number | undefined) => (n === undefined ? "…" : String(n));
       </ul>
     </div>
 
+    <div
+      v-if="stats?.to_check_details.length"
+      data-testid="ffme-to-check-details"
+      class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800"
+    >
+      <b>🔎 À corriger dans la fiche adhérent (exportés avec un champ vide) :</b>
+      <ul class="mt-1 list-disc pl-5">
+        <li v-for="(item, i) in stats.to_check_details" :key="i">{{ item }}</li>
+      </ul>
+    </div>
+
     <UiButton data-testid="ffme-download" :busy="busy && 'Génération du CSV FFME…'" @click="download">
       📥 Télécharger le fichier CSV FFME
     </UiButton>

@@ -50,6 +50,15 @@ class TestMemberView(unittest.TestCase):
         self.assertEqual(m["phone"], "")                               # None -> ""
         self.assertEqual((m["last_name"], m["first_name"]), ("MARTIN", "Léo"))
 
+    def test_member_row_country_and_nationality_as_the_form_offers_them(self):
+        def countries(**over):
+            m = member_view.member_row(row(**over), {}, datetime.date(2026, 9, 1))
+            return m["country"], m["nationality"]
+        self.assertEqual(countries(country="FRANCE", nationality="francaise"), ("France", "Française"))
+        self.assertEqual(countries(country="Belgique", nationality="France"), ("Belgique", "Française"))
+        self.assertEqual(countries(country="Fràce", nationality="Frncaise"), ("Fràce", "Frncaise"))  # not recognised: as stored
+        self.assertEqual(countries(country=None), ("", ""))
+
     def test_member_without_slot_or_birth_date(self):
         m = member_view.member_row(row(tarif_name="Inconnu", birth_date=""), {}, datetime.date(2026, 9, 1))
         self.assertEqual((m["creneau_groupe"], m["categorie"], m["creneau_details"], m["age"]), ("", "", "", None))

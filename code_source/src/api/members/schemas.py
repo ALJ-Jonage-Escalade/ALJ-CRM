@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import re
-from typing import List, Literal, Optional
+from typing import Annotated, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AfterValidator, BaseModel, Field, WithJsonSchema, field_validator
 
 from api.request_body import RequestBody
+from domain.members.countries import country_names, nationality_names
 from domain.members.sex import Sex
 
 
@@ -45,6 +46,21 @@ class EmergencyContact(RequestBody):
     phone: str = ""
 
 
+def _one_of(choices: List[str], what: str) -> AfterValidator:
+    def check(value: str) -> str:
+        if value and value not in choices:
+            raise ValueError(f"{what} inconnu(e) : {value}")
+        return value
+    return AfterValidator(check)
+
+
+# The choices of the member form (domain/members/countries.py), "" to clear; an enum in the API contract
+CountryName = Annotated[str, _one_of(country_names(), "pays"),
+                        WithJsonSchema({"type": "string", "enum": ["", *country_names()]})]
+NationalityName = Annotated[str, _one_of(nationality_names(), "nationalité"),
+                            WithJsonSchema({"type": "string", "enum": ["", *nationality_names()]})]
+
+
 class Member(BaseModel):
     """One member of a season (one purchase), as domain/members/view.py member_row() builds it.
     Names, city and phones are already formatted; status_norm is the French status label."""
@@ -59,6 +75,8 @@ class Member(BaseModel):
     address: str
     zip_code: str
     city: str
+    country: str = Field(description="As stored (HelloAsso free text or a choice of the form)")
+    nationality: str = Field(description="As stored (HelloAsso free text or a choice of the form)")
     phone: str
     email_primary: str
     email_secondary: str
@@ -146,6 +164,8 @@ class MemberChanges(RequestBody):
     address: Optional[str] = None
     zip_code: Optional[str] = None
     city: Optional[str] = None
+    country: Optional[CountryName] = None
+    nationality: Optional[NationalityName] = None
     emergency_contacts: Optional[List[EmergencyContact]] = Field(default=None, description="Replaces the whole list, in this order; [] removes every contact")
     tarif_name: Optional[str] = Field(default=None, min_length=1)
     commentaires_correctif: Optional[str] = None
@@ -185,6 +205,8 @@ class NewMember(RequestBody):
     address: str = ""
     zip_code: str = ""
     city: str = ""
+    country: CountryName = "France"
+    nationality: NationalityName = ""
     emergency_contacts: List[EmergencyContact] = Field(default_factory=list, description="In order, the first one is the main one")
     commentaires_correctif: str = ""
 

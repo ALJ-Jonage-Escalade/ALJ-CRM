@@ -69,7 +69,8 @@ class TestFfmeRoutes(MemberDbTestCase):
         stats = self.client.get("/api/ffme/stats", params={"season": "2026-2027"}).json()
         self.assertEqual((stats["status"], stats["season"]), ("success", "2026-2027"))
         self.assertEqual((stats["estimated_total"], stats["new_licences_count"], stats["renewals_count"]), (1, 1, 0))
-        self.assertEqual(stats["ignored_details"], ["PETIT Max (date de naissance manquante/invalide)"])
+        self.assertEqual(stats["ignored_details"], ["PETIT Max (date de naissance absente ou invalide (''))"])
+        self.assertEqual(stats["to_check_details"], [])
 
         resp = self.client.get("/api/ffme/export", params={"season": "2026-2027", "include_termine": "true"})
         self.assertEqual(resp.headers["content-type"], "text/csv; charset=utf-8")
@@ -92,6 +93,22 @@ class TestFfmeRoutes(MemberDbTestCase):
         self.assertNotIn("MARTIN", text)
         petit = next(line for line in text.splitlines() if "PETIT" in line)
         self.assertEqual(petit.split(";")[:5], ["123456", "PETIT", "Max", "10/03/2017", ""])
+
+    def test_csv_export_unknown_country_or_nationality(self):
+        # Not recognised: a first licence is left out, a renewal is sent with the value empty and listed to check
+        self.seed("1", "Léo", "MARTIN", "Adultes autonomes", **{"champ_Nationalité": "Frncaise"})
+        self.seed("2", "Max", "PETIT", "Adultes autonomes", champ_Pays="Fràce",
+                  **{"champ_Numéro de Licence FFME (6 chiffres)": "123456", "champ_Nationalité": "Sueddois"})
+        stats = self.client.get("/api/ffme/stats", params={"season": "2026-2027"}).json()
+        self.assertEqual((stats["estimated_total"], stats["renewals_count"], stats["new_licences_count"]), (1, 1, 0))
+        self.assertEqual(stats["ignored_details"], ["MARTIN Léo (nationalité non reconnue ('Frncaise'))"])
+        self.assertEqual(stats["to_check_details"], ["PETIT Max (pays non reconnu ('Fràce') → champ vide dans le fichier)",
+                                                     "PETIT Max (nationalité non reconnue ('Sueddois') → champ vide dans le fichier)"])
+
+        text = self.client.get("/api/ffme/export", params={"season": "2026-2027"}).content.decode("utf-8-sig")
+        self.assertNotIn("MARTIN", text)
+        petit = next(line for line in text.splitlines() if "PETIT" in line).split(";")
+        self.assertEqual((petit[5], petit[10]), ("", ""))
 
     def test_csv_export_sex_code(self):
         self.seed("1", "Léa", "MARTIN", "Adultes autonomes", champ_Sexe="Féminin")

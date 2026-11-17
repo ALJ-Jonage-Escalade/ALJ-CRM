@@ -7216,6 +7216,13 @@
             },
             "type": "array",
             "title": "Ignored Details"
+          },
+          "to_check_details": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "To Check Details"
           }
         },
         "type": "object",
@@ -7228,10 +7235,11 @@
           "estimated_total",
           "renewals_count",
           "new_licences_count",
-          "ignored_details"
+          "ignored_details",
+          "to_check_details"
         ],
         "title": "FfmeStats",
-        "description": "Members of the season in the federal CSV export. ignored_details: the first 20 rows left out, with the reason."
+        "description": "Members of the season in the federal CSV export. ignored_details: the first 20 rows left out, with the reason;\nto_check_details: the first 20 values exported empty (country or nationality not recognised on a renewal)."
       },
       "GoogleChecks": {
         "properties": {
@@ -8627,6 +8635,16 @@
             "type": "string",
             "title": "City"
           },
+          "country": {
+            "type": "string",
+            "title": "Country",
+            "description": "As stored (HelloAsso free text or a choice of the form)"
+          },
+          "nationality": {
+            "type": "string",
+            "title": "Nationality",
+            "description": "As stored (HelloAsso free text or a choice of the form)"
+          },
           "phone": {
             "type": "string",
             "title": "Phone"
@@ -8786,6 +8804,8 @@
           "address",
           "zip_code",
           "city",
+          "country",
+          "nationality",
           "phone",
           "email_primary",
           "email_secondary",
@@ -9020,6 +9040,126 @@
               }
             ],
             "title": "City"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "",
+                  "France",
+                  "Afrique du Sud",
+                  "Algérie",
+                  "Allemagne",
+                  "Andorre",
+                  "Argentine",
+                  "Australie",
+                  "Autriche",
+                  "Belgique",
+                  "Brésil",
+                  "Bulgarie",
+                  "Canada",
+                  "Chili",
+                  "Chine",
+                  "Côte d'Ivoire",
+                  "Croatie",
+                  "Danemark",
+                  "Espagne",
+                  "États-Unis",
+                  "Finlande",
+                  "Grèce",
+                  "Hongrie",
+                  "Inde",
+                  "Irlande",
+                  "Italie",
+                  "Japon",
+                  "Luxembourg",
+                  "Maroc",
+                  "Mexique",
+                  "Monaco",
+                  "Norvège",
+                  "Nouvelle-Zélande",
+                  "Pays-Bas",
+                  "Pologne",
+                  "Portugal",
+                  "Roumanie",
+                  "Royaume-Uni",
+                  "Russie",
+                  "Sénégal",
+                  "Suède",
+                  "Suisse",
+                  "Tchéquie",
+                  "Tunisie",
+                  "Turquie",
+                  "Ukraine",
+                  "Vietnam"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "nationality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "",
+                  "Française",
+                  "Sud-africaine",
+                  "Algérienne",
+                  "Allemande",
+                  "Andorrane",
+                  "Argentine",
+                  "Australienne",
+                  "Autrichienne",
+                  "Belge",
+                  "Brésilienne",
+                  "Bulgare",
+                  "Canadienne",
+                  "Chilienne",
+                  "Chinoise",
+                  "Ivoirienne",
+                  "Croate",
+                  "Danoise",
+                  "Espagnole",
+                  "Américaine",
+                  "Finlandaise",
+                  "Grecque",
+                  "Hongroise",
+                  "Indienne",
+                  "Irlandaise",
+                  "Italienne",
+                  "Japonaise",
+                  "Luxembourgeoise",
+                  "Marocaine",
+                  "Mexicaine",
+                  "Monégasque",
+                  "Norvégienne",
+                  "Néo-zélandaise",
+                  "Néerlandaise",
+                  "Polonaise",
+                  "Portugaise",
+                  "Roumaine",
+                  "Britannique",
+                  "Russe",
+                  "Sénégalaise",
+                  "Suédoise",
+                  "Suisse",
+                  "Tchèque",
+                  "Tunisienne",
+                  "Turque",
+                  "Ukrainienne",
+                  "Vietnamienne"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nationality"
           },
           "emergency_contacts": {
             "anyOf": [
@@ -9811,6 +9951,114 @@
           "city": {
             "type": "string",
             "title": "City",
+            "default": ""
+          },
+          "country": {
+            "type": "string",
+            "enum": [
+              "",
+              "France",
+              "Afrique du Sud",
+              "Algérie",
+              "Allemagne",
+              "Andorre",
+              "Argentine",
+              "Australie",
+              "Autriche",
+              "Belgique",
+              "Brésil",
+              "Bulgarie",
+              "Canada",
+              "Chili",
+              "Chine",
+              "Côte d'Ivoire",
+              "Croatie",
+              "Danemark",
+              "Espagne",
+              "États-Unis",
+              "Finlande",
+              "Grèce",
+              "Hongrie",
+              "Inde",
+              "Irlande",
+              "Italie",
+              "Japon",
+              "Luxembourg",
+              "Maroc",
+              "Mexique",
+              "Monaco",
+              "Norvège",
+              "Nouvelle-Zélande",
+              "Pays-Bas",
+              "Pologne",
+              "Portugal",
+              "Roumanie",
+              "Royaume-Uni",
+              "Russie",
+              "Sénégal",
+              "Suède",
+              "Suisse",
+              "Tchéquie",
+              "Tunisie",
+              "Turquie",
+              "Ukraine",
+              "Vietnam"
+            ],
+            "title": "Country",
+            "default": "France"
+          },
+          "nationality": {
+            "type": "string",
+            "enum": [
+              "",
+              "Française",
+              "Sud-africaine",
+              "Algérienne",
+              "Allemande",
+              "Andorrane",
+              "Argentine",
+              "Australienne",
+              "Autrichienne",
+              "Belge",
+              "Brésilienne",
+              "Bulgare",
+              "Canadienne",
+              "Chilienne",
+              "Chinoise",
+              "Ivoirienne",
+              "Croate",
+              "Danoise",
+              "Espagnole",
+              "Américaine",
+              "Finlandaise",
+              "Grecque",
+              "Hongroise",
+              "Indienne",
+              "Irlandaise",
+              "Italienne",
+              "Japonaise",
+              "Luxembourgeoise",
+              "Marocaine",
+              "Mexicaine",
+              "Monégasque",
+              "Norvégienne",
+              "Néo-zélandaise",
+              "Néerlandaise",
+              "Polonaise",
+              "Portugaise",
+              "Roumaine",
+              "Britannique",
+              "Russe",
+              "Sénégalaise",
+              "Suédoise",
+              "Suisse",
+              "Tchèque",
+              "Tunisienne",
+              "Turque",
+              "Ukrainienne",
+              "Vietnamienne"
+            ],
+            "title": "Nationality",
             "default": ""
           },
           "emergency_contacts": {

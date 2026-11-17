@@ -11,6 +11,8 @@ export function member(change: Partial<Member>): Member {
     "address",
     "zip_code",
     "city",
+    "country",
+    "nationality",
     "phone",
     "email_primary",
     "email_secondary",

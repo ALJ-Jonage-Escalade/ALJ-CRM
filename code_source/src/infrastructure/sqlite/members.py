@@ -76,7 +76,7 @@ class MemberRepository:
     _MEMBER_ROWS_SELECT = """
         SELECT u.id AS user_id, p.id AS purchase_id,
                u.last_name, u.first_name, u.birth_date, u.sex,
-               u.address, u.zip_code, u.city, u.phone, u.email_primary, u.email_secondary,
+               u.address, u.zip_code, u.city, u.country, u.nationality, u.phone, u.email_primary, u.email_secondary,
                u.licence_ffme, u.health_commitment, u.photo_auth, u.badge_rouge, u.autonomie_bloc,
                u.raw_passports, u.raw_diplomas,
                o.payer_first_name, o.payer_last_name, o.payer_email, o.order_ref, o.order_date,
@@ -150,7 +150,7 @@ class MemberRepository:
         Ajoute manuellement un adhérent dans le schéma v2 (users + orders + purchases),
         en synthétisant une commande « MANUEL-... » équivalente à une inscription HelloAsso.
         Champs attendus : last_name, first_name, birth_date ('JJ/MM/AAAA' ou ISO), sex,
-        phone, email_primary, address, zip_code, city, tarif_name, status, amount.
+        phone, email_primary, address, zip_code, city, country, nationality, tarif_name, status, amount.
         Returns the order reference. InvalidRequest when a registration with a higher priority already exists;
         a database error is rolled back and raised.
         """
@@ -176,7 +176,8 @@ class MemberRepository:
                 "champ_Adresse : numéro et nom de rue": str(fields.get("address") or "").strip(),
                 "champ_Code postal": str(fields.get("zip_code") or "").strip(),
                 "champ_Ville": str(fields.get("city") or "").strip(),
-                "champ_Pays": "France",
+                "champ_Pays": str(fields.get("country") or "France").strip(),
+                "champ_Nationalité": str(fields.get("nationality") or "").strip(),
                 "payer_lastName": str(fields.get("payer_lastName") or fields.get("payer_last_name") or fields.get("last_name") or "").strip(),
                 "payer_firstName": str(fields.get("payer_firstName") or fields.get("payer_first_name") or fields.get("first_name") or "").strip(),
                 "payer_email": str(fields.get("payer_email") or payer_email).strip(),
@@ -381,7 +382,7 @@ class MemberRepository:
 
 # Member fields written as trimmed text, and the yes/no fields with their default
 _USER_TEXT_FIELDS = (
-    "email_primary", "email_secondary", "phone", "licence_ffme", "address", "zip_code", "city",
+    "email_primary", "email_secondary", "phone", "licence_ffme", "address", "zip_code", "city", "country", "nationality",
 )
 _USER_YES_NO_DEFAULTS = {"badge_rouge": "Non", "autonomie_bloc": "Non", "photo_auth": "Oui"}
 

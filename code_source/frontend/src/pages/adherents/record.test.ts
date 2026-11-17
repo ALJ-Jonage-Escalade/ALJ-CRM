@@ -220,6 +220,24 @@ describe("edit and add", () => {
     });
   });
 
+  it("sends the country and nationality chosen, keeps an unrecognised one unless changed", () => {
+    const typo = member({ country: "Fràce", nationality: "Française" });
+    expect(changesOf(typo, draftOf(typo))).toEqual({ fields: {}, lines: [] });
+    expect(changesOf(typo, { ...draftOf(typo), country: "France", nationality: "" })).toEqual({
+      fields: { country: "France", nationality: "" },
+      lines: ["Pays : Fràce ➔ France", "Nationalité : Française ➔ vide"],
+    });
+  });
+
+  it("a new member is French unless changed; an unrecognised value is never sent", () => {
+    const draft = draftOf(undefined, "Adulte loisir");
+    expect([draft.country, draft.nationality]).toEqual(["France", "Française"]);
+    expect(newMemberOf({ ...draft, country: "Belgique", nationality: "Belge" })).toEqual(
+      expect.objectContaining({ country: "Belgique", nationality: "Belge" }),
+    );
+    expect(newMemberOf({ ...draft, country: "Fràce" }).country).toBe("");
+  });
+
   it("never guesses the sex of a new member", () => {
     const draft = draftOf(undefined, "Adulte loisir");
     expect(draft.sex).toBe("");

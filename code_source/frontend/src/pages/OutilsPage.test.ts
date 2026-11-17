@@ -43,6 +43,7 @@ const STATS = {
   renewals_count: 18,
   new_licences_count: 12,
   ignored_details: ["PETIT Max (date de naissance manquante/invalide)"],
+  to_check_details: ["MARTIN Léo (pays non reconnu ('Fràce') → champ vide dans le fichier)"],
 };
 const PREVIEW = {
   status: "success",
@@ -946,6 +947,7 @@ describe("OutilsPage", () => {
     const { byId, sent } = await render("coach", "/bureau/outils/ffme");
     expect(["ffme-total", "ffme-renewals", "ffme-new", "ffme-ignored"].map((id) => byId(id)!.textContent)).toEqual(["30", "18", "12", "2"]);
     expect(byId("ffme-ignored-details")!.textContent).toContain("PETIT Max (date de naissance manquante/invalide)");
+    expect(byId("ffme-to-check-details")!.textContent).toContain("MARTIN Léo (pays non reconnu ('Fràce')");
 
     byId("ffme-include-finished")!.click();
     byId("ffme-download")!.click();

@@ -169,6 +169,16 @@ describe("MemberForm validation", () => {
     wrapper.unmount();
   });
 
+  it("offers the countries and nationalities of the FFME export, an unrecognised stored value first", () => {
+    const { field, wrapper } = render(draftOf(member({ country: "Fràce", nationality: "Française" })), false);
+    const country = field("country").element as HTMLSelectElement;
+    expect(country.value).toBe("Fràce");
+    expect(country.options[1]!.text).toBe("Fràce (non reconnu)");
+    expect(country.options[2]!.text).toBe("France");
+    expect((field("nationality").element as HTMLSelectElement).value).toBe("Française");
+    wrapper.unmount();
+  });
+
   it("keeps a status and a tariff that are not among the choices", () => {
     const d = draftOf(member({ status_norm: "Payé", tarif_name: "Tarif 2024" }));
     const { field, wrapper } = render(d, false);

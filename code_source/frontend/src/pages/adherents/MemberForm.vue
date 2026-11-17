@@ -6,6 +6,7 @@
 import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
+import { choicesWith, COUNTRY_CHOICES, NATIONALITY_CHOICES } from "../../lib/countries";
 import { SEX_LABELS, SEX_NOT_GIVEN, type Sex } from "../../lib/sex";
 import {
   contactPhoneField,
@@ -52,6 +53,9 @@ const statuses = computed(() =>
     : [[draft.value.status, draft.value.status] as const, ...STATUS_CHOICES],
 );
 const sexes = Object.entries(SEX_LABELS) as [Sex, string][];
+// The stored value stays among the choices when the FFME export does not recognise it (as the tariff and status)
+const countries = choicesWith(COUNTRY_CHOICES, draft.value.country);
+const nationalities = choicesWith(NATIONALITY_CHOICES, draft.value.nationality);
 
 const root = ref<HTMLFormElement | null>(null);
 async function submit(): Promise<void> {
@@ -271,6 +275,20 @@ const TEXT_FIELDS: { name: TextField; label: string; type?: string; placeholder?
           :class="fieldClass(f.name)"
         />
         <p v-if="errors[f.name]" :id="`member-${f.name}-error`" class="mt-1 text-xs text-red-600">{{ errors[f.name] }}</p>
+      </div>
+      <div>
+        <label for="member-country" :class="label">🌍 Pays (FFME)</label>
+        <select v-model="draft.country" v-bind="attrs('country')" :class="fieldClass('country')">
+          <option value="">Non renseigné (France)</option>
+          <option v-for="option in countries" :key="option.value" :value="option.value">{{ option.text }}</option>
+        </select>
+      </div>
+      <div>
+        <label for="member-nationality" :class="label">🪪 Nationalité (FFME)</label>
+        <select v-model="draft.nationality" v-bind="attrs('nationality')" :class="fieldClass('nationality')">
+          <option value="">Non renseignée (française)</option>
+          <option v-for="option in nationalities" :key="option.value" :value="option.value">{{ option.text }}</option>
+        </select>
       </div>
     </div>
 
