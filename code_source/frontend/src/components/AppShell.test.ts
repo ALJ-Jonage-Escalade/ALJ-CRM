@@ -1,6 +1,6 @@
 import { fakeAuth } from "../test/harness";
-import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { AUTH_KEY, type AuthState } from "../composables/auth";
@@ -16,10 +16,14 @@ import { dialogs } from "../composables/dialogs";
 const USER = { uid: "u1", email: "albus@alj-escalade.fr" };
 const signedIn = (role: Role): AuthState => ({ status: "signedIn", user: USER, role });
 
+// Attached to the document: jsdom (31+) gives detached elements an empty computed style, which isVisible() reads
+enableAutoUnmount(afterEach);
+
 function render(state: AuthState, googleStatus = "ok", page: PageId = "accueil", queued = 0, signInError: string | null = null) {
   const auth = fakeAuth(state);
   const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: googleStatus })));
   const wrapper = mount(AppShell, {
+    attachTo: document.body,
     props: { page, title: "Titre" },
     slots: { default: '<p id="page-body">contenu</p>' },
     global: {
