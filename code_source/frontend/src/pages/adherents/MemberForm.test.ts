@@ -21,6 +21,93 @@ function render(draft: MemberDraft, adding: boolean) {
   return { wrapper, field, error };
 }
 
+describe("MemberForm emergency contacts", () => {
+  const CONTACTS = [
+    { name: "Marie", phone: "06 01 01 01 01" },
+    { name: "Paul", phone: "06 02 02 02 02" },
+    { name: "Anna", phone: "06 03 03 03 03" },
+  ];
+
+  function renderContacts() {
+    const draft = reactive(
+      draftOf(member({ first_name: "Léa", last_name: "DUPONT", tarif_name: "Adulte loisir", emergency_contacts: CONTACTS })),
+    );
+    const { wrapper } = render(draft, false);
+    const rows = () => wrapper.findAll('[data-testid="contact-row"]');
+    const names = () => rows().map((r) => (r.find('[data-testid="contact-name"]').element as HTMLInputElement).value);
+    return { wrapper, draft, rows, names };
+  }
+
+  it("labels the first row as the main contact and numbers the others", () => {
+    const { wrapper, rows } = renderContacts();
+    expect(rows().map((r) => r.find('[data-testid="contact-label"]').text())).toEqual(["Principal", "Contact 2", "Contact 3"]);
+    wrapper.unmount();
+  });
+
+  it("adds any number of rows and focuses the new one", async () => {
+    const { wrapper, rows } = renderContacts();
+    await wrapper.find('[data-testid="contact-add"]').trigger("click");
+    await wrapper.find('[data-testid="contact-add"]').trigger("click");
+    await nextTick();
+    expect(rows()).toHaveLength(5);
+    expect(document.activeElement).toBe(rows()[4]!.find('[data-testid="contact-name"]').element);
+    wrapper.unmount();
+  });
+
+  it("moves a row, keeps its values and the focus on the button pressed", async () => {
+    const { wrapper, rows, names, draft } = renderContacts();
+    await rows()[2]!.find('[data-testid="contact-up"]').trigger("click");
+    await nextTick();
+    expect(names()).toEqual(["Marie", "Anna", "Paul"]);
+    expect(draft.emergency_contacts.map((r) => r.phone)).toEqual(["06 01 01 01 01", "06 03 03 03 03", "06 02 02 02 02"]);
+    expect(document.activeElement).toBe(rows()[1]!.find('[data-testid="contact-up"]').element);
+
+    // Up to the first row: its ↑ is gone, the focus goes to its ↓
+    await rows()[1]!.find('[data-testid="contact-up"]').trigger("click");
+    await nextTick();
+    expect(names()).toEqual(["Anna", "Marie", "Paul"]);
+    expect(document.activeElement).toBe(rows()[0]!.find('[data-testid="contact-down"]').element);
+    wrapper.unmount();
+  });
+
+  it("offers no ↑ on the first row and no ↓ on the last, and names every button", () => {
+    const { wrapper, rows } = renderContacts();
+    expect(rows()[0]!.find('[data-testid="contact-up"]').exists()).toBe(false);
+    expect(rows()[0]!.find('[data-testid="contact-down"]').exists()).toBe(true);
+    expect(rows()[2]!.find('[data-testid="contact-down"]').exists()).toBe(false);
+    expect(rows()[1]!.find('[data-testid="contact-remove"]').attributes("aria-label")).toBe("Supprimer le contact 2");
+    expect(rows()[1]!.find('[data-testid="contact-up"]').attributes("aria-label")).toBe("Monter le contact 2");
+    expect(rows()[1]!.find('[data-testid="contact-down"]').attributes("aria-label")).toBe("Descendre le contact 2");
+    wrapper.unmount();
+  });
+
+  it("removes a row", async () => {
+    const { wrapper, rows, names } = renderContacts();
+    await rows()[0]!.find('[data-testid="contact-remove"]').trigger("click");
+    await nextTick();
+    expect(names()).toEqual(["Paul", "Anna"]);
+    expect(rows()[0]!.find('[data-testid="contact-label"]').text()).toBe("Principal");
+    expect(document.activeElement).toBe(wrapper.find('[data-testid="contact-add"]').element);
+    wrapper.unmount();
+  });
+
+  it("shows an invalid phone under its row, focuses it and does not save", async () => {
+    const { wrapper, rows, draft } = renderContacts();
+    await rows()[1]!.find('[data-testid="contact-phone"]').setValue("12");
+    await wrapper.find("form").trigger("submit");
+    await nextTick();
+    expect(rows()[1]!.text()).toContain("Numéro de téléphone invalide.");
+    expect(rows()[0]!.text()).not.toContain("Numéro de téléphone invalide.");
+    expect(document.activeElement).toBe(rows()[1]!.find('[data-testid="contact-phone"]').element);
+    expect(wrapper.emitted("save")).toBeUndefined();
+
+    draft.emergency_contacts[1]!.phone = "06 02 02 02 02";
+    await nextTick();
+    expect(rows()[1]!.text()).not.toContain("Numéro de téléphone invalide.");
+    wrapper.unmount();
+  });
+});
+
 describe("MemberForm validation", () => {
   it("adding: shows each missing field under it, focuses the first one, and does not save", async () => {
     const { wrapper, field, error } = render(draftOf(undefined, ""), true);

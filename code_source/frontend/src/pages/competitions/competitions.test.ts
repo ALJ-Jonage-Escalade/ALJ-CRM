@@ -28,6 +28,7 @@ import {
   UNIDENTIFIED,
   type Competition,
   type CompetitorContact,
+  type SavedCompetitorContact,
   type MemberSlot,
 } from "./competitions";
 
@@ -172,6 +173,7 @@ describe("participants", () => {
       first_name: "Zoé",
       phone: "06 22",
       creneau_groupe: "Compét. U14",
+      emergency_contacts: [{ name: "Paul", phone: "06 01" }],
       emergency1_name: "Paul",
       emergency1_phone: "06 01",
       emergency2_name: "",
@@ -243,7 +245,7 @@ describe("participants", () => {
     ]);
   });
 
-  it("builds the 3 contact cards from the competitor's contacts, e-mail on the athlete's card only", () => {
+  it("builds one card per contact, e-mail on the athlete's card only", () => {
     const p = { nom: "DUPONT", prenom: "Lucas", email: "lucas@test.fr" };
     const member: MemberSlot = { id: 10, nom: "DUPONT", prenom: "Lucas", email: "lucas@test.fr", email_secondaire: "maman@test.fr" };
     const contact: CompetitorContact = {
@@ -252,6 +254,11 @@ describe("participants", () => {
       first_name: "Lucas",
       phone: "06 00 11 22 33",
       creneau_groupe: "",
+      emergency_contacts: [
+        { name: "Dupont Marie", phone: "06 11 11 11 11" },
+        { name: "Dupont Jean", phone: "06 22 22 22 22" },
+        { name: "Dupont Anna", phone: "06 33 33 33 33" },
+      ],
       emergency1_name: "Dupont Marie",
       emergency1_phone: "06 11 11 11 11",
       emergency2_name: "Dupont Jean",
@@ -259,19 +266,86 @@ describe("participants", () => {
     };
     expect(athleteContactCards(p, member, contact)).toEqual([
       { role: "athlete", title: "🧗 Athlète", name: "Lucas DUPONT", phone: "06 00 11 22 33", email: "lucas@test.fr" },
-      { role: "emergency1", title: "🚨 Contact d'urgence 1", name: "Dupont Marie", phone: "06 11 11 11 11", email: "" },
-      { role: "emergency2", title: "🚨 Contact d'urgence 2", name: "Dupont Jean", phone: "06 22 22 22 22", email: "" },
+      { role: "emergency", title: "🚨 Contact d'urgence 1", name: "Dupont Marie", phone: "06 11 11 11 11", email: "" },
+      { role: "emergency", title: "🚨 Contact d'urgence 2", name: "Dupont Jean", phone: "06 22 22 22 22", email: "" },
+      { role: "emergency", title: "🚨 Contact d'urgence 3", name: "Dupont Anna", phone: "06 33 33 33 33", email: "" },
     ]);
+  });
+
+  it("lists every contact of a competitor as a link, and reads a copy saved offline before the list existed", () => {
+    const entry = { adherent_id: 2, last_name: "", first_name: "", phone: "", creneau_groupe: "" };
+    const three: CompetitorContact = {
+      ...entry,
+      emergency_contacts: [
+        { name: "A", phone: "01" },
+        { name: "Sans numéro", phone: "" },
+        { name: "C", phone: "03" },
+      ],
+      emergency1_name: "",
+      emergency1_phone: "",
+      emergency2_name: "",
+      emergency2_phone: "",
+    };
+    const competition = {
+      id: 1,
+      nom: "Coupe",
+      participants: [{ adherent_id: 2, nom: "X", prenom: "Y", urgence_nom: "Copie", urgence_tel: "0600" }],
+    };
+    const row = participantRows(competition, [], [three])[0]!;
+    expect(row.emergency).toEqual([
+      { name: "A", phone: "01" },
+      { name: "C", phone: "03" },
+    ]);
+    expect(row.contacts.map((card) => card.title)).toEqual([
+      "🧗 Athlète",
+      "🚨 Contact d'urgence 1",
+      "🚨 Contact d'urgence 2",
+      "🚨 Contact d'urgence 3",
+    ]);
+
+    const saved: SavedCompetitorContact = {
+      ...three,
+      emergency_contacts: null,
+      emergency1_name: "Ancien",
+      emergency1_phone: "01",
+      emergency2_name: "Autre",
+      emergency2_phone: "02",
+    };
+    expect(participantRows(competition, [], [saved])[0]!.emergency).toEqual([
+      { name: "Ancien", phone: "01" },
+      { name: "Autre", phone: "02" },
+    ]);
+  });
+
+  it("uses the copy made when the member was added only without a competitor entry", () => {
+    const competition = {
+      id: 1,
+      nom: "Coupe",
+      participants: [{ adherent_id: 2, nom: "X", prenom: "Y", urgence_nom: "Copie", urgence_tel: "0600" }],
+    };
+    expect(participantRows(competition, [], [])[0]!.contacts[1]).toMatchObject({ name: "Copie", phone: "0600" });
+    const emptied: CompetitorContact = {
+      adherent_id: 2,
+      last_name: "",
+      first_name: "",
+      phone: "",
+      creneau_groupe: "",
+      emergency_contacts: [],
+      emergency1_name: "",
+      emergency1_phone: "",
+      emergency2_name: "",
+      emergency2_phone: "",
+    };
+    expect(participantRows(competition, [], [emptied])[0]!.emergency).toEqual([]);
   });
 
   it("handles empty or partial contacts gracefully", () => {
     const p = { nom: "SOLO", prenom: "Han" };
     const cards = athleteContactCards(p);
-    expect(cards).toHaveLength(3);
+    expect(cards).toHaveLength(2);
     expect(cards[0]!.name).toBe("Han SOLO");
     expect(cards[0]!.phone).toBe("");
     expect(cards[0]!.email).toBe("");
-    expect(cards[1]!.name).toBe("");
-    expect(cards[2]!.name).toBe("");
+    expect(cards[1]).toEqual({ role: "emergency", title: "🚨 Contact d'urgence", name: "", phone: "", email: "" });
   });
 });

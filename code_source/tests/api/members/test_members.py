@@ -89,16 +89,12 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         self.assertIsNone(members["Max"]["key"])
         self.assertNotIn("hid_proxkey", members["Léo"])
 
-    def test_update_modifies_all_fields_including_identity_and_emergency(self):
+    def test_update_modifies_all_fields_including_identity(self):
         r = self.update({
             "last_name": "BERNARD",
             "first_name": "Léonard",
             "birth_date": "2011-06-15",
             "amount": 135.5,
-            "emergency1_name": "DUPONT Pierre",
-            "emergency1_phone": "06 01 02 03 04",
-            "emergency2_name": "DUPONT Marie",
-            "emergency2_phone": "06 05 06 07 08",
             "photo_auth": "Non",
         })
         self.assertEqual(r.status_code, 200, r.text)
@@ -107,11 +103,51 @@ class TestMemberRecordRoutes(MemberDbTestCase):
         self.assertEqual(updated["first_name"], "Léonard")
         self.assertEqual(updated["birth_date"], "2011-06-15")
         self.assertEqual(updated["amount"], 135.5)
-        self.assertEqual(updated["emergency1_name"], "Dupont Pierre")
-        self.assertEqual(updated["emergency1_phone"], "06 01 02 03 04")
-        self.assertEqual(updated["emergency2_name"], "Dupont Marie")
-        self.assertEqual(updated["emergency2_phone"], "06 05 06 07 08")
         self.assertEqual(updated["photo_auth"], "Non")
+
+    def contacts(self):
+        return self.client.get("/api/members").json()["members"][0]["emergency_contacts"]
+
+    def test_update_saves_the_contact_list_in_order(self):
+        sent = [{"name": "PIERRE", "phone": "0601020304"}, {"name": "MARIE", "phone": ""}, {"name": "", "phone": "0605060708"}]
+        self.assertEqual(self.update({"emergency_contacts": sent}).status_code, 200)
+        self.assertEqual(self.contacts(), [{"name": "Pierre", "phone": "06 01 02 03 04"}, {"name": "Marie", "phone": ""},
+                                           {"name": "", "phone": "06 05 06 07 08"}])
+
+    def test_update_flat_read_fields_match_the_list(self):
+        self.update({"emergency_contacts": [{"name": "PIERRE", "phone": "0601020304"}, {"name": "MARIE", "phone": "0605060708"}, {"name": "ANNA", "phone": ""}]})
+        leo = self.client.get("/api/members").json()["members"][0]
+        self.assertEqual((leo["emergency1_name"], leo["emergency1_phone"], leo["emergency2_name"], leo["emergency2_phone"]),
+                         ("Pierre", "06 01 02 03 04", "Marie", "06 05 06 07 08"))
+
+    def test_update_without_the_list_changes_nothing(self):
+        self.update({"emergency_contacts": [{"name": "PIERRE", "phone": ""}]})
+        self.assertEqual(self.update({"phone": "0611223344"}).status_code, 200)
+        self.assertEqual(self.contacts(), [{"name": "Pierre", "phone": ""}])
+
+    def test_update_empty_list_removes_the_contacts(self):
+        self.update({"emergency_contacts": [{"name": "PIERRE", "phone": ""}]})
+        self.assertEqual(self.update({"emergency_contacts": []}).status_code, 200)
+        self.assertEqual(self.contacts(), [])
+
+    def test_update_drops_blank_rows(self):
+        self.update({"emergency_contacts": [{"name": " ", "phone": ""}, {"name": "PIERRE", "phone": ""}]})
+        self.assertEqual(self.contacts(), [{"name": "Pierre", "phone": ""}])
+
+    def test_update_refuses_the_flat_fields(self):
+        # A tab of the previous build gets a visible error, never a silent loss (plans/emergency-contacts.md, D9)
+        self.assertEqual(self.update({"emergency1_name": "PIERRE"}).status_code, 422)
+        created = self.client.post("/api/members/create", json={"fields": {
+            "last_name": "DUPONT", "first_name": "Jean", "birth_date": "2010-02-01", "tarif_name": "Loisir", "emergency1_name": "PIERRE"}})
+        self.assertEqual(created.status_code, 422)
+
+    def test_create_saves_the_contact_list(self):
+        response = self.client.post("/api/members/create", json={"fields": {
+            "last_name": "AAA", "first_name": "Jean", "birth_date": "2010-02-01", "tarif_name": "Loisir",
+            "emergency_contacts": [{"name": "A", "phone": "0601020301"}, {"name": "B", "phone": "0601020302"}, {"name": "C", "phone": "0601020303"}]}})
+        self.assertEqual(response.status_code, 200, response.text)
+        created = [m for m in self.client.get("/api/members").json()["members"] if m["last_name"] == "AAA"][0]
+        self.assertEqual([c["name"] for c in created["emergency_contacts"]], ["A", "B", "C"])
 
     def test_update_refusals(self):
         bad_email = self.update({"email_primary": "pas-une-adresse"})

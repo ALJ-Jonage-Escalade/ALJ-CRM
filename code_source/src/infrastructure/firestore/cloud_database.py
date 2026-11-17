@@ -144,7 +144,7 @@ class CloudDatabase:
 
     @classmethod
     def _after_sync(cls, report: Dict[str, Any]):
-        if set(report.get("tables") or []) & {"users", "orders", "purchases", "planning", "seasons"}:
+        if set(report.get("tables") or []) & {"users", "emergency_contacts", "orders", "purchases", "planning", "seasons"}:
             cls._projection_dirty = True
         if report.get("pushed") or report.get("deleted") or report.get("pulled"):
             logger.info(f"[CLOUD_DB] envoyés={report.get('pushed', 0)} supprimés={report.get('deleted', 0)} "

@@ -231,9 +231,10 @@ def member_record(fake, rng, person, season, order_no):
         "champ_Pays": "United Kingdom",
         "champ_Téléphone ": "" if incomplete else fake.phone_number(),
         "champ_Adresse mail pour la réception des informations du club": email,
-        "champ_Personne à prévenir en cas d'urgence - NOM  et PRENOM en majuscule":
-            f"{last.upper()} {payer_first.upper()}" if person["minor"] else fake.name().upper(),
-        "champ_Personne à prévenir en cas d'urgence - Téléphone": fake.phone_number(),
+        # The same contact each season, or the import would add a second one (values always drawn, in this order: the seed stays the same)
+        "champ_Personne à prévenir en cas d'urgence - NOM  et PRENOM en majuscule": person.setdefault(
+            "emergency_name", f"{last.upper()} {payer_first.upper()}" if person["minor"] else fake.name().upper()),
+        "champ_Personne à prévenir en cas d'urgence - Téléphone": person.setdefault("emergency_phone", fake.phone_number()),
         "champ_Numéro de Licence FFME (6 chiffres)": "" if incomplete else str(rng.randint(100000, 999999)),
         "champ_En cas de prise de vue (Photo ou vidéo), j'autorise": "Oui" if rng.random() < 0.9 else "Non",
         "champ_Je m'engage à compléter mon questionnaire de santé": "" if incomplete else "Oui",
@@ -307,6 +308,13 @@ def build_sqlite(path, fake, rng, coach_names):
     previous = [member_record(fake, rng, p, PREVIOUS_SEASON, i) for i, p in enumerate(returning, start=1)]
     MemberRepository.upsert_members(previous, PREVIOUS_SEASON)
     MemberRepository.upsert_members(current, SEASON)
+    # A member with more contacts than the HelloAsso form can give
+    last_member = MemberRepository.list_member_rows(SEASON)[-1]
+    MemberRepository.update_member_fields(user_id=last_member["user_id"], fields={"emergency_contacts": [
+        {"name": "Molly WEASLEY", "phone": "07 00 00 00 01"},
+        {"name": "Arthur WEASLEY", "phone": "07 00 00 00 02"},
+        {"name": "Bill WEASLEY", "phone": "07 00 00 00 03"},
+    ]})
     # Own random stream: the rest of the seed data stays the same
     fill_geocache(random.Random(SEED))  # noqa: S311 - reproducible fake coordinates, not security
 

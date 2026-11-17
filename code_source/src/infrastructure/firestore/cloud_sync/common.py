@@ -10,7 +10,7 @@ from domain.members.sex import parse_sex
 # Tables synchronisées (les tables legacy `adherents` / `adherents_seasons`,
 # remplacées par le schéma v2, ne sont pas migrées).
 TRACKED_TABLES = (
-    "seasons", "users", "orders", "purchases", "purchase_options",
+    "seasons", "users", "emergency_contacts", "orders", "purchases", "purchase_options",
     "planning", "email_templates", "app_settings", "geocache",
     "keys", "key_assignments", "key_events",  # club keys, plans/club-keys.md
 )
@@ -19,19 +19,22 @@ MOD_FIELD = "_modified_at"
 DEL_FIELD = "_deleted"
 BY_FIELD = "_modified_by"
 META_FIELDS = (MOD_FIELD, DEL_FIELD, BY_FIELD)
-# Bumped when a column changes: caches of an older format are rebuilt from Firestore (2: users.gender -> users.sex)
-CACHE_FORMAT = "2"
+# Bumped when a column changes: caches of an older format are rebuilt from Firestore (2: users.gender -> users.sex, 3: emergency_contacts)
+CACHE_FORMAT = "3"
 PULL_MARGIN_SECONDS = 300
 COMMIT_CHUNK = 400
 # Références entre tables (pour renuméroter une ligne dont l'ID est déjà pris
 # par un autre poste).
 REFERENCES = {
     "seasons": [("orders", "season_id")],
-    "users": [("purchases", "user_id"), ("key_assignments", "user_id")],
+    "users": [("purchases", "user_id"), ("emergency_contacts", "user_id"), ("key_assignments", "user_id")],
     "keys": [("key_assignments", "key_id"), ("key_events", "key_id")],
     "orders": [("purchases", "order_id")],
     "purchases": [("purchase_options", "purchase_id")],
 }
+# Fields kept on a deleted document, besides its key: a tombstone of a contact says whose it was, and nothing about the
+# contact, so scripts/migrate_emergency_contacts.py does not bring back contacts an admin has removed.
+TOMBSTONE_FIELDS = {"emergency_contacts": ("user_id",)}
 
 
 def collection_for(table: str) -> str:

@@ -11,8 +11,9 @@ _src_dir = os.path.join(os.path.dirname(_test_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from infrastructure.firestore.cloud_sync.bootstrap import build_cache, create_schema, import_database  # noqa: E402
-from infrastructure.firestore.cloud_sync.cache import connect, pending_count  # noqa: E402
+from infrastructure.firestore.cloud_database import CloudDatabase  # noqa: E402
+from infrastructure.firestore.cloud_sync.bootstrap import build_cache, cache_is_valid, create_schema, import_database  # noqa: E402
+from infrastructure.firestore.cloud_sync.cache import connect, pending_count, set_state  # noqa: E402
 from infrastructure.firestore.client import FirestoreConflictError  # noqa: E402
 from infrastructure.firestore.cloud_sync.common import collection_for, ts_key  # noqa: E402
 from infrastructure.firestore.cloud_sync.sync import flush, pull  # noqa: E402
@@ -220,6 +221,54 @@ class CloudDatabaseTest(unittest.TestCase):
         self.sync(self.b)
         self.assertIsNone(self.row(self.b, "SELECT id FROM purchases WHERE id = 101"))
         self.assertEqual(self.row(self.b, "SELECT user_id FROM purchases WHERE id = 200")[0], 2)
+
+    def test_emergency_contact_syncs_when_created_edited_and_deleted(self):
+        self.write(self.a, "INSERT INTO emergency_contacts (id, user_id, name, phone, position) VALUES (1, 1, 'Marie', '0601020304', 0)")
+        self.sync(self.a)
+        self.assertEqual(self.store.docs[("crm_emergency_contacts", "1")]["fields"]["user_id"], 1)
+        self.sync(self.b)
+        self.assertEqual(self.row(self.b, "SELECT name, phone, position FROM emergency_contacts WHERE id = 1"), ("Marie", "0601020304", 0))
+
+        self.write(self.b, "UPDATE emergency_contacts SET phone = '0611111111' WHERE id = 1")
+        self.sync(self.b)
+        self.sync(self.a)
+        self.assertEqual(self.row(self.a, "SELECT phone FROM emergency_contacts WHERE id = 1"), ("0611111111",))
+
+        self.write(self.a, "DELETE FROM emergency_contacts WHERE id = 1")
+        self.sync(self.a)
+        self.assertTrue(self.store.docs[("crm_emergency_contacts", "1")]["deleted"])
+        # The tombstone says whose contact it was (the migration skips that member) and nothing about the contact
+        self.assertEqual(self.store.docs[("crm_emergency_contacts", "1")]["fields"], {"id": 1, "user_id": 1})
+        self.sync(self.b)
+        self.assertIsNone(self.row(self.b, "SELECT id FROM emergency_contacts WHERE id = 1"))
+
+    def test_contact_edit_alone_asks_for_a_new_directory(self):
+        CloudDatabase._projection_dirty = False
+        self.addCleanup(setattr, CloudDatabase, "_projection_dirty", False)
+        CloudDatabase._after_sync({"tables": ["emergency_contacts"]})
+        self.assertTrue(CloudDatabase._projection_dirty)
+
+    def test_renumbered_member_keeps_their_emergency_contacts(self):
+        for path, name in ((self.a, "PETIT"), (self.b, "GRAND")):
+            self.write(path, "INSERT INTO users (last_name, first_name, last_name_key, first_name_key) "
+                             f"VALUES ('{name}', 'Max', '{name}', 'MAX')")
+            self.write(path, "INSERT INTO emergency_contacts (user_id, name, position) "
+                             f"SELECT id, 'Contact de {name}', 0 FROM users WHERE last_name = '{name}'")
+        self.sync(self.a)
+        report = self.sync(self.b)
+        self.assertTrue(report.get("renumbered"))
+        self.sync(self.a)
+        for path in (self.a, self.b):
+            pairs =sqlite3.connect(path).execute(
+                "SELECT u.last_name, c.name FROM emergency_contacts c JOIN users u ON u.id = c.user_id ORDER BY 1").fetchall()
+            self.assertEqual(pairs, [("GRAND", "Contact de GRAND"), ("PETIT", "Contact de PETIT")])
+
+    def test_cache_of_the_previous_format_is_rebuilt(self):
+        conn = connect(self.a)
+        set_state(conn, "format", "2")
+        conn.commit()
+        conn.close()
+        self.assertFalse(cache_is_valid(self.a, self.store.project_id))
 
     def test_same_new_id_on_two_posts_is_renumbered(self):
         for p, name in ((self.a, "PETIT"), (self.b, "GRAND")):

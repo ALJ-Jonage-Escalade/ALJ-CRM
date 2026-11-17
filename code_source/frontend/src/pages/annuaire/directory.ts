@@ -4,6 +4,7 @@
    Filters, search and display helpers are the ones of Adhérents (adherents/members.ts). */
 import { normKey } from "../../lib/text";
 import type { Creneau, Member, MemberList } from "../adherents/members";
+import { emergencyContactsOf, type EmergencyContactSource } from "../../lib/emergencyContacts";
 import { formatDayText } from "../../lib/format";
 
 const FIELDS = [
@@ -23,10 +24,7 @@ const FIELDS = [
   "email_primary",
   "email_secondary",
   "licence_ffme",
-  "emergency1_name",
-  "emergency1_phone",
-  "emergency2_name",
-  "emergency2_phone",
+  "emergency_contacts",
   "photo_auth",
   "badge_rouge",
   "autonomie_bloc",
@@ -36,7 +34,8 @@ const FIELDS = [
   "payer_email",
 ] as const satisfies readonly (keyof Member)[];
 
-export type DirectoryMember = Pick<Member, (typeof FIELDS)[number]>;
+/** The flat contact fields are only found on copies saved on a device before the list existed (emergencyContactsOf). */
+export type DirectoryMember = Omit<Pick<Member, (typeof FIELDS)[number]>, "emergency_contacts"> & EmergencyContactSource;
 
 export interface Directory {
   season: string;
@@ -44,12 +43,20 @@ export interface Directory {
   members: DirectoryMember[];
 }
 
+function pickFields<T, K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> {
+  const picked = {} as Pick<T, K>;
+  for (const key of keys) {
+    picked[key] = source[key];
+  }
+  return picked;
+}
+
 /** The answer of GET /api/members reduced to what the directory shows (and keeps on the device). */
 export function toDirectory(list: MemberList): Directory {
   return {
     season: list.season,
     creneaux: list.creneaux,
-    members: list.members.map((m) => Object.fromEntries(FIELDS.map((k) => [k, m[k]])) as DirectoryMember),
+    members: list.members.map((m) => pickFields(m, FIELDS)),
   };
 }
 
@@ -70,8 +77,10 @@ export function detailRows(member: DirectoryMember): { label: string; value: str
     ["✉️ E-mail", member.email_primary],
     ["✉️ E-mail 2", member.email_secondary],
     ["🪪 Licence FFME", member.licence_ffme],
-    ["🚨 Urgence 1", joined([member.emergency1_name, member.emergency1_phone], " · ")],
-    ["🚨 Urgence 2", joined([member.emergency2_name, member.emergency2_phone], " · ")],
+    ...emergencyContactsOf(member).map((contact, index): [string, string] => [
+      `🚨 Urgence ${index + 1}`,
+      joined([contact.name, contact.phone], " · "),
+    ]),
     ["📷 Droit à l'image", member.photo_auth],
     ["🔴 Badge rouge", member.badge_rouge],
     ["🧗 Autonomie bloc", member.autonomie_bloc],
@@ -87,8 +96,11 @@ export function detailRows(member: DirectoryMember): { label: string; value: str
 export function emergencyRows(member: DirectoryMember): { label: string; name: string; phone: string }[] {
   return [
     { label: "👤 Adhérent", name: "", phone: member.phone },
-    { label: "🚨 Urgence 1", name: member.emergency1_name, phone: member.emergency1_phone },
-    { label: "🚨 Urgence 2", name: member.emergency2_name, phone: member.emergency2_phone },
+    ...emergencyContactsOf(member).map((contact, index) => ({
+      label: `🚨 Urgence ${index + 1}`,
+      name: contact.name,
+      phone: contact.phone,
+    })),
   ].filter((r) => r.name || r.phone);
 }
 

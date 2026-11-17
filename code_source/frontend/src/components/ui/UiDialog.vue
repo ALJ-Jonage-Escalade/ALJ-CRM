@@ -5,7 +5,7 @@ import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPor
 
 // Attributes (data-testid…) go to the dialog box, not to the root, which renders nothing
 defineOptions({ inheritAttrs: false });
-// wide: a form of several columns; xl: a form next to a document (PDF preview)
+// wide: a form of several columns; xl: a form next to a document (PDF preview), a row of contact cards
 defineProps<{ title: string; description?: string; wide?: boolean; xl?: boolean }>();
 const open = defineModel<boolean>("open", { required: true });
 </script>

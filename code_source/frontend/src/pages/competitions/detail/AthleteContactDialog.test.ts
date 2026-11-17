@@ -37,14 +37,14 @@ describe("AthleteContactDialog", () => {
         email: "lucas@test.fr",
       },
       {
-        role: "emergency1",
+        role: "emergency",
         title: "🚨 Contact d'urgence 1",
         name: "Marie Dupont",
         phone: "06 11 11 11 11",
         email: "",
       },
       {
-        role: "emergency2",
+        role: "emergency",
         title: "🚨 Contact d'urgence 2",
         name: "Jean Dupont",
         phone: "06 22 22 22 22",

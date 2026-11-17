@@ -48,6 +48,7 @@ export function member(change: Partial<Member>): Member {
     sex: null,
     amount: null,
     key: null,
+    emergency_contacts: [],
     season_name: "2026-2027",
     ...change,
   } as Member;

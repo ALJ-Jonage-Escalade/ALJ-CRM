@@ -63,7 +63,7 @@ def test_competitors_shown_offline_other_changes_refused(mobile_page, competitio
     contact = next(c for c in contacts if c["adherent_id"] == member["id"])
     # Contacts only: no health, address or e-mail data on the phone (plan O2)
     assert set(contact) == {"adherent_id", "last_name", "first_name", "phone", "creneau_groupe",
-                            "emergency1_name", "emergency1_phone", "emergency2_name", "emergency2_phone"}
+                            "emergency_contacts", "emergency1_name", "emergency1_phone", "emergency2_name", "emergency2_phone"}
     go_offline(page, mobile_page.context, competition)
     try:
         expect(page.get_by_test_id("detail-name")).to_have_text(competition["nom"])

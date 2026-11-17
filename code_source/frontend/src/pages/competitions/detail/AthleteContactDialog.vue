@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* Modal displaying the complete contact card of an athlete in a competition: the athlete themselves, emergency contact 1 and emergency contact 2. */
+/* Modal displaying the complete contact card of an athlete in a competition: the athlete themselves, then each emergency contact. */
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialog from "../../../components/ui/UiDialog.vue";
@@ -22,7 +22,7 @@ const emit = defineEmits<{
     :open="open"
     :title="athlete ? `📇 Fiche contact : ${athlete.prenom} ${athlete.nom}` : '📇 Fiche contact'"
     description="Coordonnées de l'athlète et de ses contacts d'urgence"
-    wide
+    xl
     data-testid="athlete-contact-dialog"
     @update:open="emit('update:open', $event)"
   >
@@ -45,7 +45,7 @@ const emit = defineEmits<{
       <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div
           v-for="c in athlete.contacts"
-          :key="c.role"
+          :key="c.title"
           data-testid="contact-card"
           class="flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 shadow-sm"
         >
@@ -65,7 +65,7 @@ const emit = defineEmits<{
                   v-if="c.phone"
                   :href="telHref(c.phone)"
                   data-testid="contact-phone-link"
-                  class="font-semibold text-blue-700 hover:underline"
+                  class="font-semibold whitespace-nowrap text-blue-700 hover:underline"
                 >
                   📞 {{ c.phone }}
                 </a>

@@ -7,8 +7,11 @@ import {
   attestationRecipient,
   attestationTemplates,
   changesOf,
+  contactPhoneField,
   DEFAULT_ATTESTATION_TEMPLATE,
+  draftErrors,
   draftOf,
+  newContactRow,
   newMemberOf,
   recordRows,
   memberVariables,
@@ -86,8 +89,7 @@ describe("edit and add", () => {
       first_name: "Jean",
       birth_date: "2010-01-01",
       amount: 120,
-      emergency1_name: "DUPONT Pierre",
-      emergency1_phone: "06 01 02 03 04",
+      emergency_contacts: [{ name: "DUPONT Pierre", phone: "06 01 02 03 04" }],
       photo_auth: "Oui",
     });
     const d = {
@@ -96,10 +98,10 @@ describe("edit and add", () => {
       first_name: "Jeanne",
       birth_date: "2010-02-02",
       amount: "150.50",
-      emergency1_name: "MARTIN Paul",
-      emergency1_phone: "06 99 88 77 66",
-      emergency2_name: "MARTIN Claire",
-      emergency2_phone: "06 11 22 33 44",
+      emergency_contacts: [
+        { key: 1, name: "MARTIN Paul", phone: "06 99 88 77 66" },
+        { key: 2, name: "MARTIN Claire", phone: "06 11 22 33 44" },
+      ],
       photo_auth: "Non" as const,
     };
     expect(changesOf(m, d)).toEqual({
@@ -108,10 +110,10 @@ describe("edit and add", () => {
         first_name: "Jeanne",
         birth_date: "2010-02-02",
         amount: 150.5,
-        emergency1_name: "MARTIN Paul",
-        emergency1_phone: "06 99 88 77 66",
-        emergency2_name: "MARTIN Claire",
-        emergency2_phone: "06 11 22 33 44",
+        emergency_contacts: [
+          { name: "MARTIN Paul", phone: "06 99 88 77 66" },
+          { name: "MARTIN Claire", phone: "06 11 22 33 44" },
+        ],
         photo_auth: "Non",
       },
       lines: [
@@ -119,12 +121,89 @@ describe("edit and add", () => {
         "Prénom : Jean ➔ Jeanne",
         "Date de naissance : 2010-01-01 ➔ 2010-02-02",
         "Droit à l'image : Oui ➔ Non",
-        "Urgence 1 (nom) : DUPONT Pierre ➔ MARTIN Paul",
-        "Urgence 1 (tél) : 06 01 02 03 04 ➔ 06 99 88 77 66",
-        "Urgence 2 (nom) : vide ➔ MARTIN Claire",
-        "Urgence 2 (tél) : vide ➔ 06 11 22 33 44",
+        "Contacts d'urgence : DUPONT Pierre · 06 01 02 03 04 ➔ MARTIN Paul · 06 99 88 77 66 ; MARTIN Claire · 06 11 22 33 44",
         "Montant : 120 € ➔ 150.5 €",
       ],
+    });
+  });
+
+  describe("emergency contacts", () => {
+    const three = [
+      { name: "Marie", phone: "06 01 01 01 01" },
+      { name: "Paul", phone: "" },
+      { name: "", phone: "06 03 03 03 03" },
+    ];
+
+    it("shows one line per contact", () => {
+      const rows = recordRows(member({ emergency_contacts: three })).filter((r) => r.icon === "🚨");
+      expect(rows.map((r) => [r.label, r.value])).toEqual([
+        ["Urgence 1", "Marie · 06 01 01 01 01"],
+        ["Urgence 2", "Paul"],
+        ["Urgence 3", "06 03 03 03 03"],
+      ]);
+    });
+
+    it("draft: one row per contact with a distinct key, one blank row to fill without contact", () => {
+      const rows = draftOf(member({ emergency_contacts: three })).emergency_contacts;
+      expect(rows.map((r) => [r.name, r.phone])).toEqual(three.map((c) => [c.name, c.phone]));
+      expect(new Set(rows.map((r) => r.key)).size).toBe(3);
+      expect(draftOf().emergency_contacts.map((r) => [r.name, r.phone])).toEqual([["", ""]]);
+    });
+
+    it("sends nothing when the list does not change, a blank row included", () => {
+      const withContacts = member({ emergency_contacts: three });
+      const draft = draftOf(withContacts);
+      draft.emergency_contacts.push(newContactRow());
+      expect(changesOf(withContacts, draft)).toEqual({ fields: {}, lines: [] });
+      const none = member({});
+      expect(changesOf(none, draftOf(none))).toEqual({ fields: {}, lines: [] });
+    });
+
+    it("sends the whole list on a reorder, without its local keys", () => {
+      const withContacts = member({ emergency_contacts: three.slice(0, 2) });
+      const draft = draftOf(withContacts);
+      draft.emergency_contacts.reverse();
+      expect(changesOf(withContacts, draft)).toEqual({
+        fields: {
+          emergency_contacts: [
+            { name: "Paul", phone: "" },
+            { name: "Marie", phone: "06 01 01 01 01" },
+          ],
+        },
+        lines: ["Contacts d'urgence : Marie · 06 01 01 01 01 ; Paul ➔ Paul ; Marie · 06 01 01 01 01"],
+      });
+    });
+
+    it("sends an empty list when every contact is removed", () => {
+      const withContact = member({ emergency_contacts: three.slice(0, 1) });
+      expect(changesOf(withContact, { ...draftOf(withContact), emergency_contacts: [] })).toEqual({
+        fields: { emergency_contacts: [] },
+        lines: ["Contacts d'urgence : Marie · 06 01 01 01 01 ➔ vide"],
+      });
+    });
+
+    it("a new member takes the filled rows, trimmed", () => {
+      const draft = draftOf(undefined, "Adulte loisir");
+      draft.emergency_contacts = [
+        { key: 1, name: " Marie ", phone: " 06 01 01 01 01 " },
+        { key: 2, name: "", phone: "  " },
+        { key: 3, name: "Paul", phone: "" },
+      ];
+      expect(newMemberOf(draft).emergency_contacts).toEqual([
+        { name: "Marie", phone: "06 01 01 01 01" },
+        { name: "Paul", phone: "" },
+      ]);
+    });
+
+    it("reports an invalid phone on its own row", () => {
+      const draft = draftOf(undefined, "Adulte loisir");
+      draft.emergency_contacts = [
+        { key: 7, name: "Marie", phone: "06 01 01 01 01" },
+        { key: 8, name: "Paul", phone: "12" },
+      ];
+      const errors = draftErrors(draft, false);
+      expect(errors[contactPhoneField(8)]).toBe("Numéro de téléphone invalide.");
+      expect(errors[contactPhoneField(7)]).toBeUndefined();
     });
   });
 

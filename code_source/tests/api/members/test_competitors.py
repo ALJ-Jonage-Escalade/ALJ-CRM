@@ -45,6 +45,7 @@ class TestCompetitors(MemberDbTestCase, ApiTestCase):
         self.assertEqual(by_id[self.leo], {
             "adherent_id": self.leo, "last_name": "MARTIN", "first_name": "Léo",
             "phone": "06 12 34 56 78", "creneau_groupe": "Compétition U18",
+            "emergency_contacts": [{"name": "Claire Martin", "phone": "06 11 11 11 11"}, {"name": "Paul Martin", "phone": "06 22 22 22 22"}],
             "emergency1_name": "Claire Martin", "emergency1_phone": "06 11 11 11 11",
             "emergency2_name": "Paul Martin", "emergency2_phone": "06 22 22 22 22",
         })

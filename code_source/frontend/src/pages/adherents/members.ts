@@ -5,6 +5,7 @@ import type { BadgeColor } from "../../components/ui/palette";
 import { localStorageOrNone } from "../../lib/localStorage";
 import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
+import { emergencyContactsOf } from "../../lib/emergencyContacts";
 import { formatDayText } from "../../lib/format";
 import { SEX_LABELS } from "../../lib/sex";
 import { normKey, plural } from "../../lib/text";
@@ -354,7 +355,7 @@ export function countSummary(shown: number, total: number, season: string): stri
 
 // ---------------------------------------------------------------- CSV export
 
-const CSV_HEADERS = [
+const CSV_HEADERS_BEFORE_CONTACTS = [
   "Nom",
   "Prénom",
   "Date de naissance",
@@ -372,21 +373,21 @@ const CSV_HEADERS = [
   "Adresse",
   "Code postal",
   "Ville",
-  "Urgence 1 - Nom",
-  "Urgence 1 - Tél",
-  "Urgence 2 - Nom",
-  "Urgence 2 - Tél",
-  "Payeur",
-  "E-mail payeur",
-  "Réf Commande",
-  "Date commande",
 ];
+const CSV_HEADERS_AFTER_CONTACTS = ["Payeur", "E-mail payeur", "Réf Commande", "Date commande"];
 
 /** Rows of the CSV export of the list shown (same columns as the former page), for lib/csv.ts. */
 export function csvRows(members: readonly Member[]): Cell[][] {
+  const contactsOf = members.map((m) => emergencyContactsOf(m));
+  // Two pairs of columns at least, as always, and as many as the longest list so that no contact is lost
+  const contactColumns = Array.from({ length: Math.max(2, ...contactsOf.map((contacts) => contacts.length)) }, (_, position) => position);
   return [
-    CSV_HEADERS,
-    ...members.map((m) => [
+    [
+      ...CSV_HEADERS_BEFORE_CONTACTS,
+      ...contactColumns.flatMap((position) => [`Urgence ${position + 1} - Nom`, `Urgence ${position + 1} - Tél`]),
+      ...CSV_HEADERS_AFTER_CONTACTS,
+    ],
+    ...members.map((m, memberIndex) => [
       m.last_name,
       m.first_name,
       formatDayText(m.birth_date),
@@ -404,10 +405,10 @@ export function csvRows(members: readonly Member[]): Cell[][] {
       m.address,
       m.zip_code,
       m.city,
-      m.emergency1_name,
-      m.emergency1_phone,
-      m.emergency2_name,
-      m.emergency2_phone,
+      ...contactColumns.flatMap((position) => {
+        const contact = contactsOf[memberIndex]?.[position];
+        return [contact?.name ?? "", contact?.phone ?? ""];
+      }),
       m.payer,
       m.payer_email,
       m.order_ref,
