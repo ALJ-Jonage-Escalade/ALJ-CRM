@@ -10,7 +10,7 @@ certifi==2026.10.23
     #   httpx
 colorama==0.4.6 ; sys_platform == 'win32'
     # via pytest
-coverage==7.17.2
+coverage==7.17.3
     # via pytest-cov
 faker==40.39.0
 h11==0.16.0
@@ -45,7 +45,7 @@ pytest==9.1.1
     #   pytest-timeout
 pytest-cov==7.1.0
 pytest-timeout==2.4.0
-ruff==0.17.4
+ruff==0.17.5
 typing-extensions==4.16.0
     # via
     #   anyio
