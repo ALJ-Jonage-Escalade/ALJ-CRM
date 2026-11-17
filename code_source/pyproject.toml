@@ -22,7 +22,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "pytest==9.2.0",
+    # Held at 9.1: pytest 9.2 ignores the group suffix pytest-xdist 3.8 writes to item._nodeid, so --dist loadgroup
+    # splits the e2e xdist_groups across workers (shared fake HelloAsso state → flaky e2e). Lift with a fixed xdist
+    "pytest==9.1.1",
     "pytest-timeout==2.4.0",
     "ruff==0.17.4",
     "mypy==2.4.1",
