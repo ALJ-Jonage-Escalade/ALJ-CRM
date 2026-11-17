@@ -65,6 +65,10 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── assets/              ← ressources lues à l'exécution : templates/ (attestation HTML, liste de présence Excel), social/
 │   ├── frontend/                ← application web Vue 3 + Vite + TypeScript (tous les écrans, téléphone et ordinateur) ;
 │   │                              src/sw.ts : service worker Workbox, compilé dans dist/sw.js (voir §5)
+│   │   └── src/                 ← pages/<rubrique>/ (écrans, un dossier par menu) ; services/ (appels API par domaine,
+│   │                              comme src/api/) ; lib/ (client typé, api-schema.ts généré, utilitaires purs) ;
+│   │                              composables/ (connexion, réseau, hors ligne, données synchronisées, dialogues, toasts) ; components/ (shell, tableaux, ui/)
+│   ├── e2e/                     ← tests Playwright de bout en bout (bureau/), hors uv (voir code_source/AGENTS.md)
 │   ├── web/                     ← manifest.webmanifest et assets/logo.png (servis par FastAPI, hors compilation)
 │   ├── tests/                   ← tests pytest/unittest, rangés comme le code testé : domain/, exports/, infrastructure/, services/, api/, web/ ; modules racine de src/ à la racine
 │   ├── dev/                     ← mode dev local : émulateur Firebase (Docker), dev.env, run_server.sh, seed/ (données fictives)
