@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 import server
 from api.admin import access
 from api.auth import me
-from api.competitions import coaches, competitions, helloasso_items, participants
+from api.competitions import coaches, competitions, email_log, helloasso_items, participants
 from api.competitions import members as competition_members
 from api.competitions import results
 from api.integrations import helloasso_campaigns
@@ -68,8 +68,8 @@ class TestSqliteCacheScope(unittest.TestCase):
 
     def test_every_firestore_router_route_skips_cache(self):
         routes = api_routes(competitions.router, participants.router, coaches.router,
-                            competition_members.router, helloasso_items.router, results.router, me.router, access.router,
-                            helloasso_campaigns.router)
+                            competition_members.router, helloasso_items.router, results.router, email_log.router, me.router,
+                            access.router, helloasso_campaigns.router)
         self.assertGreater(len(routes), 15)
         for r in routes:
             self.assertFalse(server.uses_sqlite_cache(concrete(r.path)), r.path)
@@ -81,7 +81,7 @@ class TestSqliteCacheScope(unittest.TestCase):
         settings, members…), whatever its prefix."""
         firestore_only = set(map(id, api_routes(competitions.router, participants.router, coaches.router,
                                                 competition_members.router, helloasso_items.router, results.router,
-                                                me.router, access.router, helloasso_campaigns.router)))
+                                                email_log.router, me.router, access.router, helloasso_campaigns.router)))
         routes = [r for r in app_routes(server.app.routes)
                   if id(r) not in firestore_only and r.path.startswith("/api/")]
         self.assertGreater(len(routes), 15)

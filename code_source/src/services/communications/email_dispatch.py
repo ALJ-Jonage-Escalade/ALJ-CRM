@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, TypedDict
 
 from domain.club_emails import CLUB_SENDER_DOMAIN
 from domain.competitions.models import Competition, default_deadline
+from domain.email_log import LoggedRecipient
 from domain.errors import InvalidRequest, UpstreamUnavailable
 from domain.email_personalization import apply_template_variables, template_recipient
 from domain.utils import format_amount, format_period, normalize_name
@@ -25,6 +26,7 @@ from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
 from infrastructure.sqlite.members import MemberRepository
+from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
 
 logger = logging.getLogger("alj")
 
@@ -210,10 +212,12 @@ class EmailDispatchService:
         competition_id: Optional[int] = None,
         sender_email: Optional[str] = None,
         sender_name: Optional[str] = None,
-        add_signature: bool = True
+        add_signature: bool = True,
+        author: str = "",
     ) -> Dict[str, Any]:
-        """Sends the e-mail to each recipient, with its variables replaced. A failed recipient does not stop the
-        others (status "partial"). InvalidRequest: nothing to send; UpstreamUnavailable: every e-mail failed."""
+        """Sends the e-mail to each recipient, with its variables replaced, and records the send in the e-mail log.
+        A failed recipient does not stop the others (status "partial").
+        InvalidRequest: nothing to send; UpstreamUnavailable: every e-mail failed (recorded too)."""
         subj_tmpl = subject or ""
         body_tmpl = body or ""
         default_from_email = sender_email
@@ -241,12 +245,15 @@ class EmailDispatchService:
         sent_count = 0
         errors_count = 0
         details = []
+        logged: List[LoggedRecipient] = []
+        subjects: List[str] = []
 
         for dest in destinataires:
             to_email = dest.get("email")
             full_name = f"{dest.get('first_name', '')} {dest.get('last_name', '')}".strip()
 
             if not to_email or "@" not in to_email:
+                logged.append(logged_recipient(to_email or "", full_name, dest.get("id"), "Adresse e-mail invalide ou absente"))
                 errors_count += 1
                 details.append({
                     "id": dest.get("id"),
@@ -258,6 +265,7 @@ class EmailDispatchService:
                 continue
 
             rendered = render_email(subj_tmpl, body_tmpl, dest, comp_ctx, add_signature)
+            subjects.append(rendered["subject"])
             try:
                 EmailSender.send_email(
                     to_email=to_email,
@@ -269,6 +277,7 @@ class EmailDispatchService:
                     from_name=default_from_name
                 )
                 sent_count += 1
+                logged.append(logged_recipient(to_email, full_name, dest.get("id")))
                 details.append({
                     "id": dest.get("id"),
                     "name": full_name,
@@ -278,14 +287,19 @@ class EmailDispatchService:
             except MailError as ex:  # this recipient only: the others are still sent
                 logger.warning("[EMAIL_DISPATCH] Envoi impossible à %s : %s", to_email, ex)
                 errors_count += 1
+                logged.append(logged_recipient(to_email, full_name, dest.get("id"), SEND_FAILED))
                 details.append({
                     "id": dest.get("id"),
                     "name": full_name,
                     "email": to_email,
                     "status": "error",
-                    "error": "Erreur lors de l'envoi (détails dans les journaux)."
+                    "error": SEND_FAILED,
                 })
 
+        # The subject as the first recipient got it: a personalised one differs per recipient
+        record_send("competition_email" if competition_id else "member_email", author, logged,
+                                 subjects[0] if subjects else subj_tmpl, template=template_name or "",
+                                 competition_ids=[competition_id] if competition_id else [])
         first_err = next((d["error"] for d in details if "error" in d), "Erreur d'envoi.")
         if errors_count and not sent_count:
             raise UpstreamUnavailable(f"Aucun e-mail n'est parti : {first_err}")
@@ -295,5 +309,5 @@ class EmailDispatchService:
             "errors_count": errors_count,
             "total_recipients": len(destinataires),
             "message": "" if errors_count == 0 else first_err,
-            "details": details
+            "details": details,
         }

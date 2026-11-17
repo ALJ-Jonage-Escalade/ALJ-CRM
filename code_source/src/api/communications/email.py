@@ -10,6 +10,7 @@ from api.communications.schemas import (
     EmailDispatch, EmailSendRequest, EmailStatus, EmailTemplate,
     EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate,
 )
+from api.auth.me import author_of
 from api.responses import error, error_responses
 from services.communications.email_dispatch import EmailDispatchService
 from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
@@ -134,5 +135,6 @@ def send_email_api(request: Request, data: EmailSendRequest) -> EmailDispatch | 
         sender_email=data.sender_email or None,
         sender_name=data.sender_name or None,
         add_signature=data.add_signature,
+        author=author_of(request),
     )
     return EmailDispatch.model_validate(result)

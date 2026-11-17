@@ -106,7 +106,7 @@ async def security_headers_middleware(request, call_next):
 app.middleware("http")(security_headers_middleware)  # outermost
 
 # Data routes of the web front end (competitions, coaches, HelloAsso links, members): src/api/
-from api.competitions import coaches, competitions, helloasso_items, participants
+from api.competitions import coaches, competitions, email_log, helloasso_items, participants
 from api.competitions import members as competition_members
 from api.competitions import results
 from api.activities import planning, presence
@@ -122,7 +122,7 @@ from api.web import health, pages, pwa
 from api.responses import service_error_handler
 from domain.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
-             results, members, seasons, helloasso_import, email, whatsapp, attestations,
+             results, email_log, members, seasons, helloasso_import, email, whatsapp, attestations,
              planning, presence, members_map, pivot, ffme, keys,
              helloasso, helloasso_campaigns, google_auth, cloud_db, me, access,
              pages, pwa, health):
@@ -135,7 +135,7 @@ pages.mount_static(app)
 # (results) reads its settings from Firestore: Cloud Scheduler's 07:00 call must not wait for a
 # full cache rebuild on a cold start (180 s deadline).
 FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items,
-                                                      results, me, access, helloasso_campaigns)
+                                                      results, email_log, me, access, helloasso_campaigns)
                             for r in _api.router.routes if isinstance(r, APIRoute))
 # FastAPI's decorator form: add_exception_handler's type only accepts handlers taking any Exception
 app.exception_handler(ServiceError)(service_error_handler)

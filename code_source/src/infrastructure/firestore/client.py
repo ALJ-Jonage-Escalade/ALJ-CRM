@@ -231,12 +231,25 @@ class FirestoreClient:
                     access_token: Optional[str] = None) -> List[Dict[str, Any]]:
         """The `limit` documents with the highest `field` value, highest first (Firestore's automatic
         single-field index); documents without that field are left out."""
-        url = f"{cls.database_url(project_id)}:runQuery"
-        body: Dict[str, Any] = {"structuredQuery": {
-            "from": [{"collectionId": collection_name}],
+        return cls._run_query(collection_name, {
             "orderBy": [{"field": {"fieldPath": field}, "direction": "DESCENDING"}],
             "limit": limit,
-        }}
+        }, project_id, access_token)
+
+    @classmethod
+    def list_containing(cls, collection_name: str, field: str, value: Any,
+                        project_id: Optional[str] = None,
+                        access_token: Optional[str] = None) -> List[Dict[str, Any]]:  # Any: a field value, then documents
+        """Every document whose array `field` contains `value` (automatic single-field index: no order, sort them)."""
+        return cls._run_query(collection_name, {"where": {"fieldFilter": {
+            "field": {"fieldPath": field}, "op": "ARRAY_CONTAINS", "value": python_to_firestore_value(value),
+        }}}, project_id, access_token)
+
+    @classmethod
+    def _run_query(cls, collection_name: str, query: Dict[str, Any], project_id: Optional[str],
+                   access_token: Optional[str]) -> List[Dict[str, Any]]:  # Any: a structured query, then documents
+        url = f"{cls.database_url(project_id)}:runQuery"
+        body: Dict[str, Any] = {"structuredQuery": {"from": [{"collectionId": collection_name}], **query}}
         try:
             resp = requests.post(url, headers=cls._headers(access_token), json=body, timeout=30)
         except requests.RequestException as e:

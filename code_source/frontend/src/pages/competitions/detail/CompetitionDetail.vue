@@ -35,6 +35,10 @@ import {
 } from "../competitions";
 import CompetitionActions from "./CompetitionActions.vue";
 import EmailForm from "./EmailForm.vue";
+import EmailHistory from "./EmailHistory.vue";
+import { lastSendState } from "./emailHistory";
+import { useCompetitionEmailLog } from "./emailLog";
+import LastContact from "./LastContact.vue";
 import { COMPETITIONS_KEY } from "../context";
 import type { QueuedFlag } from "../outbox";
 import AthleteContactDialog from "./AthleteContactDialog.vue";
@@ -54,7 +58,7 @@ const props = defineProps<{
   coaches: readonly Coach[];
 }>();
 // Who may write, the outbox and the account: shared by the competitions page with all its sub-pages
-const { canWrite, staff, contactsShown, outbox, uid } = inject(COMPETITIONS_KEY)!;
+const { canWrite, staff, contactsShown, online, outbox, uid } = inject(COMPETITIONS_KEY)!;
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const writer = inject(WRITER_KEY)!;
 
@@ -235,6 +239,12 @@ async function restore(r: Row): Promise<void> {
 }
 
 const emailing = ref(false);
+
+// ---------------------------------------------------------------- E-mail history
+
+const emailLog = useCompetitionEmailLog(() => c.value.id);
+const logView = emailLog.view;
+const historyOpen = ref(false);
 const contactAthlete = ref<Row | null>(null);
 const contactDialogOpen = ref(false);
 /* A dialog open while its participant is set; closing it (Escape, outside click) forgets the participant. */
@@ -295,6 +305,10 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
             <i v-if="!c.coaches?.length">Aucun coach assigné</i>
           </template>
           <template v-else>🏃 {{ c.coaches?.length ? `Coachs : ${c.coaches.join(", ")}` : "Aucun coach" }}</template>
+        </p>
+        <p class="mt-0.5 text-xs text-slate-500 lg:mt-1.5" data-testid="detail-last-send">
+          ✉️ Dernier envoi aux compétiteurs :
+          <LastContact :state="lastSendState(logView)" :online="online" @open="historyOpen = true" />
         </p>
         <div class="mt-1.5 flex flex-wrap gap-1.5 lg:mt-2">
           <a
@@ -521,10 +535,15 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           (m) => {
             emailing = false;
             writer.toast(m, 6000);
+            void emailLog.refresh();
           }
         "
         @cancel="emailing = false"
       />
+    </UiDialog>
+
+    <UiDialog v-model:open="historyOpen" :title="`✉️ E-mails envoyés : ${c.nom}`" wide data-testid="history-dialog">
+      <EmailHistory :entries="logView.log?.entries ?? []" />
     </UiDialog>
 
     <!-- Wide: long tariff names (« Compétition U15 U17 - nés en 2008, … ») stay on one line on a computer -->
