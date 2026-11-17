@@ -11,6 +11,10 @@ updates:
       # Une seule PR pour toutes les mises à jour de la semaine, majeures comprises : elles modifient toutes uv.lock
       python:
         patterns: ["*"]
+    ignore:
+      # pytest 9.2 casse --dist loadgroup de pytest-xdist 3.8 (groupes e2e éclatés) : à lever avec un xdist corrigé
+      - dependency-name: "pytest"
+        versions: [">=9.2"]
   # Dépendances npm : package.json + package-lock.json (application Vue), versions exactes conservées
   - package-ecosystem: "npm"
     directory: "/code_source/frontend"
