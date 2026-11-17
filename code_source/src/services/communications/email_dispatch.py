@@ -215,8 +215,8 @@ class EmailDispatchService:
         add_signature: bool = True,
         author: str = "",
     ) -> Dict[str, Any]:
-        """Sends the e-mail to each recipient, with its variables replaced, and records the send in the e-mail log.
-        A failed recipient does not stop the others (status "partial").
+        """Sends the e-mail to each recipient, with its variables replaced, and records the send in the e-mail log
+        (`log_notice` when it could not be). A failed recipient does not stop the others (status "partial").
         InvalidRequest: nothing to send; UpstreamUnavailable: every e-mail failed (recorded too)."""
         subj_tmpl = subject or ""
         body_tmpl = body or ""
@@ -297,7 +297,7 @@ class EmailDispatchService:
                 })
 
         # The subject as the first recipient got it: a personalised one differs per recipient
-        record_send("competition_email" if competition_id else "member_email", author, logged,
+        log_notice = record_send("competition_email" if competition_id else "member_email", author, logged,
                                  subjects[0] if subjects else subj_tmpl, template=template_name or "",
                                  competition_ids=[competition_id] if competition_id else [])
         first_err = next((d["error"] for d in details if "error" in d), "Erreur d'envoi.")
@@ -310,4 +310,5 @@ class EmailDispatchService:
             "total_recipients": len(destinataires),
             "message": "" if errors_count == 0 else first_err,
             "details": details,
+            "log_notice": log_notice,
         }

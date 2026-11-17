@@ -8,7 +8,7 @@ import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
 import { CLIENT_KEY, errorText } from "../../../lib/client";
 import { createCommunicationsApi, type EmailTemplate } from "../../../services/communications";
 import type { Competition, Row } from "../competitions";
-import { audience, AUDIENCES, defaultTemplate, hasEmail, sendBody, variables, type Audience } from "./email";
+import { audience, AUDIENCES, defaultTemplate, hasEmail, sendBody, sentMessage, variables, type Audience } from "./email";
 import { fillTemplate, plural } from "../../../lib/text";
 import { dialogs } from "../../../composables/dialogs";
 
@@ -111,10 +111,7 @@ async function send(): Promise<void> {
   try {
     const result = await communicationsApi.sendEmail(sendBody(props.competition, reachable.value, subject.value, body.value));
     // A refused request (400) or a sending where every e-mail failed (502) is thrown by unwrap(), caught below
-    emit(
-      "sent",
-      `✅ ${result.sent_count} e-mail(s) envoyé(s) avec succès${result.errors_count ? `, ${result.errors_count} en échec` : ""}.`,
-    );
+    emit("sent", sentMessage(result));
   } catch (e) {
     problem.value = `❌ Échec d'envoi : ${errorText(e)}`;
   } finally {

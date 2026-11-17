@@ -6658,6 +6658,18 @@
             "type": "array",
             "title": "Details",
             "default": []
+          },
+          "log_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Notice",
+            "description": "Set when the e-mails left but the send is missing from the e-mail log"
           }
         },
         "type": "object",

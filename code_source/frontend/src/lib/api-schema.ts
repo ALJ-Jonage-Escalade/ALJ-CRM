@@ -2385,6 +2385,11 @@ export interface components {
              * @default []
              */
             details?: components["schemas"]["EmailSendDetail"][];
+            /**
+             * Log Notice
+             * @description Set when the e-mails left but the send is missing from the e-mail log
+             */
+            log_notice?: string | null;
         };
         /**
          * EmailLogEntry

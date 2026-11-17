@@ -99,7 +99,7 @@ class TestEmailDispatchService(unittest.TestCase):
         ]
         res = EmailDispatchService.dispatch_emails(subject="Rappel {first_name}", body="Bonjour", recipients=recipients,
                                                    competition_id=7, add_signature=False, author="coach@alj.example")
-        self.assertEqual(res["status"], "partial")
+        self.assertEqual((res["status"], res["log_notice"]), ("partial", None))
         (entry,) = email_log.current_store().entries
         self.assertEqual((entry["kind"], entry["author"], entry["competition_ids"], entry["member_ids"]),
                          ("competition_email", "coach@alj.example", [7], [1, 2]))
@@ -115,6 +115,13 @@ class TestEmailDispatchService(unittest.TestCase):
                                                  add_signature=False)
         (entry,) = email_log.current_store().entries
         self.assertEqual((entry["kind"], [r["status"] for r in entry["recipients"]]), ("member_email", ["failed"]))
+
+    @patch("infrastructure.mail.sender.EmailSender.send_email")
+    def test_dispatch_log_down_still_sent(self, _send):
+        email_log.current_store().failing = True
+        res = EmailDispatchService.dispatch_emails(subject="Info", body="Bonjour", recipients=[{"id": 1, "email": "a@example.com"}],
+                                                   add_signature=False)
+        self.assertEqual((res["status"], res["sent_count"], res["log_notice"]), ("success", 1, email_log.NOT_RECORDED))
 
     def test_fastapi_templates_and_status_endpoints(self):
         """Teste les route handlers FastAPI /api/email-templates et /api/email-status."""

@@ -8,7 +8,7 @@ import pytest
 
 from domain.errors import NotFound
 from services.communications import email_log
-from services.communications.email_log import logged_recipient, record_send
+from services.communications.email_log import NOT_RECORDED, logged_recipient, record_send
 
 
 def test_record_send_writes_one_entry(email_log_store):
@@ -21,6 +21,12 @@ def test_record_send_writes_one_entry(email_log_store):
     assert [(r["email"], r["status"], r["error"]) for r in entry["recipients"]] == [
         ("a@example.org", "sent", None), ("b@example.org", "failed", "refusé"), ("club@alj.example", "sent", None)]
     assert entry["at"].endswith("+00:00")
+
+
+def test_store_failure_is_a_notice(email_log_store, caplog):
+    email_log_store.failing = True
+    assert record_send("member_email", "coach@alj.example", [logged_recipient("a@example.org")], "Info") == NOT_RECORDED
+    assert "not recorded" in caplog.text
 
 
 def test_competition_history(email_log_store):

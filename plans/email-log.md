@@ -85,8 +85,8 @@ notice; the e-mail form shows « envoyé, mais non enregistré dans l'historique
 
 ### Acceptance criteria
 
-- [ ] Service test: a store failure leaves the send successful and returns the notice
-- [ ] Response field, OpenAPI regenerated, form message
+- [x] Service test: a store failure leaves the send successful and returns the notice
+- [x] Response field, OpenAPI regenerated, form message
 
 ---
 

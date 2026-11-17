@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { participantRows, type Competition } from "../competitions";
 import { fillTemplate } from "../../../lib/text";
-import { amountText, audience, defaultTemplate, sendBody, variables } from "./email";
+import { amountText, audience, defaultTemplate, sendBody, sentMessage, variables } from "./email";
 
 const COMP: Competition = {
   id: 10,
@@ -64,5 +64,14 @@ describe("competition e-mail", () => {
         { id: 2, first_name: "Zoé", last_name: "Durand", email: "zoe@x.fr", num_licence: "" },
       ],
     });
+  });
+});
+
+describe("sentMessage", () => {
+  it("counts the failures and says when the send is missing from the history", () => {
+    expect(sentMessage({ sent_count: 2, errors_count: 0, log_notice: null })).toBe("✅ 2 e-mail(s) envoyé(s) avec succès.");
+    expect(sentMessage({ sent_count: 2, errors_count: 1, log_notice: "x" })).toBe(
+      "✅ 2 e-mail(s) envoyé(s) avec succès, 1 en échec. ⚠️ Envoyé, mais non enregistré dans l'historique.",
+    );
   });
 });
