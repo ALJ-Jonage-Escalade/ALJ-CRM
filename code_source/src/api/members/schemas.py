@@ -46,10 +46,10 @@ class EmergencyContact(RequestBody):
     phone: str = ""
 
 
-def _one_of(choices: List[str], what: str) -> AfterValidator:
+def _one_of(choices: List[str], field_label: str) -> AfterValidator:
     def check(value: str) -> str:
         if value and value not in choices:
-            raise ValueError(f"{what} inconnu(e) : {value}")
+            raise ValueError(f"{field_label} inconnu(e) : {value}")
         return value
     return AfterValidator(check)
 
