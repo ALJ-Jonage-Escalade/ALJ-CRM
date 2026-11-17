@@ -69,8 +69,8 @@ competitor. A resend through the existing form updates the row.
 
 ### Acceptance criteria
 
-- [ ] Per-competitor summary: member id, e-mail fallback, failed then sent, sent then failed, siblings tracked apart
-- [ ] Row indicator and filtered dialog; frontend helpers tested with Vitest
+- [x] Per-competitor summary: member id, e-mail fallback, failed then sent, sent then failed, siblings tracked apart
+- [x] Row indicator and filtered dialog; frontend helpers tested with Vitest
 
 ---
 

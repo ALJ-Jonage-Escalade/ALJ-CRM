@@ -36,7 +36,7 @@ import {
 import CompetitionActions from "./CompetitionActions.vue";
 import EmailForm from "./EmailForm.vue";
 import EmailHistory from "./EmailHistory.vue";
-import { lastSendState } from "./emailHistory";
+import { competitorContact, entriesFor, lastSendState } from "./emailHistory";
 import { useCompetitionEmailLog } from "./emailLog";
 import LastContact from "./LastContact.vue";
 import { COMPETITIONS_KEY } from "../context";
@@ -244,7 +244,25 @@ const emailing = ref(false);
 
 const emailLog = useCompetitionEmailLog(() => c.value.id);
 const logView = emailLog.view;
-const historyOpen = ref(false);
+/* The history dialog: every send of the competition ("all"), or those that included one competitor */
+const historyOf = ref<Row | "all" | null>(null);
+const historyOpen = computed({
+  get: () => historyOf.value !== null,
+  set: (open: boolean) => {
+    if (!open) {
+      historyOf.value = null;
+    }
+  },
+});
+const historyEntries = computed(() => {
+  const entries = logView.value.log?.entries ?? [];
+  const who = historyOf.value;
+  return who === null || who === "all" ? entries : entriesFor(entries, who);
+});
+const historyTitle = computed(() => {
+  const who = historyOf.value;
+  return who && who !== "all" ? `✉️ E-mails envoyés à ${named(who)}` : `✉️ E-mails envoyés : ${c.value.nom}`;
+});
 const contactAthlete = ref<Row | null>(null);
 const contactDialogOpen = ref(false);
 /* A dialog open while its participant is set; closing it (Escape, outside click) forgets the participant. */
@@ -308,7 +326,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         </p>
         <p class="mt-0.5 text-xs text-slate-500 lg:mt-1.5" data-testid="detail-last-send">
           ✉️ Dernier envoi aux compétiteurs :
-          <LastContact :state="lastSendState(logView)" :online="online" @open="historyOpen = true" />
+          <LastContact :state="lastSendState(logView)" :online="online" @open="historyOf = 'all'" />
         </p>
         <div class="mt-1.5 flex flex-wrap gap-1.5 lg:mt-2">
           <a
@@ -463,9 +481,12 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
               v-for="r in list"
               :key="r.adherent_id ?? `${r.nom}-${r.prenom}`"
               :row="r"
+              :contact="competitorContact(logView, r)"
+              :online="online"
               :can-write="canWrite"
               :staff="staff || canWrite"
               :contacts-shown="contactsShown"
+              @history="historyOf = r"
               @toggle="(flag, value) => toggle(r, flag, value)"
               @remove="removeOne(r)"
               @pay="paying = server(r) ?? null"
@@ -489,9 +510,12 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
               v-for="r in list"
               :key="r.adherent_id ?? `${r.nom}-${r.prenom}`"
               :row="r"
+              :contact="competitorContact(logView, r)"
+              :online="online"
               :can-write="canWrite"
               :staff="staff || canWrite"
               :contacts-shown="contactsShown"
+              @history="historyOf = r"
               @toggle="(flag, value) => toggle(r, flag, value)"
               @remove="removeOne(r)"
               @pay="paying = server(r) ?? null"
@@ -542,8 +566,8 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       />
     </UiDialog>
 
-    <UiDialog v-model:open="historyOpen" :title="`✉️ E-mails envoyés : ${c.nom}`" wide data-testid="history-dialog">
-      <EmailHistory :entries="logView.log?.entries ?? []" />
+    <UiDialog v-model:open="historyOpen" :title="historyTitle" wide data-testid="history-dialog">
+      <EmailHistory :entries="historyEntries" />
     </UiDialog>
 
     <!-- Wide: long tariff names (« Compétition U15 U17 - nés en 2008, … ») stay on one line on a computer -->

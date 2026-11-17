@@ -1,7 +1,8 @@
-/* The e-mail log of a competition as its page shows it (server: domain/email_log.py): what to write on the header,
-   and the French names of the kinds. */
+/* The e-mail log of a competition as its page shows it (server: domain/email_log.py): what to write on the header
+   and on each competitor's row, the sends that included a competitor, and the French names of the kinds. */
 import type { Schemas } from "../../../lib/client";
 import { formatDate, formatDateTime, parseDate } from "../../../lib/format";
+import type { Row } from "../competitions";
 
 export type EmailLog = Schemas["CompetitionEmailLog"];
 export type EmailLogEntry = Schemas["EmailLogEntry"];
@@ -40,12 +41,37 @@ function unknownState(view: LogView): ContactState {
   return view.failed ? { kind: "unavailable" } : { kind: "loading" };
 }
 
+/** A recipient or summary item is this competitor: same member, else same address when the row has no member. */
+function isCompetitor(item: { member_id?: number | null; email?: string }, row: Pick<Row, "adherent_id" | "email">): boolean {
+  if (row.adherent_id != null) {
+    return item.member_id === row.adherent_id;
+  }
+  const email = (row.email ?? "").trim().toLowerCase();
+  return !!email && (item.email ?? "").trim().toLowerCase() === email;
+}
+
+export function competitorContact(view: LogView, row: Pick<Row, "adherent_id" | "email">): ContactState {
+  if (!view.log) {
+    return unknownState(view);
+  }
+  const contact = (view.log.summary.competitors ?? []).find((c) => isCompetitor(c, row));
+  if (contact?.last_failed) {
+    return { kind: "failed", at: contact.last_sent_at ?? null };
+  }
+  return contact?.last_sent_at ? { kind: "date", at: contact.last_sent_at } : { kind: "none" };
+}
+
 export function lastSendState(view: LogView): ContactState {
   if (!view.log) {
     return unknownState(view);
   }
   const at = view.log.summary.last_competitor_email_at;
   return at ? { kind: "date", at } : { kind: "none" };
+}
+
+/** The sends that included this competitor, newest first as the log gives them. */
+export function entriesFor(entries: readonly EmailLogEntry[], row: Pick<Row, "adherent_id" | "email">): EmailLogEntry[] {
+  return entries.filter((entry) => (entry.recipients ?? []).some((r) => isCompetitor(r, row)));
 }
 
 export function failedCount(entry: EmailLogEntry): number {
