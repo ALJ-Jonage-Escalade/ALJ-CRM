@@ -55,11 +55,12 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       <b v-else class="block text-[13.5px] whitespace-nowrap" data-testid="participant-name">{{ row.nom }} {{ row.prenom }}</b>
       <span class="block text-[11px] text-slate-500">
         🪪 {{ row.num_licence || "sans licence" }}
+        <template v-if="contact && contact.kind !== 'loading'">
+          ·
+          <LastContact :state="contact" :online="online ?? true" @open="emit('history')" />
+        </template>
         <template v-if="staff && row.commande_helloasso">· 🧾 {{ row.commande_helloasso }}</template>
         <template v-if="staff && row.note_paiement">· 📝 {{ row.note_paiement }}</template>
-      </span>
-      <span v-if="contact" class="block text-[11px]">
-        <LastContact :state="contact" :online="online ?? true" @open="emit('history')" />
       </span>
     </td>
     <td class="px-2.5 py-2 text-center">

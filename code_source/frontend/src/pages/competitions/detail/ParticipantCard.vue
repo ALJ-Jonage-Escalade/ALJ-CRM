@@ -53,11 +53,15 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
         </button>
         <b v-else class="block text-[14.5px]" data-testid="participant-name">{{ row.nom }} {{ row.prenom }}</b>
         <span class="block text-xs text-slate-500">
-          🪪 {{ row.num_licence || "sans licence" }} · {{ row.tarif || "—" }}
+          🪪 {{ row.num_licence || "sans licence" }}
+          <template v-if="contact && contact.kind !== 'loading'">
+            ·
+            <LastContact :state="contact" :online="online ?? true" @open="emit('history')" />
+          </template>
+          · {{ row.tarif || "—" }}
           <template v-if="staff && row.commande_helloasso">· 🧾 {{ row.commande_helloasso }}</template>
           <template v-if="staff && row.note_paiement">· 📝 {{ row.note_paiement }}</template>
         </span>
-        <span v-if="contact" class="block text-xs"><LastContact :state="contact" :online="online ?? true" @open="emit('history')" /></span>
       </span>
       <UiBadge :color="paymentBadge(row.statut_paiement).color" class="shrink-0" data-testid="payment-badge" title="Statut de paiement">
         {{ paymentBadge(row.statut_paiement).label }}

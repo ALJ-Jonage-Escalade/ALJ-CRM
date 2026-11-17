@@ -36,9 +36,8 @@ import {
 import CompetitionActions from "./CompetitionActions.vue";
 import EmailForm from "./EmailForm.vue";
 import EmailHistory from "./EmailHistory.vue";
-import { competitorContact, entriesFor, lastSendState } from "./emailHistory";
+import { competitorContact, entriesFor } from "./emailHistory";
 import { useCompetitionEmailLog } from "./emailLog";
-import LastContact from "./LastContact.vue";
 import { COMPETITIONS_KEY } from "../context";
 import type { QueuedFlag } from "../outbox";
 import AthleteContactDialog from "./AthleteContactDialog.vue";
@@ -327,9 +326,15 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           </template>
           <template v-else>🏃 {{ c.coaches?.length ? `Coachs : ${c.coaches.join(", ")}` : "Aucun coach" }}</template>
         </p>
-        <p class="mt-0.5 text-xs text-slate-500 lg:mt-1.5" data-testid="detail-last-send">
-          ✉️ Dernier envoi aux compétiteurs :
-          <LastContact :state="lastSendState(logView)" :online="online" @open="historyOf = 'all'" />
+        <p class="mt-0.5 text-xs text-slate-500 lg:mt-1.5">
+          <button
+            type="button"
+            data-testid="history-open"
+            class="cursor-pointer font-semibold text-blue-700 hover:underline"
+            @click="historyOf = 'all'"
+          >
+            ✉️ Historique des e-mails
+          </button>
           <span v-if="emailLog.staleSince.value" data-testid="history-stale">
             · 💾 historique du {{ formatDateTime(emailLog.staleSince.value) }}
           </span>
@@ -576,7 +581,11 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       <p v-if="emailLog.staleSince.value" class="mb-2 text-xs text-amber-800">
         💾 Historique du {{ formatDateTime(emailLog.staleSince.value) }} : les envois suivants n'y figurent pas.
       </p>
-      <EmailHistory :entries="historyEntries" />
+      <!-- Never « no e-mail » when the log could not be read: nobody may read « never contacted » -->
+      <p v-if="!logView.log" class="text-[13px] text-slate-500" data-testid="history-unavailable">
+        {{ !logView.failed ? "Chargement…" : online ? "Historique indisponible." : "Historique indisponible hors ligne." }}
+      </p>
+      <EmailHistory v-else :entries="historyEntries" />
     </UiDialog>
 
     <!-- Wide: long tariff names (« Compétition U15 U17 - nés en 2008, … ») stay on one line on a computer -->

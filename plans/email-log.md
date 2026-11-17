@@ -21,13 +21,16 @@ Durable decisions that apply across all phases:
   recipient matches a competitor by member id, else by lower-cased e-mail when the competitor has no member id.
   A competitor's last contact: date of the last `sent`, `failed` when their latest attempt failed, else none.
 - **Route**: `GET /api/competitions/{competition_id}/email-log` → entries (newest first) + summary
-  (`last_competitor_email_at` and one item per competitor). Readonly and above (like the other competition reads),
+  (one item per competitor). Readonly and above (like the other competition reads),
   Firestore-only router, in the route inventory, OpenAPI + generated types regenerated.
 - **Recording**: `record_send` writes once after the send loop and never raises: a store failure is a warning and
   a « not recorded » notice. `POST /api/send-email` answers it as an optional field.
 - **Existing traces unchanged**: attestation sent date, invitation sent date, « all paid » setting.
 - **Offline**: the page caches the last answer per competition; stale notice when shown offline; with no cache,
   « historique indisponible hors ligne », never « — ».
+- **No competition-wide date** (owner decision, after phase 6): the header shows no « Dernier envoi aux
+  compétiteurs » date, only a « ✉️ Historique des e-mails » button; the dates are per competitor. Stories 1 and 12
+  are dropped.
 
 ---
 
@@ -39,9 +42,9 @@ Durable decisions that apply across all phases:
 
 The shared e-mail dispatch records one `email_log` entry per send (`competition_email` with a competition,
 `member_email` without), with the author passed by the route and each recipient's own status. The new read route
-returns a competition's entries and its last `competition_email` date. The competition page fetches it when a
-competition is opened and after a successful send; its header shows « Dernier envoi aux compétiteurs : … », which
-opens a dialog listing the sends newest first (date, kind, author, template / subject, recipient count and failures),
+returns a competition's entries. The competition page fetches it when a competition is opened and after a
+successful send; its header shows « ✉️ Historique des e-mails » (first a « Dernier envoi aux compétiteurs » date,
+removed after phase 6), which opens a dialog listing the sends newest first (date, kind, author, template / subject, recipient count and failures),
 each expandable to its recipients with address and status.
 
 ### Acceptance criteria

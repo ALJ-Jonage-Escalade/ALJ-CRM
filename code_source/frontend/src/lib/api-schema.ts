@@ -2314,11 +2314,6 @@ export interface components {
         /** ContactSummary */
         ContactSummary: {
             /**
-             * Last Competitor Email At
-             * @description Last e-mail to the competitors with at least one sent (internal e-mails left out)
-             */
-            last_competitor_email_at?: string | null;
-            /**
              * Competitors
              * @default []
              */

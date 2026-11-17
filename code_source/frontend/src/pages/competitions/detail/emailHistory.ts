@@ -1,5 +1,5 @@
-/* The e-mail log of a competition as its page shows it (server: domain/email_log.py): what to write on the header
-   and on each competitor's row, the sends that included a competitor, and the French names of the kinds. */
+/* The e-mail log of a competition as its page shows it (server: domain/email_log.py): what to write on each competitor's
+   row, the sends that included a competitor, and the French names of the kinds. */
 import type { Schemas } from "../../../lib/client";
 import { formatDate, formatDateTime, parseDate } from "../../../lib/format";
 import type { Row } from "../competitions";
@@ -59,14 +59,6 @@ export function competitorContact(view: LogView, row: Pick<Row, "adherent_id" | 
     return { kind: "failed", at: contact.last_sent_at ?? null };
   }
   return contact?.last_sent_at ? { kind: "date", at: contact.last_sent_at } : { kind: "none" };
-}
-
-export function lastSendState(view: LogView): ContactState {
-  if (!view.log) {
-    return unknownState(view);
-  }
-  const at = view.log.summary.last_competitor_email_at;
-  return at ? { kind: "date", at } : { kind: "none" };
 }
 
 /** The sends that included this competitor, newest first as the log gives them. */

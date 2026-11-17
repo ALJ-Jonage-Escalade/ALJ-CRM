@@ -1,14 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  competitorContact,
-  entriesFor,
-  failedCount,
-  isInternal,
-  KIND_LABELS,
-  lastSendState,
-  type EmailLog,
-  type EmailLogEntry,
-} from "./emailHistory";
+import { competitorContact, entriesFor, failedCount, isInternal, KIND_LABELS, type EmailLog, type EmailLogEntry } from "./emailHistory";
 
 const recipient = (member_id: number | null, email: string, status: "sent" | "failed" = "sent") => ({
   member_id,
@@ -36,7 +27,6 @@ const log: EmailLog = {
     entry("2026-11-01T09:00:00+00:00", [recipient(1, "ana@example.org"), recipient(null, "Guest@Example.org")]),
   ],
   summary: {
-    last_competitor_email_at: "2026-11-02T09:00:00+00:00",
     competitors: [
       { member_id: 1, email: "ana@example.org", last_sent_at: "2026-11-01T09:00:00+00:00", last_failed: true },
       { member_id: 2, email: "bob@example.org", last_sent_at: "2026-11-02T09:00:00+00:00", last_failed: false },
@@ -62,18 +52,10 @@ describe("competitor contact", () => {
     const row = { adherent_id: 3, email: "cleo@example.org" };
     expect(competitorContact({ log: null, failed: true }, row)).toEqual({ kind: "unavailable" });
     expect(competitorContact({ log: null, failed: false }, row)).toEqual({ kind: "loading" });
-    expect(lastSendState({ log: null, failed: true })).toEqual({ kind: "unavailable" });
   });
 });
 
 describe("history", () => {
-  it("last send to the competitors", () => {
-    expect(lastSendState(loaded)).toEqual({ kind: "date", at: "2026-11-02T09:00:00+00:00" });
-    expect(lastSendState({ log: { entries: [], summary: { last_competitor_email_at: null, competitors: [] } }, failed: false })).toEqual({
-      kind: "none",
-    });
-  });
-
   it("the sends that included one competitor, newest first", () => {
     expect(entriesFor(log.entries, { adherent_id: 1, email: "ana@example.org" }).map((e) => e.at)).toEqual([
       "2026-11-02T09:00:00+00:00",

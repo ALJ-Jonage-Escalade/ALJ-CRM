@@ -6550,18 +6550,6 @@
       },
       "ContactSummary": {
         "properties": {
-          "last_competitor_email_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Competitor Email At",
-            "description": "Last e-mail to the competitors with at least one sent (internal e-mails left out)"
-          },
           "competitors": {
             "items": {
               "$ref": "#/components/schemas/CompetitorLastContact"

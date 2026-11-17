@@ -60,7 +60,6 @@ class CompetitorContact(TypedDict):
 
 
 class ContactSummary(TypedDict):
-    last_competitor_email_at: Optional[str]  # last competitor e-mail of the competition with at least one sent
     competitors: List[CompetitorContact]
 
 
@@ -72,10 +71,8 @@ def recipient_is(recipient: LoggedRecipient, competitor: Competitor) -> bool:
 
 
 def contact_summary(entries: Iterable[EmailLogEntry], competitors: Sequence[Competitor]) -> ContactSummary:
-    """Last competitor e-mail of a competition (its entries) and each competitor's last contact."""
+    """Each competitor's last contact, from the entries of their competition."""
     to_competitors = sorted((entry for entry in entries if entry["kind"] == COMPETITOR_KIND), key=lambda entry: entry["at"])
-    last_at = next((entry["at"] for entry in reversed(to_competitors)
-                    if any(recipient["status"] == "sent" for recipient in entry["recipients"])), None)
     contacts: List[CompetitorContact] = []
     for competitor in competitors:
         last_sent_at: Optional[str] = None
@@ -88,7 +85,7 @@ def contact_summary(entries: Iterable[EmailLogEntry], competitors: Sequence[Comp
                         last_sent_at = entry["at"]
         contacts.append(CompetitorContact(member_id=competitor["member_id"], email=competitor["email"],
                                           last_sent_at=last_sent_at, last_failed=last_failed))
-    return ContactSummary(last_competitor_email_at=last_at, competitors=contacts)
+    return ContactSummary(competitors=contacts)
 
 
 def member_ids_of(recipients: Iterable[LoggedRecipient]) -> List[int]:

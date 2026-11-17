@@ -36,8 +36,6 @@ class CompetitorLastContact(BaseModel):
 
 
 class ContactSummary(BaseModel):
-    last_competitor_email_at: Optional[str] = Field(
-        None, description="Last e-mail to the competitors with at least one sent (internal e-mails left out)")
     competitors: List[CompetitorLastContact] = []
 
 

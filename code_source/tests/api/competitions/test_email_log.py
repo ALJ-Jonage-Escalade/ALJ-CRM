@@ -24,7 +24,6 @@ class TestCompetitionEmailLog(ApiTestCase):
         by_kind = {e["kind"]: e for e in body["entries"]}
         self.assertEqual(set(by_kind), {"competition_all_paid", "competition_email"})
         sent_at = by_kind["competition_email"]["at"]
-        self.assertEqual(body["summary"]["last_competitor_email_at"], sent_at)
         self.assertEqual(body["summary"]["competitors"],
                          [{"member_id": 3, "email": "ana@example.org", "last_sent_at": sent_at, "last_failed": False}])
 

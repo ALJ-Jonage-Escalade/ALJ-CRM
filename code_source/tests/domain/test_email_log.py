@@ -1,4 +1,4 @@
-"""Contact summary of a competition: last e-mail to its competitors, and each competitor's last contact."""
+"""Contact summary of a competition: each competitor's last contact."""
 
 from __future__ import annotations
 
@@ -51,26 +51,13 @@ def entry(at: str, *recipients: LoggedRecipient, kind: EmailKind = "competition_
                  Competitor(member_id=1, email="parent@example.org"), None, True, id="the sibling whose e-mail failed"),
     pytest.param([entry("2026-11-01", recipient(1, "a@x.org"), kind="competition_all_paid")], ALICE, None, False,
                  id="internal kind ignored"),
+    pytest.param([entry("2026-11-01", recipient(1, "a@x.org"), kind="results_batch", competition_ids=[7, 8])], ALICE, None, False,
+                 id="results batch covering several competitions ignored"),
 ])
 def test_competitor_contact(entries, competitor, last_sent_at, last_failed):
     (contact,) = contact_summary(entries, [competitor])["competitors"]
     assert (contact["member_id"], contact["email"]) == (competitor["member_id"], competitor["email"])
     assert (contact["last_sent_at"], contact["last_failed"]) == (last_sent_at, last_failed)
-
-
-@pytest.mark.parametrize("entries, last_at", [
-    pytest.param([], None, id="no e-mail"),
-    pytest.param([entry("2026-11-01", recipient(1, "a@x.org")), entry("2026-11-03", recipient(2, "b@x.org"))], "2026-11-03",
-                 id="latest send"),
-    pytest.param([entry("2026-11-01", recipient(1, "a@x.org")), entry("2026-11-03", recipient(1, "a@x.org", "failed"))],
-                 "2026-11-01", id="a send where every e-mail failed does not count"),
-    pytest.param([entry("2026-11-01", recipient(1, "a@x.org")),
-                  entry("2026-11-04", recipient(None, "club@alj.example"), kind="competition_all_paid"),
-                  entry("2026-11-05", recipient(None, "club@alj.example"), kind="results_batch", competition_ids=[7, 8])],
-                 "2026-11-01", id="internal e-mails left out, one results batch covering several competitions included"),
-])
-def test_last_competitor_email(entries, last_at):
-    assert contact_summary(entries, [ALICE])["last_competitor_email_at"] == last_at
 
 
 def test_member_ids_each_once():
