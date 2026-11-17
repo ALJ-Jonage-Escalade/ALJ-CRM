@@ -31,7 +31,7 @@ cssselect2==0.10.1
     # via weasyprint
 et-xmlfile==2.0.0
     # via openpyxl
-fastapi==0.162.4
+fastapi==0.162.7
     # via alj-escalade-manager
 fonttools==4.68.0
     # via weasyprint
