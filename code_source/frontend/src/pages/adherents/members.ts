@@ -53,10 +53,19 @@ export function isWaiting(raw: string, label: string = raw): boolean {
 }
 
 const SECTIONS = ["Collège", "Enfants", "Perfectionnement", "Compétition"] as const;
+type Section = (typeof SECTIONS)[number];
+
+/** The keyword that puts a slot group in its section, checked in this order (« Compétition » before the others). */
+const SECTION_KEYWORDS: readonly [string, Section][] = [
+  ["competition", "Compétition"],
+  ["college", "Collège"],
+  ["enfants", "Enfants"],
+  ["perfectionnement", "Perfectionnement"],
+];
 
 /** Lines of the slot filter: groups outside the sections first, then each section (Enfants by birth years). */
 export function creneauItems(creneaux: readonly Creneau[]): CreneauItem[] {
-  const lists: Record<Exclude<(typeof SECTIONS)[number], "Enfants">, [string, string][]> = {
+  const lists: Record<Exclude<Section, "Enfants">, [string, string][]> = {
     Collège: [],
     Perfectionnement: [],
     Compétition: [],
@@ -64,21 +73,18 @@ export function creneauItems(creneaux: readonly Creneau[]): CreneauItem[] {
   const children: Record<string, [string, string][]> = {};
   const others: [string, string][] = [];
 
-  for (const c of creneaux) {
-    const name = c.groupe;
-    const n = normKey(name);
-    if (n.includes("competition")) {
-      lists["Compétition"].push([name, shortenGroupLabel(name, "competition")]);
-    } else if (n.includes("college")) {
-      lists["Collège"].push([name, shortenGroupLabel(name, "college")]);
-    } else if (n.includes("enfants")) {
-      const years = n.match(/20\d\d\s*-\s*20\d\d/);
-      const sub = years ? years[0].replace(/\s/g, "") : "Autres tranches";
-      (children[sub] ??= []).push([name, shortenGroupLabel(name, "enfants", ["20\\d\\d\\s*-\\s*20\\d\\d"])]);
-    } else if (n.includes("perfectionnement")) {
-      lists.Perfectionnement.push([name, shortenGroupLabel(name, "perfectionnement")]);
-    } else {
+  for (const creneau of creneaux) {
+    const name = creneau.groupe;
+    const key = normKey(name);
+    const [keyword, section] = SECTION_KEYWORDS.find(([word]) => key.includes(word)) ?? [];
+    if (!keyword || !section) {
       others.push([name, name]);
+    } else if (section === "Enfants") {
+      const years = key.match(/20\d\d\s*-\s*20\d\d/);
+      const ageBand = years ? years[0].replace(/\s/g, "") : "Autres tranches";
+      (children[ageBand] ??= []).push([name, shortenGroupLabel(name, keyword, ["20\\d\\d\\s*-\\s*20\\d\\d"])]);
+    } else {
+      lists[section].push([name, shortenGroupLabel(name, keyword)]);
     }
   }
 
@@ -90,7 +96,7 @@ export function creneauItems(creneaux: readonly Creneau[]): CreneauItem[] {
   const items: CreneauItem[] = groups(others);
   for (const section of SECTIONS) {
     if (section === "Enfants") {
-      const subs = Object.keys(children).sort();
+      const subs = Object.keys(children).sort((left, right) => left.localeCompare(right, "fr"));
       if (!subs.length) {
         continue;
       }

@@ -79,9 +79,12 @@ export function createApiClient(api: ApiFetch, baseUrl: string = location.origin
   });
 }
 
+/** What a typed client call resolves to: the body of a success or of a refusal, and the response. */
+export type ApiCall<T> = Promise<{ data?: T; error?: unknown; response: Response }>;
+
 /** The body of a success; throws an ApiError for a refusal, a server error or a network failure. */
-export async function unwrap<T>(call: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
-  let result: { data?: T; error?: unknown; response: Response };
+export async function unwrap<T>(call: ApiCall<T>): Promise<T> {
+  let result: Awaited<ApiCall<T>>;
   try {
     result = await call;
   } catch (e) {

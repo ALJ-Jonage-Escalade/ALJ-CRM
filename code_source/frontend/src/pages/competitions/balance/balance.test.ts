@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceCsv, balanceLabel, balances, searchBalances, seasons, totals } from "./balance";
+import { balanceCsv, balanceLabel, balances, searchBalances, totals } from "./balance";
 import type { Competition } from "../competitions";
 
 const TODAY = "2026-11-15";
@@ -36,10 +36,6 @@ const LIST: Competition[] = [
 ];
 
 describe("balance", () => {
-  it("lists the seasons with competitions and the current one", () => {
-    expect(seasons(LIST, TODAY)).toEqual(["2026-2027", "2025-2026"]);
-  });
-
   it("adds up what is due and paid, a carried-over payment as a credit, a lost one balanced", () => {
     const list = balances(LIST, "2026-2027", TODAY);
     expect(list.map((b) => [b.nom, b.due, b.paid, b.remaining])).toEqual([

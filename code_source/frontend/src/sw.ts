@@ -9,6 +9,7 @@
 import { clientsClaim } from "workbox-core";
 import { cleanupOutdatedCaches, matchPrecache, precacheAndRoute } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
+import type { RouteHandlerCallbackOptions } from "workbox-core/types";
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -23,7 +24,7 @@ const APP_PAGES = [/^\/$/, /^\/competitions(\/|$)/, /^\/index$/, /^\/bureau(\/|$
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
-async function networkThenEntryPage({ request }: { request: Request }): Promise<Response> {
+async function networkThenEntryPage({ request }: RouteHandlerCallbackOptions): Promise<Response> {
   try {
     return await fetch(request);
   } catch {

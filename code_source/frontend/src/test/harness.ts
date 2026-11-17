@@ -5,7 +5,7 @@ import { vi } from "vitest";
 import { isRef, ref, type Ref } from "vue";
 import { AUTH_KEY, type Auth, type AuthState } from "../composables/auth";
 import { API_KEY, type ApiFetch } from "../lib/api";
-import { CLIENT_KEY, createApiClient } from "../lib/client";
+import { CLIENT_KEY, createApiClient, type ApiClient } from "../lib/client";
 
 /** Base URL of the fake API client. */
 export const TEST_ORIGIN = "http://alj.test";
@@ -55,4 +55,24 @@ export async function settle(maxRounds = 100): Promise<void> {
   } finally {
     globalThis.setImmediate = original;
   }
+}
+
+/** A request the fake API received: method, path with its query, and JSON body (undefined without one). */
+export interface SentRequest {
+  method: string;
+  path: string;
+  body: unknown;
+}
+
+/** A typed client over a fake API that records each request and answers `answer` (a fresh copy each time), for the
+    tests of the services: what each method sends. */
+export function recordingClient(answer: unknown = {}): { client: ApiClient; sent: SentRequest[] } {
+  const sent: SentRequest[] = [];
+  const api: ApiFetch = (url, init) => {
+    const { pathname, search } = new URL(url);
+    const text = typeof init?.body === "string" ? init.body : "";
+    sent.push({ method: init?.method ?? "GET", path: decodeURIComponent(pathname + search), body: text ? JSON.parse(text) : undefined });
+    return Promise.resolve(json(answer));
+  };
+  return { client: createApiClient(api, TEST_ORIGIN), sent };
 }
