@@ -46,7 +46,7 @@ from infrastructure.firestore.cloud_sync.rest_store import RestStore  # noqa: E4
 # Any in this script: fields and ids as read from Firestore documents, which RestStore does not type
 CONTACTS = collection_for("emergency_contacts")
 MAX_ATTEMPTS = 5
-GCLOUD_TOKEN_LIFETIME = 45 * 60  # seconds; gcloud's access tokens last 1 hour
+GCLOUD_TOKEN_LIFETIME = 5 * 60  # seconds; gcloud hands back its cached token, which may have far less than its hour left
 
 
 class GcloudToken:
@@ -91,10 +91,10 @@ def order_refs_by_user(store: RestStore) -> Dict[Any, str]:
     """{user id -> order refs}, from crm_purchases and crm_orders (crm_users holds no order ref)."""
     orders = {d["fields"].get("id"): d["fields"].get("order_ref") for d in store.list_all(collection_for("orders")) if not d["deleted"]}
     refs: Dict[Any, List[str]] = {}
-    for d in store.list_all(collection_for("purchases")):
-        ref = orders.get(d["fields"].get("order_id"))
-        if ref and not d["deleted"]:
-            refs.setdefault(d["fields"].get("user_id"), []).append(str(ref))
+    for purchase in store.list_all(collection_for("purchases")):
+        ref = orders.get(purchase["fields"].get("order_id"))
+        if ref and not purchase["deleted"]:
+            refs.setdefault(purchase["fields"].get("user_id"), []).append(str(ref))
     return {user_id: ", ".join(values) for user_id, values in refs.items()}
 
 
@@ -142,13 +142,14 @@ def migrate(store: RestStore, apply: bool, report: Report) -> None:
             continue
         fields = doc["fields"]
         user_id = fields.get("id")
-        wanted = missing_contacts([], old_rows(fields))
+        rows = old_rows(fields)
+        wanted = missing_contacts([], rows)
         if user_id in owners:
             report.skipped += 1
             if live.get(user_id, []) != wanted:
                 different.append(user_id)
             continue
-        cleaned = clean_contacts(old_rows(fields))
+        cleaned = clean_contacts(rows)
         report.duplicates += len(cleaned) - len(wanted)
         report.by_count[len(wanted)] += 1
         if cleaned and not str(fields.get("emergency1_name") or "").strip() and not str(fields.get("emergency1_phone") or "").strip():

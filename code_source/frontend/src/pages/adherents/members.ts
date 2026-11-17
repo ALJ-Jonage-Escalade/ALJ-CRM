@@ -355,7 +355,7 @@ export function countSummary(shown: number, total: number, season: string): stri
 
 // ---------------------------------------------------------------- CSV export
 
-const CSV_HEADERS = [
+const CSV_HEADERS_BEFORE_CONTACTS = [
   "Nom",
   "Prénom",
   "Date de naissance",
@@ -383,7 +383,7 @@ export function csvRows(members: readonly Member[]): Cell[][] {
   const contactColumns = Array.from({ length: Math.max(2, ...contactsOf.map((contacts) => contacts.length)) }, (_, position) => position);
   return [
     [
-      ...CSV_HEADERS,
+      ...CSV_HEADERS_BEFORE_CONTACTS,
       ...contactColumns.flatMap((position) => [`Urgence ${position + 1} - Nom`, `Urgence ${position + 1} - Tél`]),
       ...CSV_HEADERS_AFTER_CONTACTS,
     ],
