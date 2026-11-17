@@ -3,7 +3,8 @@
 Membership management for the climbing section of the Amicale Laïque de Jonage: a web app (FastAPI + PWA) on
 Google Cloud Run, with data in Firestore. (The former Windows desktop client was removed; see
 `documentations/desktop_features_missing_in_web.md`.)
-User docs: `README.md` · Architecture: `documentations/ARCHITECTURE.md` · Local dev stack: `code_source/dev/README.md`.
+User docs: `README.md` · Architecture: `documentations/ARCHITECTURE.md` (§2: what each folder holds and where new
+code goes; read it before adding a module) · Local dev stack: `code_source/dev/README.md`.
 Python conventions (lint, typing, tests): `code_source/AGENTS.md`.
 Frontend: a Vue 3 app in `code_source/frontend/` (plan: `plans/vue-responsive-frontend.md`,
 decisions: `documentations/plan_frontend_vue.md`); every screen is in it. `code_source/web/` only keeps the PWA manifest and logo.
