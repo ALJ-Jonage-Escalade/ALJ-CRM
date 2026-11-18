@@ -2,7 +2,8 @@
 
 Two variants, chosen by the presence screen:
 - "autonome": every autonomous group in one table, with the badge, bloc and orange passport columns, an
-  « Autorisation » column, and the authorised minors of other groups added (domain/members/presence_rules.py);
+  « Autorisation » column, and the members of AUTONOMOUS_EXTRA_TARIFS and the authorised minors of other
+  groups added (domain/members/presence_rules.py);
 - "cours": one table per course, without the badge columns; either one file per course or every table
   stacked in a single sheet (`same_sheet`), each starting on a new printed page.
 """
@@ -27,7 +28,7 @@ from openpyxl.worksheet.pagebreak import Break
 from openpyxl.worksheet.properties import PageSetupProperties
 from openpyxl.worksheet.worksheet import Worksheet
 
-from domain.members.presence_rules import MemberRow, authorized_minors, member_identity_key, members_with_tarifs
+from domain.members.presence_rules import AUTONOMOUS_EXTRA_TARIFS, MemberRow, authorized_minors, member_identity_key, members_with_tarifs
 from exports.spreadsheet_safety import neutralize_formulas, template_formulas
 from infrastructure.qrcodes import find_group_qrcode, get_group_qrcode
 from paths import template_path
@@ -263,7 +264,7 @@ def sheet_groups(
     today: datetime.date,
 ) -> list[SheetGroup]:
     """The tables to print, members sorted by first name. "autonome" merges every group into one table and
-    adds the authorised minors of the other groups."""
+    adds the members of AUTONOMOUS_EXTRA_TARIFS and the authorised minors of the other groups."""
     covered_tarifs = {tarif for name in selected_groups for tarif in VIRTUAL_GROUP_TARIFS.get(name, ())}
     names = [name for name in selected_groups if name not in covered_tarifs]
     if not names:
@@ -273,7 +274,7 @@ def sheet_groups(
         if len(merged_name) > 80:
             merged_name = "Groupes Fusionnés"
         own = [member for name in names for member in group_members(name, members, group_tarifs)]
-        listed = own + authorized_minors(members, today)
+        listed = own + members_with_tarifs(members, AUTONOMOUS_EXTRA_TARIFS) + authorized_minors(members, today)
         groups = [SheetGroup(
             name=merged_name if len(names) > 1 else names[0],
             members=_unique_by_identity(listed),

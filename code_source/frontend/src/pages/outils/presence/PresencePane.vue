@@ -100,7 +100,8 @@ const label = "mb-0.5 block text-[11.5px] font-semibold text-slate-500";
         <p class="mb-3 text-[13px] text-slate-500">
           Fusionne l'ensemble des créneaux autonomes en
           <b>un seul tableau Excel</b>
-          . Intègre automatiquement les jeunes mineurs avec autorisation parentale (Autonomes / Famille) issus des autres cours.
+          . Intègre automatiquement les inscrits « Perfectionnement U19 Adulte » et les jeunes mineurs avec autorisation parentale
+          (Autonomes / Famille) issus des autres cours.
         </p>
         <div
           data-testid="presence-autonomous-summary"
