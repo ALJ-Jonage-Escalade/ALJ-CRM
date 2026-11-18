@@ -86,7 +86,15 @@ jobs:
       run: npm ci --no-fund
 
     - name: Audit runtime dependencies (npm audit)
-      run: npm audit --omit=dev --audit-level=high
+      # TEMPORARY (added 2026-11-18): GHSA-fc5q-39xc-vjpf (picomatch ReDoS) has no patched release;
+      # it reaches "runtime" only via vue-router's build-time plugin deps, never the browser bundle.
+      # Remove the exclusion once picomatch > 4.0.7 is out.
+      run: |
+        npm audit --omit=dev --json > "$RUNNER_TEMP/audit.json" || true
+        jq -e '[.vulnerabilities[].via[] | objects
+                | select(.severity == "high" or .severity == "critical")
+                | select(.url | endswith("GHSA-fc5q-39xc-vjpf") | not)] | length == 0' "$RUNNER_TEMP/audit.json" \
+          || { npm audit --omit=dev --audit-level=high; exit 1; }
 
     - name: Audit dev dependencies (npm audit, informational)
       # Build and test tools only: reported here, fixed through Dependabot, does not block
