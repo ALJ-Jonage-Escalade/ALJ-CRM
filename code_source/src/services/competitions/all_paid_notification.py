@@ -27,7 +27,7 @@ def notified_setting_key(competition_id: int) -> str:
     return f"COMP_ALL_PAID_NOTIFIED_{competition_id}"
 
 
-def check_and_notify_all_paid(competition_id: int, author: str = SYSTEM_AUTHOR) -> bool:
+def check_and_notify_all_paid(competition_id: int) -> bool:
     """Sends the club the summary e-mail once every selected competitor of the competition has paid, once:
     the setting COMP_ALL_PAID_NOTIFIED_<id> records the send, and is cleared as soon as one of them has not paid
     (so a later full payment notifies again). Returns whether the e-mail was sent now."""
@@ -64,10 +64,10 @@ def check_and_notify_all_paid(competition_id: int, author: str = SYSTEM_AUTHOR) 
         )
     except MailError:  # the payments are recorded; the e-mail is tried again on the next notification
         logger.exception("[WEBHOOK_HELLOASSO] E-mail 'Tous les paiements validés' non envoyé à %s", recipient)
-        record_send("competition_all_paid", author, [logged_recipient(recipient, error=SEND_FAILED)], subject,
+        record_send("competition_all_paid", SYSTEM_AUTHOR, [logged_recipient(recipient, error=SEND_FAILED)], subject,
                     competition_ids=[competition_id])
         return False
-    record_send("competition_all_paid", author, [logged_recipient(recipient)], subject, competition_ids=[competition_id])
+    record_send("competition_all_paid", SYSTEM_AUTHOR, [logged_recipient(recipient)], subject, competition_ids=[competition_id])
     AppSettingsRepository.save(setting_key, datetime.datetime.now().isoformat(timespec="seconds"))
     logger.info("[WEBHOOK_HELLOASSO] E-mail 'Tous les paiements validés' envoyé à %s pour « %s »", recipient, competition_name)
     return True

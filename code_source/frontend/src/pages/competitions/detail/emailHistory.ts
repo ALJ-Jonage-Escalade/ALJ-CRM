@@ -29,7 +29,7 @@ export function isInternal(kind: Kind): boolean {
  * - loading: nothing known yet, nothing shown.
  */
 export type ContactState =
-  { kind: "date"; at: string } | { kind: "failed"; at: string | null } | { kind: "none" } | { kind: "unavailable" } | { kind: "loading" };
+  { kind: "date"; at: string } | { kind: "failed" } | { kind: "none" } | { kind: "unavailable" } | { kind: "loading" };
 
 /** The log of the page: the answer (or its copy), and whether reading it failed with nothing to show. */
 export interface LogView {
@@ -56,7 +56,7 @@ export function competitorContact(view: LogView, row: Pick<Row, "adherent_id" | 
   }
   const contact = (view.log.summary.competitors ?? []).find((c) => isCompetitor(c, row));
   if (contact?.last_failed) {
-    return { kind: "failed", at: contact.last_sent_at ?? null };
+    return { kind: "failed" };
   }
   return contact?.last_sent_at ? { kind: "date", at: contact.last_sent_at } : { kind: "none" };
 }

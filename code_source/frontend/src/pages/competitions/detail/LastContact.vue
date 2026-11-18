@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* A last-contact date (the competition's header, a competitor's row): opens the e-mail history when there is one. */
+/* A competitor's last-contact date (their row or card): opens the e-mail history when there is one. */
 import { dayOf, type ContactState } from "./emailHistory";
 
 defineProps<{ state: ContactState; online: boolean }>();

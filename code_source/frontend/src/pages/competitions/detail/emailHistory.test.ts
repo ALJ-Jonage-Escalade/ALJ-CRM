@@ -39,7 +39,7 @@ const loaded = { log, failed: false };
 
 describe("competitor contact", () => {
   it.each([
-    ["last send failed", { adherent_id: 1, email: "ana@example.org" }, { kind: "failed", at: "2026-11-01T09:00:00+00:00" }],
+    ["last send failed", { adherent_id: 1, email: "ana@example.org" }, { kind: "failed" }],
     ["sent", { adherent_id: 2, email: "x@example.org" }, { kind: "date", at: "2026-11-02T09:00:00+00:00" }],
     ["never e-mailed", { adherent_id: 3, email: "cleo@example.org" }, { kind: "none" }],
     ["no member id: by address", { adherent_id: null, email: "GUEST@example.org" }, { kind: "date", at: "2026-11-01T09:00:00+00:00" }],
