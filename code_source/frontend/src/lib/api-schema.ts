@@ -2747,7 +2747,8 @@ export interface components {
         };
         /**
          * FfmeStats
-         * @description Members of the season in the federal CSV export. ignored_details: the first 20 rows left out, with the reason.
+         * @description Members of the season in the federal CSV export. ignored_details: the first 20 rows left out, with the reason;
+         *     to_check_details: the first 20 values exported empty (country or nationality not recognised on a renewal).
          */
         FfmeStats: {
             /**
@@ -2771,6 +2772,8 @@ export interface components {
             new_licences_count: number;
             /** Ignored Details */
             ignored_details: string[];
+            /** To Check Details */
+            to_check_details: string[];
         };
         /** GoogleChecks */
         GoogleChecks: {
@@ -3450,6 +3453,16 @@ export interface components {
             zip_code: string;
             /** City */
             city: string;
+            /**
+             * Country
+             * @description As stored (HelloAsso free text or a choice of the form)
+             */
+            country: string;
+            /**
+             * Nationality
+             * @description As stored (HelloAsso free text or a choice of the form)
+             */
+            nationality: string;
             /** Phone */
             phone: string;
             /** Email Primary */
@@ -3564,6 +3577,10 @@ export interface components {
             zip_code?: string | null;
             /** City */
             city?: string | null;
+            /** Country */
+            country?: ("" | "France" | "Afrique du Sud" | "Algérie" | "Allemagne" | "Andorre" | "Argentine" | "Australie" | "Autriche" | "Belgique" | "Brésil" | "Bulgarie" | "Canada" | "Chili" | "Chine" | "Côte d'Ivoire" | "Croatie" | "Danemark" | "Espagne" | "États-Unis" | "Finlande" | "Grèce" | "Hongrie" | "Inde" | "Irlande" | "Italie" | "Japon" | "Luxembourg" | "Maroc" | "Mexique" | "Monaco" | "Norvège" | "Nouvelle-Zélande" | "Pays-Bas" | "Pologne" | "Portugal" | "Roumanie" | "Royaume-Uni" | "Russie" | "Sénégal" | "Suède" | "Suisse" | "Tchéquie" | "Tunisie" | "Turquie" | "Ukraine" | "Vietnam") | null;
+            /** Nationality */
+            nationality?: ("" | "Française" | "Sud-africaine" | "Algérienne" | "Allemande" | "Andorrane" | "Argentine" | "Australienne" | "Autrichienne" | "Belge" | "Brésilienne" | "Bulgare" | "Canadienne" | "Chilienne" | "Chinoise" | "Ivoirienne" | "Croate" | "Danoise" | "Espagnole" | "Américaine" | "Finlandaise" | "Grecque" | "Hongroise" | "Indienne" | "Irlandaise" | "Italienne" | "Japonaise" | "Luxembourgeoise" | "Marocaine" | "Mexicaine" | "Monégasque" | "Norvégienne" | "Néo-zélandaise" | "Néerlandaise" | "Polonaise" | "Portugaise" | "Roumaine" | "Britannique" | "Russe" | "Sénégalaise" | "Suédoise" | "Suisse" | "Tchèque" | "Tunisienne" | "Turque" | "Ukrainienne" | "Vietnamienne") | null;
             /**
              * Emergency Contacts
              * @description Replaces the whole list, in this order; [] removes every contact
@@ -3943,6 +3960,18 @@ export interface components {
              * @default
              */
             city?: string;
+            /**
+             * Country
+             * @default France
+             * @enum {string}
+             */
+            country?: "" | "France" | "Afrique du Sud" | "Algérie" | "Allemagne" | "Andorre" | "Argentine" | "Australie" | "Autriche" | "Belgique" | "Brésil" | "Bulgarie" | "Canada" | "Chili" | "Chine" | "Côte d'Ivoire" | "Croatie" | "Danemark" | "Espagne" | "États-Unis" | "Finlande" | "Grèce" | "Hongrie" | "Inde" | "Irlande" | "Italie" | "Japon" | "Luxembourg" | "Maroc" | "Mexique" | "Monaco" | "Norvège" | "Nouvelle-Zélande" | "Pays-Bas" | "Pologne" | "Portugal" | "Roumanie" | "Royaume-Uni" | "Russie" | "Sénégal" | "Suède" | "Suisse" | "Tchéquie" | "Tunisie" | "Turquie" | "Ukraine" | "Vietnam";
+            /**
+             * Nationality
+             * @default
+             * @enum {string}
+             */
+            nationality?: "" | "Française" | "Sud-africaine" | "Algérienne" | "Allemande" | "Andorrane" | "Argentine" | "Australienne" | "Autrichienne" | "Belge" | "Brésilienne" | "Bulgare" | "Canadienne" | "Chilienne" | "Chinoise" | "Ivoirienne" | "Croate" | "Danoise" | "Espagnole" | "Américaine" | "Finlandaise" | "Grecque" | "Hongroise" | "Indienne" | "Irlandaise" | "Italienne" | "Japonaise" | "Luxembourgeoise" | "Marocaine" | "Mexicaine" | "Monégasque" | "Norvégienne" | "Néo-zélandaise" | "Néerlandaise" | "Polonaise" | "Portugaise" | "Roumaine" | "Britannique" | "Russe" | "Sénégalaise" | "Suédoise" | "Suisse" | "Tchèque" | "Tunisienne" | "Turque" | "Ukrainienne" | "Vietnamienne";
             /**
              * Emergency Contacts
              * @description In order, the first one is the main one

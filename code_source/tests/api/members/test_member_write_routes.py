@@ -68,6 +68,8 @@ class TestMemberWriteRoutes(unittest.TestCase):
                     "address": "15 rue des Alpes",
                     "zip_code": "69330",
                     "city": "Jonage",
+                    "country": "Belgique",
+                    "nationality": "Belge",
                     "emergency_contacts": [{"name": "VALENTIN Marc", "phone": "06 99 88 77 66"}],
                     "commentaires_correctif": "Inscription manuelle web bureau"
                 }
@@ -93,6 +95,7 @@ class TestMemberWriteRoutes(unittest.TestCase):
             self.assertEqual(u["address"], "15 rue des Alpes")
             self.assertEqual(u["zip_code"], "69330")
             self.assertEqual(u["city"], "Jonage")
+            self.assertEqual((u["country"], u["nationality"]), ("Belgique", "Belge"))
 
             contact = conn.execute("SELECT name, phone FROM emergency_contacts WHERE user_id = ?", (u["id"],)).fetchone()
             self.assertEqual(tuple(contact), ("VALENTIN Marc", "06 99 88 77 66"))
@@ -123,6 +126,18 @@ class TestMemberWriteRoutes(unittest.TestCase):
                        {"last_name": "DUPONT", "first_name": "Jean", "birth_date": "2000-01-01"}):  # tarif manquant
             with self.subTest(fields=fields), self.assertRaises(InvalidRequest):
                 MemberService.add_member(fields)
+
+    def test_member_country_and_nationality_are_choices_of_the_form(self):
+        """Pays et nationalité : un choix du formulaire (domain/members/countries.py) ou vide, jamais un texte libre."""
+        from pydantic import ValidationError
+
+        from api.members.schemas import MemberChanges, NewMember
+
+        self.assertEqual(MemberChanges(country="", nationality="Française").nationality, "Française")
+        self.assertEqual(NewMember().country, "France")
+        for fields in ({"country": "Fràce"}, {"nationality": "Francaise"}, {"country": "Française"}):
+            with self.subTest(fields=fields), self.assertRaises(ValidationError):
+                MemberChanges(**fields)
 
     def test_member_update_requires_admin_role(self):
         """L'endpoint /api/members/update exige le rôle admin."""
@@ -171,6 +186,8 @@ class TestMemberWriteRoutes(unittest.TestCase):
                     "address": "12 chemin du Moulin",
                     "zip_code": "69330",
                     "city": "Jonage",
+                    "country": "Suisse",
+                    "nationality": "Suisse",
                     "badge_rouge": "Oui",
                     "autonomie_bloc": "Oui",
                     "email_primary": "luc.bernard@nouveau.fr",
@@ -197,6 +214,7 @@ class TestMemberWriteRoutes(unittest.TestCase):
             self.assertEqual(u["email_primary"], "luc.bernard@nouveau.fr")
             self.assertEqual(u["email_secondary"], "parent.luc@example.com")
             self.assertEqual(u["phone"], "06 99 88 77 66")
+            self.assertEqual((u["country"], u["nationality"]), ("Suisse", "Suisse"))
 
             # Vérification dans la table purchases (créneau & statut & commentaire)
             p = conn.execute("SELECT * FROM purchases WHERE id = 70").fetchone()

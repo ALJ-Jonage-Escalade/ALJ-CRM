@@ -3,6 +3,8 @@
 The expected rows were produced by the export before its refactoring (desloppify batch 6) and follow the club's
 reference format; tests/exports/test_ffme_golden_master.py still compares real data, on a workstation only.
 A change here changes the file sent to the FFME: renew the expected rows only with the club's approval.
+Renewed for issue #117 (ISO country and nationality codes): Lovegood's country Irlande gives IE (was IR, Iran),
+Weasley's nationality Suédoise gives SE (was empty: the accent defeated the old text test).
 """
 
 from __future__ import annotations
@@ -47,24 +49,42 @@ MEMBERS = [
      "status": "Validé", "order_ref": "CMD-9"},
     {"last_name": "Jedusor", "first_name": "Tom", "birth_date": "31/12/1926", "sex": "M", "tarif_name": "Adulte", "amount": 150.0,
      "status": "Annulé", "order_ref": "CMD-10"},
+    # Country spelled out: its ISO code, not its first two letters nor « FR » for the « fr » of « Afrique ».
+    # Not France, so the postal code and phone are kept as given
+    {"last_name": "Delacour", "first_name": "Fleur", "licence_ffme": "", "birth_date": "30/07/1981", "sex": "F",
+     "nationality": "Sud-africaine", "country": "Afrique du Sud", "address": "1 Long Street", "zip_code": "8001",
+     "city": "Le Cap", "phone": "+27 21 123 4567", "email_primary": "fleur@beauxbatons.example",
+     "tarif_name": "Adulte", "amount": 150.0, "status": "Validé", "order_ref": "CMD-12"},
+    # Nationality not recognised on a first licence: left out (never guessed)
+    {"last_name": "Krum", "first_name": "Viktor", "licence_ffme": "", "birth_date": "01/01/1976", "sex": "M",
+     "nationality": "Durmstrang", "country": "Bulgarie", "tarif_name": "Adulte", "amount": 150.0, "status": "Validé",
+     "order_ref": "CMD-13"},
+    # Country not recognised on a renewal: exported empty and listed to check
+    {"last_name": "Chang", "first_name": "Cho", "licence_ffme": "445566", "birth_date": "07/04/1979", "sex": "F",
+     "nationality": "Britannique", "country": "Écosse", "phone": "0131 496 0000",
+     "tarif_name": "Adulte", "amount": 150.0, "status": "Validé", "order_ref": "CMD-14"},
     # Unknown names, no sex but a renewal
     {"last_name": "", "first_name": None, "licence_ffme": 98765, "birth_date": "02/05/2009", "sex": None,
      "tarif_name": "Adulte", "amount": 150.0, "status": "Validé", "order_ref": "CMD-11"},
 ]
 
 EXPECTED_ROWS = [
+    '445566;CHANG;Cho;07/04/1979;F;GB;;;;;;;01314960000;;;;;;;;;;A;RC;NON;NON;NON;NON;NON;NON',
+    ';DELACOUR;Fleur;30/07/1981;F;ZA;1 Long Street;;8001;LE CAP;ZA;;27211234567;fleur@beauxbatons.example;;;;;;;;;A;RC;NON;NON;NON;NON;NON;NON',
     ';GRANGER;Hermione;19/09/1979;F;FR;ADRESSE NON COMMUNIQUEE;;69330;JONAGE;FR;;0612345678;parent.granger@example.org;;DUMBLEDORE;;;;;;;A;B+;NON;NON;NON;NON;NON;NON',
     '98765;INCONNU;INCONNU;02/05/2009;;FR;;;;;FR;;;;;;;;;;;;A;RC;NON;NON;NON;NON;NON;NON',
-    ';LOVEGOOD;Luna;13/02/2011;F;IE;ADRESSE NON COMMUNIQUEE;;;JONAGE;IR;;33612345678;contact@alj-escalade.fr;;;;;;;;;J;RC;NON;NON;NON;NON;NON;NON',
+    ';LOVEGOOD;Luna;13/02/2011;F;IE;ADRESSE NON COMMUNIQUEE;;;JONAGE;IE;;33612345678;contact@alj-escalade.fr;;;;;;;;;J;RC;NON;NON;NON;NON;NON;NON',
     '636947;POTTER;Harry;31/07/2010;H;FR;4 Privet Drive;;01234;JONAGE;FR;;0612345678;harry.potter@hogwarts.example;hp@owl.example;POTTER;Lily;0698765432;;;;;J;B++;OUI;NON;OUI;OUI;NON;NON',
-    '1234567;WEASLEY;Ron;01/03/1980;H;;Le Terrier;;1000;BRUXELLES;BE;;;ron@burrow.example;;;;;;;;;F;B;NON;NON;NON;NON;NON;NON',
+    '1234567;WEASLEY;Ron;01/03/1980;H;SE;Le Terrier;;1000;BRUXELLES;BE;;;ron@burrow.example;;;;;;;;;F;B;NON;NON;NON;NON;NON;NON',
 ]
 # include_termine adds the member already declared ('Terminé'), in its place by name
 DONE_ROW = '765432;LONDUBAT;Neville;30/07/1980;H;FR;;;;;FR;;;;;;;;;;;;A;RC;NON;NON;NON;NON;NON;NON'
 EXPECTED_IGNORED = [
     "⚠️ [IGNORÉ] MALEFOY Drago (Commande CMD-6) : date de naissance absente ou invalide ('')",
     '⚠️ [IGNORÉ] DIGGORY Cedric (Commande CMD-7) : sexe non renseigné',
+    "⚠️ [IGNORÉ] KRUM Viktor (Commande CMD-13) : nationalité non reconnue ('Durmstrang')",
 ]
+EXPECTED_TO_CHECK = ["⚠️ [À VÉRIFIER] CHANG Cho (Commande CMD-14) : pays non reconnu ('Écosse') → champ vide dans le fichier"]
 
 
 def _csv(rows: list[str]) -> bytes:
@@ -76,7 +96,7 @@ def test_ffme_csv_bytes_matches_the_golden_rows() -> None:
 
 
 def test_ffme_csv_bytes_with_done_members() -> None:
-    expected = EXPECTED_ROWS[:2] + [DONE_ROW] + EXPECTED_ROWS[2:]
+    expected = EXPECTED_ROWS[:4] + [DONE_ROW] + EXPECTED_ROWS[4:]
     assert ffme_csv_bytes(MEMBERS, include_termine=True) == _csv(expected)
 
 
@@ -86,6 +106,10 @@ def test_ffme_csv_bytes_does_not_depend_on_the_order_of_the_members_read() -> No
 
 def test_ffme_csv_rows_lists_the_members_left_out() -> None:
     assert _ffme_csv_rows(MEMBERS, include_termine=False)[1] == EXPECTED_IGNORED
+
+
+def test_ffme_csv_rows_lists_the_values_to_check() -> None:
+    assert _ffme_csv_rows(MEMBERS, include_termine=False)[2] == EXPECTED_TO_CHECK
 
 
 def test_ffme_csv_rows_accepts_a_date_object_as_birth_date() -> None:

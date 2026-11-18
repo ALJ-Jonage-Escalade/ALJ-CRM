@@ -6,18 +6,15 @@ Knows nothing about HTTP: refusals are raised as domain.errors.
 
 from __future__ import annotations
 
-import datetime
 import io
 import logging
-from typing import Any, Dict, List, Optional, Tuple, TypedDict
+from typing import Dict, List, Optional, Tuple, TypedDict
 
 import openpyxl
 
 from domain.errors import InvalidRequest
-from domain.members.sex import parse_sex
-from domain.members.view import is_cancelled
 from domain.utils import clean_digits_only, is_missing, normalize_name
-from exports.membership_excel import ffme_csv_bytes, parse_date_to_datetime
+from exports.membership_excel import check_ffme_member, ffme_csv_bytes
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.ffme_import import FfmeImportRepository, FfmeMatch, MemberForMatching
@@ -78,6 +75,7 @@ class ExportStats(TypedDict):
     renewals_count: int
     new_licences_count: int
     ignored_details: List[str]
+    to_check_details: List[str]
 
 
 # --------------------------------------------------------------------------
@@ -88,40 +86,30 @@ def export_csv(season: str, include_termine: bool) -> bytes:
 
 
 def export_stats(season: str) -> ExportStats:
-    """What export_csv would declare for the season, with the rules of generate_ffme_csv: members left out
-    (waiting list, nothing paid unless added by hand, cancelled, missing birth date, missing sex on a first licence),
-    already done ('Terminé'), renewals and first licences."""
+    """What export_csv would declare for the season, with the export's own rules (check_ffme_member): members left
+    out (waiting list, nothing paid unless added by hand, cancelled, missing birth date, missing sex or unknown
+    country / nationality on a first licence), already done ('Terminé'), renewals and first licences, and the
+    values exported empty that the office should correct."""
     produced_count = ignored_count = done_count = renewals_count = new_licences_count = 0
     ignored_details: List[str] = []
-    now = datetime.datetime.now()
+    to_check_details: List[str] = []
 
     for member in MemberRepository.list_flat_member_rows(season):
-        tariff_name = str(member.get("tarif_name") or "").lower()
-        status = str(member.get("status") or "").lower()
-        added_by_hand = "ajout manuel" in str(member.get("commentaires_correctif") or "").lower()
-        if "attente" in tariff_name or (member.get("amount", 0.0) == 0.0 and not added_by_hand) or is_cancelled(status):
+        check = check_ffme_member(member, include_termine=True)
+        if check is None:
             ignored_count += 1
             continue
-
-        name = f"{str(member.get('last_name') or 'Inconnu').strip().upper()} {str(member.get('first_name') or 'Inconnu').strip()}"
-        birth_date = _birth_date(member)
-        if not birth_date or birth_date >= now:
+        if check.row is None:
             ignored_count += 1
-            ignored_details.append(f"{name} (date de naissance manquante/invalide)")
+            ignored_details.append(f"{check.label} ({check.left_out_reason})")
             continue
+        to_check_details.extend(f"{check.label} ({item})" for item in check.to_check)
 
-        # Sex: required for a first licence (same rule as generate_ffme_csv)
-        is_renewal = 5 <= len(clean_digits_only(member.get("licence_ffme") or "")) <= 10
-        if not is_renewal and parse_sex(member.get("sex")) is None:
-            ignored_count += 1
-            ignored_details.append(f"{name} (sexe non renseigné)")
-            continue
-
-        if "termin" in status:
+        if "termin" in str(member.get("status") or "").lower():
             done_count += 1
         else:
             produced_count += 1
-        if is_renewal:
+        if check.is_renewal:
             renewals_count += 1
         else:
             new_licences_count += 1
@@ -134,17 +122,8 @@ def export_stats(season: str) -> ExportStats:
         renewals_count=renewals_count,
         new_licences_count=new_licences_count,
         ignored_details=ignored_details[:20],
+        to_check_details=to_check_details[:20],
     )
-
-
-def _birth_date(member: Dict[str, Any]) -> Optional[datetime.datetime]:  # Any: a row of the member read model
-    value = member.get("birth_date") or member.get("champ_Date de naissance de l'adhérent") or ""
-    if isinstance(value, datetime.datetime):
-        return value
-    if isinstance(value, datetime.date):
-        return datetime.datetime(value.year, value.month, value.day)
-    parsed = parse_date_to_datetime(str(value).strip())
-    return parsed if isinstance(parsed, datetime.datetime) else None
 
 
 # --------------------------------------------------------------------------

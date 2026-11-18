@@ -6,6 +6,7 @@ import type { Schemas } from "../../lib/client";
 import { looksLikeEmail } from "../../lib/email";
 import { emergencyContactsOf } from "../../lib/emergencyContacts";
 import { formatDate, formatDayText } from "../../lib/format";
+import { COUNTRY_CHOICES, knownChoice, NATIONALITY_CHOICES } from "../../lib/countries";
 import { SEX_LABELS, sexLabel, type Sex } from "../../lib/sex";
 import { normKey } from "../../lib/text";
 import type { MemberStatus } from "../../services/members";
@@ -40,6 +41,8 @@ export function recordRows(member: Member): RecordRow[] {
   );
   add("⚧", "Sexe", member.sex ? SEX_LABELS[member.sex] : "");
   add("📍", "Adresse", join(", ", member.address, join(" ", member.zip_code, member.city)));
+  add("🌍", "Pays", member.country ?? "");
+  add("🪪", "Nationalité", member.nationality ?? "");
   add("📞", "Téléphone", member.phone);
   add("✉️", "E-mail principal", member.email_primary);
   add("✉️", "E-mail secondaire", member.email_secondary);
@@ -170,6 +173,10 @@ export interface MemberDraft {
   address: string;
   zip_code: string;
   city: string;
+  /** A choice of COUNTRY_CHOICES, or the stored value the FFME export does not recognise (kept unless changed). */
+  country: string;
+  /** A choice of NATIONALITY_CHOICES, or the stored value the FFME export does not recognise (kept unless changed). */
+  nationality: string;
   /** In order, the first one is the main one; blank rows are not sent. */
   emergency_contacts: ContactRow[];
   commentaires_correctif: string;
@@ -202,6 +209,9 @@ export function draftOf(member?: Member, firstTarif = ""): MemberDraft {
     address: member?.address ?? "",
     zip_code: member?.zip_code ?? "",
     city: member?.city ?? "",
+    // A list saved offline before the fields existed has none
+    country: member ? (member.country ?? "") : "France",
+    nationality: member ? (member.nationality ?? "") : "Française",
     emergency_contacts: contacts.length ? contacts.map((contact) => newContactRow(contact.name, contact.phone)) : [newContactRow()],
     commentaires_correctif: member?.commentaires_correctif ?? "",
   };
@@ -294,6 +304,8 @@ export function newMemberOf(draft: MemberDraft): NewMember {
     address: draft.address.trim(),
     zip_code: draft.zip_code.trim(),
     city: draft.city.trim(),
+    country: knownChoice(COUNTRY_CHOICES, draft.country),
+    nationality: knownChoice(NATIONALITY_CHOICES, draft.nationality),
     emergency_contacts: contactsToSend(draft.emergency_contacts),
     commentaires_correctif: draft.commentaires_correctif.trim(),
   };
@@ -320,6 +332,8 @@ const EDITED: [keyof MemberChanges & TextField, string][] = [
   ["address", "Adresse"],
   ["zip_code", "Code postal"],
   ["city", "Ville"],
+  ["country", "Pays"],
+  ["nationality", "Nationalité"],
   ["tarif_name", "Créneau / Tarif"],
 ];
 
