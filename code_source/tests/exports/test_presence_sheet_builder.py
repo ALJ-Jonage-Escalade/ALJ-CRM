@@ -73,7 +73,7 @@ def test_cours_groups_list_active_members_once_sorted_by_first_name() -> None:
 
 
 def test_autonome_merges_groups_and_adds_authorised_minors() -> None:
-    [group] = sheet_groups(["Autonomes A", "Autonomes B"], MEMBERS, "autonome", TARIFS, TODAY)
+    [group] = sheet_groups(["Autonomes A", "Autonomes B"], MEMBERS, "autonome", TARIFS, TODAY, ["Perfectionnement U19 Adulte"])
     assert group.name == "Autonomes A & Autonomes B"
     assert group.lookup_name == "Autonomes A"
     assert [m["first_name"] for m in group.members] == ["Ines", "Jules", "Lou", "Noah"]
@@ -135,7 +135,7 @@ def test_one_file_per_course_repeats_the_column_headers_when_printed() -> None:
 
 def test_autonome_sheet_has_badges_authorisation_and_health_columns() -> None:
     [file] = generate_presence_sheets(["Autonomes A", "Autonomes B"], MEMBERS, PLANNING, variant="autonome", group_tarifs=TARIFS,
-                                      show_health_col=True, today=TODAY)
+                                      show_health_col=True, today=TODAY, extra_tarifs=["Perfectionnement U19 Adulte"])
     ws = _sheet(file.content)
     assert [ws.cell(row=6, column=c).value for c in range(1, 9)] == [
         "Prénom", "Nom", "Badge rouge", "Bloc", "Passeport Orange", "Autorisation", "Santé", "Date"]

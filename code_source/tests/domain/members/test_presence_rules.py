@@ -78,8 +78,7 @@ def test_count_autonomous_matches_the_sheet_rules() -> None:
         _member("Eve", "Ailleurs", None, parental_auth_family="Oui"),                     # authorised, birth date unreadable
         _member("Cleo", "Jeune", "2010-01-01", parental_auth_family="Oui"),               # already on the sheet
         _member("Fay", "Annulee", "2012-01-01", status="Annulé", parental_auth_family="Oui"),
-        _member("Gus", "Perf", "2000-01-01", tarif="Perfectionnement U19 Adulte"),        # course listed on the sheet
     ]
     counts = count_autonomous(members, {"Adultes autonomes"}, TODAY)
-    assert counts == AutonomousCounts(adults=3, minors=1, authorized_minors=2)
-    assert counts.total == 6
+    assert counts == AutonomousCounts(adults=2, minors=1, authorized_minors=2)
+    assert counts.total == 5

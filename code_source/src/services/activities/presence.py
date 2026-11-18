@@ -11,7 +11,7 @@ from typing import List, Literal, Optional
 
 from domain.constants import get_active_season, resolve_season
 from domain.errors import InvalidRequest
-from domain.members.planning_groups import is_autonome_creneau
+from domain.members.planning_groups import autonomous_sheet_extra_tarifs, is_autonome_creneau
 from domain.members.presence_rules import AutonomousCounts, count_autonomous, members_with_tarifs
 from exports.presence_sheets import generate_presence_sheets
 from infrastructure.sqlite.members import MemberRepository
@@ -50,7 +50,9 @@ def presence_overview() -> PresenceOverview:
     members = MemberRepository.list_flat_member_rows(season)
 
     autonomous_creneaux = [c for c in creneaux if is_autonome_creneau(c)]
+    # the members of some course groups are listed on the autonomous sheet too, so they count in its headcount
     autonomous_tarifs = {str(t).strip() for c in autonomous_creneaux for t in c.get("tarifs") or []}
+    autonomous_tarifs.update(autonomous_sheet_extra_tarifs(creneaux))
     courses = [
         CourseGroup(
             name=str(c["groupe"]),
@@ -88,7 +90,8 @@ def export_presence_sheets(variant: Variant, season: str, start_date: str, end_d
         raise InvalidRequest("La date de début doit précéder la date de fin.")
 
     autonomous = variant == "autonome"
-    creneaux = [c for c in PlanningRepository.load_creneaux_groups() if is_autonome_creneau(c) == autonomous]
+    all_creneaux = PlanningRepository.load_creneaux_groups()
+    creneaux = [c for c in all_creneaux if is_autonome_creneau(c) == autonomous]
     if not autonomous and selected_groups:
         creneaux = [c for c in creneaux if c["groupe"] in selected_groups]
     if not creneaux:
@@ -104,6 +107,7 @@ def export_presence_sheets(variant: Variant, season: str, start_date: str, end_d
         group_tarifs={c["groupe"]: c["tarifs"] for c in creneaux},
         show_health_col=show_health_col,
         same_sheet=same_sheet,
+        extra_tarifs=autonomous_sheet_extra_tarifs(all_creneaux) if autonomous else (),
     )
     if len(files) == 1:
         return PresenceDownload(files[0].filename, files[0].content, is_zip=False)

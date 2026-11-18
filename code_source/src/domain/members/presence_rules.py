@@ -8,8 +8,6 @@ Rules:
 - A member from another group with a parental authorisation (autonomous or family) is an authorised minor
   unless their birth date shows they are 18 or older: the authorisation only exists for minors, so an
   unreadable birth date keeps them on the autonomous sheet.
-- The members of the course tariffs in AUTONOMOUS_EXTRA_TARIFS are listed on the autonomous sheet as well
-  (their course keeps its own sheet).
 """
 from __future__ import annotations
 
@@ -25,9 +23,6 @@ from domain.members.view import is_cancelled
 MemberRow = Mapping[str, Any]
 
 IdentityKey = tuple[str, str, str]
-
-# HelloAsso tariffs of courses whose members also climb on autonomous slots: listed on the autonomous sheet too.
-AUTONOMOUS_EXTRA_TARIFS = ("Perfectionnement U19 Adulte",)
 
 
 def member_birth_date(member: MemberRow) -> datetime.date | None:
@@ -99,10 +94,9 @@ class AutonomousCounts:
 
 
 def count_autonomous(members: Iterable[MemberRow], autonomous_tarifs: Iterable[str], today: datetime.date) -> AutonomousCounts:
-    """Counts shown on the presence screen, computed with the rules the generated sheet uses
-    (the AUTONOMOUS_EXTRA_TARIFS members count as the sheet's own)."""
+    """Counts shown on the presence screen, computed with the rules the generated sheet uses."""
     rows = list(members)
-    own = members_with_tarifs(rows, [*autonomous_tarifs, *AUTONOMOUS_EXTRA_TARIFS])
+    own = members_with_tarifs(rows, autonomous_tarifs)
     own_keys = {member_identity_key(member) for member in own}
     minors = sum(1 for member in own if is_adult(member, today) is False)
     added = [member for member in authorized_minors(rows, today) if member_identity_key(member) not in own_keys]

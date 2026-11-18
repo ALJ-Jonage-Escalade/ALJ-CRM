@@ -13,12 +13,22 @@ from domain.utils import normalize_string
 
 SECTION_ORDER = ("Collège", "Enfants", "Perfectionnement", "Compétition")
 
+# Course groups (planning page) whose members are also listed on the autonomous attendance sheet;
+# the course keeps its own sheet.
+AUTONOMOUS_SHEET_EXTRA_GROUPS = ("Perfectionnement U19 Adulte",)
+
 
 def is_autonome_creneau(creneau) -> bool:
     """Vrai si le créneau (nom du groupe ou l'un de ses tarifs) est un créneau autonome."""
     if "autonome" in normalize_string(creneau.get("groupe") or ""):
         return True
     return any("autonome" in normalize_string(t) for t in creneau.get("tarifs") or [])
+
+
+def autonomous_sheet_extra_tarifs(creneaux) -> list[str]:
+    """HelloAsso tariffs of the AUTONOMOUS_SHEET_EXTRA_GROUPS creneaux (accents/case ignored on the group name)."""
+    wanted = {normalize_string(name) for name in AUTONOMOUS_SHEET_EXTRA_GROUPS}
+    return [str(t) for c in creneaux if normalize_string(c.get("groupe") or "") in wanted for t in c.get("tarifs") or []]
 
 
 def accent_class_pattern(word: str) -> str:
