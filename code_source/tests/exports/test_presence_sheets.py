@@ -82,8 +82,9 @@ class TestPresenceSheetGenerator(unittest.TestCase):
         self.assertTrue(saved.json()["item"]["seance_autonome"])
         MemberRepository.upsert_members([_member("ORD-4", "ROBERT", "Ana", "Perf adultes")], "2026-2027")
 
-        autonome = client.get("/api/presence/config").json()["autonome"]
-        cours = [c["groupe"] for c in client.get("/api/presence/config").json()["cours"]]
+        config = client.get("/api/presence/config").json()
+        autonome = config["autonome"]
+        cours = [c["groupe"] for c in config["cours"]]
         self.assertEqual((autonome["groups"], autonome["extra_groups"]), (["Adultes autonomes"], ["Perfectionnement U19 Adulte"]))
         self.assertEqual(autonome["total"], 2)
         self.assertEqual(cours, ["Loisir cours", "Perfectionnement U19 Adulte"])
