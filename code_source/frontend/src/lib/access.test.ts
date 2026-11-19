@@ -142,7 +142,7 @@ describe("sub-pages", () => {
       "/bureau/competitions/bilan",
       "/bureau/competitions/coachs",
     ]);
-    expect(subPages("planning")).toEqual([]);
+    expect(subPages("communications")).toEqual([]);
   });
 
   it("split the settings into Général and Campagne HelloAsso, for admins online only", () => {

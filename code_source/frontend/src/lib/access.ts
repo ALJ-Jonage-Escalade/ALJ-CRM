@@ -80,6 +80,10 @@ export const PAGES = [
     access: "staff",
     screen: "any",
     offlineRead: false,
+    children: [
+      { id: "semaine", label: "Vue semaine", path: "", access: "staff", offline: "none" },
+      { id: "tableau", label: "Tableau des créneaux", path: "tableau", access: "staff", offline: "none" },
+    ],
   },
   {
     id: "outils",
