@@ -145,7 +145,12 @@ def _is_declared(member: dict, include_termine: bool) -> bool:
     added_by_hand = "ajout manuel" in str(member.get("commentaires_correctif", "")).lower()
     if "attente" in tarif_name or (member.get("amount", 0.0) == 0.0 and not added_by_hand) or is_cancelled(status):
         return False
-    return include_termine or "termin" not in status
+    return include_termine or not is_termine(member)
+
+
+def is_termine(member: Mapping[str, object]) -> bool:
+    """Status 'Terminé': the membership is already declared to the FFME."""
+    return "termin" in str(member.get("status") or "").lower()
 
 
 def _ffme_row(member: dict) -> FfmeRowCheck:

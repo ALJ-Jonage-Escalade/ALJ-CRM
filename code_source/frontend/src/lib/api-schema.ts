@@ -863,7 +863,7 @@ export interface paths {
         };
         /**
          * Get Ffme Stats Api
-         * @description Members of the season that the federal CSV export would declare, and those it leaves out.
+         * @description Members of the season that the federal CSV export would declare with the same option, and those it leaves out.
          */
         get: operations["get_ffme_stats_api_api_ffme_stats_get"];
         put?: never;
@@ -2747,8 +2747,9 @@ export interface components {
         };
         /**
          * FfmeStats
-         * @description Members of the season in the federal CSV export. ignored_details: the first 20 rows left out, with the reason;
-         *     to_check_details: the first 20 values exported empty (country or nationality not recognised on a renewal).
+         * @description Members of the season in the federal CSV export, with or without those already declared ('Terminé') as asked.
+         *     ignored_details: the first 20 rows left out, with the reason; to_check_details: the first 20 values exported empty
+         *     (country or nationality not recognised on a renewal).
          */
         FfmeStats: {
             /**
@@ -2758,10 +2759,6 @@ export interface components {
             status: "success";
             /** Season */
             season: string;
-            /** Produced Count */
-            produced_count: number;
-            /** Termine Count */
-            termine_count: number;
             /** Ignored Count */
             ignored_count: number;
             /** Estimated Total */
@@ -7014,6 +7011,7 @@ export interface operations {
         parameters: {
             query?: {
                 season?: string | null;
+                include_termine?: boolean;
             };
             header?: never;
             path?: never;

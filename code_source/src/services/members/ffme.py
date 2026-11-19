@@ -14,7 +14,7 @@ import openpyxl
 
 from domain.errors import InvalidRequest
 from domain.utils import clean_digits_only, is_missing, normalize_name
-from exports.membership_excel import check_ffme_member, ffme_csv_bytes
+from exports.membership_excel import check_ffme_member, ffme_csv_bytes, is_termine
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.ffme_import import FfmeImportRepository, FfmeMatch, MemberForMatching
@@ -68,8 +68,6 @@ class FfmePreparation(TypedDict):
 
 
 class ExportStats(TypedDict):
-    produced_count: int
-    termine_count: int
     ignored_count: int
     estimated_total: int
     renewals_count: int
@@ -85,17 +83,19 @@ def export_csv(season: str, include_termine: bool) -> bytes:
     return ffme_csv_bytes(MemberRepository.list_flat_member_rows(season), include_termine=include_termine)
 
 
-def export_stats(season: str) -> ExportStats:
-    """What export_csv would declare for the season, with the export's own rules (check_ffme_member): members left
-    out (waiting list, nothing paid unless added by hand, cancelled, missing birth date, missing sex or unknown
-    country / nationality on a first licence), already done ('Terminé'), renewals and first licences, and the
-    values exported empty that the office should correct."""
-    produced_count = ignored_count = done_count = renewals_count = new_licences_count = 0
+def export_stats(season: str, include_termine: bool) -> ExportStats:
+    """What export_csv would declare for the season with the same option, by the export's own rules (check_ffme_member):
+    members left out (waiting list, nothing paid unless added by hand, cancelled, missing birth date, missing sex or
+    unknown country / nationality on a first licence), renewals and first licences, and the values exported empty that
+    the office should correct. Members already declared ('Terminé') are not counted at all when they are not included."""
+    exported_count = ignored_count = renewals_count = new_licences_count = 0
     ignored_details: List[str] = []
     to_check_details: List[str] = []
 
     for member in MemberRepository.list_flat_member_rows(season):
-        check = check_ffme_member(member, include_termine=True)
+        if not include_termine and is_termine(member):
+            continue
+        check = check_ffme_member(member, include_termine)
         if check is None:
             ignored_count += 1
             continue
@@ -105,20 +105,15 @@ def export_stats(season: str) -> ExportStats:
             continue
         to_check_details.extend(f"{check.label} ({item})" for item in check.to_check)
 
-        if "termin" in str(member.get("status") or "").lower():
-            done_count += 1
-        else:
-            produced_count += 1
+        exported_count += 1
         if check.is_renewal:
             renewals_count += 1
         else:
             new_licences_count += 1
 
     return ExportStats(
-        produced_count=produced_count,
-        termine_count=done_count,
         ignored_count=ignored_count,
-        estimated_total=produced_count + done_count,
+        estimated_total=exported_count,
         renewals_count=renewals_count,
         new_licences_count=new_licences_count,
         ignored_details=ignored_details[:20],

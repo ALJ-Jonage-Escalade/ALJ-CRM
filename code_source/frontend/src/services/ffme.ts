@@ -5,7 +5,8 @@ import { unwrap, type ApiClient, type Schemas } from "../lib/client";
 /** Return type inferred on purpose: each method answers the body type of its route in the contract. */
 export function createFfmeApi(client: ApiClient) {
   return {
-    stats: () => unwrap(client.GET("/api/ffme/stats")),
+    /** Counts of the CSV that exportFile(includeFinished) would produce. */
+    stats: (includeFinished: boolean) => unwrap(client.GET("/api/ffme/stats", { params: { query: { include_termine: includeFinished } } })),
     /** FFME CSV file, for saveExport(). */
     exportFile: (includeFinished: boolean) =>
       client.GET("/api/ffme/export", { params: { query: { include_termine: includeFinished } }, parseAs: "blob" }),
