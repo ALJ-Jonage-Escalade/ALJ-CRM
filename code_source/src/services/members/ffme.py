@@ -1,11 +1,12 @@
 """FFME: the federal CSV export of the season's members, and the import of the MyFFME licensee list (Excel) matched
-against the members, by licence number then by name.
+against the members, by licence number then by name, checked against the birth date.
 
 Knows nothing about HTTP: refusals are raised as domain.errors.
 """
 
 from __future__ import annotations
 
+import datetime
 import io
 import logging
 from typing import Dict, List, Optional, Tuple, TypedDict
@@ -13,6 +14,7 @@ from typing import Dict, List, Optional, Tuple, TypedDict
 import openpyxl
 
 from domain.errors import InvalidRequest
+from domain.members.age_rules import parse_birth_date
 from domain.utils import clean_digits_only, is_missing, normalize_name
 from exports.membership_excel import check_ffme_member, ffme_csv_bytes, is_termine
 from infrastructure.firestore.cloud_database import CloudDatabase
@@ -30,6 +32,7 @@ NOTHING_TO_APPLY = "Aucune mise à jour à appliquer (aucun rapprochement trouv�
 LAST_NAME, FIRST_NAME, LICENCE = "Nom", "Prénom", "N° de licence"
 REQUIRED_COLUMNS = (LAST_NAME, FIRST_NAME, LICENCE)
 HEALTH_DOCUMENT = "Document de santé"
+BIRTH_DATE = "Date de naissance"
 STATUS_DONE = "Terminé"
 
 
@@ -126,7 +129,8 @@ def export_stats(season: str, include_termine: bool) -> ExportStats:
 # --------------------------------------------------------------------------
 def prepare_licensees(excel_content: bytes) -> FfmePreparation:
     """Phase A of the import: reads the MyFFME Excel export and matches each licensee with a member, by licence
-    number then by name. Writes nothing; problems are listed in stats.errors."""
+    number then by name; a known birth date of the file that disagrees with the member's rules the match out. Writes
+    nothing; problems are listed in stats.errors."""
     preparation = FfmePreparation(updates=[], unmatched=[], users=[],
                                   stats=MatchStats(total_processed=0, matched_by_licence=0, matched_by_name=0, errors=[]))
     stats = preparation["stats"]
@@ -145,15 +149,15 @@ def prepare_licensees(excel_content: bytes) -> FfmePreparation:
         formula_licences = _formula_licences(excel_content)
         members = FfmeImportRepository.list_members_for_matching()
         preparation["users"] = members
-        members_by_licence = {}
-        members_by_name = {}
+        members_by_licence: Dict[str, MemberForMatching] = {}
+        members_by_name: Dict[Tuple[str, str], List[MemberForMatching]] = {}  # homonyms included
         for member in members:
             licence = clean_digits_only(member["licence_ffme"])
             if licence:
                 members_by_licence[licence] = member
             name_key = (normalize_name(member["last_name"]), normalize_name(member["first_name"]))
             if all(name_key):
-                members_by_name[name_key] = member
+                members_by_name.setdefault(name_key, []).append(member)
 
         has_health_column = HEALTH_DOCUMENT in sheet["columns"]
         for row in sheet["rows"]:
@@ -164,11 +168,16 @@ def prepare_licensees(excel_content: bytes) -> FfmePreparation:
             if not licence:
                 licence = clean_digits_only(formula_licences.get((last_name, first_name), ""))
 
+            birth_date = parse_birth_date(row.get(BIRTH_DATE))
             matched: Optional[MemberForMatching] = members_by_licence.get(licence) if licence else None
+            # A licence given to the wrong member (a sibling's, typed on HelloAsso) is not trusted: the name decides
+            if matched and not _birth_dates_agree(birth_date, matched):
+                matched = None
             if matched:
                 stats["matched_by_licence"] += 1
             elif last_name and first_name:
-                matched = members_by_name.get((normalize_name(last_name), normalize_name(first_name)))
+                homonyms = members_by_name.get((normalize_name(last_name), normalize_name(first_name)), [])
+                matched = _match_by_birth_date(homonyms, birth_date)
                 if matched:
                     stats["matched_by_name"] += 1
 
@@ -180,7 +189,7 @@ def prepare_licensees(excel_content: bytes) -> FfmePreparation:
             else:
                 preparation["unmatched"].append(UnmatchedLicensee(
                     nom=last_name, prenom=first_name, licence=licence,
-                    birth_date=_cell_text(row, "Date de naissance"),
+                    birth_date=_cell_text(row, BIRTH_DATE),
                     passeports=_cell_text(row, "Passeports"),
                     diplomes=_cell_text(row, "Diplômes"),
                     document_sante=health_document,
@@ -256,6 +265,21 @@ def _formula_licences(excel_content: bytes) -> Dict[Tuple[str, str], str]:
         value = row[column] if column < len(row) else None
         licences[(last_name, first_name)] = "" if value is None else str(value)
     return licences
+
+
+def _birth_dates_agree(birth_date: Optional[datetime.date], member: MemberForMatching) -> bool:
+    """False only when the file's birth date and the member's are both known and differ."""
+    member_birth_date = parse_birth_date(member["birth_date"])
+    return birth_date is None or member_birth_date is None or member_birth_date == birth_date
+
+
+def _match_by_birth_date(homonyms: List[MemberForMatching], birth_date: Optional[datetime.date]) -> Optional[MemberForMatching]:
+    """The only member of the same name whose birth date agrees with the file's (an equal one wins over an unknown
+    one); None when none or several remain, left to the office's manual matching."""
+    agreeing = [member for member in homonyms if _birth_dates_agree(birth_date, member)]
+    same_birth_date = [member for member in agreeing if birth_date is not None and parse_birth_date(member["birth_date"]) == birth_date]
+    candidates = same_birth_date or agreeing
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _cell_text(row: LicenseeRow, column: str) -> str:
