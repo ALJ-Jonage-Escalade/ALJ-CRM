@@ -174,10 +174,9 @@ def prepare_licensees(excel_content: bytes) -> FfmePreparation:
 
             health_document = _cell_text(row, HEALTH_DOCUMENT) if has_health_column else ""
             if matched:
-                # The file's (cleaned) licence number wins; the member's is kept only when the file has none
-                final_licence = licence or clean_digits_only(matched["licence_ffme"])
+                # An empty licence keeps the member's (apply_ffme_matches)
                 preparation["updates"].append((
-                    STATUS_DONE, final_licence, _cell_text(row, "Passeports"), _cell_text(row, "Diplômes"), health_document, matched["id"]))
+                    STATUS_DONE, licence, _cell_text(row, "Passeports"), _cell_text(row, "Diplômes"), health_document, matched["id"]))
             else:
                 preparation["unmatched"].append(UnmatchedLicensee(
                     nom=last_name, prenom=first_name, licence=licence,

@@ -15,6 +15,7 @@ from api.ffme.schemas import FfmeFile, FfmeImportRequest, FfmeImportResult, Ffme
 from api.responses import error_responses, file_download
 from domain.constants import resolve_season
 from domain.errors import InvalidRequest
+from domain.utils import clean_digits_only
 from infrastructure.sqlite.ffme_import import FfmeMatch
 from services.members import ffme
 
@@ -80,7 +81,8 @@ def apply_ffme_import_api(data: FfmeImportRequest) -> FfmeImportResult:
     season = resolve_season(data.season)
     excel_content = _decoded(data.content_base64) if data.content_base64 else None
     manual_matches: List[FfmeMatch] = [
-        (ffme.STATUS_DONE, m.licence, m.passeports, m.diplomes, m.document_sante, m.user_id) for m in data.manual_matches]
+        (ffme.STATUS_DONE, clean_digits_only(m.licence), m.passeports, m.diplomes, m.document_sante, m.user_id)
+        for m in data.manual_matches]
     updated_count, stats = ffme.apply_import(season, excel_content, manual_matches)
     return FfmeImportResult(
         status="success",
