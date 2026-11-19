@@ -43,14 +43,21 @@ const CONFIG = {
 const STATS = {
   status: "success",
   season: "2026-2027",
-  produced_count: 20,
-  termine_count: 10,
   ignored_count: 2,
   estimated_total: 30,
   renewals_count: 18,
   new_licences_count: 12,
   ignored_details: ["PETIT Max (date de naissance manquante/invalide)"],
   to_check_details: ["MARTIN Léo (pays non reconnu ('Fràce') → champ vide dans le fichier)"],
+};
+const STATS_WITHOUT_TERMINE = {
+  ...STATS,
+  ignored_count: 1,
+  estimated_total: 20,
+  renewals_count: 9,
+  new_licences_count: 11,
+  ignored_details: [],
+  to_check_details: [],
 };
 const PREVIEW = {
   status: "success",
@@ -173,7 +180,7 @@ const ANSWERS: Record<string, Answer> = {
   "GET /api/reports/pivot-records": (_, url) => json({ season: url.searchParams.get("season"), records: [] }),
   "GET /api/presence/config": () => json(CONFIG),
   "POST /api/presence/export": () => file("Feuilles.xlsx"),
-  "GET /api/ffme/stats": () => json(STATS),
+  "GET /api/ffme/stats": (_, url) => json(url.searchParams.get("include_termine") === "false" ? STATS_WITHOUT_TERMINE : STATS),
   "POST /api/helloasso/memberships/preview": () => json(MEMBERSHIP_PREVIEW),
   "GET /api/helloasso/memberships/last-sync": () => json({ last_sync: null }),
   "GET /api/helloasso/campaigns": () => json(MEMBERSHIP_CAMPAIGNS),
@@ -959,7 +966,13 @@ describe("OutilsPage", () => {
 
     byId("ffme-include-finished")!.click();
     await flushPromises();
-    expect(byId("ffme-total")!.textContent).toBe("20");
+    expect(sent("GET", "/api/ffme/stats").map((call) => call.path)).toEqual([
+      "/api/ffme/stats?include_termine=true",
+      "/api/ffme/stats?include_termine=false",
+    ]);
+    expect(["ffme-total", "ffme-renewals", "ffme-new", "ffme-ignored"].map((id) => byId(id)!.textContent)).toEqual(["20", "9", "11", "1"]);
+    expect(byId("ffme-ignored-details")).toBeNull();
+    expect(byId("ffme-to-check-details")).toBeNull();
     byId("ffme-download")!.click();
     await flushPromises();
     expect(sent("GET", "/api/ffme/export").at(-1)!.path).toBe("/api/ffme/export?include_termine=false");

@@ -3121,7 +3121,7 @@
     "/api/ffme/stats": {
       "get": {
         "summary": "Get Ffme Stats Api",
-        "description": "Members of the season that the federal CSV export would declare, and those it leaves out.",
+        "description": "Members of the season that the federal CSV export would declare with the same option, and those it leaves out.",
         "operationId": "get_ffme_stats_api_api_ffme_stats_get",
         "parameters": [
           {
@@ -3138,6 +3138,16 @@
                 }
               ],
               "title": "Season"
+            }
+          },
+          {
+            "name": "include_termine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Termine"
             }
           }
         ],
@@ -7186,14 +7196,6 @@
             "type": "string",
             "title": "Season"
           },
-          "produced_count": {
-            "type": "integer",
-            "title": "Produced Count"
-          },
-          "termine_count": {
-            "type": "integer",
-            "title": "Termine Count"
-          },
           "ignored_count": {
             "type": "integer",
             "title": "Ignored Count"
@@ -7229,8 +7231,6 @@
         "required": [
           "status",
           "season",
-          "produced_count",
-          "termine_count",
           "ignored_count",
           "estimated_total",
           "renewals_count",
@@ -7239,7 +7239,7 @@
           "to_check_details"
         ],
         "title": "FfmeStats",
-        "description": "Members of the season in the federal CSV export. ignored_details: the first 20 rows left out, with the reason;\nto_check_details: the first 20 values exported empty (country or nationality not recognised on a renewal)."
+        "description": "Members of the season in the federal CSV export, with or without those already declared ('Terminé') as asked.\nignored_details: the first 20 rows left out, with the reason; to_check_details: the first 20 values exported empty\n(country or nationality not recognised on a renewal)."
       },
       "GoogleChecks": {
         "properties": {

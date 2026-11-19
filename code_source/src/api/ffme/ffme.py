@@ -35,10 +35,10 @@ def _match_stats(stats: ffme.MatchStats, matched_manually: int = 0) -> FfmeMatch
 
 
 @router.get("/api/ffme/stats", response_model=FfmeStats, responses=error_responses(400))
-def get_ffme_stats_api(season: Optional[str] = None) -> FfmeStats:
-    """Members of the season that the federal CSV export would declare, and those it leaves out."""
+def get_ffme_stats_api(season: Optional[str] = None, include_termine: bool = Query(True)) -> FfmeStats:
+    """Members of the season that the federal CSV export would declare with the same option, and those it leaves out."""
     target_season = resolve_season(season)
-    return FfmeStats(status="success", season=target_season, **ffme.export_stats(target_season))
+    return FfmeStats(status="success", season=target_season, **ffme.export_stats(target_season, include_termine))
 
 
 @router.get("/api/ffme/export", response_class=Response,

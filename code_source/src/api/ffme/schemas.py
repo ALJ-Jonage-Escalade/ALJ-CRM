@@ -10,12 +10,11 @@ from api.request_body import RequestBody
 
 
 class FfmeStats(BaseModel):
-    """Members of the season in the federal CSV export. ignored_details: the first 20 rows left out, with the reason;
-    to_check_details: the first 20 values exported empty (country or nationality not recognised on a renewal)."""
+    """Members of the season in the federal CSV export, with or without those already declared ('Terminé') as asked.
+    ignored_details: the first 20 rows left out, with the reason; to_check_details: the first 20 values exported empty
+    (country or nationality not recognised on a renewal)."""
     status: Literal["success"]
     season: str
-    produced_count: int
-    termine_count: int
     ignored_count: int
     estimated_total: int
     renewals_count: int

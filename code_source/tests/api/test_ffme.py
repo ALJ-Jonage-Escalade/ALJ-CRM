@@ -81,6 +81,22 @@ class TestFfmeRoutes(MemberDbTestCase):
         self.assertNotIn("PETIT", text)
         self.assertNotIn("REMBOURSEE", text)
 
+    def test_stats_follow_the_termine_option(self):
+        # Without « Terminé », those members leave every count, the ignored ones included, as they leave the file
+        self.seed("1", "Léo", "MARTIN", "Adultes autonomes")
+        self.seed("2", "Max", "PETIT", "Adultes autonomes", status="Terminé", **{"champ_Numéro de Licence FFME (6 chiffres)": "123456"})
+        self.seed("3", "Zoé", "DURAND", "Adultes autonomes", status="Terminé", **{"champ_Date de naissance de l'adhérent": ""})
+        counts = ("estimated_total", "renewals_count", "new_licences_count", "ignored_count")
+        for include_termine, expected, ignored_details in ((True, (2, 1, 1, 1), ["DURAND Zoé (date de naissance absente ou invalide (''))"]),
+                                                           (False, (1, 0, 1, 0), [])):
+            with self.subTest(include_termine=include_termine):
+                params = {"season": "2026-2027", "include_termine": str(include_termine).lower()}
+                stats = self.client.get("/api/ffme/stats", params=params).json()
+                self.assertEqual(tuple(stats[key] for key in counts), expected)
+                self.assertEqual(stats["ignored_details"], ignored_details)
+                rows = self.client.get("/api/ffme/export", params=params).content.decode("utf-8-sig").splitlines()[1:]
+                self.assertEqual(len([row for row in rows if row]), stats["estimated_total"])
+
     def test_csv_export_member_without_sex(self):
         # A first licence needs the sex (never guessed): left out and reported; a renewal is sent with it empty
         self.seed("1", "Léo", "MARTIN", "Adultes autonomes", champ_Sexe="")
