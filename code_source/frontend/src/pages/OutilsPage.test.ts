@@ -958,6 +958,8 @@ describe("OutilsPage", () => {
     expect(byId("ffme-to-check-details")!.textContent).toContain("MARTIN Léo (pays non reconnu ('Fràce')");
 
     byId("ffme-include-finished")!.click();
+    await flushPromises();
+    expect(byId("ffme-total")!.textContent).toBe("20");
     byId("ffme-download")!.click();
     await flushPromises();
     expect(sent("GET", "/api/ffme/export").at(-1)!.path).toBe("/api/ffme/export?include_termine=false");
