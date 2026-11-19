@@ -2,8 +2,8 @@
 
 Two variants, chosen by the presence screen:
 - "autonome": every autonomous group in one table, with the badge, bloc and orange passport columns, an
-  « Autorisation » column, and the members of `extra_tarifs` (some course groups, see
-  domain/members/planning_groups.py) and the authorised minors of other groups added (domain/members/presence_rules.py);
+  « Autorisation » column, and the members of `extra_tarifs` (the course groups ticked « Séance autonome »,
+  see domain/members/planning_groups.py) and the authorised minors of other groups added (domain/members/presence_rules.py);
 - "cours": one table per course, without the badge columns; either one file per course or every table
   stacked in a single sheet (`same_sheet`), each starting on a new printed page.
 """

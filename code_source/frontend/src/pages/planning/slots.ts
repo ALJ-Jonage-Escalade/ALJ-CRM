@@ -156,6 +156,7 @@ export function draftOf(slot?: Slot): SlotDraft {
       whatsapp_link: "",
       naissance_min: "",
       naissance_max: "",
+      seance_autonome: false,
     };
   }
   return { ...slot, helloasso_tarifs: [...slot.helloasso_tarifs], encadrants: slot.encadrants.join(", ") };

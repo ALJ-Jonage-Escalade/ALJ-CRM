@@ -20,12 +20,13 @@ const SLOT = (change: Partial<Slot>): Slot => ({
   whatsapp_link: "",
   naissance_min: "",
   naissance_max: "",
+  seance_autonome: false,
   ...change,
 });
 const SLOTS = [
   SLOT({ id: 1, groupe: "Loisir collège", encadrants: ["Remus Lupin"] }),
   SLOT({ id: 2, groupe: "Compétition U13", type: "compétition", jour: "Mercredi" }),
-  SLOT({ id: 3, groupe: "Autonome", type: "autonome", jour: "Lundi / Jeudi" }),
+  SLOT({ id: 3, groupe: "Autonome", type: "autonome", jour: "Lundi / Jeudi", seance_autonome: true }),
 ];
 
 type Answer = (body: unknown) => Response;
@@ -86,6 +87,7 @@ describe("PlanningPage", () => {
 
     await open("tableau");
     expect(all("slot-row")).toHaveLength(3);
+    expect(all("slot-seance-autonome-cell").map((c) => c.textContent.includes("Séance autonome"))).toEqual([false, false, true]);
     const search = byId("slot-search") as HTMLInputElement;
     search.value = "lupin";
     search.dispatchEvent(new Event("input"));
@@ -143,6 +145,7 @@ describe("PlanningPage", () => {
           whatsapp_link: "",
           naissance_min: "",
           naissance_max: "",
+          seance_autonome: false,
         },
       },
     ]);

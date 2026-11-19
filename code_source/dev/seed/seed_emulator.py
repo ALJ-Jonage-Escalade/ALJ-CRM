@@ -128,7 +128,8 @@ def planning_items(coaches):
     snape, mcgonagall, flitwick, sprout, lupin, hagrid = coaches
     # `type` and `jour` values are parsed by the app (planning Excel export, presence sheets):
     # they keep the application's French vocabulary. Everything else is English, except
-    # « Autonome » in autonomous slot names/tariffs: `is_autonome_creneau` looks for that word.
+    # « Autonome » in autonomous slot names (presence sheet lookups and planning colours look for that word).
+    # The autonomous slots are ticked « Séance autonome »: that box makes the autonomous attendance sheet.
     items = [
         ("Leisure - Children 2017-2019", "cours", "U8-U10", "Mercredi", "14:00-15:30",
          [hagrid, sprout], ["Leisure - Children born 2017, 2018, 2019"], "2017-01-01", "2019-12-31"),
@@ -152,7 +153,7 @@ def planning_items(coaches):
     return [
         {"id": i, "groupe": group, "type": kind, "categorie_age": age_cat, "jour": day, "horaires": hours,
          "encadrants": coach_names, "helloasso_tarifs": rates, "naissance_min": born_min, "naissance_max": born_max,
-         "whatsapp_link": ""}
+         "whatsapp_link": "", "seance_autonome": kind == "autonome"}
         for i, (group, kind, age_cat, day, hours, coach_names, rates, born_min, born_max)
         in enumerate(items, start=1)
     ]

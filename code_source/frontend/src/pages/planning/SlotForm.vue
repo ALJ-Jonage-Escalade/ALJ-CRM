@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /* Fields of a slot (create or edit). Checked before saving (slotError): the form emits save, or invalid with the
-   message to show. The day, type and tariffs a slot already has stay among the choices, so saving it keeps them. */
-import { computed } from "vue";
+   message to show. The day, type and tariffs a slot already has stay among the choices, so saving it keeps them.
+   Choosing the type Autonome ticks « Séance autonome » (it can still be unticked). */
+import { computed, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { dayOptions, slotError, tarifOptions, typeOptions, type SlotDraft } from "./slots";
@@ -15,6 +16,14 @@ const types = computed(() => typeOptions(draft.value.type));
 // The tariffs linked when the form opens: unticking one the season no longer has keeps it in the list
 const linked = [...draft.value.helloasso_tarifs];
 const tarifs = computed(() => tarifOptions(props.tarifs, linked));
+watch(
+  () => draft.value.type,
+  (type) => {
+    if (type === "autonome") {
+      draft.value.seance_autonome = true;
+    }
+  },
+);
 
 function submit(): void {
   const error = slotError(draft.value);
@@ -78,6 +87,13 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
         />
       </div>
     </div>
+    <label class="flex cursor-pointer items-start gap-2 text-[13px]">
+      <input v-model="draft.seance_autonome" type="checkbox" data-testid="slot-seance-autonome" class="mt-0.5" />
+      <span>
+        <b>Séance autonome</b>
+        <span class="block text-[11.5px] text-slate-500">Les inscrits de ce groupe figurent sur la fiche de présence autonome.</span>
+      </span>
+    </label>
     <div>
       <label for="slot-encadrants" :class="label">Encadrant(s) (séparés par des virgules)</label>
       <input

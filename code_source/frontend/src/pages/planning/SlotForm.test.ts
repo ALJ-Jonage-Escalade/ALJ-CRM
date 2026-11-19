@@ -16,6 +16,7 @@ const SLOT: Slot = {
   whatsapp_link: "",
   naissance_min: "",
   naissance_max: "",
+  seance_autonome: false,
 };
 
 function render(slot?: Slot, tarifs = ["Autonome adultes", "Licence sèche"]) {
@@ -46,6 +47,18 @@ describe("SlotForm", () => {
       helloasso_tarifs: ["Licence sèche"],
     });
     expect(wrapper.emitted("save")).toHaveLength(1);
+  });
+
+  it("ticks « Séance autonome » when the type Autonome is chosen, and lets it be unticked", async () => {
+    const { wrapper, draft, byId } = render(SLOT);
+    // Opening a slot keeps its box as saved, whatever its type
+    expect((byId("slot-seance-autonome").element as HTMLInputElement).checked).toBe(false);
+    await byId("slot-type").setValue("cours");
+    await byId("slot-type").setValue("autonome");
+    expect(draft.value.seance_autonome).toBe(true);
+    await byId("slot-seance-autonome").setValue(false);
+    await wrapper.find("form").trigger("submit");
+    expect(draft.value.seance_autonome).toBe(false);
   });
 
   it("keeps the day and tariff a slot already has", () => {

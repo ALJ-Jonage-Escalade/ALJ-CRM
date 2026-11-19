@@ -11,7 +11,7 @@ from typing import List, Literal, Optional
 
 from domain.constants import get_active_season, resolve_season
 from domain.errors import InvalidRequest
-from domain.members.planning_groups import autonomous_sheet_extra_tarifs, is_autonome_creneau
+from domain.members.planning_groups import autonomous_sheet_extra_tarifs, forms_autonomous_sheet, joins_autonomous_sheet
 from domain.members.presence_rules import AutonomousCounts, count_autonomous, members_with_tarifs
 from exports.presence_sheets import generate_presence_sheets
 from infrastructure.sqlite.members import MemberRepository
@@ -40,6 +40,7 @@ class PresenceOverview:
     season: str
     autonomous_counts: AutonomousCounts
     autonomous_groups: List[str]
+    extra_groups: List[str]  # course groups ticked « Séance autonome »: their members are on the autonomous sheet too
     courses: List[CourseGroup]
 
 
@@ -49,8 +50,8 @@ def presence_overview() -> PresenceOverview:
     creneaux = PlanningRepository.load_creneaux_groups()
     members = MemberRepository.list_flat_member_rows(season)
 
-    autonomous_creneaux = [c for c in creneaux if is_autonome_creneau(c)]
-    # the members of some course groups are listed on the autonomous sheet too, so they count in its headcount
+    autonomous_creneaux = [c for c in creneaux if forms_autonomous_sheet(c)]
+    # the members of the course groups ticked « Séance autonome » are on the autonomous sheet too, so they count in its headcount
     autonomous_tarifs = {str(t).strip() for c in autonomous_creneaux for t in c.get("tarifs") or []}
     autonomous_tarifs.update(autonomous_sheet_extra_tarifs(creneaux))
     courses = [
@@ -60,12 +61,13 @@ def presence_overview() -> PresenceOverview:
             tarifs=[str(t) for t in c["tarifs"] or []],
             member_count=len(members_with_tarifs(members, c["tarifs"] or [])),
         )
-        for c in creneaux if not is_autonome_creneau(c)
+        for c in creneaux if not forms_autonomous_sheet(c)
     ]
     return PresenceOverview(
         season=season,
         autonomous_counts=count_autonomous(members, autonomous_tarifs, datetime.date.today()),
         autonomous_groups=[str(c["groupe"]) for c in autonomous_creneaux],
+        extra_groups=[str(c["groupe"]) for c in creneaux if joins_autonomous_sheet(c)],
         courses=courses,
     )
 
@@ -91,7 +93,7 @@ def export_presence_sheets(variant: Variant, season: str, start_date: str, end_d
 
     autonomous = variant == "autonome"
     all_creneaux = PlanningRepository.load_creneaux_groups()
-    creneaux = [c for c in all_creneaux if is_autonome_creneau(c) == autonomous]
+    creneaux = [c for c in all_creneaux if forms_autonomous_sheet(c) == autonomous]
     if not autonomous and selected_groups:
         creneaux = [c for c in creneaux if c["groupe"] in selected_groups]
     if not creneaux:

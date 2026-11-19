@@ -27,7 +27,14 @@ const CONFIG = {
   status: "success",
   season: "2026-2027",
   default_dates: { start: "07/09/2026", end: "27/06/2027" },
-  autonome: { adultes: 12, mineurs: 3, mineurs_autorises: 2, total: 17, groups: ["Autonome"] },
+  autonome: {
+    adultes: 12,
+    mineurs: 3,
+    mineurs_autorises: 2,
+    total: 17,
+    groups: ["Autonome"],
+    extra_groups: ["Perfectionnement U19 Adulte"],
+  },
   cours: [
     { groupe: "Loisir collège", slots: "Lundi 18:00 - 20:00", tarifs: ["Loisir"], count: 8 },
     { groupe: "Compétition U13", slots: "", tarifs: ["Compet"], count: 5 },
@@ -902,6 +909,7 @@ describe("OutilsPage", () => {
     stubDownloads();
     const { byId, all, open, sent } = await render("coach", "/bureau/outils/presence");
     expect(byId("presence-autonomous-summary")!.textContent).toContain("Total adhérents : 17");
+    expect(byId("presence-autonomous-groups")!.textContent).toMatch(/Groupes : Autonome\s+Cours ajoutés : Perfectionnement U19 Adulte/);
     expect(byId("course-count")!.textContent.trim()).toBe("2 créneau(x)");
     expect(all("course").map((c) => (c as HTMLInputElement).checked)).toEqual([true, true]);
     expect(byId<HTMLInputElement>("courses-start")!.value).toBe("07/09/2026");

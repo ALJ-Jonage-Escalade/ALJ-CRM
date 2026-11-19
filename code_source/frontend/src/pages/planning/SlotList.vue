@@ -15,7 +15,7 @@ const KIND_COLOR: Record<Kind, BadgeColor> = {
   autonome: "slate",
 };
 
-const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_minmax(0,1fr)_minmax(0,1.3fr)_40px_84px] md:items-start md:gap-3";
+const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_76px_minmax(0,1fr)_minmax(0,1.3fr)_40px_84px] md:items-start md:gap-3";
 </script>
 
 <template>
@@ -24,6 +24,7 @@ const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_minmax(0,1fr)
       <span>Jour & horaires</span>
       <span>Groupe & catégorie</span>
       <span>Type</span>
+      <span class="text-center">Séance autonome</span>
       <span>Encadrant(s)</span>
       <span>Tarif(s) HelloAsso</span>
       <span class="text-center">WA</span>
@@ -49,6 +50,13 @@ const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_minmax(0,1fr)
         </div>
         <div>
           <UiBadge :color="KIND_COLOR[slotKind(slot)]" variant="soft">{{ slot.type || "cours" }}</UiBadge>
+        </div>
+        <div data-testid="slot-seance-autonome-cell" class="md:text-center">
+          <span v-if="slot.seance_autonome" title="Sur la fiche de présence autonome">
+            ✅
+            <span class="text-xs md:sr-only">Séance autonome</span>
+          </span>
+          <span v-else class="hidden text-[11px] text-slate-500 md:inline">—</span>
         </div>
         <div class="text-xs">
           <span class="text-slate-500 md:hidden">👤</span>

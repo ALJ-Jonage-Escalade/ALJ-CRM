@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 
+from domain.members.planning_groups import is_autonomous_type
 from infrastructure.sqlite.connection import SqliteDatabase
 
 logger = logging.getLogger("alj")
@@ -45,7 +46,8 @@ class PlanningRepository:
                 else:
                     tarifs = []
                 row_dict["helloasso_tarifs"] = tarifs
-                
+                row_dict["seance_autonome"] = bool(row_dict.get("seance_autonome"))
+
                 planning_list.append(row_dict)
 
             return planning_list
@@ -56,7 +58,8 @@ class PlanningRepository:
     def load_creneaux_groups(cls) -> list:
         """Agrège le planning par groupe de créneau unique (un groupe peut posséder
         plusieurs créneaux horaires et plusieurs tarifs HelloAsso).
-        Retourne une liste de dicts {groupe, tarifs, slots} triée par nom de groupe."""
+        Retourne une liste de dicts {groupe, tarifs, slots, seance_autonome, type_autonome} triée par nom de groupe ;
+        seance_autonome / type_autonome : vrai si l'un de ses créneaux est coché « Séance autonome » / de type Autonome."""
         creneaux: dict[str, dict] = {}
         order = []
         for item in cls.load_planning_data():
@@ -64,18 +67,20 @@ class PlanningRepository:
             if not g_name:
                 continue
             if g_name not in creneaux:
-                creneaux[g_name] = {"tarifs": [], "slots": []}
+                creneaux[g_name] = {"tarifs": [], "slots": [], "seance_autonome": False, "type_autonome": False}
                 order.append(g_name)
             for t in item.get("helloasso_tarifs") or []:
                 t_str = str(t).strip()
                 if t_str and t_str not in creneaux[g_name]["tarifs"]:
                     creneaux[g_name]["tarifs"].append(t_str)
+            creneaux[g_name]["seance_autonome"] |= bool(item.get("seance_autonome"))
+            creneaux[g_name]["type_autonome"] |= is_autonomous_type(item.get("type"))
             creneaux[g_name]["slots"].append((
                 str(item.get("jour") or "").strip(),
                 str(item.get("horaires") or "").strip()
             ))
         return [
-            {"groupe": g, "tarifs": creneaux[g]["tarifs"], "slots": creneaux[g]["slots"]}
+            {"groupe": g, **creneaux[g]}
             for g in sorted(order)
         ]
 
@@ -91,8 +96,8 @@ class PlanningRepository:
                 enc_json = json.dumps(item.get("encadrants", []), ensure_ascii=False)
                 tarifs_json = json.dumps(item.get("helloasso_tarifs", []), ensure_ascii=False)
                 cursor.execute("""
-                    INSERT OR REPLACE INTO planning (id, groupe, type, categorie_age, whatsapp_link, jour, horaires, encadrants, helloasso_tarifs, naissance_min, naissance_max)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT OR REPLACE INTO planning (id, groupe, type, categorie_age, whatsapp_link, jour, horaires, encadrants, helloasso_tarifs, naissance_min, naissance_max, seance_autonome)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     item.get("id"),
                     item.get("groupe"),
@@ -104,7 +109,8 @@ class PlanningRepository:
                     enc_json,
                     tarifs_json,
                     str(item.get("naissance_min") or ""),
-                    str(item.get("naissance_max") or "")
+                    str(item.get("naissance_max") or ""),
+                    int(bool(item.get("seance_autonome")))
                 ))
             conn.commit()
             logger.debug("[SQLITE] Planning enregistré avec succès dans SQLite.")
@@ -131,8 +137,8 @@ class PlanningRepository:
             tarifs_json = json.dumps(item.get("helloasso_tarifs", []), ensure_ascii=False)
 
             cursor.execute("""
-                INSERT OR REPLACE INTO planning (id, groupe, type, categorie_age, whatsapp_link, jour, horaires, encadrants, helloasso_tarifs, naissance_min, naissance_max)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO planning (id, groupe, type, categorie_age, whatsapp_link, jour, horaires, encadrants, helloasso_tarifs, naissance_min, naissance_max, seance_autonome)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 int(item_id),
                 str(item.get("groupe") or "").strip(),
@@ -144,7 +150,8 @@ class PlanningRepository:
                 enc_json,
                 tarifs_json,
                 str(item.get("naissance_min") or "").strip(),
-                str(item.get("naissance_max") or "").strip()
+                str(item.get("naissance_max") or "").strip(),
+                int(bool(item.get("seance_autonome")))
             ))
             conn.commit()
             logger.debug(f"[SQLITE] Créneau #{item_id} ({item.get('groupe')}) enregistré avec succès.")
