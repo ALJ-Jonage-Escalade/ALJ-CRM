@@ -6,6 +6,7 @@ import pytest
 from playwright.sync_api import expect
 
 from helpers.auth import login_as
+from helpers.competitions import sub_menu_entry
 from helpers.data import unique_name
 from helpers.dialogs import cancel_dialog, confirm_dialog
 
@@ -57,7 +58,7 @@ def test_week_view_and_table(page, planning):
     saturday = next(s for s in planning if s["jour"] == "Samedi")
     expect(page.get_by_test_id("day-Samedi").get_by_test_id("slot-card")).to_contain_text(saturday["groupe"])
 
-    page.get_by_test_id("view-table").click()
+    sub_menu_entry(page, "tableau").click()
     expect(page.get_by_test_id("slot-row")).to_have_count(len(planning))
     page.get_by_test_id("slot-search").fill("bouldering")
     expect(page.get_by_test_id("slot-row")).to_have_count(1)
@@ -89,7 +90,7 @@ def test_create_edit_delete_slot(page, planning):
     expect(page.get_by_test_id("slot-dialog")).to_be_hidden()
     expect(page.get_by_test_id("day-Samedi").get_by_test_id("slot-card").filter(has_text=groupe)).to_be_visible()
 
-    page.get_by_test_id("view-table").click()
+    sub_menu_entry(page, "tableau").click()
     row = _row(page, groupe)
     expect(row).to_contain_text("Remus Lupin, Rubeus Hagrid")
     expect(row).to_contain_text("Autonome bouldering")
@@ -107,18 +108,18 @@ def test_create_edit_delete_slot(page, planning):
     page.get_by_test_id("slot-horaires").fill("16:00 - 18:00")
     page.get_by_test_id("slot-save").click()
     expect(page.get_by_test_id("toast")).to_contain_text("enregistré")
-    page.get_by_test_id("view-table").click()
+    sub_menu_entry(page, "tableau").click()
     expect(_row(page, groupe)).to_contain_text("16:00 - 18:00")
     assert _stored(page, groupe) == {**stored, "horaires": "16:00 - 18:00"}
 
     # The week view's card opens the same form
-    page.get_by_test_id("view-week").click()
+    sub_menu_entry(page, "semaine").click()
     page.get_by_test_id("slot-card").filter(has_text=groupe).click()
     expect(page.get_by_test_id("slot-groupe")).to_have_value(groupe)
     page.get_by_test_id("slot-cancel").click()
     expect(page.get_by_test_id("slot-dialog")).to_be_hidden()
 
-    page.get_by_test_id("view-table").click()
+    sub_menu_entry(page, "tableau").click()
     _row(page, groupe).get_by_test_id("slot-delete").click()
     cancel_dialog(page)
     expect(_row(page, groupe)).to_have_count(1)
@@ -133,7 +134,7 @@ def test_editing_keeps_a_two_day_slot(page, planning):
     """Its day is not in the form's list: saving keeps it (the former page moved the slot to Monday)."""
     two_days = next(s for s in planning if s["jour"] == "Lundi / Jeudi")
     _open(page)
-    page.get_by_test_id("view-table").click()
+    sub_menu_entry(page, "tableau").click()
     _row(page, two_days["groupe"]).get_by_test_id("slot-edit").click()
     page.get_by_test_id("slot-save").click()
     expect(page.get_by_test_id("toast")).to_contain_text("enregistré")
@@ -181,7 +182,7 @@ def test_print_shows_the_grid_only(page, planning):
     _open(page)
     page.emulate_media(media="print")
     expect(page.get_by_test_id("day-Samedi")).to_be_visible()
-    for control in ("slot-new", "planning-print", "export-menu", "view-table"):
+    for control in ("slot-new", "planning-print", "export-menu", "subnav-side", "subnav-strip"):
         expect(page.get_by_test_id(control)).to_be_hidden()
 
 
@@ -189,7 +190,7 @@ def test_phone(mobile_page, planning):
     """Read and edit on a phone: no horizontal page scroll, the form fits the screen."""
     page = _open(mobile_page)
     assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
-    page.get_by_test_id("view-table").click()
+    sub_menu_entry(page, "tableau").click()
     expect(page.get_by_test_id("slot-row")).to_have_count(len(planning))
     assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
     _row(page, planning[0]["groupe"]).get_by_test_id("slot-edit").click()

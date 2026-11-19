@@ -28,6 +28,7 @@ def get_presence_config() -> PresenceConfig:
             mineurs_autorises=counts.authorized_minors,
             total=counts.total,
             groups=overview.autonomous_groups,
+            extra_groups=overview.extra_groups,
         ),
         cours=[PresenceCourse(groupe=c.name, slots=c.schedule, tarifs=c.tarifs, count=c.member_count) for c in overview.courses],
     )

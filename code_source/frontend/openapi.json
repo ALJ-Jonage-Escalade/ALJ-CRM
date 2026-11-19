@@ -10339,6 +10339,10 @@
           "naissance_max": {
             "type": "string",
             "title": "Naissance Max"
+          },
+          "seance_autonome": {
+            "type": "boolean",
+            "title": "Seance Autonome"
           }
         },
         "type": "object",
@@ -10353,10 +10357,11 @@
           "helloasso_tarifs",
           "whatsapp_link",
           "naissance_min",
-          "naissance_max"
+          "naissance_max",
+          "seance_autonome"
         ],
         "title": "PlanningSlot",
-        "description": "A weekly slot. jour: a day (\"Lundi\"…), or several (\"Lundi / Jeudi\"); horaires: \"18:00 - 20:00\".\nhelloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds."
+        "description": "A weekly slot. jour: a day (\"Lundi\"…), or several (\"Lundi / Jeudi\"); horaires: \"18:00 - 20:00\".\nhelloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds;\nseance_autonome: its members are listed on the autonomous attendance sheet."
       },
       "PlanningSlotDeleted": {
         "properties": {
@@ -10462,6 +10467,11 @@
             "type": "string",
             "title": "Naissance Max",
             "default": ""
+          },
+          "seance_autonome": {
+            "type": "boolean",
+            "title": "Seance Autonome",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -10493,6 +10503,13 @@
             },
             "type": "array",
             "title": "Groups"
+          },
+          "extra_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Extra Groups"
           }
         },
         "type": "object",
@@ -10501,10 +10518,11 @@
           "mineurs",
           "mineurs_autorises",
           "total",
-          "groups"
+          "groups",
+          "extra_groups"
         ],
         "title": "PresenceAutonomous",
-        "description": "Members of the autonomous slots, plus the minors of other groups allowed to climb on their own."
+        "description": "Members of the autonomous slots, plus the minors of other groups allowed to climb on their own.\ngroups: the autonomous groups; extra_groups: the course groups ticked « Séance autonome », added to the sheet."
       },
       "PresenceConfig": {
         "properties": {

@@ -19,9 +19,10 @@ router = APIRouter()
 def _slot(row: Dict[str, Any]) -> PlanningSlot:  # Any: a row of the planning table
     """Old rows may hold NULL columns."""
     text = {field: str(row.get(field) or "").strip() for field in PlanningSlot.model_fields
-            if field not in ("id", "encadrants", "helloasso_tarifs")}
+            if field not in ("id", "encadrants", "helloasso_tarifs", "seance_autonome")}
     return PlanningSlot(id=int(row["id"]), encadrants=[str(e) for e in row.get("encadrants") or []],
-                        helloasso_tarifs=[str(t) for t in row.get("helloasso_tarifs") or []], **text)
+                        helloasso_tarifs=[str(t) for t in row.get("helloasso_tarifs") or []],
+                        seance_autonome=bool(row.get("seance_autonome")), **text)
 
 
 @router.get("/api/planning", response_model=List[PlanningSlot], responses=error_responses(500))

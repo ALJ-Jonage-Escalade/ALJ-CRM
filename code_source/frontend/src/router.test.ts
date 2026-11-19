@@ -159,6 +159,15 @@ describe("app routes", () => {
   });
 
   it.each([
+    ["/bureau/planning", "planning", "semaine"],
+    ["/bureau/planning/tableau", "planning-tableau", "tableau"],
+  ])("open the Planning sub-page %s, kept mounted while switching", async (path, name, sub) => {
+    const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
+    await router.push(path);
+    expect([router.currentRoute.value.name, router.currentRoute.value.meta]).toEqual([name, { access: "staff", sub, keepAlive: true }]);
+  });
+
+  it.each([
     ["/bureau/outils?tab=ffme-import", "/bureau/outils/ffme-import"],
     ["/bureau/outils?tab=map", "/bureau/outils?tab=map"],
     ["/bureau/competitions?section=bilan", "/bureau/competitions/bilan"],

@@ -37,6 +37,8 @@ const ParametresPage = () => import("./pages/ParametresPage.vue");
 const ParametresGeneralPage = () => import("./pages/parametres/ParametresGeneralPage.vue");
 const ParametresCampaignsPage = () => import("./pages/parametres/ParametresCampaignsPage.vue");
 const PlanningPage = () => import("./pages/PlanningPage.vue");
+const PlanningWeekPage = () => import("./pages/planning/PlanningWeekPage.vue");
+const PlanningTablePage = () => import("./pages/planning/PlanningTablePage.vue");
 const CompetitionsHelloAssoPage = () => import("./pages/competitions/CompetitionsHelloAssoPage.vue"); // online only
 const OutilsMapPage = () => import("./pages/outils/OutilsMapPage.vue");
 const OutilsPivotPage = () => import("./pages/outils/OutilsPivotPage.vue"); // with the pivot table library
@@ -67,6 +69,7 @@ const SUB_COMPONENTS: Partial<Record<PageId, Record<string, RouteComponent>>> = 
     "helloasso-import": OutilsHelloAssoImportPage,
     cles: OutilsKeysPage,
   },
+  planning: { semaine: PlanningWeekPage, tableau: PlanningTablePage },
 };
 
 declare module "vue-router" {
@@ -109,7 +112,12 @@ export const routes: RouteRecordRaw[] = [
   },
   { path: "/index", name: "annuaire", component: AnnuairePage, meta: { access: pageAccess("annuaire") } },
   { path: "/bureau/communications", name: "communications", component: CommunicationsPage, meta: { access: pageAccess("communications") } },
-  { path: "/bureau/planning", name: "planning", component: PlanningPage, meta: { access: pageAccess("planning") } },
+  {
+    path: "/bureau/planning",
+    component: PlanningPage,
+    meta: { access: pageAccess("planning") },
+    children: subRoutes("planning", "planning", true),
+  },
   {
     path: "/bureau/outils",
     component: OutilsPage,

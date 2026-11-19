@@ -1,103 +1,46 @@
 """
-Hiérarchie des groupes de créneaux (table planning) pour les listes de sélection
-de l'IHM : fiches de présence (Exporter), filtres Adhérents et Attestations.
+Groupes de créneaux du planning et fiches de présence.
 
-Un groupe de créneau du planning peut regrouper plusieurs tarifs HelloAsso :
-le matching membres/tarifs est à la charge de l'appelant (payload de tarifs
-rattaché à chaque créneau). Ce module reste pur : il reçoit la liste des
-créneaux déjà agrégés (PlanningRepository.load_creneaux_groups()).
+Un groupe de créneau du planning peut regrouper plusieurs créneaux horaires et plusieurs
+tarifs HelloAsso (PlanningRepository.load_creneaux_groups()). La case « Séance autonome »
+d'un créneau décide de la fiche autonome : un groupe coché de type Autonome forme la fiche,
+un groupe coché d'un autre type (ex. Perfectionnement U19 Adulte) y ajoute ses inscrits et
+garde sa propre fiche de cours. Ce module reste pur.
 """
-import re
+from __future__ import annotations
+
+from collections.abc import Iterable, Mapping
 
 from domain.utils import normalize_string
 
-SECTION_ORDER = ("Collège", "Enfants", "Perfectionnement", "Compétition")
-
-# Course groups (planning page) whose members are also listed on the autonomous attendance sheet;
-# the course keeps its own sheet.
-AUTONOMOUS_SHEET_EXTRA_GROUPS = ("Perfectionnement U19 Adulte",)
+# A group of PlanningRepository.load_creneaux_groups(): groupe, tarifs, slots, seance_autonome, type_autonome
+CreneauGroup = Mapping[str, object]
 
 
-def is_autonome_creneau(creneau) -> bool:
-    """Vrai si le créneau (nom du groupe ou l'un de ses tarifs) est un créneau autonome."""
-    if "autonome" in normalize_string(creneau.get("groupe") or ""):
-        return True
-    return any("autonome" in normalize_string(t) for t in creneau.get("tarifs") or [])
+def is_autonomous_type(slot_type: object) -> bool:
+    """Vrai pour le type « autonome » d'un créneau (accents / majuscules ignorés)."""
+    return normalize_string(str(slot_type or "")) == "autonome"
 
 
-def autonomous_sheet_extra_tarifs(creneaux) -> list[str]:
-    """HelloAsso tariffs of the AUTONOMOUS_SHEET_EXTRA_GROUPS creneaux (accents/case ignored on the group name)."""
-    wanted = {normalize_string(name) for name in AUTONOMOUS_SHEET_EXTRA_GROUPS}
-    return [str(t) for c in creneaux if normalize_string(c.get("groupe") or "") in wanted for t in c.get("tarifs") or []]
+def forms_autonomous_sheet(creneau: CreneauGroup) -> bool:
+    """Groupe dont la fiche autonome est faite (titre, QR codes, horaires) : coché et de type Autonome.
+    Il n'a pas de fiche de cours."""
+    return bool(creneau.get("seance_autonome")) and bool(creneau.get("type_autonome"))
 
 
-def accent_class_pattern(word: str) -> str:
-    """Motif regex insensible aux accents (é/è/ê, à, î...) pour découper les libellés."""
-    tr = str.maketrans({
-        "e": "[eèéêë]", "a": "[aàâä]", "i": "[iîï]", "o": "[oôö]",
-        "u": "[uùûü]", "c": "[cç]", "y": "[yÿ]",
-    })
-    return word.translate(tr)
+def joins_autonomous_sheet(creneau: CreneauGroup) -> bool:
+    """Groupe de cours coché « Séance autonome » : ses inscrits sont ajoutés à la fiche autonome."""
+    return bool(creneau.get("seance_autonome")) and not creneau.get("type_autonome")
 
 
-def shorten_group_label(name: str, keyword: str, drop_patterns=()) -> str:
-    """Retire du libellé le nom de rubrique (et autres motifs) devenus redondants.
-    Ex : « Compétition - U11-U15 » dans la rubrique Compétition -> « U11-U15 »."""
-    parts = re.split(accent_class_pattern(keyword), name, flags=re.IGNORECASE)
-    rest = max(parts, key=len) if len(parts) > 1 else name
-    for dp in drop_patterns:
-        rest = re.sub(dp, "", rest, flags=re.IGNORECASE)
-    rest = re.sub(r"\s{2,}", " ", rest).strip(" \t-–—")
-    if rest.startswith("(") and rest.endswith(")"):
-        rest = rest[1:-1].strip()
-    return rest if rest else name
+def autonomous_sheet_extra_tarifs(creneaux: Iterable[CreneauGroup]) -> list[str]:
+    """Tarifs HelloAsso des groupes de cours ajoutés à la fiche autonome (joins_autonomous_sheet)."""
+    return [str(t) for c in creneaux if joins_autonomous_sheet(c) for t in _tarifs(c)]
 
 
-def build_creneau_items(creneaux, include_autonome=True):
-    """Organise les créneaux en rubriques hiérarchiques :
-    - créneaux hors rubrique d'abord (Autonome, Adultes débutants, Lycée...), sans titre ;
-    - puis Collège, Enfants (sous-rubriques par tranche d'âge 2016-2018 / 2019-2020),
-      Perfectionnement et Compétition.
-    Retourne une liste de (kind, libellé, nom_brut) où kind ∈ {'section', 'sub-section', 'group'}.
-    `include_autonome=False` exclut les créneaux autonomes (export des cours)."""
-    buckets = {"Collège": [], "Enfants": {}, "Perfectionnement": [], "Compétition": []}
-    others = []
-    for c in creneaux:
-        name = str(c.get("groupe") or "").strip()
-        if not name:
-            continue
-        if not include_autonome and is_autonome_creneau(c):
-            continue
-        n = normalize_string(name)
-        if "competition" in n:
-            buckets["Compétition"].append((name, shorten_group_label(name, "competition")))
-        elif "college" in n:
-            buckets["Collège"].append((name, shorten_group_label(name, "college")))
-        elif "enfants" in n:
-            m = re.search(r"20\d\d\s*-\s*20\d\d", n)
-            sub = m.group(0).replace(" ", "") if m else "Autres tranches"
-            short = shorten_group_label(name, "enfants", (r"20\d\d\s*-\s*20\d\d",))
-            buckets["Enfants"].setdefault(sub, []).append((name, short))
-        elif "perfectionnement" in n:
-            buckets["Perfectionnement"].append((name, shorten_group_label(name, "perfectionnement")))
-        else:
-            others.append((name, name))
-
-    items = []
-    # Les créneaux hors rubrique sont listés en premier, sans titre de rubrique.
-    items.extend(("group", short, name) for name, short in sorted(others))
-    for section in SECTION_ORDER:
-        entries = buckets.get(section)
-        if not entries:
-            continue
-        items.append(("section", section, section))
-        if isinstance(entries, dict):
-            for sub in sorted(entries):
-                items.append(("sub-section", sub, sub))
-                items.extend(("group", short, name) for name, short in sorted(entries[sub]))
-        else:
-            items.extend(("group", short, name) for name, short in sorted(entries))
-    return items
+def _tarifs(creneau: CreneauGroup) -> list[str]:
+    tarifs = creneau.get("tarifs")
+    return [str(t) for t in tarifs] if isinstance(tarifs, list) else []
 
 
 def group_for_tarif(tarif_name: str, planning_data) -> str:
@@ -115,28 +58,3 @@ def group_for_tarif(tarif_name: str, planning_data) -> str:
             if normalize_string(t) == target:
                 return str(item.get("groupe") or "").strip()
     return ""
-
-
-def prune_empty_sections(blocks):
-    """Retire les rubriques (section / sub-section) sans aucun créneau exploitable
-    en dessous : utile quand l'appelant filtre les créneaux dont le payload est vide.
-    Les blocs attendus sont des tuples (kind, label, payload) avec
-    kind ∈ {'section', 'sub-section', 'group'} ; l'ordre est préservé."""
-    n = len(blocks)
-    keep = [True] * n
-    for i, (kind, _label, _payload) in enumerate(blocks):
-        if kind not in ("section", "sub-section"):
-            continue
-        level = 0 if kind == "section" else 1
-        has_group = False
-        for j in range(i + 1, n):
-            k2 = blocks[j][0]
-            if k2 == "group":
-                has_group = True
-                break
-            # Un nouveau titre de niveau >= arrête la recherche de descendants
-            if k2 == "section" or (k2 == "sub-section" and level == 1):
-                break
-        if not has_group:
-            keep[i] = False
-    return [b for i, b in enumerate(blocks) if keep[i]]

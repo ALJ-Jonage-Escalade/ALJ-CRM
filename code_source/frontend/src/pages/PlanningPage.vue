@@ -1,7 +1,9 @@
 <script setup lang="ts">
-/* Planning (coaches and admins): the week's slots on a grid or in a table, create / edit / delete, print, Excel
-   exports. Online only: nothing is kept on the device. */
-import { computed, inject, nextTick, onMounted, ref } from "vue";
+/* Planning (coaches and admins): layout of its sub-pages, Vue semaine (the grid) and Tableau des créneaux (router.ts).
+   Loads the slots they share, owns the slot dialog (create / edit), deletion, print and the Excel and calendar exports.
+   Online only: nothing is kept on the device. */
+import { computed, inject, nextTick, onMounted, provide, ref } from "vue";
+import { RouterView, useRoute, useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
@@ -15,26 +17,20 @@ import { createActivitiesApi } from "../services/activities";
 import { createMembersApi } from "../services/members";
 import { saveExport, saveFile } from "../lib/download";
 import { plural } from "../lib/text";
+import { PLANNING_KEY } from "./planning/context";
 import SlotForm from "./planning/SlotForm.vue";
-import SlotList from "./planning/SlotList.vue";
-import {
-  countLabel,
-  draftOf,
-  filterSlots,
-  KINDS,
-  planningIcs,
-  updateOf,
-  type KindFilter,
-  type Slot,
-  type SlotDraft,
-} from "./planning/slots";
-import WeekGrid from "./planning/WeekGrid.vue";
+import { countLabel, draftOf, planningIcs, updateOf, type Slot, type SlotDraft } from "./planning/slots";
 import { dialogs } from "../composables/dialogs";
 
 const client = inject(CLIENT_KEY)!;
 const activitiesApi = createActivitiesApi(client);
 const membersApi = createMembersApi(client);
 const toast = useToast();
+const route = useRoute();
+const router = useRouter();
+
+// The open sub-page (router.ts): its id, as AppShell lists it
+const sub = computed(() => route.meta.sub ?? "semaine");
 
 const slots = ref<Slot[]>([]);
 const status = ref("Chargement…");
@@ -64,14 +60,11 @@ async function refresh(): Promise<void> {
   toast.show("🔄 Planning réactualisé.");
 }
 
-// Views
-const view = ref<"week" | "table">("week");
-const search = ref("");
-const kind = ref<KindFilter>("all");
-const shown = computed(() => filterSlots(slots.value, search.value, kind.value));
-
+// The grid is what gets printed: the week sub-page (the index route) is opened first
 async function print(): Promise<void> {
-  view.value = "week";
+  if (sub.value !== "semaine") {
+    await router.push({ name: "planning" });
+  }
   await nextTick();
   window.print();
 }
@@ -139,23 +132,25 @@ function exportCalendar(): void {
   toast.show(`📅 Fichier agenda (.ics) téléchargé, à importer dans Google Agenda${left}.`, skipped ? 8000 : 4000);
 }
 
+provide(PLANNING_KEY, { slots, open, remove });
+
 onMounted(() => {
   void loadPlanning();
   void loadTarifs();
 });
-
-const chip = (active: boolean) => [
-  "cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold",
-  active ? "border-accent bg-accent text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
-];
 </script>
 
 <template>
-  <AppShell page="planning" title="Planning & Créneaux">
+  <AppShell page="planning" title="Planning & Créneaux" :sub="sub">
     <UiCard class="mb-3 print:hidden">
       <div class="flex flex-wrap items-center justify-between gap-2.5">
         <div class="min-w-0">
-          <h2 class="text-base font-bold">📅 Planning & gestion des créneaux</h2>
+          <h2 class="flex flex-wrap items-center gap-2 text-base font-bold">
+            📅 Planning & gestion des créneaux
+            <span data-testid="slot-count" class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+              {{ status }}
+            </span>
+          </h2>
           <p class="text-xs text-slate-500">
             Création, modification des créneaux, animateurs, tarifs HelloAsso et impression de la grille.
           </p>
@@ -187,61 +182,13 @@ const chip = (active: boolean) => [
           </UiButton>
         </div>
       </div>
-      <div class="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
-        <div class="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            data-testid="view-week"
-            :aria-pressed="view === 'week'"
-            :class="chip(view === 'week')"
-            @click="view = 'week'"
-          >
-            🗓️ Vue semaine
-          </button>
-          <button
-            type="button"
-            data-testid="view-table"
-            :aria-pressed="view === 'table'"
-            :class="chip(view === 'table')"
-            @click="view = 'table'"
-          >
-            📋 Tableau des créneaux
-          </button>
-        </div>
-        <span data-testid="slot-count" class="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
-          {{ status }}
-        </span>
-      </div>
     </UiCard>
 
-    <WeekGrid v-if="view === 'week'" :slots="slots" @open="open" />
-
-    <div v-else class="flex flex-col gap-2.5">
-      <UiCard class="flex flex-wrap items-center gap-2">
-        <input
-          v-model="search"
-          type="search"
-          data-testid="slot-search"
-          aria-label="Filtrer les créneaux"
-          placeholder="🔍 Filtrer les créneaux (nom, jour, encadrant, tarif)…"
-          class="min-w-0 flex-1 basis-60 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[12.5px]"
-        />
-        <div class="flex flex-wrap gap-1.5">
-          <button
-            v-for="[value, label] in KINDS"
-            :key="value"
-            type="button"
-            :data-testid="`kind-${value}`"
-            :aria-pressed="kind === value"
-            :class="chip(kind === value)"
-            @click="kind = value"
-          >
-            {{ label }}
-          </button>
-        </div>
-      </UiCard>
-      <SlotList :slots="shown" @edit="open" @remove="remove" />
-    </div>
+    <RouterView v-slot="{ Component }">
+      <KeepAlive>
+        <component :is="Component" />
+      </KeepAlive>
+    </RouterView>
 
     <UiDialog v-model:open="editing" :title="dialogTitle" wide data-testid="slot-dialog">
       <SlotForm

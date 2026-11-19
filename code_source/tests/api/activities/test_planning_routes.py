@@ -41,13 +41,15 @@ class TestPlanningRoutes(unittest.TestCase):
         self.assertEqual(res_create["status"], "success")
         saved_id = res_create["item"]["id"]
         self.assertGreater(saved_id, 0)
-        expected = {**new_slot, "id": saved_id, "encadrants": ["Test Coach"], "whatsapp_link": "", "naissance_min": "", "naissance_max": ""}
+        expected = {**new_slot, "id": saved_id, "encadrants": ["Test Coach"], "whatsapp_link": "", "naissance_min": "", "naissance_max": "",
+                    "seance_autonome": False}
         self.assertEqual(res_create["item"], expected)
 
         # 2. Modification du créneau
-        res_update = client.post("/api/planning/item", json={**expected, "groupe": "Test Créneau Modifié Web"})
+        updated = {**expected, "groupe": "Test Créneau Modifié Web", "seance_autonome": True}
+        res_update = client.post("/api/planning/item", json=updated)
         self.assertEqual(res_update.status_code, 200)
-        self.assertEqual(client.get("/api/planning").json(), [{**expected, "groupe": "Test Créneau Modifié Web"}])
+        self.assertEqual(client.get("/api/planning").json(), [updated])
 
         # 3. Export Excel (grille et liste)
         for mode in ("grid", "list"):

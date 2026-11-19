@@ -240,7 +240,8 @@ class SqliteDatabase:
             encadrants TEXT,
             helloasso_tarifs TEXT DEFAULT '[]',
             naissance_min TEXT DEFAULT '',
-            naissance_max TEXT DEFAULT ''
+            naissance_max TEXT DEFAULT '',
+            seance_autonome INTEGER DEFAULT 0
         );
         """)
         _add_missing_column(conn, cursor, "planning", "helloasso_tarifs", "TEXT DEFAULT '[]'")
@@ -249,6 +250,8 @@ class SqliteDatabase:
         # et l'année de naissance doit correspondre aux années du tarif HelloAsso.
         _add_missing_column(conn, cursor, "planning", "naissance_min", "TEXT DEFAULT ''")
         _add_missing_column(conn, cursor, "planning", "naissance_max", "TEXT DEFAULT ''")
+        # Case « Séance autonome » : les inscrits du créneau figurent sur la fiche de présence autonome
+        _add_missing_column(conn, cursor, "planning", "seance_autonome", "INTEGER DEFAULT 0")
 
         # Document de santé FFME : information associée à une personne pour une saison
         # donnée, stockée au niveau de l'achat (purchases).

@@ -14,7 +14,8 @@ from api.request_body import RequestBody
 
 class PlanningSlot(BaseModel):
     """A weekly slot. jour: a day ("Lundi"…), or several ("Lundi / Jeudi"); horaires: "18:00 - 20:00".
-    helloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds."""
+    helloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds;
+    seance_autonome: its members are listed on the autonomous attendance sheet."""
     id: int
     groupe: str
     type: str
@@ -26,6 +27,7 @@ class PlanningSlot(BaseModel):
     whatsapp_link: str
     naissance_min: str
     naissance_max: str
+    seance_autonome: bool
 
 
 class PlanningSlotUpdate(RequestBody):
@@ -41,6 +43,7 @@ class PlanningSlotUpdate(RequestBody):
     whatsapp_link: str = ""
     naissance_min: str = ""
     naissance_max: str = ""
+    seance_autonome: bool = False
 
 
 class PlanningSlotSaved(BaseModel):
@@ -61,12 +64,14 @@ class PresenceDates(BaseModel):
 
 
 class PresenceAutonomous(BaseModel):
-    """Members of the autonomous slots, plus the minors of other groups allowed to climb on their own."""
+    """Members of the autonomous slots, plus the minors of other groups allowed to climb on their own.
+    groups: the autonomous groups; extra_groups: the course groups ticked « Séance autonome », added to the sheet."""
     adultes: int
     mineurs: int
     mineurs_autorises: int
     total: int
     groups: List[str]
+    extra_groups: List[str]
 
 
 class PresenceCourse(BaseModel):

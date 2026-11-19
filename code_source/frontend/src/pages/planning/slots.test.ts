@@ -30,6 +30,7 @@ function slot(change: Partial<Slot> = {}): Slot {
     whatsapp_link: "",
     naissance_min: "",
     naissance_max: "",
+    seance_autonome: false,
     ...change,
   };
 }

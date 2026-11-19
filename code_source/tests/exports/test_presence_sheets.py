@@ -39,7 +39,8 @@ class TestPresenceSheetGenerator(unittest.TestCase):
         SqliteDatabase.set_db_path(os.path.join(self._tmpdir, "database.db"))
         SqliteDatabase.setup_database()
         PlanningRepository.save_planning_item({"groupe": "Adultes autonomes", "type": "autonome", "jour": "Mardi",
-                                             "horaires": "19h-22h", "helloasso_tarifs": ["Adultes autonomes"]})
+                                             "horaires": "19h-22h", "helloasso_tarifs": ["Adultes autonomes"],
+                                             "seance_autonome": True})
         PlanningRepository.save_planning_item({"groupe": "Loisir cours", "jour": "Lundi", "horaires": "18h-20h",
                                              "encadrants": ["Camille DIDIER"], "helloasso_tarifs": ["Loisir cours"]})
         MemberRepository.upsert_members([
@@ -69,6 +70,24 @@ class TestPresenceSheetGenerator(unittest.TestCase):
         self.assertIn("autonome", data)
         self.assertIn("cours", data)
         self.assertIn("default_dates", data)
+
+    def test_presence_api_config_adds_the_ticked_course_groups_to_the_autonomous_sheet(self):
+        """A course ticked « Séance autonome » keeps its course sheet; its members count on the autonomous sheet."""
+        from fastapi.testclient import TestClient
+        from server import app
+        client = TestClient(app, base_url="http://localhost")
+        saved = client.post("/api/planning/item", json={"groupe": "Perfectionnement U19 Adulte", "type": "perfectionnement",
+                                                        "jour": "Mercredi", "horaires": "20h-22h",
+                                                        "helloasso_tarifs": ["Perf adultes"], "seance_autonome": True})
+        self.assertTrue(saved.json()["item"]["seance_autonome"])
+        MemberRepository.upsert_members([_member("ORD-4", "ROBERT", "Ana", "Perf adultes")], "2026-2027")
+
+        config = client.get("/api/presence/config").json()
+        autonome = config["autonome"]
+        cours = [c["groupe"] for c in config["cours"]]
+        self.assertEqual((autonome["groups"], autonome["extra_groups"]), (["Adultes autonomes"], ["Perfectionnement U19 Adulte"]))
+        self.assertEqual(autonome["total"], 2)
+        self.assertEqual(cours, ["Loisir cours", "Perfectionnement U19 Adulte"])
 
     def test_presence_api_export_autonome(self):
         """Vérifie que /api/presence/export génère et télécharge une feuille Excel pour les autonomes."""

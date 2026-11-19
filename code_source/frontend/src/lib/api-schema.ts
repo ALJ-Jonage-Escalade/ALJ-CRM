@@ -4066,7 +4066,8 @@ export interface components {
         /**
          * PlanningSlot
          * @description A weekly slot. jour: a day ("Lundi"…), or several ("Lundi / Jeudi"); horaires: "18:00 - 20:00".
-         *     helloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds.
+         *     helloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds;
+         *     seance_autonome: its members are listed on the autonomous attendance sheet.
          */
         PlanningSlot: {
             /** Id */
@@ -4091,6 +4092,8 @@ export interface components {
             naissance_min: string;
             /** Naissance Max */
             naissance_max: string;
+            /** Seance Autonome */
+            seance_autonome: boolean;
         };
         /** PlanningSlotDeleted */
         PlanningSlotDeleted: {
@@ -4173,10 +4176,16 @@ export interface components {
              * @default
              */
             naissance_max?: string;
+            /**
+             * Seance Autonome
+             * @default false
+             */
+            seance_autonome?: boolean;
         };
         /**
          * PresenceAutonomous
          * @description Members of the autonomous slots, plus the minors of other groups allowed to climb on their own.
+         *     groups: the autonomous groups; extra_groups: the course groups ticked « Séance autonome », added to the sheet.
          */
         PresenceAutonomous: {
             /** Adultes */
@@ -4189,6 +4198,8 @@ export interface components {
             total: number;
             /** Groups */
             groups: string[];
+            /** Extra Groups */
+            extra_groups: string[];
         };
         /** PresenceConfig */
         PresenceConfig: {

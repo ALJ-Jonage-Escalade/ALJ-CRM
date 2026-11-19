@@ -63,7 +63,7 @@ class TestBureauAccess(unittest.TestCase):
                      "/bureau/competitions/bilan", "/bureau/competitions/coachs", "/competitions/helloasso",
                      "/competitions/bilan", "/competitions/coachs", "/bureau/outils/pivot", "/bureau/outils/stats",
                      "/bureau/outils/presence", "/bureau/outils/ffme", "/bureau/outils/ffme-import",
-                     "/bureau/outils/helloasso-import", "/bureau/parametres/campagnes"):
+                     "/bureau/outils/helloasso-import", "/bureau/parametres/campagnes", "/bureau/planning/tableau"):
             self.assertEqual(self.client.get(path).status_code, 200, path)
         self.assertEqual(self.client.get("/bureau/inconnue").status_code, 404)
         self.assertEqual(self.client.get("/bureau/competitions/inconnue").status_code, 404)

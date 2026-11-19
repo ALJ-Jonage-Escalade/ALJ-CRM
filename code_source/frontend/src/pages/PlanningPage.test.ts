@@ -1,9 +1,10 @@
 import { fakeAuth, json, provided } from "../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import { type ApiFetch } from "../lib/api";
 import type { Role } from "../lib/roles";
-import PlanningPage from "./PlanningPage.vue";
+import { routes } from "../router";
 import type { Slot } from "./planning/slots";
 import { dialogs } from "../composables/dialogs";
 
@@ -19,12 +20,13 @@ const SLOT = (change: Partial<Slot>): Slot => ({
   whatsapp_link: "",
   naissance_min: "",
   naissance_max: "",
+  seance_autonome: false,
   ...change,
 });
 const SLOTS = [
   SLOT({ id: 1, groupe: "Loisir collège", encadrants: ["Remus Lupin"] }),
   SLOT({ id: 2, groupe: "Compétition U13", type: "compétition", jour: "Mercredi" }),
-  SLOT({ id: 3, groupe: "Autonome", type: "autonome", jour: "Lundi / Jeudi" }),
+  SLOT({ id: 3, groupe: "Autonome", type: "autonome", jour: "Lundi / Jeudi", seance_autonome: true }),
 ];
 
 type Answer = (body: unknown) => Response;
@@ -35,7 +37,7 @@ const ANSWERS: Record<string, Answer> = {
   "DELETE /api/planning/item/2": () => json({ status: "success", message: "ok" }),
 };
 
-function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS) {
+async function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS, path = "/bureau/planning") {
   const calls: { method: string; path: string; body?: unknown }[] = [];
   const api: ApiFetch = vi.fn(async (url: string, init?: RequestInit) => {
     const u = new URL(url);
@@ -46,9 +48,13 @@ function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS)
     return answer ? answer(body) : json({}, 404);
   });
   const auth = fakeAuth({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role });
-  const wrapper = mount(PlanningPage, {
+  // The app's routes: the page renders its sub-pages (router.ts)
+  const router = createRouter({ history: createMemoryHistory(), routes });
+  await router.push(path);
+  const wrapper = mount(RouterView, {
     attachTo: document.body,
     global: {
+      plugins: [router],
       provide: provided(auth, api),
       stubs: { VersionBadge: true, PageLink: { template: "<a><slot /></a>" } },
     },
@@ -57,7 +63,12 @@ function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS)
   const byId = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
   const all = (id: string) => [...document.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`)];
   const writes = () => calls.filter((c) => c.method !== "GET");
-  return { wrapper, calls, writes, byId, all };
+  // The sub-menu links are stubbed (PageLink): opened through the router, as PageLink does
+  const open = async (sub: "semaine" | "tableau") => {
+    await router.push(sub === "semaine" ? "/bureau/planning" : `/bureau/planning/${sub}`);
+    await flushPromises();
+  };
+  return { wrapper, router, calls, writes, byId, all, open };
 }
 
 afterEach(() => {
@@ -67,16 +78,16 @@ afterEach(() => {
 
 describe("PlanningPage", () => {
   it("shows the week, then the table with its filters", async () => {
-    const { byId, all } = render();
+    const { byId, all, open } = await render();
     await flushPromises();
     expect(byId("slot-count")!.textContent).toBe("3 créneaux configurés");
     // The two-day slot has no column
     expect(all("slot-card").map((c) => c.querySelector("b")!.textContent)).toEqual(["Loisir collège", "Compétition U13"]);
     expect(byId("day-Mercredi")!.textContent).toContain("Compétition U13");
 
-    byId("view-table")!.click();
-    await flushPromises();
+    await open("tableau");
     expect(all("slot-row")).toHaveLength(3);
+    expect(all("slot-seance-autonome-cell").map((c) => c.textContent.includes("Séance autonome"))).toEqual([false, false, true]);
     const search = byId("slot-search") as HTMLInputElement;
     search.value = "lupin";
     search.dispatchEvent(new Event("input"));
@@ -87,10 +98,25 @@ describe("PlanningPage", () => {
     byId("kind-compétition")!.click();
     await flushPromises();
     expect(all("slot-row")).toHaveLength(1);
+
+    // The table keeps its filters while the week is shown (sub-pages kept mounted)
+    await open("semaine");
+    await open("tableau");
+    expect(all("slot-row")).toHaveLength(1);
+  });
+
+  it("prints the week grid, opened first from the table", async () => {
+    const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    const { byId, router } = await render("admin", ANSWERS, "/bureau/planning/tableau");
+    byId("planning-print")!.click();
+    await flushPromises();
+    expect(router.currentRoute.value.fullPath).toBe("/bureau/planning");
+    expect(byId("day-Lundi")).not.toBeNull();
+    expect(print).toHaveBeenCalledOnce();
   });
 
   it("creates a slot from the dialog", async () => {
-    const { byId, writes, calls } = render();
+    const { byId, writes, calls } = await render();
     await flushPromises();
     byId("slot-new")!.click();
     await flushPromises();
@@ -119,6 +145,7 @@ describe("PlanningPage", () => {
           whatsapp_link: "",
           naissance_min: "",
           naissance_max: "",
+          seance_autonome: false,
         },
       },
     ]);
@@ -128,7 +155,7 @@ describe("PlanningPage", () => {
   });
 
   it("edits a slot from its card, and shows a refusal", async () => {
-    const { byId, all, writes } = render("admin", {
+    const { byId, all, writes } = await render("admin", {
       ...ANSWERS,
       "POST /api/planning/item": () => json({ status: "error", message: "Les horaires sont obligatoires." }, 400),
     });
@@ -145,7 +172,7 @@ describe("PlanningPage", () => {
   });
 
   it("does not send a slot without a name", async () => {
-    const { byId, writes } = render();
+    const { byId, writes } = await render();
     await flushPromises();
     byId("slot-new")!.click();
     await flushPromises();
@@ -157,9 +184,7 @@ describe("PlanningPage", () => {
 
   it("deletes a slot once confirmed", async () => {
     const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-    const { byId, all, writes } = render();
-    await flushPromises();
-    byId("view-table")!.click();
+    const { byId, all, writes } = await render("admin", ANSWERS, "/bureau/planning/tableau");
     await flushPromises();
     all("slot-delete")[1]!.click();
     expect(writes()).toEqual([]);
@@ -173,7 +198,7 @@ describe("PlanningPage", () => {
   });
 
   it("lets a coach change the slots too", async () => {
-    const { byId, all, writes } = render("coach");
+    const { byId, all, writes } = await render("coach");
     await flushPromises();
     expect(byId("slot-new")).not.toBeNull();
     all("slot-card")[0]!.click();
@@ -184,7 +209,10 @@ describe("PlanningPage", () => {
   });
 
   it("says when the planning cannot be loaded", async () => {
-    const { byId } = render("admin", { ...ANSWERS, "GET /api/planning": () => json({ status: "error", message: "Erreur interne." }, 500) });
+    const { byId } = await render("admin", {
+      ...ANSWERS,
+      "GET /api/planning": () => json({ status: "error", message: "Erreur interne." }, 500),
+    });
     await flushPromises();
     expect(byId("slot-count")!.textContent).toBe("Erreur chargement");
     expect(byId("toast")!.textContent).toBe("❌ Impossible de charger le planning : Erreur interne.");
