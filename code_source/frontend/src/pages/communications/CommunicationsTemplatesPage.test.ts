@@ -1,9 +1,9 @@
-import { fakeAuth, json, provided } from "../test/harness";
+import { fakeAuth, json, provided } from "../../test/harness";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type ApiFetch } from "../lib/api";
-import CommunicationsPage from "./CommunicationsPage.vue";
-import { dialogs } from "../composables/dialogs";
+import { type ApiFetch } from "../../lib/api";
+import CommunicationsTemplatesPage from "./CommunicationsTemplatesPage.vue";
+import { dialogs } from "../../composables/dialogs";
 
 const RELANCE = { name: "Relance", subject: "Rappel {first_name}", body: "Bonjour", sender_email: "a@alj.example", sender_name: "ALJ" };
 const ECHEANCE = { name: "Rappel echeance", subject: "Échéance", body: "Payez", sender_email: "b@alj.example", sender_name: "ALJ" };
@@ -38,7 +38,7 @@ function render(answers: Record<string, Answer> = ANSWERS) {
     return answer ? answer(body) : json({}, 404);
   });
   const auth = fakeAuth({ status: "signedIn", user: { uid: "u1", email: "admin@alj.example" }, role: "admin" });
-  const wrapper = mount(CommunicationsPage, {
+  const wrapper = mount(CommunicationsTemplatesPage, {
     attachTo: document.body,
     global: {
       provide: provided(auth, api),
@@ -57,7 +57,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("CommunicationsPage", () => {
+describe("CommunicationsTemplatesPage", () => {
   it("opens the instalment reminder, with its preview and the WhatsApp text", async () => {
     const { byId, value } = render();
     await flushPromises();

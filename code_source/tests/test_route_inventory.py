@@ -30,6 +30,7 @@ EXPECTED_ROUTES: dict[tuple[str, str], Optional[Role]] = {
     ("GET", "/annuaire/competitions.html"): None,
     ("GET", "/annuaire/index.html"): None,
     ("GET", "/api/admin/access/history"): Role.ADMIN,
+    ("GET", "/api/admin/email-log"): Role.ADMIN,
     ("GET", "/api/admin/access/roles"): Role.ADMIN,
     ("POST", "/api/admin/access/roles"): Role.ADMIN,
     ("DELETE", "/api/admin/access/roles/{email}"): Role.ADMIN,

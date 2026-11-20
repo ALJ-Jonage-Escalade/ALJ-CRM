@@ -54,6 +54,11 @@ export const PAGES = [
     access: "admin",
     screen: "any",
     offlineRead: false,
+    // Online only: neither the templates nor the sends are kept on the device
+    children: [
+      { id: "modeles", label: "Modèles", path: "", access: "admin", offline: "none" },
+      { id: "historique", label: "Historique des envois", path: "historique", access: "admin", offline: "none" },
+    ],
   },
   {
     id: "competitions",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -43,3 +43,10 @@ class CompetitionEmailLog(BaseModel):
     """Every send about the competition, newest first, and its competitors' last contacts."""
     entries: List[EmailLogEntry]
     summary: ContactSummary
+
+
+class RecentEmailLog(BaseModel):
+    """The latest sends of the whole app, newest first (Communications › Historique des envois)."""
+    entries: List[EmailLogEntry]
+    competition_names: Dict[int, str] = Field(description="Name of each competition of these entries that still exists")
+    truncated: bool = Field(description="The cap was reached: older sends are not listed")

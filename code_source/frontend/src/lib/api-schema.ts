@@ -390,6 +390,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/email-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent Email Log */
+        get: operations["recent_email_log_api_admin_email_log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/members": {
         parameters: {
             query?: never;
@@ -4453,6 +4470,26 @@ export interface components {
             same_sheet?: boolean;
         };
         /**
+         * RecentEmailLog
+         * @description The latest sends of the whole app, newest first (Communications › Historique des envois).
+         */
+        RecentEmailLog: {
+            /** Entries */
+            entries: components["schemas"]["EmailLogEntry"][];
+            /**
+             * Competition Names
+             * @description Name of each competition of these entries that still exists
+             */
+            competition_names: {
+                [key: string]: string;
+            };
+            /**
+             * Truncated
+             * @description The cap was reached: older sends are not listed
+             */
+            truncated: boolean;
+        };
+        /**
          * ResultsFetchRequest
          * @description url: MyCompet results page or number given by the coach ("": the stored one, else a search); club: name
          *     searched in the results.
@@ -6060,6 +6097,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    recent_email_log_api_admin_email_log_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentEmailLog"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Service Unavailable */

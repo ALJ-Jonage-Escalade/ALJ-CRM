@@ -1822,6 +1822,44 @@
         }
       }
     },
+    "/api/admin/email-log": {
+      "get": {
+        "summary": "Recent Email Log",
+        "operationId": "recent_email_log_api_admin_email_log_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentEmailLog"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/members": {
       "get": {
         "summary": "List Members",
@@ -11051,6 +11089,38 @@
         "type": "object",
         "title": "PresenceExportRequest",
         "description": "Attendance sheets to generate. season: the active one when empty; dates: dd/mm/yyyy, the season's when empty.\ncours only: selected_groups (all the courses when empty) and same_sheet (one workbook, else a ZIP of one file per course)."
+      },
+      "RecentEmailLog": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/EmailLogEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "competition_names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Competition Names",
+            "description": "Name of each competition of these entries that still exists"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "The cap was reached: older sends are not listed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries",
+          "competition_names",
+          "truncated"
+        ],
+        "title": "RecentEmailLog",
+        "description": "The latest sends of the whole app, newest first (Communications › Historique des envois)."
       },
       "ResultsFetchRequest": {
         "properties": {

@@ -32,6 +32,8 @@ const AdherentsPage = () => import("./pages/AdherentsPage.vue");
 const AdministrationPage = () => import("./pages/AdministrationPage.vue");
 const AdministrationAccessPage = () => import("./pages/administration/AdministrationAccessPage.vue");
 const CommunicationsPage = () => import("./pages/CommunicationsPage.vue");
+const CommunicationsTemplatesPage = () => import("./pages/communications/CommunicationsTemplatesPage.vue");
+const CommunicationsHistoryPage = () => import("./pages/communications/CommunicationsHistoryPage.vue");
 const OutilsPage = () => import("./pages/OutilsPage.vue");
 const ParametresPage = () => import("./pages/ParametresPage.vue");
 const ParametresGeneralPage = () => import("./pages/parametres/ParametresGeneralPage.vue");
@@ -52,6 +54,7 @@ const OutilsKeysPage = () => import("./pages/outils/OutilsKeysPage.vue");
 /** Component of each sub-page, by page then sub-page id (lib/access.ts subPages). */
 const SUB_COMPONENTS: Partial<Record<PageId, Record<string, RouteComponent>>> = {
   administration: { acces: AdministrationAccessPage },
+  communications: { modeles: CommunicationsTemplatesPage, historique: CommunicationsHistoryPage },
   parametres: { general: ParametresGeneralPage, campagnes: ParametresCampaignsPage },
   competitions: {
     competitions: CompetitionsListPage,
@@ -111,7 +114,12 @@ export const routes: RouteRecordRaw[] = [
     children: subRoutes("competitions", "competitions"),
   },
   { path: "/index", name: "annuaire", component: AnnuairePage, meta: { access: pageAccess("annuaire") } },
-  { path: "/bureau/communications", name: "communications", component: CommunicationsPage, meta: { access: pageAccess("communications") } },
+  {
+    path: "/bureau/communications",
+    component: CommunicationsPage,
+    meta: { access: pageAccess("communications") },
+    children: subRoutes("communications", "communications"),
+  },
   {
     path: "/bureau/planning",
     component: PlanningPage,

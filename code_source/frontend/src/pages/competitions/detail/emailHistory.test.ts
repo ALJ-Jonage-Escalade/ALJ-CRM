@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { competitorContact, entriesFor, failedCount, isInternal, KIND_LABELS, type EmailLog, type EmailLogEntry } from "./emailHistory";
+import type { EmailLogEntry } from "../../../lib/emailLog";
+import { competitorContact, entriesFor, type EmailLog } from "./emailHistory";
 
 const recipient = (member_id: number | null, email: string, status: "sent" | "failed" = "sent") => ({
   member_id,
@@ -62,12 +63,5 @@ describe("history", () => {
       "2026-11-01T09:00:00+00:00",
     ]);
     expect(entriesFor(log.entries, { adherent_id: null, email: "guest@example.org" })).toHaveLength(1);
-  });
-
-  it("labels, internal kinds and failures", () => {
-    expect(KIND_LABELS.competition_all_paid).toMatch(/^Interne/);
-    expect(isInternal("results_batch")).toBe(true);
-    expect(isInternal("competition_email")).toBe(false);
-    expect(log.entries.map(failedCount)).toEqual([0, 1, 0]);
   });
 });

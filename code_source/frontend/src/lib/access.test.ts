@@ -142,7 +142,14 @@ describe("sub-pages", () => {
       "/bureau/competitions/bilan",
       "/bureau/competitions/coachs",
     ]);
-    expect(subPages("communications")).toEqual([]);
+  });
+
+  it("split Communications into Modèles and Historique des envois, for admins online only", () => {
+    const pages = subPages("communications");
+    expect(pages.map((s) => [s.label, subHref("communications", s), s.access, s.offline])).toEqual([
+      ["Modèles", "/bureau/communications", "admin", "none"],
+      ["Historique des envois", "/bureau/communications/historique", "admin", "none"],
+    ]);
   });
 
   it("split the settings into Général and Campagne HelloAsso, for admins online only", () => {

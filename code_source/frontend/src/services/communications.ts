@@ -1,5 +1,5 @@
-/* API of the communications theme (server: api/communications/): e-mail templates and sending, the WhatsApp text,
-   payment attestations. Conventions of every service: frontend/AGENTS.md § API services. */
+/* API of the communications theme (server: api/communications/): e-mail templates and sending, the e-mail log, the
+   WhatsApp text, payment attestations. Conventions of every service: frontend/AGENTS.md § API services. */
 import { unwrap, type ApiClient, type Schemas } from "../lib/client";
 
 /** A saved e-mail template: name, subject, body and sender. */
@@ -18,6 +18,8 @@ export function createCommunicationsApi(client: ApiClient) {
     emailStatus: () => unwrap(client.GET("/api/email-status")),
     /** Sends each recipient the subject and body with their variables filled in (or a saved template's). */
     sendEmail: (body: Schemas["EmailSendRequest"]) => unwrap(client.POST("/api/send-email", { body })),
+    /** The latest sends of the whole app, newest first, with the names of their competitions (admins). */
+    emailLog: () => unwrap(client.GET("/api/admin/email-log")),
 
     // ------------------------------------------------------------ WhatsApp
     whatsappTemplate: () => unwrap(client.GET("/api/whatsapp-template")),

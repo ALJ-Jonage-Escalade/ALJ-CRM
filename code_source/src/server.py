@@ -106,13 +106,13 @@ async def security_headers_middleware(request, call_next):
 app.middleware("http")(security_headers_middleware)  # outermost
 
 # Data routes of the web front end (competitions, coaches, HelloAsso links, members): src/api/
-from api.competitions import coaches, competitions, email_log, helloasso_items, participants
+from api.competitions import coaches, competitions, email_log as competition_email_log, helloasso_items, participants
 from api.competitions import members as competition_members
 from api.competitions import results
 from api.activities import planning, presence
 from api.admin import access
 from api.auth import me
-from api.communications import attestations, email, whatsapp
+from api.communications import attestations, email, email_log, whatsapp
 from api.members import helloasso_import, members, seasons
 from api.ffme import ffme
 from api.keys import keys
@@ -122,7 +122,7 @@ from api.web import health, pages, pwa
 from api.responses import service_error_handler
 from domain.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
-             results, email_log, members, seasons, helloasso_import, email, whatsapp, attestations,
+             results, competition_email_log, email_log, members, seasons, helloasso_import, email, whatsapp, attestations,
              planning, presence, members_map, pivot, ffme, keys,
              helloasso, helloasso_campaigns, google_auth, cloud_db, me, access,
              pages, pwa, health):
@@ -130,12 +130,13 @@ for _api in (competitions, participants, coaches, competition_members, helloasso
 pages.mount_static(app)
 # Every route of these routers skips the SQLite cache refresh: a route that reads or writes the
 # cache (members, email templates…) must live in another router, even under /api/competitions.
-# /api/me and /api/admin/access only use the access list,
+# /api/me and /api/admin/access only use the access list, /api/admin/email-log the e-mail log and competitions,
 # /api/helloasso/campaigns the app_settings collection and HelloAsso. The MyCompet results batch
 # (results) reads its settings from Firestore: Cloud Scheduler's 07:00 call must not wait for a
 # full cache rebuild on a cold start (180 s deadline).
 FIRESTORE_ONLY_PATHS.extend(r.path_regex for _api in (competitions, participants, coaches, competition_members, helloasso_items,
-                                                      results, email_log, me, access, helloasso_campaigns)
+                                                      results, competition_email_log, email_log, me, access,
+                                                      helloasso_campaigns)
                             for r in _api.router.routes if isinstance(r, APIRoute))
 # FastAPI's decorator form: add_exception_handler's type only accepts handlers taking any Exception
 app.exception_handler(ServiceError)(service_error_handler)
