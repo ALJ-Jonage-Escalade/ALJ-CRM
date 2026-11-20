@@ -20,6 +20,7 @@ from infrastructure.mail.sender import EmailSender
 from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.security.role_directory import normalized_email, parsed
 from services.access.rules import AccessRules
+from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
 
 logger = logging.getLogger("alj")
 
@@ -100,9 +101,15 @@ def send_invitation(rules: AccessRules, entry: RoleEntry, author: str, page_url:
         text, html = invitation_email(entry, inviter_name(rules, author), app_link(page_url))
         send(to_email=entry["email"], subject=SUBJECT, body=text, html_body=html,
              from_email=DEFAULT_SENDER_EMAIL, from_name=DEFAULT_SENDER_NAME)
-        return Invitation(entry=rules.mark_invitation_sent(entry["email"]), email_sent=True, email_error=None)
-    except Exception as e:  # mailer down, bad configuration, store error after sending: the invitation stays
+    except Exception as e:  # mailer down, bad configuration: the invitation stays
         logger.warning("Invitation de %s : e-mail non envoyé", entry["email"], exc_info=True)
+        record_send("access_invitation", author, [logged_recipient(entry["email"], entry["display_name"], error=SEND_FAILED)], SUBJECT)
+        return Invitation(entry=entry, email_sent=False, email_error=str(e) or type(e).__name__)
+    record_send("access_invitation", author, [logged_recipient(entry["email"], entry["display_name"])], SUBJECT)
+    try:
+        return Invitation(entry=rules.mark_invitation_sent(entry["email"]), email_sent=True, email_error=None)
+    except Exception as e:  # store error after sending: reported as before, the admin resends
+        logger.warning("Invitation de %s : envoi non enregistré", entry["email"], exc_info=True)
         return Invitation(entry=entry, email_sent=False, email_error=str(e) or type(e).__name__)
 
 

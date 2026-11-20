@@ -1753,6 +1753,75 @@
         }
       }
     },
+    "/api/competitions/{competition_id}/email-log": {
+      "get": {
+        "summary": "Competition Email Log",
+        "operationId": "competition_email_log_api_competitions__competition_id__email_log_get",
+        "parameters": [
+          {
+            "name": "competition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Competition Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompetitionEmailLog"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/members": {
       "get": {
         "summary": "List Members",
@@ -5926,6 +5995,27 @@
         ],
         "title": "CompetitionCreate"
       },
+      "CompetitionEmailLog": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/EmailLogEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ContactSummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries",
+          "summary"
+        ],
+        "title": "CompetitionEmailLog",
+        "description": "Every send about the competition, newest first, and its competitors' last contacts."
+      },
       "CompetitionFfmeLookup": {
         "properties": {
           "id_ffme": {
@@ -6418,6 +6508,60 @@
         "title": "CompetitorContact",
         "description": "Contacts of a participant of an open competition (domain/members/view.py competitor_contacts): the only\nmember data kept offline on a coach's phone."
       },
+      "CompetitorLastContact": {
+        "properties": {
+          "member_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "default": ""
+          },
+          "last_sent_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sent At",
+            "description": "Last competitor e-mail that left for this competitor"
+          },
+          "last_failed": {
+            "type": "boolean",
+            "title": "Last Failed",
+            "description": "Their latest attempt failed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "CompetitorLastContact"
+      },
+      "ContactSummary": {
+        "properties": {
+          "competitors": {
+            "items": {
+              "$ref": "#/components/schemas/CompetitorLastContact"
+            },
+            "type": "array",
+            "title": "Competitors",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "ContactSummary"
+      },
       "Creneau": {
         "properties": {
           "groupe": {
@@ -6502,6 +6646,18 @@
             "type": "array",
             "title": "Details",
             "default": []
+          },
+          "log_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Notice",
+            "description": "Set when the e-mails left but the send is missing from the e-mail log"
           }
         },
         "type": "object",
@@ -6510,6 +6666,74 @@
         ],
         "title": "EmailDispatch",
         "description": "Outcome of /api/send-email when at least one e-mail left: status \"partial\" when some recipients failed (see\ndetails). A refused request is a 400, and a sending where every e-mail failed a 502."
+      },
+      "EmailLogEntry": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At",
+            "description": "ISO 8601 UTC"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author",
+            "description": "E-mail of the person who sent it, « system » for automatic sends"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "competition_email",
+              "member_email",
+              "competition_all_paid",
+              "results_batch",
+              "attestation",
+              "access_invitation"
+            ],
+            "title": "Kind"
+          },
+          "template": {
+            "type": "string",
+            "title": "Template",
+            "default": ""
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "default": ""
+          },
+          "competition_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Competition Ids",
+            "default": []
+          },
+          "member_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Member Ids",
+            "default": []
+          },
+          "recipients": {
+            "items": {
+              "$ref": "#/components/schemas/LoggedRecipient"
+            },
+            "type": "array",
+            "title": "Recipients",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "author",
+          "kind"
+        ],
+        "title": "EmailLogEntry",
+        "description": "One send action (one click on « Envoyer », one webhook notification, one cron e-mail); no body stored."
       },
       "EmailRecipient": {
         "properties": {
@@ -8561,6 +8785,57 @@
         ],
         "title": "KeyReturnIn",
         "description": "A key given back (not before it was handed over)."
+      },
+      "LoggedRecipient": {
+        "properties": {
+          "member_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Id",
+            "description": "None: an address outside the members (the club's inbox)"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "description": "The address the e-mail was sent to, even if corrected since"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "status"
+        ],
+        "title": "LoggedRecipient"
       },
       "ManualPayment": {
         "properties": {

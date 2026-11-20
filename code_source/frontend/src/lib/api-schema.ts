@@ -373,6 +373,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/competitions/{competition_id}/email-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Competition Email Log */
+        get: operations["competition_email_log_api_competitions__competition_id__email_log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/members": {
         parameters: {
             query?: never;
@@ -2001,6 +2018,15 @@ export interface components {
             type?: string | null;
         };
         /**
+         * CompetitionEmailLog
+         * @description Every send about the competition, newest first, and its competitors' last contacts.
+         */
+        CompetitionEmailLog: {
+            /** Entries */
+            entries: components["schemas"]["EmailLogEntry"][];
+            summary: components["schemas"]["ContactSummary"];
+        };
+        /**
          * CompetitionFfmeLookup
          * @description Informations de la compétition extraites de MyCompet FFME par son numéro.
          */
@@ -2264,6 +2290,35 @@ export interface components {
              */
             emergency2_phone: string;
         };
+        /** CompetitorLastContact */
+        CompetitorLastContact: {
+            /** Member Id */
+            member_id?: number | null;
+            /**
+             * Email
+             * @default
+             */
+            email?: string;
+            /**
+             * Last Sent At
+             * @description Last competitor e-mail that left for this competitor
+             */
+            last_sent_at?: string | null;
+            /**
+             * Last Failed
+             * @description Their latest attempt failed
+             * @default false
+             */
+            last_failed?: boolean;
+        };
+        /** ContactSummary */
+        ContactSummary: {
+            /**
+             * Competitors
+             * @default []
+             */
+            competitors?: components["schemas"]["CompetitorLastContact"][];
+        };
         /**
          * Creneau
          * @description A slot group of the planning and the HelloAsso tariffs it covers.
@@ -2325,6 +2380,57 @@ export interface components {
              * @default []
              */
             details?: components["schemas"]["EmailSendDetail"][];
+            /**
+             * Log Notice
+             * @description Set when the e-mails left but the send is missing from the e-mail log
+             */
+            log_notice?: string | null;
+        };
+        /**
+         * EmailLogEntry
+         * @description One send action (one click on « Envoyer », one webhook notification, one cron e-mail); no body stored.
+         */
+        EmailLogEntry: {
+            /**
+             * At
+             * @description ISO 8601 UTC
+             */
+            at: string;
+            /**
+             * Author
+             * @description E-mail of the person who sent it, « system » for automatic sends
+             */
+            author: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "competition_email" | "member_email" | "competition_all_paid" | "results_batch" | "attestation" | "access_invitation";
+            /**
+             * Template
+             * @default
+             */
+            template?: string;
+            /**
+             * Subject
+             * @default
+             */
+            subject?: string;
+            /**
+             * Competition Ids
+             * @default []
+             */
+            competition_ids?: number[];
+            /**
+             * Member Ids
+             * @default []
+             */
+            member_ids?: number[];
+            /**
+             * Recipients
+             * @default []
+             */
+            recipients?: components["schemas"]["LoggedRecipient"][];
         };
         /**
          * EmailRecipient
@@ -3411,6 +3517,31 @@ export interface components {
              * @default
              */
             comment?: string;
+        };
+        /** LoggedRecipient */
+        LoggedRecipient: {
+            /**
+             * Member Id
+             * @description None: an address outside the members (the club's inbox)
+             */
+            member_id?: number | null;
+            /**
+             * Email
+             * @description The address the e-mail was sent to, even if corrected since
+             */
+            email: string;
+            /**
+             * Name
+             * @default
+             */
+            name?: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "sent" | "failed";
+            /** Error */
+            error?: string | null;
         };
         /**
          * ManualPayment
@@ -5880,6 +6011,64 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    competition_email_log_api_competitions__competition_id__email_log_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                competition_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompetitionEmailLog"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

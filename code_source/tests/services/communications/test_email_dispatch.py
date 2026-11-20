@@ -12,6 +12,9 @@ _src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
+from domain.errors import UpstreamUnavailable
+from infrastructure.mail.sender import MailError
+from services.communications import email_log
 from services.communications.email_dispatch import EmailDispatchService, render_email
 from api.communications.email import get_email_templates, get_email_status
 
@@ -83,6 +86,42 @@ class TestEmailDispatchService(unittest.TestCase):
         self.assertEqual(res["sent_count"], 2)
         self.assertEqual(res["errors_count"], 0)
         self.assertEqual(mock_send.call_count, 2)
+
+    @patch("services.communications.email_dispatch.EmailDispatchService.get_competition_context", return_value={})
+    @patch("infrastructure.mail.sender.EmailSender.send_email")
+    def test_dispatch_records_one_log_entry(self, mock_send, _context):
+        """One send, one entry: each recipient with the address used and its own status, a partial failure included."""
+        mock_send.side_effect = [None, MailError("550 mailbox unavailable")]
+        recipients = [
+            {"id": 1, "first_name": "Alice", "last_name": "DURAND", "email": "alice@example.com"},
+            {"id": 2, "first_name": "Bob", "last_name": "DURAND", "email": "bob@example.com"},
+            {"id": 3, "first_name": "Carl", "last_name": "SANS", "email": "pas-une-adresse"},
+        ]
+        res = EmailDispatchService.dispatch_emails(subject="Rappel {first_name}", body="Bonjour", recipients=recipients,
+                                                   competition_id=7, add_signature=False, author="coach@alj.example")
+        self.assertEqual((res["status"], res["log_notice"]), ("partial", None))
+        (entry,) = email_log.current_store().entries
+        self.assertEqual((entry["kind"], entry["author"], entry["competition_ids"], entry["member_ids"]),
+                         ("competition_email", "coach@alj.example", [7], [1, 2]))
+        self.assertEqual(entry["subject"], "Rappel Alice")
+        self.assertEqual([(r["member_id"], r["email"], r["status"]) for r in entry["recipients"]],
+                         [(1, "alice@example.com", "sent"), (2, "bob@example.com", "failed")])
+        self.assertNotIn("550", entry["recipients"][1]["error"])  # the mailer's reason stays in the logs
+
+    @patch("infrastructure.mail.sender.EmailSender.send_email", side_effect=MailError("down"))
+    def test_dispatch_all_failed_is_recorded(self, _send):
+        with self.assertRaises(UpstreamUnavailable):
+            EmailDispatchService.dispatch_emails(subject="Info", body="Bonjour", recipients=[{"id": 1, "email": "a@example.com"}],
+                                                 add_signature=False)
+        (entry,) = email_log.current_store().entries
+        self.assertEqual((entry["kind"], [r["status"] for r in entry["recipients"]]), ("member_email", ["failed"]))
+
+    @patch("infrastructure.mail.sender.EmailSender.send_email")
+    def test_dispatch_log_down_still_sent(self, _send):
+        email_log.current_store().failing = True
+        res = EmailDispatchService.dispatch_emails(subject="Info", body="Bonjour", recipients=[{"id": 1, "email": "a@example.com"}],
+                                                   add_signature=False)
+        self.assertEqual((res["status"], res["sent_count"], res["log_notice"]), ("success", 1, email_log.NOT_RECORDED))
 
     def test_fastapi_templates_and_status_endpoints(self):
         """Teste les route handlers FastAPI /api/email-templates et /api/email-status."""

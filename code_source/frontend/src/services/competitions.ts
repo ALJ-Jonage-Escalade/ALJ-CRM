@@ -33,6 +33,8 @@ export function createCompetitionsApi(client: ApiClient) {
       ),
     remove: (competitionId: number) => unwrap(client.DELETE("/api/competitions/{competition_id}", competition(competitionId))),
     archivePast: () => unwrap(client.POST("/api/competitions/archive-past")),
+    /** Every e-mail sent about the competition, newest first, and its competitors' last contacts. */
+    emailLog: (competitionId: number) => unwrap(client.GET("/api/competitions/{competition_id}/email-log", competition(competitionId))),
     /** Scrapes MyCompet FFME for competition title and metadata from its ID number. */
     lookupFfme: (idFfme: string) =>
       unwrap(client.GET("/api/competitions/lookup-ffme/{id_ffme}", { params: { path: { id_ffme: idFfme } } })),

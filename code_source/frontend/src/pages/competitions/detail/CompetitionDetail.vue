@@ -35,6 +35,9 @@ import {
 } from "../competitions";
 import CompetitionActions from "./CompetitionActions.vue";
 import EmailForm from "./EmailForm.vue";
+import EmailHistory from "./EmailHistory.vue";
+import { competitorContact, entriesFor } from "./emailHistory";
+import { useCompetitionEmailLog } from "./emailLog";
 import { COMPETITIONS_KEY } from "../context";
 import type { QueuedFlag } from "../outbox";
 import AthleteContactDialog from "./AthleteContactDialog.vue";
@@ -43,7 +46,7 @@ import ParticipantRow from "./ParticipantRow.vue";
 import PaymentForm from "./PaymentForm.vue";
 import WithdrawForm from "./WithdrawForm.vue";
 import { competitionItself, WRITER_KEY } from "../writer";
-import { formatDayText } from "../../../lib/format";
+import { formatDateTime, formatDayText } from "../../../lib/format";
 import { plural } from "../../../lib/text";
 import { dialogs } from "../../../composables/dialogs";
 
@@ -54,7 +57,7 @@ const props = defineProps<{
   coaches: readonly Coach[];
 }>();
 // Who may write, the outbox and the account: shared by the competitions page with all its sub-pages
-const { canWrite, staff, contactsShown, outbox, uid } = inject(COMPETITIONS_KEY)!;
+const { canWrite, staff, contactsShown, online, outbox, uid } = inject(COMPETITIONS_KEY)!;
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const writer = inject(WRITER_KEY)!;
 
@@ -235,6 +238,33 @@ async function restore(r: Row): Promise<void> {
 }
 
 const emailing = ref(false);
+
+// ---------------------------------------------------------------- E-mail history
+
+const emailLog = useCompetitionEmailLog(
+  () => c.value.id,
+  () => uid.value,
+);
+const logView = emailLog.view;
+/* The history dialog: every send of the competition ("all"), or those that included one competitor */
+const historyOf = ref<Row | "all" | null>(null);
+const historyOpen = computed({
+  get: () => historyOf.value !== null,
+  set: (open: boolean) => {
+    if (!open) {
+      historyOf.value = null;
+    }
+  },
+});
+const historyEntries = computed(() => {
+  const entries = logView.value.log?.entries ?? [];
+  const who = historyOf.value;
+  return who === null || who === "all" ? entries : entriesFor(entries, who);
+});
+const historyTitle = computed(() => {
+  const who = historyOf.value;
+  return who && who !== "all" ? `✉️ E-mails envoyés à ${named(who)}` : `✉️ E-mails envoyés : ${c.value.nom}`;
+});
 const contactAthlete = ref<Row | null>(null);
 const contactDialogOpen = ref(false);
 /* A dialog open while its participant is set; closing it (Escape, outside click) forgets the participant. */
@@ -295,6 +325,19 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
             <i v-if="!c.coaches?.length">Aucun coach assigné</i>
           </template>
           <template v-else>🏃 {{ c.coaches?.length ? `Coachs : ${c.coaches.join(", ")}` : "Aucun coach" }}</template>
+        </p>
+        <p class="mt-0.5 text-xs text-slate-500 lg:mt-1.5">
+          <button
+            type="button"
+            data-testid="history-open"
+            class="cursor-pointer font-semibold text-blue-700 hover:underline"
+            @click="historyOf = 'all'"
+          >
+            ✉️ Historique des e-mails
+          </button>
+          <span v-if="emailLog.staleSince.value" data-testid="history-stale">
+            · 💾 historique du {{ formatDateTime(emailLog.staleSince.value) }}
+          </span>
         </p>
         <div class="mt-1.5 flex flex-wrap gap-1.5 lg:mt-2">
           <a
@@ -449,9 +492,12 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
               v-for="r in list"
               :key="r.adherent_id ?? `${r.nom}-${r.prenom}`"
               :row="r"
+              :contact="competitorContact(logView, r)"
+              :online="online"
               :can-write="canWrite"
               :staff="staff || canWrite"
               :contacts-shown="contactsShown"
+              @history="historyOf = r"
               @toggle="(flag, value) => toggle(r, flag, value)"
               @remove="removeOne(r)"
               @pay="paying = server(r) ?? null"
@@ -475,9 +521,12 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
               v-for="r in list"
               :key="r.adherent_id ?? `${r.nom}-${r.prenom}`"
               :row="r"
+              :contact="competitorContact(logView, r)"
+              :online="online"
               :can-write="canWrite"
               :staff="staff || canWrite"
               :contacts-shown="contactsShown"
+              @history="historyOf = r"
               @toggle="(flag, value) => toggle(r, flag, value)"
               @remove="removeOne(r)"
               @pay="paying = server(r) ?? null"
@@ -521,10 +570,22 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           (m) => {
             emailing = false;
             writer.toast(m, 6000);
+            void emailLog.refresh();
           }
         "
         @cancel="emailing = false"
       />
+    </UiDialog>
+
+    <UiDialog v-model:open="historyOpen" :title="historyTitle" wide data-testid="history-dialog">
+      <p v-if="emailLog.staleSince.value" class="mb-2 text-xs text-amber-800">
+        💾 Historique du {{ formatDateTime(emailLog.staleSince.value) }} : les envois suivants n'y figurent pas.
+      </p>
+      <!-- Never « no e-mail » when the log could not be read: nobody may read « never contacted » -->
+      <p v-if="!logView.log" class="text-[13px] text-slate-500" data-testid="history-unavailable">
+        {{ !logView.failed ? "Chargement…" : online ? "Historique indisponible." : "Historique indisponible hors ligne." }}
+      </p>
+      <EmailHistory v-else :entries="historyEntries" />
     </UiDialog>
 
     <!-- Wide: long tariff names (« Compétition U15 U17 - nés en 2008, … ») stay on one line on a computer -->

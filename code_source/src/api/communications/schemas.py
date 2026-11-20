@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.request_body import RequestBody
 
@@ -142,3 +142,4 @@ class EmailDispatch(BaseModel):
     errors_count: int = 0
     total_recipients: int = 0
     details: List[EmailSendDetail] = []
+    log_notice: Optional[str] = Field(None, description="Set when the e-mails left but the send is missing from the e-mail log")

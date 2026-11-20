@@ -3,8 +3,18 @@
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import { telHref } from "../../../lib/text";
 import { hasPaid, isCancelled, paymentBadge, rankingText, type Row } from "../competitions";
+import type { ContactState } from "./emailHistory";
+import LastContact from "./LastContact.vue";
 
-const props = defineProps<{ row: Row; canWrite: boolean; staff: boolean; contactsShown: boolean }>();
+// contact: when the competitor was last e-mailed (the competition's e-mail log); not shown when absent
+const props = defineProps<{
+  row: Row;
+  canWrite: boolean;
+  staff: boolean;
+  contactsShown: boolean;
+  contact?: ContactState;
+  online?: boolean;
+}>();
 const emit = defineEmits<{
   toggle: [flag: "selectionne" | "present", value: boolean];
   remove: [];
@@ -12,6 +22,7 @@ const emit = defineEmits<{
   withdraw: [];
   restore: [];
   showContact: [];
+  history: [];
 }>();
 
 /* The box shows the data, not the click: it changes once the change is made (or queued), and stays put when refused. */
@@ -42,7 +53,12 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
         </button>
         <b v-else class="block text-[14.5px]" data-testid="participant-name">{{ row.nom }} {{ row.prenom }}</b>
         <span class="block text-xs text-slate-500">
-          🪪 {{ row.num_licence || "sans licence" }} · {{ row.tarif || "—" }}
+          🪪 {{ row.num_licence || "sans licence" }}
+          <template v-if="contact && contact.kind !== 'loading'">
+            ·
+            <LastContact :state="contact" :online="online ?? true" @open="emit('history')" />
+          </template>
+          · {{ row.tarif || "—" }}
           <template v-if="staff && row.commande_helloasso">· 🧾 {{ row.commande_helloasso }}</template>
           <template v-if="staff && row.note_paiement">· 📝 {{ row.note_paiement }}</template>
         </span>

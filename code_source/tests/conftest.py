@@ -64,3 +64,14 @@ def _in_memory_access_list():
     install_access()
     yield
     role_directory.install(None)
+
+
+@pytest.fixture(autouse=True)
+def email_log_store():
+    """The e-mail log in memory and empty: every sender records its sends here, never in the real Firestore."""
+    from support.fake_email_log import InMemoryEmailLogStore
+    from services.communications import email_log
+    store = InMemoryEmailLogStore()
+    email_log.install(store)
+    yield store
+    email_log.install(None)

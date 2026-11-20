@@ -11,7 +11,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from domain.errors import Conflict, InvalidRequest, NotFound, ServiceError, StorageUnavailable, UpstreamUnavailable
+from domain.errors import Conflict, Forbidden, InvalidRequest, NotFound, ServiceError, StorageUnavailable, UpstreamUnavailable
 from infrastructure.firestore.client import FirestoreError
 
 logger = logging.getLogger("alj")
@@ -97,6 +97,7 @@ def internal_error(e: Exception, where: str) -> str:
 SERVICE_ERROR_STATUS = (
     (NotFound, 404),
     (InvalidRequest, 400),
+    (Forbidden, 403),
     (Conflict, 409),
     (StorageUnavailable, 503),
     (UpstreamUnavailable, 502),

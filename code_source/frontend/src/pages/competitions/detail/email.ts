@@ -93,3 +93,10 @@ export function sendBody(competition: Competition, recipients: readonly Row[], s
     })),
   };
 }
+
+/** The toast after a send; says when the send is missing from the e-mail history (the dates shown are then incomplete). */
+export function sentMessage(result: Pick<Schemas["EmailDispatch"], "sent_count" | "errors_count" | "log_notice">): string {
+  const failures = result.errors_count ? `, ${result.errors_count} en échec` : "";
+  const notice = result.log_notice ? " ⚠️ Envoyé, mais non enregistré dans l'historique." : "";
+  return `✅ ${result.sent_count} e-mail(s) envoyé(s) avec succès${failures}.${notice}`;
+}

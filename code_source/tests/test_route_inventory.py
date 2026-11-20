@@ -56,6 +56,7 @@ EXPECTED_ROUTES: dict[tuple[str, str], Optional[Role]] = {
     ("GET", "/api/competitions/lookup-ffme/{id_ffme}"): Role.READONLY,
     ("DELETE", "/api/competitions/{competition_id}"): Role.COACH,
     ("PATCH", "/api/competitions/{competition_id}"): Role.COACH,
+    ("GET", "/api/competitions/{competition_id}/email-log"): Role.READONLY,
     ("GET", "/api/competitions/{competition_id}/export-excel"): Role.READONLY,
     ("GET", "/api/competitions/{competition_id}/export-pdf"): Role.READONLY,
     ("POST", "/api/competitions/{competition_id}/fetch-results"): Role.COACH,
