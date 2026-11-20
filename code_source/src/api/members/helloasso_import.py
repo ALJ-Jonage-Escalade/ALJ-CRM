@@ -26,16 +26,19 @@ from api.members.helloasso_import_schemas import (
     MembershipMember,
     MembershipPreview,
     MembershipPreviewRequest,
+    MembershipRequest,
     MembershipRow,
     MembershipValueCheck,
     MembershipValueCheckRequest,
 )
 from api.auth.me import author_of
 from api.responses import error_responses
+from domain.email_log import LastRequest
 from domain.members.import_corrections import helloasso_value
 from domain.members.member_data_rules import DataIssue, IssueField
 from domain.members.membership_import import Decision, ImportPlan, KnownMember, PlanEntry, WriteAction, season_membership
 from infrastructure.sqlite.membership_import import AppliedWrite
+from services.communications.email_log import last_correction_requests_by_item
 from services.members import correction_requests
 from services.members.helloasso_import import ImportResult
 from services.members.helloasso_import import MembershipImportService as Service
@@ -52,8 +55,9 @@ def _issue(issue: DataIssue) -> MembershipIssue:
     return MembershipIssue(field=issue.field, code=issue.code, message=issue.message, blocking=issue.blocking)
 
 
-def _row(entry: PlanEntry, members: dict[int, KnownMember]) -> MembershipRow:
+def _row(entry: PlanEntry, members: dict[int, KnownMember], requests: dict[int, LastRequest]) -> MembershipRow:
     record = entry.record
+    request = requests.get(entry.item_id)
     matched = members.get(entry.member_id) if entry.member_id is not None else None
     return MembershipRow(
         item_id=record.item_id, bucket=entry.bucket, reason=entry.reason, order_ref=record.order_ref,
@@ -64,6 +68,7 @@ def _row(entry: PlanEntry, members: dict[int, KnownMember]) -> MembershipRow:
         candidates=[_candidate(member) for member in entry.candidates],
         attached_to=_candidate(entry.attached_to) if entry.attached_to else None,
         matched_member=_candidate(matched) if matched else None,
+        last_request=MembershipRequest(at=request["at"], author=request["author"]) if request else None,
         changes=[MembershipChange(field=change.field, crm=change.crm, before=change.before, after=change.after)
                  for change in entry.changes],
         issues=[_issue(issue) for issue in entry.issues],
@@ -75,9 +80,10 @@ def _row(entry: PlanEntry, members: dict[int, KnownMember]) -> MembershipRow:
 
 def _preview(plan: ImportPlan) -> MembershipPreview:
     members = {member.user_id: member for member in plan.members}
+    requests = last_correction_requests_by_item()
     return MembershipPreview(
         status="success", season=plan.season, campaign=plan.campaign_slug, blocked_reason=plan.blocked_reason,
-        counts=BucketCounts(**plan.counts()), rows=[_row(entry, members) for entry in plan.entries],
+        counts=BucketCounts(**plan.counts()), rows=[_row(entry, members, requests) for entry in plan.entries],
         members=[MembershipMember(**_candidate(member).model_dump(), membership=season_membership(plan, member.user_id).kind)
                  for member in sorted(plan.members, key=lambda m: (m.last_name.casefold(), m.first_name.casefold()))],
     )

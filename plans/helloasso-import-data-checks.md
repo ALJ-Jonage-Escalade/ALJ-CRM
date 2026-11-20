@@ -29,7 +29,9 @@ Durable decisions that apply across all phases:
   - `POST /api/helloasso/memberships/corrections/check` — dry run: issues of the submitted values, nothing saved
   - `PUT /api/helloasso/memberships/corrections/{item_id}/{field}` — save, returns the recomputed `MembershipPreview`
   - `DELETE /api/helloasso/memberships/corrections/{item_id}/{field}` — remove, returns the recomputed `MembershipPreview`
-  - `POST /api/helloasso/memberships/correction-requests` — `mode: preview` (summary + example e-mail) or `send`
+  - `POST /api/helloasso/memberships/correction-requests/preview` — the e-mail of the first order, nothing sent (the
+    summary is counted by the page)
+  - `POST /api/helloasso/memberships/correction-requests` — send, one e-mail per order
 - **E-mail log**: new kind `correction_request`; entries gain `helloasso_order_refs` and `helloasso_item_ids`
   (lists). The last request per row: query on `kind`, filtered in Python (no composite index).
 - **Import history**: each imported item gains `corrections: [{field, helloasso_value, value}]` (author: the import's).
@@ -49,11 +51,11 @@ carry their issues and the import page lists them under each row.
 
 ### Acceptance criteria
 
-- [ ] Only `dd/mm/yyyy` and ISO dates are read; `dd/mm/yy` and `dd-mm-yyyy` are unreadable
-- [ ] Future date, age < 3 or > 100 at season start: blocking issue, row in « À vérifier », cannot create
-- [ ] Unreadable date: same behaviour as a missing one, with an issue
-- [ ] Preview rows expose `issues`; the page shows them on the row
-- [ ] Domain tests at the bounds; planner and API tests
+- [x] Only `dd/mm/yyyy` and ISO dates are read; `dd/mm/yy` and `dd-mm-yyyy` are unreadable
+- [x] Future date, age < 3 or > 100 at season start: blocking issue, row in « À vérifier », cannot create
+- [x] Unreadable date: same behaviour as a missing one, with an issue
+- [x] Preview rows expose `issues`; the page shows them on the row
+- [x] Domain tests at the bounds; planner and API tests
 
 ---
 
@@ -69,10 +71,10 @@ checked on their effective values. Normalised values written on import.
 
 ### Acceptance criteria
 
-- [ ] `+33 6…`, `0033 6…`, `+33 (0)6…` recognised as French, no warning
-- [ ] Too short, letters, an e-mail: warning; missing member phone: warning; empty emergency phone: no warning
-- [ ] A renewal with a filled CRM phone is checked on the CRM phone
-- [ ] Warnings never block an import; normalised phones are written
+- [x] `+33 6…`, `0033 6…`, `+33 (0)6…` recognised as French, no warning
+- [x] Too short, letters, an e-mail: warning; missing member phone: warning; empty emergency phone: no warning
+- [x] A renewal with a filled CRM phone is checked on the CRM phone
+- [x] Warnings never block an import; normalised phones are written
 
 ---
 
@@ -87,9 +89,9 @@ mail is flagged through an MX lookup cached per preview, fail-open, disabled in 
 
 ### Acceptance criteria
 
-- [ ] Invalid syntax: warning; missing primary e-mail: warning; empty second e-mail: nothing
-- [ ] Domain answered "no": warning; "unknown": nothing
-- [ ] The DNS adapter is injected, faked in tests, off in dev
+- [x] Invalid syntax: warning; missing primary e-mail: warning; empty second e-mail: nothing
+- [x] Domain answered "no": warning; "unknown": nothing
+- [x] The DNS adapter is injected, faked in tests, off in dev
 
 ---
 
@@ -105,9 +107,9 @@ renewal whose HelloAsso licence differs from the CRM one shows a note that the C
 
 ### Acceptance criteria
 
-- [ ] `FRANCAISE`, `france`, `FR` normalised silently; unknown / missing: warning
-- [ ] Licence of 5 or 7 digits: warning; `non`, `en cours`: empty, no warning
-- [ ] Renewal licence mismatch: informative note, CRM value kept
+- [x] `FRANCAISE`, `france`, `FR` normalised silently; unknown / missing: warning
+- [x] Licence of 5 or 7 digits: warning; `non`, `en cours`: empty, no warning
+- [x] Renewal licence mismatch: informative note, CRM value kept
 
 ---
 
@@ -125,10 +127,10 @@ renewal; the import history records the corrections.
 
 ### Acceptance criteria
 
-- [ ] Check route returns the issues of submitted values without saving
-- [ ] Save / delete routes return the recomputed preview; corrections survive reloads and syncs
-- [ ] A correction moving a row (unreadable date → renewal) is classified on the corrected data, in preview and import
-- [ ] Corrected renewal field overwrites the CRM value; history items list their corrections
+- [x] Check route returns the issues of submitted values without saving
+- [x] Save / delete routes return the recomputed preview; corrections survive reloads and syncs
+- [x] A correction moving a row (unreadable date → renewal) is classified on the corrected data, in preview and import
+- [x] Corrected renewal field overwrites the CRM value; history items list their corrections
 
 ---
 
@@ -144,8 +146,8 @@ unfolds and the row is scrolled to and highlighted.
 
 ### Acceptance criteria
 
-- [ ] Move description tested (Vitest): section change, matched member, cancelled choice, no move
-- [ ] Dialog announces the move; the row is highlighted in its new section
+- [x] Move description tested (Vitest): section change, matched member, cancelled choice, no move
+- [x] Dialog announces the move; the row is highlighted in its new section
 
 ---
 
@@ -163,9 +165,9 @@ order refs and item ids).
 
 ### Acceptance criteria
 
-- [ ] `{problemes}` content: grouped by registration, corrected issues left out (domain tests)
-- [ ] Preview mode returns the summary and an example; send mode sends one e-mail per order to the payer (+ Cc)
-- [ ] Each send recorded in the e-mail log with its references
+- [x] `{problemes}` content: grouped by registration, corrected issues left out (domain tests)
+- [x] The preview route returns an example; the send route sends one e-mail per order to the payer (+ Cc)
+- [x] Each send recorded in the e-mail log with its references
 
 ---
 
@@ -180,5 +182,5 @@ sending dialog warns when a selected registration was already asked.
 
 ### Acceptance criteria
 
-- [ ] `last_request` on rows from the log
-- [ ] Warning before sending again for an already asked registration
+- [x] `last_request` on rows from the log
+- [x] Warning before sending again for an already asked registration

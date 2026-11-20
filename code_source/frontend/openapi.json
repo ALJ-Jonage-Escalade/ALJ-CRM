@@ -10761,6 +10761,25 @@
         "title": "MembershipPreviewRequest",
         "description": "campaign: slug of the membership form to read for this sync only (never saved); null or blank: the active one\n(Paramètres › Campagnes)."
       },
+      "MembershipRequest": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "author"
+        ],
+        "title": "MembershipRequest",
+        "description": "The last correction request sent to the family about the registration (e-mail log)."
+      },
       "MembershipRow": {
         "properties": {
           "item_id": {
@@ -10876,6 +10895,16 @@
             },
             "type": "object",
             "title": "Values"
+          },
+          "last_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MembershipRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -10900,7 +10929,8 @@
           "matched_member",
           "issues",
           "corrections",
-          "values"
+          "values",
+          "last_request"
         ],
         "title": "MembershipRow",
         "description": "One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and\nwhether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),\n\"\" when missing: order_date the registration, payment_date the first payment, refund_date the refund (status\nRefunded / Refunding)."

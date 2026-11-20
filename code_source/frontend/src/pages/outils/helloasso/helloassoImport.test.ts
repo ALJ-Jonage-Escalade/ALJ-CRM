@@ -11,6 +11,7 @@ import {
   incompleteRows,
   initialChoices,
   isCheckable,
+  lastRequestText,
   requestSummary,
   describeMove,
   keepChoices,
@@ -56,6 +57,7 @@ const row = (change: Partial<MembershipRow>): MembershipRow => ({
   corrections: [],
   values: {},
   matched_member: null,
+  last_request: null,
   ...change,
 });
 
@@ -344,5 +346,14 @@ describe("requestSummary", () => {
 
   it("says when nothing is to be asked", () => {
     expect(requestSummary([row({})]).text).toBe("Aucune des inscriptions choisies n'a d'information à corriger.");
+  });
+});
+
+describe("lastRequestText", () => {
+  it("says when and by whom the family was last asked", () => {
+    const asked = row({ last_request: { at: "2026-09-02T08:30:00+00:00", author: "albus@poudlard.example" } });
+
+    expect(lastRequestText(asked)).toMatch(/^Correction demandée le 02\/09\/2026 .* par albus@poudlard\.example$/);
+    expect(lastRequestText(row({}))).toBe("");
   });
 });

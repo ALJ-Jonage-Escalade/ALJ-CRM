@@ -146,6 +146,7 @@ const MEMBERSHIP_PREVIEW = {
       corrections: [],
       values: {},
       matched_member: null,
+      last_request: null,
     },
     {
       item_id: 2,
@@ -169,6 +170,7 @@ const MEMBERSHIP_PREVIEW = {
       corrections: [],
       values: {},
       matched_member: null,
+      last_request: null,
     },
   ],
   members: [] as unknown[],
@@ -588,7 +590,17 @@ describe("OutilsPage", () => {
     const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
     const issue = { field: "phone", code: "invalid", message: "Téléphone de l'adhérent invalide (« 0612 »).", blocking: false };
     ANSWERS["POST /api/helloasso/memberships/preview"] = () =>
-      json({ ...MEMBERSHIP_PREVIEW, rows: [{ ...MEMBERSHIP_PREVIEW.rows[0]!, issues: [issue] }, MEMBERSHIP_PREVIEW.rows[1]] });
+      json({
+        ...MEMBERSHIP_PREVIEW,
+        rows: [
+          {
+            ...MEMBERSHIP_PREVIEW.rows[0]!,
+            issues: [issue],
+            last_request: { at: "2026-09-02T08:30:00+00:00", author: "albus@poudlard.example" },
+          },
+          MEMBERSHIP_PREVIEW.rows[1],
+        ],
+      });
     const example = {
       to: "molly@terrier.example",
       cc: [],
@@ -605,6 +617,8 @@ describe("OutilsPage", () => {
       byId("ha-request-open")!.click();
       await flushPromises();
 
+      expect(byId("ha-last-request")!.textContent).toContain("albus@poudlard.example");
+      expect(byId("ha-request-again")!.textContent).toContain("WEASLEY Ginny");
       expect(byId("ha-request-summary")!.textContent).toBe("1 e-mail à 1 famille, pour 1 inscription");
       expect(byId("ha-request-example")!.textContent).toContain("molly@terrier.example");
       const sends = (): unknown[] =>

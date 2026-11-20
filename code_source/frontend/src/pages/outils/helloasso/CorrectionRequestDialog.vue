@@ -8,7 +8,7 @@ import UiDialog from "../../../components/ui/UiDialog.vue";
 import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
 import { CLIENT_KEY, errorText, type Schemas } from "../../../lib/client";
 import { createMembersApi } from "../../../services/members";
-import { personLabel, requestSummary, type MembershipRow } from "./helloassoImport";
+import { lastRequestText, personLabel, requestSummary, type MembershipRow } from "./helloassoImport";
 
 // rows: the rows that can be asked; picked: the item ids checked on opening
 const props = defineProps<{ rows: MembershipRow[]; picked: number[]; campaign: string | null }>();
@@ -25,6 +25,8 @@ const done = ref("");
 
 const chosen = computed(() => props.rows.filter((row) => checked.value.includes(row.item_id)));
 const summary = computed(() => requestSummary(chosen.value));
+// The chosen registrations the family was already asked about: shown before sending again
+const alreadyAsked = computed(() => chosen.value.filter((row) => row.last_request));
 
 watch(
   open,
@@ -121,6 +123,17 @@ async function send(): Promise<void> {
       </label>
     </fieldset>
     <p data-testid="ha-request-summary" class="mb-2 text-[13px] font-semibold">{{ summary.text }}</p>
+    <div
+      v-if="alreadyAsked.length && !done"
+      data-testid="ha-request-again"
+      role="alert"
+      class="mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-900"
+    >
+      <p class="font-semibold">⚠️ Déjà demandé à la famille — renvoyer seulement si nécessaire :</p>
+      <ul class="mt-1 list-disc pl-5">
+        <li v-for="row in alreadyAsked" :key="row.item_id">{{ personLabel(row) }} : {{ lastRequestText(row) }}</li>
+      </ul>
+    </div>
     <div v-if="example" data-testid="ha-request-example" class="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs">
       <p class="mb-1 text-slate-500">Exemple (première commande) :</p>
       <p>

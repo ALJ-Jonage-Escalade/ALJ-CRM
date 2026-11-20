@@ -98,3 +98,22 @@ def member_ids_of(recipients: Iterable[LoggedRecipient]) -> List[int]:
         if recipient["member_id"] is not None:
             seen.setdefault(recipient["member_id"], None)
     return list(seen)
+
+
+CORRECTION_REQUEST_KIND: EmailKind = "correction_request"
+
+
+class LastRequest(TypedDict):
+    at: str
+    author: str
+
+
+def last_correction_requests(entries: Iterable[EmailLogEntry]) -> Dict[int, LastRequest]:
+    """When each HelloAsso registration was last asked to be corrected, and by whom: the latest correction request
+    that reached at least one address."""
+    last: Dict[int, LastRequest] = {}
+    for entry in sorted(entries, key=lambda entry: entry["at"]):
+        if entry["kind"] == CORRECTION_REQUEST_KIND and any(recipient["status"] == "sent" for recipient in entry["recipients"]):
+            for item_id in entry["helloasso_item_ids"]:
+                last[item_id] = LastRequest(at=entry["at"], author=entry["author"])
+    return last

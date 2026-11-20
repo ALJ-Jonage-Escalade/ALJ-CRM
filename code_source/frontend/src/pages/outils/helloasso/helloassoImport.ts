@@ -308,6 +308,16 @@ export function requestSummary(rows: MembershipRow[]): { emails: number; registr
   };
 }
 
+/** « Correction demandée le date, par X », "" when the family was never asked (e-mail log). */
+export function lastRequestText(row: MembershipRow): string {
+  const request = row.last_request;
+  if (!request) {
+    return "";
+  }
+  const date = parseDate(request.at);
+  return `Correction demandée le ${date ? formatDateTime(date) : request.at} par ${request.author}`;
+}
+
 /** The choices after the preview is recomputed (a correction saved or undone): a row still in its section keeps the
     admin's choice, a row that moved gets the initial choice of its new section. */
 export function keepChoices(before: MembershipPreview, after: MembershipPreview, choices: Choices): Choices {

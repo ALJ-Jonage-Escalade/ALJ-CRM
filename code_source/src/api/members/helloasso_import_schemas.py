@@ -56,6 +56,12 @@ class MembershipCorrection(BaseModel):
     at: str
 
 
+class MembershipRequest(BaseModel):
+    """The last correction request sent to the family about the registration (e-mail log)."""
+    at: str
+    author: str
+
+
 class MembershipRow(BaseModel):
     """One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
     whether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),
@@ -85,6 +91,7 @@ class MembershipRow(BaseModel):
     corrections: List[MembershipCorrection]
     # The correctable values, by field (member_data_rules.IssueField): HelloAsso's, normalised, or the corrected one
     values: Dict[str, str]
+    last_request: Optional[MembershipRequest]
 
 
 class MembershipMember(BaseModel):

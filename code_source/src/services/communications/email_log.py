@@ -16,9 +16,12 @@ from domain.email_log import (
     Competitor,
     ContactSummary,
     EmailKind,
+    CORRECTION_REQUEST_KIND,
     EmailLogEntry,
+    LastRequest,
     LoggedRecipient,
     contact_summary,
+    last_correction_requests,
     member_ids_of,
 )
 from infrastructure.firestore.competitions import competitions
@@ -113,3 +116,13 @@ def recent_history() -> RecentHistory:
     names = {competition.id: competition.nom for competition in competitions.list_competitions()
              if competition.id is not None and competition.id in mentioned}
     return RecentHistory(entries=entries, competition_names=names, truncated=len(entries) >= RECENT_LIMIT)
+
+
+def last_correction_requests_by_item() -> Dict[int, LastRequest]:
+    """When each HelloAsso registration was last asked to be corrected. Never raises: the log unreadable, the rows
+    show no request (logged), the import page still works."""
+    try:
+        return last_correction_requests(current_store().list_of_kind(CORRECTION_REQUEST_KIND))
+    except Exception:  # the trace is a help, never a reason to refuse the preview
+        logger.warning("E-mail log: correction requests unreadable", exc_info=True)
+        return {}

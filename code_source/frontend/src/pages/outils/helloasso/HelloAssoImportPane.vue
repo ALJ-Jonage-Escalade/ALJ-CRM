@@ -37,6 +37,7 @@ import {
   initialChoices,
   isCheckable,
   keepChoices,
+  lastRequestText,
   correctionLines,
   lastSyncText,
   memberHref,
@@ -151,6 +152,15 @@ const requestOpen = computed({
     }
   },
 });
+
+/** The preview read again after a correction request (the rows show it), the admin's choices kept. */
+async function refreshPreview(): Promise<void> {
+  try {
+    corrected(await membersApi.helloAssoPreview(campaign.value));
+  } catch (e) {
+    console.warn("Aperçu HelloAsso après la demande de correction :", e);
+  }
+}
 
 /** The preview recomputed after a correction: the move it caused, if any; the admin's choices kept on the rows that
     did not move. */
@@ -533,6 +543,9 @@ async function apply(): Promise<void> {
                   >
                     ✏️ Corriger…
                   </button>
+                  <span v-if="row.last_request" data-testid="ha-last-request" class="mt-1 block text-slate-600">
+                    📧 {{ lastRequestText(row) }}
+                  </span>
                   <button
                     v-if="canRequest(row)"
                     type="button"
@@ -558,6 +571,7 @@ async function apply(): Promise<void> {
         :rows="requestable"
         :picked="requestPicked"
         :campaign="campaign"
+        @sent="refreshPreview"
       />
       <CorrectionDialog
         v-if="fixingRow"

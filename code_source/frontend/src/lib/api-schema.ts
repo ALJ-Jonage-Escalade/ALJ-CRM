@@ -4210,6 +4210,16 @@ export interface components {
             campaign?: string | null;
         };
         /**
+         * MembershipRequest
+         * @description The last correction request sent to the family about the registration (e-mail log).
+         */
+        MembershipRequest: {
+            /** At */
+            at: string;
+            /** Author */
+            author: string;
+        };
+        /**
          * MembershipRow
          * @description One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
          *     whether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),
@@ -4260,6 +4270,7 @@ export interface components {
             values: {
                 [key: string]: string;
             };
+            last_request: components["schemas"]["MembershipRequest"] | null;
         };
         /**
          * MembershipValueCheck

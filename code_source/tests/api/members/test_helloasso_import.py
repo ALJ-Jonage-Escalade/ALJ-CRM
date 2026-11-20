@@ -14,6 +14,7 @@ from support.member_db import MemberDbTestCase
 from infrastructure.helloasso.api import HelloAssoApiError
 from infrastructure.security.api_auth import Role, required_role
 from infrastructure.sqlite.connection import SqliteDatabase
+from services.communications import email_log
 
 CAMPAIGN = "adhesion-escalade-2026-2027-amicale-laique-escalade-2"
 PREVIEW = "/api/helloasso/memberships/preview"
@@ -500,9 +501,7 @@ class TestCorrectionRequests(HelloAssoImportTestCase):
         sent = patch("infrastructure.mail.sender.EmailSender.send_email")
         self.send_email = sent.start()
         self.addCleanup(sent.stop)
-        self.log = patch("services.communications.email_log.current_store")
-        self.store = self.log.start().return_value
-        self.addCleanup(self.log.stop)
+        self.store = email_log.current_store()  # the in-memory log of tests/conftest.py
 
     def test_the_preview_shows_an_example_email_and_sends_nothing(self) -> None:
         response = self.client.post(f"{REQUESTS}/preview", json={"item_ids": [1, 2]})
@@ -523,7 +522,7 @@ class TestCorrectionRequests(HelloAssoImportTestCase):
         self.assertEqual((call.kwargs["to_email"], call.kwargs["cc"], call.kwargs["reply_to"]),
                          ("parent@terrier.example", ["ginny@poudlard.example"], "inscription@alj-escalade.fr"))
         self.assertIn("&lt;b&gt;06&lt;/b&gt;", call.kwargs["html_body"])  # a typed value never adds markup
-        [logged] = [entry.args[0] for entry in self.store.add_entry.call_args_list]
+        [logged] = self.store.entries
         self.assertEqual((logged["kind"], logged["helloasso_order_refs"], logged["helloasso_item_ids"]),
                          ("correction_request", ["777"], [1, 2]))
 
@@ -533,3 +532,13 @@ class TestCorrectionRequests(HelloAssoImportTestCase):
         response = self.client.post(REQUESTS, json={"item_ids": [99]})
 
         self.assertEqual((response.status_code, response.json()["code"]), (400, "nothing_to_request"))
+
+    def test_a_row_shows_when_its_correction_was_last_asked_and_by_whom(self) -> None:
+        self.assertIsNone(self.client.post(PREVIEW).json()["rows"][0]["last_request"])
+
+        self.client.post(REQUESTS, json={"item_ids": [1]})
+
+        rows = {row["item_id"]: row for row in self.client.post(PREVIEW).json()["rows"]}
+        self.assertEqual(rows[1]["last_request"]["author"], "serveur local")
+        self.assertEqual(rows[1]["last_request"]["at"], self.store.entries[0]["at"])
+        self.assertIsNone(rows[2]["last_request"])
