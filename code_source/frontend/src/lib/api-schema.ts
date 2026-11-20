@@ -2756,7 +2756,8 @@ export interface components {
         /**
          * FfmeRowChange
          * @description A matched row of the file (row_number: its Excel line) and what the import changes on its member.
-         *     licence: the member's licence after the import. no_active_registration: no purchase of the season left to mark
+         *     licence: the member's licence after the import; licence_conflict: "LAST First" of another member already holding
+         *     the file's licence (to correct by hand), empty otherwise. no_active_registration: no purchase of the season left to mark
          *     « Terminé » (none, or cancelled ones only).
          */
         FfmeRowChange: {
@@ -2777,6 +2778,8 @@ export interface components {
              * @enum {string}
              */
             source: "licence" | "nom" | "manuel";
+            /** Licence Conflict */
+            licence_conflict: string;
             /** Changes */
             changes: components["schemas"]["FfmeFieldChange"][];
             /** No Active Registration */

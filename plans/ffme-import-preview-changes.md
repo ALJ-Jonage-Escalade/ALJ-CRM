@@ -34,6 +34,10 @@ active registration on the season goes unnoticed.
   something), « sans inscription active » and the blocked members are derived in the browser from `changes`.
 - `FfmeRowChange.licence`: the member's licence after the import, so that the search finds a row whose licence
   does not change.
+- Added after a review note: `FfmeRowChange.licence_conflict` names another member already holding the file's
+  licence (a sibling's number typed on HelloAsso, the row now sent to the right child by the birth date). Listed and
+  ranked with « sans inscription active », warning « ⚠️ Licence N déjà enregistrée sur X : à corriger sur sa fiche »;
+  never cleared automatically, the stored number may be the right one.
 - Several purchases of a season only coexist at equal priority (the member writers drop the lower ones), so the
   planner marks every active one; old status shown as their distinct statuses.
 

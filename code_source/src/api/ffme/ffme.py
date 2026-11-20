@@ -97,6 +97,7 @@ def _row_change(row: ffme.PlannedRow) -> FfmeRowChange:
     return FfmeRowChange(
         row_number=row["row_number"], user_id=member["id"], last_name=member["last_name"] or "", first_name=member["first_name"] or "",
         birth_date=member["birth_date"] or "", licence=row["write"]["licence"], source=row["source"],
+        licence_conflict=row["licence_conflict"],
         changes=[FfmeFieldChange(**change) for change in row["changes"]],
         no_active_registration=row["no_active_registration"], duplicate=row["duplicate"],
     )

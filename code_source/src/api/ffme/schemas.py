@@ -66,7 +66,8 @@ class FfmeFieldChange(BaseModel):
 
 class FfmeRowChange(BaseModel):
     """A matched row of the file (row_number: its Excel line) and what the import changes on its member.
-    licence: the member's licence after the import. no_active_registration: no purchase of the season left to mark
+    licence: the member's licence after the import; licence_conflict: "LAST First" of another member already holding
+    the file's licence (to correct by hand), empty otherwise. no_active_registration: no purchase of the season left to mark
     « Terminé » (none, or cancelled ones only)."""
     row_number: int
     user_id: int
@@ -75,6 +76,7 @@ class FfmeRowChange(BaseModel):
     birth_date: str
     licence: str
     source: Literal["licence", "nom", "manuel"]
+    licence_conflict: str
     changes: List[FfmeFieldChange]
     no_active_registration: bool
     duplicate: bool

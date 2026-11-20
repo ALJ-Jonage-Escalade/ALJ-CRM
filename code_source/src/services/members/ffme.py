@@ -85,6 +85,7 @@ class PlannedRow(TypedDict):
     changes: List[FieldChange]
     no_active_registration: bool
     duplicate: bool  # its member is matched by another row too
+    licence_conflict: str  # "LAST First" of another member holding the file's licence (a sibling's, typed by mistake)
     write: MemberWrite
 
 
@@ -233,7 +234,8 @@ def prepare_licensees(excel_content: bytes, season: str, manual_matches: Sequenc
                 raise InvalidRequest(UNKNOWN_MANUAL_MATCH.format(row_number=manual["row_number"]))
             matched_rows.append((linked_licensee, linked_member, "manuel"))
         preparation["unmatched"] = list(unmatched_by_row.values())
-        preparation["rows"] = [_planned_row(licensee, member, source, purchases.get(member["id"], []))
+        preparation["rows"] = [_planned_row(licensee, member, source, purchases.get(member["id"], []),
+                                            members_by_licence.get(licensee["licence"]))
                                for licensee, member, source in matched_rows]
         duplicates = _duplicate_user_ids(preparation["rows"])
         for planned in preparation["rows"]:
@@ -248,7 +250,7 @@ def prepare_licensees(excel_content: bytes, season: str, manual_matches: Sequenc
 
 def is_listed(row: PlannedRow) -> bool:
     """Shown by the preview: the row changes something, or needs the office's attention."""
-    return bool(row["changes"]) or row["no_active_registration"] or row["duplicate"]
+    return bool(row["changes"]) or row["no_active_registration"] or row["duplicate"] or bool(row["licence_conflict"])
 
 
 def apply_import(season: str, excel_content: bytes, manual_matches: Sequence[ManualMatch] = (),
@@ -279,7 +281,8 @@ def _duplicate_user_ids(rows: List[PlannedRow]) -> Set[int]:
     return {user_id for user_id, count in counts.items() if count > 1}
 
 
-def _planned_row(licensee: Licensee, member: MemberForMatching, source: MatchSource, purchases: List[SeasonPurchase]) -> PlannedRow:
+def _planned_row(licensee: Licensee, member: MemberForMatching, source: MatchSource, purchases: List[SeasonPurchase],
+                 licence_holder: Optional[MemberForMatching]) -> PlannedRow:
     plan = plan_member_changes(
         member["id"],
         FileValues(licence=licensee["licence"], passports=licensee["passeports"], diplomas=licensee["diplomes"],
@@ -288,7 +291,16 @@ def _planned_row(licensee: Licensee, member: MemberForMatching, source: MatchSou
                     purchases=purchases),
     )
     return PlannedRow(row_number=licensee["row_number"], member=member, source=source, changes=plan["changes"],
-                      no_active_registration=plan["no_active_registration"], duplicate=False, write=plan["write"])
+                      no_active_registration=plan["no_active_registration"], duplicate=False, write=plan["write"],
+                      licence_conflict=_licence_conflict(member, licence_holder))
+
+
+def _licence_conflict(member: MemberForMatching, licence_holder: Optional[MemberForMatching]) -> str:
+    """The other member already holding the row's licence, for the office to correct by hand (never cleared here: the
+    stored number may be the right one)."""
+    if licence_holder is None or licence_holder["id"] == member["id"]:
+        return ""
+    return f"{licence_holder['last_name']} {licence_holder['first_name']}"
 
 
 def _read_licensee_sheet(excel_content: bytes) -> LicenseeSheet:

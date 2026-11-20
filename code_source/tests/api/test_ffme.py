@@ -181,7 +181,8 @@ class TestFfmeRoutes(MemberDbTestCase):
 
         self.assertEqual(preview["changes"], [{
             "row_number": 3, "user_id": self._user("MARTIN")["id"], "last_name": "MARTIN", "first_name": "Léo",
-            "birth_date": "2017-03-10", "licence": "112233", "source": "nom", "no_active_registration": False, "duplicate": False,
+            "birth_date": "2017-03-10", "licence": "112233", "source": "nom", "licence_conflict": "",
+            "no_active_registration": False, "duplicate": False,
             "changes": [{"field": "licence", "old": "", "new": "112233"},
                         {"field": "passeports", "old": "", "new": "Grimpeur Vert"},
                         {"field": "statut", "old": "Validé", "new": "Terminé"}],
@@ -227,6 +228,15 @@ class TestFfmeRoutes(MemberDbTestCase):
         result = self.client.post("/api/ffme/import", json={**body, "excluded_rows": [3]}).json()
         self.assertEqual(result["updated_count"], 1)
         self.assertEqual(self._user("MARTIN")["licence_ffme"], "445566")
+
+    def test_preview_flags_a_licence_stored_on_another_member(self):
+        # A sibling's licence typed on HelloAsso: the birth date sends the row to the right child, the other keeps it
+        self.seed("1", "Léo", "MARTIN", "Cours ados", **{"champ_Numéro de Licence FFME (6 chiffres)": "111111"})
+        self.seed("2", "Emma", "MARTIN", "Cours ados", **{"champ_Date de naissance de l'adhérent": "2015-04-02"})
+
+        preview = self._preview([{"Nom": "MARTIN", "Prénom": "Emma", "N° de licence": "111111", "Date de naissance": "02/04/2015"}])
+
+        self.assertEqual([(row["first_name"], row["licence_conflict"]) for row in preview["changes"]], [("Emma", "MARTIN Léo")])
 
     def test_import_succeeds_when_the_backup_folder_cannot_be_created(self):
         self.seed("1", "Léo", "MARTIN", "Cours ados")

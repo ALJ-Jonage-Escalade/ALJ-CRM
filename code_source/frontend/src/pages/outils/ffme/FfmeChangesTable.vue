@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* The changes of the FFME import, one row per matched file row: a checkbox to leave the row out, how it was matched,
-   and « ancien → nouveau » for each field it changes; warnings for a member matched twice or without an active
-   registration on the season. */
+   and « ancien → nouveau » for each field it changes; warnings for a member matched twice, a licence already stored
+   on another member (left to the office: the stored number may be the right one), or no active registration. */
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import type { BadgeColor } from "../../../components/ui/palette";
 import type { RowChange } from "./ffme";
@@ -61,6 +61,9 @@ function changeText(row: RowChange, field: Field): string {
             <div class="text-slate-500">{{ row.birth_date || "—" }} · ligne {{ row.row_number }}</div>
             <div v-if="blockedUserIds.has(row.user_id) && !excludedRows.has(row.row_number)" class="font-semibold text-red-700">
               ⚠️ Adhérent rapproché par plusieurs lignes du fichier
+            </div>
+            <div v-if="row.licence_conflict" data-testid="ffme-licence-conflict" class="font-semibold text-amber-700">
+              ⚠️ Licence {{ row.licence }} déjà enregistrée sur {{ row.licence_conflict }} : à corriger sur sa fiche
             </div>
           </td>
           <td class="px-2.5 py-1.5">

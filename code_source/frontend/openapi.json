@@ -7265,6 +7265,10 @@
             ],
             "title": "Source"
           },
+          "licence_conflict": {
+            "type": "string",
+            "title": "Licence Conflict"
+          },
           "changes": {
             "items": {
               "$ref": "#/components/schemas/FfmeFieldChange"
@@ -7290,12 +7294,13 @@
           "birth_date",
           "licence",
           "source",
+          "licence_conflict",
           "changes",
           "no_active_registration",
           "duplicate"
         ],
         "title": "FfmeRowChange",
-        "description": "A matched row of the file (row_number: its Excel line) and what the import changes on its member.\nlicence: the member's licence after the import. no_active_registration: no purchase of the season left to mark\n« Terminé » (none, or cancelled ones only)."
+        "description": "A matched row of the file (row_number: its Excel line) and what the import changes on its member.\nlicence: the member's licence after the import; licence_conflict: \"LAST First\" of another member already holding\nthe file's licence (to correct by hand), empty otherwise. no_active_registration: no purchase of the season left to mark\n« Terminé » (none, or cancelled ones only)."
       },
       "FfmeStats": {
         "properties": {

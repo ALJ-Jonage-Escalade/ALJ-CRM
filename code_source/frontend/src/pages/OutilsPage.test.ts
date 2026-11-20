@@ -66,6 +66,7 @@ const FFME_CHANGE = {
   birth_date: "2009-07-22",
   licence: "112233",
   source: "nom",
+  licence_conflict: "",
   changes: [
     { field: "licence", old: "", new: "112233" },
     { field: "statut", old: "Validé", new: "Terminé" },
@@ -93,6 +94,7 @@ const PREVIEW = {
       source: "licence",
       changes: [],
       no_active_registration: true,
+      licence_conflict: "DURAND Hugo",
     },
   ],
   unmatched: [
@@ -1050,7 +1052,7 @@ describe("OutilsPage", () => {
     );
     // What needs a look first: no active registration, then the match by name
     expect(all("ffme-change").map((row) => row.textContent)).toEqual([
-      expect.stringContaining("⚠️ Aucune inscription active sur la saison"),
+      expect.stringMatching(/⚠️ Licence 445566 déjà enregistrée sur DURAND Hugo.*⚠️ Aucune inscription active sur la saison/),
       expect.stringMatching(/PETIT Max.*Nom.*— → 112233.*Validé → Terminé/),
     ]);
 

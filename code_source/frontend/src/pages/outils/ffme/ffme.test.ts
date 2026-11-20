@@ -30,6 +30,7 @@ const CHANGE = (row_number: number, last_name: string, more: Partial<RowChange> 
   birth_date: "",
   licence: "636947",
   source: "licence",
+  licence_conflict: "",
   changes: [{ field: "statut", old: "Validé", new: "Terminé" }],
   no_active_registration: false,
   duplicate: false,
@@ -59,7 +60,7 @@ describe("ffme import", () => {
     expect(manualMatches(rows, [])).toEqual([]);
   });
 
-  it("sorts the changes by what needs a look: matched twice, no active registration, manual, by name, by licence", () => {
+  it("sorts the changes by what needs a look: matched twice, licence held by another member or no active registration, manual, by name, by licence", () => {
     const rows = [
       CHANGE(1, "Zola"),
       CHANGE(2, "Petit", { source: "nom" }),
@@ -67,8 +68,9 @@ describe("ffme import", () => {
       CHANGE(4, "Durand", { no_active_registration: true }),
       CHANGE(5, "Dupont", { duplicate: true }),
       CHANGE(6, "Évans"),
+      CHANGE(7, "Dupuis", { licence_conflict: "MARTIN Léo" }),
     ];
-    expect(sortChanges(rows).map((row) => row.row_number)).toEqual([5, 4, 3, 2, 6, 1]);
+    expect(sortChanges(rows).map((row) => row.row_number)).toEqual([5, 7, 4, 3, 2, 6, 1]);
   });
 
   it("searches by name or licence, accents and case ignored", () => {

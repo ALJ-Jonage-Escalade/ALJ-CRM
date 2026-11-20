@@ -41,12 +41,13 @@ export function sortedMembers(members: readonly Member[]): Member[] {
 
 const SOURCE_RANK: Record<RowChange["source"], number> = { manuel: 2, nom: 3, licence: 4 };
 
-/** What needs a look first: matched twice, then no active registration, then by how sure the match is. */
+/** What needs a look first: matched twice, then a licence held by another member or no active registration, then by
+    how sure the match is. */
 function attentionRank(row: RowChange): number {
   if (row.duplicate) {
     return 0;
   }
-  return row.no_active_registration ? 1 : SOURCE_RANK[row.source];
+  return row.licence_conflict || row.no_active_registration ? 1 : SOURCE_RANK[row.source];
 }
 
 /** The changes sorted by what needs a look, then by name (accents and case ignored). */
