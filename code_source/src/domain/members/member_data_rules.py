@@ -157,15 +157,14 @@ def _country(field: IssueField, raw: str) -> tuple[str, list[DataIssue]]:
     return (country.name if field == "country" else country.nationality), []
 
 
-LICENCE_DIGITS = 6
+LICENCE_DIGITS = (6, 7)  # the FFME numbers have 6 or 7 digits
 
 
 def _licence(raw: str) -> tuple[str, list[DataIssue]]:
-    """An FFME licence: its digits, exactly six. Text without digit ("non", "en cours") is no licence."""
+    """An FFME licence: its digits, six or seven. Text without digit ("non", "en cours") is no licence."""
     digits = re.sub(r"\D", "", str(raw or ""))
-    if digits and len(digits) != LICENCE_DIGITS:
-        return digits, [DataIssue("licence", "invalid", f"Licence FFME invalide (« {str(raw).strip()} ») : {LICENCE_DIGITS} chiffres "
-                                                        "attendus.")]
+    if digits and len(digits) not in LICENCE_DIGITS:
+        return digits, [DataIssue("licence", "invalid", f"Licence FFME invalide (« {str(raw).strip()} ») : 6 ou 7 chiffres attendus.")]
     return digits, []
 
 

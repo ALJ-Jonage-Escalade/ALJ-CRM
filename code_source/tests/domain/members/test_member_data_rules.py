@@ -155,9 +155,9 @@ def test_an_unknown_or_missing_country_or_nationality_is_a_warning(field: str) -
 
 
 @pytest.mark.parametrize(("raw", "stored", "issues"), [
-    ("123456", "123456", []), (" 12 34 56 ", "123456", []),
+    ("123456", "123456", []), (" 12 34 56 ", "123456", []), ("1234567", "1234567", []),
     ("", "", []), ("non", "", []), ("en cours", "", []),  # no licence: never a warning
-    ("12345", "12345", ["invalid"]), ("1234567", "1234567", ["invalid"]),
+    ("12345", "12345", ["invalid"]), ("12345678", "12345678", ["invalid"]),
 ])
-def test_an_ffme_licence_must_have_six_digits(raw: str, stored: str, issues: list[str]) -> None:
+def test_an_ffme_licence_must_have_six_or_seven_digits(raw: str, stored: str, issues: list[str]) -> None:
     assert _value("licence", raw) == (stored, issues)

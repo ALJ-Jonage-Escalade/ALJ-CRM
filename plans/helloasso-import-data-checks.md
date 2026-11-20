@@ -102,13 +102,13 @@ mail is flagged through an MX lookup cached per preview, fail-open, disabled in 
 ### What to build
 
 Country and nationality read through `parse_country`: recognised spellings stored canonically without warning,
-unknown or missing ones flagged. FFME licence: digits must be exactly 6; a value with no digit counts as empty; a
+unknown or missing ones flagged. FFME licence: digits must be 6 or 7; a value with no digit counts as empty; a
 renewal whose HelloAsso licence differs from the CRM one shows a note that the CRM value is kept.
 
 ### Acceptance criteria
 
 - [x] `FRANCAISE`, `france`, `FR` normalised silently; unknown / missing: warning
-- [x] Licence of 5 or 7 digits: warning; `non`, `en cours`: empty, no warning
+- [x] Licence of 5 or 8 digits: warning (6 or 7 accepted); `non`, `en cours`: empty, no warning
 - [x] Renewal licence mismatch: informative note, CRM value kept
 
 ---

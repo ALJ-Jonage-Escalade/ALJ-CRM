@@ -479,7 +479,7 @@ def test_a_renewal_is_checked_on_the_country_and_licence_the_crm_keeps() -> None
 
 
 def test_a_new_member_with_a_wrong_licence_is_warned() -> None:
-    [entry] = plan_membership_import([_record(licence="1234567")], season=SEASON, campaign_slug=CAMPAIGN).entries
+    [entry] = plan_membership_import([_record(licence="12345")], season=SEASON, campaign_slug=CAMPAIGN).entries
 
     assert ("licence", "invalid") in _issues(entry)
 
