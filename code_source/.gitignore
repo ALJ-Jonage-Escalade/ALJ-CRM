@@ -55,3 +55,6 @@ desktop.ini
 
 # Application Vue (frontend/) : dépendances npm (package-lock.json fait foi)
 node_modules/
+
+# FFME import test file, written by dev/seed/seed_emulator.py
+dev/seed/ffme_licencies_dev.xlsx

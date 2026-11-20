@@ -50,6 +50,10 @@ jamais ajouté en mode dev.
 - **Persistance** : l'émulateur exporte ses données dans `dev/.emulator-data/` à l'arrêt
   (`docker compose -f dev/docker-compose.yml down`) et les recharge au démarrage.
   Relancer le seed repart de zéro (et vide le cache `data-dev/` du serveur).
+- **Import FFME** : le seed écrit aussi `dev/seed/ffme_licencies_dev.xlsx` (non versionné), un export MyFFME tiré
+  des adhérents du seed, une ligne par cas de la prévisualisation (licence, nom, homonymes, licence d'un frère ou
+  d'une sœur, doublon, inscription annulée, lignes non rapprochées…) ; le seed affiche le résultat attendu de chaque
+  ligne. À charger dans Outils › Import FFME après un seed (l'importer modifie les adhérents : reseeder pour recommencer).
 - **Règles** : l'émulateur applique le vrai `firestore.rules` (monté en lecture seule) : refus de tout client.
   Le serveur passe par le jeton administrateur de l'émulateur (`owner`), qui joue le rôle d'IAM.
 - **HelloAsso** : la synchro et l'import des adhésions HelloAsso appellent l'API HelloAsso réelle (lecture)
@@ -154,5 +158,6 @@ python -m pytest -c e2e/pytest.ini e2e -m smoke      # rapide ; sans -m : toute 
 | `run_server.sh` | charge `dev.env`, vérifie l'émulateur et Mailpit, lance `check_env.py` puis uvicorn `--reload` |
 | `check_env.py` | refuse le démarrage si un e-mail pouvait partir réellement ou si l'émulateur manque |
 | `seed/seed_emulator.py`, `seed/hp_names.py` | données fictives (Faker, graine fixe) |
+| `seed/ffme_cases.py` | fichier de test de l'import FFME, tiré du seed |
 | `../src/infrastructure/runtime_env.py` | source unique prod/dev côté serveur |
 | `../frontend/src/lib/firebase.ts` | initialisation Firebase unique côté navigateur |

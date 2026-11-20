@@ -11,11 +11,21 @@ from typing import List, Optional
 from fastapi import APIRouter, Query
 from fastapi.responses import Response
 
-from api.ffme.schemas import FfmeFile, FfmeImportRequest, FfmeImportResult, FfmeLicensee, FfmeMatchStats, FfmeMember, FfmePreview, FfmeStats
+from api.ffme.schemas import (
+    FfmeFieldChange,
+    FfmeImportRequest,
+    FfmeImportResult,
+    FfmeLicensee,
+    FfmeMatchStats,
+    FfmeMember,
+    FfmePreview,
+    FfmePreviewRequest,
+    FfmeRowChange,
+    FfmeStats,
+)
 from api.responses import error_responses, file_download
 from domain.constants import resolve_season
 from domain.errors import InvalidRequest
-from infrastructure.sqlite.ffme_import import FfmeMatch
 from services.members import ffme
 
 router = APIRouter()
@@ -28,6 +38,10 @@ def _decoded(content_base64: str) -> bytes:
         return base64.b64decode(content_base64, validate=True)
     except binascii.Error as e:
         raise InvalidRequest(UNREADABLE_FILE) from e
+
+
+def _manual_matches(data: FfmePreviewRequest) -> List[ffme.ManualMatch]:
+    return [ffme.ManualMatch(row_number=match.row_number, user_id=match.user_id) for match in data.manual_matches]
 
 
 def _match_stats(stats: ffme.MatchStats, matched_manually: int = 0) -> FfmeMatchStats:
@@ -51,25 +65,41 @@ def export_ffme_api(season: Optional[str] = None, include_termine: bool = Query(
 
 
 @router.post("/api/ffme/preview", response_model=FfmePreview, responses=error_responses(400))
-def preview_ffme_import_api(data: FfmeFile) -> FfmePreview:
+def preview_ffme_import_api(data: FfmePreviewRequest) -> FfmePreview:
     """Analyse un fichier Excel FFME et prépare le rapprochement sans modifier la base."""
     if not data.content_base64:
         raise InvalidRequest("Fichier Excel manquant (content_base64 obligatoire).")
-    preparation = ffme.prepare_licensees(_decoded(data.content_base64))
+    season = resolve_season(None)
+    preparation = ffme.prepare_licensees(_decoded(data.content_base64), season, _manual_matches(data))
     stats = preparation["stats"]
-    if stats["errors"] and not preparation["updates"]:
+    if stats["errors"] and not preparation["rows"]:
         raise InvalidRequest(stats["errors"][0])
-    unmatched = [FfmeLicensee(**{k: str(row.get(k) or "") for k in FfmeLicensee.model_fields}) for row in preparation["unmatched"]]
+    unmatched = [FfmeLicensee(**licensee) for licensee in preparation["unmatched"]]
+    listed = [row for row in preparation["rows"] if ffme.is_listed(row)]
     users = [FfmeMember(id=int(u["id"]), last_name=str(u["last_name"] or ""), first_name=str(u["first_name"] or ""),
                         birth_date=str(u["birth_date"] or "")) for u in preparation["users"]]
     return FfmePreview(
         status="success",
         filename=data.filename,
+        season=season,
         stats=_match_stats(stats),
-        matched_count=len(preparation["updates"]),
+        matched_count=len(preparation["rows"]),
         unmatched_count=len(unmatched),
         unmatched=unmatched,
         users=users,
+        changes=[_row_change(row) for row in listed],
+        unchanged_count=len(preparation["rows"]) - len(listed),
+    )
+
+
+def _row_change(row: ffme.PlannedRow) -> FfmeRowChange:
+    member = row["member"]
+    return FfmeRowChange(
+        row_number=row["row_number"], user_id=member["id"], last_name=member["last_name"] or "", first_name=member["first_name"] or "",
+        birth_date=member["birth_date"] or "", licence=row["write"]["licence"], source=row["source"],
+        licence_conflict=row["licence_conflict"],
+        changes=[FfmeFieldChange(**change) for change in row["changes"]],
+        no_active_registration=row["no_active_registration"], duplicate=row["duplicate"],
     )
 
 
@@ -78,10 +108,8 @@ def apply_ffme_import_api(data: FfmeImportRequest) -> FfmeImportResult:
     """Applique l'importation FFME en BDD : rapprochements automatiques du fichier (recalculés ici, comme
     dans l'aperçu) et associations manuelles choisies par le bureau."""
     season = resolve_season(data.season)
-    excel_content = _decoded(data.content_base64) if data.content_base64 else None
-    manual_matches: List[FfmeMatch] = [
-        (ffme.STATUS_DONE, m.licence, m.passeports, m.diplomes, m.document_sante, m.user_id) for m in data.manual_matches]
-    updated_count, stats = ffme.apply_import(season, excel_content, manual_matches)
+    manual_matches = _manual_matches(data)
+    updated_count, stats = ffme.apply_import(season, _decoded(data.content_base64), manual_matches, set(data.excluded_rows))
     return FfmeImportResult(
         status="success",
         message=f"Importation FFME validée : {updated_count} adhérents mis à jour.",

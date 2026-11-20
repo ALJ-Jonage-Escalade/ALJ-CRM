@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security.api_auth import Role, required_role
 from infrastructure.sqlite.connection import SqliteDatabase
-from services.members.ffme import UNREADABLE_EXCEL
+from services.members.ffme import DUPLICATE_MATCH, UNREADABLE_EXCEL
 from support.member_db import MemberDbTestCase
 
 import server
@@ -143,9 +143,9 @@ class TestFfmeRoutes(MemberDbTestCase):
         self.seed("2", "Max", "PETIT", "Cours ados")
         content = _xlsx([
             {"Nom": "MARTIN", "Prénom": "Léo", "N° de licence": "112233", "Passeports": "Grimpeur Vert",
-             "Diplômes": "Initiateur SAE", "Document de santé": "Questionnaire de santé"},
+             "Diplômes": "Initiateur SAE", "Document de santé": "QS"},
             {"Nom": "PETIT-DUPONT", "Prénom": "Maxime", "N° de licence": "998877", "Date de naissance": "22/07/2009",
-             "Passeports": "Grimpeur Bleu", "Document de santé": "Certificat médical"},
+             "Passeports": "Grimpeur Bleu", "Document de santé": "COMPETITION"},
         ])
 
         preview = self.client.post("/api/ffme/preview", json={"filename": "ffme.xlsx", "content_base64": content}).json()
@@ -153,14 +153,12 @@ class TestFfmeRoutes(MemberDbTestCase):
         self.assertEqual(preview["stats"], {"total_processed": 2, "matched_by_licence": 0, "matched_by_name": 1,
                                             "matched_manually": 0, "errors": []})
         self.assertEqual(preview["unmatched"], [{
-            "nom": "PETIT-DUPONT", "prenom": "Maxime", "licence": "998877", "birth_date": "22/07/2009",
-            "passeports": "Grimpeur Bleu", "diplomes": "", "document_sante": "Certificat médical"}])
+            "row_number": 4, "nom": "PETIT-DUPONT", "prenom": "Maxime", "licence": "998877", "birth_date": "22/07/2009",
+            "passeports": "Grimpeur Bleu", "diplomes": "", "document_sante": "COMPETITION"}])
         self.assertEqual(sorted(u["last_name"] for u in preview["users"]), ["MARTIN", "PETIT"])
         self.assertEqual(self._user("MARTIN")["licence_ffme"] or "", "")  # nothing written yet
 
-        petit = self._user("PETIT")["id"]
-        row = preview["unmatched"][0]
-        manual = {"user_id": petit, **{k: row[k] for k in ("nom", "prenom", "licence", "passeports", "diplomes", "document_sante")}}
+        manual = {"row_number": 4, "user_id": self._user("PETIT")["id"]}
         result = self.client.post("/api/ffme/import", json={"filename": "ffme.xlsx", "content_base64": content,
                                                             "manual_matches": [manual]}).json()
         self.assertEqual((result["status"], result["updated_count"], result["matched_manually"]), ("success", 2, 1))
@@ -169,9 +167,78 @@ class TestFfmeRoutes(MemberDbTestCase):
         martin = self._user("MARTIN")
         self.assertEqual((martin["licence_ffme"], martin["raw_passports"], martin["raw_diplomas"]),
                          ("112233", "Grimpeur Vert", "Initiateur SAE"))
-        self.assertEqual(self._statuses("MARTIN"), [("Terminé", "Questionnaire de santé")])
+        self.assertEqual(self._statuses("MARTIN"), [("Terminé", "QS")])
         self.assertEqual(self._user("PETIT")["licence_ffme"], "998877")
-        self.assertEqual(self._statuses("PETIT"), [("Terminé", "Certificat médical")])
+        self.assertEqual(self._statuses("PETIT"), [("Terminé", "COMPETITION")])
+
+    def _preview(self, rows, **body):
+        return self.client.post("/api/ffme/preview", json={"filename": "ffme.xlsx", "content_base64": _xlsx(rows), **body}).json()
+
+    def test_preview_lists_the_changes_of_a_matched_row(self):
+        self.seed("1", "Léo", "MARTIN", "Cours ados")
+
+        preview = self._preview([{"Nom": "MARTIN", "Prénom": "Léo", "N° de licence": "112233", "Passeports": "Grimpeur Vert",
+                                  "Document de santé": "QS"}])
+
+        self.assertEqual(preview["changes"], [{
+            "row_number": 3, "user_id": self._user("MARTIN")["id"], "last_name": "MARTIN", "first_name": "Léo",
+            "birth_date": "2017-03-10", "licence": "112233", "source": "nom", "licence_conflict": "",
+            "no_active_registration": False, "duplicate": False,
+            "changes": [{"field": "licence", "old": "", "new": "112233"},
+                        {"field": "passeports", "old": "", "new": "Grimpeur Vert"},
+                        {"field": "document_sante", "old": "", "new": "QS"},
+                        {"field": "statut", "old": "Validé", "new": "Terminé"}],
+        }])
+
+    def test_preview_counts_unchanged_members_and_lists_those_without_active_registration(self):
+        self.seed("1", "Léo", "MARTIN", "Cours ados")
+        self.seed("2", "Max", "PETIT", "Cours ados", status="Canceled")
+        rows = [{"Nom": "MARTIN", "Prénom": "Léo", "N° de licence": "112233"}, {"Nom": "PETIT", "Prénom": "Max"}]
+        self.client.post("/api/ffme/import", json={"content_base64": _xlsx(rows)})
+
+        preview = self._preview(rows)
+
+        self.assertEqual((preview["season"], preview["unchanged_count"]), ("2026-2027", 1))
+        self.assertEqual([(row["last_name"], row["changes"], row["no_active_registration"]) for row in preview["changes"]],
+                         [("PETIT", [], True)])
+
+    def test_preview_with_a_manual_match_lists_its_changes(self):
+        self.seed("1", "Max", "PETIT", "Cours ados")
+        rows = [{"Nom": "PETIT-DUPONT", "Prénom": "Maxime", "N° de licence": "998877"}]
+        self.assertEqual([row["row_number"] for row in self._preview(rows)["unmatched"]], [3])
+
+        preview = self._preview(rows, manual_matches=[{"row_number": 3, "user_id": self._user("PETIT")["id"]}])
+
+        self.assertEqual(preview["unmatched"], [])
+        self.assertEqual([(row["row_number"], row["source"], row["changes"][0]) for row in preview["changes"]],
+                         [(3, "manuel", {"field": "licence", "old": "", "new": "998877"})])
+
+    def test_member_matched_twice_is_flagged_then_refused_until_a_row_is_left_out(self):
+        self.seed("1", "Léo", "MARTIN", "Cours ados")
+        rows = [{"Nom": "MARTIN", "Prénom": "Léo", "N° de licence": "112233"},
+                {"Nom": "MARTIN", "Prénom": "Léon", "N° de licence": "445566"}]
+        manual = [{"row_number": 4, "user_id": self._user("MARTIN")["id"]}]
+
+        preview = self._preview(rows, manual_matches=manual)
+        self.assertEqual([(row["row_number"], row["duplicate"]) for row in preview["changes"]], [(3, True), (4, True)])
+
+        body = {"content_base64": _xlsx(rows), "manual_matches": manual}
+        refused = self.client.post("/api/ffme/import", json=body)
+        self.assertEqual((refused.status_code, refused.json()["message"]), (400, DUPLICATE_MATCH.format(name="MARTIN Léo")))
+        self.assertEqual(self._user("MARTIN")["licence_ffme"] or "", "")
+
+        result = self.client.post("/api/ffme/import", json={**body, "excluded_rows": [3]}).json()
+        self.assertEqual(result["updated_count"], 1)
+        self.assertEqual(self._user("MARTIN")["licence_ffme"], "445566")
+
+    def test_preview_flags_a_licence_stored_on_another_member(self):
+        # A sibling's licence typed on HelloAsso: the birth date sends the row to the right child, the other keeps it
+        self.seed("1", "Léo", "MARTIN", "Cours ados", **{"champ_Numéro de Licence FFME (6 chiffres)": "111111"})
+        self.seed("2", "Emma", "MARTIN", "Cours ados", **{"champ_Date de naissance de l'adhérent": "2015-04-02"})
+
+        preview = self._preview([{"Nom": "MARTIN", "Prénom": "Emma", "N° de licence": "111111", "Date de naissance": "02/04/2015"}])
+
+        self.assertEqual([(row["first_name"], row["licence_conflict"]) for row in preview["changes"]], [("Emma", "MARTIN Léo")])
 
     def test_import_succeeds_when_the_backup_folder_cannot_be_created(self):
         self.seed("1", "Léo", "MARTIN", "Cours ados")

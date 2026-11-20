@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { manualMatches, readBase64, sortedMembers, type Licensee, type Member } from "./ffme";
+import {
+  blockedUserIds,
+  changeMatches,
+  healthDocumentMark,
+  licenseeMatches,
+  manualMatches,
+  readBase64,
+  sortChanges,
+  sortedMembers,
+  type Licensee,
+  type Member,
+  type RowChange,
+} from "./ffme";
 
-const ROW = (nom: string): Licensee => ({
+const ROW = (row_number: number, nom: string): Licensee => ({
+  row_number,
   nom,
   prenom: "Tom",
   licence: "998877",
@@ -9,6 +22,20 @@ const ROW = (nom: string): Licensee => ({
   passeports: "Bleu",
   diplomes: "",
   document_sante: "Certificat",
+});
+const CHANGE = (row_number: number, last_name: string, more: Partial<RowChange> = {}): RowChange => ({
+  row_number,
+  user_id: row_number,
+  last_name,
+  first_name: "Tom",
+  birth_date: "",
+  licence: "636947",
+  source: "licence",
+  licence_conflict: "",
+  changes: [{ field: "statut", old: "Validé", new: "Terminé" }],
+  no_active_registration: false,
+  duplicate: false,
+  ...more,
 });
 const MEMBER = (id: number, last_name: string, first_name: string): Member => ({ id, last_name, first_name, birth_date: "" });
 
@@ -26,11 +53,44 @@ describe("ffme import", () => {
   });
 
   it("keeps the rows linked to a member", () => {
-    const rows = [ROW("DUPONT"), ROW("DURAND"), ROW("MOREL")];
+    const rows = [ROW(3, "DUPONT"), ROW(4, "DURAND"), ROW(5, "MOREL")];
     expect(manualMatches(rows, [null, 12, 0])).toEqual([
-      { user_id: 12, nom: "DURAND", prenom: "Tom", licence: "998877", passeports: "Bleu", diplomes: "", document_sante: "Certificat" },
-      { user_id: 0, nom: "MOREL", prenom: "Tom", licence: "998877", passeports: "Bleu", diplomes: "", document_sante: "Certificat" },
+      { row_number: 4, user_id: 12 },
+      { row_number: 5, user_id: 0 },
     ]);
     expect(manualMatches(rows, [])).toEqual([]);
+  });
+
+  it("sorts the changes by what needs a look: matched twice, licence held by another member or no active registration, manual, by name, by licence", () => {
+    const rows = [
+      CHANGE(1, "Zola"),
+      CHANGE(2, "Petit", { source: "nom" }),
+      CHANGE(3, "Morel", { source: "manuel" }),
+      CHANGE(4, "Durand", { no_active_registration: true }),
+      CHANGE(5, "Dupont", { duplicate: true }),
+      CHANGE(6, "Évans"),
+      CHANGE(7, "Dupuis", { licence_conflict: "MARTIN Léo" }),
+    ];
+    expect(sortChanges(rows).map((row) => row.row_number)).toEqual([5, 7, 4, 3, 2, 6, 1]);
+  });
+
+  it("searches by name or licence, accents and case ignored", () => {
+    const row = CHANGE(3, "Hélène");
+    expect(["helene", " TOM ", "6369", ""].map((query) => changeMatches(row, query))).toEqual([true, true, true, true]);
+    expect(changeMatches(row, "998877")).toBe(false);
+    expect(["dupont", "9988"].map((query) => licenseeMatches(ROW(3, "DUPONT"), query))).toEqual([true, true]);
+    expect(licenseeMatches(ROW(3, "DUPONT"), "636947")).toBe(false);
+  });
+
+  it("blocks a member while several ticked rows point to them", () => {
+    const rows = [CHANGE(3, "Dupont", { user_id: 7 }), CHANGE(4, "Dupont", { user_id: 7, source: "manuel" }), CHANGE(5, "Morel")];
+    expect([...blockedUserIds(rows, new Set())]).toEqual([7]);
+    expect([...blockedUserIds(rows, new Set([4]))]).toEqual([]);
+  });
+});
+
+describe("healthDocumentMark", () => {
+  it("marks a valid health document ✅ and a pending one ❌", () => {
+    expect(["QS", "COMPETITION", "LOISIR", "ATTENTE", " attente "].map(healthDocumentMark)).toEqual(["✅", "✅", "✅", "❌", "❌"]);
   });
 });

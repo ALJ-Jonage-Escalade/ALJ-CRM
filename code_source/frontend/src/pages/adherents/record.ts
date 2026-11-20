@@ -7,6 +7,7 @@ import { looksLikeEmail } from "../../lib/email";
 import { emergencyContactsOf } from "../../lib/emergencyContacts";
 import { formatDate, formatDayText } from "../../lib/format";
 import { COUNTRY_CHOICES, knownChoice, NATIONALITY_CHOICES } from "../../lib/countries";
+import { PASSPORT_COLOURS, passportMarks } from "../../lib/passports";
 import { SEX_LABELS, sexLabel, type Sex } from "../../lib/sex";
 import { normKey } from "../../lib/text";
 import type { MemberStatus } from "../../services/members";
@@ -70,9 +71,14 @@ export function recordRows(member: Member): RecordRow[] {
     });
   }
   if (diplomes(member).some((d) => d.type === "passeport_orange")) {
-    add("🟠", "Passeport orange", "Oui");
+    add(PASSPORT_COLOURS.orange, "Passeport orange", "Oui");
   }
-  add("🎓", "Passeports FFME", member.raw_passports);
+  const passportCircles = passportMarks(member.raw_passports);
+  add(
+    "🎓",
+    "Passeports FFME",
+    passportCircles === member.raw_passports ? member.raw_passports : `${passportCircles} ${member.raw_passports}`,
+  );
   if (member.payer && normKey(member.payer) !== normKey(`${member.first_name} ${member.last_name}`)) {
     add("💳", "Payeur", member.payer + (member.payer_email ? ` (${member.payer_email})` : ""));
   }

@@ -59,14 +59,49 @@ const STATS_WITHOUT_TERMINE = {
   ignored_details: [],
   to_check_details: [],
 };
+const FFME_CHANGE = {
+  user_id: 7,
+  last_name: "PETIT",
+  first_name: "Max",
+  birth_date: "2009-07-22",
+  licence: "112233",
+  source: "nom",
+  licence_conflict: "",
+  changes: [
+    { field: "licence", old: "", new: "112233" },
+    { field: "passeports", old: "Passeport Blanc", new: "Passeport Blanc, Passeport Jaune" },
+    { field: "document_sante", old: "ATTENTE", new: "QS" },
+    { field: "statut", old: "Validé", new: "Terminé" },
+  ],
+  no_active_registration: false,
+  duplicate: false,
+};
 const PREVIEW = {
   status: "success",
   filename: "ffme.xlsx",
+  season: "2026-2027",
   matched_count: 3,
   unmatched_count: 1,
+  unchanged_count: 1,
   stats: { total_processed: 4, matched_by_licence: 2, matched_by_name: 1, matched_manually: 0, errors: [] },
+  changes: [
+    { ...FFME_CHANGE, row_number: 3 },
+    {
+      ...FFME_CHANGE,
+      row_number: 5,
+      user_id: 4,
+      last_name: "DURAND",
+      first_name: "Léa",
+      licence: "445566",
+      source: "licence",
+      changes: [],
+      no_active_registration: true,
+      licence_conflict: "DURAND Hugo",
+    },
+  ],
   unmatched: [
     {
+      row_number: 4,
       nom: "DUPONT",
       prenom: "Tom",
       licence: "998877",
@@ -196,7 +231,21 @@ const ANSWERS: Record<string, Answer> = {
       attached: [],
     }),
   "GET /api/ffme/export": () => file("import_ffme_20261022.csv"),
-  "POST /api/ffme/preview": () => json(PREVIEW),
+  // A manual match of row 4 to PETIT Max (id 7): PETIT is matched twice, by row 3 and row 4
+  "POST /api/ffme/preview": (body) =>
+    json(
+      (body as { manual_matches?: unknown[] }).manual_matches?.length
+        ? {
+            ...PREVIEW,
+            unmatched: [],
+            changes: [
+              { ...PREVIEW.changes[0], duplicate: true },
+              { ...FFME_CHANGE, row_number: 4, source: "manuel", duplicate: true, changes: [{ field: "licence", old: "", new: "998877" }] },
+              PREVIEW.changes[1],
+            ],
+          }
+        : PREVIEW,
+    ),
   "POST /api/ffme/import": () =>
     json({
       status: "success",
@@ -979,10 +1028,11 @@ describe("OutilsPage", () => {
     expect(byId("toast")!.textContent).toBe("✅ Fichier FFME « import_ffme_20261022.csv » téléchargé !");
   });
 
-  it("previews the FFME file, then applies it with a manual match", async () => {
+  it("previews every change of the FFME file, then applies the ticked rows", async () => {
     const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
     const { byId, all, sent } = await render("admin", "/bureau/outils/ffme-import");
     expect((byId("ffme-analyze") as HTMLButtonElement).disabled).toBe(true);
+    expect(byId("ffme-quick-import")).toBeNull();
 
     const input = byId<HTMLInputElement>("ffme-file")!;
     Object.defineProperty(input, "files", { value: [new File(["not xlsx"], "liste.csv")], configurable: true });
@@ -997,48 +1047,74 @@ describe("OutilsPage", () => {
 
     byId("ffme-analyze")!.click();
     await flushPromises();
-    expect(sent("POST", "/api/ffme/preview")[0]!.body).toEqual({ filename: "ffme.xlsx", content_base64: btoa("PK") });
-    expect(byId("ffme-unmatched-count")!.textContent).toBe("1");
+    expect(sent("POST", "/api/ffme/preview")[0]!.body).toEqual({ filename: "ffme.xlsx", content_base64: btoa("PK"), manual_matches: [] });
+    expect(byId("ffme-preview")!.textContent).toContain("Saison 2026-2027");
+    expect(["ffme-to-change", "ffme-unchanged", "ffme-no-registration", "ffme-unmatched-count"].map((id) => byId(id)!.textContent)).toEqual(
+      ["1", "1", "1", "1"],
+    );
+    // What needs a look first: no active registration, then the match by name
+    expect(all("ffme-change").map((row) => row.textContent)).toEqual([
+      expect.stringMatching(/⚠️ Licence 445566 déjà enregistrée sur DURAND Hugo.*⚠️ Aucune inscription active sur la saison/),
+      expect.stringMatching(/PETIT Max.*Nom.*— → 112233.*⚪ → ⚪🟡.*✅ QS.*Validé.*→.*Terminé/),
+    ]);
+    // The status as on the Adhérents page: one pill per status
+    const statusPills = [...(all("ffme-change")[1]?.querySelectorAll('[data-testid="ffme-status"]') ?? [])];
+    expect(statusPills.map((pill) => [pill.textContent?.trim(), pill.className.includes("rounded-full")])).toEqual([
+      ["Validé", true],
+      ["Terminé", true],
+    ]);
+
+    const search = byId<HTMLInputElement>("ffme-search")!;
+    search.value = "durand";
+    search.dispatchEvent(new Event("input"));
+    await flushPromises();
+    expect(all("ffme-change").map((row) => row.textContent)).toEqual([expect.stringContaining("DURAND Léa")]);
+    expect(all("ffme-unmatched")).toHaveLength(0);
+    search.value = "";
+    search.dispatchEvent(new Event("input"));
+    await flushPromises();
+
     const select = byId<HTMLSelectElement>("ffme-match")!;
     // Members in alphabetical order, after "ignore"
     expect([...select.options].map((o) => o.text)).toEqual(["-- Ignorer cette ligne --", "DURAND Léa (—)", "PETIT Max (2009-07-22)"]);
     select.selectedIndex = 2;
     select.dispatchEvent(new Event("change"));
+    await flushPromises();
+    expect(sent("POST", "/api/ffme/preview")[1]!.body).toEqual({
+      filename: "ffme.xlsx",
+      content_base64: btoa("PK"),
+      manual_matches: [{ row_number: 4, user_id: 7 }],
+    });
+    // The linked row keeps its picker, to undo the link
+    expect(byId<HTMLSelectElement>("ffme-match")!.value).toBe("7");
+    const rows = all("ffme-change");
+    expect(rows.slice(0, 2).map((row) => row.textContent)).toEqual([
+      expect.stringContaining("⚠️ Adhérent rapproché par plusieurs lignes du fichier"),
+      expect.stringContaining("⚠️ Adhérent rapproché par plusieurs lignes du fichier"),
+    ]);
+    expect((byId("ffme-apply") as HTMLButtonElement).disabled).toBe(true);
+
+    // Leave out the automatic row of PETIT (row 3): the manual one stays
+    const automatic = rows.find((row) => row.textContent.includes("Nom"))!;
+    automatic.querySelector<HTMLInputElement>("[data-testid=ffme-keep]")!.click();
+    await flushPromises();
+    expect((byId("ffme-apply") as HTMLButtonElement).disabled).toBe(false);
 
     byId("ffme-apply")!.click();
     await flushPromises();
     expect(confirm).toHaveBeenLastCalledWith(
       expect.objectContaining({
         message:
-          "Confirmer l'enregistrement de 4 adhérents en base de données ?\n\n• 3 réconciliés automatiquement\n• 1 associés manuellement",
+          "Confirmer l'enregistrement de 1 adhérent en base de données ?\n\n• 0 réconcilié automatiquement\n• 1 associé manuellement",
       }),
     );
     expect(sent("POST", "/api/ffme/import")[0]!.body).toEqual({
       filename: "ffme.xlsx",
       content_base64: btoa("PK"),
-      manual_matches: [
-        { user_id: 7, nom: "DUPONT", prenom: "Tom", licence: "998877", passeports: "", diplomes: "", document_sante: "Certificat" },
-      ],
+      manual_matches: [{ row_number: 4, user_id: 7 }],
+      excluded_rows: [3],
     });
     expect(byId("ffme-import-done")!.textContent).toContain("4 adhérents ont été mis à jour");
     expect(all("ffme-preview")).toHaveLength(0);
-  });
-
-  it("imports straight away once confirmed", async () => {
-    const confirm = vi.spyOn(dialogs, "confirm").mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-    const { byId, sent } = await render("admin", "/bureau/outils/ffme-import");
-    const input = byId<HTMLInputElement>("ffme-file")!;
-    Object.defineProperty(input, "files", { value: [new File(["PK"], "ffme.xlsx")], configurable: true });
-    input.dispatchEvent(new Event("change"));
-    await flushPromises();
-
-    byId("ffme-quick-import")!.click();
-    await flushPromises();
-    expect(sent("POST", "/api/ffme/import")).toHaveLength(0);
-    byId("ffme-quick-import")!.click();
-    await flushPromises();
-    expect(confirm).toHaveBeenCalledTimes(2);
-    expect(sent("POST", "/api/ffme/import")[0]!.body).toEqual({ filename: "ffme.xlsx", content_base64: btoa("PK"), manual_matches: [] });
-    expect(byId("toast")!.textContent).toBe("🎉 Importation FFME validée : 4 adhérents mis à jour.");
   });
 });

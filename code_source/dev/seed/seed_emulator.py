@@ -293,6 +293,8 @@ EMAIL_TEMPLATES = [
 # Writing
 # --------------------------------------------------------------------------
 def build_sqlite(path, fake, rng, coach_names):
+    import ffme_cases
+    from faker import Faker
     from infrastructure.sqlite.connection import SqliteDatabase
     from infrastructure.sqlite.email_templates import EmailTemplateRepository
     from infrastructure.sqlite.members import MemberRepository
@@ -309,6 +311,13 @@ def build_sqlite(path, fake, rng, coach_names):
     previous = [member_record(fake, rng, p, PREVIOUS_SEASON, i) for i, p in enumerate(returning, start=1)]
     MemberRepository.upsert_members(previous, PREVIOUS_SEASON)
     MemberRepository.upsert_members(current, SEASON)
+    # Cases of the FFME import test file (dev/seed/ffme_cases.py), own random streams: the rest stays the same
+    extra_fake = Faker("en_GB")
+    extra_fake.seed_instance(SEED)
+    extra_rng = random.Random(SEED)  # noqa: S311 - reproducible fake data, not security
+    MemberRepository.upsert_members(ffme_cases.extra_records(
+        lambda person, order_no: member_record(extra_fake, extra_rng, person, SEASON, order_no), planning), SEASON)
+    ffme_cases.prepare_cases(SEASON)
     # A member with more contacts than the HelloAsso form can give
     last_member = MemberRepository.list_member_rows(SEASON)[-1]
     MemberRepository.update_member_fields(user_id=last_member["user_id"], fields={"emergency_contacts": [
@@ -485,6 +494,7 @@ def main() -> int:
     if "--access-only" in sys.argv[1:]:
         return seed_access_only(project)
 
+    import ffme_cases
     from faker import Faker
     from hp_names import COACHES
     from infrastructure.firestore.cloud_sync.bootstrap import import_database
@@ -503,6 +513,9 @@ def main() -> int:
     db_path = os.path.join(workdir, "seed.db")
     n_cur, n_prev = build_sqlite(db_path, fake, rng, COACHES)
     print(f"🧙 {n_cur} memberships {SEASON}, {n_prev} memberships {PREVIOUS_SEASON} (re-registrations)")
+    ffme_file, *ffme_file_cases = ffme_cases.write_ffme_file(SEASON, HERE)
+    print(f"📄 FFME import test file (Outils › Import FFME): {ffme_file}")
+    print("\n".join(f"   - {case}" for case in ffme_file_cases))
 
     written = import_database(db_path, RestStore())
     print(f"☁️  crm_* collections: {written}")

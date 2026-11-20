@@ -10,8 +10,8 @@ export function createFfmeApi(client: ApiClient) {
     /** FFME CSV file, for saveExport(). */
     exportFile: (includeFinished: boolean) =>
       client.GET("/api/ffme/export", { params: { query: { include_termine: includeFinished } }, parseAs: "blob" }),
-    /** Matches the federation's file against the members, changes nothing. */
-    preview: (body: Schemas["FfmeFile"]) => unwrap(client.POST("/api/ffme/preview", { body })),
+    /** Matches the federation's file (and the office's manual matches) against the members and lists the changes, writes nothing. */
+    preview: (body: Schemas["FfmePreviewRequest"]) => unwrap(client.POST("/api/ffme/preview", { body })),
     import: (body: Schemas["FfmeImportRequest"]) => unwrap(client.POST("/api/ffme/import", { body })),
   };
 }

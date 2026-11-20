@@ -45,6 +45,12 @@ describe("record", () => {
     expect(recordRows(member({ first_name: "Léa", last_name: "DUPONT", payer: "Léa DUPONT" }))).toEqual([]);
   });
 
+  it("shows the FFME passports with their colours", () => {
+    const passports = (raw: string) => recordRows(member({ raw_passports: raw })).find((r) => r.label === "Passeports FFME")?.value;
+    expect(passports("Passeport Blanc, Passeport Jaune")).toBe("⚪🟡 Passeport Blanc, Passeport Jaune");
+    expect(passports("Passeport Ouvert")).toBe("Passeport Ouvert");
+  });
+
   it("shows the key a member holds, linked to it on Outils › Clés", () => {
     const rows = recordRows(member({ key: { id: 4, code: "12", given_on: "2024-09-12" } }));
     expect(rows.find((r) => r.icon === "🔑")).toEqual({

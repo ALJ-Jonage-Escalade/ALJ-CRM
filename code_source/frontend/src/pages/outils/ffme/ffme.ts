@@ -1,11 +1,14 @@
 /* Import of the licensee list exported from MyFFME (.xlsx): the file goes to the server base64 encoded; the server
-   matches its rows with the members (license number, then name). The rows it could not match are shown with a list
-   of members to pick from; the picked ones are sent with the file when applying. */
+   matches its rows with the members (license number, then name, checked against the birth date) and lists what the
+   import changes. The rows it could not match are shown with a list of members to pick from; each pick is previewed
+   again, then sent with the file when applying, with the rows the office left out. */
 import type { Schemas } from "../../../lib/client";
+import { normKey, plural } from "../../../lib/text";
 
 export type Licensee = Schemas["FfmeLicensee"];
 export type Member = Schemas["FfmeMember"];
 export type ManualMatch = Schemas["FfmeManualMatch"];
+export type RowChange = Schemas["FfmeRowChange"];
 
 export function isXlsx(name: string): boolean {
   return name.toLowerCase().endsWith(".xlsx");
@@ -36,6 +39,53 @@ export function sortedMembers(members: readonly Member[]): Member[] {
   return [...members].sort((a, b) => collator.compare(a.last_name, b.last_name) || collator.compare(a.first_name, b.first_name));
 }
 
+const SOURCE_RANK: Record<RowChange["source"], number> = { manuel: 2, nom: 3, licence: 4 };
+
+/** What needs a look first: matched twice, then a licence held by another member or no active registration, then by
+    how sure the match is. */
+function attentionRank(row: RowChange): number {
+  if (row.duplicate) {
+    return 0;
+  }
+  return row.licence_conflict || row.no_active_registration ? 1 : SOURCE_RANK[row.source];
+}
+
+/** The changes sorted by what needs a look, then by name (accents and case ignored). */
+export function sortChanges(rows: readonly RowChange[]): RowChange[] {
+  const collator = new Intl.Collator("fr", { sensitivity: "base" });
+  return [...rows].sort(
+    (a, b) =>
+      attentionRank(a) - attentionRank(b) || collator.compare(a.last_name, b.last_name) || collator.compare(a.first_name, b.first_name),
+  );
+}
+
+function anyMatches(query: string, values: readonly string[]): boolean {
+  const key = normKey(query);
+  return values.some((value) => normKey(value).includes(key));
+}
+
+/** The search field of the preview: a change row by the member's name or licence (accents and case ignored). */
+export function changeMatches(row: RowChange, query: string): boolean {
+  return anyMatches(query, [row.last_name, row.first_name, row.licence]);
+}
+
+/** The search field of the preview: an unmatched row by the file's name or licence. */
+export function licenseeMatches(licensee: Licensee, query: string): boolean {
+  return anyMatches(query, [licensee.nom, licensee.prenom, licensee.licence]);
+}
+
+/** The members that several ticked rows point to: the import refuses them until one row is left out. */
+export function blockedUserIds(rows: readonly RowChange[], excludedRows: ReadonlySet<number>): Set<number> {
+  const seen = new Set<number>();
+  const blocked = new Set<number>();
+  for (const row of rows) {
+    if (!excludedRows.has(row.row_number)) {
+      (seen.has(row.user_id) ? blocked : seen).add(row.user_id);
+    }
+  }
+  return blocked;
+}
+
 /** The rows linked to a member: choices[i] is the member picked for unmatched[i], null to leave the row out. */
 export function manualMatches(unmatched: readonly Licensee[], choices: readonly (number | null)[]): ManualMatch[] {
   return unmatched.flatMap((row, i) => {
@@ -43,14 +93,21 @@ export function manualMatches(unmatched: readonly Licensee[], choices: readonly 
     if (userId == null) {
       return [];
     }
-    const { nom, prenom, licence, passeports, diplomes, document_sante } = row;
-    return [{ user_id: userId, nom, prenom, licence, passeports, diplomes, document_sante }];
+    return [{ row_number: row.row_number, user_id: userId }];
   });
 }
 
-export function applyConfirmation(matched: number, manual: number): string {
+/** The confirmation before writing `rows` (the ticked rows that change something). */
+export function applyConfirmation(rows: readonly RowChange[]): string {
+  const manualCount = rows.filter((row) => row.source === "manuel").length;
+  const automaticCount = rows.length - manualCount;
   return (
-    `Confirmer l'enregistrement de ${matched + manual} adhérents en base de données ?\n\n` +
-    `• ${matched} réconciliés automatiquement\n• ${manual} associés manuellement`
+    `Confirmer l'enregistrement de ${rows.length} adhérent${plural(rows.length)} en base de données ?\n\n` +
+    `• ${automaticCount} réconcilié${plural(automaticCount)} automatiquement\n• ${manualCount} associé${plural(manualCount)} manuellement`
   );
+}
+
+/** The health document of the file: QS, COMPETITION or LOISIR lets the member climb (✅), ATTENTE does not (❌). */
+export function healthDocumentMark(value: string): "✅" | "❌" {
+  return value.trim().toUpperCase() === "ATTENTE" ? "❌" : "✅";
 }

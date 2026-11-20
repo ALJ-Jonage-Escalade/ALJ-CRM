@@ -212,7 +212,9 @@ def test_ffme_import_preview_and_apply(page, test_data, tmp_path):
 
     page.get_by_test_id("ffme-analyze").click()
     expect(page.get_by_test_id("ffme-rows")).to_have_text("2")
-    expect(page.get_by_test_id("ffme-by-name")).to_have_text("1")
+    expect(page.get_by_test_id("ffme-to-change")).to_have_text("1")
+    expect(page.get_by_test_id("ffme-change")).to_have_count(1)
+    expect(page.get_by_test_id("ffme-change")).to_contain_text("→ 4242420")
     expect(page.get_by_test_id("ffme-unmatched")).to_have_count(1)
     expect(page.get_by_test_id("ffme-unmatched")).to_contain_text("INCONNU Zoé")
     expect(page.get_by_test_id("ffme-match").locator("option:checked")).to_have_text("-- Ignorer cette ligne --")
