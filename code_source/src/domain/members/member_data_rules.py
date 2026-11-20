@@ -10,6 +10,8 @@ import datetime
 from dataclasses import dataclass
 from typing import Literal
 
+import phonenumbers
+
 # Plausible age on the season start (1 September): below, the registration year was typed in; above, a typo such as
 # 1026. Plain constants, not the group age rules.
 MIN_AGE = 3
@@ -30,6 +32,10 @@ class DataIssue:
 @dataclass(frozen=True)
 class MemberValues:
     birth_date: str = ""  # as typed (dd/mm/yyyy) or ISO; normalised: ISO, "" when blocking
+    # Normalised: French numbers "06 12 34 56 78", foreign ones international ("+41 79 123 45 67"); as typed when invalid
+    phone: str = ""
+    emergency_phone_1: str = ""
+    emergency_phone_2: str = ""
 
 
 @dataclass(frozen=True)
@@ -80,7 +86,32 @@ def _birth_date(raw: str, season_start: datetime.date) -> tuple[str, list[DataIs
     return birth.isoformat(), []
 
 
+_PHONE_LABELS: dict[IssueField, str] = {"phone": "Téléphone de l'adhérent", "emergency_phone_1": "Téléphone du contact d'urgence",
+                                         "emergency_phone_2": "Téléphone du 2e contact d'urgence"}
+
+
+def _phone(field: IssueField, raw: str, required: bool) -> tuple[str, list[DataIssue]]:
+    """A phone number, region FR by default: valid ones reformatted (national for France, international otherwise)."""
+    typed = str(raw or "").strip()
+    label = _PHONE_LABELS[field]
+    if not typed:
+        return "", [DataIssue(field, "missing", f"{label} manquant.")] if required else []
+    try:
+        number = phonenumbers.parse(typed, "FR")
+    except phonenumbers.NumberParseException:
+        number = None
+    if number is None or not phonenumbers.is_valid_number(number):
+        return typed, [DataIssue(field, "invalid", f"{label} invalide (« {typed} »).")]
+    french = phonenumbers.region_code_for_number(number) == "FR"
+    return phonenumbers.format_number(number, phonenumbers.PhoneNumberFormat.NATIONAL if french
+                                      else phonenumbers.PhoneNumberFormat.INTERNATIONAL), []
+
+
 def check_member_data(values: MemberValues, *, season_start: datetime.date) -> CheckedValues:
     """The values normalised, and their issues."""
     birth_date, issues = _birth_date(values.birth_date, season_start)
-    return CheckedValues(MemberValues(birth_date=birth_date), tuple(issues))
+    phone, phone_issues = _phone("phone", values.phone, required=True)
+    emergency_phone_1, emergency_1_issues = _phone("emergency_phone_1", values.emergency_phone_1, required=False)
+    emergency_phone_2, emergency_2_issues = _phone("emergency_phone_2", values.emergency_phone_2, required=False)
+    normalised = MemberValues(birth_date=birth_date, phone=phone, emergency_phone_1=emergency_phone_1, emergency_phone_2=emergency_phone_2)
+    return CheckedValues(normalised, tuple(issues + phone_issues + emergency_1_issues + emergency_2_issues))

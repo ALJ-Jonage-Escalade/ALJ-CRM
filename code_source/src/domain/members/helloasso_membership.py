@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Mapping, Optional
 
 from domain.competitions.matching import parse_campaign_identifier
+from domain.members.emergency_contacts import HELLOASSO_CONTACT_FIELDS
 from domain.members.member_data_rules import read_birth_date
 from domain.utils import is_helloasso_url, normalize_string
 
@@ -21,6 +22,12 @@ INSURANCE_OPTIONS = (
 )
 # Birth date field of the flat format (schema_v2.DOB_COLUMN)
 BIRTH_DATE_FIELD = "champ_Date de naissance de l'adhérent"
+
+
+# Custom fields of the form checked at the import (member_data_rules), named as the member writers read them
+# (schema_v2.USER_FIELD_MAP and emergency_contacts.HELLOASSO_CONTACT_FIELDS, without their "champ_" prefix)
+PHONE_FIELD = "Téléphone "
+EMERGENCY_PHONE_FIELDS = tuple(phone.removeprefix("champ_") for _name, phone in HELLOASSO_CONTACT_FIELDS)
 
 
 def insurance_of(option_name: str) -> Optional[str]:

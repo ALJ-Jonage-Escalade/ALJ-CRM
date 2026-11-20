@@ -19,6 +19,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "lxml" },
     { name = "openpyxl" },
+    { name = "phonenumberslite" },
     { name = "pillow" },
     { name = "pydantic" },
     { name = "pyjwt", extra = ["crypto"] },
@@ -46,6 +47,7 @@ requires-dist = [
     { name = "fastapi", specifier = "==0.162.7" },
     { name = "lxml", specifier = "==6.1.3" },
     { name = "openpyxl", specifier = "==3.1.5" },
+    { name = "phonenumberslite", specifier = ">=9.0.44" },
     { name = "pillow", specifier = "==13.0.0" },
     { name = "pydantic", specifier = "==2.14.3" },
     { name = "pyjwt", extras = ["crypto"], specifier = "==2.15.1" },
@@ -931,6 +933,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5a/82/42f767fc1c1143d6fd36efb827202a2d997a375e160a71eb2888a925aac1/pathspec-1.1.1.tar.gz", hash = "sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a", size = 135180, upload-time = "2026-04-27T01:46:08.907Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl", hash = "sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189", size = 57328, upload-time = "2026-04-27T01:46:07.06Z" },
+]
+
+[[package]]
+name = "phonenumberslite"
+version = "9.0.44"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1d/6b/6e09482740b17d2dcebd6fe53bef56555697282c829fafa2eff0440d64d8/phonenumberslite-9.0.44.tar.gz", hash = "sha256:9a4aa54947d90950643aaaf23fbf303ce6d99c6c10eba531acd47aaf18d41baf", size = 295584, upload-time = "2026-11-20T14:24:46.518Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c3/b1/60ac023e559703b03e2f8546060d7b0980753823d75eb42be8d5b51e83cd/phonenumberslite-9.0.44-py2.py3-none-any.whl", hash = "sha256:9e19246d5c9a6b2f0f0e89f85dffcca370047d65ca29052643346c5d8fae01f7", size = 473692, upload-time = "2026-11-20T14:24:45.216Z" },
 ]
 
 [[package]]

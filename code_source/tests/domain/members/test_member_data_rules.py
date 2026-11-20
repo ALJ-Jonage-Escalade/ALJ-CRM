@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from dataclasses import replace
 
 import pytest
 
@@ -39,7 +40,8 @@ def test_a_birth_date_giving_an_implausible_age_on_the_season_start_blocks(raw: 
 def test_a_readable_birth_date_is_stored_as_iso(raw: str, iso: str) -> None:
     checked = check_member_data(MemberValues(birth_date=raw), season_start=SEASON_START)
 
-    assert (checked.values.birth_date, checked.issues) == (iso, ())
+    assert checked.values.birth_date == iso
+    assert _birth_date_issues(raw) == []
 
 
 @pytest.mark.parametrize("raw", ["11/08/13", "11-08-2013", "2013/08/11", "31/02/2013", "onze août", "08/11/2013 ou 11/08"])
@@ -47,8 +49,46 @@ def test_an_unreadable_birth_date_blocks(raw: str) -> None:
     checked = check_member_data(MemberValues(birth_date=raw), season_start=SEASON_START)
 
     assert checked.values.birth_date == ""
-    assert [(issue.code, issue.blocking) for issue in checked.issues] == [("unreadable", True)]
+    assert _birth_date_issues(raw) == [("unreadable", True)]
 
 
 def test_a_missing_birth_date_blocks() -> None:
     assert _birth_date_issues("  ") == [("missing", True)]
+
+
+def _phone(raw: str, field: str = "phone") -> tuple[str, list[str]]:
+    checked = check_member_data(replace(MemberValues(), **{field: raw}), season_start=SEASON_START)
+    return getattr(checked.values, field), [issue.code for issue in checked.issues if issue.field == field]
+
+
+@pytest.mark.parametrize(("raw", "stored"), [
+    ("0612345678", "06 12 34 56 78"), ("06.12.34.56.78", "06 12 34 56 78"), ("06 12 34 56 78", "06 12 34 56 78"),
+    ("+33612345678", "06 12 34 56 78"), ("+33 6 12 34 56 78", "06 12 34 56 78"), ("0033 6 12 34 56 78", "06 12 34 56 78"),
+    ("+33 (0)6 12 34 56 78", "06 12 34 56 78"), ("04 78 12 34 56", "04 78 12 34 56"),
+    # Foreign numbers: international format, recognisable as foreign
+    ("+41 79 123 45 67", "+41 79 123 45 67"), ("0044 7911 123456", "+44 7911 123456"),
+])
+def test_a_valid_phone_is_stored_in_one_format_without_warning(raw: str, stored: str) -> None:
+    assert _phone(raw) == (stored, [])
+
+
+@pytest.mark.parametrize("raw", ["061234567", "06123456789", "06 12 AB 56 78", "molly@terrier.example", "12"])
+def test_a_phone_that_cannot_be_valid_is_a_warning_and_kept_as_typed(raw: str) -> None:
+    assert _phone(raw) == (raw, ["invalid"])
+
+
+def test_a_missing_member_phone_is_a_warning() -> None:
+    assert _phone(" ") == ("", ["missing"])
+
+
+@pytest.mark.parametrize("field", ["emergency_phone_1", "emergency_phone_2"])
+def test_the_emergency_phones_follow_the_same_rule_but_may_be_empty(field: str) -> None:
+    assert _phone("+33612345678", field) == ("06 12 34 56 78", [])
+    assert _phone("061234567", field) == ("061234567", ["invalid"])
+    assert _phone("", field) == ("", [])
+
+
+def test_only_the_birth_date_blocks() -> None:
+    checked = check_member_data(MemberValues(birth_date="11/08/2013", phone="12", emergency_phone_1="12"), season_start=SEASON_START)
+
+    assert checked.issues and not any(issue.blocking for issue in checked.issues)

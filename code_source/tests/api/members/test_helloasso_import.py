@@ -75,9 +75,12 @@ class TestMembershipPreview(HelloAssoImportTestCase):
 
         rows = {row["item_id"]: row for row in self.client.post(PREVIEW).json()["rows"]}
 
-        self.assertEqual(rows[1]["issues"], [])
+        def birth_date_issues(row: dict[str, Any]) -> list[dict[str, Any]]:  # Any: JSON body
+            return [issue for issue in row["issues"] if issue["field"] == "birth_date"]
+
+        self.assertEqual(birth_date_issues(rows[1]), [])
         self.assertEqual((rows[2]["bucket"], rows[2]["can_create"], rows[2]["birth_date"]), ("to_review", False, "01/01/1026"))
-        [issue] = rows[2]["issues"]
+        [issue] = birth_date_issues(rows[2])
         self.assertEqual((issue["field"], issue["code"], issue["blocking"]), ("birth_date", "too_old", True))
         self.assertIn("01/01/1026", issue["message"])
 
@@ -215,6 +218,26 @@ class TestMembershipRerunsAndRenewals(HelloAssoImportTestCase):
         self.assertEqual((renewed["last_name"], renewed["first_name"]), ("Weasley", "Ginny"))
         self.assertEqual(result["counts"], {"created": 0, "renewed": 1, "updated": 0, "attached": 0, "skipped": 0})
         self.assertEqual((self.count("users"), self.count("purchases")), (1, 2))
+
+    def test_a_renewal_is_checked_on_the_phone_the_crm_keeps_and_a_new_member_gets_the_normalised_one(self) -> None:
+        self.seed("ORD-OLD", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026",
+                  **{"champ_Date de naissance de l'adhérent": "2013-08-11", "champ_Téléphone ": "0600000000"})
+        typo = {"name": "Téléphone ", "answer": "061234567"}
+        luna_phone = {"name": "Téléphone ", "answer": "+33 6 12 34 56 78"}
+        self.items = [ha_item(1, "Weasley", "Ginny", customFields=[*ha_item(1, "", "")["customFields"], typo]),
+                      ha_item(2, "LOVEGOOD", "Luna", customFields=[*ha_item(2, "", "")["customFields"], luna_phone])]
+
+        rows = {row["item_id"]: row for row in self.client.post(PREVIEW).json()["rows"]}
+        self.import_all()
+
+        self.assertEqual((rows[1]["bucket"], rows[1]["issues"]), ("renewal", []))
+        conn = SqliteDatabase.get_connection()
+        try:
+            phones = dict(conn.execute("SELECT first_name, phone FROM users").fetchall())
+        finally:
+            conn.close()
+        self.assertEqual(phones, {"Ginny": "0600000000", "Luna": "06 12 34 56 78"})
+
 
 class TestMembershipsToReview(HelloAssoImportTestCase):
 

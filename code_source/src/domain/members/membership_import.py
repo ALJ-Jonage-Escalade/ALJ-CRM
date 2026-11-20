@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Iterable, Literal, Mapping, Optional
 
-from domain.members.helloasso_membership import MembershipRecord, season_guard
+from domain.members.helloasso_membership import EMERGENCY_PHONE_FIELDS, PHONE_FIELD, MembershipRecord, season_guard
 from domain.members.member_data_rules import CheckedValues, DataIssue, MemberValues, check_member_data, season_start
 from domain.members.purchase_priority import purchase_priority_score
 from domain.utils import normalize_name
@@ -33,6 +33,7 @@ class KnownMember:
     first_name: str
     birth_date: str  # ISO, "" when unknown
     licence: str  # FFME licence, digits only
+    phone: str = ""  # the CRM value a renewal keeps (member_data_rules checks it instead of the HelloAsso one)
 
 
 @dataclass(frozen=True)
@@ -284,14 +285,44 @@ def _apply_priority(entries: list[PlanEntry], base: _Base) -> list[PlanEntry]:
     return result
 
 
-def _checked(record: MembershipRecord, season: str) -> CheckedValues:
-    """The record's values as the import would store them, checked (birth date: the mapped ISO date, else as typed)."""
-    return check_member_data(MemberValues(birth_date=record.birth_date or record.birth_date_raw), season_start=season_start(season))
+def _check(record: MembershipRecord, season: str, member: Optional[KnownMember] = None) -> CheckedValues:
+    """The values the import would store, checked: those of `member` when filled (a renewal keeps them), else the
+    HelloAsso ones. Birth date: the mapped ISO date, else as typed. Emergency phones: always HelloAsso's (a renewal
+    adds the contacts the member does not have yet)."""
+    fields = record.custom_fields
+
+    def kept(crm: str, helloasso: str) -> str:
+        return crm if crm.strip() else helloasso
+
+    emergency = [fields.get(name, "") for name in EMERGENCY_PHONE_FIELDS]
+    values = MemberValues(birth_date=record.birth_date or record.birth_date_raw,
+                          phone=kept(member.phone if member else "", fields.get(PHONE_FIELD, "")),
+                          emergency_phone_1=emergency[0], emergency_phone_2=emergency[1])
+    return check_member_data(values, season_start=season_start(season))
 
 
-def _with_checked_values(record: MembershipRecord, checked: CheckedValues) -> MembershipRecord:
-    """The record with its normalised values: a blocking birth date is dropped, the record then behaves as without one."""
-    return replace(record, birth_date=checked.values.birth_date)
+def _normalised(record: MembershipRecord, checked: CheckedValues) -> MembershipRecord:
+    """The record with the normalised values it would be written with (only the fields it holds). A blocking birth
+    date is dropped: the record then behaves as without one."""
+    values = checked.values
+    normalised = {PHONE_FIELD: values.phone, EMERGENCY_PHONE_FIELDS[0]: values.emergency_phone_1,
+                  EMERGENCY_PHONE_FIELDS[1]: values.emergency_phone_2}
+    fields = dict(record.custom_fields)
+    fields.update({name: value for name, value in normalised.items() if fields.get(name, "").strip()})
+    return replace(record, birth_date=values.birth_date, custom_fields=fields)
+
+
+# Rows whose registration writes nothing on the member: their values are not checked
+_NOT_CHECKED = (Bucket.ALREADY_IMPORTED, Bucket.UPDATED)
+
+
+def _with_checks(entry: PlanEntry, base: _Base, season: str) -> PlanEntry:
+    """The entry with the issues of the values it would store, and its record normalised."""
+    if entry.bucket in _NOT_CHECKED or entry.changes:
+        return entry
+    member = base.members.get(entry.member_id) if entry.bucket == Bucket.RENEWAL and entry.member_id is not None else None
+    checked = _check(entry.record, season, member)
+    return replace(entry, record=_normalised(entry.record, checked), issues=checked.issues)
 
 
 def plan_membership_import(records: Iterable[MembershipRecord], *, season: str, campaign_slug: str,
@@ -303,9 +334,9 @@ def plan_membership_import(records: Iterable[MembershipRecord], *, season: str, 
     if blocked_reason:
         entries = [PlanEntry(record, Bucket.BLOCKED, blocked_reason) for record in records]
     else:
-        checked = {record.item_id: _checked(record, season) for record in records}
-        entries = _apply_priority([_classify(_with_checked_values(record, checked[record.item_id]), base) for record in records], base)
-        entries = [replace(entry, issues=checked[entry.item_id].issues) for entry in entries]
+        # Classified on a plausible birth date only, then checked on the values each row would store
+        records = [replace(record, birth_date=_check(record, season).values.birth_date) for record in records]
+        entries = [_with_checks(entry, base, season) for entry in _apply_priority([_classify(record, base) for record in records], base)]
     return ImportPlan(season=season, campaign_slug=campaign_slug, entries=entries, blocked_reason=blocked_reason,
                       members=tuple(base.members.values()), season_purchases=tuple(base.season_purchases))
 

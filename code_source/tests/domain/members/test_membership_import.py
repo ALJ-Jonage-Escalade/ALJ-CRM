@@ -14,6 +14,7 @@ from domain.members.membership_import import (
     KnownMember,
     KnownPurchase,
     MembersSnapshot,
+    PlanEntry,
     StaleDecisions,
     WriteAction,
     apply_decisions,
@@ -228,7 +229,8 @@ def test_a_registration_without_a_plausible_birth_date_is_never_new(birth_date: 
 
     assert plan.entries[0].bucket == Bucket.TO_REVIEW
     assert not plan.entries[0].can_create
-    assert [(found.field, found.code, found.blocking) for found in plan.entries[0].issues] == [("birth_date", issue, True)]
+    assert [(found.field, found.code, found.blocking) for found in plan.entries[0].issues
+            if found.field == "birth_date"] == [("birth_date", issue, True)]
     with pytest.raises(StaleDecisions):
         apply_decisions(plan, {9001: Decision(Bucket.TO_REVIEW, "create")})
 
@@ -388,3 +390,45 @@ def test_the_season_membership_of_each_member_is_known_to_the_preview(purchases:
     plan = _plan(_record(2, last_name="Potter"), purchases=purchases)
 
     assert season_membership(plan, 7).kind == expected
+
+
+# ---------------------------------------------------------------------------
+# Data checks: the values the import would store, normalised, with their issues
+# ---------------------------------------------------------------------------
+def _issues(entry: PlanEntry) -> list[tuple[str, str]]:
+    return [(issue.field, issue.code) for issue in entry.issues]
+
+
+def test_a_new_member_is_written_with_normalised_phones() -> None:
+    record = _record(custom_fields={"Téléphone ": "+33 6 12 34 56 78",
+                                    "Personne à prévenir en cas d'urgence - Téléphone": "0033612345679"})
+
+    [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN).entries
+
+    fields = entry.record.legacy_fields()
+    assert (fields["champ_Téléphone "], fields["champ_Personne à prévenir en cas d'urgence - Téléphone"]) == ("06 12 34 56 78",
+                                                                                                         "06 12 34 56 79")
+    assert _issues(entry) == []
+
+
+def test_a_registration_with_problems_stays_importable() -> None:
+    record = _record(custom_fields={"Téléphone ": "061234567"})
+
+    [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN).entries
+
+    assert entry.bucket == Bucket.NEW
+    assert _issues(entry) == [("phone", "invalid")]
+    assert [write.action for write in apply_decisions(_plan(record, members=()), {9001: Decision(Bucket.NEW, "import")})] == [WriteAction.CREATE]
+
+
+@pytest.mark.parametrize(("crm_phone", "expected"), [
+    ("06 12 34 56 78", []),  # the CRM value is kept: the HelloAsso typo is never written
+    ("", [("phone", "invalid")]),  # blank in the CRM: the HelloAsso value fills it
+])
+def test_a_renewal_is_checked_on_the_values_it_will_keep(crm_phone: str, expected: list[tuple[str, str]]) -> None:
+    record = _record(custom_fields={"Téléphone ": "061234567"})
+
+    [entry] = _plan(record, members=(replace(GINNY, phone=crm_phone),)).entries
+
+    assert entry.bucket == Bucket.RENEWAL
+    assert _issues(entry) == expected
