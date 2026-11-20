@@ -7,6 +7,10 @@ from typing import Optional, get_args
 from fastapi import APIRouter, Request
 
 from api.members.helloasso_import_schemas import (
+    CorrectionEmail,
+    CorrectionRequestBody,
+    CorrectionRequestPreview,
+    CorrectionRequestResult,
     BucketCounts,
     ImportCounts,
     ImportedMember,
@@ -32,6 +36,7 @@ from domain.members.import_corrections import helloasso_value
 from domain.members.member_data_rules import DataIssue, IssueField
 from domain.members.membership_import import Decision, ImportPlan, KnownMember, PlanEntry, WriteAction, season_membership
 from infrastructure.sqlite.membership_import import AppliedWrite
+from services.members import correction_requests
 from services.members.helloasso_import import ImportResult
 from services.members.helloasso_import import MembershipImportService as Service
 
@@ -103,6 +108,20 @@ def check_membership_value(data: MembershipValueCheckRequest) -> MembershipValue
     """Checks a value with the import's rules as the admin types it. Saves nothing."""
     value, issues = Service.check_value(data.field, data.value)
     return MembershipValueCheck(status="success", value=value, issues=[_issue(issue) for issue in issues])
+
+
+@router.post("/api/helloasso/memberships/correction-requests/preview", response_model=CorrectionRequestPreview,
+             responses=error_responses(400, 502))
+def preview_correction_requests(data: CorrectionRequestBody) -> CorrectionRequestPreview:
+    """The correction request of the first order of these registrations, as it would be sent. Sends nothing."""
+    return CorrectionRequestPreview(status="success", example=CorrectionEmail(**correction_requests.example(data.item_ids, data.campaign)))
+
+
+@router.post("/api/helloasso/memberships/correction-requests", response_model=CorrectionRequestResult,
+             responses=error_responses(400, 502))
+def send_correction_requests(request: Request, data: CorrectionRequestBody) -> CorrectionRequestResult:
+    """Asks the families to fix their data: one e-mail per order, to the payer, recorded in the e-mail log."""
+    return CorrectionRequestResult(status="success", **correction_requests.send(data.item_ids, author_of(request), data.campaign))
 
 
 def _imported(applied: AppliedWrite, plan: ImportPlan) -> ImportedMember:

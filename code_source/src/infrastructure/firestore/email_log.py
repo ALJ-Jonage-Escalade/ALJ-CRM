@@ -59,6 +59,8 @@ def log_entry(doc: Dict[str, Any]) -> Optional[EmailLogEntry]:  # Any: a Firesto
         competition_ids=[i for i in map(_optional_int, doc.get("competition_ids") or []) if i is not None],
         member_ids=[i for i in map(_optional_int, doc.get("member_ids") or []) if i is not None],
         recipients=recipients,
+        helloasso_order_refs=[str(ref) for ref in doc.get("helloasso_order_refs") or []],
+        helloasso_item_ids=[i for i in map(_optional_int, doc.get("helloasso_item_ids") or []) if i is not None],
     )
 
 

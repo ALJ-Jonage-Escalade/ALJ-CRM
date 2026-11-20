@@ -584,6 +584,51 @@ describe("OutilsPage", () => {
     }
   });
 
+  it("asks a family to correct a registration: summary and example first, then one e-mail sent", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const issue = { field: "phone", code: "invalid", message: "Téléphone de l'adhérent invalide (« 0612 »).", blocking: false };
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () =>
+      json({ ...MEMBERSHIP_PREVIEW, rows: [{ ...MEMBERSHIP_PREVIEW.rows[0]!, issues: [issue] }, MEMBERSHIP_PREVIEW.rows[1]] });
+    const example = {
+      to: "molly@terrier.example",
+      cc: [],
+      subject: "Adhésion : informations à corriger",
+      body: "Bonjour Molly,\n- Téléphone…",
+    };
+    ANSWERS["POST /api/helloasso/memberships/correction-requests/preview"] = () => json({ status: "success", example });
+    ANSWERS["POST /api/helloasso/memberships/correction-requests"] = () =>
+      json({ status: "success", sent: 1, failed: 0, log_notice: null });
+    try {
+      const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      byId("ha-request-open")!.click();
+      await flushPromises();
+
+      expect(byId("ha-request-summary")!.textContent).toBe("1 e-mail à 1 famille, pour 1 inscription");
+      expect(byId("ha-request-example")!.textContent).toContain("molly@terrier.example");
+      const sends = (): unknown[] =>
+        sent("POST", "/api/helloasso/memberships/correction-requests").filter((call) => !call.path.endsWith("/preview"));
+      expect(sends()).toHaveLength(0);
+
+      byId("ha-request-send")!.click();
+      await flushPromises();
+
+      expect(sends()).toEqual([
+        expect.objectContaining({ body: { item_ids: [1], campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2" } }),
+      ]);
+      expect(sent("POST", "/api/helloasso/memberships/correction-requests/preview").at(-1)!.body).toEqual({
+        item_ids: [1],
+        campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+      });
+      expect(byId("ha-request-done")!.textContent).toContain("1 e-mail(s) envoyé(s)");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+      delete ANSWERS["POST /api/helloasso/memberships/correction-requests/preview"];
+      delete ANSWERS["POST /api/helloasso/memberships/correction-requests"];
+    }
+  });
+
   it("shows each HelloAsso status as an icon, its meaning in the tooltip", async () => {
     const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
     const statuses = ["Processed", "Registered", "Canceled", "Refunded", "Refunding", "Unknown", "Strange"];

@@ -14,6 +14,7 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   results_batch: "Interne : résultats de compétition",
   attestation: "Attestation de paiement",
   access_invitation: "Invitation au bureau",
+  correction_request: "Adhésion : demande de correction",
 };
 
 /** E-mails to the club itself, listed in the history but never counted as a contact with the families. */

@@ -2430,6 +2430,124 @@
         }
       }
     },
+    "/api/helloasso/memberships/correction-requests/preview": {
+      "post": {
+        "summary": "Preview Correction Requests",
+        "description": "The correction request of the first order of these registrations, as it would be sent. Sends nothing.",
+        "operationId": "preview_correction_requests_api_helloasso_memberships_correction_requests_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionRequestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionRequestPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/memberships/correction-requests": {
+      "post": {
+        "summary": "Send Correction Requests",
+        "description": "Asks the families to fix their data: one e-mail per order, to the payer, recorded in the e-mail log.",
+        "operationId": "send_correction_requests_api_helloasso_memberships_correction_requests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionRequestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionRequestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/helloasso/memberships/import": {
       "post": {
         "summary": "Import Memberships",
@@ -6833,6 +6951,124 @@
         "type": "object",
         "title": "ContactSummary"
       },
+      "CorrectionEmail": {
+        "properties": {
+          "to": {
+            "type": "string",
+            "title": "To"
+          },
+          "cc": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cc"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "description": "Plain text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "to",
+          "cc",
+          "subject",
+          "body"
+        ],
+        "title": "CorrectionEmail"
+      },
+      "CorrectionRequestBody": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Item Ids"
+          },
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item_ids"
+        ],
+        "title": "CorrectionRequestBody",
+        "description": "The registrations to ask the families about (HelloAsso item ids); `campaign`: the one of the preview."
+      },
+      "CorrectionRequestPreview": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "example": {
+            "$ref": "#/components/schemas/CorrectionEmail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "example"
+        ],
+        "title": "CorrectionRequestPreview",
+        "description": "The e-mail of the first order, as it would be sent (nothing is sent)."
+      },
+      "CorrectionRequestResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "sent": {
+            "type": "integer",
+            "title": "Sent"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "log_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Notice"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "sent",
+          "failed"
+        ],
+        "title": "CorrectionRequestResult",
+        "description": "One e-mail per order: `sent` left, `failed` did not; `log_notice`: the send is not in the e-mail log."
+      },
       "Creneau": {
         "properties": {
           "groupe": {
@@ -6958,7 +7194,8 @@
               "competition_all_paid",
               "results_batch",
               "attestation",
-              "access_invitation"
+              "access_invitation",
+              "correction_request"
             ],
             "title": "Kind"
           },
@@ -6994,6 +7231,24 @@
             },
             "type": "array",
             "title": "Recipients",
+            "default": []
+          },
+          "helloasso_order_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Helloasso Order Refs",
+            "description": "A correction request: the HelloAsso orders it is about",
+            "default": []
+          },
+          "helloasso_item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Helloasso Item Ids",
+            "description": "A correction request: the HelloAsso registrations it is about",
             "default": []
           }
         },

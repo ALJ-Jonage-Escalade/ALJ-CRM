@@ -287,6 +287,27 @@ export function canCorrect(row: MembershipRow): boolean {
   return row.bucket === "new" || row.bucket === "renewal" || (row.bucket === "to_review" && !row.changes.length);
 }
 
+/** A row the family can be asked to correct: correctable, with problems. */
+export function canRequest(row: MembershipRow): boolean {
+  return canCorrect(row) && row.issues.length > 0;
+}
+
+/** What a correction request of these rows sends: one e-mail per HelloAsso order (one family), for the rows with
+    problems. */
+export function requestSummary(rows: MembershipRow[]): { emails: number; registrations: number; text: string } {
+  const asked = rows.filter((row) => row.issues.length);
+  const emails = new Set(asked.map((row) => row.order_ref)).size;
+  if (!emails) {
+    return { emails, registrations: 0, text: "Aucune des inscriptions choisies n'a d'information à corriger." };
+  }
+  const plural = (count: number, word: string): string => `${count} ${word}${count > 1 ? "s" : ""}`;
+  return {
+    emails,
+    registrations: asked.length,
+    text: `${plural(emails, "e-mail")} à ${plural(emails, "famille")}, pour ${plural(asked.length, "inscription")}`,
+  };
+}
+
 /** The choices after the preview is recomputed (a correction saved or undone): a row still in its section keeps the
     admin's choice, a row that moved gets the initial choice of its new section. */
 export function keepChoices(before: MembershipPreview, after: MembershipPreview, choices: Choices): Choices {

@@ -478,3 +478,58 @@ class TestMembershipCorrections(HelloAssoImportTestCase):
 
         self.assertIsNone(before["matched_member"])
         self.assertEqual((after["matched_member"]["last_name"], after["matched_member"]["first_name"]), ("WEASLEY", "Ginny"))
+
+
+REQUESTS = "/api/helloasso/memberships/correction-requests"
+
+
+class TestCorrectionRequests(HelloAssoImportTestCase):
+    """The admin asks the families to fix their data: one e-mail per order, to the payer."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        order = {"id": 777, "date": "2026-09-01T10:00:00+02:00"}
+
+        def item(item_id: int, first_name: str, **answers: str) -> dict[str, Any]:  # Any: HelloAsso JSON
+            fields = [*ha_item(item_id, "", "")["customFields"], *({"name": name, "answer": value} for name, value in answers.items())]
+            return ha_item(item_id, "WEASLEY", first_name, order=order, customFields=fields)
+
+        email = "Adresse mail pour la réception des informations du club"
+        self.items = [item(1, "Ginny", **{"Téléphone ": "061234567", email: "ginny@poudlard.example"}),
+                      item(2, "Ron", **{"Téléphone ": "<b>06</b>"})]
+        sent = patch("infrastructure.mail.sender.EmailSender.send_email")
+        self.send_email = sent.start()
+        self.addCleanup(sent.stop)
+        self.log = patch("services.communications.email_log.current_store")
+        self.store = self.log.start().return_value
+        self.addCleanup(self.log.stop)
+
+    def test_the_preview_shows_an_example_email_and_sends_nothing(self) -> None:
+        response = self.client.post(f"{REQUESTS}/preview", json={"item_ids": [1, 2]})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        example = response.json()["example"]
+        self.assertEqual((example["to"], example["cc"]), ("parent@terrier.example", ["ginny@poudlard.example"]))
+        self.assertIn("Ginny WEASLEY :\n- Téléphone de l'adhérent invalide (« 061234567 »).", example["body"])
+        self.assertIn("Ron WEASLEY", example["body"])
+        self.send_email.assert_not_called()
+
+    def test_one_email_per_order_goes_to_the_payer_with_the_primary_email_in_copy_and_is_logged(self) -> None:
+        response = self.client.post(REQUESTS, json={"item_ids": [1, 2]})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual((response.json()["sent"], response.json()["failed"]), (1, 0))
+        [call] = self.send_email.call_args_list
+        self.assertEqual((call.kwargs["to_email"], call.kwargs["cc"], call.kwargs["reply_to"]),
+                         ("parent@terrier.example", ["ginny@poudlard.example"], "inscription@alj-escalade.fr"))
+        self.assertIn("&lt;b&gt;06&lt;/b&gt;", call.kwargs["html_body"])  # a typed value never adds markup
+        [logged] = [entry.args[0] for entry in self.store.add_entry.call_args_list]
+        self.assertEqual((logged["kind"], logged["helloasso_order_refs"], logged["helloasso_item_ids"]),
+                         ("correction_request", ["777"], [1, 2]))
+
+    def test_a_request_without_any_problem_is_refused(self) -> None:
+        self.items = [ha_item(3, "LOVEGOOD", "Luna", customFields=[])]
+
+        response = self.client.post(REQUESTS, json={"item_ids": [99]})
+
+        self.assertEqual((response.status_code, response.json()["code"]), (400, "nothing_to_request"))

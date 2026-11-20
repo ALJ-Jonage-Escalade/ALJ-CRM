@@ -45,6 +45,12 @@ export function createMembersApi(client: ApiClient) {
           params: { path: { item_id: itemId, field }, query: campaign ? { campaign } : {} },
         }),
       ),
+    /** The correction request of the first order of these registrations, as it would be sent; sends nothing. */
+    helloAssoRequestPreview: (itemIds: number[], campaign: string | null) =>
+      unwrap(client.POST("/api/helloasso/memberships/correction-requests/preview", { body: { item_ids: itemIds, campaign } })),
+    /** Asks the families to fix their data: one e-mail per order, to the payer, recorded in the e-mail log. */
+    helloAssoRequestCorrections: (itemIds: number[], campaign: string | null) =>
+      unwrap(client.POST("/api/helloasso/memberships/correction-requests", { body: { item_ids: itemIds, campaign } })),
     /** Checks a value with the import's rules, nothing saved: the value as it would be stored, and its issues. */
     helloAssoCheckValue: (field: MembershipField, value: string) =>
       unwrap(client.POST("/api/helloasso/memberships/corrections/check", { body: { field, value } })),

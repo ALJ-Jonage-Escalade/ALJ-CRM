@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Dict, Iterable, List, Literal, Optional, Sequence, TypedDict, TypeGuard, get_args
 
 EmailKind = Literal["competition_email", "member_email", "competition_all_paid", "results_batch", "attestation",
-                    "access_invitation"]
+                    "access_invitation", "correction_request"]
 SendStatus = Literal["sent", "failed"]
 
 COMPETITOR_KIND: EmailKind = "competition_email"
@@ -45,6 +45,9 @@ class EmailLogEntry(TypedDict):
     competition_ids: List[int]
     member_ids: List[int]
     recipients: List[LoggedRecipient]
+    # The HelloAsso registrations a send is about (a correction request): their orders and item ids
+    helloasso_order_refs: List[str]
+    helloasso_item_ids: List[int]
 
 
 class Competitor(TypedDict):

@@ -582,6 +582,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/helloasso/memberships/correction-requests/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Correction Requests
+         * @description The correction request of the first order of these registrations, as it would be sent. Sends nothing.
+         */
+        post: operations["preview_correction_requests_api_helloasso_memberships_correction_requests_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/helloasso/memberships/correction-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Correction Requests
+         * @description Asks the families to fix their data: one e-mail per order, to the payer, recorded in the e-mail log.
+         */
+        post: operations["send_correction_requests_api_helloasso_memberships_correction_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/helloasso/memberships/import": {
         parameters: {
             query?: never;
@@ -2380,6 +2420,59 @@ export interface components {
              */
             competitors?: components["schemas"]["CompetitorLastContact"][];
         };
+        /** CorrectionEmail */
+        CorrectionEmail: {
+            /** To */
+            to: string;
+            /** Cc */
+            cc: string[];
+            /** Subject */
+            subject: string;
+            /**
+             * Body
+             * @description Plain text
+             */
+            body: string;
+        };
+        /**
+         * CorrectionRequestBody
+         * @description The registrations to ask the families about (HelloAsso item ids); `campaign`: the one of the preview.
+         */
+        CorrectionRequestBody: {
+            /** Item Ids */
+            item_ids: number[];
+            /** Campaign */
+            campaign?: string | null;
+        };
+        /**
+         * CorrectionRequestPreview
+         * @description The e-mail of the first order, as it would be sent (nothing is sent).
+         */
+        CorrectionRequestPreview: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            example: components["schemas"]["CorrectionEmail"];
+        };
+        /**
+         * CorrectionRequestResult
+         * @description One e-mail per order: `sent` left, `failed` did not; `log_notice`: the send is not in the e-mail log.
+         */
+        CorrectionRequestResult: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Sent */
+            sent: number;
+            /** Failed */
+            failed: number;
+            /** Log Notice */
+            log_notice?: string | null;
+        };
         /**
          * Creneau
          * @description A slot group of the planning and the HelloAsso tariffs it covers.
@@ -2466,7 +2559,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "competition_email" | "member_email" | "competition_all_paid" | "results_batch" | "attestation" | "access_invitation";
+            kind: "competition_email" | "member_email" | "competition_all_paid" | "results_batch" | "attestation" | "access_invitation" | "correction_request";
             /**
              * Template
              * @default
@@ -2492,6 +2585,18 @@ export interface components {
              * @default []
              */
             recipients?: components["schemas"]["LoggedRecipient"][];
+            /**
+             * Helloasso Order Refs
+             * @description A correction request: the HelloAsso orders it is about
+             * @default []
+             */
+            helloasso_order_refs?: string[];
+            /**
+             * Helloasso Item Ids
+             * @description A correction request: the HelloAsso registrations it is about
+             * @default []
+             */
+            helloasso_item_ids?: number[];
         };
         /**
          * EmailRecipient
@@ -6689,6 +6794,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_correction_requests_api_helloasso_memberships_correction_requests_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionRequestPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    send_correction_requests_api_helloasso_memberships_correction_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionRequestResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

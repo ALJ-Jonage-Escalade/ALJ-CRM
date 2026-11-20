@@ -13,6 +13,7 @@ import UiCard from "../../../components/ui/UiCard.vue";
 import UiTile from "../../../components/ui/UiTile.vue";
 import AttachPicker from "./AttachPicker.vue";
 import CorrectionDialog from "./CorrectionDialog.vue";
+import CorrectionRequestDialog from "./CorrectionRequestDialog.vue";
 import { useNetworkUp } from "../../../composables/network";
 import { CLIENT_KEY, errorText } from "../../../lib/client";
 import { formatDayText, formatEuros } from "../../../lib/format";
@@ -27,6 +28,7 @@ import {
   campaignOptions,
   canAttach,
   canCorrect,
+  canRequest,
   changeLines,
   decisionsOf,
   describeMove,
@@ -138,6 +140,18 @@ const fixingOpen = computed({
 const unfolded = ref<BucketName[]>([]);
 const highlighted = ref<number | null>(null);
 
+// The correction request dialog: the rows that can be asked, and those checked on opening (null: closed)
+const requestable = computed(() => preview.value?.rows.filter(canRequest) ?? []);
+const requestPicked = ref<number[] | null>(null);
+const requestOpen = computed({
+  get: () => requestPicked.value !== null,
+  set: (isOpen: boolean) => {
+    if (!isOpen) {
+      requestPicked.value = null;
+    }
+  },
+});
+
 /** The preview recomputed after a correction: the move it caused, if any; the admin's choices kept on the rows that
     did not move. */
 function corrected(updated: MembershipPreview): void {
@@ -178,6 +192,7 @@ function reset(): void {
   searches.value = {};
   unfolded.value = [];
   highlighted.value = null;
+  requestPicked.value = null;
   done.value = null;
   failure.value = "";
 }
@@ -349,6 +364,12 @@ async function apply(): Promise<void> {
         </UiTile>
       </div>
 
+      <div v-if="requestable.length" class="mb-4">
+        <UiButton variant="muted" small data-testid="ha-request-all" @click="requestPicked = requestable.map((row) => row.item_id)">
+          📧 Demander des corrections aux familles ({{ requestable.length }} inscription(s) à corriger)
+        </UiButton>
+      </div>
+
       <!-- Folded or unfolded by the admin; the sections with nothing to do start folded -->
       <details
         v-for="section in sections"
@@ -512,6 +533,15 @@ async function apply(): Promise<void> {
                   >
                     ✏️ Corriger…
                   </button>
+                  <button
+                    v-if="canRequest(row)"
+                    type="button"
+                    data-testid="ha-request-open"
+                    class="mt-1 block text-blue-700 underline"
+                    @click="requestPicked = [row.item_id]"
+                  >
+                    📧 Demander une correction…
+                  </button>
                   <p v-if="rowProblem(row, preview, choices)" data-testid="ha-row-problem" class="mt-1 font-semibold text-red-700">
                     {{ rowProblem(row, preview, choices) }}
                   </p>
@@ -522,6 +552,13 @@ async function apply(): Promise<void> {
         </div>
       </details>
 
+      <CorrectionRequestDialog
+        v-if="requestPicked"
+        v-model:open="requestOpen"
+        :rows="requestable"
+        :picked="requestPicked"
+        :campaign="campaign"
+      />
       <CorrectionDialog
         v-if="fixingRow"
         v-model:open="fixingOpen"

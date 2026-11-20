@@ -11,6 +11,7 @@ import {
   incompleteRows,
   initialChoices,
   isCheckable,
+  requestSummary,
   describeMove,
   keepChoices,
   lastSyncText,
@@ -324,5 +325,24 @@ describe("describeMove", () => {
 
   it("is null when the row stays in its section", () => {
     expect(describeMove(preview([toReview]), preview([toReview]), 2, {})).toBeNull();
+  });
+});
+
+describe("requestSummary", () => {
+  const issue = { field: "phone" as const, code: "invalid", message: "Téléphone invalide.", blocking: false };
+
+  it("counts one e-mail per order, the registrations with problems only", () => {
+    const rows = [
+      row({ item_id: 1, order_ref: "500", issues: [issue] }),
+      row({ item_id: 2, order_ref: "500", issues: [issue] }),
+      row({ item_id: 3, order_ref: "501", issues: [issue] }),
+      row({ item_id: 4, order_ref: "502" }),
+    ];
+
+    expect(requestSummary(rows)).toEqual({ emails: 2, registrations: 3, text: "2 e-mails à 2 familles, pour 3 inscriptions" });
+  });
+
+  it("says when nothing is to be asked", () => {
+    expect(requestSummary([row({})]).text).toBe("Aucune des inscriptions choisies n'a d'information à corriger.");
   });
 });

@@ -81,6 +81,20 @@ class TestHeaders(unittest.TestCase):
         self.assertIsNone(msg["Reply-To"])
 
 
+    def test_a_copy_and_a_reply_address_reach_the_headers_and_the_envelope(self):
+        from infrastructure.mail.sender import EmailSender
+        secrets = {"SMTP_HOST": "localhost", "SMTP_PORT": "1025", "SMTP_USER": "u", "SMTP_PASSWORD": "p",
+                   "SMTP_FROM_EMAIL": "office@example.com"}
+        smtp = MagicMock()
+        with patch("infrastructure.mail.sender.SecretStore.get_secret", side_effect=lambda k: secrets.get(k, "")), \
+             patch("smtplib.SMTP", return_value=smtp), patch.object(EmailSender, "log_audit"):
+            EmailSender.send_email(to_email="payer@example.com", subject="Hi", body="body", cc=["child@example.com\r\nBcc: x@y"],
+                                   reply_to="inscription@example.com")
+        _, envelope_to, text = smtp.sendmail.call_args.args
+        msg = message_from_string(text)
+        self.assertEqual(envelope_to, ["payer@example.com", "child@example.com Bcc: x@y"])
+        self.assertEqual((msg["Cc"], msg["Reply-To"], msg["Bcc"]), ("child@example.com Bcc: x@y", "inscription@example.com", None))
+
 class TestSmtpEncryption(unittest.TestCase):
     """The SMTP password and the members' e-mails never travel unencrypted, except to Mailpit in dev."""
 

@@ -191,3 +191,30 @@ class MembershipValueCheck(BaseModel):
     status: Literal["success"]
     value: str
     issues: List[MembershipIssue]
+
+
+class CorrectionRequestBody(RequestBody):
+    """The registrations to ask the families about (HelloAsso item ids); `campaign`: the one of the preview."""
+    item_ids: List[int] = Field(min_length=1, max_length=500)
+    campaign: Optional[str] = None
+
+
+class CorrectionEmail(BaseModel):
+    to: str
+    cc: List[str]
+    subject: str
+    body: str = Field(description="Plain text")
+
+
+class CorrectionRequestPreview(BaseModel):
+    """The e-mail of the first order, as it would be sent (nothing is sent)."""
+    status: Literal["success"]
+    example: CorrectionEmail
+
+
+class CorrectionRequestResult(BaseModel):
+    """One e-mail per order: `sent` left, `failed` did not; `log_notice`: the send is not in the e-mail log."""
+    status: Literal["success"]
+    sent: int
+    failed: int
+    log_notice: Optional[str] = None

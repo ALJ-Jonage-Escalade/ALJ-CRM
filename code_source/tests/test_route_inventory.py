@@ -94,6 +94,8 @@ EXPECTED_ROUTES: dict[tuple[str, str], Optional[Role]] = {
     ("PUT", "/api/helloasso/memberships/corrections/{item_id}/{field}"): Role.ADMIN,
     ("DELETE", "/api/helloasso/memberships/corrections/{item_id}/{field}"): Role.ADMIN,
     ("POST", "/api/helloasso/memberships/corrections/check"): Role.ADMIN,
+    ("POST", "/api/helloasso/memberships/correction-requests"): Role.ADMIN,
+    ("POST", "/api/helloasso/memberships/correction-requests/preview"): Role.ADMIN,
     ("GET", "/api/helloasso/memberships/last-sync"): Role.ADMIN,
     ("POST", "/api/helloasso/memberships/preview"): Role.ADMIN,
     ("POST", "/api/helloasso/sync"): Role.COACH,

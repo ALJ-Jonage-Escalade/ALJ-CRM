@@ -61,7 +61,8 @@ def logged_recipient(email: str, name: str = "", member_id: Optional[int] = None
 
 
 def record_send(kind: EmailKind, author: str, recipients: Sequence[LoggedRecipient], subject: str,
-                template: str = "", competition_ids: Iterable[int] = ()) -> Optional[str]:
+                template: str = "", competition_ids: Iterable[int] = (), helloasso_order_refs: Iterable[str] = (),
+                helloasso_item_ids: Iterable[int] = ()) -> Optional[str]:
     """Writes one entry for a send action; returns NOT_RECORDED when the store failed (logged), else None."""
     entry = EmailLogEntry(
         at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
@@ -72,6 +73,8 @@ def record_send(kind: EmailKind, author: str, recipients: Sequence[LoggedRecipie
         competition_ids=list(dict.fromkeys(competition_ids)),
         member_ids=member_ids_of(recipients),
         recipients=list(recipients),
+        helloasso_order_refs=list(dict.fromkeys(helloasso_order_refs)),
+        helloasso_item_ids=list(dict.fromkeys(helloasso_item_ids)),
     )
     try:
         current_store().add_entry(entry)

@@ -10,6 +10,7 @@ Permet de :
 
 from __future__ import annotations
 
+import html
 import logging
 from typing import Any, Dict, List, Optional, TypedDict
 
@@ -38,19 +39,22 @@ class RenderedEmail(TypedDict):
 
 
 def render_email(subject: str, body: str, recipient: Dict[str, Any], competition: Dict[str, str],
-                 add_signature: bool) -> RenderedEmail:  # Any: a member row or a recipient sent by the page
+                 add_signature: bool, extra_variables: Optional[Dict[str, str]] = None) -> RenderedEmail:  # Any: a member row or a recipient sent by the page
     """The e-mail personalised for one recipient. The HTML part is built from the template first, then filled with
-    escaped values, so a member's value (public HelloAsso form) never adds markup."""
+    escaped values, so a member's value (public HelloAsso form) never adds markup. `extra_variables`: other
+    "{name}" variables of the body, multi-line text (their lines are kept in the HTML part)."""
     person = template_recipient(recipient)
+    extra = extra_variables or {}
     body_plain = apply_template_variables(body, person, competition)
+    for name, value in extra.items():
+        body_plain = body_plain.replace(name, value)
     if add_signature:
         body_plain += "\n\n" + build_signature_plain()
-    return RenderedEmail(
-        subject=apply_template_variables(subject, person, competition),
-        body_plain=body_plain,
-        body_html=apply_template_variables(build_email_html(body, add_signature=add_signature, image_src_mode="cid"),
-                                           person, competition, escape_html=True),
-    )
+    body_html = apply_template_variables(build_email_html(body, add_signature=add_signature, image_src_mode="cid"),
+                                         person, competition, escape_html=True)
+    for name, value in extra.items():
+        body_html = body_html.replace(name, html.escape(value).replace("\n", "<br>\n"))
+    return RenderedEmail(subject=apply_template_variables(subject, person, competition), body_plain=body_plain, body_html=body_html)
 
 
 class EmailDispatchService:
