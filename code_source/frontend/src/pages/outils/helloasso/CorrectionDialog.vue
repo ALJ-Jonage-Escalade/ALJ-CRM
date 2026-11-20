@@ -3,7 +3,7 @@
    the value HelloAsso gave (struck through once corrected), an editable value checked by the server as it is typed
    (same rules as the import, nothing saved), and its problems. Saving or undoing a correction answers the preview
    recomputed with it, given to the page. Online only, like the whole import. */
-import { computed, inject, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialog from "../../../components/ui/UiDialog.vue";
@@ -29,6 +29,8 @@ const failure = ref("");
 
 const CHECK_DELAY_MS = 400;
 const timers = new Map<MembershipField, ReturnType<typeof setTimeout>>();
+// No check left pending once the dialog is gone
+onBeforeUnmount(() => timers.forEach((timer) => clearTimeout(timer)));
 
 function current(field: MembershipField): string {
   return props.row.values[field] ?? "";

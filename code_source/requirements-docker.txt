@@ -30,7 +30,9 @@ cryptography==50.0.2
 cssselect2==0.10.1
     # via weasyprint
 dnspython==2.9.2
-    # via email-validator
+    # via
+    #   alj-escalade-manager
+    #   email-validator
 email-validator==2.4.0
     # via alj-escalade-manager
 et-xmlfile==2.0.0

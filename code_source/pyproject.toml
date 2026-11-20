@@ -18,8 +18,11 @@ dependencies = [
     "segno==1.6.6",
     # Attestation PDFs (needs Pango from the system, installed by the Dockerfile)
     "weasyprint==70.0",
-    "phonenumberslite>=9.0.44",
-    "email-validator>=2.4.0",
+    # HelloAsso import checks (domain/members/member_data_rules.py): phone numbers, e-mail syntax
+    "phonenumberslite==9.0.44",
+    "email-validator==2.4.0",
+    # Imported directly (infrastructure/mail/mail_domains.py: its own resolver), not only through email-validator
+    "dnspython==2.9.2",
 ]
 
 [dependency-groups]

@@ -57,7 +57,7 @@ def build_message(to_email: str, subject: str, body: str, sender: str, sender_na
     name = sanitize_email_header(sender_name)
     msg["From"] = formataddr((name, sender)) if name else sender  # RFC 2822: readable name, accents encoded
     if cc:
-        msg["Cc"] = ", ".join(cc)
+        msg["Cc"] = ", ".join(sanitize_email_header(address) for address in cc)
     if reply_to:
         msg["Reply-To"] = sanitize_email_header(reply_to)
 
