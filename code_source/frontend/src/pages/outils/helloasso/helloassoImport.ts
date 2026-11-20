@@ -302,6 +302,48 @@ export function keepChoices(before: MembershipPreview, after: MembershipPreview,
   return kept;
 }
 
+/** A row that changed section after a correction (or its undo): sections before and after, the member it now matches,
+    and the admin's choice the move cancelled. */
+export interface RowMove {
+  from: string;
+  to: string;
+  member: string | null;
+  cancelledChoice: string | null;
+}
+
+function bucketLabel(bucket: BucketName): string {
+  return BUCKETS.find((info) => info.name === bucket)?.label ?? bucket;
+}
+
+/** The label of a choice the admin made on a row (not its initial one), null when they made none. */
+function madeChoice(before: MembershipPreview, row: MembershipRow, choices: Choices): string | null {
+  const choice = choices[row.item_id]?.choice;
+  if (!choice || choice === initialChoices(before)[row.item_id]?.choice) {
+    return null;
+  }
+  const memberId = attachedMemberId(choice);
+  if (memberId !== null) {
+    const picked = before.members.find((member) => member.user_id === memberId);
+    return picked ? `Rattacher à ${personLabel(picked)}` : "Rattacher à un autre adhérent";
+  }
+  return reviewOptions(row).find((option) => option.value === choice)?.label ?? choice;
+}
+
+/** How a registration moved between two previews, null when it stayed in its section. */
+export function describeMove(before: MembershipPreview, after: MembershipPreview, itemId: number, choices: Choices): RowMove | null {
+  const old = before.rows.find((row) => row.item_id === itemId);
+  const moved = after.rows.find((row) => row.item_id === itemId);
+  if (!old || !moved || old.bucket === moved.bucket) {
+    return null;
+  }
+  return {
+    from: bucketLabel(old.bucket),
+    to: bucketLabel(moved.bucket),
+    member: moved.matched_member ? personLabel(moved.matched_member) : null,
+    cancelledChoice: madeChoice(before, old, choices),
+  };
+}
+
 /** Body of the import: the choice of each checked row (with its comment for an attach), skip for the others, with the
     bucket the preview showed it in. */
 export function decisionsOf(preview: MembershipPreview, choices: Choices): Record<number, MembershipDecision> {

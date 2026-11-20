@@ -4146,6 +4146,7 @@ export interface components {
             /** Changes */
             changes: components["schemas"]["MembershipChange"][];
             attached_to?: components["schemas"]["MembershipCandidate"] | null;
+            matched_member: components["schemas"]["MembershipCandidate"] | null;
             /** Issues */
             issues: components["schemas"]["MembershipIssue"][];
             /** Corrections */

@@ -11,6 +11,7 @@ import {
   incompleteRows,
   initialChoices,
   isCheckable,
+  describeMove,
   keepChoices,
   lastSyncText,
   memberHref,
@@ -53,6 +54,7 @@ const row = (change: Partial<MembershipRow>): MembershipRow => ({
   issues: [],
   corrections: [],
   values: {},
+  matched_member: null,
   ...change,
 });
 
@@ -286,5 +288,41 @@ describe("keepChoices", () => {
       1: { checked: false, choice: "import", comment: "" },
       2: { checked: true, choice: "import", comment: "" },
     });
+  });
+});
+
+describe("describeMove", () => {
+  const ginny = { user_id: 7, last_name: "WEASLEY", first_name: "Ginny", birth_date: "2013-08-11", licence: "" };
+  const toReview = row({ item_id: 2, bucket: "to_review", can_create: true, candidates: [ginny] });
+
+  it("names the old section, the new one and the member the row now matches", () => {
+    const after = preview([row({ item_id: 2, bucket: "renewal", matched_member: ginny })]);
+
+    expect(describeMove(preview([toReview]), after, 2, {})).toEqual({
+      from: "⚠️ À vérifier",
+      to: "🔁 Renouvellements",
+      member: "WEASLEY Ginny",
+      cancelledChoice: null,
+    });
+  });
+
+  it("names the choice the move cancels", () => {
+    const after = preview([row({ item_id: 2, bucket: "renewal", matched_member: ginny })]);
+    const choices: Choices = { 2: { checked: true, choice: "create", comment: "" } };
+
+    expect(describeMove(preview([toReview]), after, 2, choices)?.cancelledChoice).toBe("Créer un nouvel adhérent");
+  });
+
+  it("names a member picked by hand as the cancelled choice", () => {
+    const after = preview([row({ item_id: 2, bucket: "new" })]);
+    const choices: Choices = { 2: { checked: true, choice: "attach:9", comment: "Sa fille" } };
+
+    const move = describeMove(preview([toReview], [member({ user_id: 9 })]), after, 2, choices);
+
+    expect(move).toMatchObject({ to: "🆕 Nouveaux", member: null, cancelledChoice: "Rattacher à WEASLEY Molly" });
+  });
+
+  it("is null when the row stays in its section", () => {
+    expect(describeMove(preview([toReview]), preview([toReview]), 2, {})).toBeNull();
   });
 });

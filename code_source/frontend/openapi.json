@@ -10591,6 +10591,16 @@
               }
             ]
           },
+          "matched_member": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MembershipCandidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "issues": {
             "items": {
               "$ref": "#/components/schemas/MembershipIssue"
@@ -10632,6 +10642,7 @@
           "candidates",
           "can_create",
           "changes",
+          "matched_member",
           "issues",
           "corrections",
           "values"

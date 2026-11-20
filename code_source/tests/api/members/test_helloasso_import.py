@@ -470,3 +470,11 @@ class TestMembershipCorrections(HelloAssoImportTestCase):
         values = self.row(self.client.post(PREVIEW).json())["values"]
 
         self.assertEqual((values["birth_date"], values["country"], values["phone"]), ("11/08/13", "France", ""))
+
+    def test_a_row_names_the_member_it_now_matches(self) -> None:
+        before = self.row(self.client.post(PREVIEW).json())
+
+        after = self.row(self.client.put(f"{CORRECTIONS}/1/birth_date", json={"value": "11/08/2013"}).json())
+
+        self.assertIsNone(before["matched_member"])
+        self.assertEqual((after["matched_member"]["last_name"], after["matched_member"]["first_name"]), ("WEASLEY", "Ginny"))

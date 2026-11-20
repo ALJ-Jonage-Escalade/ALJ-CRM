@@ -145,6 +145,7 @@ const MEMBERSHIP_PREVIEW = {
       issues: [],
       corrections: [],
       values: {},
+      matched_member: null,
     },
     {
       item_id: 2,
@@ -167,6 +168,7 @@ const MEMBERSHIP_PREVIEW = {
       issues: [{ field: "birth_date", code: "missing", message: "Date de naissance manquante.", blocking: true }],
       corrections: [],
       values: {},
+      matched_member: null,
     },
   ],
   members: [] as unknown[],
@@ -542,6 +544,43 @@ describe("OutilsPage", () => {
       vi.useRealTimers();
       delete ANSWERS["POST /api/helloasso/memberships/corrections/check"];
       delete ANSWERS["PUT /api/helloasso/memberships/corrections/1/phone"];
+    }
+  });
+
+  it("announces a correction that moves the row, then shows the row highlighted in its new section", async () => {
+    const ginny = { user_id: 7, last_name: "WEASLEY", first_name: "Ginny", birth_date: "2013-08-11", licence: "" };
+    const moved = { ...MEMBERSHIP_PREVIEW.rows[0]!, bucket: "renewal", matched_member: ginny };
+    ANSWERS["PUT /api/helloasso/memberships/corrections/1/licence"] = () =>
+      json({ ...MEMBERSHIP_PREVIEW, rows: [moved, MEMBERSHIP_PREVIEW.rows[1]] });
+    const scrollIntoView = vi.fn();
+    const jsdomScroll = Element.prototype.scrollIntoView; // undefined: jsdom does no layout
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      byId("ha-fix-open")!.click();
+      await flushPromises();
+      const input = document.querySelector<HTMLInputElement>('[data-testid="ha-fix-licence"] input')!;
+      input.value = "123456";
+      input.dispatchEvent(new Event("input"));
+      await flushPromises();
+      document.querySelector<HTMLButtonElement>('[data-testid="ha-fix-licence"] [data-testid="ha-fix-save"]')!.click();
+      await flushPromises();
+
+      expect(byId("ha-fix-move")!.textContent).toContain("« 🆕 Nouveaux » à « 🔁 Renouvellements »");
+      expect(byId("ha-fix-move")!.textContent).toContain("WEASLEY Ginny");
+
+      byId("ha-fix-show")!.click();
+      await flushPromises();
+
+      expect(byId("ha-fix-dialog")).toBeNull();
+      const row = document.querySelector('[data-testid="ha-row-renewal"][data-highlighted]');
+      expect(row?.closest("details")?.open).toBe(true);
+      expect(scrollIntoView).toHaveBeenCalled();
+    } finally {
+      Element.prototype.scrollIntoView = jsdomScroll;
+      delete ANSWERS["PUT /api/helloasso/memberships/corrections/1/licence"];
     }
   });
 

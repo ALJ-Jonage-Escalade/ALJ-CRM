@@ -10,11 +10,12 @@ import UiDialog from "../../../components/ui/UiDialog.vue";
 import { CLIENT_KEY, errorText } from "../../../lib/client";
 import { choicesWith, COUNTRY_CHOICES, NATIONALITY_CHOICES } from "../../../lib/countries";
 import { createMembersApi, type MembershipField } from "../../../services/members";
-import { CORRECTABLE_FIELDS, personLabel, type MembershipPreview, type MembershipRow } from "./helloassoImport";
+import { CORRECTABLE_FIELDS, personLabel, type MembershipPreview, type MembershipRow, type RowMove } from "./helloassoImport";
 
 type Issue = MembershipRow["issues"][number];
 
-const props = defineProps<{ row: MembershipRow; campaign: string | null }>();
+// move: the last correction moved the row to another section (announced here; the page shows the row once closed)
+const props = defineProps<{ row: MembershipRow; campaign: string | null; move: RowMove | null }>();
 const emit = defineEmits<{ updated: [preview: MembershipPreview] }>();
 const open = defineModel<boolean>("open", { required: true });
 
@@ -125,6 +126,25 @@ function undo(field: MembershipField): Promise<void> {
     <p v-if="failure" data-testid="ha-fix-error" class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
       ❌ {{ failure }}
     </p>
+    <div
+      v-if="move"
+      data-testid="ha-fix-move"
+      role="status"
+      class="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] text-blue-900"
+    >
+      <p class="font-semibold">
+        ↪️ L'inscription passe de « {{ move.from }} » à « {{ move.to }} »
+        <template v-if="move.member">
+          : adhérent reconnu
+          <b>{{ move.member }}</b>
+        </template>
+        .
+      </p>
+      <p v-if="move.cancelledChoice" data-testid="ha-fix-cancelled" class="mt-1">
+        Votre choix « {{ move.cancelledChoice }} » est annulé : refaites-le si besoin.
+      </p>
+      <UiButton small class="mt-2" data-testid="ha-fix-show" @click="open = false">Fermer et voir la ligne</UiButton>
+    </div>
     <div class="flex flex-col gap-3">
       <div
         v-for="item in fields"

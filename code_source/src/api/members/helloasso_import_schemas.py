@@ -79,6 +79,8 @@ class MembershipRow(BaseModel):
     can_create: bool
     changes: List[MembershipChange]
     attached_to: Optional[MembershipCandidate] = None  # imported rows: the member, when their name is not the HelloAsso one
+    # The member the registration is recognised as (renewal, imported, changed), None for a new person or a row to review
+    matched_member: Optional[MembershipCandidate]
     issues: List[MembershipIssue]
     corrections: List[MembershipCorrection]
     # The correctable values, by field (member_data_rules.IssueField): HelloAsso's, normalised, or the corrected one

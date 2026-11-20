@@ -47,8 +47,9 @@ def _issue(issue: DataIssue) -> MembershipIssue:
     return MembershipIssue(field=issue.field, code=issue.code, message=issue.message, blocking=issue.blocking)
 
 
-def _row(entry: PlanEntry) -> MembershipRow:
+def _row(entry: PlanEntry, members: dict[int, KnownMember]) -> MembershipRow:
     record = entry.record
+    matched = members.get(entry.member_id) if entry.member_id is not None else None
     return MembershipRow(
         item_id=record.item_id, bucket=entry.bucket, reason=entry.reason, order_ref=record.order_ref,
         order_date=record.order_date, payment_date=record.payment_date,
@@ -57,6 +58,7 @@ def _row(entry: PlanEntry) -> MembershipRow:
         amount=record.amount, status=record.status, can_create=entry.can_create,
         candidates=[_candidate(member) for member in entry.candidates],
         attached_to=_candidate(entry.attached_to) if entry.attached_to else None,
+        matched_member=_candidate(matched) if matched else None,
         changes=[MembershipChange(field=change.field, crm=change.crm, before=change.before, after=change.after)
                  for change in entry.changes],
         issues=[_issue(issue) for issue in entry.issues],
@@ -67,9 +69,10 @@ def _row(entry: PlanEntry) -> MembershipRow:
 
 
 def _preview(plan: ImportPlan) -> MembershipPreview:
+    members = {member.user_id: member for member in plan.members}
     return MembershipPreview(
         status="success", season=plan.season, campaign=plan.campaign_slug, blocked_reason=plan.blocked_reason,
-        counts=BucketCounts(**plan.counts()), rows=[_row(entry) for entry in plan.entries],
+        counts=BucketCounts(**plan.counts()), rows=[_row(entry, members) for entry in plan.entries],
         members=[MembershipMember(**_candidate(member).model_dump(), membership=season_membership(plan, member.user_id).kind)
                  for member in sorted(plan.members, key=lambda m: (m.last_name.casefold(), m.first_name.casefold()))],
     )
