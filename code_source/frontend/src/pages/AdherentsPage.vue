@@ -23,6 +23,7 @@ import { membersRead } from "../services/members";
 import { csvBlob } from "../lib/csv";
 import { saveFile } from "../lib/download";
 import { formatDayText } from "../lib/format";
+import { PASSPORT_COLOURS } from "../lib/passports";
 import { isAdmin } from "../lib/roles";
 import MemberActionsDialog from "./adherents/MemberActionsDialog.vue";
 import MemberAddDialog from "./adherents/MemberAddDialog.vue";
@@ -160,7 +161,7 @@ const COLUMNS: DataColumn<Member>[] = [
   {
     id: "diplome",
     label: "Diplôme",
-    title: "Diplômes & autonomie (🔴 Badge rouge, 🧗 Autonomie bloc, 🟠 Passeport orange)",
+    title: `Diplômes & autonomie (🔴 Badge rouge, 🧗 Autonomie bloc, ${PASSPORT_COLOURS.orange} Passeport orange)`,
     value: (m) => diplomeWeight(m),
     compare: (a, b) => diplomeWeight(a) - diplomeWeight(b) || collator.compare(a.last_name, b.last_name),
     descFirst: true,

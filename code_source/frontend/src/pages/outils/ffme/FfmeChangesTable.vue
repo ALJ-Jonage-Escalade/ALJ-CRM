@@ -4,6 +4,7 @@
    on another member (left to the office: the stored number may be the right one), or no active registration. */
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import type { BadgeColor } from "../../../components/ui/palette";
+import { passportMarks } from "../../../lib/passports";
 import { healthDocumentMark, type RowChange } from "./ffme";
 
 defineProps<{ rows: readonly RowChange[]; excludedRows: ReadonlySet<number>; blockedUserIds: ReadonlySet<number> }>();
@@ -32,10 +33,16 @@ function changeText(row: RowChange, field: Field): string {
   return change ? `${change.old || "—"} → ${change.new}` : "";
 }
 
-/** The health document cell: ✅ / ❌ and the new value, the full change in the tooltip. */
+/** The cell: health document ✅ / ❌ and the new value, passports as coloured circles; the full change in the tooltip. */
 function cellText(row: RowChange, field: Field): string {
   const change = changeOf(row, field);
-  return change && field === "document_sante" ? `${healthDocumentMark(change.new)} ${change.new}` : changeText(row, field);
+  if (change && field === "document_sante") {
+    return `${healthDocumentMark(change.new)} ${change.new}`;
+  }
+  if (change && field === "passeports") {
+    return `${passportMarks(change.old) || "—"} → ${passportMarks(change.new)}`;
+  }
+  return changeText(row, field);
 }
 </script>
 

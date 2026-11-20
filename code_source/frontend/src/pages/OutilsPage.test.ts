@@ -69,6 +69,7 @@ const FFME_CHANGE = {
   licence_conflict: "",
   changes: [
     { field: "licence", old: "", new: "112233" },
+    { field: "passeports", old: "Passeport Blanc", new: "Passeport Blanc, Passeport Jaune" },
     { field: "document_sante", old: "ATTENTE", new: "QS" },
     { field: "statut", old: "Validé", new: "Terminé" },
   ],
@@ -1054,7 +1055,7 @@ describe("OutilsPage", () => {
     // What needs a look first: no active registration, then the match by name
     expect(all("ffme-change").map((row) => row.textContent)).toEqual([
       expect.stringMatching(/⚠️ Licence 445566 déjà enregistrée sur DURAND Hugo.*⚠️ Aucune inscription active sur la saison/),
-      expect.stringMatching(/PETIT Max.*Nom.*— → 112233.*✅ QS.*Validé → Terminé/),
+      expect.stringMatching(/PETIT Max.*Nom.*— → 112233.*⚪ → ⚪🟡.*✅ QS.*Validé → Terminé/),
     ]);
 
     const search = byId<HTMLInputElement>("ffme-search")!;

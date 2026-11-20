@@ -7,6 +7,7 @@ import type { Cell } from "../../lib/csv";
 import type { Schemas } from "../../lib/client";
 import { emergencyContactsOf } from "../../lib/emergencyContacts";
 import { formatDayText } from "../../lib/format";
+import { PASSPORT_COLOURS } from "../../lib/passports";
 import { SEX_LABELS } from "../../lib/sex";
 import { normKey, plural } from "../../lib/text";
 import type { MemberStatus } from "../../services/members";
@@ -301,7 +302,7 @@ export function diplomes(member: Pick<Member, "badge_rouge" | "autonomie_bloc" |
   }
   const passports = `${member.raw_passports} ${member.passeport_orange}`.toLowerCase();
   if (passports.includes("orange") || member.passeport_orange.toLowerCase() === "oui") {
-    items.push({ type: "passeport_orange", label: "Passeport orange", icon: "🟠" });
+    items.push({ type: "passeport_orange", label: "Passeport orange", icon: PASSPORT_COLOURS.orange });
   }
   return items;
 }
