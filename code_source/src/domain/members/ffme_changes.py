@@ -15,7 +15,6 @@ from domain.members.view import is_cancelled, normalize_status
 STATUS_DONE = "Terminé"
 
 
-
 class SeasonPurchase(TypedDict):
     id: int
     status: str
