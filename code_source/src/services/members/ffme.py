@@ -9,17 +9,19 @@ from __future__ import annotations
 import datetime
 import io
 import logging
-from typing import Dict, List, Optional, Tuple, TypedDict
+from collections import Counter
+from typing import Collection, Dict, List, Literal, Optional, Sequence, Set, Tuple, TypedDict
 
 import openpyxl
 
 from domain.errors import InvalidRequest
 from domain.members.age_rules import parse_birth_date
+from domain.members.ffme_changes import FieldChange, FileValues, MemberState, MemberWrite, SeasonPurchase, plan_member_changes
 from domain.utils import clean_digits_only, is_missing, normalize_name
 from exports.membership_excel import check_ffme_member, ffme_csv_bytes, is_termine
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.sqlite.connection import SqliteDatabase
-from infrastructure.sqlite.ffme_import import FfmeImportRepository, FfmeMatch, MemberForMatching
+from infrastructure.sqlite.ffme_import import FfmeImportRepository, MemberForMatching
 from infrastructure.sqlite.members import MemberRepository
 
 logger = logging.getLogger("alj")
@@ -28,12 +30,13 @@ logger = logging.getLogger("alj")
 UNREADABLE_EXCEL = "Fichier Excel illisible : vérifiez qu'il s'agit bien de l'export .xlsx des licenciés MyFFME."
 MATCHING_FAILED = "Erreur lors du rapprochement FFME (détails dans les journaux)."
 NOTHING_TO_APPLY = "Aucune mise à jour à appliquer (aucun rapprochement trouvé)."
+DUPLICATE_MATCH = "Importation refusée : {name} est rapproché par plusieurs lignes du fichier, n'en gardez qu'une."
+UNKNOWN_MANUAL_MATCH = "Association manuelle impossible : ligne {row_number} du fichier déjà rapprochée ou adhérent introuvable."
 
 LAST_NAME, FIRST_NAME, LICENCE = "Nom", "Prénom", "N° de licence"
 REQUIRED_COLUMNS = (LAST_NAME, FIRST_NAME, LICENCE)
 HEALTH_DOCUMENT = "Document de santé"
 BIRTH_DATE = "Date de naissance"
-STATUS_DONE = "Terminé"
 
 
 # One row of the licensee sheet: column header -> cell value (text, number, date or None)
@@ -43,6 +46,7 @@ LicenseeRow = Dict[str, object]
 class LicenseeSheet(TypedDict):
     columns: List[str]
     rows: List[LicenseeRow]
+    row_numbers: List[int]  # the Excel line of each row
 
 
 class MatchStats(TypedDict):
@@ -52,7 +56,9 @@ class MatchStats(TypedDict):
     errors: List[str]
 
 
-class UnmatchedLicensee(TypedDict):
+class Licensee(TypedDict):
+    """A row of the file: its Excel line and its values (text)."""
+    row_number: int
     nom: str
     prenom: str
     licence: str
@@ -62,10 +68,30 @@ class UnmatchedLicensee(TypedDict):
     document_sante: str
 
 
+class ManualMatch(TypedDict):
+    """A row left unmatched (row_number: its Excel line), linked by the office to a member."""
+    row_number: int
+    user_id: int
+
+
+MatchSource = Literal["licence", "nom", "manuel"]
+
+
+class PlannedRow(TypedDict):
+    """A matched row of the file and what the import changes on its member (domain.members.ffme_changes)."""
+    row_number: int
+    member: MemberForMatching
+    source: MatchSource
+    changes: List[FieldChange]
+    no_active_registration: bool
+    duplicate: bool  # its member is matched by another row too
+    write: MemberWrite
+
+
 class FfmePreparation(TypedDict):
-    """The file matched against the members, nothing written."""
-    updates: List[FfmeMatch]
-    unmatched: List[UnmatchedLicensee]
+    """The file matched against the members and the changes planned, nothing written."""
+    rows: List[PlannedRow]
+    unmatched: List[Licensee]
     users: List[MemberForMatching]  # every member, for the office's manual matches
     stats: MatchStats
 
@@ -127,11 +153,12 @@ def export_stats(season: str, include_termine: bool) -> ExportStats:
 # --------------------------------------------------------------------------
 # Import of the MyFFME licensee list
 # --------------------------------------------------------------------------
-def prepare_licensees(excel_content: bytes) -> FfmePreparation:
+def prepare_licensees(excel_content: bytes, season: str, manual_matches: Sequence[ManualMatch] = ()) -> FfmePreparation:
     """Phase A of the import: reads the MyFFME Excel export and matches each licensee with a member, by licence
-    number then by name; a known birth date of the file that disagrees with the member's rules the match out. Writes
-    nothing; problems are listed in stats.errors."""
-    preparation = FfmePreparation(updates=[], unmatched=[], users=[],
+    number then by name; a known birth date of the file that disagrees with the member's rules the match out. Plans
+    the changes of every matched row (and of the office's manual matches) on the season. Writes nothing; problems are
+    listed in stats.errors."""
+    preparation = FfmePreparation(rows=[], unmatched=[], users=[],
                                   stats=MatchStats(total_processed=0, matched_by_licence=0, matched_by_name=0, errors=[]))
     stats = preparation["stats"]
     try:
@@ -159,8 +186,10 @@ def prepare_licensees(excel_content: bytes) -> FfmePreparation:
             if all(name_key):
                 members_by_name.setdefault(name_key, []).append(member)
 
+        purchases = FfmeImportRepository.list_season_purchases(season)
         has_health_column = HEALTH_DOCUMENT in sheet["columns"]
-        for row in sheet["rows"]:
+        matched_rows: List[Tuple[Licensee, MemberForMatching, MatchSource]] = []
+        for row_number, row in zip(sheet["row_numbers"], sheet["rows"], strict=True):
             stats["total_processed"] += 1
             last_name = _cell_text(row, LAST_NAME)
             first_name = _cell_text(row, FIRST_NAME)
@@ -169,6 +198,7 @@ def prepare_licensees(excel_content: bytes) -> FfmePreparation:
                 licence = clean_digits_only(formula_licences.get((last_name, first_name), ""))
 
             birth_date = parse_birth_date(row.get(BIRTH_DATE))
+            source: MatchSource = "licence"
             matched: Optional[MemberForMatching] = members_by_licence.get(licence) if licence else None
             # A licence given to the wrong member (a sibling's, typed on HelloAsso) is not trusted: the name decides
             if matched and not _birth_dates_agree(birth_date, matched):
@@ -178,43 +208,87 @@ def prepare_licensees(excel_content: bytes) -> FfmePreparation:
             elif last_name and first_name:
                 homonyms = members_by_name.get((normalize_name(last_name), normalize_name(first_name)), [])
                 matched = _match_by_birth_date(homonyms, birth_date)
+                source = "nom"
                 if matched:
                     stats["matched_by_name"] += 1
 
-            health_document = _cell_text(row, HEALTH_DOCUMENT) if has_health_column else ""
+            licensee = Licensee(
+                row_number=row_number, nom=last_name, prenom=first_name, licence=licence,
+                birth_date=_cell_text(row, BIRTH_DATE),
+                passeports=_cell_text(row, "Passeports"),
+                diplomes=_cell_text(row, "Diplômes"),
+                document_sante=_cell_text(row, HEALTH_DOCUMENT) if has_health_column else "",
+            )
             if matched:
-                # An empty licence keeps the member's (apply_ffme_matches)
-                preparation["updates"].append((
-                    STATUS_DONE, licence, _cell_text(row, "Passeports"), _cell_text(row, "Diplômes"), health_document, matched["id"]))
+                matched_rows.append((licensee, matched, source))
             else:
-                preparation["unmatched"].append(UnmatchedLicensee(
-                    nom=last_name, prenom=first_name, licence=licence,
-                    birth_date=_cell_text(row, BIRTH_DATE),
-                    passeports=_cell_text(row, "Passeports"),
-                    diplomes=_cell_text(row, "Diplômes"),
-                    document_sante=health_document,
-                ))
+                preparation["unmatched"].append(licensee)
+
+        members_by_id = {member["id"]: member for member in members}
+        unmatched_by_row = {licensee["row_number"]: licensee for licensee in preparation["unmatched"]}
+        for manual in manual_matches:
+            linked_licensee = unmatched_by_row.pop(manual["row_number"], None)
+            linked_member = members_by_id.get(manual["user_id"])
+            if linked_licensee is None or linked_member is None:
+                raise InvalidRequest(UNKNOWN_MANUAL_MATCH.format(row_number=manual["row_number"]))
+            matched_rows.append((linked_licensee, linked_member, "manuel"))
+        preparation["unmatched"] = list(unmatched_by_row.values())
+        preparation["rows"] = [_planned_row(licensee, member, source, purchases.get(member["id"], []))
+                               for licensee, member, source in matched_rows]
+        duplicates = _duplicate_user_ids(preparation["rows"])
+        for planned in preparation["rows"]:
+            planned["duplicate"] = planned["member"]["id"] in duplicates
+    except InvalidRequest:
+        raise
     except Exception:  # reported to the office as a fixed message; the cause (SQL, data) goes to the logs
         logger.exception("FFME import: matching failed")
         stats["errors"].append(MATCHING_FAILED)
     return preparation
 
 
-def apply_import(season: str, excel_content: Optional[bytes], manual_matches: List[FfmeMatch]) -> Tuple[int, MatchStats]:
-    """Phase B: writes the file's automatic matches (computed again, as in the preview) and the office's manual
-    matches. Returns the number of members updated and the matching statistics. InvalidRequest when nothing applies."""
-    updates: List[FfmeMatch] = []
-    stats = MatchStats(total_processed=0, matched_by_licence=0, matched_by_name=0, errors=[])
-    if excel_content is not None:
-        preparation = prepare_licensees(excel_content)
-        updates, stats = list(preparation["updates"]), preparation["stats"]
-    updates.extend(manual_matches)
-    if not updates:
+def is_listed(row: PlannedRow) -> bool:
+    """Shown by the preview: the row changes something, or needs the office's attention."""
+    return bool(row["changes"]) or row["no_active_registration"] or row["duplicate"]
+
+
+def apply_import(season: str, excel_content: bytes, manual_matches: Sequence[ManualMatch] = (),
+                 excluded_rows: Collection[int] = ()) -> Tuple[int, MatchStats]:
+    """Phase B: writes the changes planned for the file's automatic matches (computed again, as in the preview) and
+    the office's manual matches, except the rows the office left out (Excel lines). Returns the number of members
+    changed and the matching statistics. InvalidRequest when nothing matched, or when a member is still matched by
+    several rows."""
+    preparation = prepare_licensees(excel_content, season, manual_matches)
+    stats = preparation["stats"]
+    if not preparation["rows"]:
         raise InvalidRequest((stats["errors"] or [NOTHING_TO_APPLY])[0])
-    if not CloudDatabase.is_enabled():  # a local database of its own: keep a copy before the import changes it
+    rows = [row for row in preparation["rows"] if row["row_number"] not in excluded_rows]
+    duplicates = _duplicate_user_ids(rows)
+    if duplicates:
+        member = next(row["member"] for row in rows if row["member"]["id"] in duplicates)
+        raise InvalidRequest(DUPLICATE_MATCH.format(name=f"{member['last_name']} {member['first_name']}"))
+    writes = [row["write"] for row in rows if row["changes"]]
+    if writes and not CloudDatabase.is_enabled():  # a local database of its own: keep a copy before the import changes it
         SqliteDatabase.create_db_backup()
-    FfmeImportRepository.apply_ffme_matches(updates, season_name=season)
-    return len(updates), stats
+    FfmeImportRepository.apply_ffme_matches(writes)
+    return len(writes), stats
+
+
+def _duplicate_user_ids(rows: List[PlannedRow]) -> Set[int]:
+    """The members matched by several rows."""
+    counts = Counter(row["member"]["id"] for row in rows)
+    return {user_id for user_id, count in counts.items() if count > 1}
+
+
+def _planned_row(licensee: Licensee, member: MemberForMatching, source: MatchSource, purchases: List[SeasonPurchase]) -> PlannedRow:
+    plan = plan_member_changes(
+        member["id"],
+        FileValues(licence=licensee["licence"], passports=licensee["passeports"], diplomas=licensee["diplomes"],
+                   health_document=licensee["document_sante"]),
+        MemberState(licence=member["licence_ffme"], passports=member["raw_passports"], diplomas=member["raw_diplomas"],
+                    purchases=purchases),
+    )
+    return PlannedRow(row_number=licensee["row_number"], member=member, source=source, changes=plan["changes"],
+                      no_active_registration=plan["no_active_registration"], duplicate=False, write=plan["write"])
 
 
 def _read_licensee_sheet(excel_content: bytes) -> LicenseeSheet:
@@ -235,11 +309,15 @@ def _read_licensee_sheet(excel_content: bytes) -> LicenseeSheet:
 
 def _sheet_from_rows(values: List[List[object]], header_index: int) -> LicenseeSheet:
     if len(values) <= header_index:
-        return LicenseeSheet(columns=[], rows=[])
+        return LicenseeSheet(columns=[], rows=[], row_numbers=[])
     columns = [str(header).strip() if header is not None else "" for header in values[header_index]]
-    # strict=False: a row may stop before the last column (empty trailing cells)
-    rows = [dict(zip(columns, row, strict=False)) for row in values[header_index + 1:] if any(not is_missing(cell) for cell in row)]
-    return LicenseeSheet(columns=columns, rows=rows)
+    sheet = LicenseeSheet(columns=columns, rows=[], row_numbers=[])
+    for index in range(header_index + 1, len(values)):
+        if any(not is_missing(cell) for cell in values[index]):
+            # strict=False: a row may stop before the last column (empty trailing cells)
+            sheet["rows"].append(dict(zip(columns, values[index], strict=False)))
+            sheet["row_numbers"].append(index + 1)
+    return sheet
 
 
 def _formula_licences(excel_content: bytes) -> Dict[Tuple[str, str], str]:

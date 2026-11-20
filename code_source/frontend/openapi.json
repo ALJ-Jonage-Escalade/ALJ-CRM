@@ -3257,7 +3257,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FfmeFile"
+                "$ref": "#/components/schemas/FfmePreviewRequest"
               }
             }
           },
@@ -6896,23 +6896,36 @@
         "title": "EmergencyContact",
         "description": "Someone to call for a member. Blank rows are dropped when saved: a row holds a name, a phone or both."
       },
-      "FfmeFile": {
+      "FfmeFieldChange": {
         "properties": {
-          "filename": {
+          "field": {
             "type": "string",
-            "title": "Filename",
-            "default": "licencies_ffme.xlsx"
+            "enum": [
+              "licence",
+              "passeports",
+              "diplomes",
+              "document_sante",
+              "statut"
+            ],
+            "title": "Field"
           },
-          "content_base64": {
+          "old": {
             "type": "string",
-            "title": "Content Base64",
-            "default": ""
+            "title": "Old"
+          },
+          "new": {
+            "type": "string",
+            "title": "New"
           }
         },
-        "additionalProperties": false,
         "type": "object",
-        "title": "FfmeFile",
-        "description": "The licensee list exported from MyFFME (.xlsx), base64 encoded."
+        "required": [
+          "field",
+          "old",
+          "new"
+        ],
+        "title": "FfmeFieldChange",
+        "description": "A field the import changes: licence, passeports, diplomes, document_sante or statut (old: empty when unset)."
       },
       "FfmeImportRequest": {
         "properties": {
@@ -6926,11 +6939,6 @@
             "title": "Content Base64",
             "default": ""
           },
-          "season": {
-            "type": "string",
-            "title": "Season",
-            "default": ""
-          },
           "manual_matches": {
             "items": {
               "$ref": "#/components/schemas/FfmeManualMatch"
@@ -6938,12 +6946,25 @@
             "type": "array",
             "title": "Manual Matches",
             "default": []
+          },
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "default": ""
+          },
+          "excluded_rows": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Excluded Rows",
+            "default": []
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "FfmeImportRequest",
-        "description": "The file is matched again by the server; manual_matches are added. season: the active one when empty."
+        "description": "The file is matched again by the server; manual_matches are added, excluded_rows (Excel lines) left out.\nseason: the active one when empty."
       },
       "FfmeImportResult": {
         "properties": {
@@ -6985,6 +7006,10 @@
       },
       "FfmeLicensee": {
         "properties": {
+          "row_number": {
+            "type": "integer",
+            "title": "Row Number"
+          },
           "nom": {
             "type": "string",
             "title": "Nom"
@@ -7016,6 +7041,7 @@
         },
         "type": "object",
         "required": [
+          "row_number",
           "nom",
           "prenom",
           "licence",
@@ -7025,52 +7051,27 @@
           "document_sante"
         ],
         "title": "FfmeLicensee",
-        "description": "A row of the file matched with no member: shown so that the office can pick one."
+        "description": "A row of the file matched with no member (row_number: its Excel line): shown so that the office can pick one."
       },
       "FfmeManualMatch": {
         "properties": {
+          "row_number": {
+            "type": "integer",
+            "title": "Row Number"
+          },
           "user_id": {
             "type": "integer",
             "title": "User Id"
-          },
-          "nom": {
-            "type": "string",
-            "title": "Nom",
-            "default": ""
-          },
-          "prenom": {
-            "type": "string",
-            "title": "Prenom",
-            "default": ""
-          },
-          "licence": {
-            "type": "string",
-            "title": "Licence",
-            "default": ""
-          },
-          "passeports": {
-            "type": "string",
-            "title": "Passeports",
-            "default": ""
-          },
-          "diplomes": {
-            "type": "string",
-            "title": "Diplomes",
-            "default": ""
-          },
-          "document_sante": {
-            "type": "string",
-            "title": "Document Sante",
-            "default": ""
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "row_number",
           "user_id"
         ],
         "title": "FfmeManualMatch",
-        "description": "A row left unmatched by the preview, linked by the office to member user_id."
+        "description": "A row left unmatched by the preview (row_number: its Excel line), linked by the office to member user_id."
       },
       "FfmeMatchStats": {
         "properties": {
@@ -7146,6 +7147,10 @@
             "type": "string",
             "title": "Filename"
           },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
           "stats": {
             "$ref": "#/components/schemas/FfmeMatchStats"
           },
@@ -7170,20 +7175,127 @@
             },
             "type": "array",
             "title": "Users"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/FfmeRowChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "unchanged_count": {
+            "type": "integer",
+            "title": "Unchanged Count"
           }
         },
         "type": "object",
         "required": [
           "status",
           "filename",
+          "season",
           "stats",
           "matched_count",
           "unmatched_count",
           "unmatched",
-          "users"
+          "users",
+          "changes",
+          "unchanged_count"
         ],
         "title": "FfmePreview",
-        "description": "Matching of the file, nothing written. matched_count: rows matched by license number or name."
+        "description": "Matching of the file against the members and the purchases of the season (the active one), nothing written.\nmatched_count: rows matched by license number or name.\nchanges: the matched rows that change something or need attention; unchanged_count: the other matched rows."
+      },
+      "FfmePreviewRequest": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "default": "licencies_ffme.xlsx"
+          },
+          "content_base64": {
+            "type": "string",
+            "title": "Content Base64",
+            "default": ""
+          },
+          "manual_matches": {
+            "items": {
+              "$ref": "#/components/schemas/FfmeManualMatch"
+            },
+            "type": "array",
+            "title": "Manual Matches",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FfmePreviewRequest",
+        "description": "The file, with the office's manual matches: their changes are listed with the automatic ones."
+      },
+      "FfmeRowChange": {
+        "properties": {
+          "row_number": {
+            "type": "integer",
+            "title": "Row Number"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "birth_date": {
+            "type": "string",
+            "title": "Birth Date"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "licence",
+              "nom",
+              "manuel"
+            ],
+            "title": "Source"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/FfmeFieldChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "no_active_registration": {
+            "type": "boolean",
+            "title": "No Active Registration"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row_number",
+          "user_id",
+          "last_name",
+          "first_name",
+          "birth_date",
+          "licence",
+          "source",
+          "changes",
+          "no_active_registration",
+          "duplicate"
+        ],
+        "title": "FfmeRowChange",
+        "description": "A matched row of the file (row_number: its Excel line) and what the import changes on its member.\nlicence: the member's licence after the import. no_active_registration: no purchase of the season left to mark\n« Terminé » (none, or cancelled ones only)."
       },
       "FfmeStats": {
         "properties": {

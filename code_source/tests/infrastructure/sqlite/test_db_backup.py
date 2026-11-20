@@ -2,8 +2,11 @@
 with Firestore (the cache is rebuilt from it)."""
 
 import glob
+import io
 import os
 from unittest.mock import patch
+
+import openpyxl
 
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.sqlite.connection import SqliteDatabase
@@ -23,15 +26,14 @@ class TestCreateDbBackup(MemberDbTestCase):
 
     def test_ffme_import_backs_up_only_without_firestore(self):
         self.seed("1", "Léo", "MARTIN", "Cours ados")
-        conn = SqliteDatabase.get_connection()
-        try:
-            user_id = conn.execute("SELECT id FROM users WHERE last_name = 'MARTIN'").fetchone()["id"]
-        finally:
-            conn.close()
-        match = ("Terminé", "112233", "", "", "", user_id)
-        for firestore_enabled, backups in ((True, 0), (False, 1)):
+        for firestore_enabled, backups, licence in ((True, 0, "112233"), (False, 1, "445566")):  # each import changes the licence
+            workbook = openpyxl.Workbook()
+            workbook.active.append(["Nom", "Prénom", "N° de licence"])
+            workbook.active.append(["MARTIN", "Léo", licence])
+            buffer = io.BytesIO()
+            workbook.save(buffer)
             with self.subTest(firestore_enabled=firestore_enabled), \
                     patch("infrastructure.sqlite.connection.ROOT_DIR", self._tmp.name), \
                     patch.object(CloudDatabase, "is_enabled", return_value=firestore_enabled):
-                ffme.apply_import("2026-2027", None, [match])
+                ffme.apply_import("2026-2027", buffer.getvalue())
             self.assertEqual(len(self._backups()), backups)

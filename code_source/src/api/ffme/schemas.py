@@ -38,7 +38,8 @@ class FfmeMatchStats(BaseModel):
 
 
 class FfmeLicensee(BaseModel):
-    """A row of the file matched with no member: shown so that the office can pick one."""
+    """A row of the file matched with no member (row_number: its Excel line): shown so that the office can pick one."""
+    row_number: int
     nom: str
     prenom: str
     licence: str
@@ -56,32 +57,61 @@ class FfmeMember(BaseModel):
     birth_date: str
 
 
+class FfmeFieldChange(BaseModel):
+    """A field the import changes: licence, passeports, diplomes, document_sante or statut (old: empty when unset)."""
+    field: Literal["licence", "passeports", "diplomes", "document_sante", "statut"]
+    old: str
+    new: str
+
+
+class FfmeRowChange(BaseModel):
+    """A matched row of the file (row_number: its Excel line) and what the import changes on its member.
+    licence: the member's licence after the import. no_active_registration: no purchase of the season left to mark
+    « Terminé » (none, or cancelled ones only)."""
+    row_number: int
+    user_id: int
+    last_name: str
+    first_name: str
+    birth_date: str
+    licence: str
+    source: Literal["licence", "nom", "manuel"]
+    changes: List[FfmeFieldChange]
+    no_active_registration: bool
+    duplicate: bool
+
+
 class FfmePreview(BaseModel):
-    """Matching of the file, nothing written. matched_count: rows matched by license number or name."""
+    """Matching of the file against the members and the purchases of the season (the active one), nothing written.
+    matched_count: rows matched by license number or name.
+    changes: the matched rows that change something or need attention; unchanged_count: the other matched rows."""
     status: Literal["success"]
     filename: str
+    season: str
     stats: FfmeMatchStats
     matched_count: int
     unmatched_count: int
     unmatched: List[FfmeLicensee]
     users: List[FfmeMember]
+    changes: List[FfmeRowChange]
+    unchanged_count: int
 
 
 class FfmeManualMatch(RequestBody):
-    """A row left unmatched by the preview, linked by the office to member user_id."""
+    """A row left unmatched by the preview (row_number: its Excel line), linked by the office to member user_id."""
+    row_number: int
     user_id: int
-    nom: str = ""
-    prenom: str = ""
-    licence: str = ""
-    passeports: str = ""
-    diplomes: str = ""
-    document_sante: str = ""
 
 
-class FfmeImportRequest(FfmeFile):
-    """The file is matched again by the server; manual_matches are added. season: the active one when empty."""
-    season: str = ""
+class FfmePreviewRequest(FfmeFile):
+    """The file, with the office's manual matches: their changes are listed with the automatic ones."""
     manual_matches: List[FfmeManualMatch] = []
+
+
+class FfmeImportRequest(FfmePreviewRequest):
+    """The file is matched again by the server; manual_matches are added, excluded_rows (Excel lines) left out.
+    season: the active one when empty."""
+    season: str = ""
+    excluded_rows: List[int] = []
 
 
 class FfmeImportResult(BaseModel):

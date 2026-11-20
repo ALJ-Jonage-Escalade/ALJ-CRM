@@ -2565,24 +2565,24 @@ export interface components {
             phone?: string;
         };
         /**
-         * FfmeFile
-         * @description The licensee list exported from MyFFME (.xlsx), base64 encoded.
+         * FfmeFieldChange
+         * @description A field the import changes: licence, passeports, diplomes, document_sante or statut (old: empty when unset).
          */
-        FfmeFile: {
+        FfmeFieldChange: {
             /**
-             * Filename
-             * @default licencies_ffme.xlsx
+             * Field
+             * @enum {string}
              */
-            filename?: string;
-            /**
-             * Content Base64
-             * @default
-             */
-            content_base64?: string;
+            field: "licence" | "passeports" | "diplomes" | "document_sante" | "statut";
+            /** Old */
+            old: string;
+            /** New */
+            new: string;
         };
         /**
          * FfmeImportRequest
-         * @description The file is matched again by the server; manual_matches are added. season: the active one when empty.
+         * @description The file is matched again by the server; manual_matches are added, excluded_rows (Excel lines) left out.
+         *     season: the active one when empty.
          */
         FfmeImportRequest: {
             /**
@@ -2596,15 +2596,20 @@ export interface components {
              */
             content_base64?: string;
             /**
+             * Manual Matches
+             * @default []
+             */
+            manual_matches?: components["schemas"]["FfmeManualMatch"][];
+            /**
              * Season
              * @default
              */
             season?: string;
             /**
-             * Manual Matches
+             * Excluded Rows
              * @default []
              */
-            manual_matches?: components["schemas"]["FfmeManualMatch"][];
+            excluded_rows?: number[];
         };
         /** FfmeImportResult */
         FfmeImportResult: {
@@ -2625,9 +2630,11 @@ export interface components {
         };
         /**
          * FfmeLicensee
-         * @description A row of the file matched with no member: shown so that the office can pick one.
+         * @description A row of the file matched with no member (row_number: its Excel line): shown so that the office can pick one.
          */
         FfmeLicensee: {
+            /** Row Number */
+            row_number: number;
             /** Nom */
             nom: string;
             /** Prenom */
@@ -2645,41 +2652,13 @@ export interface components {
         };
         /**
          * FfmeManualMatch
-         * @description A row left unmatched by the preview, linked by the office to member user_id.
+         * @description A row left unmatched by the preview (row_number: its Excel line), linked by the office to member user_id.
          */
         FfmeManualMatch: {
+            /** Row Number */
+            row_number: number;
             /** User Id */
             user_id: number;
-            /**
-             * Nom
-             * @default
-             */
-            nom?: string;
-            /**
-             * Prenom
-             * @default
-             */
-            prenom?: string;
-            /**
-             * Licence
-             * @default
-             */
-            licence?: string;
-            /**
-             * Passeports
-             * @default
-             */
-            passeports?: string;
-            /**
-             * Diplomes
-             * @default
-             */
-            diplomes?: string;
-            /**
-             * Document Sante
-             * @default
-             */
-            document_sante?: string;
         };
         /** FfmeMatchStats */
         FfmeMatchStats: {
@@ -2725,7 +2704,9 @@ export interface components {
         };
         /**
          * FfmePreview
-         * @description Matching of the file, nothing written. matched_count: rows matched by license number or name.
+         * @description Matching of the file against the members and the purchases of the season (the active one), nothing written.
+         *     matched_count: rows matched by license number or name.
+         *     changes: the matched rows that change something or need attention; unchanged_count: the other matched rows.
          */
         FfmePreview: {
             /**
@@ -2735,6 +2716,8 @@ export interface components {
             status: "success";
             /** Filename */
             filename: string;
+            /** Season */
+            season: string;
             stats: components["schemas"]["FfmeMatchStats"];
             /** Matched Count */
             matched_count: number;
@@ -2744,6 +2727,62 @@ export interface components {
             unmatched: components["schemas"]["FfmeLicensee"][];
             /** Users */
             users: components["schemas"]["FfmeMember"][];
+            /** Changes */
+            changes: components["schemas"]["FfmeRowChange"][];
+            /** Unchanged Count */
+            unchanged_count: number;
+        };
+        /**
+         * FfmePreviewRequest
+         * @description The file, with the office's manual matches: their changes are listed with the automatic ones.
+         */
+        FfmePreviewRequest: {
+            /**
+             * Filename
+             * @default licencies_ffme.xlsx
+             */
+            filename?: string;
+            /**
+             * Content Base64
+             * @default
+             */
+            content_base64?: string;
+            /**
+             * Manual Matches
+             * @default []
+             */
+            manual_matches?: components["schemas"]["FfmeManualMatch"][];
+        };
+        /**
+         * FfmeRowChange
+         * @description A matched row of the file (row_number: its Excel line) and what the import changes on its member.
+         *     licence: the member's licence after the import. no_active_registration: no purchase of the season left to mark
+         *     « Terminé » (none, or cancelled ones only).
+         */
+        FfmeRowChange: {
+            /** Row Number */
+            row_number: number;
+            /** User Id */
+            user_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Birth Date */
+            birth_date: string;
+            /** Licence */
+            licence: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "licence" | "nom" | "manuel";
+            /** Changes */
+            changes: components["schemas"]["FfmeFieldChange"][];
+            /** No Active Registration */
+            no_active_registration: boolean;
+            /** Duplicate */
+            duplicate: boolean;
         };
         /**
          * FfmeStats
@@ -7098,7 +7137,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["FfmeFile"];
+                "application/json": components["schemas"]["FfmePreviewRequest"];
             };
         };
         responses: {
