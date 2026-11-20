@@ -4,7 +4,7 @@
    on another member (left to the office: the stored number may be the right one), or no active registration. */
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import type { BadgeColor } from "../../../components/ui/palette";
-import type { RowChange } from "./ffme";
+import { healthDocumentMark, type RowChange } from "./ffme";
 
 defineProps<{ rows: readonly RowChange[]; excludedRows: ReadonlySet<number>; blockedUserIds: ReadonlySet<number> }>();
 const emit = defineEmits<{ toggle: [rowNumber: number] }>();
@@ -23,9 +23,19 @@ const SOURCES: Record<RowChange["source"], { label: string; color: BadgeColor }>
   manuel: { label: "Manuel", color: "violet" },
 };
 
+function changeOf(row: RowChange, field: Field) {
+  return row.changes.find((c) => c.field === field);
+}
+
 function changeText(row: RowChange, field: Field): string {
-  const change = row.changes.find((c) => c.field === field);
+  const change = changeOf(row, field);
   return change ? `${change.old || "—"} → ${change.new}` : "";
+}
+
+/** The health document cell: ✅ / ❌ and the new value, the full change in the tooltip. */
+function cellText(row: RowChange, field: Field): string {
+  const change = changeOf(row, field);
+  return change && field === "document_sante" ? `${healthDocumentMark(change.new)} ${change.new}` : changeText(row, field);
 }
 </script>
 
@@ -73,7 +83,7 @@ function changeText(row: RowChange, field: Field): string {
             <span v-if="column.field === 'statut' && row.no_active_registration" class="font-semibold text-amber-700">
               ⚠️ Aucune inscription active sur la saison
             </span>
-            <span v-else class="block truncate" :title="changeText(row, column.field)">{{ changeText(row, column.field) }}</span>
+            <span v-else class="block truncate" :title="changeText(row, column.field)">{{ cellText(row, column.field) }}</span>
           </td>
         </tr>
       </tbody>

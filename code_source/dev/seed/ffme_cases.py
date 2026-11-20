@@ -21,7 +21,8 @@ FILE_NAME = "ffme_licencies_dev.xlsx"
 HEADER = ["Nom", "Prénom", "N° de licence", "Date de naissance", "Passeports", "Diplômes", "Document de santé"]
 HOMONYM_BIRTH = datetime.date(1980, 7, 31)
 CANCELLED_LICENCE = "512345"
-KEPT_PASSPORTS, KEPT_DIPLOMAS, KEPT_DOCUMENT = "Passeport Vert", "Initiateur SAE", "Certificat médical"
+KEPT_PASSPORTS, KEPT_DIPLOMAS = "Passeport Vert", "Initiateur SAE"
+HEALTH = "Document de santé"  # QS, COMPETITION, LOISIR (valid) or ATTENTE; an empty cell is ATTENTE
 
 
 class SeedMember(TypedDict):
@@ -32,6 +33,8 @@ class SeedMember(TypedDict):
     licence: str
     birth_date: Optional[datetime.date]
     status: str
+    tarif: str
+    health_document: str
 
 
 def extra_records(build_record: Callable[[dict, int], dict], planning: List[dict]) -> List[dict]:
@@ -51,7 +54,8 @@ def _members(season: str) -> List[SeedMember]:
     try:
         rows = conn.execute("""
             SELECT u.id AS user_id, p.id AS purchase_id, u.last_name, u.first_name, COALESCE(u.licence_ffme, '') AS licence,
-                   u.birth_date, COALESCE(p.status, '') AS status
+                   u.birth_date, COALESCE(p.status, '') AS status,
+                   COALESCE(p.tarif_name, '') AS tarif, COALESCE(p.document_sante, '') AS health_document
             FROM users u JOIN purchases p ON p.user_id = u.id JOIN orders o ON o.id = p.order_id
             JOIN seasons s ON s.id = o.season_id
             WHERE s.name = ? ORDER BY u.last_name, u.first_name, u.birth_date
@@ -61,7 +65,7 @@ def _members(season: str) -> List[SeedMember]:
     return [SeedMember(user_id=row["user_id"], purchase_id=row["purchase_id"], last_name=row["last_name"],
                        first_name=row["first_name"], licence=row["licence"],
                        birth_date=datetime.date.fromisoformat(row["birth_date"]) if row["birth_date"] else None,
-                       status=row["status"])
+                       status=row["status"], tarif=row["tarif"], health_document=row["health_document"])
             for row in rows]
 
 
@@ -77,14 +81,23 @@ def _kept_member(members: List[SeedMember]) -> SeedMember:
     return [m for m in _licensed(members) if normalize_status(m["status"]) == "Terminé"][1]
 
 
+def _valid_health_document(member: SeedMember) -> str:
+    if "competition" in member["tarif"].lower():
+        return "COMPETITION"
+    return "QS" if member["user_id"] % 3 == 0 else "LOISIR"
+
+
 def prepare_cases(season: str) -> None:
-    """Stored values the file leaves empty: the preview must show no change for this member."""
-    kept = _kept_member(_members(season))
+    """The health document of every licensed member (earlier imports), and passports / diplomas the file leaves
+    empty: the preview must show no change for that member."""
+    members = _members(season)
+    kept = _kept_member(members)
     conn = SqliteDatabase.get_connection()
     try:
         conn.execute("UPDATE users SET raw_passports = ?, raw_diplomas = ? WHERE id = ?",
                      (KEPT_PASSPORTS, KEPT_DIPLOMAS, kept["user_id"]))
-        conn.execute("UPDATE purchases SET document_sante = ? WHERE id = ?", (KEPT_DOCUMENT, kept["purchase_id"]))
+        conn.executemany("UPDATE purchases SET document_sante = ? WHERE id = ?",
+                         [(_valid_health_document(m), m["purchase_id"]) for m in members if m["licence"]])
         conn.commit()
     finally:
         conn.close()
@@ -96,8 +109,8 @@ def _cell_date(member: SeedMember) -> str:
 
 def _row(member: SeedMember, **cells: str) -> Dict[str, str]:
     row = {"Nom": member["last_name"].upper(), "Prénom": member["first_name"], "N° de licence": member["licence"],
-           "Date de naissance": _cell_date(member)}
-    row.update({key.replace("_", " "): value for key, value in cells.items()})
+           "Date de naissance": _cell_date(member), HEALTH: member["health_document"]}
+    row.update(cells)
     return row
 
 
@@ -127,23 +140,29 @@ def write_ffme_file(season: str, folder: str) -> List[str]:
     diploma = take(lambda m: (m["birth_date"] or datetime.date.max).year < 2005)
     rows.append(_row(diploma, Diplômes="Initiateur SAE, Juge de bloc"))
     health = take(lambda m: True)
-    rows.append(_row(health, Passeports="Passeport Orange", **{"Document de santé": "Questionnaire de santé"}))
+    new_document = "QS" if health["health_document"] == "COMPETITION" else "COMPETITION"
+    rows.append(_row(health, Passeports="Passeport Orange", **{HEALTH: new_document}))
     cases += [f"Licence : {_name(passports)} → passeports",
               f"Licence : {_name(diploma)} → diplômes",
-              f"Licence : {_name(health)} → passeports et document de santé"]
+              f"Licence : {_name(health)} → passeports, document de santé ✅ {health['health_document']} → {new_document}"]
+
+    # Health document back to pending: written « ATTENTE », or an empty cell (read as ATTENTE)
+    pending, emptied = take(lambda m: True), take(lambda m: True)
+    rows += [_row(pending, **{HEALTH: "ATTENTE"}), _row(emptied, **{HEALTH: ""})]
+    cases.append(f"Licence : {_name(pending)} (ATTENTE) et {_name(emptied)} (cellule vide) → document de santé ❌ ATTENTE")
 
     # Empty cells keep the stored values
     rows.append(_row(kept))
-    cases.append(f"Inchangé : {_name(kept)} garde {KEPT_PASSPORTS} / {KEPT_DIPLOMAS} / {KEPT_DOCUMENT} (cellules vides)")
+    cases.append(f"Inchangé : {_name(kept)} garde {KEPT_PASSPORTS} / {KEPT_DIPLOMAS} (cellules vides)")
 
     # Incomplete registrations (no licence, « Validé »): matched by name, licence given, status « Terminé »
     incomplete = [m for m in members if not m["licence"] and not is_cancelled(m["status"])
                   and (m["last_name"], m["first_name"]) != ("POTTER", "Harry")]
     for number, member in enumerate(incomplete, start=1):
         used.add(member["user_id"])
-        rows.append(_row(member, **{"N° de licence": f"{700000 + number}"}))
+        rows.append(_row(member, **{"N° de licence": f"{700000 + number}", HEALTH: "QS" if number < len(incomplete) else ""}))
     cases.append(f"Nom : {len(incomplete)} inscriptions incomplètes ({', '.join(_name(m) for m in incomplete)})"
-                 " → licence 70000N, statut Validé → Terminé")
+                 " → licence 70000N, statut Validé → Terminé, document de santé ✅ QS (❌ ATTENTE pour le dernier)")
 
     # A sibling's licence: the birth date sends the row to the right child, the other one keeps the number
     families: Dict[str, List[SeedMember]] = {}
@@ -159,8 +178,8 @@ def write_ffme_file(season: str, folder: str) -> List[str]:
     # Homonyms: the birth date picks the adult Harry Potter; without it, nobody (manual link)
     adult_harry = next(m for m in members if (m["last_name"].upper(), m["first_name"]) == ("POTTER", "Harry")
                        and m["birth_date"] == HOMONYM_BIRTH)
-    rows.append(_row(adult_harry, **{"N° de licence": "780731"}))
-    rows.append({"Nom": "POTTER", "Prénom": "Harry"})
+    rows.append(_row(adult_harry, **{"N° de licence": "780731", HEALTH: "QS"}))
+    rows.append({"Nom": "POTTER", "Prénom": "Harry", HEALTH: "QS"})
     cases += [f"Nom (homonymes, date de naissance) : POTTER Harry né le {HOMONYM_BIRTH:%d/%m/%Y} → licence 780731",
               "Non rapproché : POTTER Harry sans date de naissance (homonymes)"]
 
@@ -181,7 +200,7 @@ def write_ffme_file(season: str, folder: str) -> List[str]:
     cases.append(f"Licence : {_name(cancelled)} → passeports, ⚠️ Aucune inscription active sur la saison")
 
     # Unknown to the club
-    rows.append({"Nom": "LOCKHART", "Prénom": "Gilderoy", "N° de licence": "599999", "Date de naissance": "26/01/1964"})
+    rows.append({"Nom": "LOCKHART", "Prénom": "Gilderoy", "N° de licence": "599999", "Date de naissance": "26/01/1964", HEALTH: "LOISIR"})
     cases.append("Non rapproché : LOCKHART Gilderoy (inconnu, à lier à la main ou à ignorer)")
 
     # Every other licensed member: matched by licence, nothing to change but the status of the incomplete ones

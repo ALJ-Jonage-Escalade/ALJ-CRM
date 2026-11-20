@@ -38,6 +38,11 @@ active registration on the season goes unnoticed.
   licence (a sibling's number typed on HelloAsso, the row now sent to the right child by the birth date). Listed and
   ranked with « sans inscription active », warning « ⚠️ Licence N déjà enregistrée sur X : à corriger sur sa fiche »;
   never cleared automatically, the stored number may be the right one.
+- Health document (production values: QS, COMPETITION, LOISIR — valid, the member may climb — or ATTENTE): an empty
+  cell of the « Document de santé » column is read as ATTENTE (a file without the column keeps the stored values).
+  The preview cell shows ✅ for a valid new value, ❌ for ATTENTE, then the value; old → new in the tooltip.
+- Test file: `dev/seed/seed_emulator.py` writes `dev/seed/ffme_licencies_dev.xlsx` (git-ignored, `dev/seed/ffme_cases.py`),
+  one row per case of the preview, from the seed data.
 - Several purchases of a season only coexist at equal priority (the member writers drop the lower ones), so the
   planner marks every active one; old status shown as their distinct statuses.
 

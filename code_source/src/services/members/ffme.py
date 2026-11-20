@@ -36,6 +36,9 @@ UNKNOWN_MANUAL_MATCH = "Association manuelle impossible : ligne {row_number} du 
 LAST_NAME, FIRST_NAME, LICENCE = "Nom", "Prénom", "N° de licence"
 REQUIRED_COLUMNS = (LAST_NAME, FIRST_NAME, LICENCE)
 HEALTH_DOCUMENT = "Document de santé"
+# The health document column holds QS, COMPETITION, LOISIR (valid: the member may climb) or ATTENTE; MyFFME leaves
+# the cell empty while nothing was received
+HEALTH_DOCUMENT_PENDING = "ATTENTE"
 BIRTH_DATE = "Date de naissance"
 
 
@@ -218,7 +221,7 @@ def prepare_licensees(excel_content: bytes, season: str, manual_matches: Sequenc
                 birth_date=_cell_text(row, BIRTH_DATE),
                 passeports=_cell_text(row, "Passeports"),
                 diplomes=_cell_text(row, "Diplômes"),
-                document_sante=_cell_text(row, HEALTH_DOCUMENT) if has_health_column else "",
+                document_sante=(_cell_text(row, HEALTH_DOCUMENT) or HEALTH_DOCUMENT_PENDING) if has_health_column else "",
             )
             if matched:
                 matched_rows.append((licensee, matched, source))

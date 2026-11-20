@@ -106,3 +106,8 @@ export function applyConfirmation(rows: readonly RowChange[]): string {
     `• ${automaticCount} réconcilié${plural(automaticCount)} automatiquement\n• ${manualCount} associé${plural(manualCount)} manuellement`
   );
 }
+
+/** The health document of the file: QS, COMPETITION or LOISIR lets the member climb (✅), ATTENTE does not (❌). */
+export function healthDocumentMark(value: string): "✅" | "❌" {
+  return value.trim().toUpperCase() === "ATTENTE" ? "❌" : "✅";
+}

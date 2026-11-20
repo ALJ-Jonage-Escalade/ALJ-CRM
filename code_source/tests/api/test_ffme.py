@@ -143,9 +143,9 @@ class TestFfmeRoutes(MemberDbTestCase):
         self.seed("2", "Max", "PETIT", "Cours ados")
         content = _xlsx([
             {"Nom": "MARTIN", "Prénom": "Léo", "N° de licence": "112233", "Passeports": "Grimpeur Vert",
-             "Diplômes": "Initiateur SAE", "Document de santé": "Questionnaire de santé"},
+             "Diplômes": "Initiateur SAE", "Document de santé": "QS"},
             {"Nom": "PETIT-DUPONT", "Prénom": "Maxime", "N° de licence": "998877", "Date de naissance": "22/07/2009",
-             "Passeports": "Grimpeur Bleu", "Document de santé": "Certificat médical"},
+             "Passeports": "Grimpeur Bleu", "Document de santé": "COMPETITION"},
         ])
 
         preview = self.client.post("/api/ffme/preview", json={"filename": "ffme.xlsx", "content_base64": content}).json()
@@ -154,7 +154,7 @@ class TestFfmeRoutes(MemberDbTestCase):
                                             "matched_manually": 0, "errors": []})
         self.assertEqual(preview["unmatched"], [{
             "row_number": 4, "nom": "PETIT-DUPONT", "prenom": "Maxime", "licence": "998877", "birth_date": "22/07/2009",
-            "passeports": "Grimpeur Bleu", "diplomes": "", "document_sante": "Certificat médical"}])
+            "passeports": "Grimpeur Bleu", "diplomes": "", "document_sante": "COMPETITION"}])
         self.assertEqual(sorted(u["last_name"] for u in preview["users"]), ["MARTIN", "PETIT"])
         self.assertEqual(self._user("MARTIN")["licence_ffme"] or "", "")  # nothing written yet
 
@@ -167,9 +167,9 @@ class TestFfmeRoutes(MemberDbTestCase):
         martin = self._user("MARTIN")
         self.assertEqual((martin["licence_ffme"], martin["raw_passports"], martin["raw_diplomas"]),
                          ("112233", "Grimpeur Vert", "Initiateur SAE"))
-        self.assertEqual(self._statuses("MARTIN"), [("Terminé", "Questionnaire de santé")])
+        self.assertEqual(self._statuses("MARTIN"), [("Terminé", "QS")])
         self.assertEqual(self._user("PETIT")["licence_ffme"], "998877")
-        self.assertEqual(self._statuses("PETIT"), [("Terminé", "Certificat médical")])
+        self.assertEqual(self._statuses("PETIT"), [("Terminé", "COMPETITION")])
 
     def _preview(self, rows, **body):
         return self.client.post("/api/ffme/preview", json={"filename": "ffme.xlsx", "content_base64": _xlsx(rows), **body}).json()
@@ -177,7 +177,8 @@ class TestFfmeRoutes(MemberDbTestCase):
     def test_preview_lists_the_changes_of_a_matched_row(self):
         self.seed("1", "Léo", "MARTIN", "Cours ados")
 
-        preview = self._preview([{"Nom": "MARTIN", "Prénom": "Léo", "N° de licence": "112233", "Passeports": "Grimpeur Vert"}])
+        preview = self._preview([{"Nom": "MARTIN", "Prénom": "Léo", "N° de licence": "112233", "Passeports": "Grimpeur Vert",
+                                  "Document de santé": "QS"}])
 
         self.assertEqual(preview["changes"], [{
             "row_number": 3, "user_id": self._user("MARTIN")["id"], "last_name": "MARTIN", "first_name": "Léo",
@@ -185,6 +186,7 @@ class TestFfmeRoutes(MemberDbTestCase):
             "no_active_registration": False, "duplicate": False,
             "changes": [{"field": "licence", "old": "", "new": "112233"},
                         {"field": "passeports", "old": "", "new": "Grimpeur Vert"},
+                        {"field": "document_sante", "old": "", "new": "QS"},
                         {"field": "statut", "old": "Validé", "new": "Terminé"}],
         }])
 

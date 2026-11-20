@@ -75,8 +75,8 @@ class TestPrepareLicensees(MemberDbTestCase):
 
 
 class TestApplyImport(MemberDbTestCase):
-    """What apply_import writes: an empty value of the file keeps the stored one; « Terminé » goes to every purchase
-    of the season but cancelled or refunded ones."""
+    """What apply_import writes: an empty value of the file keeps the stored one, but an empty health document is
+    « ATTENTE »; « Terminé » goes to every purchase of the season but cancelled or refunded ones."""
 
     def _query(self, sql: str) -> list[Any]:
         conn = SqliteDatabase.get_connection()
@@ -101,15 +101,38 @@ class TestApplyImport(MemberDbTestCase):
         rows = self._query("SELECT o.order_ref, p.status FROM purchases p JOIN orders o ON o.id = p.order_id")
         return {row["order_ref"]: row["status"] for row in rows}
 
+    def _health_document(self) -> str:
+        return self._query("SELECT document_sante FROM purchases")[0]["document_sante"]
+
     def test_apply_import_empty_values_keep_stored_ones(self):
         self.seed("1", "Léo", "MARTIN", "Cours ados")
-        self._import("112233", "P1", "D1", "Certificat")
+        self._import("112233", "P1", "D1", "QS")
 
-        self._import()
+        self._import(health_document="QS")
 
         user = self._query("SELECT licence_ffme, raw_passports, raw_diplomas FROM users")[0]
         self.assertEqual(tuple(user), ("112233", "P1", "D1"))
-        self.assertEqual(self._query("SELECT document_sante FROM purchases")[0]["document_sante"], "Certificat")
+
+    def test_apply_import_empty_health_document_is_pending(self):
+        self.seed("1", "Léo", "MARTIN", "Cours ados")
+        self._import("112233", health_document="QS")
+
+        self._import("112233")
+
+        self.assertEqual(self._health_document(), "ATTENTE")
+
+    def test_apply_import_without_health_document_column_keeps_stored_one(self):
+        self.seed("1", "Léo", "MARTIN", "Cours ados")
+        self._import("112233", health_document="LOISIR")
+        workbook = openpyxl.Workbook()
+        workbook.active.append(HEADER[:-1])
+        workbook.active.append(["MARTIN", "Léo", "112233"])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+
+        apply_import(SEASON, buffer.getvalue())
+
+        self.assertEqual(self._health_document(), "LOISIR")
 
     def test_apply_import_marks_every_purchase_but_cancelled_ones(self):
         for ref, tarif in (("1", "Cours ados"), ("2", "Cours compétition"), ("3", "Cours adultes")):
@@ -124,7 +147,7 @@ class TestApplyImport(MemberDbTestCase):
     def test_apply_import_leaves_cancelled_only_member_unchanged(self):
         self.seed("1", "Léo", "MARTIN", "Cours ados", status="Canceled")
 
-        self._import("112233", health_document="Certificat")
+        self._import("112233", health_document="QS")
 
         self.assertEqual(self._statuses(), {"1": "Canceled"})
         self.assertEqual(self._query("SELECT licence_ffme FROM users")[0]["licence_ffme"], "112233")

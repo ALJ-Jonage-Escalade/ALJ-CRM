@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   blockedUserIds,
   changeMatches,
+  healthDocumentMark,
   licenseeMatches,
   manualMatches,
   readBase64,
@@ -85,5 +86,11 @@ describe("ffme import", () => {
     const rows = [CHANGE(3, "Dupont", { user_id: 7 }), CHANGE(4, "Dupont", { user_id: 7, source: "manuel" }), CHANGE(5, "Morel")];
     expect([...blockedUserIds(rows, new Set())]).toEqual([7]);
     expect([...blockedUserIds(rows, new Set([4]))]).toEqual([]);
+  });
+});
+
+describe("healthDocumentMark", () => {
+  it("marks a valid health document ✅ and a pending one ❌", () => {
+    expect(["QS", "COMPETITION", "LOISIR", "ATTENTE", " attente "].map(healthDocumentMark)).toEqual(["✅", "✅", "✅", "❌", "❌"]);
   });
 });
