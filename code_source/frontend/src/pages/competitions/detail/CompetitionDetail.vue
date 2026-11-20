@@ -35,7 +35,7 @@ import {
 } from "../competitions";
 import CompetitionActions from "./CompetitionActions.vue";
 import EmailForm from "./EmailForm.vue";
-import EmailHistory from "./EmailHistory.vue";
+import EmailHistory from "../../../components/EmailHistory.vue";
 import { competitorContact, entriesFor } from "./emailHistory";
 import { useCompetitionEmailLog } from "./emailLog";
 import { COMPETITIONS_KEY } from "../context";

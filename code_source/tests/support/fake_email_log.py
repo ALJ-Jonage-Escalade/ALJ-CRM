@@ -25,3 +25,8 @@ class InMemoryEmailLogStore:
         if self.failing:
             raise LogDown("Firestore injoignable")
         return [entry for entry in self.entries if competition_id in entry["competition_ids"]]
+
+    def list_latest(self, limit: int) -> List[EmailLogEntry]:
+        if self.failing:
+            raise LogDown("Firestore injoignable")
+        return sorted(self.entries, key=lambda entry: entry["at"], reverse=True)[:limit]

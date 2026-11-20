@@ -2,7 +2,8 @@
 
 Read and written by the server only (firestore.rules refuses every client). No `crm_` prefix: not copied into the
 SQLite cache. A competition's entries are found with `array-contains` on `competition_ids`, without `orderBy`: no
-composite index to deploy, the caller sorts them.
+composite index to deploy, the caller sorts them. The whole log is read newest first on `at` (automatic
+single-field index), capped.
 """
 
 from __future__ import annotations
@@ -25,6 +26,9 @@ class EmailLogStore(Protocol):
     def add_entry(self, entry: EmailLogEntry) -> None: ...
     def list_for_competition(self, competition_id: int) -> List[EmailLogEntry]:
         """The entries about this competition, in no particular order."""
+        ...
+    def list_latest(self, limit: int) -> List[EmailLogEntry]:
+        """The `limit` newest entries of the whole app, newest first."""
         ...
 
 
@@ -68,4 +72,8 @@ class FirestoreEmailLogStore:
 
     def list_for_competition(self, competition_id: int) -> List[EmailLogEntry]:
         entries = (log_entry(doc) for doc in FirestoreClient.list_containing(COLLECTION, "competition_ids", competition_id))
+        return [entry for entry in entries if entry is not None]
+
+    def list_latest(self, limit: int) -> List[EmailLogEntry]:
+        entries = (log_entry(doc) for doc in FirestoreClient.list_latest(COLLECTION, "at", limit))
         return [entry for entry in entries if entry is not None]

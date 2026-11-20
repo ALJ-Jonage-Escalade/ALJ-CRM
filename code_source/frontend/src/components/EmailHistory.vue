@@ -1,11 +1,18 @@
 <script setup lang="ts">
-/* The e-mails sent about a competition (or those that included one competitor), newest first: kind, author,
-   template or subject, recipients; each send opens to its recipients, with the address used and its status. */
-import { failedCount, isInternal, KIND_LABELS, momentOf, type EmailLogEntry } from "./emailHistory";
-import { plural } from "../../../lib/text";
+/* A list of sends from the e-mail log, newest first: kind, author, template or subject, recipients, and the
+   competitions when their names are given (Historique des envois); each send opens to its recipients, with the
+   address used and its status. Used by the competition page and Communications › Historique des envois. */
+import { failedCount, isInternal, KIND_LABELS, momentOf, type EmailLogEntry } from "../lib/emailLog";
+import { plural } from "../lib/text";
 
-defineProps<{ entries: readonly EmailLogEntry[] }>();
+const props = defineProps<{
+  entries: readonly EmailLogEntry[];
+  /** Names of the competitions, by id: shown on each send about them (none on the competition page itself). */
+  competitionNames?: Readonly<Record<number, string>>;
+}>();
 const author = (entry: EmailLogEntry) => (entry.author === "system" ? "envoi automatique" : entry.author);
+const competitionsOf = (entry: EmailLogEntry): string[] =>
+  props.competitionNames ? (entry.competition_ids ?? []).flatMap((id) => props.competitionNames?.[id] ?? []) : [];
 </script>
 
 <template>
@@ -16,6 +23,7 @@ const author = (entry: EmailLogEntry) => (entry.author === "system" ? "envoi aut
         <summary class="cursor-pointer px-3 py-2 select-none">
           <b>{{ momentOf(entry.at) }}</b>
           · {{ KIND_LABELS[entry.kind] }}
+          <span v-if="competitionsOf(entry).length" data-testid="history-competitions">· 🏆 {{ competitionsOf(entry).join(", ") }}</span>
           <span class="block text-xs text-slate-500">
             {{ author(entry) }} · {{ entry.template || entry.subject || "sans objet" }} · {{ entry.recipients?.length ?? 0 }} destinataire{{
               plural(entry.recipients?.length ?? 0)

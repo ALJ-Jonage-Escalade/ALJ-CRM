@@ -1,4 +1,5 @@
-"""The e-mail log: every sender records its send here, and the competition page reads a competition's history.
+"""The e-mail log: every sender records its send here; the competition page reads a competition's history, and
+Communications › Historique des envois the latest sends of the whole app.
 
 `record_send` never raises: the e-mails are gone when it runs, so a store failure is a warning and a notice for the
 person who sent them (the dates shown are then incomplete), never an error that would make them send again.
@@ -9,7 +10,7 @@ from __future__ import annotations
 import datetime
 import logging
 import threading
-from typing import Iterable, List, Optional, Sequence, TypedDict
+from typing import Dict, Iterable, List, Optional, Sequence, TypedDict
 
 from domain.email_log import (
     Competitor,
@@ -20,6 +21,7 @@ from domain.email_log import (
     contact_summary,
     member_ids_of,
 )
+from infrastructure.firestore.competitions import competitions
 from infrastructure.firestore.email_log import EmailLogStore, FirestoreEmailLogStore
 from services.competitions.store import require_competition, storage
 
@@ -28,6 +30,8 @@ logger = logging.getLogger("alj")
 # What the pages and the log say of a recipient the mailer refused (the server's reason stays in the logs)
 SEND_FAILED = "Erreur lors de l'envoi (détails dans les journaux)."
 NOT_RECORDED = "E-mail envoyé, mais non enregistré dans l'historique des envois."
+# Sends shown by Historique des envois: a few hundred a season, filtered on the page (no purge before #136)
+RECENT_LIMIT = 500
 
 _store: Optional[EmailLogStore] = None
 _store_lock = threading.Lock()
@@ -90,3 +94,19 @@ def competition_history(competition_id: int) -> CompetitionHistory:
                    for p in competition.get("participants") or []]
     entries = sorted(current_store().list_for_competition(competition_id), key=lambda entry: entry["at"], reverse=True)
     return CompetitionHistory(entries=entries, summary=contact_summary(entries, competitors))
+
+
+class RecentHistory(TypedDict):
+    entries: List[EmailLogEntry]  # newest first
+    competition_names: Dict[int, str]  # the competitions of these entries that still exist
+    truncated: bool  # RECENT_LIMIT reached: older sends are not listed
+
+
+@storage
+def recent_history() -> RecentHistory:
+    """The latest sends of the whole app, with the names of the competitions they are about."""
+    entries = current_store().list_latest(RECENT_LIMIT)
+    mentioned = {competition_id for entry in entries for competition_id in entry["competition_ids"]}
+    names = {competition.id: competition.nom for competition in competitions.list_competitions()
+             if competition.id is not None and competition.id in mentioned}
+    return RecentHistory(entries=entries, competition_names=names, truncated=len(entries) >= RECENT_LIMIT)

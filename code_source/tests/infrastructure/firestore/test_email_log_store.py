@@ -33,6 +33,12 @@ class TestFirestoreEmailLogStore(unittest.TestCase):
         self.assertEqual(entries[0]["recipients"], sent_entry("", [7])["recipients"])
         self.assertEqual((entries[0]["template"], entries[0]["member_ids"]), ("Relance", [3]))
 
+    def test_latest_of_the_whole_log_newest_first(self):
+        for at, ids in (("2026-11-01T09:00:00+00:00", [7]), ("2026-11-03T09:00:00+00:00", []), ("2026-11-02T09:00:00+00:00", [8])):
+            self.store.add_entry(sent_entry(at, ids))
+        self.fake.upsert_document(email_log.COLLECTION, "x", {"kind": "fax", "at": "2026-11-04T09:00:00+00:00"})
+        self.assertEqual([e["at"][:10] for e in self.store.list_latest(3)], ["2026-11-03", "2026-11-02"])
+
     def test_unknown_kind_left_out(self):
         self.fake.upsert_document(email_log.COLLECTION, "x", {"kind": "fax", "competition_ids": [7]})
         self.assertEqual(self.store.list_for_competition(7), [])

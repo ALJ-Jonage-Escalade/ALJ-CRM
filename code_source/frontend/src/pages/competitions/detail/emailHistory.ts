@@ -1,26 +1,11 @@
 /* The e-mail log of a competition as its page shows it (server: domain/email_log.py): what to write on each competitor's
-   row, the sends that included a competitor, and the French names of the kinds. */
+   row and the sends that included a competitor (kinds and shared helpers: lib/emailLog.ts). */
 import type { Schemas } from "../../../lib/client";
-import { formatDate, formatDateTime, parseDate } from "../../../lib/format";
+import type { EmailLogEntry } from "../../../lib/emailLog";
+import { formatDate, parseDate } from "../../../lib/format";
 import type { Row } from "../competitions";
 
 export type EmailLog = Schemas["CompetitionEmailLog"];
-export type EmailLogEntry = Schemas["EmailLogEntry"];
-type Kind = EmailLogEntry["kind"];
-
-export const KIND_LABELS: Record<Kind, string> = {
-  competition_email: "E-mail aux compétiteurs",
-  member_email: "E-mail aux adhérents",
-  competition_all_paid: "Interne : tous les paiements reçus",
-  results_batch: "Interne : résultats de compétition",
-  attestation: "Attestation de paiement",
-  access_invitation: "Invitation au bureau",
-};
-
-/** E-mails to the club itself, listed in the history but never counted as a contact with the families. */
-export function isInternal(kind: Kind): boolean {
-  return kind === "competition_all_paid" || kind === "results_batch";
-}
 
 /**
  * What a date line shows:
@@ -66,18 +51,8 @@ export function entriesFor(entries: readonly EmailLogEntry[], row: Pick<Row, "ad
   return entries.filter((entry) => (entry.recipients ?? []).some((r) => isCompetitor(r, row)));
 }
 
-export function failedCount(entry: EmailLogEntry): number {
-  return (entry.recipients ?? []).filter((r) => r.status === "failed").length;
-}
-
 /** « 24/10/2026 » for a server date. */
 export function dayOf(at: string): string {
   const date = parseDate(at);
   return date ? formatDate(date) : at;
-}
-
-/** « 24/10/2026 14:05 » for a server date. */
-export function momentOf(at: string): string {
-  const date = parseDate(at);
-  return date ? formatDateTime(date) : at;
 }
