@@ -131,3 +131,33 @@ def test_without_domain_check_no_domain_is_flagged() -> None:
     checked = check_member_data(MemberValues(email="molly@gmial.com"), season_start=SEASON_START)
 
     assert [issue.code for issue in checked.issues if issue.field == "email"] == []
+
+
+def _value(field: str, raw: str) -> tuple[str, list[str]]:
+    checked = check_member_data(replace(MemberValues(), **{field: raw}), season_start=SEASON_START)
+    return getattr(checked.values, field), [issue.code for issue in checked.issues if issue.field == field]
+
+
+@pytest.mark.parametrize(("field", "raw", "stored"), [
+    ("country", "france", "France"), ("country", "FR", "France"), ("country", "Allemagne", "Allemagne"),
+    ("country", " royaume uni ", "Royaume-Uni"),
+    ("nationality", "FRANCAISE", "Française"), ("nationality", "Français", "Française"), ("nationality", "FR", "Française"),
+    ("nationality", "Allemagne", "Allemande"),
+])
+def test_a_recognised_country_or_nationality_is_stored_in_its_canonical_spelling(field: str, raw: str, stored: str) -> None:
+    assert _value(field, raw) == (stored, [])
+
+
+@pytest.mark.parametrize("field", ["country", "nationality"])
+def test_an_unknown_or_missing_country_or_nationality_is_a_warning(field: str) -> None:
+    assert _value(field, "Bretagne") == ("Bretagne", ["unknown"])
+    assert _value(field, "") == ("", ["missing"])
+
+
+@pytest.mark.parametrize(("raw", "stored", "issues"), [
+    ("123456", "123456", []), (" 12 34 56 ", "123456", []),
+    ("", "", []), ("non", "", []), ("en cours", "", []),  # no licence: never a warning
+    ("12345", "12345", ["invalid"]), ("1234567", "1234567", ["invalid"]),
+])
+def test_an_ffme_licence_must_have_six_digits(raw: str, stored: str, issues: list[str]) -> None:
+    assert _value("licence", raw) == (stored, issues)

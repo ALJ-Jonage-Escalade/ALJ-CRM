@@ -11,9 +11,12 @@ from enum import Enum
 from typing import Iterable, Literal, Mapping, Optional
 
 from domain.members.helloasso_membership import (
+    COUNTRY_FIELD,
     EMAIL_2_FIELD,
     EMAIL_FIELD,
     EMERGENCY_PHONE_FIELDS,
+    LICENCE_FIELD,
+    NATIONALITY_FIELD,
     PHONE_FIELD,
     MembershipRecord,
     season_guard,
@@ -44,6 +47,8 @@ class KnownMember:
     phone: str = ""
     email: str = ""
     email_2: str = ""
+    country: str = ""
+    nationality: str = ""
 
 
 @dataclass(frozen=True)
@@ -297,10 +302,11 @@ def _apply_priority(entries: list[PlanEntry], base: _Base) -> list[PlanEntry]:
 
 # The checked values the form holds: field of MemberValues -> custom field of the form
 _FORM_FIELDS = {"phone": PHONE_FIELD, "emergency_phone_1": EMERGENCY_PHONE_FIELDS[0], "emergency_phone_2": EMERGENCY_PHONE_FIELDS[1],
-                "email": EMAIL_FIELD, "email_2": EMAIL_2_FIELD}
+                "email": EMAIL_FIELD, "email_2": EMAIL_2_FIELD, "country": COUNTRY_FIELD, "nationality": NATIONALITY_FIELD,
+                "licence": LICENCE_FIELD}
 # Those a renewal keeps from the CRM when filled (fill blank fields only). Emergency phones: never, a renewal adds the
 # contacts the member does not have yet
-_KEPT_FROM_CRM = ("phone", "email", "email_2")
+_KEPT_FROM_CRM = ("phone", "email", "email_2", "country", "nationality", "licence")
 
 
 def _check(record: MembershipRecord, season: str, member: Optional[KnownMember] = None,
@@ -308,6 +314,7 @@ def _check(record: MembershipRecord, season: str, member: Optional[KnownMember] 
     """The values the import would store, checked: those of `member` when filled (a renewal keeps them), else the
     HelloAsso ones. Birth date: the mapped ISO date, else as typed."""
     values = {field: record.custom_fields.get(name, "") for field, name in _FORM_FIELDS.items()}
+    values["licence"] = record.licence  # as the mapping read it (the form's licence field, digits only)
     if member:
         values.update({field: getattr(member, field) for field in _KEPT_FROM_CRM if getattr(member, field).strip()})
     return check_member_data(MemberValues(birth_date=record.birth_date or record.birth_date_raw, **values),
@@ -332,7 +339,10 @@ def _with_checks(entry: PlanEntry, base: _Base, season: str, domain_accepts_mail
         return entry
     member = base.members.get(entry.member_id) if entry.bucket == Bucket.RENEWAL and entry.member_id is not None else None
     checked = _check(entry.record, season, member, domain_accepts_mail)
-    return replace(entry, record=_normalised(entry.record, checked), issues=checked.issues)
+    reason = entry.reason
+    if member and member.licence and entry.record.licence and member.licence != entry.record.licence:
+        reason += f" Licence {entry.record.licence} sur HelloAsso : la licence {member.licence} du CRM est conservée."
+    return replace(entry, record=_normalised(entry.record, checked), issues=checked.issues, reason=reason)
 
 
 def plan_membership_import(records: Iterable[MembershipRecord], *, season: str, campaign_slug: str,

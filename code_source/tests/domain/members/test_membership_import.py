@@ -454,3 +454,36 @@ def test_a_renewal_is_checked_on_the_emails_the_crm_keeps() -> None:
     [entry] = _plan(record, members=(replace(GINNY, email="molly@terrier.example"),)).entries
 
     assert [issue for issue in _issues(entry) if issue[0].startswith("email")] == []
+
+
+def test_countries_and_nationalities_are_written_in_their_canonical_spelling() -> None:
+    record = _record(custom_fields={"Pays": "FRANCE", "Nationalité": "FRANCAISE"})
+
+    [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN).entries
+
+    fields = entry.record.legacy_fields()
+    assert (fields["champ_Pays"], fields["champ_Nationalité"]) == ("France", "Française")
+    assert [issue for issue in _issues(entry) if issue[0] in ("country", "nationality")] == []
+
+
+def test_a_renewal_is_checked_on_the_country_and_licence_the_crm_keeps() -> None:
+    record = _record(licence="12345", custom_fields={"Pays": "Bretagne", "Nationalité": "Bretonne"})
+    member = replace(GINNY, licence="123456", country="France", nationality="Française")
+
+    [entry] = _plan(record, members=(member,)).entries
+
+    assert entry.bucket == Bucket.RENEWAL
+    assert [issue for issue in _issues(entry) if issue[0] in ("country", "nationality", "licence")] == []
+
+
+def test_a_new_member_with_a_wrong_licence_is_warned() -> None:
+    [entry] = plan_membership_import([_record(licence="1234567")], season=SEASON, campaign_slug=CAMPAIGN).entries
+
+    assert ("licence", "invalid") in _issues(entry)
+
+
+def test_a_renewal_with_another_licence_on_helloasso_says_the_crm_one_is_kept() -> None:
+    [entry] = _plan(_record(licence="654321")).entries
+
+    assert entry.bucket == Bucket.RENEWAL
+    assert "654321" in entry.reason and "123456" in entry.reason

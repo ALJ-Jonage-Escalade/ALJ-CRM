@@ -7,12 +7,15 @@ a birth-date issue blocks (the registration then waits in « À vérifier »); e
 from __future__ import annotations
 
 import datetime
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal, Optional
 
 import phonenumbers
 from email_validator import EmailNotValidError, validate_email
+
+from domain.members.countries import parse_country
 
 # Plausible age on the season start (1 September): below, the registration year was typed in; above, a typo such as
 # 1026. Plain constants, not the group age rules.
@@ -44,6 +47,10 @@ class MemberValues:
     # Normalised by email-validator (domain lower-cased); as typed when invalid
     email: str = ""
     email_2: str = ""
+    # Normalised: the canonical name / nationality of the country table (countries.py); as typed when not recognised
+    country: str = ""
+    nationality: str = ""
+    licence: str = ""  # FFME licence; normalised: its digits ("" when it has none: no licence)
 
 
 @dataclass(frozen=True)
@@ -134,6 +141,30 @@ def _email(field: IssueField, raw: str, required: bool, domain_accepts_mail: Opt
     return address.normalized, []
 
 
+def _country(field: IssueField, raw: str) -> tuple[str, list[DataIssue]]:
+    """A country or nationality typed in any recognised spelling ("FRANCAISE", "fr"), stored in the canonical one."""
+    typed = str(raw or "").strip()
+    label = "Pays" if field == "country" else "Nationalité"
+    if not typed:
+        return "", [DataIssue(field, "missing", f"{label} manquant{'e' if field == 'nationality' else ''}.")]
+    country = parse_country(typed)
+    if country is None:
+        return typed, [DataIssue(field, "unknown", f"{label} non reconnu{'e' if field == 'nationality' else ''} (« {typed} »).")]
+    return (country.name if field == "country" else country.nationality), []
+
+
+LICENCE_DIGITS = 6
+
+
+def _licence(raw: str) -> tuple[str, list[DataIssue]]:
+    """An FFME licence: its digits, exactly six. Text without digit ("non", "en cours") is no licence."""
+    digits = re.sub(r"\D", "", str(raw or ""))
+    if digits and len(digits) != LICENCE_DIGITS:
+        return digits, [DataIssue("licence", "invalid", f"Licence FFME invalide (« {str(raw).strip()} ») : {LICENCE_DIGITS} chiffres "
+                                                        "attendus.")]
+    return digits, []
+
+
 def check_member_data(values: MemberValues, *, season_start: datetime.date,
                       domain_accepts_mail: Optional[DomainCheck] = None) -> CheckedValues:
     """The values normalised, and their issues. `domain_accepts_mail`: None skips the domain check (dev, tests)."""
@@ -144,6 +175,9 @@ def check_member_data(values: MemberValues, *, season_start: datetime.date,
         "emergency_phone_2": _phone("emergency_phone_2", values.emergency_phone_2, required=False),
         "email": _email("email", values.email, True, domain_accepts_mail),
         "email_2": _email("email_2", values.email_2, False, domain_accepts_mail),
+        "country": _country("country", values.country),
+        "nationality": _country("nationality", values.nationality),
+        "licence": _licence(values.licence),
     }
     normalised = MemberValues(**{field: value for field, (value, _issues) in checked.items()})
     return CheckedValues(normalised, tuple(issue for _value, issues in checked.values() for issue in issues))

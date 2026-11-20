@@ -165,9 +165,10 @@ class MembershipImportRepository:
         try:
             members = [KnownMember(user_id=row["id"], last_name=row["last_name"] or "", first_name=row["first_name"] or "",
                                    birth_date=row["birth_date"] or "", licence=re.sub(r"\D", "", row["licence_ffme"] or ""),
-                                   phone=row["phone"] or "", email=row["email_primary"] or "", email_2=row["email_secondary"] or "")
+                                   phone=row["phone"] or "", email=row["email_primary"] or "", email_2=row["email_secondary"] or "",
+                                   country=row["country"] or "", nationality=row["nationality"] or "")
                        for row in conn.execute("SELECT id, last_name, first_name, birth_date, licence_ffme, phone, email_primary,"
-                                               " email_secondary FROM users")]
+                                               " email_secondary, country, nationality FROM users")]
             purchases = [KnownPurchase(purchase_id=row["id"], user_id=row["user_id"], order_ref=str(row["order_ref"] or ""),
                                        season=row["season"] or "", helloasso_item_id=row["helloasso_item_id"],
                                        status=row["status"] or "", tarif_name=row["tarif_name"] or "", amount=float(row["amount"] or 0.0),

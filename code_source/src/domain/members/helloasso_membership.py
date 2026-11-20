@@ -29,6 +29,9 @@ BIRTH_DATE_FIELD = "champ_Date de naissance de l'adhérent"
 PHONE_FIELD = "Téléphone "
 EMAIL_FIELD = "Adresse mail pour la réception des informations du club"
 EMAIL_2_FIELD = "Deuxième adresse mail pour la réception des informations du club"
+COUNTRY_FIELD = "Pays"
+NATIONALITY_FIELD = "Nationalité"
+LICENCE_FIELD = "Numéro de Licence FFME (6 chiffres)"
 EMERGENCY_PHONE_FIELDS = tuple(phone.removeprefix("champ_") for _name, phone in HELLOASSO_CONTACT_FIELDS)
 
 
