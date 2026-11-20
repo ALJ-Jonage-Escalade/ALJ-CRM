@@ -5,6 +5,7 @@
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import type { BadgeColor } from "../../../components/ui/palette";
 import { passportMarks } from "../../../lib/passports";
+import { statusColor } from "../../adherents/members";
 import { healthDocumentMark, type RowChange } from "./ffme";
 
 defineProps<{ rows: readonly RowChange[]; excludedRows: ReadonlySet<number>; blockedUserIds: ReadonlySet<number> }>();
@@ -26,6 +27,12 @@ const SOURCES: Record<RowChange["source"], { label: string; color: BadgeColor }>
 
 function changeOf(row: RowChange, field: Field) {
   return row.changes.find((c) => c.field === field);
+}
+
+/** The statuses of a status change: old ones (« Validé / En cours » when the purchases differ), then the new one. */
+function statusChange(row: RowChange): { old: string[]; new: string } | undefined {
+  const change = changeOf(row, "statut");
+  return change && { old: change.old ? change.old.split(" / ") : [], new: change.new };
 }
 
 function changeText(row: RowChange, field: Field): string {
@@ -89,6 +96,18 @@ function cellText(row: RowChange, field: Field): string {
           <td v-for="column in FIELDS" :key="column.field" class="max-w-48 px-2.5 py-1.5">
             <span v-if="column.field === 'statut' && row.no_active_registration" class="font-semibold text-amber-700">
               ⚠️ Aucune inscription active sur la saison
+            </span>
+            <span
+              v-else-if="column.field === 'statut' && statusChange(row)"
+              class="flex flex-wrap items-center gap-1"
+              :title="changeText(row, column.field)"
+            >
+              <UiBadge v-for="status in statusChange(row)?.old" :key="status" :color="statusColor(status)" data-testid="ffme-status">
+                {{ status }}
+              </UiBadge>
+              <span v-if="!statusChange(row)?.old.length">—</span>
+              →
+              <UiBadge :color="statusColor(statusChange(row)?.new ?? '')" data-testid="ffme-status">{{ statusChange(row)?.new }}</UiBadge>
             </span>
             <span v-else class="block truncate" :title="changeText(row, column.field)">{{ cellText(row, column.field) }}</span>
           </td>

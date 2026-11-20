@@ -1055,7 +1055,13 @@ describe("OutilsPage", () => {
     // What needs a look first: no active registration, then the match by name
     expect(all("ffme-change").map((row) => row.textContent)).toEqual([
       expect.stringMatching(/⚠️ Licence 445566 déjà enregistrée sur DURAND Hugo.*⚠️ Aucune inscription active sur la saison/),
-      expect.stringMatching(/PETIT Max.*Nom.*— → 112233.*⚪ → ⚪🟡.*✅ QS.*Validé → Terminé/),
+      expect.stringMatching(/PETIT Max.*Nom.*— → 112233.*⚪ → ⚪🟡.*✅ QS.*Validé.*→.*Terminé/),
+    ]);
+    // The status as on the Adhérents page: one pill per status
+    const statusPills = [...(all("ffme-change")[1]?.querySelectorAll('[data-testid="ffme-status"]') ?? [])];
+    expect(statusPills.map((pill) => [pill.textContent?.trim(), pill.className.includes("rounded-full")])).toEqual([
+      ["Validé", true],
+      ["Terminé", true],
     ]);
 
     const search = byId<HTMLInputElement>("ffme-search")!;
