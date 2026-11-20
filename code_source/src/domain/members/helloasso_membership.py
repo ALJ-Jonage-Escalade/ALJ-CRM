@@ -27,6 +27,8 @@ BIRTH_DATE_FIELD = "champ_Date de naissance de l'adhérent"
 # Custom fields of the form checked at the import (member_data_rules), named as the member writers read them
 # (schema_v2.USER_FIELD_MAP and emergency_contacts.HELLOASSO_CONTACT_FIELDS, without their "champ_" prefix)
 PHONE_FIELD = "Téléphone "
+EMAIL_FIELD = "Adresse mail pour la réception des informations du club"
+EMAIL_2_FIELD = "Deuxième adresse mail pour la réception des informations du club"
 EMERGENCY_PHONE_FIELDS = tuple(phone.removeprefix("champ_") for _name, phone in HELLOASSO_CONTACT_FIELDS)
 
 

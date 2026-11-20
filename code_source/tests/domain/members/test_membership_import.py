@@ -408,7 +408,7 @@ def test_a_new_member_is_written_with_normalised_phones() -> None:
     fields = entry.record.legacy_fields()
     assert (fields["champ_Téléphone "], fields["champ_Personne à prévenir en cas d'urgence - Téléphone"]) == ("06 12 34 56 78",
                                                                                                          "06 12 34 56 79")
-    assert _issues(entry) == []
+    assert [field for field, _code in _issues(entry) if "phone" in field] == []
 
 
 def test_a_registration_with_problems_stays_importable() -> None:
@@ -417,7 +417,7 @@ def test_a_registration_with_problems_stays_importable() -> None:
     [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN).entries
 
     assert entry.bucket == Bucket.NEW
-    assert _issues(entry) == [("phone", "invalid")]
+    assert ("phone", "invalid") in _issues(entry)
     assert [write.action for write in apply_decisions(_plan(record, members=()), {9001: Decision(Bucket.NEW, "import")})] == [WriteAction.CREATE]
 
 
@@ -431,4 +431,26 @@ def test_a_renewal_is_checked_on_the_values_it_will_keep(crm_phone: str, expecte
     [entry] = _plan(record, members=(replace(GINNY, phone=crm_phone),)).entries
 
     assert entry.bucket == Bucket.RENEWAL
-    assert _issues(entry) == expected
+    assert [issue for issue in _issues(entry) if issue[0] == "phone"] == expected
+
+
+EMAIL_FIELD = "Adresse mail pour la réception des informations du club"
+EMAIL_2_FIELD = "Deuxième adresse mail pour la réception des informations du club"
+
+
+def test_the_emails_are_checked_with_the_domain_check_and_written_normalised() -> None:
+    record = _record(custom_fields={EMAIL_FIELD: "Molly@Terrier.Example", EMAIL_2_FIELD: "arthur@gmial.com"})
+
+    [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN,
+                                     domain_accepts_mail=lambda domain: domain != "gmial.com").entries
+
+    assert [issue for issue in _issues(entry) if issue[0].startswith("email")] == [("email_2", "no_mail_domain")]
+    assert entry.record.legacy_fields()[f"champ_{EMAIL_FIELD}"] == "Molly@terrier.example"
+
+
+def test_a_renewal_is_checked_on_the_emails_the_crm_keeps() -> None:
+    record = _record(custom_fields={EMAIL_FIELD: "molly terrier.example"})
+
+    [entry] = _plan(record, members=(replace(GINNY, email="molly@terrier.example"),)).entries
+
+    assert [issue for issue in _issues(entry) if issue[0].startswith("email")] == []

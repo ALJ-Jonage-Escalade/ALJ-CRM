@@ -18,10 +18,12 @@ from domain.members.helloasso_membership import (
     parse_membership_campaign,
 )
 from domain.members.membership_import import Decision, ImportPlan, StaleDecisions, apply_decisions, plan_membership_import
+from infrastructure import runtime_env
 from infrastructure.firestore.app_settings import HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.client import FirestoreError
 from infrastructure.firestore.membership_import_history import ImportedItem, ImportHistoryEntry, MembershipImportHistory
 from infrastructure.helloasso import api as helloasso_api
+from infrastructure.mail.mail_domains import MailDomainCheck
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.membership_import import AppliedWrite, MembershipImportRepository, MembershipWriteRefused
 from domain.errors import Conflict, InvalidRequest, UpstreamUnavailable
@@ -134,5 +136,7 @@ class MembershipImportService:
             items = helloasso_api.fetch_form_items(campaign.form_type, campaign.slug)
         except helloasso_api.HelloAssoApiError as e:
             raise UpstreamUnavailable(e.message, e.code) from e
+        # The e-mail domains are looked up on Cloud Run only: dev and tests never reach the network
+        domain_check = MailDomainCheck() if runtime_env.is_cloud_run() else None
         return plan_membership_import(map_membership_items(items), season=season, campaign_slug=campaign.slug,
-                                      snapshot=MembershipImportRepository.snapshot())
+                                      snapshot=MembershipImportRepository.snapshot(), domain_accepts_mail=domain_check)

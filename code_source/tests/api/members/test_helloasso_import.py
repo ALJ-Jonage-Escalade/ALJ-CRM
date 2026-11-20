@@ -230,7 +230,8 @@ class TestMembershipRerunsAndRenewals(HelloAssoImportTestCase):
         rows = {row["item_id"]: row for row in self.client.post(PREVIEW).json()["rows"]}
         self.import_all()
 
-        self.assertEqual((rows[1]["bucket"], rows[1]["issues"]), ("renewal", []))
+        self.assertEqual(rows[1]["bucket"], "renewal")
+        self.assertEqual([issue for issue in rows[1]["issues"] if issue["field"] == "phone"], [])
         conn = SqliteDatabase.get_connection()
         try:
             phones = dict(conn.execute("SELECT first_name, phone FROM users").fetchall())

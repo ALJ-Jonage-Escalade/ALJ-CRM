@@ -19,6 +19,7 @@ dependencies = [
     # Attestation PDFs (needs Pango from the system, installed by the Dockerfile)
     "weasyprint==70.0",
     "phonenumberslite>=9.0.44",
+    "email-validator>=2.4.0",
 ]
 
 [dependency-groups]

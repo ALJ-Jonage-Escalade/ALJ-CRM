@@ -92,3 +92,42 @@ def test_only_the_birth_date_blocks() -> None:
     checked = check_member_data(MemberValues(birth_date="11/08/2013", phone="12", emergency_phone_1="12"), season_start=SEASON_START)
 
     assert checked.issues and not any(issue.blocking for issue in checked.issues)
+
+
+# The domain check, faked: "gmial.com" cannot receive mail, "lent.example" does not answer
+DOMAINS = {"gmial.com": False, "lent.example": None}
+
+
+def _email(raw: str, field: str = "email") -> tuple[str, list[str]]:
+    checked = check_member_data(replace(MemberValues(), **{field: raw}), season_start=SEASON_START,
+                                domain_accepts_mail=lambda domain: DOMAINS.get(domain, True))
+    return getattr(checked.values, field), [issue.code for issue in checked.issues if issue.field == field]
+
+
+@pytest.mark.parametrize(("raw", "stored"), [
+    ("molly@terrier.example", "molly@terrier.example"), (" Molly.Weasley@Terrier.Example ", "Molly.Weasley@terrier.example"),
+    ("molly@lent.example", "molly@lent.example"),  # the domain check failed: no warning
+])
+def test_a_valid_email_is_stored_normalised_without_warning(raw: str, stored: str) -> None:
+    assert _email(raw) == (stored, [])
+
+
+@pytest.mark.parametrize("raw", ["molly weasley@terrier.example", "molly.terrier.example", "06 12 34 56 78", "molly@terrier"])
+def test_an_email_with_invalid_syntax_is_a_warning_and_kept_as_typed(raw: str) -> None:
+    assert _email(raw) == (raw, ["invalid"])
+
+
+def test_an_email_whose_domain_cannot_receive_mail_is_a_warning() -> None:
+    assert _email("molly@gmial.com") == ("molly@gmial.com", ["no_mail_domain"])
+
+
+def test_a_missing_primary_email_is_a_warning_but_the_second_one_may_be_empty() -> None:
+    assert _email("") == ("", ["missing"])
+    assert _email("", "email_2") == ("", [])
+    assert _email("molly@gmial.com", "email_2") == ("molly@gmial.com", ["no_mail_domain"])
+
+
+def test_without_domain_check_no_domain_is_flagged() -> None:
+    checked = check_member_data(MemberValues(email="molly@gmial.com"), season_start=SEASON_START)
+
+    assert [issue.code for issue in checked.issues if issue.field == "email"] == []

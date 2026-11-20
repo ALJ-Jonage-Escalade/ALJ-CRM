@@ -7,17 +7,22 @@ a birth-date issue blocks (the registration then waits in « À vérifier »); e
 from __future__ import annotations
 
 import datetime
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Optional
 
 import phonenumbers
+from email_validator import EmailNotValidError, validate_email
 
 # Plausible age on the season start (1 September): below, the registration year was typed in; above, a typo such as
 # 1026. Plain constants, not the group age rules.
 MIN_AGE = 3
 MAX_AGE = 100
 
-IssueField =Literal["birth_date", "phone", "emergency_phone_1", "emergency_phone_2", "email", "email_2", "country",
+# Whether a domain can receive mail: True, False, or None when the check could not answer (never an issue)
+DomainCheck = Callable[[str], Optional[bool]]
+
+IssueField = Literal["birth_date", "phone", "emergency_phone_1", "emergency_phone_2", "email", "email_2", "country",
                      "nationality", "licence"]
 
 
@@ -36,6 +41,9 @@ class MemberValues:
     phone: str = ""
     emergency_phone_1: str = ""
     emergency_phone_2: str = ""
+    # Normalised by email-validator (domain lower-cased); as typed when invalid
+    email: str = ""
+    email_2: str = ""
 
 
 @dataclass(frozen=True)
@@ -107,11 +115,35 @@ def _phone(field: IssueField, raw: str, required: bool) -> tuple[str, list[DataI
                                       else phonenumbers.PhoneNumberFormat.INTERNATIONAL), []
 
 
-def check_member_data(values: MemberValues, *, season_start: datetime.date) -> CheckedValues:
-    """The values normalised, and their issues."""
-    birth_date, issues = _birth_date(values.birth_date, season_start)
-    phone, phone_issues = _phone("phone", values.phone, required=True)
-    emergency_phone_1, emergency_1_issues = _phone("emergency_phone_1", values.emergency_phone_1, required=False)
-    emergency_phone_2, emergency_2_issues = _phone("emergency_phone_2", values.emergency_phone_2, required=False)
-    normalised = MemberValues(birth_date=birth_date, phone=phone, emergency_phone_1=emergency_phone_1, emergency_phone_2=emergency_phone_2)
-    return CheckedValues(normalised, tuple(issues + phone_issues + emergency_1_issues + emergency_2_issues))
+_EMAIL_LABELS: dict[IssueField, str] = {"email": "Adresse e-mail du club", "email_2": "Deuxième adresse e-mail du club"}
+
+
+def _email(field: IssueField, raw: str, required: bool, domain_accepts_mail: Optional[DomainCheck]) -> tuple[str, list[DataIssue]]:
+    """An e-mail address: syntax and normalisation by email-validator, then whether its domain can receive mail."""
+    typed = str(raw or "").strip()
+    label = _EMAIL_LABELS[field]
+    if not typed:
+        return "", [DataIssue(field, "missing", f"{label} manquante.")] if required else []
+    try:
+        address = validate_email(typed, check_deliverability=False)
+    except EmailNotValidError:
+        return typed, [DataIssue(field, "invalid", f"{label} invalide (« {typed} »).")]
+    if domain_accepts_mail is not None and domain_accepts_mail(address.ascii_domain) is False:
+        return address.normalized, [DataIssue(field, "no_mail_domain", f"{label} : le domaine « {address.domain} » ne reçoit pas "
+                                                                       f"d'e-mails (faute de frappe ?).")]
+    return address.normalized, []
+
+
+def check_member_data(values: MemberValues, *, season_start: datetime.date,
+                      domain_accepts_mail: Optional[DomainCheck] = None) -> CheckedValues:
+    """The values normalised, and their issues. `domain_accepts_mail`: None skips the domain check (dev, tests)."""
+    checked = {
+        "birth_date": _birth_date(values.birth_date, season_start),
+        "phone": _phone("phone", values.phone, required=True),
+        "emergency_phone_1": _phone("emergency_phone_1", values.emergency_phone_1, required=False),
+        "emergency_phone_2": _phone("emergency_phone_2", values.emergency_phone_2, required=False),
+        "email": _email("email", values.email, True, domain_accepts_mail),
+        "email_2": _email("email_2", values.email_2, False, domain_accepts_mail),
+    }
+    normalised = MemberValues(**{field: value for field, (value, _issues) in checked.items()})
+    return CheckedValues(normalised, tuple(issue for _value, issues in checked.values() for issue in issues))
