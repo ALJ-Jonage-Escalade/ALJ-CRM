@@ -506,6 +506,45 @@ describe("OutilsPage", () => {
     }
   });
 
+  it("corrects a registration's value from its row: the server checks it, saves it and answers the recomputed preview", async () => {
+    const newRow = MEMBERSHIP_PREVIEW.rows[0]!;
+    const corrected = {
+      ...newRow,
+      values: { phone: "06 12 34 56 78" },
+      corrections: [{ field: "phone", value: "0612345678", helloasso_value: "061234567", author: "albus@poudlard.example", at: "" }],
+    };
+    ANSWERS["POST /api/helloasso/memberships/corrections/check"] = () => json({ status: "success", value: "06 12 34 56 78", issues: [] });
+    ANSWERS["PUT /api/helloasso/memberships/corrections/1/phone"] = () =>
+      json({ ...MEMBERSHIP_PREVIEW, rows: [corrected, MEMBERSHIP_PREVIEW.rows[1]] });
+    try {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      byId("ha-fix-open")!.click();
+      await flushPromises();
+
+      const input = document.querySelector<HTMLInputElement>('[data-testid="ha-fix-phone"] input')!;
+      input.value = "0612345678";
+      input.dispatchEvent(new Event("input"));
+      await vi.advanceTimersByTimeAsync(500);
+      document.querySelector<HTMLButtonElement>('[data-testid="ha-fix-phone"] [data-testid="ha-fix-save"]')!.click();
+      await flushPromises();
+
+      expect(sent("POST", "/api/helloasso/memberships/corrections/check").at(-1)!.body).toEqual({ field: "phone", value: "0612345678" });
+      expect(sent("PUT", "/api/helloasso/memberships/corrections/1/phone").at(-1)!.body).toEqual({
+        value: "0612345678",
+        campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+      });
+      expect(byId("ha-corrected")).not.toBeNull();
+      expect(byId("ha-correction")!.textContent).toContain("061234567");
+    } finally {
+      vi.useRealTimers();
+      delete ANSWERS["POST /api/helloasso/memberships/corrections/check"];
+      delete ANSWERS["PUT /api/helloasso/memberships/corrections/1/phone"];
+    }
+  });
+
   it("shows each HelloAsso status as an icon, its meaning in the tooltip", async () => {
     const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
     const statuses = ["Processed", "Registered", "Canceled", "Refunded", "Refunding", "Unknown", "Strange"];

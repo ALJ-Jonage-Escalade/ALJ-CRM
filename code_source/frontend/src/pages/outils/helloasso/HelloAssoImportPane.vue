@@ -12,6 +12,7 @@ import UiButton from "../../../components/ui/UiButton.vue";
 import UiCard from "../../../components/ui/UiCard.vue";
 import UiTile from "../../../components/ui/UiTile.vue";
 import AttachPicker from "./AttachPicker.vue";
+import CorrectionDialog from "./CorrectionDialog.vue";
 import { useNetworkUp } from "../../../composables/network";
 import { CLIENT_KEY, errorText } from "../../../lib/client";
 import { formatDayText, formatEuros } from "../../../lib/format";
@@ -25,12 +26,15 @@ import {
   BUCKETS,
   campaignOptions,
   canAttach,
+  canCorrect,
   changeLines,
   decisionsOf,
   FOLDED_BUCKETS,
   incompleteRows,
   initialChoices,
   isCheckable,
+  keepChoices,
+  correctionLines,
   lastSyncText,
   memberHref,
   needsIdentityChoice,
@@ -114,6 +118,26 @@ const sections = computed(() => {
 const selectedCount = computed(() => (preview.value ? selectedRows(preview.value, choices.value).length : 0));
 /** Checked rows still missing something (an attach without member or comment): the import waits for them. */
 const incompleteCount = computed(() => (preview.value ? incompleteRows(preview.value, choices.value).length : 0));
+
+// The registration whose data the admin is correcting (its HelloAsso item id), null when the dialog is closed
+const fixingId = ref<number | null>(null);
+const fixingRow = computed(() => preview.value?.rows.find((row) => row.item_id === fixingId.value) ?? null);
+const fixingOpen = computed({
+  get: () => fixingRow.value !== null,
+  set: (isOpen: boolean) => {
+    if (!isOpen) {
+      fixingId.value = null;
+    }
+  },
+});
+
+/** The preview recomputed after a correction: the admin's choices are kept on the rows that did not move. */
+function corrected(updated: MembershipPreview): void {
+  if (preview.value) {
+    choices.value = keepChoices(preview.value, updated, choices.value);
+  }
+  preview.value = updated;
+}
 
 function reset(): void {
   preview.value = null;
@@ -365,6 +389,7 @@ async function apply(): Promise<void> {
                 </td>
                 <td data-testid="ha-person" class="px-2.5 py-1.5 font-semibold break-words">
                   {{ personLabel(row) }}
+                  <UiBadge v-if="row.corrections.length" color="blue" variant="soft" data-testid="ha-corrected">corrigée</UiBadge>
                   <template v-if="row.attached_to">
                     →
                     <a :href="memberHref(row.attached_to, preview.season)" class="text-blue-700 underline">
@@ -393,6 +418,12 @@ async function apply(): Promise<void> {
                 <td class="px-2.5 py-1.5 break-words text-slate-500">
                   {{ row.reason }}
                   <span v-for="line in changeLines(row)" :key="line" class="block font-semibold text-slate-700">{{ line }}</span>
+                  <span v-for="line in correctionLines(row)" :key="line.label" data-testid="ha-correction" class="block text-slate-700">
+                    ✏️ {{ line.label }} :
+                    <s>{{ line.helloasso || "—" }}</s>
+                    →
+                    <b>{{ line.value || "—" }}</b>
+                  </span>
                   <ul v-if="row.issues.length" class="mt-1 space-y-0.5">
                     <li
                       v-for="issue in row.issues"
@@ -435,6 +466,15 @@ async function apply(): Promise<void> {
                   >
                     🔗 Rattacher…
                   </button>
+                  <button
+                    v-if="canCorrect(row)"
+                    type="button"
+                    data-testid="ha-fix-open"
+                    class="mt-1 block text-blue-700 underline"
+                    @click="fixingId = row.item_id"
+                  >
+                    ✏️ Corriger…
+                  </button>
                   <p v-if="rowProblem(row, preview, choices)" data-testid="ha-row-problem" class="mt-1 font-semibold text-red-700">
                     {{ rowProblem(row, preview, choices) }}
                   </p>
@@ -444,6 +484,8 @@ async function apply(): Promise<void> {
           </table>
         </div>
       </details>
+
+      <CorrectionDialog v-if="fixingRow" v-model:open="fixingOpen" :row="fixingRow" :campaign="campaign" @updated="corrected" />
 
       <div v-if="!preview.blocked_reason" class="flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-200 pt-3">
         <UiButton

@@ -11,6 +11,7 @@ import {
   incompleteRows,
   initialChoices,
   isCheckable,
+  keepChoices,
   lastSyncText,
   memberHref,
   memberOptionLabel,
@@ -269,5 +270,21 @@ describe("helloassoImport", () => {
     expect(lastSyncText({ at: "2026-10-24T14:05:00", author: "Albus", season: "2026-2027", campaign: "a" })).toMatch(
       /^Dernière synchro : 24\/10\/2026.*, par Albus$/,
     );
+  });
+});
+
+describe("keepChoices", () => {
+  it("keeps the admin's choices on the rows still in their section, and gives the moved rows their initial choice", () => {
+    const before = preview([row({ item_id: 1 }), row({ item_id: 2, bucket: "to_review", candidates: [] })]);
+    const after = preview([row({ item_id: 1 }), row({ item_id: 2, bucket: "renewal" })]);
+    const choices: Choices = {
+      1: { checked: false, choice: "import", comment: "" },
+      2: { checked: true, choice: "create", comment: "" },
+    };
+
+    expect(keepChoices(before, after, choices)).toEqual({
+      1: { checked: false, choice: "import", comment: "" },
+      2: { checked: true, choice: "import", comment: "" },
+    });
   });
 });
