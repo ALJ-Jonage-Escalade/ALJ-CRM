@@ -10,7 +10,7 @@ import datetime
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal, Optional, TypeGuard, get_args
 
 import phonenumbers
 from email_validator import EmailNotValidError, validate_email
@@ -27,6 +27,10 @@ DomainCheck = Callable[[str], Optional[bool]]
 
 IssueField = Literal["birth_date", "phone", "emergency_phone_1", "emergency_phone_2", "email", "email_2", "country",
                      "nationality", "licence"]
+
+
+def is_issue_field(value: object) -> TypeGuard[IssueField]:
+    return value in get_args(IssueField)
 
 
 @dataclass(frozen=True)

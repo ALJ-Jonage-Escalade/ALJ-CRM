@@ -12,7 +12,7 @@ from typing import Any, Dict, Iterable, Mapping, Optional
 
 from domain.competitions.matching import parse_campaign_identifier
 from domain.members.emergency_contacts import HELLOASSO_CONTACT_FIELDS
-from domain.members.member_data_rules import read_birth_date
+from domain.members.member_data_rules import IssueField, read_birth_date
 from domain.utils import is_helloasso_url, normalize_string
 
 # Insurance options of the form, as the members base names them (purchase_options.option_name)
@@ -33,6 +33,11 @@ COUNTRY_FIELD = "Pays"
 NATIONALITY_FIELD = "Nationalité"
 LICENCE_FIELD = "Numéro de Licence FFME (6 chiffres)"
 EMERGENCY_PHONE_FIELDS = tuple(phone.removeprefix("champ_") for _name, phone in HELLOASSO_CONTACT_FIELDS)
+# The checked values the form holds (every one but the birth date): field of member_data_rules -> custom field
+FORM_FIELDS: dict[IssueField, str] = {
+    "phone": PHONE_FIELD, "emergency_phone_1": EMERGENCY_PHONE_FIELDS[0], "emergency_phone_2": EMERGENCY_PHONE_FIELDS[1],
+    "email": EMAIL_FIELD, "email_2": EMAIL_2_FIELD, "country": COUNTRY_FIELD, "nationality": NATIONALITY_FIELD, "licence": LICENCE_FIELD,
+}
 
 
 def insurance_of(option_name: str) -> Optional[str]:

@@ -143,6 +143,8 @@ const MEMBERSHIP_PREVIEW = {
       can_create: true,
       changes: [],
       issues: [],
+      corrections: [],
+      values: {},
     },
     {
       item_id: 2,
@@ -163,6 +165,8 @@ const MEMBERSHIP_PREVIEW = {
       can_create: false,
       changes: [],
       issues: [{ field: "birth_date", code: "missing", message: "Date de naissance manquante.", blocking: true }],
+      corrections: [],
+      values: {},
     },
   ],
   members: [] as unknown[],

@@ -15,12 +15,19 @@ from infrastructure.firestore.client import FirestoreClient
 COLLECTION = "helloasso_membership_imports"
 
 
+class CorrectedField(TypedDict):
+    field: str
+    helloasso_value: str
+    value: str  # as the admin typed it
+
+
 class ImportedItem(TypedDict):
     item_id: int
     bucket: str  # bucket of the plan applied
     decision: str  # the admin's choice ("import", "skip", "create", "link:<id>", "attach:<id>"); "skip" when none was sent
     action: str  # what was written: create | attach | update | backfill | assign, "" for nothing
     comment: NotRequired[str]  # the admin's comment (attach by hand)
+    corrections: NotRequired[List[CorrectedField]]  # the admin's corrections applied (author: the import's)
 
 
 class ImportHistoryEntry(TypedDict):

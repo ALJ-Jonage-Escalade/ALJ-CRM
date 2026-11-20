@@ -538,6 +538,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/helloasso/memberships/corrections/{item_id}/{field}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Membership Correction
+         * @description Saves the admin's correction of one field of a registration; answers the preview recomputed with it.
+         */
+        put: operations["save_membership_correction_api_helloasso_memberships_corrections__item_id___field__put"];
+        post?: never;
+        /**
+         * Remove Membership Correction
+         * @description Removes the correction of one field (HelloAsso's value applies again); answers the preview recomputed.
+         */
+        delete: operations["remove_membership_correction_api_helloasso_memberships_corrections__item_id___field__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/helloasso/memberships/corrections/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Membership Value
+         * @description Checks a value with the import's rules as the admin types it. Saves nothing.
+         */
+        post: operations["check_membership_value_api_helloasso_memberships_corrections_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/helloasso/memberships/import": {
         parameters: {
             query?: never;
@@ -3886,6 +3930,35 @@ export interface components {
             after: string;
         };
         /**
+         * MembershipCorrection
+         * @description The admin's correction of one field: the value used instead of HelloAsso's, kept until the row is imported.
+         */
+        MembershipCorrection: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "birth_date" | "phone" | "emergency_phone_1" | "emergency_phone_2" | "email" | "email_2" | "country" | "nationality" | "licence";
+            /** Value */
+            value: string;
+            /** Helloasso Value */
+            helloasso_value: string;
+            /** Author */
+            author: string;
+            /** At */
+            at: string;
+        };
+        /**
+         * MembershipCorrectionRequest
+         * @description The corrected value of one field; `campaign`: the one of the preview (see MembershipPreviewRequest).
+         */
+        MembershipCorrectionRequest: {
+            /** Value */
+            value: string;
+            /** Campaign */
+            campaign?: string | null;
+        };
+        /**
          * MembershipDecision
          * @description The admin's choice on a preview row: import / skip (new, renewal, updated rows), create / skip / link:<member id>
          *     (rows to review), attach:<member id> (new, renewal and to-review rows: given by hand to any member, `comment`
@@ -4075,6 +4148,37 @@ export interface components {
             attached_to?: components["schemas"]["MembershipCandidate"] | null;
             /** Issues */
             issues: components["schemas"]["MembershipIssue"][];
+            /** Corrections */
+            corrections: components["schemas"]["MembershipCorrection"][];
+            /** Values */
+            values: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * MembershipValueCheck
+         * @description A value checked with the import's rules, nothing saved: `value` as it would be stored, and its issues.
+         */
+        MembershipValueCheck: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Value */
+            value: string;
+            /** Issues */
+            issues: components["schemas"]["MembershipIssue"][];
+        };
+        /** MembershipValueCheckRequest */
+        MembershipValueCheckRequest: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "birth_date" | "phone" | "emergency_phone_1" | "emergency_phone_2" | "email" | "email_2" | "country" | "nationality" | "licence";
+            /** Value */
+            value: string;
         };
         /**
          * NewMember
@@ -6436,6 +6540,154 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    save_membership_correction_api_helloasso_memberships_corrections__item_id___field__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+                field: "birth_date" | "phone" | "emergency_phone_1" | "emergency_phone_2" | "email" | "email_2" | "country" | "nationality" | "licence";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembershipCorrectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    remove_membership_correction_api_helloasso_memberships_corrections__item_id___field__delete: {
+        parameters: {
+            query?: {
+                campaign?: string | null;
+            };
+            header?: never;
+            path: {
+                item_id: number;
+                field: "birth_date" | "phone" | "emergency_phone_1" | "emergency_phone_2" | "email" | "email_2" | "country" | "nationality" | "licence";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    check_membership_value_api_helloasso_memberships_corrections_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembershipValueCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipValueCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

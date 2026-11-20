@@ -391,3 +391,82 @@ class TestMembershipAttachedByHand(HelloAssoImportTestCase):
         self.assertEqual(row["attached_to"], {"user_id": self.ginny, "last_name": "WEASLEY", "first_name": "Ginny",
                                               "birth_date": "2013-08-11", "licence": ""})
         self.assertIn("rattachée à WEASLEY Ginny", row["reason"])
+
+
+CORRECTIONS = "/api/helloasso/memberships/corrections"
+
+
+class TestMembershipCorrections(HelloAssoImportTestCase):
+    """The admin corrects a registration's data from the preview; the correction is kept until the row is imported."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.seed("ORD-OLD", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026",
+                  **{"champ_Date de naissance de l'adhérent": "2013-08-11", "champ_Téléphone ": "0600000000"})
+        self.items = [ha_item(1, "WEASLEY", "Ginny", birth_date="11/08/13")]
+
+    def row(self, body: dict[str, Any]) -> dict[str, Any]:  # Any: JSON body
+        [row] = body["rows"]
+        return row
+
+    def test_a_saved_correction_returns_the_recomputed_preview_and_is_kept_on_later_syncs(self) -> None:
+        self.assertEqual(self.row(self.client.post(PREVIEW).json())["bucket"], "to_review")
+
+        response = self.client.put(f"{CORRECTIONS}/1/birth_date", json={"value": "11/08/2013"})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        row = self.row(response.json())
+        self.assertEqual((row["bucket"], row["birth_date"]), ("renewal", "2013-08-11"))
+        [correction] = row["corrections"]
+        self.assertEqual((correction["field"], correction["value"], correction["helloasso_value"], correction["author"]),
+                         ("birth_date", "11/08/2013", "11/08/13", "serveur local"))
+        self.assertEqual(self.row(self.client.post(PREVIEW).json())["corrections"], [correction])
+
+    def test_an_undone_correction_puts_the_row_back(self) -> None:
+        self.client.put(f"{CORRECTIONS}/1/birth_date", json={"value": "11/08/2013"})
+
+        response = self.client.delete(f"{CORRECTIONS}/1/birth_date")
+
+        self.assertEqual(response.status_code, 200, response.text)
+        row = self.row(response.json())
+        self.assertEqual((row["bucket"], row["corrections"]), ("to_review", []))
+        self.assertEqual(self.fake.store.get("helloasso_membership_corrections"), {})
+
+    def test_a_correction_of_an_unknown_registration_is_refused(self) -> None:
+        response = self.client.put(f"{CORRECTIONS}/99/phone", json={"value": "0612345678"})
+
+        self.assertEqual((response.status_code, response.json()["code"]), (404, "registration_not_found"))
+
+    def test_a_value_is_checked_with_the_import_rules_without_saving(self) -> None:
+        good = self.client.post(f"{CORRECTIONS}/check", json={"field": "phone", "value": "+33612345678"}).json()
+        bad = self.client.post(f"{CORRECTIONS}/check", json={"field": "birth_date", "value": "01/01/1026"}).json()
+
+        self.assertEqual((good["value"], good["issues"]), ("06 12 34 56 78", []))
+        self.assertEqual([(issue["code"], issue["blocking"]) for issue in bad["issues"]], [("too_old", True)])
+        self.assertNotIn("helloasso_membership_corrections", self.fake.store)
+
+    def test_a_corrected_value_overwrites_the_crm_on_import_and_is_recorded_in_the_history(self) -> None:
+        self.client.put(f"{CORRECTIONS}/1/birth_date", json={"value": "11/08/2013"})
+        self.client.put(f"{CORRECTIONS}/1/phone", json={"value": "+33612345678"})
+
+        result = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {"1": {"bucket": "renewal", "choice": "import"}}})
+
+        self.assertEqual(result.status_code, 200, result.text)
+        conn = SqliteDatabase.get_connection()
+        try:
+            phone = conn.execute("SELECT phone FROM users").fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(phone, "06 12 34 56 78")
+        [entry] = self.fake.store["helloasso_membership_imports"].values()
+        self.assertEqual(entry["items"][0]["corrections"], [
+            {"field": "birth_date", "helloasso_value": "11/08/13", "value": "11/08/2013"},
+            {"field": "phone", "helloasso_value": "", "value": "+33612345678"},
+        ])
+
+    def test_a_row_shows_its_correctable_values(self) -> None:
+        self.client.put(f"{CORRECTIONS}/1/country", json={"value": "france"})
+
+        values = self.row(self.client.post(PREVIEW).json())["values"]
+
+        self.assertEqual((values["birth_date"], values["country"], values["phone"]), ("11/08/13", "France", ""))

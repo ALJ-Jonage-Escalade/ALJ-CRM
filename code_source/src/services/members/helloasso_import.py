@@ -13,20 +13,24 @@ from typing import Optional
 
 from domain.members.helloasso_membership import (
     MembershipCampaign,
+    MembershipRecord,
     default_membership_campaign,
     map_membership_items,
     parse_membership_campaign,
 )
-from domain.members.membership_import import Decision, ImportPlan, StaleDecisions, apply_decisions, plan_membership_import
+from domain.members.import_corrections import Corrections, FieldCorrection, helloasso_value
+from domain.members.member_data_rules import DataIssue, DomainCheck, IssueField, MemberValues, check_member_data, season_start
+from domain.members.membership_import import Decision, ImportPlan, PlanEntry, StaleDecisions, apply_decisions, plan_membership_import
 from infrastructure import runtime_env
 from infrastructure.firestore.app_settings import HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.client import FirestoreError
-from infrastructure.firestore.membership_import_history import ImportedItem, ImportHistoryEntry, MembershipImportHistory
+from infrastructure.firestore.membership_corrections import MembershipCorrections
+from infrastructure.firestore.membership_import_history import CorrectedField, ImportedItem, ImportHistoryEntry, MembershipImportHistory
 from infrastructure.helloasso import api as helloasso_api
 from infrastructure.mail.mail_domains import MailDomainCheck
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.membership_import import AppliedWrite, MembershipImportRepository, MembershipWriteRefused
-from domain.errors import Conflict, InvalidRequest, UpstreamUnavailable
+from domain.errors import Conflict, InvalidRequest, NotFound, UpstreamUnavailable
 from services.members.seasons import SeasonService
 
 logger = logging.getLogger("alj")
@@ -49,10 +53,29 @@ def _parse(reference: str) -> MembershipCampaign:
         raise InvalidRequest(str(e), "invalid_campaign") from e
 
 
-def _imported_item(item_id: int, bucket: str, action: str, decision: Optional[Decision]) -> ImportedItem:
-    item = ImportedItem(item_id=item_id, bucket=bucket, action=action, decision=decision.choice if decision else "skip")
+def _now() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+
+
+def _domain_check() -> Optional[DomainCheck]:
+    """The e-mail domains are looked up on Cloud Run only: dev and tests never reach the network."""
+    return MailDomainCheck() if runtime_env.is_cloud_run() else None
+
+
+def _corrections(season: str) -> Corrections:
+    try:
+        return MembershipCorrections.for_season(season)
+    except FirestoreError as e:
+        raise UpstreamUnavailable(f"Corrections des inscriptions illisibles : {e}", "firestore_unavailable") from e
+
+
+def _imported_item(entry: PlanEntry, action: str, decision: Optional[Decision]) -> ImportedItem:
+    item = ImportedItem(item_id=entry.item_id, bucket=entry.bucket.value, action=action, decision=decision.choice if decision else "skip")
     if decision and decision.comment.strip():
         item["comment"] = decision.comment.strip()
+    if action and entry.corrections:
+        item["corrections"] = [CorrectedField(field=correction.field, helloasso_value=correction.helloasso_value, value=correction.value)
+                               for correction in entry.corrections]
     return item
 
 
@@ -118,10 +141,9 @@ class MembershipImportService:
         except MembershipWriteRefused as e:
             raise Conflict(f"{e} Rien n'a été importé.", "write_refused") from e
         actions = {written.item_id: written.action.value for written in applied}
-        items = [_imported_item(entry.item_id, entry.bucket.value, actions.get(entry.item_id, ""), decisions.get(entry.item_id))
-                 for entry in plan.entries]
+        items = [_imported_item(entry, actions.get(entry.item_id, ""), decisions.get(entry.item_id)) for entry in plan.entries]
         history_id = MembershipImportHistory.record(ImportHistoryEntry(
-            at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), author=author, season=plan.season,
+            at=_now(), author=author, season=plan.season,
             campaign=plan.campaign_slug, counts=plan.counts(), items=items))
         return ImportResult(plan, applied, history_id)
 
@@ -130,13 +152,56 @@ class MembershipImportService:
         return MembershipImportHistory.latest()
 
     @staticmethod
-    def _plan(season: str, chosen_campaign: Optional[str]) -> ImportPlan:
+    def save_correction(item_id: int, field: IssueField, value: str, author: str, chosen_campaign: Optional[str] = None) -> ImportPlan:
+        """Saves the admin's correction of one field of a registration of the active season; returns the plan
+        recomputed with it. NotFound when the campaign has no such registration."""
+        season = MembershipImportService.active_season()
+        campaign, records = MembershipImportService._records(chosen_campaign)
+        record = next((record for record in records if record.item_id == item_id), None)
+        if record is None:
+            raise NotFound(f"Inscription HelloAsso {item_id} introuvable dans la campagne.", "registration_not_found")
+        correction = FieldCorrection(field=field, value=value.strip(), helloasso_value=helloasso_value(record, field), author=author,
+                                     at=_now())
+        try:
+            MembershipCorrections.save(season, item_id, correction)
+        except FirestoreError as e:
+            raise UpstreamUnavailable(f"Correction non enregistrée : {e}", "firestore_unavailable") from e
+        return MembershipImportService._plan_of(season, campaign, records)
+
+    @staticmethod
+    def remove_correction(item_id: int, field: IssueField, chosen_campaign: Optional[str] = None) -> ImportPlan:
+        """Removes the correction of one field (the HelloAsso value applies again); returns the plan recomputed."""
+        season = MembershipImportService.active_season()
+        try:
+            MembershipCorrections.remove(season, item_id, field)
+        except FirestoreError as e:
+            raise UpstreamUnavailable(f"Correction non annulée : {e}", "firestore_unavailable") from e
+        return MembershipImportService._plan(season, chosen_campaign)
+
+    @staticmethod
+    def check_value(field: IssueField, value: str) -> tuple[str, list[DataIssue]]:
+        """A value the admin is typing, checked with the import's rules (dry run, nothing saved): the value as it
+        would be stored, and its issues."""
+        values = MemberValues(**{field: value})
+        checked = check_member_data(values, season_start=season_start(MembershipImportService.active_season()),
+                                    domain_accepts_mail=_domain_check())
+        return getattr(checked.values, field), [issue for issue in checked.issues if issue.field == field]
+
+    @staticmethod
+    def _records(chosen_campaign: Optional[str]) -> tuple[MembershipCampaign, list[MembershipRecord]]:
         campaign = MembershipImportService.campaign(chosen_campaign)
         try:
             items = helloasso_api.fetch_form_items(campaign.form_type, campaign.slug)
         except helloasso_api.HelloAssoApiError as e:
             raise UpstreamUnavailable(e.message, e.code) from e
-        # The e-mail domains are looked up on Cloud Run only: dev and tests never reach the network
-        domain_check = MailDomainCheck() if runtime_env.is_cloud_run() else None
-        return plan_membership_import(map_membership_items(items), season=season, campaign_slug=campaign.slug,
-                                      snapshot=MembershipImportRepository.snapshot(), domain_accepts_mail=domain_check)
+        return campaign, map_membership_items(items)
+
+    @staticmethod
+    def _plan(season: str, chosen_campaign: Optional[str]) -> ImportPlan:
+        campaign, records = MembershipImportService._records(chosen_campaign)
+        return MembershipImportService._plan_of(season, campaign, records)
+
+    @staticmethod
+    def _plan_of(season: str, campaign: MembershipCampaign, records: list[MembershipRecord]) -> ImportPlan:
+        return plan_membership_import(records, season=season, campaign_slug=campaign.slug, snapshot=MembershipImportRepository.snapshot(),
+                                      domain_accepts_mail=_domain_check(), corrections=_corrections(season))

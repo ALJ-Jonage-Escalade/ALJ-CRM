@@ -47,6 +47,15 @@ class MembershipIssue(BaseModel):
     blocking: bool
 
 
+class MembershipCorrection(BaseModel):
+    """The admin's correction of one field: the value used instead of HelloAsso's, kept until the row is imported."""
+    field: IssueField
+    value: str
+    helloasso_value: str
+    author: str
+    at: str
+
+
 class MembershipRow(BaseModel):
     """One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
     whether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),
@@ -71,6 +80,9 @@ class MembershipRow(BaseModel):
     changes: List[MembershipChange]
     attached_to: Optional[MembershipCandidate] = None  # imported rows: the member, when their name is not the HelloAsso one
     issues: List[MembershipIssue]
+    corrections: List[MembershipCorrection]
+    # The correctable values, by field (member_data_rules.IssueField): HelloAsso's, normalised, or the corrected one
+    values: Dict[str, str]
 
 
 class MembershipMember(BaseModel):
@@ -159,3 +171,21 @@ class MembershipLastImport(BaseModel):
 class MembershipLastSync(BaseModel):
     """The latest import, null before the first one."""
     last_sync: Optional[MembershipLastImport]
+
+
+class MembershipCorrectionRequest(RequestBody):
+    """The corrected value of one field; `campaign`: the one of the preview (see MembershipPreviewRequest)."""
+    value: str = Field(max_length=200)
+    campaign: Optional[str] = None
+
+
+class MembershipValueCheckRequest(RequestBody):
+    field: IssueField
+    value: str = Field(max_length=200)
+
+
+class MembershipValueCheck(BaseModel):
+    """A value checked with the import's rules, nothing saved: `value` as it would be stored, and its issues."""
+    status: Literal["success"]
+    value: str
+    issues: List[MembershipIssue]

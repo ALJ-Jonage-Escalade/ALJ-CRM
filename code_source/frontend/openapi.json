@@ -2197,6 +2197,239 @@
         }
       }
     },
+    "/api/helloasso/memberships/corrections/{item_id}/{field}": {
+      "put": {
+        "summary": "Save Membership Correction",
+        "description": "Saves the admin's correction of one field of a registration; answers the preview recomputed with it.",
+        "operationId": "save_membership_correction_api_helloasso_memberships_corrections__item_id___field__put",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "field",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "birth_date",
+                "phone",
+                "emergency_phone_1",
+                "emergency_phone_2",
+                "email",
+                "email_2",
+                "country",
+                "nationality",
+                "licence"
+              ],
+              "type": "string",
+              "title": "Field"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipCorrectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove Membership Correction",
+        "description": "Removes the correction of one field (HelloAsso's value applies again); answers the preview recomputed.",
+        "operationId": "remove_membership_correction_api_helloasso_memberships_corrections__item_id___field__delete",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "field",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "birth_date",
+                "phone",
+                "emergency_phone_1",
+                "emergency_phone_2",
+                "email",
+                "email_2",
+                "country",
+                "nationality",
+                "licence"
+              ],
+              "type": "string",
+              "title": "Field"
+            }
+          },
+          {
+            "name": "campaign",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/helloasso/memberships/corrections/check": {
+      "post": {
+        "summary": "Check Membership Value",
+        "description": "Checks a value with the import's rules as the admin types it. Saves nothing.",
+        "operationId": "check_membership_value_api_helloasso_memberships_corrections_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipValueCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipValueCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/helloasso/memberships/import": {
       "post": {
         "summary": "Import Memberships",
@@ -9871,6 +10104,78 @@
         "title": "MembershipChange",
         "description": "A value HelloAsso changed since the last import: in the CRM now (crm), as HelloAsso gave it last time (before),\nas HelloAsso gives it now (after). Amounts in euros, two decimals."
       },
+      "MembershipCorrection": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "birth_date",
+              "phone",
+              "emergency_phone_1",
+              "emergency_phone_2",
+              "email",
+              "email_2",
+              "country",
+              "nationality",
+              "licence"
+            ],
+            "title": "Field"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "helloasso_value": {
+            "type": "string",
+            "title": "Helloasso Value"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "value",
+          "helloasso_value",
+          "author",
+          "at"
+        ],
+        "title": "MembershipCorrection",
+        "description": "The admin's correction of one field: the value used instead of HelloAsso's, kept until the row is imported."
+      },
+      "MembershipCorrectionRequest": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Value"
+          },
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "MembershipCorrectionRequest",
+        "description": "The corrected value of one field; `campaign`: the one of the preview (see MembershipPreviewRequest)."
+      },
       "MembershipDecision": {
         "properties": {
           "bucket": {
@@ -10292,6 +10597,20 @@
             },
             "type": "array",
             "title": "Issues"
+          },
+          "corrections": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipCorrection"
+            },
+            "type": "array",
+            "title": "Corrections"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Values"
           }
         },
         "type": "object",
@@ -10313,10 +10632,71 @@
           "candidates",
           "can_create",
           "changes",
-          "issues"
+          "issues",
+          "corrections",
+          "values"
         ],
         "title": "MembershipRow",
         "description": "One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and\nwhether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),\n\"\" when missing: order_date the registration, payment_date the first payment, refund_date the refund (status\nRefunded / Refunding)."
+      },
+      "MembershipValueCheck": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "value",
+          "issues"
+        ],
+        "title": "MembershipValueCheck",
+        "description": "A value checked with the import's rules, nothing saved: `value` as it would be stored, and its issues."
+      },
+      "MembershipValueCheckRequest": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "birth_date",
+              "phone",
+              "emergency_phone_1",
+              "emergency_phone_2",
+              "email",
+              "email_2",
+              "country",
+              "nationality",
+              "licence"
+            ],
+            "title": "Field"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "MembershipValueCheckRequest"
       },
       "NewMember": {
         "properties": {

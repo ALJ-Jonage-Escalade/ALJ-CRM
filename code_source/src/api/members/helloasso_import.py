@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, get_args
 
 from fastapi import APIRouter, Request
 
@@ -12,6 +12,8 @@ from api.members.helloasso_import_schemas import (
     ImportedMember,
     MembershipCandidate,
     MembershipChange,
+    MembershipCorrection,
+    MembershipCorrectionRequest,
     MembershipImportRequest,
     MembershipIssue,
     MembershipImportResult,
@@ -21,9 +23,13 @@ from api.members.helloasso_import_schemas import (
     MembershipPreview,
     MembershipPreviewRequest,
     MembershipRow,
+    MembershipValueCheck,
+    MembershipValueCheckRequest,
 )
 from api.auth.me import author_of
 from api.responses import error_responses
+from domain.members.import_corrections import helloasso_value
+from domain.members.member_data_rules import DataIssue, IssueField
 from domain.members.membership_import import Decision, ImportPlan, KnownMember, PlanEntry, WriteAction, season_membership
 from infrastructure.sqlite.membership_import import AppliedWrite
 from services.members.helloasso_import import ImportResult
@@ -35,6 +41,10 @@ router = APIRouter()
 def _candidate(member: KnownMember) -> MembershipCandidate:
     return MembershipCandidate(user_id=member.user_id, last_name=member.last_name, first_name=member.first_name,
                                birth_date=member.birth_date, licence=member.licence)
+
+
+def _issue(issue: DataIssue) -> MembershipIssue:
+    return MembershipIssue(field=issue.field, code=issue.code, message=issue.message, blocking=issue.blocking)
 
 
 def _row(entry: PlanEntry) -> MembershipRow:
@@ -49,8 +59,10 @@ def _row(entry: PlanEntry) -> MembershipRow:
         attached_to=_candidate(entry.attached_to) if entry.attached_to else None,
         changes=[MembershipChange(field=change.field, crm=change.crm, before=change.before, after=change.after)
                  for change in entry.changes],
-        issues=[MembershipIssue(field=issue.field, code=issue.code, message=issue.message, blocking=issue.blocking)
-                for issue in entry.issues],
+        issues=[_issue(issue) for issue in entry.issues],
+        values={field: helloasso_value(record, field) for field in get_args(IssueField)},
+        corrections=[MembershipCorrection(field=correction.field, value=correction.value, helloasso_value=correction.helloasso_value,
+                                          author=correction.author, at=correction.at) for correction in entry.corrections],
     )
 
 
@@ -67,6 +79,27 @@ def _preview(plan: ImportPlan) -> MembershipPreview:
 def preview_membership_import(data: Optional[MembershipPreviewRequest] = None) -> MembershipPreview:
     """Reads the membership campaign on HelloAsso and sorts its registrations for the active season. Writes nothing."""
     return _preview(Service.preview(data.campaign if data else None))
+
+
+@router.put("/api/helloasso/memberships/corrections/{item_id}/{field}", response_model=MembershipPreview,
+            responses=error_responses(400, 404, 502))
+def save_membership_correction(request: Request, item_id: int, field: IssueField, data: MembershipCorrectionRequest) -> MembershipPreview:
+    """Saves the admin's correction of one field of a registration; answers the preview recomputed with it."""
+    return _preview(Service.save_correction(item_id, field, data.value, author_of(request), data.campaign))
+
+
+@router.delete("/api/helloasso/memberships/corrections/{item_id}/{field}", response_model=MembershipPreview,
+               responses=error_responses(400, 502))
+def remove_membership_correction(item_id: int, field: IssueField, campaign: Optional[str] = None) -> MembershipPreview:
+    """Removes the correction of one field (HelloAsso's value applies again); answers the preview recomputed."""
+    return _preview(Service.remove_correction(item_id, field, campaign))
+
+
+@router.post("/api/helloasso/memberships/corrections/check", response_model=MembershipValueCheck)
+def check_membership_value(data: MembershipValueCheckRequest) -> MembershipValueCheck:
+    """Checks a value with the import's rules as the admin types it. Saves nothing."""
+    value, issues = Service.check_value(data.field, data.value)
+    return MembershipValueCheck(status="success", value=value, issues=[_issue(issue) for issue in issues])
 
 
 def _imported(applied: AppliedWrite, plan: ImportPlan) -> ImportedMember:
