@@ -9991,6 +9991,46 @@
         "title": "MembershipImportResult",
         "description": "history_id: the import's entry in the history."
       },
+      "MembershipIssue": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "birth_date",
+              "phone",
+              "emergency_phone_1",
+              "emergency_phone_2",
+              "email",
+              "email_2",
+              "country",
+              "nationality",
+              "licence"
+            ],
+            "title": "Field"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "blocking": {
+            "type": "boolean",
+            "title": "Blocking"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "code",
+          "message",
+          "blocking"
+        ],
+        "title": "MembershipIssue",
+        "description": "A problem of a value the import would store: `blocking` (birth date only) holds the row in « À vérifier »."
+      },
       "MembershipLastImport": {
         "properties": {
           "at": {
@@ -10245,6 +10285,13 @@
                 "type": "null"
               }
             ]
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipIssue"
+            },
+            "type": "array",
+            "title": "Issues"
           }
         },
         "type": "object",
@@ -10265,7 +10312,8 @@
           "status",
           "candidates",
           "can_create",
-          "changes"
+          "changes",
+          "issues"
         ],
         "title": "MembershipRow",
         "description": "One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and\nwhether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),\n\"\" when missing: order_date the registration, payment_date the first payment, refund_date the refund (status\nRefunded / Refunding)."

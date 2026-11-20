@@ -217,11 +217,18 @@ def test_a_person_without_a_close_name_and_birth_date_is_new(overrides: dict[str
     assert _plan(_record(9001, **overrides)).entries[0].bucket == Bucket.NEW
 
 
-def test_a_registration_without_birth_date_is_never_new() -> None:
-    plan = _plan(_record(9001, last_name="Granger", first_name="Hermione", birth_date="", licence=""))
+@pytest.mark.parametrize(("birth_date", "typed", "issue"), [
+    ("", "", "missing"),
+    ("", "11/08/13", "unreadable"),
+    ("1026-01-01", "01/01/1026", "too_old"),  # read, but implausible: never reaches the FFME
+    ("2026-08-11", "11/08/2026", "too_young"),  # the registration year typed in
+], ids=["missing", "unreadable", "too old", "too young"])
+def test_a_registration_without_a_plausible_birth_date_is_never_new(birth_date: str, typed: str, issue: str) -> None:
+    plan = _plan(_record(9001, last_name="Granger", first_name="Hermione", birth_date=birth_date, birth_date_raw=typed, licence=""))
 
     assert plan.entries[0].bucket == Bucket.TO_REVIEW
     assert not plan.entries[0].can_create
+    assert [(found.field, found.code, found.blocking) for found in plan.entries[0].issues] == [("birth_date", issue, True)]
     with pytest.raises(StaleDecisions):
         apply_decisions(plan, {9001: Decision(Bucket.TO_REVIEW, "create")})
 

@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Iterable, Literal, Mapping, Optional
 
 from domain.members.helloasso_membership import MembershipRecord, season_guard
+from domain.members.member_data_rules import CheckedValues, DataIssue, MemberValues, check_member_data, season_start
 from domain.members.purchase_priority import purchase_priority_score
 from domain.utils import normalize_name
 
@@ -85,6 +86,7 @@ class PlanEntry:
     candidates: tuple[KnownMember, ...] = ()  # to_review: the members it may be
     changes: tuple[FieldChange, ...] = ()  # updated, or to_review when the CRM changed the value too
     attached_to: Optional[KnownMember] = None  # imported: the member, when their name is not the HelloAsso one (attach by hand)
+    issues: tuple[DataIssue, ...] = ()  # the problems of the values the import would store (member_data_rules)
 
     @property
     def can_create(self) -> bool:
@@ -178,9 +180,9 @@ def _classify(record: MembershipRecord, base: _Base) -> PlanEntry:
     same_name, same_licence = base.same_name(record), base.same_licence(record)
     if not record.birth_date:
         if len(same_licence) == 1:
-            return PlanEntry(record, Bucket.RENEWAL, "Date de naissance illisible, adhérent reconnu par sa licence FFME.",
+            return PlanEntry(record, Bucket.RENEWAL, "Date de naissance illisible ou invraisemblable, adhérent reconnu par sa licence FFME.",
                              same_licence[0].user_id)
-        return _to_review(record, "Date de naissance manquante ou illisible : choisissez l'adhérent à compléter.",
+        return _to_review(record, "Date de naissance manquante, illisible ou invraisemblable : choisissez l'adhérent à compléter.",
                           same_name + same_licence)
     same_identity = [m for m in same_name if m.birth_date == record.birth_date]
     if len(same_identity) == 1 and (not same_licence or same_licence == same_identity):
@@ -282,6 +284,16 @@ def _apply_priority(entries: list[PlanEntry], base: _Base) -> list[PlanEntry]:
     return result
 
 
+def _checked(record: MembershipRecord, season: str) -> CheckedValues:
+    """The record's values as the import would store them, checked (birth date: the mapped ISO date, else as typed)."""
+    return check_member_data(MemberValues(birth_date=record.birth_date or record.birth_date_raw), season_start=season_start(season))
+
+
+def _with_checked_values(record: MembershipRecord, checked: CheckedValues) -> MembershipRecord:
+    """The record with its normalised values: a blocking birth date is dropped, the record then behaves as without one."""
+    return replace(record, birth_date=checked.values.birth_date)
+
+
 def plan_membership_import(records: Iterable[MembershipRecord], *, season: str, campaign_slug: str,
                            snapshot: Optional[MembersSnapshot] = None) -> ImportPlan:
     """The plan of the import of these registrations into `season`, against the members already in the base."""
@@ -291,7 +303,9 @@ def plan_membership_import(records: Iterable[MembershipRecord], *, season: str, 
     if blocked_reason:
         entries = [PlanEntry(record, Bucket.BLOCKED, blocked_reason) for record in records]
     else:
-        entries = _apply_priority([_classify(record, base) for record in records], base)
+        checked = {record.item_id: _checked(record, season) for record in records}
+        entries = _apply_priority([_classify(_with_checked_values(record, checked[record.item_id]), base) for record in records], base)
+        entries = [replace(entry, issues=checked[entry.item_id].issues) for entry in entries]
     return ImportPlan(season=season, campaign_slug=campaign_slug, entries=entries, blocked_reason=blocked_reason,
                       members=tuple(base.members.values()), season_purchases=tuple(base.season_purchases))
 

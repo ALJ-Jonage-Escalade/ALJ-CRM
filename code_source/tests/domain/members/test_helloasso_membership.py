@@ -67,6 +67,9 @@ def test_map_membership_item_reads_custom_fields_from_answer_or_value(custom_fie
         ("2013-08-11", "2013-08-11"),
         ("2013-08-11T00:00:00", "2013-08-11"),
         ("onze août", ""),
+        # Never guessed: a two-digit year or a dash format may be misread
+        ("11/08/13", ""),
+        ("11-08-2013", ""),
     ],
 )
 def test_map_membership_item_parses_the_birth_date(typed: str, expected: str) -> None:

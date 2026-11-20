@@ -70,6 +70,17 @@ class TestMembershipPreview(HelloAssoImportTestCase):
         self.assertTrue(rows[2]["reason"])
         self.assertEqual((self.count("users"), self.count("orders"), self.count("purchases")), (0, 0, 0))
 
+    def test_preview_rows_list_the_problems_of_their_data(self) -> None:
+        self.items = [ha_item(1, "WEASLEY", "Ginny"), ha_item(2, "LOVEGOOD", "Luna", birth_date="01/01/1026")]
+
+        rows = {row["item_id"]: row for row in self.client.post(PREVIEW).json()["rows"]}
+
+        self.assertEqual(rows[1]["issues"], [])
+        self.assertEqual((rows[2]["bucket"], rows[2]["can_create"], rows[2]["birth_date"]), ("to_review", False, "01/01/1026"))
+        [issue] = rows[2]["issues"]
+        self.assertEqual((issue["field"], issue["code"], issue["blocking"]), ("birth_date", "too_old", True))
+        self.assertIn("01/01/1026", issue["message"])
+
     def test_preview_reads_the_environment_then_the_default_campaign_of_the_season(self) -> None:
         self.client.post(PREVIEW)
         with patch.dict(os.environ, {"CAMPAIGN_SLUG": "https://www.helloasso.com/associations/alj/adhesions/adhesions-env-2026-2027"}):

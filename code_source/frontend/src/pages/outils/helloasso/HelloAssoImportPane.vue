@@ -393,6 +393,16 @@ async function apply(): Promise<void> {
                 <td class="px-2.5 py-1.5 break-words text-slate-500">
                   {{ row.reason }}
                   <span v-for="line in changeLines(row)" :key="line" class="block font-semibold text-slate-700">{{ line }}</span>
+                  <ul v-if="row.issues.length" class="mt-1 space-y-0.5">
+                    <li
+                      v-for="issue in row.issues"
+                      :key="`${issue.field}-${issue.code}`"
+                      data-testid="ha-issue"
+                      :class="issue.blocking ? 'font-semibold text-red-700' : 'text-amber-700'"
+                    >
+                      {{ issue.blocking ? "⛔" : "⚠️" }} {{ issue.message }}
+                    </li>
+                  </ul>
                   <select
                     v-if="needsIdentityChoice(row)"
                     data-testid="ha-review-choice"

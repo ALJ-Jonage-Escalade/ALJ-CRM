@@ -13,6 +13,7 @@ from api.members.helloasso_import_schemas import (
     MembershipCandidate,
     MembershipChange,
     MembershipImportRequest,
+    MembershipIssue,
     MembershipImportResult,
     MembershipLastImport,
     MembershipLastSync,
@@ -48,6 +49,8 @@ def _row(entry: PlanEntry) -> MembershipRow:
         attached_to=_candidate(entry.attached_to) if entry.attached_to else None,
         changes=[MembershipChange(field=change.field, crm=change.crm, before=change.before, after=change.after)
                  for change in entry.changes],
+        issues=[MembershipIssue(field=issue.field, code=issue.code, message=issue.message, blocking=issue.blocking)
+                for issue in entry.issues],
     )
 
 

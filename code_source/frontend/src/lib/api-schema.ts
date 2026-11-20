@@ -3940,6 +3940,23 @@ export interface components {
             attached: components["schemas"]["ImportedMember"][];
         };
         /**
+         * MembershipIssue
+         * @description A problem of a value the import would store: `blocking` (birth date only) holds the row in « À vérifier ».
+         */
+        MembershipIssue: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "birth_date" | "phone" | "emergency_phone_1" | "emergency_phone_2" | "email" | "email_2" | "country" | "nationality" | "licence";
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Blocking */
+            blocking: boolean;
+        };
+        /**
          * MembershipLastImport
          * @description at: ISO date (UTC); author: e-mail of the admin who ran it.
          */
@@ -4056,6 +4073,8 @@ export interface components {
             /** Changes */
             changes: components["schemas"]["MembershipChange"][];
             attached_to?: components["schemas"]["MembershipCandidate"] | null;
+            /** Issues */
+            issues: components["schemas"]["MembershipIssue"][];
         };
         /**
          * NewMember

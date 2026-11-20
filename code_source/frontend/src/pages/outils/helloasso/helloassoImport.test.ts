@@ -49,6 +49,7 @@ const row = (change: Partial<MembershipRow>): MembershipRow => ({
   candidates: [],
   can_create: true,
   changes: [],
+  issues: [],
   ...change,
 });
 

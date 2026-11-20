@@ -6,17 +6,13 @@ Single reading of the membership form's items, shared by the membership dashboar
 
 from __future__ import annotations
 
-import datetime
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Mapping, Optional
 
 from domain.competitions.matching import parse_campaign_identifier
+from domain.members.member_data_rules import read_birth_date
 from domain.utils import is_helloasso_url, normalize_string
-
-# Formats seen in the birth date field of the form (typed by families, or ISO from HelloAsso)
-_BIRTH_DATE_FORMATS = ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y")
-
 
 # Insurance options of the form, as the members base names them (purchase_options.option_name)
 INSURANCE_OPTIONS = (
@@ -107,16 +103,9 @@ def _custom_value(custom_field: Mapping[str, Any]) -> str:  # Any: raw HelloAsso
 
 
 def parse_birth_date(raw: str) -> str:
-    """ISO date of a birth date typed on the form, "" when it cannot be read."""
-    text = str(raw or "").strip()
-    if "T" in text:
-        text = text.split("T", 1)[0]
-    for date_format in _BIRTH_DATE_FORMATS:
-        try:
-            return datetime.datetime.strptime(text, date_format).date().isoformat()
-        except ValueError:
-            continue
-    return ""
+    """ISO date of a birth date typed on the form (member_data_rules.read_birth_date), "" when it cannot be read."""
+    birth = read_birth_date(raw)
+    return birth.isoformat() if birth else ""
 
 
 def _field_by_words(custom_fields: Mapping[str, str], *words: str) -> str:

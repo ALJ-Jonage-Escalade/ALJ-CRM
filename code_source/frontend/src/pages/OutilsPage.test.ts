@@ -142,6 +142,7 @@ const MEMBERSHIP_PREVIEW = {
       candidates: [],
       can_create: true,
       changes: [],
+      issues: [],
     },
     {
       item_id: 2,
@@ -161,6 +162,7 @@ const MEMBERSHIP_PREVIEW = {
       candidates: [],
       can_create: false,
       changes: [],
+      issues: [{ field: "birth_date", code: "missing", message: "Date de naissance manquante.", blocking: true }],
     },
   ],
   members: [] as unknown[],
@@ -451,6 +453,7 @@ describe("OutilsPage", () => {
     expect(byId("ha-count-renewal")!.textContent).toContain("0");
     expect(all("ha-row-new").map((row) => row.textContent)).toEqual([expect.stringContaining("WEASLEY Ginny")]);
     expect(byId("ha-row-blocked")!.textContent).toContain("Date de naissance manquante ou illisible.");
+    expect(all("ha-issue").map((issue) => issue.textContent?.trim())).toEqual(["⛔ Date de naissance manquante."]);
     expect(all("ha-licence").map((cell) => cell.textContent)).toEqual(["—", "—"]);
     expect(all("ha-birth-date").map((cell) => cell.textContent)).toEqual(["11/08/2013", "—"]);
     expect(byId("ha-section-renewal")).toBeNull();

@@ -7,6 +7,7 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 from api.request_body import RequestBody
+from domain.members.member_data_rules import IssueField
 from domain.members.membership_import import Bucket, ChangedField, MembershipKind
 
 
@@ -38,6 +39,14 @@ class MembershipChange(BaseModel):
     after: str
 
 
+class MembershipIssue(BaseModel):
+    """A problem of a value the import would store: `blocking` (birth date only) holds the row in « À vérifier »."""
+    field: IssueField
+    code: str
+    message: str
+    blocking: bool
+
+
 class MembershipRow(BaseModel):
     """One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
     whether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),
@@ -61,6 +70,7 @@ class MembershipRow(BaseModel):
     can_create: bool
     changes: List[MembershipChange]
     attached_to: Optional[MembershipCandidate] = None  # imported rows: the member, when their name is not the HelloAsso one
+    issues: List[MembershipIssue]
 
 
 class MembershipMember(BaseModel):
