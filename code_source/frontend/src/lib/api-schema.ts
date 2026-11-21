@@ -972,6 +972,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reports/member-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Member Stats
+         * @description Every purchase of every season, without names: the page filters the season and counts people itself.
+         */
+        get: operations["get_member_stats_api_reports_member_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ffme/stats": {
         parameters: {
             query?: never;
@@ -3976,6 +3996,42 @@ export interface components {
             members: components["schemas"]["Member"][];
             /** Creneaux */
             creneaux: components["schemas"]["Creneau"][];
+        };
+        /**
+         * MemberStatsRecord
+         * @description A purchase as a row of the member statistics, without names. age: at the start of the row's season, None
+         *     without a birth date; status: Validé, Annulé, Refusé or the status as written; returning: already a member;
+         *     order_month: YYYY-MM or « Inconnue ».
+         */
+        MemberStatsRecord: {
+            /** User Id */
+            user_id: number;
+            /** @description None when not given (the page labels it) */
+            sex: components["schemas"]["Sex"] | null;
+            /** Age */
+            age: number | null;
+            /** Age Band */
+            age_band: string;
+            /** City */
+            city: string;
+            /** Group */
+            group: string;
+            /** Status */
+            status: string;
+            /** Season */
+            season: string;
+            /** Returning */
+            returning: boolean;
+            /** Order Month */
+            order_month: string;
+        };
+        /**
+         * MemberStatsRecords
+         * @description Every purchase of every season (cancelled and refused ones included).
+         */
+        MemberStatsRecords: {
+            /** Records */
+            records: components["schemas"]["MemberStatsRecord"][];
         };
         /**
          * MemberUpdate
@@ -7790,6 +7846,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    get_member_stats_api_reports_member_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberStatsRecords"];
                 };
             };
             /** @description Internal Server Error */

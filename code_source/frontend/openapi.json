@@ -3576,6 +3576,35 @@
         }
       }
     },
+    "/api/reports/member-stats": {
+      "get": {
+        "summary": "Get Member Stats",
+        "description": "Every purchase of every season, without names: the page filters the season and counts people itself.",
+        "operationId": "get_member_stats_api_reports_member_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberStatsRecords"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ffme/stats": {
       "get": {
         "summary": "Get Ffme Stats Api",
@@ -10224,6 +10253,96 @@
         ],
         "title": "MemberList",
         "description": "The members of one season, sorted by name, with the planning's slot groups (filters of the list)."
+      },
+      "MemberStatsRecord": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None when not given (the page labels it)"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "age_band": {
+            "type": "string",
+            "title": "Age Band"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          },
+          "returning": {
+            "type": "boolean",
+            "title": "Returning"
+          },
+          "order_month": {
+            "type": "string",
+            "title": "Order Month"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "sex",
+          "age",
+          "age_band",
+          "city",
+          "group",
+          "status",
+          "season",
+          "returning",
+          "order_month"
+        ],
+        "title": "MemberStatsRecord",
+        "description": "A purchase as a row of the member statistics, without names. age: at the start of the row's season, None\nwithout a birth date; status: Validé, Annulé, Refusé or the status as written; returning: already a member;\norder_month: YYYY-MM or « Inconnue »."
+      },
+      "MemberStatsRecords": {
+        "properties": {
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/MemberStatsRecord"
+            },
+            "type": "array",
+            "title": "Records"
+          }
+        },
+        "type": "object",
+        "required": [
+          "records"
+        ],
+        "title": "MemberStatsRecords",
+        "description": "Every purchase of every season (cancelled and refused ones included)."
       },
       "MemberUpdate": {
         "properties": {

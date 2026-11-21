@@ -9,5 +9,7 @@ export function createReportsApi(client: ApiClient) {
     mapPoints: (season: string) => unwrap(client.GET("/api/reports/map-points", { params: { query: { season } } })),
     /** Members of the season as rows of the pivot table (same seasons as mapPoints). */
     pivotRecords: (season: string) => unwrap(client.GET("/api/reports/pivot-records", { params: { query: { season } } })),
+    /** Every purchase of every season, without names, for the member charts (Outils › Statistiques). */
+    memberStats: () => unwrap(client.GET("/api/reports/member-stats")),
   };
 }

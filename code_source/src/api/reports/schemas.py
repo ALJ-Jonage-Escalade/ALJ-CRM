@@ -55,3 +55,24 @@ class PivotRecords(BaseModel):
     """Members of a season for the pivot table. season: the season actually read (the active one for "active")."""
     season: str
     records: List[PivotRecord]
+
+
+class MemberStatsRecord(BaseModel):
+    """A purchase as a row of the member statistics, without names. age: at the start of the row's season, None
+    without a birth date; status: Validé, Annulé, Refusé or the status as written; returning: already a member;
+    order_month: YYYY-MM or « Inconnue »."""
+    user_id: int
+    sex: Optional[Sex] = Field(description="None when not given (the page labels it)")
+    age: Optional[int]
+    age_band: str
+    city: str
+    group: str
+    status: str
+    season: str
+    returning: bool
+    order_month: str
+
+
+class MemberStatsRecords(BaseModel):
+    """Every purchase of every season (cancelled and refused ones included)."""
+    records: List[MemberStatsRecord]
