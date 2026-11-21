@@ -62,7 +62,7 @@ class TestSqliteCacheScope(unittest.TestCase):
                      "/api/settings/competitions-results"):
             self.assertFalse(f(path), path)
         for path in ("/api/members", "/api/email-templates", "/api/helloasso/sync",
-                     "/api/competitions-x", "/api/reports/map-points", "/api/reports/pivot-records",
+                     "/api/competitions-x", "/api/reports/map-points", "/api/reports/member-stats",
                      # not a route of the Firestore-only routers, although under their prefix
                      "/api/competitions/12/route-future"):
             self.assertTrue(f(path), path)

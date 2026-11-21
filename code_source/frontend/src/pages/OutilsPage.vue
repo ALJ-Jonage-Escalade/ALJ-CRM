@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* Outils (coaches and admins): members map, pivot table, competition statistics, attendance sheets, FFME CSV export
+/* Outils (coaches and admins): members map, member and competition statistics, attendance sheets, FFME CSV export
    and, for admins, imports of the MyFFME licensee list and of the HelloAsso membership campaign. Layout of the
    sub-pages (router.ts, one per tool, linked from Adhérents for the FFME ones): loads the seasons they share and
    reloads the open one. A sub-page is loaded when first opened and kept while switching (route meta.keepAlive).
@@ -22,7 +22,7 @@ const toast = useToast();
 // The open sub-page (router.ts): its id, as AppShell lists it
 const sub = computed(() => route.meta.sub ?? "map");
 
-// Map and pivot table: the active season at first, or every season
+// Map and statistics: the active season at first
 const seasons = ref<string[]>([]);
 const initialSeason = ref(""); // empty until the seasons are known
 
@@ -43,8 +43,7 @@ provide(OUTILS_KEY, { seasons, initialSeason, toast });
 // Reload of the open sub-page: only the sub-pages listed here show the card (the imports and the keys have no use for it)
 const REFRESHED: Record<string, string> = {
   map: "🔄 Carte réactualisée.",
-  pivot: "🔄 Tableau croisé dynamique réactualisé.",
-  stats: "🔄 Statistiques des compétitions réactualisées.",
+  stats: "🔄 Statistiques réactualisées.",
   presence: "🔄 Effectifs et créneaux réactualisés.",
   ffme: "🔄 Statistiques FFME réactualisées.",
 };

@@ -43,7 +43,6 @@ const PlanningWeekPage = () => import("./pages/planning/PlanningWeekPage.vue");
 const PlanningTablePage = () => import("./pages/planning/PlanningTablePage.vue");
 const CompetitionsHelloAssoPage = () => import("./pages/competitions/CompetitionsHelloAssoPage.vue"); // online only
 const OutilsMapPage = () => import("./pages/outils/OutilsMapPage.vue");
-const OutilsPivotPage = () => import("./pages/outils/OutilsPivotPage.vue"); // with the pivot table library
 const OutilsStatsPage = () => import("./pages/outils/OutilsStatsPage.vue");
 const OutilsPresencePage = () => import("./pages/outils/OutilsPresencePage.vue");
 const OutilsFfmePage = () => import("./pages/outils/OutilsFfmePage.vue");
@@ -64,7 +63,6 @@ const SUB_COMPONENTS: Partial<Record<PageId, Record<string, RouteComponent>>> = 
   },
   outils: {
     map: OutilsMapPage,
-    pivot: OutilsPivotPage,
     stats: OutilsStatsPage,
     presence: OutilsPresencePage,
     ffme: OutilsFfmePage,

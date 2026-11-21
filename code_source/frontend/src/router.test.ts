@@ -150,7 +150,6 @@ describe("app routes", () => {
 
   it.each([
     ["/bureau/outils", "outils", "map"],
-    ["/bureau/outils/pivot", "outils-pivot", "pivot"],
     ["/bureau/outils/ffme-import", "outils-ffme-import", "ffme-import"],
   ])("open the Outils sub-page %s, kept mounted while switching", async (path, name, sub) => {
     const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());

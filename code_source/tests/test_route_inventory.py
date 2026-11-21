@@ -112,7 +112,6 @@ EXPECTED_ROUTES: dict[tuple[str, str], Optional[Role]] = {
     ("GET", "/api/presence/config"): Role.COACH,
     ("POST", "/api/presence/export"): Role.COACH,
     ("GET", "/api/reports/map-points"): Role.COACH,
-    ("GET", "/api/reports/pivot-records"): Role.COACH,
     ("GET", "/api/reports/member-stats"): Role.COACH,
     ("GET", "/api/season-tarifs"): Role.COACH,
     ("GET", "/api/seasons"): Role.COACH,

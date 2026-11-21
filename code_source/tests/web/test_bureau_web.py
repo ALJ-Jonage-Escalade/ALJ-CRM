@@ -61,7 +61,7 @@ class TestBureauAccess(unittest.TestCase):
         for path in ("/bureau", "/bureau/", "/bureau/adherents", "/bureau/administration", "/bureau/communications", "/bureau/competitions",
                      "/bureau/planning", "/bureau/outils", "/bureau/parametres", "/bureau/competitions/helloasso",
                      "/bureau/competitions/bilan", "/bureau/competitions/coachs", "/competitions/helloasso",
-                     "/competitions/bilan", "/competitions/coachs", "/bureau/outils/pivot", "/bureau/outils/stats",
+                     "/competitions/bilan", "/competitions/coachs", "/bureau/outils/stats",
                      "/bureau/outils/presence", "/bureau/outils/ffme", "/bureau/outils/ffme-import",
                      "/bureau/outils/helloasso-import", "/bureau/parametres/campagnes", "/bureau/planning/tableau"):
             self.assertEqual(self.client.get(path).status_code, 200, path)

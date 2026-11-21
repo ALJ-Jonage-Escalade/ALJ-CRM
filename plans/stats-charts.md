@@ -56,10 +56,10 @@ Durable decisions that apply across all phases:
 and a member section with the season picker and the gender pie, online only.
 
 ### Acceptance criteria
-- [ ] Endpoint returns every season's rows without names; coach role in the inventory
-- [ ] A person with two validated purchases in a season counts once; Annulé/Refusé excluded
-- [ ] The pie's hidden table lists F / H / Non renseigné with counts
-- [ ] Offline: the « indisponibles hors ligne » message, no chart
+- [x] Endpoint returns every season's rows without names; coach role in the inventory
+- [x] A person with two validated purchases in a season counts once; Annulé/Refusé excluded
+- [x] The pie's hidden table lists F / H / Non renseigné with counts
+- [x] Offline: the « indisponibles hors ligne » message, no chart
 
 ---
 
@@ -70,24 +70,24 @@ The other charts and cards of the member section, the « Adhérents par saison �
 (click or « Détail › », count / % toggle).
 
 ### Acceptance criteria
-- [ ] Cards: total, % women, % new, average age (unknown ages skipped), cancelled purchases
-- [ ] Cities: top 10 + « Autres »; groups: note when totals exceed the members
-- [ ] « Détail › » toggles the stacked breakdown; % mode sums to 100 per bar
-- [ ] Season change re-filters without a request
+- [x] Cards: total, % women, % new, average age (unknown ages skipped), cancelled purchases
+- [x] Cities: top 10 + « Autres »; groups: note when totals exceed the members
+- [x] « Détail › » toggles the stacked breakdown; % mode: rounded percentages of each bar
+- [x] Season change re-filters without a request
 
 ---
 
 ## Phase 3: competition section on Chart.js
 
 ### Acceptance criteria
-- [ ] Same figures as before (existing `stats.ts` tests still pass); podiums stacked by medal, competitors as bars
+- [x] Same figures as before (existing `stats.ts` tests still pass); podiums stacked by medal, competitors as bars
 
 ---
 
 ## Phase 4: remove the TCD
 
 ### Acceptance criteria
-- [ ] No `pivot` sub-page, route, menu entry, component, test or `vue-pivottable` left; `/api/reports/pivot-records` gone
-- [ ] Docs updated (ARCHITECTURE, desktop_features_missing_in_web, …); version bumped
-- [ ] All checks green: Python (`ruff`, `mypy`, `pytest tests`, `export_openapi --check`) and frontend (lint, format,
+- [x] No `pivot` sub-page, route, menu entry, component, test or `vue-pivottable` left; `/api/reports/pivot-records` gone
+- [x] Docs updated (ARCHITECTURE, desktop_features_missing_in_web, …); version bumped
+- [x] All checks green: Python (`ruff`, `mypy`, `pytest tests`, `export_openapi --check`) and frontend (lint, format,
       typecheck, tests, build)

@@ -140,6 +140,8 @@ Done 2026-10-23 (plan phase 12): `frontend/src/sw.ts` in `injectManifest` mode, 
   `vue-pivottable` from npm (MIT, no jQuery), loaded with its tab, on `/api/reports/pivot-records` (the rows shaped in
   Python, French field names as keys); French aggregators and renderers, the layout kept in `localStorage` (never the
   value filters). `/pivot`, jQuery / jQuery UI 1.12.1 / the cdnjs scripts and the sandboxed iframe are removed.
+- 2026-11: the pivot table is removed (unused); Outils › Statistiques draws member and competition charts with
+  Chart.js (MIT) on `/api/reports/member-stats` (plan `plans/stats-charts.md`).
 
 ### D11 — One version number
 Vite reads `code_source/VERSION` at build time and injects it into the app (shown in the UI). The separate web version

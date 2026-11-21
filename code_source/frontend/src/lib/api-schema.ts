@@ -952,26 +952,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/reports/pivot-records": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Pivot Records
-         * @description Members of a season for the pivot table of the Outils page ("Toutes les saisons": every season).
-         */
-        get: operations["get_pivot_records_api_reports_pivot_records_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/reports/member-stats": {
         parameters: {
             query?: never;
@@ -4506,47 +4486,6 @@ export interface components {
             archived: number[];
         };
         /**
-         * PivotRecord
-         * @description A member (one purchase) as a row of the pivot table. The JSON keys are the French field names shown by the
-         *     table (aliases); age: at the start of the row's season, None when the birth date is unknown.
-         */
-        PivotRecord: {
-            /** Nom */
-            Nom: string;
-            /** Prénom */
-            "Pr\u00E9nom": string;
-            /** @description None when not given (the page labels it) */
-            Sexe: components["schemas"]["Sex"] | null;
-            /** Âge */
-            "\u00C2ge": number | null;
-            /** Tranche D'Âge */
-            "Tranche d'\u00C2ge": string;
-            /** Ville */
-            Ville: string;
-            /** Groupe / Tarif */
-            "Groupe / Tarif": string;
-            /** Statut */
-            Statut: string;
-            /** Saison */
-            Saison: string;
-            /** Type D'Adhésion */
-            "Type d'Adh\u00E9sion": string;
-            /** Date D'Inscription */
-            "Date d'Inscription": string;
-            /** Mois D'Inscription */
-            "Mois d'Inscription": string;
-        };
-        /**
-         * PivotRecords
-         * @description Members of a season for the pivot table. season: the season actually read (the active one for "active").
-         */
-        PivotRecords: {
-            /** Season */
-            season: string;
-            /** Records */
-            records: components["schemas"]["PivotRecord"][];
-        };
-        /**
          * PlanningSlot
          * @description A weekly slot. jour: a day ("Lundi"…), or several ("Lundi / Jeudi"); horaires: "18:00 - 20:00".
          *     helloasso_tarifs: the HelloAsso tariffs of its members; naissance_min/max: birth year or date bounds;
@@ -7779,55 +7718,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MapPoints"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
-    get_pivot_records_api_reports_pivot_records_get: {
-        parameters: {
-            query?: {
-                season?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PivotRecords"];
                 };
             };
             /** @description Bad Request */

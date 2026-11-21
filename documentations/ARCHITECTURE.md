@@ -57,7 +57,7 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   │                          email_personalization, errors
 │   │   ├── api/                 ← routeurs FastAPI, un fichier par domaine, rangés par thème (voir §4)
 │   │   ├── services/            ← cas d'usage, rangés comme api/ : access/, activities/, communications/,
-│   │   │                          competitions/ (dont webhook HelloAsso), members/ (dont import FFME)
+│   │   │                          competitions/ (dont webhook HelloAsso), keys/, members/ (dont import FFME), reports/
 │   │   ├── infrastructure/      ← accès externes, un dossier par système : security/ (auth API, secrets),
 │   │   │                          sqlite/, firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/
 │   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME), competitors_excel,
@@ -148,7 +148,7 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
 | `competitions/` | `competitions`, `participants`, `coaches`, `members`, `helloasso_items`, `results` | `/api/competitions/*`, `/api/coaches`, `/api/competition-members`, `/api/helloasso/items` · résultats MyCompet (`/api/competitions/cron/fetch-results`, `/{id}/fetch-results`, `/api/settings/competitions-results`) |
 | `communications/` | `email`, `whatsapp`, `attestations` | `/api/email-templates` (GET/POST/DELETE), `/api/email-status`, `/api/send-email` · `/api/whatsapp-template` · `/api/attestations/preview`, `/send` (PDF en mémoire, admin) |
 | `activities/` | `planning`, `presence` | `/api/planning` (GET, `/item`, `/export`) · `/api/presence/config`, `/export` |
-| `reports/` | `map`, `pivot` | `/api/reports/map-points` (points de la carte des adhérents, affichée par l'application Vue avec Leaflet) · `/api/reports/pivot-records` (lignes du tableau croisé dynamique, affiché par l'application Vue avec vue-pivottable) |
+| `reports/` | `map`, `member_stats` | `/api/reports/map-points` (points de la carte des adhérents, affichée par l'application Vue avec Leaflet) · `/api/reports/member-stats` (achats de toutes les saisons, sans nom, comptés par la page Outils › Statistiques avec Chart.js ; service `services/reports/member_stats.py`) |
 | `ffme/` | `ffme` | `/api/ffme/stats`, `/export` (CSV), `/preview`, `/import` |
 | `integrations/` | `helloasso`, `helloasso_campaigns`, `google_auth`, `cloud_db` | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync`, `/api/helloasso/campaigns` · `/api/auth/google/*` · `/api/cloud-db/status`, `/sync` |
 | `admin/` | `access` | `/api/admin/access/roles` (liste des accès, invitations), `/history` |

@@ -1,6 +1,6 @@
 """
-Member data comes from the public HelloAsso form and must be treated as hostile: the members map and the pivot
-table of the Outils page (Vue app) must show it as text.
+Member data comes from the public HelloAsso form and must be treated as hostile: the members map and the
+statistics of the Outils page (Vue app) must show it as text.
 """
 
 import os
@@ -24,12 +24,13 @@ class TestMembersMapShowsText(unittest.TestCase):
 
 
 
-class TestPivotTableShowsText(unittest.TestCase):
+class TestStatisticsShowText(unittest.TestCase):
 
     def test_no_html_from_member_data(self):
-        """The pivot table renders the members through vue-pivottable (Vue text, no HTML string); our code adds none
-        (pivot/PivotPane.test.ts renders a hostile name)."""
-        for name in ("pivot/PivotPane.vue", "pivot/pivotLayout.ts"):
+        """Cities and groups reach Chart.js, which draws them on a canvas (tooltips included), and the figures tables
+        as Vue text; our code builds no HTML string."""
+        for name in ("stats/MemberStatsPane.vue", "stats/MemberChartCard.vue", "stats/memberStats.ts",
+                     "../../components/ui/UiChart.vue"):
             with open(os.path.join(_outils, name), encoding="utf-8") as f:
                 source = f.read()
             for sink in _SINKS:
