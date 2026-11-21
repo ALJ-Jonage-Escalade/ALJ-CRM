@@ -128,7 +128,12 @@ describe("member stats", () => {
       purchase(6, { status: "Annulé", season: "2025-2026" }),
     ];
 
-    expect(memberCards(records, SEASON)).toEqual({ members: 3, newPercent: 33, averageAge: 25.5, cancelled: 2 });
+    expect(memberCards(seasonMembers(records, SEASON), records, SEASON)).toEqual({
+      members: 3,
+      newPercent: 33,
+      averageAge: 25.5,
+      cancelled: 2,
+    });
   });
 
   it("counts the members of every season by sex, oldest season first", () => {

@@ -36,7 +36,7 @@ async function load(): Promise<void> {
 onMounted(load);
 
 const members = computed(() => seasonMembers(records.value ?? [], season.value));
-const cards = computed(() => memberCards(records.value ?? [], season.value));
+const cards = computed(() => memberCards(members.value, records.value ?? [], season.value));
 const perSeason = computed(() => membersPerSeason(records.value ?? []));
 /** Groups add up to more than the members when someone paid for several. */
 const groupsNote = computed(() =>

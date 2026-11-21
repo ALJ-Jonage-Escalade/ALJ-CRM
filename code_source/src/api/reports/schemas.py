@@ -1,4 +1,4 @@
-"""Bodies of the report routes (members map and pivot table of the Outils page in the Vue app).
+"""Bodies of the report routes (members map and member statistics of the Outils page in the Vue app).
 
 The response models are the API contract: the frontend's TypeScript types are generated from them
 (dev/export_openapi.py, then `npm run gen:api` in frontend/)."""
@@ -31,30 +31,6 @@ class MapPoints(BaseModel):
     Addresses not geocoded yet are left out (geocoded in the background, on the map at the next load)."""
     season: str
     points: List[MapPoint]
-
-
-class PivotRecord(BaseModel):
-    """A member (one purchase) as a row of the pivot table. The JSON keys are the French field names shown by the
-    table (aliases); age: at the start of the row's season, None when the birth date is unknown."""
-
-    last_name: str = Field(serialization_alias="Nom")
-    first_name: str = Field(serialization_alias="Prénom")
-    sex: Optional[Sex] = Field(serialization_alias="Sexe", description="None when not given (the page labels it)")
-    age: Optional[int] = Field(serialization_alias="Âge")
-    age_band: str = Field(serialization_alias="Tranche d'Âge")
-    city: str = Field(serialization_alias="Ville")
-    group: str = Field(serialization_alias="Groupe / Tarif")
-    status: str = Field(serialization_alias="Statut")
-    season: str = Field(serialization_alias="Saison")
-    membership_type: str = Field(serialization_alias="Type d'Adhésion")
-    order_date: str = Field(serialization_alias="Date d'Inscription")
-    order_month: str = Field(serialization_alias="Mois d'Inscription")
-
-
-class PivotRecords(BaseModel):
-    """Members of a season for the pivot table. season: the season actually read (the active one for "active")."""
-    season: str
-    records: List[PivotRecord]
 
 
 class MemberStatsRecord(BaseModel):

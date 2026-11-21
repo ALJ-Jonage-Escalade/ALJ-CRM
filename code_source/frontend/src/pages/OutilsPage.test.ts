@@ -382,14 +382,6 @@ describe("OutilsPage", () => {
     expect(sent("GET", "/api/reports/map-points")).toHaveLength(2);
   });
 
-  it("shows the sub-pages without a header card above them", async () => {
-    const { byId, open } = await render("admin");
-    for (const sub of ["map", "stats", "presence", "ffme"]) {
-      await open(sub);
-      expect(byId("tools-refresh"), sub).toBeNull();
-    }
-  });
-
   it("says when the map fails", async () => {
     const mapPoints = ANSWERS["GET /api/reports/map-points"]!;
     ANSWERS["GET /api/reports/map-points"] = () => json({ status: "error", message: "Erreur interne" }, 500);

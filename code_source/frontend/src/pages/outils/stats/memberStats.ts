@@ -34,10 +34,10 @@ export interface Breakdown {
 
 export type Dimension = "sex" | "group" | "ageBand" | "city" | "returning" | "orderMonth" | "season";
 
-export const OTHERS = "Autres";
+const OTHERS = "Autres";
 
 const SEX_LABELS = { F: "Femmes", H: "Hommes" } as const;
-export const SEX_UNKNOWN = "Non renseigné";
+const SEX_UNKNOWN = "Non renseigné";
 const SEX_ORDER = [SEX_LABELS.F, SEX_LABELS.H, SEX_UNKNOWN];
 const NEW = "Nouveaux";
 const RETURNING = "Renouvellements";
@@ -173,8 +173,8 @@ export interface MemberCards {
 
 const percentOf = (part: number, total: number): number | null => (total ? Math.round((part / total) * 100) : null);
 
-export function memberCards(records: readonly MemberStatsRecord[], season: string): MemberCards {
-  const members = seasonMembers(records, season);
+/** members: seasonMembers(records, season), already computed by the page. */
+export function memberCards(members: readonly SeasonMember[], records: readonly MemberStatsRecord[], season: string): MemberCards {
   const ages = members.flatMap((member) => (member.age === null ? [] : [member.age]));
   return {
     members: members.length,
