@@ -21,6 +21,24 @@ const record = (userId: number, change: Partial<MemberStatsRecord> = {}): Member
   ...change,
 });
 
+const COMPETITIONS = [
+  {
+    id: 1,
+    nom: "Coupe",
+    date_competition: "2026-10-04",
+    participants: [
+      { adherent_id: 1, nom: "N", prenom: "P", selectionne: true, classement: "1" },
+      { adherent_id: 2, nom: "N", prenom: "P", selectionne: true, classement: "3" },
+    ],
+  },
+  {
+    id: 2,
+    nom: "Open",
+    date_competition: "2025-11-20",
+    participants: [{ adherent_id: 1, nom: "N", prenom: "P", selectionne: true, classement: "2" }],
+  },
+];
+
 const RECORDS = [record(1), record(2, { sex: "H" }), record(3, { sex: "H" }), record(4, { sex: "F", season: "2025-2026" })];
 
 async function render(answer: () => Promise<Response> | Response = () => json({ records: RECORDS })) {
@@ -29,7 +47,7 @@ async function render(answer: () => Promise<Response> | Response = () => json({ 
   const api: ApiFetch = vi.fn(async (url: string) => {
     const path = new URL(url, "http://alj.test").pathname;
     calls.push(path);
-    return path === "/api/reports/member-stats" ? answer() : json([]);
+    return path === "/api/reports/member-stats" ? answer() : json(path === "/api/competitions" ? COMPETITIONS : []);
   });
   const auth = fakeAuth({ status: "signedIn", user: { uid: "u1", email: "u@alj.example" }, role: "coach" });
   mount(OutilsStatsPage, {
@@ -100,5 +118,14 @@ describe("OutilsStatsPage, members", () => {
 
     expect(byId("member-stats-offline")!.textContent).toContain("hors ligne");
     expect(byId("chart-sex")).toBeNull();
+  });
+});
+
+describe("OutilsStatsPage, competitions", () => {
+  it("charts the podiums by medal and the selected competitors of the last seasons, oldest first", async () => {
+    const { figures } = await render();
+
+    expect(figures("chart-podiums")).toEqual(["2025-2026: 0: 1: 0", "2026-2027: 1: 0: 1"]);
+    expect(figures("chart-competitors")).toEqual(["2025-2026: 1", "2026-2027: 2"]);
   });
 });
