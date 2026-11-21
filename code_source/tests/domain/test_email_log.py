@@ -13,6 +13,7 @@ from domain.email_log import (
     LoggedRecipient,
     SendStatus,
     contact_summary,
+    last_correction_requests,
     member_ids_of,
 )
 
@@ -27,10 +28,10 @@ def recipient(member_id: Optional[int], email: str, status: SendStatus = "sent")
 
 
 def entry(at: str, *recipients: LoggedRecipient, kind: EmailKind = "competition_email",
-          competition_ids: Optional[List[int]] = None) -> EmailLogEntry:
+          competition_ids: Optional[List[int]] = None, item_ids: Optional[List[int]] = None) -> EmailLogEntry:
     return EmailLogEntry(at=at, author="coach@alj.example", kind=kind, template="", subject="Rappel",
                          competition_ids=competition_ids or [7], member_ids=member_ids_of(recipients),
-                         recipients=list(recipients))
+                         recipients=list(recipients), helloasso_order_refs=[], helloasso_item_ids=item_ids or [])
 
 
 @pytest.mark.parametrize("entries, competitor, last_sent_at, last_failed", [
@@ -62,3 +63,14 @@ def test_competitor_contact(entries, competitor, last_sent_at, last_failed):
 
 def test_member_ids_each_once():
     assert member_ids_of([recipient(2, "b"), recipient(None, "club"), recipient(1, "a"), recipient(2, "b")]) == [2, 1]
+
+
+def test_the_last_correction_request_of_a_registration_is_the_latest_that_reached_someone() -> None:
+    entries = [
+        entry("2026-09-02", recipient(None, "molly@terrier.example"), kind="correction_request", item_ids=[1, 2]),
+        entry("2026-09-05", recipient(None, "molly@terrier.example", "failed"), kind="correction_request", item_ids=[1]),
+        entry("2026-09-03", recipient(None, "molly@terrier.example"), kind="member_email", item_ids=[2]),
+    ]
+
+    assert last_correction_requests(entries) == {1: {"at": "2026-09-02", "author": "coach@alj.example"},
+                                                 2: {"at": "2026-09-02", "author": "coach@alj.example"}}

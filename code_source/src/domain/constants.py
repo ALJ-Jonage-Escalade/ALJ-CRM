@@ -7,7 +7,7 @@ from domain.errors import InvalidRequest
 
 # Saison active par défaut
 DEFAULT_SEASON = "2026-2027"
-APP_VERSION = "2.57.0"
+APP_VERSION = "2.58.0"
 
 # Tarifs permanents disponibles hors créneau de cours (ex: licence seule)
 DEFAULT_EXTRA_TARIFS = ["Licence sèche"]

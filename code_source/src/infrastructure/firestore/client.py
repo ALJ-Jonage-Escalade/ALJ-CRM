@@ -246,6 +246,15 @@ class FirestoreClient:
         }}}, project_id, access_token)
 
     @classmethod
+    def list_equal(cls, collection_name: str, field: str, value: Any,
+                   project_id: Optional[str] = None,
+                   access_token: Optional[str] = None) -> List[Dict[str, Any]]:  # Any: a field value, then documents
+        """Every document whose `field` equals `value` (automatic single-field index: no order, sort them)."""
+        return cls._run_query(collection_name, {"where": {"fieldFilter": {
+            "field": {"fieldPath": field}, "op": "EQUAL", "value": python_to_firestore_value(value),
+        }}}, project_id, access_token)
+
+    @classmethod
     def _run_query(cls, collection_name: str, query: Dict[str, Any], project_id: Optional[str],
                    access_token: Optional[str]) -> List[Dict[str, Any]]:  # Any: a structured query, then documents
         url = f"{cls.database_url(project_id)}:runQuery"

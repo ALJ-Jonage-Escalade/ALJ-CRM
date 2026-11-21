@@ -6,17 +6,14 @@ Single reading of the membership form's items, shared by the membership dashboar
 
 from __future__ import annotations
 
-import datetime
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Mapping, Optional
 
 from domain.competitions.matching import parse_campaign_identifier
+from domain.members.emergency_contacts import HELLOASSO_CONTACT_FIELDS
+from domain.members.member_data_rules import IssueField, read_birth_date
 from domain.utils import is_helloasso_url, normalize_string
-
-# Formats seen in the birth date field of the form (typed by families, or ISO from HelloAsso)
-_BIRTH_DATE_FORMATS = ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y")
-
 
 # Insurance options of the form, as the members base names them (purchase_options.option_name)
 INSURANCE_OPTIONS = (
@@ -25,6 +22,22 @@ INSURANCE_OPTIONS = (
 )
 # Birth date field of the flat format (schema_v2.DOB_COLUMN)
 BIRTH_DATE_FIELD = "champ_Date de naissance de l'adhérent"
+
+
+# Custom fields of the form checked at the import (member_data_rules), named as the member writers read them
+# (schema_v2.USER_FIELD_MAP and emergency_contacts.HELLOASSO_CONTACT_FIELDS, without their "champ_" prefix)
+PHONE_FIELD = "Téléphone "
+EMAIL_FIELD = "Adresse mail pour la réception des informations du club"
+EMAIL_2_FIELD = "Deuxième adresse mail pour la réception des informations du club"
+COUNTRY_FIELD = "Pays"
+NATIONALITY_FIELD = "Nationalité"
+LICENCE_FIELD = "Numéro de Licence FFME (6 chiffres)"
+EMERGENCY_PHONE_FIELDS = tuple(phone.removeprefix("champ_") for _name, phone in HELLOASSO_CONTACT_FIELDS)
+# The checked values the form holds (every one but the birth date): field of member_data_rules -> custom field
+FORM_FIELDS: dict[IssueField, str] = {
+    "phone": PHONE_FIELD, "emergency_phone_1": EMERGENCY_PHONE_FIELDS[0], "emergency_phone_2": EMERGENCY_PHONE_FIELDS[1],
+    "email": EMAIL_FIELD, "email_2": EMAIL_2_FIELD, "country": COUNTRY_FIELD, "nationality": NATIONALITY_FIELD, "licence": LICENCE_FIELD,
+}
 
 
 def insurance_of(option_name: str) -> Optional[str]:
@@ -107,16 +120,9 @@ def _custom_value(custom_field: Mapping[str, Any]) -> str:  # Any: raw HelloAsso
 
 
 def parse_birth_date(raw: str) -> str:
-    """ISO date of a birth date typed on the form, "" when it cannot be read."""
-    text = str(raw or "").strip()
-    if "T" in text:
-        text = text.split("T", 1)[0]
-    for date_format in _BIRTH_DATE_FORMATS:
-        try:
-            return datetime.datetime.strptime(text, date_format).date().isoformat()
-        except ValueError:
-            continue
-    return ""
+    """ISO date of a birth date typed on the form (member_data_rules.read_birth_date), "" when it cannot be read."""
+    birth = read_birth_date(raw)
+    return birth.isoformat() if birth else ""
 
 
 def _field_by_words(custom_fields: Mapping[str, str], *words: str) -> str:

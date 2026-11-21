@@ -5,6 +5,9 @@ import { unwrap, type ApiClient, type ApiRead, type Schemas } from "../lib/clien
 /** A membership status (« Validé », « Terminé »…), as the contract types it. */
 export type MemberStatus = NonNullable<Schemas["NewMember"]["status"]>;
 
+/** A correctable field of a HelloAsso registration (server: member_data_rules.IssueField). */
+export type MembershipField = Schemas["MembershipIssue"]["field"];
+
 /** The members of a season (useSyncedResource), the active one for an empty season. */
 export function membersRead(season: string): ApiRead<"/api/members"> {
   return season ? { path: "/api/members", query: { season } } : { path: "/api/members" };
@@ -27,5 +30,29 @@ export function createMembersApi(client: ApiClient) {
     helloAssoLastSync: () => unwrap(client.GET("/api/helloasso/memberships/last-sync")),
     /** Reads HelloAsso again and applies the decisions (by HelloAsso item id) to the recomputed plan. */
     helloAssoImport: (body: Schemas["MembershipImportRequest"]) => unwrap(client.POST("/api/helloasso/memberships/import", { body })),
+    /** Saves the admin's correction of one field of a registration; answers the preview recomputed with it. */
+    helloAssoSaveCorrection: (itemId: number, field: MembershipField, value: string, campaign: string | null) =>
+      unwrap(
+        client.PUT("/api/helloasso/memberships/corrections/{item_id}/{field}", {
+          params: { path: { item_id: itemId, field } },
+          body: { value, campaign },
+        }),
+      ),
+    /** Removes the correction of one field (HelloAsso's value applies again); answers the preview recomputed. */
+    helloAssoRemoveCorrection: (itemId: number, field: MembershipField, campaign: string | null) =>
+      unwrap(
+        client.DELETE("/api/helloasso/memberships/corrections/{item_id}/{field}", {
+          params: { path: { item_id: itemId, field }, query: campaign ? { campaign } : {} },
+        }),
+      ),
+    /** The correction request of the first order of these registrations, as it would be sent; sends nothing. */
+    helloAssoRequestPreview: (itemIds: number[], campaign: string | null) =>
+      unwrap(client.POST("/api/helloasso/memberships/correction-requests/preview", { body: { item_ids: itemIds, campaign } })),
+    /** Asks the families to fix their data: one e-mail per order, to the payer, recorded in the e-mail log. */
+    helloAssoRequestCorrections: (itemIds: number[], campaign: string | null) =>
+      unwrap(client.POST("/api/helloasso/memberships/correction-requests", { body: { item_ids: itemIds, campaign } })),
+    /** Checks a value with the import's rules, nothing saved: the value as it would be stored, and its issues. */
+    helloAssoCheckValue: (field: MembershipField, value: string) =>
+      unwrap(client.POST("/api/helloasso/memberships/corrections/check", { body: { field, value } })),
   };
 }

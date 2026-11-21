@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List
 
-from domain.email_log import EmailLogEntry
+from domain.email_log import EmailKind, EmailLogEntry
 
 
 class LogDown(RuntimeError):
@@ -30,3 +30,8 @@ class InMemoryEmailLogStore:
         if self.failing:
             raise LogDown("Firestore injoignable")
         return sorted(self.entries, key=lambda entry: entry["at"], reverse=True)[:limit]
+
+    def list_of_kind(self, kind: EmailKind) -> List[EmailLogEntry]:
+        if self.failing:
+            raise LogDown("Firestore injoignable")
+        return [entry for entry in self.entries if entry["kind"] == kind]

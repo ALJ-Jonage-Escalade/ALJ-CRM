@@ -20,12 +20,14 @@ class EmailLogEntry(BaseModel):
     at: str = Field(description="ISO 8601 UTC")
     author: str = Field(description="E-mail of the person who sent it, « system » for automatic sends")
     kind: Literal["competition_email", "member_email", "competition_all_paid", "results_batch", "attestation",
-                  "access_invitation"]
+                  "access_invitation", "correction_request"]
     template: str = ""
     subject: str = ""
     competition_ids: List[int] = []
     member_ids: List[int] = []
     recipients: List[LoggedRecipient] = []
+    helloasso_order_refs: List[str] = Field([], description="A correction request: the HelloAsso orders it is about")
+    helloasso_item_ids: List[int] = Field([], description="A correction request: the HelloAsso registrations it is about")
 
 
 class CompetitorLastContact(BaseModel):

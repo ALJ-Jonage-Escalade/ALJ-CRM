@@ -1,8 +1,8 @@
 """The e-mail log in Firestore: collection `email_log`, one write-once document per send action.
 
 Read and written by the server only (firestore.rules refuses every client). No `crm_` prefix: not copied into the
-SQLite cache. A competition's entries are found with `array-contains` on `competition_ids`, without `orderBy`: no
-composite index to deploy, the caller sorts them. The whole log is read newest first on `at` (automatic
+SQLite cache. A competition's entries are found with `array-contains` on `competition_ids`, the correction requests with an
+equality on `kind`, both without `orderBy`: no composite index to deploy, the caller sorts them. The whole log is read newest first on `at` (automatic
 single-field index), capped.
 """
 
@@ -12,7 +12,7 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional, Protocol
 
-from domain.email_log import EmailLogEntry, LoggedRecipient, is_email_kind, is_send_status
+from domain.email_log import EmailKind, EmailLogEntry, LoggedRecipient, is_email_kind, is_send_status
 from infrastructure.firestore.client import META_KEYS, FirestoreClient
 
 logger = logging.getLogger("alj")
@@ -29,6 +29,9 @@ class EmailLogStore(Protocol):
         ...
     def list_latest(self, limit: int) -> List[EmailLogEntry]:
         """The `limit` newest entries of the whole app, newest first."""
+        ...
+    def list_of_kind(self, kind: EmailKind) -> List[EmailLogEntry]:
+        """Every entry of this kind, in no particular order."""
         ...
 
 
@@ -59,6 +62,8 @@ def log_entry(doc: Dict[str, Any]) -> Optional[EmailLogEntry]:  # Any: a Firesto
         competition_ids=[i for i in map(_optional_int, doc.get("competition_ids") or []) if i is not None],
         member_ids=[i for i in map(_optional_int, doc.get("member_ids") or []) if i is not None],
         recipients=recipients,
+        helloasso_order_refs=[str(ref) for ref in doc.get("helloasso_order_refs") or []],
+        helloasso_item_ids=[i for i in map(_optional_int, doc.get("helloasso_item_ids") or []) if i is not None],
     )
 
 
@@ -76,4 +81,8 @@ class FirestoreEmailLogStore:
 
     def list_latest(self, limit: int) -> List[EmailLogEntry]:
         entries = (log_entry(doc) for doc in FirestoreClient.list_latest(COLLECTION, "at", limit))
+        return [entry for entry in entries if entry is not None]
+
+    def list_of_kind(self, kind: EmailKind) -> List[EmailLogEntry]:
+        entries = (log_entry(doc) for doc in FirestoreClient.list_equal(COLLECTION, "kind", kind))
         return [entry for entry in entries if entry is not None]

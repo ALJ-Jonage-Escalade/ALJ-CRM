@@ -6,12 +6,14 @@
    choice is made, and the checked ones are imported once confirmed. A registration made under another person's name
    (a parent for their child) is attached by hand to a member, with a comment (the server reads HelloAsso again and refuses decisions that no longer match). The result lists the members
    written, linked to their record. Online only: disabled with an explanation when the device is offline. */
-import { computed, inject, onMounted, ref } from "vue";
+import { computed, inject, nextTick, onMounted, ref } from "vue";
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiCard from "../../../components/ui/UiCard.vue";
 import UiTile from "../../../components/ui/UiTile.vue";
 import AttachPicker from "./AttachPicker.vue";
+import CorrectionDialog from "./CorrectionDialog.vue";
+import CorrectionRequestDialog from "./CorrectionRequestDialog.vue";
 import { useNetworkUp } from "../../../composables/network";
 import { CLIENT_KEY, errorText } from "../../../lib/client";
 import { formatDayText, formatEuros } from "../../../lib/format";
@@ -25,12 +27,18 @@ import {
   BUCKETS,
   campaignOptions,
   canAttach,
+  canCorrect,
+  canRequest,
   changeLines,
   decisionsOf,
+  describeMove,
   FOLDED_BUCKETS,
   incompleteRows,
   initialChoices,
   isCheckable,
+  keepChoices,
+  lastRequestText,
+  correctionLines,
   lastSyncText,
   memberHref,
   needsIdentityChoice,
@@ -48,6 +56,7 @@ import {
   type Choices,
   type MembershipImportResult,
   type MembershipPreview,
+  type RowMove,
 } from "./helloassoImport";
 
 const client = inject(CLIENT_KEY)!;
@@ -115,10 +124,85 @@ const selectedCount = computed(() => (preview.value ? selectedRows(preview.value
 /** Checked rows still missing something (an attach without member or comment): the import waits for them. */
 const incompleteCount = computed(() => (preview.value ? incompleteRows(preview.value, choices.value).length : 0));
 
+// The registration whose data the admin is correcting (its HelloAsso item id), null when the dialog is closed
+const fixingId = ref<number | null>(null);
+const fixingRow = computed(() => preview.value?.rows.find((row) => row.item_id === fixingId.value) ?? null);
+// The last correction moved the row to another section: announced in the dialog, the row shown once it closes
+const move = ref<RowMove | null>(null);
+const fixingOpen = computed({
+  get: () => fixingRow.value !== null,
+  set: (isOpen: boolean) => {
+    if (!isOpen) {
+      void closeFixing();
+    }
+  },
+});
+// Sections unfolded to show a moved row (the others keep their default), and that row, highlighted
+const unfolded = ref<BucketName[]>([]);
+const highlighted = ref<number | null>(null);
+
+// The correction request dialog: the rows that can be asked, and those checked on opening (null: closed)
+const requestable = computed(() => preview.value?.rows.filter(canRequest) ?? []);
+const requestPicked = ref<number[] | null>(null);
+const requestOpen = computed({
+  get: () => requestPicked.value !== null,
+  set: (isOpen: boolean) => {
+    if (!isOpen) {
+      requestPicked.value = null;
+    }
+  },
+});
+
+/** The preview read again after a correction request (the rows show it), the admin's choices kept. */
+async function refreshPreview(): Promise<void> {
+  try {
+    corrected(await membersApi.helloAssoPreview(campaign.value));
+  } catch (e) {
+    console.warn("Aperçu HelloAsso après la demande de correction :", e);
+  }
+}
+
+/** The preview recomputed after a correction: the move it caused, if any; the admin's choices kept on the rows that
+    did not move. */
+function corrected(updated: MembershipPreview): void {
+  const before = preview.value;
+  if (before && fixingId.value !== null) {
+    move.value = describeMove(before, updated, fixingId.value, choices.value);
+    choices.value = keepChoices(before, updated, choices.value);
+  }
+  preview.value = updated;
+}
+
+async function closeFixing(): Promise<void> {
+  const itemId = fixingId.value;
+  const moved = move.value;
+  fixingId.value = null;
+  move.value = null;
+  if (moved && itemId !== null) {
+    await showRow(itemId);
+  }
+}
+
+/** Unfolds the row's section (its search cleared), then scrolls to the row and highlights it. */
+async function showRow(itemId: number): Promise<void> {
+  const row = preview.value?.rows.find((found) => found.item_id === itemId);
+  if (!row) {
+    return;
+  }
+  unfolded.value = [...unfolded.value, row.bucket];
+  searches.value = { ...searches.value, [row.bucket]: "" };
+  highlighted.value = itemId;
+  await nextTick();
+  document.querySelector(`[data-item-id="${itemId}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
 function reset(): void {
   preview.value = null;
   choices.value = {};
   searches.value = {};
+  unfolded.value = [];
+  highlighted.value = null;
+  requestPicked.value = null;
   done.value = null;
   failure.value = "";
 }
@@ -290,12 +374,18 @@ async function apply(): Promise<void> {
         </UiTile>
       </div>
 
+      <div v-if="requestable.length" class="mb-4">
+        <UiButton variant="muted" small data-testid="ha-request-all" @click="requestPicked = requestable.map((row) => row.item_id)">
+          📧 Demander des corrections aux familles ({{ requestable.length }} inscription(s) à corriger)
+        </UiButton>
+      </div>
+
       <!-- Folded or unfolded by the admin; the sections with nothing to do start folded -->
       <details
         v-for="section in sections"
         :key="section.name"
         :data-testid="`ha-section-${section.name}`"
-        :open="!FOLDED_BUCKETS.includes(section.name)"
+        :open="!FOLDED_BUCKETS.includes(section.name) || unfolded.includes(section.name)"
         class="group mb-4"
       >
         <summary class="mb-1.5 flex cursor-pointer list-none items-center [&::-webkit-details-marker]:hidden gap-2 text-[13.5px] font-bold">
@@ -349,7 +439,9 @@ async function apply(): Promise<void> {
                 v-for="row in section.matching"
                 :key="row.item_id"
                 :data-testid="`ha-row-${section.name}`"
-                class="border-t border-slate-100"
+                :data-item-id="row.item_id"
+                :data-highlighted="highlighted === row.item_id || undefined"
+                :class="['border-t border-slate-100 transition-colors', highlighted === row.item_id && 'bg-yellow-100']"
               >
                 <td class="px-2.5 py-1.5">
                   <input
@@ -365,6 +457,7 @@ async function apply(): Promise<void> {
                 </td>
                 <td data-testid="ha-person" class="px-2.5 py-1.5 font-semibold break-words">
                   {{ personLabel(row) }}
+                  <UiBadge v-if="row.corrections.length" color="blue" variant="soft" data-testid="ha-corrected">corrigée</UiBadge>
                   <template v-if="row.attached_to">
                     →
                     <a :href="memberHref(row.attached_to, preview.season)" class="text-blue-700 underline">
@@ -393,6 +486,22 @@ async function apply(): Promise<void> {
                 <td class="px-2.5 py-1.5 break-words text-slate-500">
                   {{ row.reason }}
                   <span v-for="line in changeLines(row)" :key="line" class="block font-semibold text-slate-700">{{ line }}</span>
+                  <span v-for="line in correctionLines(row)" :key="line.label" data-testid="ha-correction" class="block text-slate-700">
+                    ✏️ {{ line.label }} :
+                    <s>{{ line.helloasso || "—" }}</s>
+                    →
+                    <b>{{ line.value || "—" }}</b>
+                  </span>
+                  <ul v-if="row.issues.length" class="mt-1 space-y-0.5">
+                    <li
+                      v-for="issue in row.issues"
+                      :key="`${issue.field}-${issue.code}`"
+                      data-testid="ha-issue"
+                      :class="issue.blocking ? 'font-semibold text-red-700' : 'text-amber-700'"
+                    >
+                      {{ issue.blocking ? "⛔" : "⚠️" }} {{ issue.message }}
+                    </li>
+                  </ul>
                   <select
                     v-if="needsIdentityChoice(row)"
                     data-testid="ha-review-choice"
@@ -425,6 +534,27 @@ async function apply(): Promise<void> {
                   >
                     🔗 Rattacher…
                   </button>
+                  <button
+                    v-if="canCorrect(row)"
+                    type="button"
+                    data-testid="ha-fix-open"
+                    class="mt-1 block text-blue-700 underline"
+                    @click="fixingId = row.item_id"
+                  >
+                    ✏️ Corriger…
+                  </button>
+                  <span v-if="row.last_request" data-testid="ha-last-request" class="mt-1 block text-slate-600">
+                    📧 {{ lastRequestText(row) }}
+                  </span>
+                  <button
+                    v-if="canRequest(row)"
+                    type="button"
+                    data-testid="ha-request-open"
+                    class="mt-1 block text-blue-700 underline"
+                    @click="requestPicked = [row.item_id]"
+                  >
+                    📧 Demander une correction…
+                  </button>
                   <p v-if="rowProblem(row, preview, choices)" data-testid="ha-row-problem" class="mt-1 font-semibold text-red-700">
                     {{ rowProblem(row, preview, choices) }}
                   </p>
@@ -434,6 +564,23 @@ async function apply(): Promise<void> {
           </table>
         </div>
       </details>
+
+      <CorrectionRequestDialog
+        v-if="requestPicked"
+        v-model:open="requestOpen"
+        :rows="requestable"
+        :picked="requestPicked"
+        :campaign="campaign"
+        @sent="refreshPreview"
+      />
+      <CorrectionDialog
+        v-if="fixingRow"
+        v-model:open="fixingOpen"
+        :row="fixingRow"
+        :campaign="campaign"
+        :move="move"
+        @updated="corrected"
+      />
 
       <div v-if="!preview.blocked_reason" class="flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-200 pt-3">
         <UiButton

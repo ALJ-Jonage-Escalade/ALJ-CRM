@@ -53,6 +53,9 @@ class FakeFirestore:
         return [self._out(collection_name, doc_id, doc) for doc_id, doc in self._col(collection_name).items()
                 if value in (doc.get(field) or [])]
 
+    def list_equal(self, collection_name, field, value, project_id=None, access_token=None):
+        return [self._out(collection_name, doc_id, doc) for doc_id, doc in self._col(collection_name).items() if doc.get(field) == value]
+
     def upsert_document(self, collection_name, doc_id, data, project_id=None, access_token=None):
         self._col(collection_name)[str(doc_id)] = {k: v for k, v in data.items() if k not in self.META}
         self._touch(collection_name, doc_id)
@@ -99,7 +102,7 @@ class FakeFirestore:
 def use_fake_firestore(test: unittest.TestCase) -> FakeFirestore:
     """Replace FirestoreClient by an in-memory store for the duration of `test`."""
     fake = FakeFirestore()
-    for name in ("get_document", "list_documents", "list_latest", "list_containing", "upsert_document", "create_document", "update_fields",
+    for name in ("get_document", "list_documents", "list_latest", "list_containing", "list_equal", "upsert_document", "create_document", "update_fields",
                  "delete_document", "batch_upsert"):
         p = patch.object(FirestoreClient, name, getattr(fake, name))
         p.start()

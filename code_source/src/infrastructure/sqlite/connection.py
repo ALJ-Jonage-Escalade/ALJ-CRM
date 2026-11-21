@@ -55,6 +55,19 @@ _COMPETITION_EMAIL_TEMPLATES = [
 ]
 
 
+# Correction request of the HelloAsso membership import (domain/members/correction_request.py): {problemes} lists the
+# problems of each registration of the order; the family answers by e-mail
+CORRECTION_REQUEST_EMAIL_TEMPLATE = (
+    "Adhésion : informations à corriger",
+    "Adhésion ALJ Escalade : informations à corriger",
+    "Bonjour {first_name},\n\nMerci pour votre inscription à la section escalade de l'Amicale Laïque de Jonage. En préparant les "
+    "licences FFME, nous avons relevé des informations qui semblent erronées ou manquantes :\n\n{problemes}\n\nPourriez-vous nous "
+    "indiquer les bonnes valeurs en répondant simplement à cet e-mail ? Nous corrigerons le dossier nous-mêmes.\n\nSportivement,\n"
+    "L'équipe ALJ Escalade",
+    DEFAULT_SENDER_EMAIL,
+    DEFAULT_SENDER_NAME,
+)
+
 # Club keys (HID ProxKey) of the climbing wall, plans/club-keys.md: replicated to Firestore (cloud_sync TRACKED_TABLES).
 # A code is unique whatever its case, archived keys included.
 KEYS_DDL = (
@@ -143,8 +156,8 @@ def _ensure_email_templates(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
     except Exception as e:
         logger.warning(f"[SQLITE] Impossible de s'assurer de la présence du modèle d'email 'Attestation échéance' : {e}")
 
-    # S'assurer de la présence des modèles d'e-mails de compétition
-    for template in _COMPETITION_EMAIL_TEMPLATES:
+    # S'assurer de la présence des modèles d'e-mails de compétition et de la demande de correction d'adhésion
+    for template in [*_COMPETITION_EMAIL_TEMPLATES, CORRECTION_REQUEST_EMAIL_TEMPLATE]:
         cname = template[0]
         try:
             cursor.execute("SELECT COUNT(*) FROM email_templates WHERE name = ?", (cname,))

@@ -10,7 +10,17 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Iterable, Literal, Mapping, Optional
 
-from domain.members.helloasso_membership import MembershipRecord, season_guard
+from domain.members.helloasso_membership import FORM_FIELDS, MembershipRecord, season_guard
+from domain.members.import_corrections import Corrections, FieldCorrection, apply_corrections
+from domain.members.member_data_rules import (
+    CheckedValues,
+    DataIssue,
+    DomainCheck,
+    IssueField,
+    MemberValues,
+    check_member_data,
+    season_start,
+)
 from domain.members.purchase_priority import purchase_priority_score
 from domain.utils import normalize_name
 
@@ -32,6 +42,12 @@ class KnownMember:
     first_name: str
     birth_date: str  # ISO, "" when unknown
     licence: str  # FFME licence, digits only
+    # The CRM values a renewal keeps when filled: member_data_rules checks them instead of the HelloAsso ones
+    phone: str = ""
+    email: str = ""
+    email_2: str = ""
+    country: str = ""
+    nationality: str = ""
 
 
 @dataclass(frozen=True)
@@ -85,6 +101,8 @@ class PlanEntry:
     candidates: tuple[KnownMember, ...] = ()  # to_review: the members it may be
     changes: tuple[FieldChange, ...] = ()  # updated, or to_review when the CRM changed the value too
     attached_to: Optional[KnownMember] = None  # imported: the member, when their name is not the HelloAsso one (attach by hand)
+    issues: tuple[DataIssue, ...] = ()  # the problems of the values the import would store (member_data_rules)
+    corrections: tuple[FieldCorrection, ...] = ()  # the admin's corrections, applied to `record`
 
     @property
     def can_create(self) -> bool:
@@ -178,9 +196,9 @@ def _classify(record: MembershipRecord, base: _Base) -> PlanEntry:
     same_name, same_licence = base.same_name(record), base.same_licence(record)
     if not record.birth_date:
         if len(same_licence) == 1:
-            return PlanEntry(record, Bucket.RENEWAL, "Date de naissance illisible, adhérent reconnu par sa licence FFME.",
+            return PlanEntry(record, Bucket.RENEWAL, "Date de naissance illisible ou invraisemblable, adhérent reconnu par sa licence FFME.",
                              same_licence[0].user_id)
-        return _to_review(record, "Date de naissance manquante ou illisible : choisissez l'adhérent à compléter.",
+        return _to_review(record, "Date de naissance manquante, illisible ou invraisemblable : choisissez l'adhérent à compléter.",
                           same_name + same_licence)
     same_identity = [m for m in same_name if m.birth_date == record.birth_date]
     if len(same_identity) == 1 and (not same_licence or same_licence == same_identity):
@@ -282,16 +300,66 @@ def _apply_priority(entries: list[PlanEntry], base: _Base) -> list[PlanEntry]:
     return result
 
 
+# Those a renewal keeps from the CRM when filled (fill blank fields only). Emergency phones: never, a renewal adds the
+# contacts the member does not have yet
+_KEPT_FROM_CRM: tuple[IssueField, ...] = ("phone", "email", "email_2", "country", "nationality", "licence")
+
+
+def _check(record: MembershipRecord, season: str, member: Optional[KnownMember] = None,
+           domain_accepts_mail: Optional[DomainCheck] = None, corrected: Iterable[str] = ()) -> CheckedValues:
+    """The values the import would store, checked: those of `member` when filled (a renewal keeps them), else the
+    HelloAsso ones. Birth date: the mapped ISO date, else as typed."""
+    values: dict[str, str] = {field: record.custom_fields.get(name, "") for field, name in FORM_FIELDS.items()}
+    values["licence"] = record.licence  # as the mapping read it (the form's licence field, digits only)
+    if member:  # a corrected field is written over the CRM value
+        values.update({field: getattr(member, field) for field in _KEPT_FROM_CRM
+                       if getattr(member, field).strip() and field not in corrected})
+    return check_member_data(MemberValues(birth_date=record.birth_date or record.birth_date_raw, **values),
+                             season_start=season_start(season), domain_accepts_mail=domain_accepts_mail)
+
+
+def _normalised(record: MembershipRecord, checked: CheckedValues) -> MembershipRecord:
+    """The record with the normalised values it would be written with (only the fields it holds). A blocking birth
+    date is dropped: the record then behaves as without one."""
+    fields = dict(record.custom_fields)
+    fields.update({name: getattr(checked.values, field) for field, name in FORM_FIELDS.items() if fields.get(name, "").strip()})
+    return replace(record, birth_date=checked.values.birth_date, custom_fields=fields)
+
+
+# Rows whose registration writes nothing on the member: their values are not checked
+_NOT_CHECKED = (Bucket.ALREADY_IMPORTED, Bucket.UPDATED)
+
+
+def _with_checks(entry: PlanEntry, base: _Base, season: str, domain_accepts_mail: Optional[DomainCheck]) -> PlanEntry:
+    """The entry with the issues of the values it would store, and its record normalised."""
+    if entry.bucket in _NOT_CHECKED or entry.changes:
+        return entry
+    member = base.members.get(entry.member_id) if entry.bucket == Bucket.RENEWAL and entry.member_id is not None else None
+    checked = _check(entry.record, season, member, domain_accepts_mail, {correction.field for correction in entry.corrections})
+    reason = entry.reason
+    if member and member.licence and entry.record.licence and member.licence != entry.record.licence:
+        reason += f" Licence {entry.record.licence} sur HelloAsso : la licence {member.licence} du CRM est conservée."
+    return replace(entry, record=_normalised(entry.record, checked), issues=checked.issues, reason=reason)
+
+
 def plan_membership_import(records: Iterable[MembershipRecord], *, season: str, campaign_slug: str,
-                           snapshot: Optional[MembersSnapshot] = None) -> ImportPlan:
-    """The plan of the import of these registrations into `season`, against the members already in the base."""
-    records = list(records)
+                           snapshot: Optional[MembersSnapshot] = None, domain_accepts_mail: Optional[DomainCheck] = None,
+                           corrections: Optional[Corrections] = None) -> ImportPlan:
+    """The plan of the import of these registrations into `season`, against the members already in the base.
+    `domain_accepts_mail`: whether an e-mail domain can receive mail (member_data_rules), None to skip that check.
+    `corrections`: the admin's, applied before the registrations are classified."""
+    corrections = corrections or {}
+    records = [apply_corrections(record, corrections.get(record.item_id, {})) for record in records]
     blocked_reason = season_guard(campaign_slug, season)
     base = _Base(snapshot or MembersSnapshot(), season)
     if blocked_reason:
         entries = [PlanEntry(record, Bucket.BLOCKED, blocked_reason) for record in records]
     else:
-        entries = _apply_priority([_classify(record, base) for record in records], base)
+        # Classified on a plausible birth date only, then checked on the values each row would store
+        records = [replace(record, birth_date=_check(record, season).values.birth_date) for record in records]
+        classified = _apply_priority([_classify(record, base) for record in records], base)
+        entries = [_with_checks(replace(entry, corrections=tuple(corrections.get(entry.item_id, {}).values())), base, season,
+                                domain_accepts_mail) for entry in classified]
     return ImportPlan(season=season, campaign_slug=campaign_slug, entries=entries, blocked_reason=blocked_reason,
                       members=tuple(base.members.values()), season_purchases=tuple(base.season_purchases))
 

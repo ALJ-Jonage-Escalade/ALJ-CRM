@@ -13,6 +13,8 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Optional
 
+from domain.members.helloasso_membership import FORM_FIELDS
+from domain.members.member_data_rules import IssueField
 from domain.members.membership_import import ImportWrite, KnownMember, KnownPurchase, MembersSnapshot, WriteAction
 from domain.members.view import normalize_status
 from infrastructure.sqlite import schema_v2
@@ -68,7 +70,26 @@ def _attach(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: st
         raise ValueError(f"Inscription {write.item_id} : adhérent à compléter non indiqué")
     fields = write.entry.record.legacy_fields()
     schema_v2.fill_blank_user_fields(cur, user_id, fields, now_iso, schema_v2.build_user_field_map(cur))
+    _write_corrections(cur, write, user_id, now_iso)
     return _add_membership(cur, write, user_id, season_id, now_iso)
+
+
+# The users column of each correctable field (emergency phones: none, the contacts are added when missing)
+_CORRECTED_COLUMNS: dict[IssueField, str] = {"phone": "phone", "email": "email_primary", "email_2": "email_secondary", "country": "country",
+                                             "nationality": "nationality", "licence": "licence_ffme"}
+
+
+def _write_corrections(cur: sqlite3.Cursor, write: ImportWrite, user_id: int, now_iso: str) -> None:
+    """The admin's corrections written over the member's values: the only exception to "fill blank fields only"."""
+    record = write.entry.record
+    for correction in write.entry.corrections:
+        if correction.field == "birth_date":
+            cur.execute("UPDATE users SET birth_date = ?, birth_date_raw = ?, updated_at = ? WHERE id = ?",
+                        (record.birth_date, record.birth_date_raw, now_iso, user_id))
+        elif correction.field in _CORRECTED_COLUMNS:
+            column = _CORRECTED_COLUMNS[correction.field]
+            cur.execute(f'UPDATE users SET "{column}" = ?, updated_at = ? WHERE id = ?',  # noqa: S608 - column: a value of _CORRECTED_COLUMNS
+                        (record.custom_fields.get(FORM_FIELDS[correction.field], ""), now_iso, user_id))
 
 
 def _assign(cur: sqlite3.Cursor, write: ImportWrite, season_id: int, now_iso: str) -> AppliedWrite:
@@ -164,8 +185,11 @@ class MembershipImportRepository:
         conn = SqliteDatabase.get_connection()
         try:
             members = [KnownMember(user_id=row["id"], last_name=row["last_name"] or "", first_name=row["first_name"] or "",
-                                   birth_date=row["birth_date"] or "", licence=re.sub(r"\D", "", row["licence_ffme"] or ""))
-                       for row in conn.execute("SELECT id, last_name, first_name, birth_date, licence_ffme FROM users")]
+                                   birth_date=row["birth_date"] or "", licence=re.sub(r"\D", "", row["licence_ffme"] or ""),
+                                   phone=row["phone"] or "", email=row["email_primary"] or "", email_2=row["email_secondary"] or "",
+                                   country=row["country"] or "", nationality=row["nationality"] or "")
+                       for row in conn.execute("SELECT id, last_name, first_name, birth_date, licence_ffme, phone, email_primary,"
+                                               " email_secondary, country, nationality FROM users")]
             purchases = [KnownPurchase(purchase_id=row["id"], user_id=row["user_id"], order_ref=str(row["order_ref"] or ""),
                                        season=row["season"] or "", helloasso_item_id=row["helloasso_item_id"],
                                        status=row["status"] or "", tarif_name=row["tarif_name"] or "", amount=float(row["amount"] or 0.0),

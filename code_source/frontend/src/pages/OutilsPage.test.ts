@@ -142,6 +142,11 @@ const MEMBERSHIP_PREVIEW = {
       candidates: [],
       can_create: true,
       changes: [],
+      issues: [],
+      corrections: [],
+      values: {},
+      matched_member: null,
+      last_request: null,
     },
     {
       item_id: 2,
@@ -161,6 +166,11 @@ const MEMBERSHIP_PREVIEW = {
       candidates: [],
       can_create: false,
       changes: [],
+      issues: [{ field: "birth_date", code: "missing", message: "Date de naissance manquante.", blocking: true }],
+      corrections: [],
+      values: {},
+      matched_member: null,
+      last_request: null,
     },
   ],
   members: [] as unknown[],
@@ -451,6 +461,7 @@ describe("OutilsPage", () => {
     expect(byId("ha-count-renewal")!.textContent).toContain("0");
     expect(all("ha-row-new").map((row) => row.textContent)).toEqual([expect.stringContaining("WEASLEY Ginny")]);
     expect(byId("ha-row-blocked")!.textContent).toContain("Date de naissance manquante ou illisible.");
+    expect(all("ha-issue").map((issue) => issue.textContent?.trim())).toEqual(["⛔ Date de naissance manquante."]);
     expect(all("ha-licence").map((cell) => cell.textContent)).toEqual(["—", "—"]);
     expect(all("ha-birth-date").map((cell) => cell.textContent)).toEqual(["11/08/2013", "—"]);
     expect(byId("ha-section-renewal")).toBeNull();
@@ -496,6 +507,139 @@ describe("OutilsPage", () => {
       expect(sent("POST", "/api/helloasso/memberships/preview").at(-1)!.body).toEqual({ campaign: null });
     } finally {
       ANSWERS["GET /api/helloasso/campaigns"] = campaigns;
+    }
+  });
+
+  it("corrects a registration's value from its row: the server checks it, saves it and answers the recomputed preview", async () => {
+    const newRow = MEMBERSHIP_PREVIEW.rows[0]!;
+    const corrected = {
+      ...newRow,
+      values: { phone: "06 12 34 56 78" },
+      corrections: [{ field: "phone", value: "0612345678", helloasso_value: "061234567", author: "albus@poudlard.example", at: "" }],
+    };
+    ANSWERS["POST /api/helloasso/memberships/corrections/check"] = () => json({ status: "success", value: "06 12 34 56 78", issues: [] });
+    ANSWERS["PUT /api/helloasso/memberships/corrections/1/phone"] = () =>
+      json({ ...MEMBERSHIP_PREVIEW, rows: [corrected, MEMBERSHIP_PREVIEW.rows[1]] });
+    try {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      byId("ha-fix-open")!.click();
+      await flushPromises();
+
+      const input = document.querySelector<HTMLInputElement>('[data-testid="ha-fix-phone"] input')!;
+      input.value = "0612345678";
+      input.dispatchEvent(new Event("input"));
+      await vi.advanceTimersByTimeAsync(500);
+      document.querySelector<HTMLButtonElement>('[data-testid="ha-fix-phone"] [data-testid="ha-fix-save"]')!.click();
+      await flushPromises();
+
+      expect(sent("POST", "/api/helloasso/memberships/corrections/check").at(-1)!.body).toEqual({ field: "phone", value: "0612345678" });
+      expect(sent("PUT", "/api/helloasso/memberships/corrections/1/phone").at(-1)!.body).toEqual({
+        value: "0612345678",
+        campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+      });
+      expect(byId("ha-corrected")).not.toBeNull();
+      expect(byId("ha-correction")!.textContent).toContain("061234567");
+    } finally {
+      vi.useRealTimers();
+      delete ANSWERS["POST /api/helloasso/memberships/corrections/check"];
+      delete ANSWERS["PUT /api/helloasso/memberships/corrections/1/phone"];
+    }
+  });
+
+  it("announces a correction that moves the row, then shows the row highlighted in its new section", async () => {
+    const ginny = { user_id: 7, last_name: "WEASLEY", first_name: "Ginny", birth_date: "2013-08-11", licence: "" };
+    const moved = { ...MEMBERSHIP_PREVIEW.rows[0]!, bucket: "renewal", matched_member: ginny };
+    ANSWERS["PUT /api/helloasso/memberships/corrections/1/licence"] = () =>
+      json({ ...MEMBERSHIP_PREVIEW, rows: [moved, MEMBERSHIP_PREVIEW.rows[1]] });
+    const scrollIntoView = vi.fn();
+    const jsdomScroll = Element.prototype.scrollIntoView; // undefined: jsdom does no layout
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      const { byId } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      byId("ha-fix-open")!.click();
+      await flushPromises();
+      const input = document.querySelector<HTMLInputElement>('[data-testid="ha-fix-licence"] input')!;
+      input.value = "123456";
+      input.dispatchEvent(new Event("input"));
+      await flushPromises();
+      document.querySelector<HTMLButtonElement>('[data-testid="ha-fix-licence"] [data-testid="ha-fix-save"]')!.click();
+      await flushPromises();
+
+      expect(byId("ha-fix-move")!.textContent).toContain("« 🆕 Nouveaux » à « 🔁 Renouvellements »");
+      expect(byId("ha-fix-move")!.textContent).toContain("WEASLEY Ginny");
+
+      byId("ha-fix-show")!.click();
+      await flushPromises();
+
+      expect(byId("ha-fix-dialog")).toBeNull();
+      const row = document.querySelector('[data-testid="ha-row-renewal"][data-highlighted]');
+      expect(row?.closest("details")?.open).toBe(true);
+      expect(scrollIntoView).toHaveBeenCalled();
+    } finally {
+      Element.prototype.scrollIntoView = jsdomScroll;
+      delete ANSWERS["PUT /api/helloasso/memberships/corrections/1/licence"];
+    }
+  });
+
+  it("asks a family to correct a registration: summary and example first, then one e-mail sent", async () => {
+    const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
+    const issue = { field: "phone", code: "invalid", message: "Téléphone de l'adhérent invalide (« 0612 »).", blocking: false };
+    ANSWERS["POST /api/helloasso/memberships/preview"] = () =>
+      json({
+        ...MEMBERSHIP_PREVIEW,
+        rows: [
+          {
+            ...MEMBERSHIP_PREVIEW.rows[0]!,
+            issues: [issue],
+            last_request: { at: "2026-09-02T08:30:00+00:00", author: "albus@poudlard.example" },
+          },
+          MEMBERSHIP_PREVIEW.rows[1],
+        ],
+      });
+    const example = {
+      to: "molly@terrier.example",
+      cc: [],
+      subject: "Adhésion : informations à corriger",
+      body: "Bonjour Molly,\n- Téléphone…",
+    };
+    ANSWERS["POST /api/helloasso/memberships/correction-requests/preview"] = () => json({ status: "success", example });
+    ANSWERS["POST /api/helloasso/memberships/correction-requests"] = () =>
+      json({ status: "success", sent: 1, failed: 0, log_notice: null });
+    try {
+      const { byId, sent } = await render("admin", "/bureau/outils/helloasso-import");
+      byId("ha-import-preview")!.click();
+      await flushPromises();
+      byId("ha-request-open")!.click();
+      await flushPromises();
+
+      expect(byId("ha-last-request")!.textContent).toContain("albus@poudlard.example");
+      expect(byId("ha-request-again")!.textContent).toContain("WEASLEY Ginny");
+      expect(byId("ha-request-summary")!.textContent).toBe("1 e-mail à 1 famille, pour 1 inscription");
+      expect(byId("ha-request-example")!.textContent).toContain("molly@terrier.example");
+      const sends = (): unknown[] =>
+        sent("POST", "/api/helloasso/memberships/correction-requests").filter((call) => !call.path.endsWith("/preview"));
+      expect(sends()).toHaveLength(0);
+
+      byId("ha-request-send")!.click();
+      await flushPromises();
+
+      expect(sends()).toEqual([
+        expect.objectContaining({ body: { item_ids: [1], campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2" } }),
+      ]);
+      expect(sent("POST", "/api/helloasso/memberships/correction-requests/preview").at(-1)!.body).toEqual({
+        item_ids: [1],
+        campaign: "adhesion-escalade-2026-2027-amicale-laique-escalade-2",
+      });
+      expect(byId("ha-request-done")!.textContent).toContain("1 e-mail(s) envoyé(s)");
+    } finally {
+      ANSWERS["POST /api/helloasso/memberships/preview"] = preview;
+      delete ANSWERS["POST /api/helloasso/memberships/correction-requests/preview"];
+      delete ANSWERS["POST /api/helloasso/memberships/correction-requests"];
     }
   });
 

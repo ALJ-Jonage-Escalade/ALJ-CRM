@@ -14,6 +14,7 @@ from support.member_db import MemberDbTestCase
 from infrastructure.helloasso.api import HelloAssoApiError
 from infrastructure.security.api_auth import Role, required_role
 from infrastructure.sqlite.connection import SqliteDatabase
+from services.communications import email_log
 
 CAMPAIGN = "adhesion-escalade-2026-2027-amicale-laique-escalade-2"
 PREVIEW = "/api/helloasso/memberships/preview"
@@ -69,6 +70,20 @@ class TestMembershipPreview(HelloAssoImportTestCase):
         self.assertEqual(rows[2]["bucket"], "blocked")
         self.assertTrue(rows[2]["reason"])
         self.assertEqual((self.count("users"), self.count("orders"), self.count("purchases")), (0, 0, 0))
+
+    def test_preview_rows_list_the_problems_of_their_data(self) -> None:
+        self.items = [ha_item(1, "WEASLEY", "Ginny"), ha_item(2, "LOVEGOOD", "Luna", birth_date="01/01/1026")]
+
+        rows = {row["item_id"]: row for row in self.client.post(PREVIEW).json()["rows"]}
+
+        def birth_date_issues(row: dict[str, Any]) -> list[dict[str, Any]]:  # Any: JSON body
+            return [issue for issue in row["issues"] if issue["field"] == "birth_date"]
+
+        self.assertEqual(birth_date_issues(rows[1]), [])
+        self.assertEqual((rows[2]["bucket"], rows[2]["can_create"], rows[2]["birth_date"]), ("to_review", False, "01/01/1026"))
+        [issue] = birth_date_issues(rows[2])
+        self.assertEqual((issue["field"], issue["code"], issue["blocking"]), ("birth_date", "too_old", True))
+        self.assertIn("01/01/1026", issue["message"])
 
     def test_preview_reads_the_environment_then_the_default_campaign_of_the_season(self) -> None:
         self.client.post(PREVIEW)
@@ -204,6 +219,27 @@ class TestMembershipRerunsAndRenewals(HelloAssoImportTestCase):
         self.assertEqual((renewed["last_name"], renewed["first_name"]), ("Weasley", "Ginny"))
         self.assertEqual(result["counts"], {"created": 0, "renewed": 1, "updated": 0, "attached": 0, "skipped": 0})
         self.assertEqual((self.count("users"), self.count("purchases")), (1, 2))
+
+    def test_a_renewal_is_checked_on_the_phone_the_crm_keeps_and_a_new_member_gets_the_normalised_one(self) -> None:
+        self.seed("ORD-OLD", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026",
+                  **{"champ_Date de naissance de l'adhérent": "2013-08-11", "champ_Téléphone ": "0600000000"})
+        typo = {"name": "Téléphone ", "answer": "061234567"}
+        luna_phone = {"name": "Téléphone ", "answer": "+33 6 12 34 56 78"}
+        self.items = [ha_item(1, "Weasley", "Ginny", customFields=[*ha_item(1, "", "")["customFields"], typo]),
+                      ha_item(2, "LOVEGOOD", "Luna", customFields=[*ha_item(2, "", "")["customFields"], luna_phone])]
+
+        rows = {row["item_id"]: row for row in self.client.post(PREVIEW).json()["rows"]}
+        self.import_all()
+
+        self.assertEqual(rows[1]["bucket"], "renewal")
+        self.assertEqual([issue for issue in rows[1]["issues"] if issue["field"] == "phone"], [])
+        conn = SqliteDatabase.get_connection()
+        try:
+            phones = dict(conn.execute("SELECT first_name, phone FROM users").fetchall())
+        finally:
+            conn.close()
+        self.assertEqual(phones, {"Ginny": "0600000000", "Luna": "06 12 34 56 78"})
+
 
 class TestMembershipsToReview(HelloAssoImportTestCase):
 
@@ -356,3 +392,153 @@ class TestMembershipAttachedByHand(HelloAssoImportTestCase):
         self.assertEqual(row["attached_to"], {"user_id": self.ginny, "last_name": "WEASLEY", "first_name": "Ginny",
                                               "birth_date": "2013-08-11", "licence": ""})
         self.assertIn("rattachée à WEASLEY Ginny", row["reason"])
+
+
+CORRECTIONS = "/api/helloasso/memberships/corrections"
+
+
+class TestMembershipCorrections(HelloAssoImportTestCase):
+    """The admin corrects a registration's data from the preview; the correction is kept until the row is imported."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.seed("ORD-OLD", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026",
+                  **{"champ_Date de naissance de l'adhérent": "2013-08-11", "champ_Téléphone ": "0600000000"})
+        self.items = [ha_item(1, "WEASLEY", "Ginny", birth_date="11/08/13")]
+
+    def row(self, body: dict[str, Any]) -> dict[str, Any]:  # Any: JSON body
+        [row] = body["rows"]
+        return row
+
+    def test_a_saved_correction_returns_the_recomputed_preview_and_is_kept_on_later_syncs(self) -> None:
+        self.assertEqual(self.row(self.client.post(PREVIEW).json())["bucket"], "to_review")
+
+        response = self.client.put(f"{CORRECTIONS}/1/birth_date", json={"value": "11/08/2013"})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        row = self.row(response.json())
+        self.assertEqual((row["bucket"], row["birth_date"]), ("renewal", "2013-08-11"))
+        [correction] = row["corrections"]
+        self.assertEqual((correction["field"], correction["value"], correction["helloasso_value"], correction["author"]),
+                         ("birth_date", "11/08/2013", "11/08/13", "serveur local"))
+        self.assertEqual(self.row(self.client.post(PREVIEW).json())["corrections"], [correction])
+
+    def test_an_undone_correction_puts_the_row_back(self) -> None:
+        self.client.put(f"{CORRECTIONS}/1/birth_date", json={"value": "11/08/2013"})
+
+        response = self.client.delete(f"{CORRECTIONS}/1/birth_date")
+
+        self.assertEqual(response.status_code, 200, response.text)
+        row = self.row(response.json())
+        self.assertEqual((row["bucket"], row["corrections"]), ("to_review", []))
+        self.assertEqual(self.fake.store.get("helloasso_membership_corrections"), {})
+
+    def test_a_correction_of_an_unknown_registration_is_refused(self) -> None:
+        response = self.client.put(f"{CORRECTIONS}/99/phone", json={"value": "0612345678"})
+
+        self.assertEqual((response.status_code, response.json()["code"]), (404, "registration_not_found"))
+
+    def test_a_value_is_checked_with_the_import_rules_without_saving(self) -> None:
+        good = self.client.post(f"{CORRECTIONS}/check", json={"field": "phone", "value": "+33612345678"}).json()
+        bad = self.client.post(f"{CORRECTIONS}/check", json={"field": "birth_date", "value": "01/01/1026"}).json()
+
+        self.assertEqual((good["value"], good["issues"]), ("06 12 34 56 78", []))
+        self.assertEqual([(issue["code"], issue["blocking"]) for issue in bad["issues"]], [("too_old", True)])
+        self.assertNotIn("helloasso_membership_corrections", self.fake.store)
+
+    def test_a_corrected_value_overwrites_the_crm_on_import_and_is_recorded_in_the_history(self) -> None:
+        self.client.put(f"{CORRECTIONS}/1/birth_date", json={"value": "11/08/2013"})
+        self.client.put(f"{CORRECTIONS}/1/phone", json={"value": "+33612345678"})
+
+        result = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {"1": {"bucket": "renewal", "choice": "import"}}})
+
+        self.assertEqual(result.status_code, 200, result.text)
+        conn = SqliteDatabase.get_connection()
+        try:
+            phone = conn.execute("SELECT phone FROM users").fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(phone, "06 12 34 56 78")
+        [entry] = self.fake.store["helloasso_membership_imports"].values()
+        self.assertEqual(entry["items"][0]["corrections"], [
+            {"field": "birth_date", "helloasso_value": "11/08/13", "value": "11/08/2013"},
+            {"field": "phone", "helloasso_value": "", "value": "+33612345678"},
+        ])
+
+    def test_a_row_shows_its_correctable_values(self) -> None:
+        self.client.put(f"{CORRECTIONS}/1/country", json={"value": "france"})
+
+        values = self.row(self.client.post(PREVIEW).json())["values"]
+
+        self.assertEqual((values["birth_date"], values["country"], values["phone"]), ("11/08/13", "France", ""))
+
+    def test_a_row_names_the_member_it_now_matches(self) -> None:
+        before = self.row(self.client.post(PREVIEW).json())
+
+        after = self.row(self.client.put(f"{CORRECTIONS}/1/birth_date", json={"value": "11/08/2013"}).json())
+
+        self.assertIsNone(before["matched_member"])
+        self.assertEqual((after["matched_member"]["last_name"], after["matched_member"]["first_name"]), ("WEASLEY", "Ginny"))
+
+
+REQUESTS = "/api/helloasso/memberships/correction-requests"
+
+
+class TestCorrectionRequests(HelloAssoImportTestCase):
+    """The admin asks the families to fix their data: one e-mail per order, to the payer."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        order = {"id": 777, "date": "2026-09-01T10:00:00+02:00"}
+
+        def item(item_id: int, first_name: str, **answers: str) -> dict[str, Any]:  # Any: HelloAsso JSON
+            fields = [*ha_item(item_id, "", "")["customFields"], *({"name": name, "answer": value} for name, value in answers.items())]
+            return ha_item(item_id, "WEASLEY", first_name, order=order, customFields=fields)
+
+        email = "Adresse mail pour la réception des informations du club"
+        self.items = [item(1, "Ginny", **{"Téléphone ": "061234567", email: "ginny@poudlard.example"}),
+                      item(2, "Ron", **{"Téléphone ": "<b>06</b>"})]
+        sent = patch("infrastructure.mail.sender.EmailSender.send_email")
+        self.send_email = sent.start()
+        self.addCleanup(sent.stop)
+        self.store = email_log.current_store()  # the in-memory log of tests/conftest.py
+
+    def test_the_preview_shows_an_example_email_and_sends_nothing(self) -> None:
+        response = self.client.post(f"{REQUESTS}/preview", json={"item_ids": [1, 2]})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        example = response.json()["example"]
+        self.assertEqual((example["to"], example["cc"]), ("parent@terrier.example", ["ginny@poudlard.example"]))
+        self.assertIn("Ginny WEASLEY :\n- Téléphone de l'adhérent invalide (« 061234567 »).", example["body"])
+        self.assertIn("Ron WEASLEY", example["body"])
+        self.send_email.assert_not_called()
+
+    def test_one_email_per_order_goes_to_the_payer_with_the_primary_email_in_copy_and_is_logged(self) -> None:
+        response = self.client.post(REQUESTS, json={"item_ids": [1, 2]})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual((response.json()["sent"], response.json()["failed"]), (1, 0))
+        [call] = self.send_email.call_args_list
+        self.assertEqual((call.kwargs["to_email"], call.kwargs["cc"], call.kwargs["reply_to"]),
+                         ("parent@terrier.example", ["ginny@poudlard.example"], "inscription@alj-escalade.fr"))
+        self.assertIn("&lt;b&gt;06&lt;/b&gt;", call.kwargs["html_body"])  # a typed value never adds markup
+        [logged] = self.store.entries
+        self.assertEqual((logged["kind"], logged["helloasso_order_refs"], logged["helloasso_item_ids"]),
+                         ("correction_request", ["777"], [1, 2]))
+
+    def test_a_request_without_any_problem_is_refused(self) -> None:
+        self.items = [ha_item(3, "LOVEGOOD", "Luna", customFields=[])]
+
+        response = self.client.post(REQUESTS, json={"item_ids": [99]})
+
+        self.assertEqual((response.status_code, response.json()["code"]), (400, "nothing_to_request"))
+
+    def test_a_row_shows_when_its_correction_was_last_asked_and_by_whom(self) -> None:
+        self.assertIsNone(self.client.post(PREVIEW).json()["rows"][0]["last_request"])
+
+        self.client.post(REQUESTS, json={"item_ids": [1]})
+
+        rows = {row["item_id"]: row for row in self.client.post(PREVIEW).json()["rows"]}
+        self.assertEqual(rows[1]["last_request"]["author"], "serveur local")
+        self.assertEqual(rows[1]["last_request"]["at"], self.store.entries[0]["at"])
+        self.assertIsNone(rows[2]["last_request"])

@@ -1,6 +1,7 @@
 /* Import of the HelloAsso membership campaign (server: api/members/helloasso_import.py): the server sorts every
    registration of the campaign into a bucket; the preview shows one section per bucket. */
 import type { BadgeColor } from "../../../components/ui/palette";
+import type { MembershipField } from "../../../services/members";
 import type { Schemas } from "../../../lib/client";
 import { formatDateTime, formatDayText, parseDate } from "../../../lib/format";
 import { normKey } from "../../../lib/text";
@@ -258,6 +259,120 @@ export function initialChoices(preview: MembershipPreview): Choices {
     }
   }
   return choices;
+}
+
+/** The correctable fields of a registration, in the order of the correction dialog, with their label. */
+export const CORRECTABLE_FIELDS: readonly { field: MembershipField; label: string }[] = [
+  { field: "birth_date", label: "Date de naissance" },
+  { field: "phone", label: "Téléphone" },
+  { field: "email", label: "E-mail du club" },
+  { field: "email_2", label: "Deuxième e-mail" },
+  { field: "emergency_phone_1", label: "Téléphone du contact d'urgence" },
+  { field: "emergency_phone_2", label: "Téléphone du 2e contact d'urgence" },
+  { field: "country", label: "Pays" },
+  { field: "nationality", label: "Nationalité" },
+  { field: "licence", label: "Licence FFME" },
+];
+
+/** The corrected values of a row, each with its label and the value HelloAsso gave. */
+export function correctionLines(row: MembershipRow): { label: string; helloasso: string; value: string }[] {
+  return CORRECTABLE_FIELDS.flatMap(({ field, label }) => {
+    const correction = row.corrections.find((found) => found.field === field);
+    return correction ? [{ label, helloasso: correction.helloasso_value, value: correction.value }] : [];
+  });
+}
+
+/** A row whose data the import would write on a member can be corrected (not an imported or changed registration). */
+export function canCorrect(row: MembershipRow): boolean {
+  return row.bucket === "new" || row.bucket === "renewal" || (row.bucket === "to_review" && !row.changes.length);
+}
+
+/** A row the family can be asked to correct: correctable, with problems. */
+export function canRequest(row: MembershipRow): boolean {
+  return canCorrect(row) && row.issues.length > 0;
+}
+
+/** What a correction request of these rows sends: one e-mail per HelloAsso order (one family), for the rows with
+    problems. */
+export function requestSummary(rows: MembershipRow[]): { emails: number; registrations: number; text: string } {
+  const asked = rows.filter((row) => row.issues.length);
+  const emails = new Set(asked.map((row) => row.order_ref)).size;
+  if (!emails) {
+    return { emails, registrations: 0, text: "Aucune des inscriptions choisies n'a d'information à corriger." };
+  }
+  const plural = (count: number, word: string): string => `${count} ${word}${count > 1 ? "s" : ""}`;
+  return {
+    emails,
+    registrations: asked.length,
+    text: `${plural(emails, "e-mail")} à ${plural(emails, "famille")}, pour ${plural(asked.length, "inscription")}`,
+  };
+}
+
+/** « Correction demandée le date, par X », "" when the family was never asked (e-mail log). */
+export function lastRequestText(row: MembershipRow): string {
+  const request = row.last_request;
+  if (!request) {
+    return "";
+  }
+  const date = parseDate(request.at);
+  return `Correction demandée le ${date ? formatDateTime(date) : request.at} par ${request.author}`;
+}
+
+/** The choices after the preview is recomputed (a correction saved or undone): a row still in its section keeps the
+    admin's choice, a row that moved gets the initial choice of its new section. */
+export function keepChoices(before: MembershipPreview, after: MembershipPreview, choices: Choices): Choices {
+  const bucketBefore = new Map(before.rows.map((row) => [row.item_id, row.bucket]));
+  const initial = initialChoices(after);
+  const kept: Choices = {};
+  for (const row of after.rows) {
+    const choice = bucketBefore.get(row.item_id) === row.bucket ? choices[row.item_id] : initial[row.item_id];
+    if (choice) {
+      kept[row.item_id] = choice;
+    }
+  }
+  return kept;
+}
+
+/** A row that changed section after a correction (or its undo): sections before and after, the member it now matches,
+    and the admin's choice the move cancelled. */
+export interface RowMove {
+  from: string;
+  to: string;
+  member: string | null;
+  cancelledChoice: string | null;
+}
+
+function bucketLabel(bucket: BucketName): string {
+  return BUCKETS.find((info) => info.name === bucket)?.label ?? bucket;
+}
+
+/** The label of a choice the admin made on a row (not its initial one), null when they made none. */
+function madeChoice(before: MembershipPreview, row: MembershipRow, choices: Choices): string | null {
+  const choice = choices[row.item_id]?.choice;
+  if (!choice || choice === initialChoices(before)[row.item_id]?.choice) {
+    return null;
+  }
+  const memberId = attachedMemberId(choice);
+  if (memberId !== null) {
+    const picked = before.members.find((member) => member.user_id === memberId);
+    return picked ? `Rattacher à ${personLabel(picked)}` : "Rattacher à un autre adhérent";
+  }
+  return reviewOptions(row).find((option) => option.value === choice)?.label ?? choice;
+}
+
+/** How a registration moved between two previews, null when it stayed in its section. */
+export function describeMove(before: MembershipPreview, after: MembershipPreview, itemId: number, choices: Choices): RowMove | null {
+  const old = before.rows.find((row) => row.item_id === itemId);
+  const moved = after.rows.find((row) => row.item_id === itemId);
+  if (!old || !moved || old.bucket === moved.bucket) {
+    return null;
+  }
+  return {
+    from: bucketLabel(old.bucket),
+    to: bucketLabel(moved.bucket),
+    member: moved.matched_member ? personLabel(moved.matched_member) : null,
+    cancelledChoice: madeChoice(before, old, choices),
+  };
 }
 
 /** Body of the import: the choice of each checked row (with its comment for an attach), skip for the others, with the

@@ -7,6 +7,7 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 from api.request_body import RequestBody
+from domain.members.member_data_rules import IssueField
 from domain.members.membership_import import Bucket, ChangedField, MembershipKind
 
 
@@ -38,6 +39,29 @@ class MembershipChange(BaseModel):
     after: str
 
 
+class MembershipIssue(BaseModel):
+    """A problem of a value the import would store: `blocking` (birth date only) holds the row in « À vérifier »."""
+    field: IssueField
+    code: str
+    message: str
+    blocking: bool
+
+
+class MembershipCorrection(BaseModel):
+    """The admin's correction of one field: the value used instead of HelloAsso's, kept until the row is imported."""
+    field: IssueField
+    value: str
+    helloasso_value: str
+    author: str
+    at: str
+
+
+class MembershipRequest(BaseModel):
+    """The last correction request sent to the family about the registration (e-mail log)."""
+    at: str
+    author: str
+
+
 class MembershipRow(BaseModel):
     """One HelloAsso registration and what the import would do with it. to_review rows: the candidate members, and
     whether a new member can be created from it (never without a birth date). Dates as HelloAsso gives them (ISO),
@@ -61,6 +85,13 @@ class MembershipRow(BaseModel):
     can_create: bool
     changes: List[MembershipChange]
     attached_to: Optional[MembershipCandidate] = None  # imported rows: the member, when their name is not the HelloAsso one
+    # The member the registration is recognised as (renewal, imported, changed), None for a new person or a row to review
+    matched_member: Optional[MembershipCandidate]
+    issues: List[MembershipIssue]
+    corrections: List[MembershipCorrection]
+    # The correctable values, by field (member_data_rules.IssueField): HelloAsso's, normalised, or the corrected one
+    values: Dict[str, str]
+    last_request: Optional[MembershipRequest]
 
 
 class MembershipMember(BaseModel):
@@ -149,3 +180,48 @@ class MembershipLastImport(BaseModel):
 class MembershipLastSync(BaseModel):
     """The latest import, null before the first one."""
     last_sync: Optional[MembershipLastImport]
+
+
+class MembershipCorrectionRequest(RequestBody):
+    """The corrected value of one field; `campaign`: the one of the preview (see MembershipPreviewRequest)."""
+    value: str = Field(max_length=200)
+    campaign: Optional[str] = None
+
+
+class MembershipValueCheckRequest(RequestBody):
+    field: IssueField
+    value: str = Field(max_length=200)
+
+
+class MembershipValueCheck(BaseModel):
+    """A value checked with the import's rules, nothing saved: `value` as it would be stored, and its issues."""
+    status: Literal["success"]
+    value: str
+    issues: List[MembershipIssue]
+
+
+class CorrectionRequestBody(RequestBody):
+    """The registrations to ask the families about (HelloAsso item ids); `campaign`: the one of the preview."""
+    item_ids: List[int] = Field(min_length=1, max_length=500)
+    campaign: Optional[str] = None
+
+
+class CorrectionEmail(BaseModel):
+    to: str
+    cc: List[str]
+    subject: str
+    body: str = Field(description="Plain text")
+
+
+class CorrectionRequestPreview(BaseModel):
+    """The e-mail of the first order, as it would be sent (nothing is sent)."""
+    status: Literal["success"]
+    example: CorrectionEmail
+
+
+class CorrectionRequestResult(BaseModel):
+    """One e-mail per order: `sent` left, `failed` did not; `log_notice`: the send is not in the e-mail log."""
+    status: Literal["success"]
+    sent: int
+    failed: int
+    log_notice: Optional[str] = None

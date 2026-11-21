@@ -7,6 +7,8 @@ from dataclasses import replace
 import pytest
 
 from domain.members.helloasso_membership import MembershipRecord
+from domain.members.import_corrections import FieldCorrection
+from domain.members.member_data_rules import IssueField
 from domain.members.membership_import import (
     Bucket,
     Decision,
@@ -14,6 +16,7 @@ from domain.members.membership_import import (
     KnownMember,
     KnownPurchase,
     MembersSnapshot,
+    PlanEntry,
     StaleDecisions,
     WriteAction,
     apply_decisions,
@@ -217,11 +220,19 @@ def test_a_person_without_a_close_name_and_birth_date_is_new(overrides: dict[str
     assert _plan(_record(9001, **overrides)).entries[0].bucket == Bucket.NEW
 
 
-def test_a_registration_without_birth_date_is_never_new() -> None:
-    plan = _plan(_record(9001, last_name="Granger", first_name="Hermione", birth_date="", licence=""))
+@pytest.mark.parametrize(("birth_date", "typed", "issue"), [
+    ("", "", "missing"),
+    ("", "11/08/13", "unreadable"),
+    ("1026-01-01", "01/01/1026", "too_old"),  # read, but implausible: never reaches the FFME
+    ("2026-08-11", "11/08/2026", "too_young"),  # the registration year typed in
+], ids=["missing", "unreadable", "too old", "too young"])
+def test_a_registration_without_a_plausible_birth_date_is_never_new(birth_date: str, typed: str, issue: str) -> None:
+    plan = _plan(_record(9001, last_name="Granger", first_name="Hermione", birth_date=birth_date, birth_date_raw=typed, licence=""))
 
     assert plan.entries[0].bucket == Bucket.TO_REVIEW
     assert not plan.entries[0].can_create
+    assert [(found.field, found.code, found.blocking) for found in plan.entries[0].issues
+            if found.field == "birth_date"] == [("birth_date", issue, True)]
     with pytest.raises(StaleDecisions):
         apply_decisions(plan, {9001: Decision(Bucket.TO_REVIEW, "create")})
 
@@ -381,3 +392,146 @@ def test_the_season_membership_of_each_member_is_known_to_the_preview(purchases:
     plan = _plan(_record(2, last_name="Potter"), purchases=purchases)
 
     assert season_membership(plan, 7).kind == expected
+
+
+# ---------------------------------------------------------------------------
+# Data checks: the values the import would store, normalised, with their issues
+# ---------------------------------------------------------------------------
+def _issues(entry: PlanEntry) -> list[tuple[str, str]]:
+    return [(issue.field, issue.code) for issue in entry.issues]
+
+
+def test_a_new_member_is_written_with_normalised_phones() -> None:
+    record = _record(custom_fields={"Téléphone ": "+33 6 12 34 56 78",
+                                    "Personne à prévenir en cas d'urgence - Téléphone": "0033612345679"})
+
+    [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN).entries
+
+    fields = entry.record.legacy_fields()
+    assert (fields["champ_Téléphone "], fields["champ_Personne à prévenir en cas d'urgence - Téléphone"]) == ("06 12 34 56 78",
+                                                                                                         "06 12 34 56 79")
+    assert [field for field, _code in _issues(entry) if "phone" in field] == []
+
+
+def test_a_registration_with_problems_stays_importable() -> None:
+    record = _record(custom_fields={"Téléphone ": "061234567"})
+
+    [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN).entries
+
+    assert entry.bucket == Bucket.NEW
+    assert ("phone", "invalid") in _issues(entry)
+    assert [write.action for write in apply_decisions(_plan(record, members=()), {9001: Decision(Bucket.NEW, "import")})] == [WriteAction.CREATE]
+
+
+@pytest.mark.parametrize(("crm_phone", "expected"), [
+    ("06 12 34 56 78", []),  # the CRM value is kept: the HelloAsso typo is never written
+    ("", [("phone", "invalid")]),  # blank in the CRM: the HelloAsso value fills it
+])
+def test_a_renewal_is_checked_on_the_values_it_will_keep(crm_phone: str, expected: list[tuple[str, str]]) -> None:
+    record = _record(custom_fields={"Téléphone ": "061234567"})
+
+    [entry] = _plan(record, members=(replace(GINNY, phone=crm_phone),)).entries
+
+    assert entry.bucket == Bucket.RENEWAL
+    assert [issue for issue in _issues(entry) if issue[0] == "phone"] == expected
+
+
+EMAIL_FIELD = "Adresse mail pour la réception des informations du club"
+EMAIL_2_FIELD = "Deuxième adresse mail pour la réception des informations du club"
+
+
+def test_the_emails_are_checked_with_the_domain_check_and_written_normalised() -> None:
+    record = _record(custom_fields={EMAIL_FIELD: "Molly@Terrier.Example", EMAIL_2_FIELD: "arthur@gmial.com"})
+
+    [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN,
+                                     domain_accepts_mail=lambda domain: domain != "gmial.com").entries
+
+    assert [issue for issue in _issues(entry) if issue[0].startswith("email")] == [("email_2", "no_mail_domain")]
+    assert entry.record.legacy_fields()[f"champ_{EMAIL_FIELD}"] == "Molly@terrier.example"
+
+
+def test_a_renewal_is_checked_on_the_emails_the_crm_keeps() -> None:
+    record = _record(custom_fields={EMAIL_FIELD: "molly terrier.example"})
+
+    [entry] = _plan(record, members=(replace(GINNY, email="molly@terrier.example"),)).entries
+
+    assert [issue for issue in _issues(entry) if issue[0].startswith("email")] == []
+
+
+def test_countries_and_nationalities_are_written_in_their_canonical_spelling() -> None:
+    record = _record(custom_fields={"Pays": "FRANCE", "Nationalité": "FRANCAISE"})
+
+    [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN).entries
+
+    fields = entry.record.legacy_fields()
+    assert (fields["champ_Pays"], fields["champ_Nationalité"]) == ("France", "Française")
+    assert [issue for issue in _issues(entry) if issue[0] in ("country", "nationality")] == []
+
+
+def test_a_renewal_is_checked_on_the_country_and_licence_the_crm_keeps() -> None:
+    record = _record(licence="12345", custom_fields={"Pays": "Bretagne", "Nationalité": "Bretonne"})
+    member = replace(GINNY, licence="123456", country="France", nationality="Française")
+
+    [entry] = _plan(record, members=(member,)).entries
+
+    assert entry.bucket == Bucket.RENEWAL
+    assert [issue for issue in _issues(entry) if issue[0] in ("country", "nationality", "licence")] == []
+
+
+def test_a_new_member_with_a_wrong_licence_is_warned() -> None:
+    [entry] = plan_membership_import([_record(licence="12345")], season=SEASON, campaign_slug=CAMPAIGN).entries
+
+    assert ("licence", "invalid") in _issues(entry)
+
+
+def test_a_renewal_with_another_licence_on_helloasso_says_the_crm_one_is_kept() -> None:
+    [entry] = _plan(_record(licence="654321")).entries
+
+    assert entry.bucket == Bucket.RENEWAL
+    assert "654321" in entry.reason and "123456" in entry.reason
+
+
+# ---------------------------------------------------------------------------
+# Corrections: the admin's fixes, applied before the registrations are classified
+# ---------------------------------------------------------------------------
+def _correction(field: IssueField, value: str, helloasso_value: str = "") -> FieldCorrection:
+    return FieldCorrection(field=field, value=value, helloasso_value=helloasso_value, author="albus@poudlard.example",
+                           at="2026-09-02T10:00:00+00:00")
+
+
+def test_a_corrected_birth_date_is_classified_on_the_corrected_value() -> None:
+    record = _record(birth_date="", birth_date_raw="11/08/13")
+    correction = _correction("birth_date", "11/08/2013", "11/08/13")
+
+    [before] = _plan(record).entries
+    [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN, snapshot=MembersSnapshot(members=[GINNY, LUNA]),
+                                     corrections={9001: {"birth_date": correction}}).entries
+
+    assert before.bucket == Bucket.TO_REVIEW
+    assert (entry.bucket, entry.member_id) == (Bucket.RENEWAL, GINNY.user_id)
+    assert [issue for issue in _issues(entry) if issue[0] == "birth_date"] == []
+    assert entry.corrections == (correction,)
+
+
+def test_a_corrected_field_of_a_renewal_is_checked_instead_of_the_crm_value() -> None:
+    record = _record(custom_fields={"Téléphone ": "061234567"})
+    member = replace(GINNY, phone="0600000000")
+
+    [entry] = plan_membership_import([record], season=SEASON, campaign_slug=CAMPAIGN, snapshot=MembersSnapshot(members=[member]),
+                                     corrections={9001: {"phone": _correction("phone", "07 12 34 56 7")}}).entries
+
+    assert ("phone", "invalid") in _issues(entry)
+    assert entry.record.custom_fields["Téléphone "] == "07 12 34 56 7"
+
+
+@pytest.mark.parametrize(("field", "value", "expected"), [
+    ("phone", "+33612345678", ("Téléphone ", "06 12 34 56 78")),
+    ("licence", "654321", ("Numéro de Licence FFME (6 chiffres)", "654321")),
+    ("country", "france", ("Pays", "France")),
+])
+def test_a_corrected_value_is_written_normalised(field: IssueField, value: str, expected: tuple[str, str]) -> None:
+    [entry] = plan_membership_import([_record()], season=SEASON, campaign_slug=CAMPAIGN,
+                                     corrections={9001: {field: _correction(field, value)}}).entries
+
+    name, written = expected
+    assert entry.record.custom_fields[name] == written

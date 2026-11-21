@@ -16,9 +16,12 @@ from domain.email_log import (
     Competitor,
     ContactSummary,
     EmailKind,
+    CORRECTION_REQUEST_KIND,
     EmailLogEntry,
+    LastRequest,
     LoggedRecipient,
     contact_summary,
+    last_correction_requests,
     member_ids_of,
 )
 from infrastructure.firestore.competitions import competitions
@@ -61,7 +64,8 @@ def logged_recipient(email: str, name: str = "", member_id: Optional[int] = None
 
 
 def record_send(kind: EmailKind, author: str, recipients: Sequence[LoggedRecipient], subject: str,
-                template: str = "", competition_ids: Iterable[int] = ()) -> Optional[str]:
+                template: str = "", competition_ids: Iterable[int] = (), helloasso_order_refs: Iterable[str] = (),
+                helloasso_item_ids: Iterable[int] = ()) -> Optional[str]:
     """Writes one entry for a send action; returns NOT_RECORDED when the store failed (logged), else None."""
     entry = EmailLogEntry(
         at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
@@ -72,6 +76,8 @@ def record_send(kind: EmailKind, author: str, recipients: Sequence[LoggedRecipie
         competition_ids=list(dict.fromkeys(competition_ids)),
         member_ids=member_ids_of(recipients),
         recipients=list(recipients),
+        helloasso_order_refs=list(dict.fromkeys(helloasso_order_refs)),
+        helloasso_item_ids=list(dict.fromkeys(helloasso_item_ids)),
     )
     try:
         current_store().add_entry(entry)
@@ -110,3 +116,13 @@ def recent_history() -> RecentHistory:
     names = {competition.id: competition.nom for competition in competitions.list_competitions()
              if competition.id is not None and competition.id in mentioned}
     return RecentHistory(entries=entries, competition_names=names, truncated=len(entries) >= RECENT_LIMIT)
+
+
+def last_correction_requests_by_item() -> Dict[int, LastRequest]:
+    """When each HelloAsso registration was last asked to be corrected. Never raises: the log unreadable, the rows
+    show no request (logged), the import page still works."""
+    try:
+        return last_correction_requests(current_store().list_of_kind(CORRECTION_REQUEST_KIND))
+    except Exception:  # the trace is a help, never a reason to refuse the preview
+        logger.warning("E-mail log: correction requests unreadable", exc_info=True)
+        return {}

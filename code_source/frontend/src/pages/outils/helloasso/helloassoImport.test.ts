@@ -11,6 +11,10 @@ import {
   incompleteRows,
   initialChoices,
   isCheckable,
+  lastRequestText,
+  requestSummary,
+  describeMove,
+  keepChoices,
   lastSyncText,
   memberHref,
   memberOptionLabel,
@@ -49,6 +53,11 @@ const row = (change: Partial<MembershipRow>): MembershipRow => ({
   candidates: [],
   can_create: true,
   changes: [],
+  issues: [],
+  corrections: [],
+  values: {},
+  matched_member: null,
+  last_request: null,
   ...change,
 });
 
@@ -266,5 +275,85 @@ describe("helloassoImport", () => {
     expect(lastSyncText({ at: "2026-10-24T14:05:00", author: "Albus", season: "2026-2027", campaign: "a" })).toMatch(
       /^Dernière synchro : 24\/10\/2026.*, par Albus$/,
     );
+  });
+});
+
+describe("keepChoices", () => {
+  it("keeps the admin's choices on the rows still in their section, and gives the moved rows their initial choice", () => {
+    const before = preview([row({ item_id: 1 }), row({ item_id: 2, bucket: "to_review", candidates: [] })]);
+    const after = preview([row({ item_id: 1 }), row({ item_id: 2, bucket: "renewal" })]);
+    const choices: Choices = {
+      1: { checked: false, choice: "import", comment: "" },
+      2: { checked: true, choice: "create", comment: "" },
+    };
+
+    expect(keepChoices(before, after, choices)).toEqual({
+      1: { checked: false, choice: "import", comment: "" },
+      2: { checked: true, choice: "import", comment: "" },
+    });
+  });
+});
+
+describe("describeMove", () => {
+  const ginny = { user_id: 7, last_name: "WEASLEY", first_name: "Ginny", birth_date: "2013-08-11", licence: "" };
+  const toReview = row({ item_id: 2, bucket: "to_review", can_create: true, candidates: [ginny] });
+
+  it("names the old section, the new one and the member the row now matches", () => {
+    const after = preview([row({ item_id: 2, bucket: "renewal", matched_member: ginny })]);
+
+    expect(describeMove(preview([toReview]), after, 2, {})).toEqual({
+      from: "⚠️ À vérifier",
+      to: "🔁 Renouvellements",
+      member: "WEASLEY Ginny",
+      cancelledChoice: null,
+    });
+  });
+
+  it("names the choice the move cancels", () => {
+    const after = preview([row({ item_id: 2, bucket: "renewal", matched_member: ginny })]);
+    const choices: Choices = { 2: { checked: true, choice: "create", comment: "" } };
+
+    expect(describeMove(preview([toReview]), after, 2, choices)?.cancelledChoice).toBe("Créer un nouvel adhérent");
+  });
+
+  it("names a member picked by hand as the cancelled choice", () => {
+    const after = preview([row({ item_id: 2, bucket: "new" })]);
+    const choices: Choices = { 2: { checked: true, choice: "attach:9", comment: "Sa fille" } };
+
+    const move = describeMove(preview([toReview], [member({ user_id: 9 })]), after, 2, choices);
+
+    expect(move).toMatchObject({ to: "🆕 Nouveaux", member: null, cancelledChoice: "Rattacher à WEASLEY Molly" });
+  });
+
+  it("is null when the row stays in its section", () => {
+    expect(describeMove(preview([toReview]), preview([toReview]), 2, {})).toBeNull();
+  });
+});
+
+describe("requestSummary", () => {
+  const issue = { field: "phone" as const, code: "invalid", message: "Téléphone invalide.", blocking: false };
+
+  it("counts one e-mail per order, the registrations with problems only", () => {
+    const rows = [
+      row({ item_id: 1, order_ref: "500", issues: [issue] }),
+      row({ item_id: 2, order_ref: "500", issues: [issue] }),
+      row({ item_id: 3, order_ref: "501", issues: [issue] }),
+      row({ item_id: 4, order_ref: "502" }),
+    ];
+
+    expect(requestSummary(rows)).toEqual({ emails: 2, registrations: 3, text: "2 e-mails à 2 familles, pour 3 inscriptions" });
+  });
+
+  it("says when nothing is to be asked", () => {
+    expect(requestSummary([row({})]).text).toBe("Aucune des inscriptions choisies n'a d'information à corriger.");
+  });
+});
+
+describe("lastRequestText", () => {
+  it("says when and by whom the family was last asked", () => {
+    const asked = row({ last_request: { at: "2026-09-02T08:30:00+00:00", author: "albus@poudlard.example" } });
+
+    expect(lastRequestText(asked)).toMatch(/^Correction demandée le 02\/09\/2026 .* par albus@poudlard\.example$/);
+    expect(lastRequestText(row({}))).toBe("");
   });
 });

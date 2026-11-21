@@ -46,7 +46,8 @@ def _ascii_filename(name: str, fallback: str) -> str:
 
 def build_message(to_email: str, subject: str, body: str, sender: str, sender_name: Optional[str] = None,
                   html_body: Optional[str] = None, inline_images: Optional[Sequence[Tuple[str, str]]] = None,
-                  attachment_bytes: Optional[bytes] = None, attachment_filename: Optional[str] = None) -> MIMEMultipart:
+                  attachment_bytes: Optional[bytes] = None, attachment_filename: Optional[str] = None,
+                  cc: Sequence[str] = (), reply_to: Optional[str] = None) -> MIMEMultipart:
     """The MIME message. Header values may come from member data: line breaks are removed so they cannot add
     headers. html_body: an HTML alternative to `body`, with inline images ((path, Content-ID) pairs);
     attachment_bytes: a file made in memory (PDF), never written to disk."""
@@ -55,6 +56,10 @@ def build_message(to_email: str, subject: str, body: str, sender: str, sender_na
     msg["To"] = sanitize_email_header(to_email)
     name = sanitize_email_header(sender_name)
     msg["From"] = formataddr((name, sender)) if name else sender  # RFC 2822: readable name, accents encoded
+    if cc:
+        msg["Cc"] = ", ".join(sanitize_email_header(address) for address in cc)
+    if reply_to:
+        msg["Reply-To"] = sanitize_email_header(reply_to)
 
     if html_body:
         alternative = MIMEMultipart("alternative")
@@ -116,12 +121,14 @@ class EmailSender:
     def send_email(cls, to_email: str, subject: str, body: str, html_body: Optional[str] = None,
                    inline_images: Optional[Sequence[Tuple[str, str]]] = None, from_email: Optional[str] = None,
                    from_name: Optional[str] = None, attachment_bytes: Optional[bytes] = None,
-                   attachment_filename: Optional[str] = None) -> None:
+                   attachment_filename: Optional[str] = None, cc: Sequence[str] = (), reply_to: Optional[str] = None) -> None:
         """Sends one e-mail (`to_email`: one address, or several separated by commas) through the Gmail API when the
         club's OAuth account is configured, else SMTP. `from_email`: sender address (a verified alias of the
-        account), the account itself by default; `from_name`: name shown in the "From" column.
+        account), the account itself by default; `from_name`: name shown in the "From" column; `cc`: addresses in
+        copy; `reply_to`: the address the answers go to.
         Raises MailError on any failure; the audit log records the outcome either way."""
         to_email = sanitize_email_header(to_email)  # may come from member data: no line break in the envelope
+        cc = [sanitize_email_header(address) for address in cc if address.strip()]
         gmail_user = SecretStore.get_secret("GMAIL_USER_EMAIL")
         use_gmail = bool(gmail_user and SecretStore.get_secret("GMAIL_CLIENT_ID") and SecretStore.get_secret("GMAIL_REFRESH_TOKEN"))
         smtp_user = SecretStore.get_secret("SMTP_USER")
@@ -129,11 +136,11 @@ class EmailSender:
         sender = sanitize_email_header(from_email) or (gmail_user if use_gmail else smtp_from)
         try:
             msg = build_message(to_email, subject, body, sender, from_name, html_body, inline_images,
-                                attachment_bytes, attachment_filename)
+                                attachment_bytes, attachment_filename, cc, reply_to)
             if use_gmail:
                 cls._send_with_gmail(msg, gmail_user)
             else:
-                cls._send_with_smtp(msg, to_email, smtp_user, smtp_from)
+                cls._send_with_smtp(msg, ", ".join([to_email, *cc]), smtp_user, smtp_from)
         except Exception as e:  # MailError, or any transport failure (network, smtplib, Google token)
             cls.log_audit(to_email, subject, "FAIL", str(e))
             if isinstance(e, MailError):
