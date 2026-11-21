@@ -164,7 +164,6 @@ export function breakdown(members: readonly SeasonMember[], dimension: Dimension
 /** The figures of the season's cards; percentages and average age null without members (or known ages). */
 export interface MemberCards {
   members: number;
-  womenPercent: number | null;
   newPercent: number | null;
   /** Average of the known ages, one decimal */
   averageAge: number | null;
@@ -179,7 +178,6 @@ export function memberCards(records: readonly MemberStatsRecord[], season: strin
   const ages = members.flatMap((member) => (member.age === null ? [] : [member.age]));
   return {
     members: members.length,
-    womenPercent: percentOf(members.filter((member) => member.sex === "F").length, members.length),
     newPercent: percentOf(members.filter((member) => !member.returning).length, members.length),
     averageAge: ages.length ? Math.round((ages.reduce((sum, age) => sum + age, 0) / ages.length) * 10) / 10 : null,
     cancelled: records.filter((record) => record.season === season && record.status === "Annulé").length,

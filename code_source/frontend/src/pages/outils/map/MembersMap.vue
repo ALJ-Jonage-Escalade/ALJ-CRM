@@ -83,7 +83,6 @@ onBeforeUnmount(() => {
   view?.destroy();
   view = null;
 });
-defineExpose({ reload: load });
 </script>
 
 <template>

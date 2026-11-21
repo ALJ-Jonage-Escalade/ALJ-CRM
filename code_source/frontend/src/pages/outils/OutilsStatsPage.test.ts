@@ -93,7 +93,8 @@ describe("OutilsStatsPage, members", () => {
     const { byId } = await render();
 
     expect(byId("card-members")!.textContent).toContain("3");
-    expect(byId("card-women")!.textContent).toContain("33 %");
+    expect(byId("card-new")!.textContent).toContain("0 %");
+    expect(byId("card-women")).toBeNull();
   });
 
   it("opens the breakdown of a chart with « Détail », in counts or in percent of each bar", async () => {
@@ -111,6 +112,12 @@ describe("OutilsStatsPage, members", () => {
     byId("detail-sex")!.click();
     await flushPromises();
     expect(byId("chart-sex-detail")).toBeNull();
+  });
+
+  it("follows the members of every season by sex, with their total", async () => {
+    const { figures } = await render();
+
+    expect(figures("chart-seasons")).toEqual(["2025-2026: 1: 0: 1", "2026-2027: 1: 2: 3"]);
   });
 
   it("says the statistics need the network instead of showing empty charts", async () => {

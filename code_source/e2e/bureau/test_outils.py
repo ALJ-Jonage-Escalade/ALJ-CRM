@@ -56,9 +56,6 @@ def test_members_map(page):
     expect(page.get_by_test_id("map-groups")).to_contain_text("Aucun groupe sélectionné")
     page.keyboard.press("Escape")
 
-    page.get_by_test_id("tools-refresh").click()
-    expect(page.get_by_test_id("toast")).to_contain_text("Carte réactualisée")
-
 
 def test_member_statistics(page):
     """Statistiques: the charts are drawn by Chart.js in a real browser, the breakdown opens under its chart."""

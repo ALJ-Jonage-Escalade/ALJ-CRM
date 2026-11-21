@@ -42,7 +42,6 @@ async function download(): Promise<void> {
 onMounted(load);
 // The counts describe the file to download: they follow the « Terminé » option
 watch(includeFinished, load);
-defineExpose({ reload: load });
 
 const count = (n: number | undefined) => (n === undefined ? "…" : String(n));
 </script>

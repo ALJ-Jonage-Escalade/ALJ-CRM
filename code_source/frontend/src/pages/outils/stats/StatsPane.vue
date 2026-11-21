@@ -28,8 +28,6 @@ async function load(): Promise<void> {
 
 onMounted(load);
 
-defineExpose({ reload: load });
-
 const seasons = computed(() => seasonStats(competitions.value, SEASON_COUNT));
 const participationRate = computed(() => participationRateText(competitions.value));
 const podiumCount = computed(() => seasons.value.reduce((sum, season) => sum + season.podiums, 0));

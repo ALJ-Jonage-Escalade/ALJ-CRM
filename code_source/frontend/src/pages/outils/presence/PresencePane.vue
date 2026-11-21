@@ -82,7 +82,6 @@ function downloadCourses(): void {
 }
 
 onMounted(load);
-defineExpose({ reload: load });
 
 const field = "w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs";
 const label = "mb-0.5 block text-[11.5px] font-semibold text-slate-500";

@@ -375,32 +375,18 @@ describe("OutilsPage", () => {
     await open("stats");
     expect(byId("sub-side-stats")!.getAttribute("aria-current")).toBe("page");
     expect(sent("GET", "/api/reports/member-stats")).toHaveLength(1);
-    byId("tools-refresh")!.click();
-    await flushPromises();
-    expect(sent("GET", "/api/reports/member-stats")).toHaveLength(2);
-    expect(byId("toast")!.textContent).toBe("🔄 Statistiques réactualisées.");
 
     // The map stays loaded: back to it, no new request
     await open("map");
     expect(byId("sub-side-map")!.getAttribute("aria-current")).toBe("page");
     expect(sent("GET", "/api/reports/map-points")).toHaveLength(2);
-    byId("tools-refresh")!.click();
-    await flushPromises();
-    expect(sent("GET", "/api/reports/map-points")).toHaveLength(3);
-    expect(byId("toast")!.textContent).toBe("🔄 Carte réactualisée.");
   });
 
-  it("offers the reload only on the sub-pages showing data that can go stale", async () => {
+  it("shows the sub-pages without a header card above them", async () => {
     const { byId, open } = await render("admin");
-    expect(byId("tools-refresh")).not.toBeNull();
-    for (const sub of ["ffme-import", "helloasso-import", "cles"]) {
+    for (const sub of ["map", "stats", "presence", "ffme"]) {
       await open(sub);
-      expect(byId(`pane-${sub}`), sub).not.toBeNull();
       expect(byId("tools-refresh"), sub).toBeNull();
-    }
-    for (const sub of ["stats", "presence", "ffme", "map"]) {
-      await open(sub);
-      expect(byId("tools-refresh"), sub).not.toBeNull();
     }
   });
 

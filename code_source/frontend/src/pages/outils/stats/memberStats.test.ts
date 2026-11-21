@@ -116,7 +116,7 @@ describe("member stats", () => {
     });
   });
 
-  it("sums up the season: members, women and new members in percent, average of the known ages, cancelled purchases", () => {
+  it("sums up the season: members, new members in percent, average of the known ages, cancelled purchases", () => {
     const records = [
       purchase(1, { sex: "F", age: 10, returning: false }),
       purchase(1, { sex: "F", age: 10, returning: false, group: "Compétition" }),
@@ -128,7 +128,7 @@ describe("member stats", () => {
       purchase(6, { status: "Annulé", season: "2025-2026" }),
     ];
 
-    expect(memberCards(records, SEASON)).toEqual({ members: 3, womenPercent: 33, newPercent: 33, averageAge: 25.5, cancelled: 2 });
+    expect(memberCards(records, SEASON)).toEqual({ members: 3, newPercent: 33, averageAge: 25.5, cancelled: 2 });
   });
 
   it("counts the members of every season by sex, oldest season first", () => {

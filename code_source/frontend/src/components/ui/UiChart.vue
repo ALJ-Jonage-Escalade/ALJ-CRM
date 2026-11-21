@@ -1,21 +1,48 @@
 <script setup lang="ts">
-/* A pie or bar chart (Chart.js, only the parts used are registered) with its figures in a visually hidden table: screen
+/* A pie, bar or line chart (Chart.js, only the parts used are registered) with its figures in a visually hidden table: screen
    readers read the table, and the tests too (jsdom draws no canvas). A click anywhere on the chart emits `select`. */
-import { ArcElement, BarController, BarElement, CategoryScale, Chart, Legend, LinearScale, PieController, Tooltip } from "chart.js";
+import {
+  ArcElement,
+  BarController,
+  BarElement,
+  CategoryScale,
+  Chart,
+  Legend,
+  LinearScale,
+  LineController,
+  LineElement,
+  PieController,
+  PointElement,
+  Tooltip,
+} from "chart.js";
 import { onBeforeUnmount, onMounted, useTemplateRef, watch } from "vue";
 
-Chart.register(ArcElement, BarController, BarElement, CategoryScale, LinearScale, Legend, PieController, Tooltip);
+Chart.register(
+  ArcElement,
+  BarController,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  Legend,
+  LineController,
+  LineElement,
+  PieController,
+  PointElement,
+  Tooltip,
+);
 
 export interface ChartDataset {
   label: string;
   data: number[];
-  /** One colour per value (a pie), or one for the whole dataset (a bar series); CSS colours. */
+  /** One colour per value (a pie), or one for the whole dataset (a bar series, a line); CSS colours. */
   colors: string | string[];
+  /** A line drawn dashed (a total next to its parts) */
+  dashed?: boolean;
 }
 
 const props = withDefaults(
   defineProps<{
-    type: "pie" | "bar";
+    type: "pie" | "bar" | "line";
     title: string;
     labels: string[];
     datasets: ChartDataset[];
@@ -35,7 +62,13 @@ let chart: Chart | null = null;
 function chartData() {
   return {
     labels: props.labels,
-    datasets: props.datasets.map((dataset) => ({ label: dataset.label, data: dataset.data, backgroundColor: dataset.colors })),
+    datasets: props.datasets.map((dataset) => ({
+      label: dataset.label,
+      data: dataset.data,
+      backgroundColor: dataset.colors,
+      borderColor: props.type === "pie" ? "#fff" : dataset.colors, // white between the slices of a pie
+      borderDash: dataset.dashed ? [6, 4] : [],
+    })),
   };
 }
 
@@ -52,7 +85,7 @@ onMounted(() => {
       responsive: true,
       maintainAspectRatio: false,
       indexAxis: props.horizontal ? "y" : "x",
-      scales: props.type === "bar" ? { x: scale, y: scale } : {},
+      scales: props.type === "pie" ? {} : { x: scale, y: scale },
       plugins: {
         legend: { display: props.type === "pie" || props.datasets.length > 1, position: "bottom" },
         tooltip: { callbacks: props.unit ? { label: (item) => `${item.dataset.label ?? ""} : ${item.formattedValue} ${props.unit}` } : {} },

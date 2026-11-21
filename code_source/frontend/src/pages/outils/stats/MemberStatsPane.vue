@@ -34,7 +34,6 @@ async function load(): Promise<void> {
 }
 
 onMounted(load);
-defineExpose({ reload: load });
 
 const members = computed(() => seasonMembers(records.value ?? [], season.value));
 const cards = computed(() => memberCards(records.value ?? [], season.value));
@@ -43,6 +42,16 @@ const perSeason = computed(() => membersPerSeason(records.value ?? []));
 const groupsNote = computed(() =>
   members.value.some((member) => member.groups.length > 1) ? "Un adhérent inscrit dans plusieurs groupes compte dans chacun." : "",
 );
+/** A line per sex, and the total dashed. */
+const perSeasonDatasets = computed(() => [
+  ...perSeason.value.series.map((serie) => ({ label: serie.label, data: serie.values, colors: CATEGORY_COLORS[serie.label] ?? HEX.slate })),
+  {
+    label: "Total",
+    data: perSeason.value.labels.map((_, index) => perSeason.value.series.reduce((sum, serie) => sum + (serie.values[index] ?? 0), 0)),
+    colors: HEX.blue,
+    dashed: true,
+  },
+]);
 const percentText = (value: number | null) => (value === null ? "—" : `${value} %`);
 </script>
 
@@ -54,11 +63,10 @@ const percentText = (value: number | null) => (value === null ? "—" : `${value
     </p>
     <p v-else-if="loadError" data-testid="member-stats-error" role="alert" class="text-[13px] text-red-700">⚠️ {{ loadError }}</p>
     <template v-else-if="records">
-      <div class="grid gap-3 grid-cols-2 sm:grid-cols-5">
+      <div class="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <UiCard
           v-for="card in [
             { id: 'members', label: 'Adhérents', value: String(cards.members) },
-            { id: 'women', label: 'Femmes', value: percentText(cards.womenPercent) },
             { id: 'new', label: 'Nouveaux', value: percentText(cards.newPercent) },
             { id: 'age', label: 'Âge moyen', value: cards.averageAge === null ? '—' : `${cards.averageAge} ans` },
             { id: 'cancelled', label: 'Inscriptions annulées', value: String(cards.cancelled) },
@@ -127,14 +135,11 @@ const percentText = (value: number | null) => (value === null ? "—" : `${value
       <UiCard>
         <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Adhérents par saison</h3>
         <UiChart
-          type="bar"
-          stacked
+          type="line"
           title="Adhérents par saison et par sexe"
           data-testid="chart-seasons"
           :labels="perSeason.labels"
-          :datasets="
-            perSeason.series.map((serie) => ({ label: serie.label, data: serie.values, colors: CATEGORY_COLORS[serie.label] ?? HEX.slate }))
-          "
+          :datasets="perSeasonDatasets"
         />
       </UiCard>
     </template>

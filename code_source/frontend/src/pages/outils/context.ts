@@ -11,8 +11,3 @@ export interface OutilsContext {
 }
 
 export const OUTILS_KEY: InjectionKey<OutilsContext> = Symbol("outils");
-
-/** What every sub-page exposes to the layout's reload button. */
-export interface ReloadablePage {
-  reload(): unknown;
-}
