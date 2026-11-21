@@ -71,6 +71,30 @@ describe("OutilsStatsPage, members", () => {
     expect(calls.filter((path) => path === "/api/reports/member-stats")).toHaveLength(1);
   });
 
+  it("sums the season up on the cards", async () => {
+    const { byId } = await render();
+
+    expect(byId("card-members")!.textContent).toContain("3");
+    expect(byId("card-women")!.textContent).toContain("33 %");
+  });
+
+  it("opens the breakdown of a chart with « Détail », in counts or in percent of each bar", async () => {
+    const { byId, figures } = await render();
+    expect(byId("chart-sex-detail")).toBeNull();
+
+    byId("detail-sex")!.click();
+    await flushPromises();
+    expect(figures("chart-sex-detail")).toEqual(["Adulte: 1: 2"]);
+
+    byId("detail-sex-percent")!.click();
+    await flushPromises();
+    expect(figures("chart-sex-detail")).toEqual(["Adulte: 33 %: 67 %"]);
+
+    byId("detail-sex")!.click();
+    await flushPromises();
+    expect(byId("chart-sex-detail")).toBeNull();
+  });
+
   it("says the statistics need the network instead of showing empty charts", async () => {
     const { byId } = await render(() => Promise.reject(new TypeError("Failed to fetch")));
 

@@ -4,11 +4,13 @@
 import { computed, inject, onMounted, ref, watch } from "vue";
 import UiCard from "../../../components/ui/UiCard.vue";
 import UiChart from "../../../components/ui/UiChart.vue";
+import { HEX } from "../../../components/ui/palette";
+import MemberChartCard from "./MemberChartCard.vue";
 import { ApiError, CLIENT_KEY, errorText } from "../../../lib/client";
 import { createReportsApi } from "../../../services/reports";
 import { OUTILS_KEY } from "../context";
 import SeasonSelect from "../SeasonSelect.vue";
-import { CATEGORY_COLORS, countBy, seasonMembers, type MemberStatsRecord } from "./memberStats";
+import { CATEGORY_COLORS, memberCards, membersPerSeason, seasonMembers, type MemberStatsRecord } from "./memberStats";
 
 const reportsApi = createReportsApi(inject(CLIENT_KEY)!);
 const { seasons, initialSeason } = inject(OUTILS_KEY)!;
@@ -35,7 +37,13 @@ onMounted(load);
 defineExpose({ reload: load });
 
 const members = computed(() => seasonMembers(records.value ?? [], season.value));
-const sexSlices = computed(() => countBy(members.value, "sex"));
+const cards = computed(() => memberCards(records.value ?? [], season.value));
+const perSeason = computed(() => membersPerSeason(records.value ?? []));
+/** Groups add up to more than the members when someone paid for several. */
+const groupsNote = computed(() =>
+  members.value.some((member) => member.groups.length > 1) ? "Un adhérent inscrit dans plusieurs groupes compte dans chacun." : "",
+);
+const percentText = (value: number | null) => (value === null ? "—" : `${value} %`);
 </script>
 
 <template>
@@ -45,23 +53,90 @@ const sexSlices = computed(() => countBy(members.value, "sex"));
       Statistiques indisponibles hors ligne.
     </p>
     <p v-else-if="loadError" data-testid="member-stats-error" role="alert" class="text-[13px] text-red-700">⚠️ {{ loadError }}</p>
-    <div v-else-if="records" class="grid gap-4 md:grid-cols-2">
-      <UiCard>
-        <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Sexe</h3>
-        <UiChart
-          type="pie"
-          title="Adhérents par sexe"
-          data-testid="chart-sex"
-          :labels="sexSlices.map((slice) => slice.label)"
-          :datasets="[
-            {
-              label: 'Adhérents',
-              data: sexSlices.map((slice) => slice.count),
-              colors: sexSlices.map((slice) => CATEGORY_COLORS[slice.label] ?? '#94a3b8'),
-            },
+    <template v-else-if="records">
+      <div class="grid gap-3 grid-cols-2 sm:grid-cols-5">
+        <UiCard
+          v-for="card in [
+            { id: 'members', label: 'Adhérents', value: String(cards.members) },
+            { id: 'women', label: 'Femmes', value: percentText(cards.womenPercent) },
+            { id: 'new', label: 'Nouveaux', value: percentText(cards.newPercent) },
+            { id: 'age', label: 'Âge moyen', value: cards.averageAge === null ? '—' : `${cards.averageAge} ans` },
+            { id: 'cancelled', label: 'Inscriptions annulées', value: String(cards.cancelled) },
           ]"
+          :key="card.id"
+          class="text-center"
+          :data-testid="`card-${card.id}`"
+        >
+          <div class="text-2xl font-black text-blue-700">{{ card.value }}</div>
+          <div class="text-xs font-semibold uppercase text-slate-500 mt-1">{{ card.label }}</div>
+        </UiCard>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2">
+        <MemberChartCard
+          id="sex"
+          title="Sexe"
+          type="pie"
+          dimension="sex"
+          :members="members"
+          :detail="{ series: 'sex', bars: 'group', title: 'Sexe par groupe' }"
+        />
+        <MemberChartCard
+          id="returning"
+          title="Nouveaux / renouvellements"
+          type="pie"
+          dimension="returning"
+          :members="members"
+          :detail="{ series: 'returning', bars: 'group', title: 'Nouveaux / renouvellements par groupe' }"
+        />
+        <MemberChartCard
+          id="age"
+          title="Tranches d'âge"
+          type="bar"
+          dimension="ageBand"
+          :members="members"
+          :detail="{ series: 'sex', bars: 'ageBand', title: 'Sexe par tranche d\'âge' }"
+        />
+        <MemberChartCard
+          id="group"
+          title="Groupes"
+          type="bar"
+          horizontal
+          dimension="group"
+          :members="members"
+          :note="groupsNote"
+          :detail="{ series: 'sex', bars: 'group', title: 'Sexe par groupe' }"
+        />
+        <MemberChartCard
+          id="city"
+          title="Villes"
+          type="bar"
+          horizontal
+          dimension="city"
+          :members="members"
+          :detail="{ series: 'sex', bars: 'city', title: 'Sexe par ville' }"
+        />
+        <MemberChartCard
+          id="month"
+          title="Inscriptions par mois"
+          type="bar"
+          dimension="orderMonth"
+          :members="members"
+          :detail="{ series: 'returning', bars: 'orderMonth', title: 'Nouveaux / renouvellements par mois' }"
+        />
+      </div>
+      <UiCard>
+        <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Adhérents par saison</h3>
+        <UiChart
+          type="bar"
+          stacked
+          title="Adhérents par saison et par sexe"
+          data-testid="chart-seasons"
+          :labels="perSeason.labels"
+          :datasets="
+            perSeason.series.map((serie) => ({ label: serie.label, data: serie.values, colors: CATEGORY_COLORS[serie.label] ?? HEX.slate }))
+          "
         />
       </UiCard>
-    </div>
+    </template>
   </div>
 </template>
