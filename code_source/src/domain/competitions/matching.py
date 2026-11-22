@@ -217,6 +217,40 @@ def match_adherent_by_name(payer: str, adherents: list):
     return None
 
 
+def _index_competitions(competitions: list) -> tuple[dict[str, dict], list[tuple[str, dict]]]:
+    """Correspondance champ saisi -> compétition : égalité exacte d'abord, puis
+    « contient » (du n° le plus long au plus court pour privilégier la précision)."""
+    comps_exact: dict[str, dict] = {}
+    comps_contains: list[tuple[str, dict]] = []
+    for competition in competitions or []:
+        ref = normalize_string(competition.get("id_ffme") or "")
+        if not ref:
+            continue
+        comps_exact.setdefault(ref, competition)
+        comps_contains.append((ref, competition))
+    comps_contains.sort(key=lambda rc: len(rc[0]), reverse=True)
+    return comps_exact, comps_contains
+
+
+def _find_competition(saisie: str, comps_exact: dict[str, dict], comps_contains: list[tuple[str, dict]]) -> Optional[dict]:
+    if not saisie:
+        return None
+    competition = comps_exact.get(saisie)
+    if competition is not None:
+        return competition
+    return next((c for ref, c in comps_contains if ref in saisie), None)
+
+
+def _find_item_adherent(item: dict, by_licence: dict[str, dict], adherents: list) -> Optional[dict]:
+    """Adhérent d'un article : par n° de licence, puis par nom du payeur."""
+    licence = re.sub(r"\D", "", str(item.get("licence") or ""))
+    adherent = by_licence.get(licence) if licence else None
+    if adherent is not None:
+        return adherent
+    payer_id = match_adherent_by_name(item.get("payeur") or "", adherents)
+    return next((a for a in adherents if a.get("id") == payer_id), None)
+
+
 def auto_link_items(items: list, competitions: list, adherents: list,
                     existing_links: Optional[dict] = None) -> dict:
     """Calcule les liens automatiques article → (compétition, adhérent).
@@ -240,17 +274,7 @@ def auto_link_items(items: list, competitions: list, adherents: list,
         if lic:
             by_licence.setdefault(lic, a)
 
-    # Correspondance champ saisi -> compétition : égalité exacte d'abord, puis
-    # « contient » (du n° le plus long au plus court pour privilégier la précision).
-    comps_exact: dict[str, dict] = {}
-    comps_contains: list = []
-    for c in competitions or []:
-        ref = normalize_string(c.get("id_ffme") or "")
-        if not ref:
-            continue
-        comps_exact.setdefault(ref, c)
-        comps_contains.append((ref, c))
-    comps_contains.sort(key=lambda rc: len(rc[0]), reverse=True)
+    comps_exact, comps_contains = _index_competitions(competitions)
 
     links = {}
     for it in items or []:
@@ -262,24 +286,11 @@ def auto_link_items(items: list, competitions: list, adherents: list,
         if normalize_string(it.get("etat") or "") not in STATUTS_PAYES:
             continue
 
-        saisie = normalize_string(it.get("competition") or "")
-        comp = comps_exact.get(saisie) if saisie else None
-        if comp is None and saisie:
-            for ref, c in comps_contains:
-                if ref in saisie:
-                    comp = c
-                    break
+        comp = _find_competition(normalize_string(it.get("competition") or ""), comps_exact, comps_contains)
         if comp is None:
             continue  # compétition inconnue : rattachement manuel requis
 
-        adherent = None
-        lic = re.sub(r"\D", "", str(it.get("licence") or ""))
-        if lic:
-            adherent = by_licence.get(lic)
-        if adherent is None:
-            payer_id = match_adherent_by_name(it.get("payeur") or "", adherents or [])
-            adherent = next((a for a in (adherents or [])
-                             if a.get("id") == payer_id), None)
+        adherent = _find_item_adherent(it, by_licence, adherents or [])
 
         links[id_item] = {
             "competition_id": comp.get("id"),
@@ -307,6 +318,104 @@ def _item_payer_name(item: dict) -> str:
     return f"{last} {first}".strip()
 
 
+def _anomaly(kind: str, severite: str, titre: str, detail: str) -> dict:
+    return {"type": kind, "severite": severite, "titre": titre, "detail": detail}
+
+
+def _index_participants(participants: list) -> tuple[dict[str, dict], dict[str, dict]]:
+    """Index des participants par licence puis par nom normalisé (premier gagnant)."""
+    by_licence: dict[str, dict] = {}
+    by_name: dict[str, dict] = {}
+    for participant in participants:
+        licence = re.sub(r"\D", "", str(participant.get("num_licence") or ""))
+        if licence:
+            by_licence.setdefault(licence, participant)
+        key = normalize_name(f"{participant.get('nom')} {participant.get('prenom')}")
+        if key:
+            by_name.setdefault(key, participant)
+    return by_licence, by_name
+
+
+def _unpaid_status_anomaly(state: str, payer: str, amount: float, order_ref: str) -> Optional[dict]:
+    """Anomalie d'un article non payé (remboursé, non finalisé), None s'il est payé."""
+    if state == "refunded":
+        return _anomaly("remboursement", "info", "Paiement remboursé",
+                        f"{payer or 'Inconnu'} ({amount:.2f} €, commande {order_ref}) est remboursé sur HelloAsso.")
+    if state not in STATUTS_PAYES:
+        return _anomaly("paiement_non_finalise", "info", "Paiement non finalisé",
+                        f"{payer or 'Inconnu'} ({amount:.2f} €, commande {order_ref}) : "
+                        f"statut HelloAsso « {state or 'inconnu'} ».")
+    return None
+
+
+def _manual_review_entry(item: dict, payer: str, amount: float, order_ref: str, licence: str, valeur_champ: str,
+                         no_competition: str, by_licence: dict[str, dict], by_name: dict[str, dict],
+                         anomalies: list) -> dict:
+    """Paiement au n° d'épreuve absent ou non conforme : ligne de correction manuelle + anomalie."""
+    participant = (by_licence.get(licence) if licence else None) or by_name.get(normalize_name(payer))
+    if valeur_champ:
+        anomalies.append(_anomaly("competition_ecartee", "avertissement", "N° de compétition non conforme",
+                                  f"{payer or 'Inconnu'} (commande {order_ref}) : le champ « Compétition concernée » "
+                                  f"indique « {valeur_champ} » au lieu du n° attendu « {no_competition} » ; "
+                                  f"validation manuelle requise."))
+    else:
+        anomalies.append(_anomaly("competition_manquante", "avertissement", "N° de compétition absent sur HelloAsso",
+                                  f"{payer or 'Inconnu'} (commande {order_ref}) : le champ « Compétition concernée » "
+                                  f"n'est pas renseigné sur HelloAsso ; validation manuelle requise."))
+    return {
+        "payer": payer or "Inconnu",
+        "montant": amount,
+        "etat": str(item.get("state") or ""),
+        "date_item": str(item.get("date") or ""),
+        "order_ref": order_ref,
+        "licence": licence,
+        "valeur_champ": valeur_champ,
+        "competition_concernee": extract_competition_name(item),
+        "numero_competition": extract_competition_number(item, fallback=False),
+        "adherent_id": participant.get("adherent_id") if participant else None,
+        "participant": f"{participant.get('nom')} {participant.get('prenom')}" if participant else "",
+    }
+
+
+def _find_paying_participant(licence: str, payer: str, order_ref: str, by_licence: dict[str, dict],
+                             by_name: dict[str, dict], anomalies: list) -> Optional[dict]:
+    """Participant d'un paiement : par licence, sinon par nom (avec anomalie de rapprochement)."""
+    if licence:
+        participant = by_licence.get(licence)
+        if participant is not None:
+            return participant
+        # Licence renseignée mais inconnue : tenter un rapprochement par nom en secours
+        participant = by_name.get(normalize_name(payer))
+        if participant:
+            anomalies.append(_anomaly("licence_ecartee", "avertissement", "Licence non reconnue",
+                                      f"{payer} (commande {order_ref}) : le n° de licence « {licence} » ne correspond "
+                                      f"à aucun participant ; rapproché par le nom (licence attendue : "
+                                      f"{participant.get('num_licence') or 'absente'})."))
+        return participant
+    participant = by_name.get(normalize_name(payer))
+    if participant:
+        anomalies.append(_anomaly("paiement_sans_licence", "avertissement", "Paiement sans n° de licence",
+                                  f"{payer} (commande {order_ref}) : aucun champ « licence » valide sur HelloAsso ; "
+                                  f"rapproché par le nom (licence attendue : {participant.get('num_licence') or 'absente'})."))
+    return participant
+
+
+def _count_pending_and_flag_missing(participants: list, seen_participants: dict, anomalies: list) -> int:
+    """Participants sélectionnés restés sans paiement (relance) ; signale les « Payé » sans paiement HelloAsso."""
+    nb_en_attente = 0
+    for participant in participants:
+        if not participant.get("selectionne"):
+            continue
+        if participant.get("statut_paiement") == PAIEMENT_PAYE and participant.get("adherent_id") not in seen_participants:
+            # Déjà marqué payé en base sans paiement détecté sur cette campagne : signaler
+            anomalies.append(_anomaly("paiement_absent", "avertissement", "Payé en base sans paiement HelloAsso",
+                                      f"{participant.get('nom')} {participant.get('prenom')} est marqué « Payé » dans "
+                                      f"la base mais aucun paiement correspondant n'a été trouvé sur la campagne."))
+        elif participant.get("statut_paiement") != PAIEMENT_PAYE:
+            nb_en_attente += 1
+    return nb_en_attente
+
+
 def match_items_to_participants(items: list, participants: list, prix_attendu: Optional[float] = None,
                                 no_competition: str = "") -> dict:
     """Croise les articles HelloAsso avec les participants de la compétition.
@@ -331,22 +440,8 @@ def match_items_to_participants(items: list, participants: list, prix_attendu: O
     updates = []
     order_by_adherent = {}
     manual_review = []
-    anomalies = []
-
-    def anomaly(kind: str, severite: str, titre: str, detail: str):
-        anomalies.append({"type": kind, "severite": severite, "titre": titre, "detail": detail})
-
-    # Index des participants par licence puis par nom normalisé
-    by_licence: dict[str, dict] = {}
-    by_name: dict[str, dict] = {}
-    for p in participants:
-        lic = re.sub(r"\D", "", str(p.get("num_licence") or ""))
-        if lic:
-            by_licence.setdefault(lic, p)
-        key = normalize_name(f"{p.get('nom')} {p.get('prenom')}")
-        if key:
-            by_name.setdefault(key, p)
-
+    anomalies: list[dict] = []
+    by_licence, by_name = _index_participants(participants)
     seen_participants: dict = {}
     nb_payes = 0
 
@@ -359,13 +454,9 @@ def match_items_to_participants(items: list, participants: list, prix_attendu: O
         payer = _item_payer_name(item)
         order_ref = str((item.get("order") or {}).get("id") or "")
 
-        if state == "refunded":
-            anomaly("remboursement", "info", "Paiement remboursé",
-                    f"{payer or 'Inconnu'} ({amount:.2f} €, commande {order_ref}) est remboursé sur HelloAsso.")
-            continue
-        if state not in STATUTS_PAYES:
-            anomaly("paiement_non_finalise", "info", "Paiement non finalisé",
-                    f"{payer or 'Inconnu'} ({amount:.2f} €, commande {order_ref}) : statut HelloAsso « {state or 'inconnu'} ».")
+        unpaid = _unpaid_status_anomaly(state, payer, amount, order_ref)
+        if unpaid is not None:
+            anomalies.append(unpaid)
             continue
 
         nb_payes += 1
@@ -375,69 +466,25 @@ def match_items_to_participants(items: list, participants: list, prix_attendu: O
         # part en correction manuelle (avec la valeur saisie sur HelloAsso en aide).
         valeur_champ = extract_competition_number(item)
         if not competition_number_ok(valeur_champ, no_competition):
-            participant = None
-            if licence:
-                participant = by_licence.get(licence) or by_name.get(normalize_name(payer))
-            else:
-                participant = by_name.get(normalize_name(payer))
-            if valeur_champ:
-                anomaly("competition_ecartee", "avertissement", "N° de compétition non conforme",
-                        f"{payer or 'Inconnu'} (commande {order_ref}) : le champ « Compétition concernée » "
-                        f"indique « {valeur_champ} » au lieu du n° attendu « {no_competition} » ; "
-                        f"validation manuelle requise.")
-            else:
-                anomaly("competition_manquante", "avertissement", "N° de compétition absent sur HelloAsso",
-                        f"{payer or 'Inconnu'} (commande {order_ref}) : le champ « Compétition concernée » "
-                        f"n'est pas renseigné sur HelloAsso ; validation manuelle requise.")
-            manual_review.append({
-                "payer": payer or "Inconnu",
-                "montant": amount,
-                "etat": str(item.get("state") or ""),
-                "date_item": str(item.get("date") or ""),
-                "order_ref": order_ref,
-                "licence": licence,
-                "valeur_champ": valeur_champ,
-                "competition_concernee": extract_competition_name(item),
-                "numero_competition": extract_competition_number(item, fallback=False),
-                "adherent_id": participant.get("adherent_id") if participant else None,
-                "participant": f"{participant.get('nom')} {participant.get('prenom')}" if participant else "",
-            })
+            manual_review.append(_manual_review_entry(item, payer, amount, order_ref, licence, valeur_champ,
+                                                      no_competition, by_licence, by_name, anomalies))
             continue
 
-        participant = None
-        if licence:
-            participant = by_licence.get(licence)
-            if participant is None:
-                # Licence renseignée mais inconnue : tenter un rapprochement par nom en secours
-                key = normalize_name(payer)
-                participant = by_name.get(key)
-                if participant:
-                    anomaly("licence_ecartee", "avertissement", "Licence non reconnue",
-                            f"{payer} (commande {order_ref}) : le n° de licence « {licence} » ne correspond "
-                            f"à aucun participant ; rapproché par le nom (licence attendue : "
-                            f"{participant.get('num_licence') or 'absente'}).")
-        else:
-            key = normalize_name(payer)
-            participant = by_name.get(key)
-            if participant:
-                anomaly("paiement_sans_licence", "avertissement", "Paiement sans n° de licence",
-                        f"{payer} (commande {order_ref}) : aucun champ « licence » valide sur HelloAsso ; "
-                        f"rapproché par le nom (licence attendue : {participant.get('num_licence') or 'absente'}).")
-
+        participant = _find_paying_participant(licence, payer, order_ref, by_licence, by_name, anomalies)
         if participant is None:
-            anomaly("paiement_inconnu", "erreur", "Paiement non identifié",
-                    f"Paiement reçu ({amount:.2f} €, commande {order_ref}) pour « {payer or 'inconnu'} » "
-                    f"{'(licence ' + licence + ') ' if licence else ''}sans participant correspondant "
-                    f"({normalize_name(payer) or 'sans nom'}).")
+            anomalies.append(_anomaly("paiement_inconnu", "erreur", "Paiement non identifié",
+                                      f"Paiement reçu ({amount:.2f} €, commande {order_ref}) pour « {payer or 'inconnu'} » "
+                                      f"{'(licence ' + licence + ') ' if licence else ''}sans participant correspondant "
+                                      f"({normalize_name(payer) or 'sans nom'})."))
             continue
 
         adherent_id = participant.get("adherent_id")
         nom_complet = f"{participant.get('nom')} {participant.get('prenom')}"
         previous = seen_participants.get(adherent_id)
         if previous is not None:
-            anomaly("doublon", "erreur", "Plusieurs paiements",
-                    f"{nom_complet} : plusieurs paiements détectés (commandes {previous} et {order_ref}). "
-                    f"Vérifier sur HelloAsso (remboursement / double inscription ?).")
+            anomalies.append(_anomaly("doublon", "erreur", "Plusieurs paiements",
+                                      f"{nom_complet} : plusieurs paiements détectés (commandes {previous} et {order_ref}). "
+                                      f"Vérifier sur HelloAsso (remboursement / double inscription ?)."))
             seen_participants[adherent_id] = f"{previous}, {order_ref}"
             order_by_adherent[adherent_id] = seen_participants[adherent_id]
             updates.append((adherent_id, amount))
@@ -445,25 +492,14 @@ def match_items_to_participants(items: list, participants: list, prix_attendu: O
         seen_participants[adherent_id] = order_ref
 
         if prix_attendu is not None and prix_attendu > 0 and abs(amount - float(prix_attendu)) > 0.01:
-            anomaly("ecart_tarif", "avertissement", "Écart de tarif",
-                    f"{nom_complet} : {amount:.2f} € payés contre {float(prix_attendu):.2f} € attendus "
-                    f"(commande {order_ref}).")
+            anomalies.append(_anomaly("ecart_tarif", "avertissement", "Écart de tarif",
+                                      f"{nom_complet} : {amount:.2f} € payés contre {float(prix_attendu):.2f} € attendus "
+                                      f"(commande {order_ref})."))
 
         order_by_adherent[adherent_id] = order_ref
         updates.append((adherent_id, amount))
 
-    # Participants invités (sélectionnés) restés sans paiement : information de relance
-    nb_en_attente = 0
-    for p in participants:
-        if not p.get("selectionne"):
-            continue
-        if p.get("statut_paiement") == PAIEMENT_PAYE and p.get("adherent_id") not in seen_participants:
-            # Déjà marqué payé en base sans paiement détecté sur cette campagne : signaler
-            anomaly("paiement_absent", "avertissement", "Payé en base sans paiement HelloAsso",
-                    f"{p.get('nom')} {p.get('prenom')} est marqué « Payé » dans la base mais aucun "
-                    f"paiement correspondant n'a été trouvé sur la campagne.")
-        elif p.get("statut_paiement") != PAIEMENT_PAYE:
-            nb_en_attente += 1
+    nb_en_attente = _count_pending_and_flag_missing(participants, seen_participants, anomalies)
 
     return {
         "updates": updates,
