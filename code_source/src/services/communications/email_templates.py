@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Optional, TypedDict
 
 from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
-from domain.email_variables import TemplateKind, infer_kind, needs_fixing, template_error, to_keys
+from domain.email_variables import TEMPLATE_KINDS, TemplateKind, infer_kind, needs_fixing, template_error, to_keys
 from domain.errors import Conflict, InvalidRequest
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
 
@@ -28,7 +28,7 @@ class ListedTemplate(SavedTemplate):
 def kind_of(template: dict) -> TemplateKind:  # a template row
     """The template's kind; inferred from its name when saved before kinds existed."""
     kind = template.get("kind")
-    return kind if kind in ("adherent", "attestation", "competition") else infer_kind(str(template.get("name") or ""))
+    return kind if kind in TEMPLATE_KINDS else infer_kind(str(template.get("name") or ""))
 
 
 def list_templates() -> list[ListedTemplate]:

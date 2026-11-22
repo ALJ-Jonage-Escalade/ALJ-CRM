@@ -118,12 +118,13 @@ def render_template(text: Optional[str], values: Mapping[str, str], escape_html:
         variable = find_variable(match.group(1))
         if variable is None:
             return match.group(0)
-        text = value(variable)
-        return html.escape(text).replace("\n", "<br>\n") if escape_html else text
+        filled = value(variable)
+        return html.escape(filled).replace("\n", "<br>\n") if escape_html else filled
 
     lines = re.split(r"(?<=\n)", expand_aliases(str(text)))
-    kept = "".join(line for line in lines if not is_dropped(line))
-    if len(kept) != sum(len(line) for line in lines):
+    kept_lines = [line for line in lines if not is_dropped(line)]
+    kept = "".join(kept_lines)
+    if len(kept_lines) != len(lines):
         kept = re.sub(r"\n{3,}", "\n\n", kept)
     return TOKEN.sub(value_of, kept)
 
