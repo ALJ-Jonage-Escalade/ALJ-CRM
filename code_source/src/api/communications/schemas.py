@@ -109,7 +109,8 @@ class EmailStatus(BaseModel):
 
 
 class EmailRecipient(RequestBody):
-    """A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…)."""
+    """A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…).
+    amount: the membership amount, in euros."""
     id: Optional[int] = None
     first_name: str = ""
     last_name: str = ""
@@ -117,6 +118,7 @@ class EmailRecipient(RequestBody):
     num_licence: str = ""
     tarif: str = ""
     season: str = ""
+    amount: Optional[float] = None
 
 
 class EmailSendRequest(RequestBody):

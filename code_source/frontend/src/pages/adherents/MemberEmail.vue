@@ -71,6 +71,7 @@ async function send(): Promise<void> {
           num_licence: m.licence_ffme,
           tarif: m.tarif_name,
           season: m.season_name,
+          amount: m.amount,
         },
       ],
     });

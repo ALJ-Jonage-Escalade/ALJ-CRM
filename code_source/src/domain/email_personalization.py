@@ -1,11 +1,12 @@
-"""Personalisation of an e-mail's subject and body: the {…} variables of the club's templates, filled from the
-recipient and, for a competition e-mail, from the competition."""
+"""Personalisation of an e-mail's subject and body: the values of the {…} variables (domain/email_variables.py),
+taken from the recipient and, for a competition e-mail, from the competition."""
 
 from __future__ import annotations
 
-import html
-import re
 from typing import Any, Mapping, Optional, TypedDict
+
+from domain.email_variables import render_template
+from domain.utils import format_amount
 
 
 class TemplateRecipient(TypedDict, total=False):
@@ -15,6 +16,7 @@ class TemplateRecipient(TypedDict, total=False):
     licence_ffme: str
     tarif_name: str
     season_name: str
+    amount: float | str | None  # the membership amount, formatted for the e-mail
 
 
 def template_recipient(member: Mapping[str, Any]) -> TemplateRecipient:  # Any: a member row, values of any type
@@ -25,72 +27,35 @@ def template_recipient(member: Mapping[str, Any]) -> TemplateRecipient:  # Any: 
         licence_ffme=str(member.get("licence_ffme") or ""),
         tarif_name=str(member.get("tarif_name") or ""),
         season_name=str(member.get("season_name") or ""),
+        amount=member.get("amount"),
     )
 
 
-# Competition variables, replaced as written and capitalised ({lieu} and {Lieu})
-_COMPETITION_KEYS = (
-    "no_competition", "name_competition", "competition_nom", "montant_competition", "date_competition",
-    "competition_date", "competition_deadline", "deadline", "lieu", "competition_lieu",
-)
-# Spellings of the WhatsApp variables that saved templates may use (including the historical "whatapp" typo);
-# the context itself only carries "whatsapp_link"
-_WHATSAPP_BLOCK_KEYS = ("bloc_whatsapp", "bloc_whatapp", "whatsapp_bloc")
-_WHATSAPP_LINK_KEYS = ("whatapp_Id", "whatsapp_id", "whatapp_id", "whatsapp_Id", "whatsapp_link", "whatapp_link")
+def template_values(recipient: TemplateRecipient, competition_context: Optional[Mapping[str, Any]] = None,  # Any: shown as text
+                    extra_values: Optional[Mapping[str, str]] = None) -> dict[str, str]:
+    """The value of each variable for this recipient: the names written as on official documents (Prénom, NOM), the
+    amount in the French format, then the competition's values and the extra ones (the problems of a correction request)."""
+    context = competition_context or {}
+    values = {
+        "first_name": str(recipient.get("first_name") or "").strip().title(),
+        "last_name": str(recipient.get("last_name") or "").strip().upper(),
+        "num_licence": str(recipient.get("licence_ffme") or ""),
+        "tarif": str(recipient.get("tarif_name") or ""),
+        "season": str(recipient.get("season_name") or ""),
+        "amount": format_amount(recipient.get("amount")),
+    }
+    for key in ("name_competition", "no_competition", "date_competition", "montant_competition", "whatsapp_link"):
+        values[key] = str(context.get(key) or "")
+    return {**values, **(extra_values or {})}
 
 
 def apply_template_variables(text: Optional[str], recipient: TemplateRecipient,
                              competition_context: Optional[Mapping[str, Any]] = None,  # Any: context values, shown as text
-                             escape_html: bool = False) -> str:
-    """Replaces the {…} variables of an e-mail subject or body:
-    - {Prénom}/{Nom}/{first_name}/{last_name}/{prenom}/{nom}: the recipient's names; {num_licence}: their FFME licence;
-      {tarif} and {season}: their group and season, when known;
-    - competition variables ({no_competition}, {name_competition}, {montant_competition}, {date_competition}…,
-      {whatsapp_link} and its other spellings, {bloc_whatsapp}), left as they are when missing from the context.
+                             escape_html: bool = False, extra_values: Optional[Mapping[str, str]] = None) -> str:
+    """The subject or body with its variables filled for this recipient (see template_values); an empty value leaves
+    nothing, and the line of an empty WhatsApp link goes away.
 
     escape_html=True: values are HTML-escaped, for a template already converted to HTML
     (member data comes from the public HelloAsso form and must never add markup).
     """
-    if text is None:
-        return ""
-    context = competition_context or {}
-    out = str(text)
-    first = str(recipient.get("first_name") or "").strip().title()
-    last = str(recipient.get("last_name") or "").strip().upper()
-    licence = str(recipient.get("licence_ffme") or "").strip()
-    tarif = str(recipient.get("tarif_name") or "").strip()
-    season = str(recipient.get("season_name") or "").strip()
-
-    def encode(value: str) -> str:
-        return html.escape(value) if escape_html else value
-
-    for key in ("{Prénom}", "{first_name}", "{prenom}"):
-        out = out.replace(key, encode(first))
-    for key in ("{Nom}", "{last_name}", "{nom}"):
-        out = out.replace(key, encode(last))
-    out = out.replace("{num_licence}", encode(licence))
-    if tarif:
-        out = out.replace("{tarif}", encode(tarif))
-    if season:
-        out = out.replace("{season}", encode(season))
-
-    for key in _COMPETITION_KEYS:
-        value = str(context.get(key) or "").strip()
-        if value:
-            out = out.replace("{" + key + "}", encode(value))
-            out = out.replace("{" + key.title() + "}", encode(value))
-
-    whatsapp_link = str(context.get("whatsapp_link") or "").strip()
-    if whatsapp_link:
-        block = encode(f"Voici le lien du groupe WhatsApp dédié à cette compétition : {whatsapp_link}")
-        for key in _WHATSAPP_BLOCK_KEYS:
-            out = out.replace("{" + key + "}", block)
-        for key in _WHATSAPP_LINK_KEYS:
-            out = out.replace("{" + key + "}", encode(whatsapp_link))
-    elif competition_context is not None:
-        for key in _WHATSAPP_BLOCK_KEYS:
-            out = out.replace("{" + key + "}", "")
-        # No WhatsApp link configured: the line that shows it goes away
-        out = re.sub(r"(?m)^[^\n]*\{(?:" + "|".join(_WHATSAPP_LINK_KEYS) + r")\}[^\n]*\r?\n?", "", out)
-        out = re.sub(r"\n{3,}", "\n\n", out)
-    return out
+    return render_template(text, template_values(recipient, competition_context, extra_values), escape_html=escape_html)

@@ -481,7 +481,10 @@ describe("AdherentsPage", () => {
     await flushPromises();
     expect(writes()[0]).toEqual(expect.objectContaining({ path: "/api/send-email" }));
     expect(writes()[0]!.body).toEqual(
-      expect.objectContaining({ subject: "Rappel {first_name}", recipients: [expect.objectContaining({ email: "lea@example.org" })] }),
+      expect.objectContaining({
+        subject: "Rappel {first_name}",
+        recipients: [expect.objectContaining({ email: "lea@example.org", tarif: "Adulte loisir", amount: null })],
+      }),
     );
     expect(document.querySelector("#toast")!.textContent).toContain("E-mail envoyé avec succès");
     expect(inBody("record-dialog")).toBeNull(); // back to the record in the panel

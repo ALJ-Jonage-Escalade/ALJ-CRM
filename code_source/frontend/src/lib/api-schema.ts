@@ -2601,6 +2601,7 @@ export interface components {
         /**
          * EmailRecipient
          * @description A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…).
+         *     amount: the membership amount, in euros.
          */
         EmailRecipient: {
             /** Id */
@@ -2635,6 +2636,8 @@ export interface components {
              * @default
              */
             season?: string;
+            /** Amount */
+            amount?: number | null;
         };
         /**
          * EmailSendDetail

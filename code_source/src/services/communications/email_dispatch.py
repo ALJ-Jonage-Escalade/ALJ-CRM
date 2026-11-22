@@ -3,19 +3,17 @@ Service d'expédition et de rendu d'e-mails sécurisé (contexte Compétitions &
 
 Permet de :
 1. Charger les modèles de mails configurés dans le CRM (table email_templates).
-2. Résoudre les variables dynamiques ({first_name}, {last_name}, {num_licence},
-   {no_competition}, {name_competition}, {montant_competition}, {date_competition}).
+2. Résoudre les variables des modèles (domain/email_variables.py).
 3. Expédier les messages via l'API Gmail sécurisée du club (OAuth2) ou SMTP.
 """
 
 from __future__ import annotations
 
-import html
 import logging
 from typing import Any, Dict, List, Optional, TypedDict
 
 from domain.club_emails import CLUB_SENDER_DOMAIN
-from domain.competitions.models import Competition, default_deadline
+from domain.competitions.models import Competition
 from domain.email_log import LoggedRecipient
 from domain.errors import InvalidRequest, UpstreamUnavailable
 from domain.email_personalization import apply_template_variables, template_recipient
@@ -39,22 +37,18 @@ class RenderedEmail(TypedDict):
 
 
 def render_email(subject: str, body: str, recipient: Dict[str, Any], competition: Dict[str, str],
-                 add_signature: bool, extra_variables: Optional[Dict[str, str]] = None) -> RenderedEmail:  # Any: a member row or a recipient sent by the page
+                 add_signature: bool, extra_values: Optional[Dict[str, str]] = None) -> RenderedEmail:  # Any: a member row or a recipient sent by the page
     """The e-mail personalised for one recipient. The HTML part is built from the template first, then filled with
-    escaped values, so a member's value (public HelloAsso form) never adds markup. `extra_variables`: other
-    "{name}" variables of the body, multi-line text (their lines are kept in the HTML part)."""
+    escaped values, so a member's value (public HelloAsso form) never adds markup. `extra_values`: values of other
+    variables (the problems of a correction request), by key."""
     person = template_recipient(recipient)
-    extra = extra_variables or {}
-    body_plain = apply_template_variables(body, person, competition)
-    for name, value in extra.items():
-        body_plain = body_plain.replace(name, value)
+    body_plain = apply_template_variables(body, person, competition, extra_values=extra_values)
     if add_signature:
         body_plain += "\n\n" + build_signature_plain()
     body_html = apply_template_variables(build_email_html(body, add_signature=add_signature, image_src_mode="cid"),
-                                         person, competition, escape_html=True)
-    for name, value in extra.items():
-        body_html = body_html.replace(name, html.escape(value).replace("\n", "<br>\n"))
-    return RenderedEmail(subject=apply_template_variables(subject, person, competition), body_plain=body_plain, body_html=body_html)
+                                         person, competition, escape_html=True, extra_values=extra_values)
+    return RenderedEmail(subject=apply_template_variables(subject, person, competition, extra_values=extra_values),
+                         body_plain=body_plain, body_html=body_html)
 
 
 def _recipients_by_id(recipient_ids: List[int]) -> List[Dict[str, Any]]:  # Any: recipient fields (id may be None)
@@ -96,6 +90,9 @@ def _direct_recipients(recipients_data: List[Dict[str, Any]]) -> List[Dict[str, 
                 "last_name": recipient.get("last_name") or recipient.get("nom") or "",
                 "email": email,
                 "licence_ffme": recipient.get("licence_ffme") or recipient.get("num_licence") or "",
+                "tarif_name": recipient.get("tarif_name") or recipient.get("tarif") or "",
+                "season_name": recipient.get("season_name") or recipient.get("season") or "",
+                "amount": recipient.get("amount"),
             })
     return resolved
 
@@ -202,34 +199,18 @@ class EmailDispatchService:
         """Extrait les variables de contexte d'une compétition pour injection dans les modèles."""
         if not competition_id:
             return {}
-        # The document, not the domain model: the place is a pass-through field the model drops
         doc = competitions.get_competition_doc(competition_id)
         if not doc:
             return {}
         comp = Competition.from_row(doc)
 
-        date_formatted = format_period(comp.date_competition, comp.date_fin)
-        deadline = comp.deadline or default_deadline(comp.date_competition)
-        deadline_formatted = format_period(deadline) if deadline else ""
         whatsapp_link = str(getattr(comp, "whatsapp_link", "") or "").strip()
-        whatsapp_block = f"Voici le lien du groupe WhatsApp dédié à cette compétition : {whatsapp_link}" if whatsapp_link else ""
-
-        lieu = str(doc.get("lieu") or "").strip()
         return {
-            "competition_id": str(comp.id),
-            "nom": comp.nom,
-            "competition_nom": comp.nom,
             "no_competition": str(comp.id_ffme or ""),
             "name_competition": comp.nom,
             "montant_competition": format_amount(comp.prix),
-            "date_competition": date_formatted,
-            "competition_date": date_formatted,
-            "competition_deadline": deadline_formatted,
-            "deadline": deadline_formatted,
-            "lieu": lieu,
-            "competition_lieu": lieu,
+            "date_competition": format_period(comp.date_competition, comp.date_fin),
             "whatsapp_link": whatsapp_link,
-            "bloc_whatsapp": whatsapp_block,
         }
 
     @classmethod

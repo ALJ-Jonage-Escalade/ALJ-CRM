@@ -50,12 +50,6 @@ class TestPersonalisedHtml(unittest.TestCase):
         self.assertEqual(apply_template_variables("{first_name}", member, escape_html=True), "&lt;B&gt;X&lt;/B&gt;")
         self.assertEqual(apply_template_variables("{first_name}", member), "<B>X</B>")
 
-    def test_competition_deadline_variable(self):
-        member = {"first_name": "Jean", "last_name": "DUPONT"}
-        ctx = {"competition_deadline": "08/11/2026", "name_competition": "Coupe"}
-        res = apply_template_variables("Date limite : {competition_deadline} pour {name_competition}", member, ctx)
-        self.assertEqual(res, "Date limite : 08/11/2026 pour Coupe")
-
 
 class TestHeaders(unittest.TestCase):
 

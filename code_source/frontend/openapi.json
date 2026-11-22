@@ -7271,12 +7271,23 @@
             "type": "string",
             "title": "Season",
             "default": ""
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "EmailRecipient",
-        "description": "A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…)."
+        "description": "A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…).\namount: the membership amount, in euros."
       },
       "EmailSendDetail": {
         "properties": {

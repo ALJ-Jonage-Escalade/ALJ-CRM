@@ -18,7 +18,7 @@ from domain.members.membership_import import PlanEntry
 # The template of the e-mail, shipped with the app (editable in Communications › Modèles)
 CORRECTION_REQUEST_TEMPLATE = "Adhésion : informations à corriger"
 # Its variable: the problems of each registration of the order
-PROBLEMS_VARIABLE = "{problemes}"
+PROBLEMS_VARIABLE = "problemes"  # its key in domain/email_variables.py
 
 
 @dataclass(frozen=True)
