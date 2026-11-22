@@ -45,7 +45,6 @@ describe("competition e-mail", () => {
     expect(defaultTemplate([t("Bienvenue"), t("Compétition - relance"), t("Compétition - 1er Inscription")])!.name).toBe(
       "Compétition - 1er Inscription",
     );
-    expect(defaultTemplate([t("Bienvenue"), t("Competition call-up")])!.name).toBe("Competition call-up");
     expect(defaultTemplate([t("Bienvenue")])!.name).toBe("Bienvenue");
     expect(defaultTemplate([])).toBeUndefined();
   });

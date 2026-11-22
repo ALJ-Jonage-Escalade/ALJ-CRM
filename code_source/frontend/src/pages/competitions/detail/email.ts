@@ -28,13 +28,10 @@ export function audience(rows: readonly Row[], who: Audience): Row[] {
 
 export const hasEmail = (row: Row): boolean => looksLikeEmail(row.email ?? "");
 
-/** The template offered first: the club's « Compétition - 1er Inscription », else any about competitions, else the first. */
+/** The competition template offered first when none is the default: the club's « Compétition - 1er Inscription »,
+    else the first. */
 export function defaultTemplate(templates: readonly EmailTemplate[]): EmailTemplate | undefined {
-  return (
-    templates.find((t) => t.name === "Compétition - 1er Inscription") ??
-    templates.find((t) => /comp[ée]tition/i.test(t.name)) ??
-    templates[0]
-  );
+  return templates.find((t) => t.name === "Compétition - 1er Inscription") ?? templates[0];
 }
 
 /** Values of the template variables for a competitor, as the server fills them (services/communications/email_dispatch.py). */

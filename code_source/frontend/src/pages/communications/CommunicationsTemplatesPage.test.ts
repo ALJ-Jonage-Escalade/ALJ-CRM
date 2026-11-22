@@ -185,7 +185,7 @@ describe("CommunicationsTemplatesPage", () => {
     const answers = { ...ANSWERS, "GET /api/email-templates": () => templatesAnswer([{ ...RELANCE, is_default: true }, ECHEANCE]) };
     const { wrapper, writes, byId } = render(answers);
     await flushPromises();
-    const options = [...byId("template-select")!.querySelectorAll("option")].map((option) => option.textContent!.trim());
+    const options = [...byId("template-select")!.querySelectorAll("option")].map((option) => option.textContent.trim());
     expect(options).toEqual(["Relance ★ par défaut", "Rappel echeance"]);
 
     await wrapper.find('[data-testid="template-select"]').setValue("Relance");

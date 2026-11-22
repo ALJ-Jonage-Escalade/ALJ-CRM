@@ -36,7 +36,7 @@ def test_mobile_campaign(mobile_page, mailpit, competition):
     expect(page.get_by_test_id("email-dialog")).to_be_visible()
     expect(page.get_by_test_id("email-count")).to_have_text("2 destinataires avec une adresse e-mail")
     # Pre-filled from the seeded « Competition call-up » template, previewed for the first recipient
-    expect(page.get_by_test_id("email-subject")).to_have_value(re.compile(r"\{name_competition\}"))
+    expect(page.get_by_test_id("email-subject")).to_have_value(re.compile(r"\{Nom de la compétition\}"))
     expect(page.get_by_test_id("email-preview")).to_contain_text(competition["nom"])
     page.get_by_test_id("email-send").click()
     expect(toast(page)).to_contain_text("2 e-mail(s) envoyé(s)")
