@@ -215,6 +215,19 @@ describe("AppShell", () => {
     expect(wrapper.findAll("nav a")).toHaveLength(9);
   });
 
+  it("opens the phone menu with its button and closes it on a tap outside", async () => {
+    const { wrapper } = render(signedIn("coach"));
+    const toggle = wrapper.find("#menu-toggle");
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+    expect(wrapper.find("#menu-panel").classes()).toEqual(expect.arrayContaining(["hidden", "md:flex"]));
+    await toggle.trigger("click");
+    expect(toggle.attributes("aria-expanded")).toBe("true");
+    expect(wrapper.find("#menu-panel").classes()).not.toContain("hidden");
+    expect(wrapper.find("#menu-panel #logout-btn").exists()).toBe(true);
+    await wrapper.find("[data-testid='menu-backdrop']").trigger("click");
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+  });
+
   it("lists the office pages on a computer only, and the directory and Compétitions on a phone", () => {
     const { wrapper } = render({ status: "signedIn", user: USER, role: "coach" });
     expect(wrapper.find('nav a[data-page="adherents"]').classes()).toEqual(expect.arrayContaining(["hidden", "md:flex"]));

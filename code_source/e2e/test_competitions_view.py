@@ -10,7 +10,7 @@ import time
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.auth import ACCOUNTS, login_as
+from helpers.auth import ACCOUNTS, login_as, open_menu
 from helpers.data import unique_name
 from helpers.competitions import SEEDED_COMPETITION, sub_menu_entry
 from helpers.offline import owner, put_record, record, wait_stored
@@ -88,7 +88,9 @@ def test_both_addresses_show_the_same_screen(page):
 
 def test_readonly_sees_no_contacts_nor_management(mobile_page, competition):
     page = open_view(mobile_page, "readonly")
+    open_menu(page)
     expect(page.locator("nav a[data-page='competitions']")).to_be_visible()
+    page.locator("#menu-toggle").click()  # closed again
     card(page, competition["nom"]).click()
     expect(participant(page, competition["member"])).to_be_visible()
     expect(page.get_by_test_id("emergency-link")).to_have_count(0)

@@ -9,7 +9,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.auth import login_as
+from helpers.auth import login_as, open_menu
 from helpers.data import eventually
 from helpers.offline import age, record, stored, wait_stored
 
@@ -137,6 +137,7 @@ def test_shown_offline_with_its_date(mobile_page, member):
 def test_logout_wipes_the_copy(mobile_page):
     page = open_directory(mobile_page)
     wait_stored(page, "directory")
+    open_menu(page)
     page.locator("#logout-btn").click()
     expect(page.locator("#gate-login")).to_be_visible()
     eventually(lambda: assert_wiped(page))
