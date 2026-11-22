@@ -11,8 +11,9 @@ export const HOME = "/bureau/";
 /** Query parameter of Accueil naming the admin page a coach was sent back from (router guards). */
 export const REFUSED_QUERY = "reserve";
 
-/** Screens on which a page is listed (menu, Accueil cards): Adhérents on a computer, the directory on a phone, from the
-    same breakpoint as the menu (`md`). Hidden by CSS only: both addresses still open on any screen. */
+/** Screens on which a page is listed (menu, Accueil cards), from the same breakpoint as the menu (`md`): on a phone,
+    only Accueil, Compétitions and the directory; the office pages are listed on a computer only. Hidden by CSS only:
+    every address still opens on any screen. */
 export type Screen = "any" | "phone" | "desktop";
 
 /** What a sub-page shows offline, when the role cannot be checked: read — the copy kept on the device; staffCopy — only
@@ -52,7 +53,7 @@ export const PAGES = [
     short: "Messages",
     href: "/bureau/communications",
     access: "admin",
-    screen: "any",
+    screen: "desktop",
     offlineRead: false,
     // Online only: neither the templates nor the sends are kept on the device
     children: [
@@ -83,7 +84,7 @@ export const PAGES = [
     short: "Planning",
     href: "/bureau/planning",
     access: "staff",
-    screen: "any",
+    screen: "desktop",
     offlineRead: false,
     children: [
       { id: "semaine", label: "Vue semaine", path: "", access: "staff", offline: "none" },
@@ -97,7 +98,7 @@ export const PAGES = [
     short: "Outils",
     href: "/bureau/outils",
     access: "staff",
-    screen: "any",
+    screen: "desktop",
     offlineRead: false,
     children: [
       { id: "stats", label: "Statistiques", path: "", access: "staff", offline: "none" },
@@ -116,7 +117,7 @@ export const PAGES = [
     short: "Réglages",
     href: "/bureau/parametres",
     access: "admin",
-    screen: "any",
+    screen: "desktop",
     offlineRead: false,
     // Online only: the settings are never kept on the device
     children: [
@@ -131,7 +132,7 @@ export const PAGES = [
     short: "Admin",
     href: "/bureau/administration",
     access: "admin",
-    screen: "any",
+    screen: "desktop",
     offlineRead: false,
     // Online only: who has access is never kept on the device
     children: [{ id: "acces", label: "Accès", path: "", access: "admin", offline: "none" }],

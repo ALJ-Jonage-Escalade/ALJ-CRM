@@ -9,7 +9,7 @@ import type { BadgeColor } from "../../../components/ui/palette";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiCard from "../../../components/ui/UiCard.vue";
 import UiTile from "../../../components/ui/UiTile.vue";
-import { useMediaQuery } from "../../../composables/media";
+import { useMediaQuery, WIDE_LAYOUT_QUERY } from "../../../composables/media";
 import { csvBlob } from "../../../lib/csv";
 import { saveFile } from "../../../lib/download";
 import { formatEuros } from "../../../lib/format";
@@ -42,7 +42,7 @@ const keyOf = (b: { adherentId: number | null; nom: string; prenom: string }) =>
 const open = ref<string | null>(null);
 const selected = computed(() => shown.value.find((b) => keyOf(b) === open.value) ?? shown.value[0] ?? null);
 
-const wide = useMediaQuery("(min-width: 768px)"); // Tailwind's md
+const wide = useMediaQuery(WIDE_LAYOUT_QUERY);
 
 function toggle(b: Balance): void {
   // On desktop a click only selects: the detail stays shown

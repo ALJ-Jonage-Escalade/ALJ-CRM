@@ -215,11 +215,12 @@ describe("AppShell", () => {
     expect(wrapper.findAll("nav a")).toHaveLength(9);
   });
 
-  it("lists Adhérents on a computer and the directory on a phone", () => {
+  it("lists the office pages on a computer only, and the directory and Compétitions on a phone", () => {
     const { wrapper } = render({ status: "signedIn", user: USER, role: "coach" });
     expect(wrapper.find('nav a[data-page="adherents"]').classes()).toEqual(expect.arrayContaining(["hidden", "md:flex"]));
     expect(wrapper.find('nav a[data-page="annuaire"]').classes()).toEqual(expect.arrayContaining(["flex", "md:hidden"]));
-    expect(wrapper.find('nav a[data-page="planning"]').classes()).not.toContain("hidden");
+    expect(wrapper.find('nav a[data-page="planning"]').classes()).toEqual(expect.arrayContaining(["hidden", "md:flex"]));
+    expect(wrapper.find('nav a[data-page="competitions"]').classes()).not.toContain("hidden");
   });
 
   it.each([

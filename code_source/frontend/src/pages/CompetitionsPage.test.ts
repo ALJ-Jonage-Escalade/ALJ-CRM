@@ -4,6 +4,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import { AUTH_KEY, type AuthState } from "../composables/auth";
+import { WIDE_LAYOUT_QUERY } from "../composables/media";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import type { Role } from "../lib/roles";
@@ -444,7 +445,7 @@ describe("CompetitionsPage", () => {
 
   it("opens the first competition of the list by itself when the list and the detail are side by side", async () => {
     vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query === "(min-width: 768px)",
+      matches: query === WIDE_LAYOUT_QUERY,
       addEventListener: () => {},
       removeEventListener: () => {},
     }));

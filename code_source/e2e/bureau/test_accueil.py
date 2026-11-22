@@ -23,10 +23,11 @@ def test_phone_layout(mobile_page):
     assert abs(nav["y"] + nav["height"] - viewport["height"]) <= 1, "navigation bar at the bottom of the screen"
     assert nav["width"] == viewport["width"]
     expect(mobile_page.locator(f"{NAV} a")).to_have_count(6)  # a coach: no Communications, no Paramètres
-    # The directory instead of Adhérents in the menu (both pages still open by their address)
-    expect(mobile_page.locator(f"{NAV} a").filter(visible=True)).to_have_count(5)
+    # Accueil, Compétitions and the directory only: the office pages stay on a computer (still open by their address)
+    expect(mobile_page.locator(f"{NAV} a").filter(visible=True)).to_have_count(3)
     expect(mobile_page.locator(f"{NAV} a[data-page='annuaire']")).to_be_visible()
     expect(mobile_page.locator(f"{NAV} a[data-page='adherents']")).to_be_hidden()
+    expect(mobile_page.locator(f"{NAV} a[data-page='planning']")).to_be_hidden()
     expect(mobile_page.get_by_text(f"v{VERSION}", exact=True).filter(visible=True)).to_be_visible()
 
 
