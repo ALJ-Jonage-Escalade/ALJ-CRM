@@ -112,17 +112,6 @@ export function layoutWeek(competitions: readonly Competition[], weekStart: stri
   return { bars, lanes: laneEnds.length };
 }
 
-/** The month's competitions (any of their days in it), by start date then name: the calendar on phones. */
-export function monthAgenda(competitions: readonly Competition[], { year, month }: YearMonth): Competition[] {
-  const first = todayIso(new Date(year, month, 1));
-  const last = todayIso(new Date(year, month + 1, 0));
-  return competitions
-    .map((competition) => ({ competition, days: competitionDays(competition) }))
-    .filter((c): c is { competition: Competition; days: [string, string] } => !!c.days && c.days[0] <= last && c.days[1] >= first)
-    .sort((a, b) => a.days[0].localeCompare(b.days[0]) || (a.competition.nom ?? "").localeCompare(b.competition.nom ?? ""))
-    .map((c) => c.competition);
-}
-
 /** A bar's colour: its discipline's (as its badge); slate without one (blue is « difficulté ») and once archived. */
 export function calendarColor(competition: Competition): BadgeColor {
   const name = shownDiscipline(competition).toLowerCase();
@@ -137,13 +126,6 @@ export const LEGEND: { label: string; color: BadgeColor }[] = [
 
 const MONTH = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
 const WEEKDAY = new Intl.DateTimeFormat("fr-FR", { weekday: "short" });
-const AGENDA_DAY = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short" });
-
-/** A "YYYY-MM-DD" day as a local Date (for Intl). */
-function localDate(dateIso: string): Date {
-  const [year, month, day] = dateIso.split("-").map(Number) as [number, number, number];
-  return new Date(year, month - 1, day);
-}
 
 /** « Novembre 2026 ». */
 export function monthTitle({ year, month }: YearMonth): string {
@@ -153,13 +135,3 @@ export function monthTitle({ year, month }: YearMonth): string {
 
 /** « lun. » … « dim. », the columns' headers (2024-01-01 was a Monday). */
 export const WEEKDAYS = Array.from({ length: 7 }, (_, i) => WEEKDAY.format(new Date(2024, 0, 1 + i)));
-
-/** « sam. 15 nov. », « sam. 15 nov. – dim. 16 nov. » (a competition without a readable date: « sans date »). */
-export function agendaDays(competition: Competition): string {
-  const days = competitionDays(competition);
-  if (!days) {
-    return "sans date";
-  }
-  const [start, end] = days.map((d) => AGENDA_DAY.format(localDate(d)));
-  return start === end ? start! : `${start} – ${end}`;
-}

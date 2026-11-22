@@ -3,9 +3,11 @@
    matchMedia (unit tests). */
 import { onScopeDispose, ref, type Ref } from "vue";
 
-/** Tailwind's `md` as redefined in styles.css: 48rem wide, except a phone held sideways (touch screen under 500px
-    tall), which keeps the phone layout. Keep both in step. */
+/** Phone or computer layout: Tailwind's `md` as redefined in styles.css, 48rem wide, except a phone held sideways
+    (touch screen under 500px tall), which keeps the phone layout. media.test.ts checks both are the same. */
 export const WIDE_LAYOUT_QUERY = "(min-width: 48rem) and (not ((pointer: coarse) and (max-height: 500px)))";
+/** Tailwind's `xl` (80rem = 1280px): room for a wide table next to a list. */
+export const XL_LAYOUT_QUERY = "(min-width: 80rem)";
 
 export function useMediaQuery(query: string): Readonly<Ref<boolean>> {
   const list = typeof window.matchMedia === "function" ? window.matchMedia(query) : null;
@@ -16,4 +18,9 @@ export function useMediaQuery(query: string): Readonly<Ref<boolean>> {
     onScopeDispose(() => list.removeEventListener("change", onChange));
   }
   return matches;
+}
+
+/** Whether the computer layout is shown (Tailwind's `md`, see WIDE_LAYOUT_QUERY): false on phones. */
+export function useWideLayout(): Readonly<Ref<boolean>> {
+  return useMediaQuery(WIDE_LAYOUT_QUERY);
 }

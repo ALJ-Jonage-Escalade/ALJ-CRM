@@ -1,9 +1,9 @@
 <script setup lang="ts" generic="T extends RowData">
-/* Responsive data table of the app: a sortable table on desktop, stacked cards on phones (below md), pages of
-   pageSize rows. Columns: DataColumn (dataTable.ts). A cell shows its value, or the page's slot `cell-<column id>`;
-   a card shows the `card` slot. sortedRows() (exposed) gives every row in the order shown (exports). Sorting and
+/* Data table of the app (computer pages: phones list the competitions only): sortable, pages of pageSize rows,
+   scrolling sideways when the window is narrow. Columns: DataColumn (dataTable.ts). A cell shows its value, or the
+   page's slot `cell-<column id>`. sortedRows() (exposed) gives every row in the order shown (exports). Sorting and
    paging are kept when the rows change (polling); resetKey sends back to the first page (new filters). hidden: ids of
-   columns not shown (their sort still applies). onRowClick: a click on a row or card, except on a link or a control
+   columns not shown (their sort still applies). onRowClick: a click on a row, except on a link or a control
    inside it; selectedKey: the row key shown as selected. */
 import { useTable, type RowData, type SortingState } from "@tanstack/vue-table";
 import { computed, toRef, watch } from "vue";
@@ -30,7 +30,6 @@ const props = withDefaults(
 
 defineSlots<{
   [cell: `cell-${string}`]: (props: { row: T; value: CellValue }) => unknown;
-  card(props: { row: T }): unknown;
 }>();
 
 // The columns of a table do not change: read once
@@ -90,8 +89,7 @@ const sortIcon = (dir: false | "asc" | "desc") => (dir === "asc" ? "▲" : dir =
 
 <template>
   <div>
-    <!-- Desktop: table -->
-    <div class="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <table class="w-full border-collapse text-[12.5px]" :aria-label="label" data-testid="data-table">
         <thead class="bg-slate-50 text-left text-[11.5px] tracking-wide text-slate-500 uppercase">
           <tr v-for="group in table.getHeaderGroups()" :key="group.id">
@@ -152,26 +150,6 @@ const sortIcon = (dir: false | "asc" | "desc") => (dir === "asc" ? "▲" : dir =
         </tbody>
       </table>
     </div>
-
-    <!-- Phones: one card per row, in the same order -->
-    <ul class="flex flex-col gap-2 md:hidden" :aria-label="label" data-testid="data-cards">
-      <li v-if="!pageRows.length" class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500">{{ empty }}</li>
-      <li
-        v-for="row in pageRows"
-        :key="row.id"
-        data-testid="data-card"
-        :data-id="row.id"
-        :aria-current="isSelected(row.id) || undefined"
-        :class="[
-          'rounded-xl border bg-white px-3.5 py-3 shadow-sm',
-          isSelected(row.id) ? 'border-accent ring-1 ring-accent' : 'border-slate-200',
-          onRowClick && 'cursor-pointer',
-        ]"
-        @click="rowClicked($event, row.original)"
-      >
-        <slot name="card" :row="row.original" />
-      </li>
-    </ul>
 
     <nav
       v-if="table.getPageCount() > 1"

@@ -179,15 +179,6 @@ onMounted(reload);
               </UiButton>
             </span>
           </template>
-          <template #card="{ row }">
-            <b>🔑 {{ row.code }}</b>
-            <span class="ml-2 text-xs text-slate-500">{{ STATUS_LABEL[row.status] }}</span>
-            <div v-if="row.holder" class="text-xs">
-              <RouterLink :to="holderLink(row)">{{ holderName(row.holder) }}</RouterLink>
-              <template v-if="!row.holder.member_this_season">⚠️</template>
-              · depuis le {{ formatDayText(row.holder.given_on) }}
-            </div>
-          </template>
         </DataTable>
         <button
           v-if="archived.length"

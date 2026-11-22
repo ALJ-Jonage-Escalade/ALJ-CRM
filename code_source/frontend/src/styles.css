@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* Wide layout (md): 48rem wide, except a phone held sideways (touch screen under 500px tall), which keeps the phone
-   layout. Same query as WIDE_LAYOUT_QUERY in composables/media.ts. */
+   layout. Same query as WIDE_LAYOUT_QUERY in composables/media.ts (checked by media.test.ts). */
 @custom-variant md (@media (min-width: 48rem) and (not ((pointer: coarse) and (max-height: 500px))));
 
 /* Club design tokens (same colours as web/shared/alj.css and the generated Excel sheets) */

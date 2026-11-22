@@ -418,7 +418,6 @@ describe("CompetitionsPage", () => {
     expect(byId("when-upcoming").exists()).toBe(false);
     expect(byId("comp-season-filter").exists()).toBe(false);
     expect(all("calendar-comp-chip").map((c) => c.text())).toEqual(["Coupe du Rhône"]);
-    expect(all("calendar-agenda-item").map((c) => c.text())).toEqual([expect.stringContaining("Coupe du Rhône")]);
     await router.push("/competitions");
     await all("calendar-comp-chip")[0]!.trigger("click");
     await settle();

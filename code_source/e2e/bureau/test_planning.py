@@ -186,19 +186,6 @@ def test_print_shows_the_grid_only(page, planning):
         expect(page.get_by_test_id(control)).to_be_hidden()
 
 
-def test_phone(mobile_page, planning):
-    """Read and edit on a phone: no horizontal page scroll, the form fits the screen."""
-    page = _open(mobile_page)
-    assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
-    sub_menu_entry(page, "tableau").click()
-    expect(page.get_by_test_id("slot-row")).to_have_count(len(planning))
-    assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
-    _row(page, planning[0]["groupe"]).get_by_test_id("slot-edit").click()
-    box = page.get_by_test_id("slot-dialog").bounding_box()
-    assert box["x"] >= 0 and box["x"] + box["width"] <= page.viewport_size["width"]
-    expect(page.get_by_test_id("slot-save")).to_be_visible()
-
-
 def test_coach_changes_a_slot(page, planning):
     """Coaches change the slots too (only replacing the whole planning is for admins)."""
     saturday = next(s for s in planning if s["jour"] == "Samedi")

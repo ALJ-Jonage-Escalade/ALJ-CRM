@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
-  agendaDays,
   calendarColor,
   competitionDays,
   initialMonth,
   layoutWeek,
   LEGEND,
-  monthAgenda,
   monthTitle,
   monthWeeks,
   shiftMonth,
@@ -149,26 +147,11 @@ describe("layoutWeek", () => {
   });
 });
 
-describe("monthAgenda", () => {
-  it("lists the competitions with a day in the month, by start then name", () => {
-    const list = [
-      comp(1, "2026-11-20", undefined, { nom: "Zeta" }),
-      comp(2, "2026-10-31", "2026-11-01", { nom: "Over the month" }),
-      comp(3, "2026-11-20", undefined, { nom: "Alpha" }),
-      comp(4, "2026-12-01"),
-      comp(5, ""),
-    ];
-    expect(monthAgenda(list, { year: 2026, month: 10 }).map((c) => c.nom)).toEqual(["Over the month", "Alpha", "Zeta"]);
-  });
-});
-
 describe("labels and colours", () => {
   it("writes months, weekdays and days in French", () => {
     expect(monthTitle({ year: 2026, month: 10 })).toBe("Novembre 2026");
     expect(WEEKDAYS[0]).toBe("lun.");
     expect(WEEKDAYS[6]).toBe("dim.");
-    expect(agendaDays(comp(1, "2026-11-14", "2026-11-15"))).toBe("sam. 14 nov. – dim. 15 nov.");
-    expect(agendaDays(comp(1, "2026-11-14"))).toBe("sam. 14 nov.");
   });
 
   it("colours by discipline, slate without one or once archived", () => {
