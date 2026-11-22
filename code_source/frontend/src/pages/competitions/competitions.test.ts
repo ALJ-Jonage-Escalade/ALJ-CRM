@@ -12,7 +12,9 @@ import {
   draftErrors,
   draftOf,
   filterCompetitions,
+  countLine,
   filterRows,
+  groupFilters,
   groupRows,
   hasPaid,
   isNotInvited,
@@ -210,6 +212,17 @@ describe("participants", () => {
     expect(filterRows(rows, "notInvited").map((r) => r.nom)).toEqual(["ABEL"]);
     expect(filterRows(rows, "all", "zoe").map((r) => r.nom)).toEqual(["DURAND"]);
     expect(groupRows(rows).map(([g]) => g)).toEqual(["Compét. U14", "Compét. U18", UNIDENTIFIED]);
+  });
+
+  it("filters by slot group, offering the groups where someone takes part", () => {
+    const rows = participantRows(c, members, contacts);
+    // « Non identifiés »: nobody takes part, no filter
+    expect(groupFilters(rows)).toEqual([
+      { group: "Compét. U14", n: 1 },
+      { group: "Compét. U18", n: 1 },
+    ]);
+    expect(filterRows(rows, "all", "", "Compét. U14").map((r) => r.nom)).toEqual(["DURAND"]);
+    expect(countLine(counts(rows), "all", 1, "Compét. U14")).toBe("1 compétiteur en « Compét. U14 »");
   });
 
   it("tells who paid, who was never invited, and their ranking", () => {

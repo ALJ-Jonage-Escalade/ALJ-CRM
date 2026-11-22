@@ -102,7 +102,7 @@ def test_change_made_offline_is_sent_later(mobile_page, test_data, competition):
         card.get_by_test_id("participe-switch").click()
         expect(card.get_by_test_id("queued")).to_be_visible()
         expect(page.locator("#sync-info")).to_contain_text("1 modification à envoyer")
-        expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (0)")
+        expect(card.get_by_test_id("participe-switch")).not_to_be_checked()
         assert participant(test_data, competition)["selectionne"] is True  # not sent yet
         # Kept on the device: still there after a restart without network (the page itself needs the network to
         # load here: service workers are blocked)
@@ -141,7 +141,7 @@ def test_change_made_offline_is_refused_when_changed_elsewhere(mobile_page, test
     expect(toast(page)).to_contain_text("modifié entre-temps sur un autre appareil")
     assert participant(test_data, competition)["selectionne"] is True
     expect(participant_card(page, member).get_by_test_id("queued")).to_have_count(0)
-    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (1)")
+    expect(participant_card(page, member).get_by_test_id("participe-switch")).to_be_checked()
 
 
 def test_change_queued_by_the_former_page_is_sent(mobile_page, test_data, competition):

@@ -169,8 +169,17 @@ let store: OfflineStore;
 beforeEach(() => {
   store = createOfflineStore({ indexedDB: new IDBFactory(), storage: localStorage });
 });
+/** A computer screen (jsdom has no matchMedia: a phone otherwise); undone after each test. */
+function onComputer(): void {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === WIDE_LAYOUT_QUERY,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   document.body.innerHTML = "";
 });
 
@@ -186,6 +195,7 @@ describe("CompetitionsPage", () => {
   });
 
   it("shows a competition's participants by group with payment status, contacts for coaches", async () => {
+    onComputer();
     const { byId, all } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
     await settle();
     expect(byId("detail-name").text()).toBe("Coupe du Rhône");
@@ -204,6 +214,18 @@ describe("CompetitionsPage", () => {
     expect(all("participant-name").map((n) => n.text())).toEqual(["DURAND Zoé"]);
     await byId("filter-notInvited").trigger("click");
     expect(all("participant-name").map((n) => n.text())).toEqual(["ABEL Max"]);
+  });
+
+  it("filters by slot group on a phone, where a competition day goes one group after the other", async () => {
+    const { byId, all } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
+    await settle();
+    expect([byId("filter-selected").exists(), byId("participant-search").exists()]).toEqual([false, false]);
+    expect(all("filter-group").map((b) => b.text())).toEqual(["Compét. U14 (1)", "Compét. U18 (1)"]);
+    await all("filter-group")[1]!.trigger("click");
+    expect(all("participant-name").map((n) => n.text())).toEqual(["MARTIN Léo"]);
+    expect(byId("participant-count").text()).toBe("1 compétiteur en « Compét. U18 »");
+    await byId("filter-all").trigger("click");
+    expect(all("participant-name")).toHaveLength(3);
   });
 
   it("offers each competitor the action their payment allows", async () => {
