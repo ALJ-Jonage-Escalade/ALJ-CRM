@@ -268,6 +268,9 @@ const ANSWERS: Record<string, Answer> = {
     }),
 };
 
+/** The members map, no longer the index sub-page. */
+const MAP = "/bureau/outils/map";
+
 async function render(role: Role = "admin", path = "/bureau/outils") {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null); // jsdom draws no canvas (Statistiques charts)
   const calls: { method: string; path: string; body?: unknown }[] = [];
@@ -296,7 +299,7 @@ async function render(role: Role = "admin", path = "/bureau/outils") {
   const all = (id: string) => [...document.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`)];
   // The sub-menu links are stubbed (PageLink): opened through the router, as PageLink does
   const open = async (sub: string) => {
-    await router.push(sub === "map" ? "/bureau/outils" : `/bureau/outils/${sub}`);
+    await router.push(sub === "stats" ? "/bureau/outils" : `/bureau/outils/${sub}`);
     await flushPromises();
   };
   const sent = (method: string, path: string) => calls.filter((c) => c.method === method && c.path.startsWith(path));
@@ -317,7 +320,7 @@ afterEach(() => {
 
 describe("OutilsPage", () => {
   it("shows the members map of the active season, filtered by group", async () => {
-    const { byId, all, sent } = await render();
+    const { byId, all, sent } = await render("admin", MAP);
     expect(sent("GET", "/api/reports/map-points").map((c) => c.path)).toEqual(["/api/reports/map-points?season=2026-2027"]);
     await vi.waitFor(() => expect(byId("map-stats")!.textContent.trim()).toBe("3 adhérents répartis sur 2 adresses"));
     expect(byId("map-groups")!.textContent.trim()).toBe("🧗 Tous les groupes ▾");
@@ -346,7 +349,7 @@ describe("OutilsPage", () => {
     ANSWERS["GET /api/reports/map-points"] = () =>
       json({ season: "2026-2027", points: [{ address: "", lat: 45.8, lon: 5.05, members: [{ name: hostile, group: hostile }] }] });
     try {
-      const { byId, all } = await render();
+      const { byId, all } = await render("admin", MAP);
       await vi.waitFor(() => expect(byId("map-stats")).not.toBeNull());
       byId("map-groups")!.click();
       await flushPromises();
@@ -364,7 +367,7 @@ describe("OutilsPage", () => {
   });
 
   it("reloads the map for another season, then keeps it while showing the statistics", async () => {
-    const { byId, open, sent } = await render();
+    const { byId, open, sent } = await render("admin", MAP);
     const season = byId<HTMLSelectElement>("map-season")!;
     expect([...season.options].map((o) => o.value)).toEqual(["2026-2027", "2025-2026", "Toutes les saisons"]);
     season.value = "Toutes les saisons";
@@ -386,7 +389,7 @@ describe("OutilsPage", () => {
     const mapPoints = ANSWERS["GET /api/reports/map-points"]!;
     ANSWERS["GET /api/reports/map-points"] = () => json({ status: "error", message: "Erreur interne" }, 500);
     try {
-      const { byId } = await render();
+      const { byId } = await render("admin", MAP);
       await vi.waitFor(() => expect(byId("map-status")!.textContent).toContain("❌ Impossible de charger la carte"));
       expect(byId("map-stats")).toBeNull();
     } finally {
@@ -409,7 +412,7 @@ describe("OutilsPage", () => {
     expect(coach.byId("sub-side-ffme-import")).toBeNull();
     expect(coach.byId("pane-ffme-import")).toBeNull();
     expect(document.getElementById("refused-page")!.textContent).toContain("Import FFME est réservée aux administrateurs");
-    expect(coach.byId("sub-side-map")!.getAttribute("aria-current")).toBe("page");
+    expect(coach.byId("sub-side-stats")!.getAttribute("aria-current")).toBe("page");
     expect(document.querySelector("h1")!.textContent).toBe("Outils");
   });
 

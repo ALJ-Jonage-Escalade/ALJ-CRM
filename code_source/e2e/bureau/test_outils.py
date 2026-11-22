@@ -35,7 +35,7 @@ def _saved(download, folder):
 def test_members_map(page):
     """Map of the members' addresses (Leaflet). The e2e setup pre-fills the geocache, so the
     server never calls Nominatim."""
-    _open(page)
+    _open(page, "admin", "map")
     expect(page.get_by_test_id("map-stats")).to_contain_text("réparti", timeout=30_000)
     expect(page.get_by_test_id("map-view").locator(".leaflet-tile-pane")).to_be_attached()
     # Members are shown as markers grouped in clusters; a cluster zooms in down to the markers, a marker opens its popup
@@ -59,7 +59,7 @@ def test_members_map(page):
 
 def test_member_statistics(page):
     """Statistiques: the charts are drawn by Chart.js in a real browser, the breakdown opens under its chart."""
-    _open(page, "coach", "stats")
+    _open(page, "coach")  # the index sub-page
     expect(page.get_by_test_id("chart-sex").locator("tbody tr")).not_to_have_count(0, timeout=30_000)  # seeded members
     canvas = page.get_by_test_id("chart-sex").locator("canvas")
     expect(canvas).to_be_visible()
