@@ -55,10 +55,12 @@ def participant(page: Page, member: dict):
 
 def test_phone_list_then_competition(mobile_page, competition):
     page = open_view(mobile_page)
+    expect(page.get_by_test_id("view-switcher")).to_be_hidden()  # the cards only: no table nor calendar on a phone
     card(page, competition["nom"]).click()
     expect(page.get_by_test_id("detail-name")).to_have_text(competition["nom"])
     expect(page).to_have_url(re.compile(rf"/competitions\?id={competition['id']}$"))
     expect(card(page, SEEDED_COMPETITION)).to_be_hidden()  # one at a time on a phone
+    expect(page.get_by_test_id("subnav-strip")).to_have_count(0)  # the main page only: the sub-pages are for a computer
     row = participant(page, competition["member"])
     expect(row.get_by_test_id("participe-switch")).to_be_checked()
     expect(row.get_by_test_id("payment-badge")).to_be_visible()

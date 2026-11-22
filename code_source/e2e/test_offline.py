@@ -76,19 +76,19 @@ def test_competitors_shown_offline_other_changes_refused(mobile_page, competitio
         mobile_page.context.set_offline(False)
 
 
-def test_coach_opens_bilan_offline_helloasso_waits_for_the_network(mobile_page, competition):
-    """Sub-pages offline (plans/sub-menus.md D6): Bilan reads the copy kept on a coach's phone, HelloAsso stays listed
+def test_coach_opens_bilan_offline_helloasso_waits_for_the_network(page, competition):
+    """Sub-pages offline (plans/sub-menus.md D6): Bilan reads the copy kept on a coach's device, HelloAsso stays listed
     but disabled."""
-    page = open_screen(mobile_page)
+    page = open_screen(page)
     open_competition(page, competition["nom"])
-    go_offline(page, mobile_page.context, competition)
+    go_offline(page, page.context, competition)
     try:
         go_to(page, "bilan")
         expect(page.get_by_test_id("balance-pane")).to_be_visible()
         expect(page).to_have_url(re.compile(r"/competitions/bilan$"))
         expect(sub_menu_entry(page, "helloasso")).to_have_attribute("aria-disabled", "true")
     finally:
-        mobile_page.context.set_offline(False)
+        page.context.set_offline(False)
 
 
 def test_change_made_offline_is_sent_later(mobile_page, test_data, competition):

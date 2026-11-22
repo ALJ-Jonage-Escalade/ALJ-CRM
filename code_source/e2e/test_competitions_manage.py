@@ -24,6 +24,9 @@ def tick_coach(page, nom: str) -> None:
 def test_create_competition(mobile_page, test_data):
     page = open_screen(mobile_page)
     nom = unique_name("E2E Create")
+    # On the season's line, to save height on a phone
+    season, create = page.get_by_test_id("comp-season-filter").bounding_box(), page.get_by_test_id("create-comp").bounding_box()
+    assert abs((season["y"] + season["height"] / 2) - (create["y"] + create["height"] / 2)) < 10
     page.get_by_test_id("create-comp").click()
     page.get_by_test_id("cf-nom").fill(nom)
     page.get_by_test_id("cf-idffme").fill("EVT-E2E-1")

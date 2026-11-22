@@ -34,7 +34,7 @@ def open_competition(page: Page, nom: str) -> Locator:
 
 def sub_menu_entry(page: Page, sub_page: str) -> Locator:
     """Entry of a sub-page in the menu shown: nested in the side menu on desktop, the strip under the title on phones
-    (frontend/src/components/SubNav.vue)."""
+    (frontend/src/components/SubNav.vue; none on Compétitions, whose sub-pages are tested on desktop)."""
     return page.locator(f"[data-testid='sub-side-{sub_page}']:visible, [data-testid='sub-strip-{sub_page}']:visible")
 
 

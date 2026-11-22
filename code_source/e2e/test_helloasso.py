@@ -64,10 +64,10 @@ def _link(page, setup, ha_item, member, comment=""):
     expect(toast(page)).to_contain_text("rattaché avec succès")
 
 
-def test_sync_links_payment_automatically(mobile_page, test_data, setup):
-    page = open_screen(mobile_page)
+def test_sync_links_payment_automatically(page, test_data, setup):
+    page = open_screen(page)
     _sync(page)
-    expect(_item_card(page, setup["auto"]).get_by_test_id("ha-state")).to_contain_text("Rattaché")
+    expect(_item_card(page, setup["auto"]).get_by_test_id("ha-linked-competition")).to_have_text(setup["competition"]["nom"])
     expect(_item_card(page, setup["unknown_payer"]).get_by_test_id("ha-state")).to_contain_text("En attente")
     expect(_item_card(page, setup["no_competition"]).get_by_test_id("ha-state")).to_contain_text("En attente")
 
@@ -80,9 +80,9 @@ def test_sync_links_payment_automatically(mobile_page, test_data, setup):
     eventually(linked)
 
 
-def test_manual_link_marks_member_paid(mobile_page, test_data, setup):
+def test_manual_link_marks_member_paid(page, test_data, setup):
     member = setup["members"][1]
-    page = open_screen(mobile_page)
+    page = open_screen(page)
     _sync(page)
     _item_card(page, setup["unknown_payer"]).get_by_test_id("ha-open").click()
     # Suggested from the competition number the payer typed
@@ -92,7 +92,7 @@ def test_manual_link_marks_member_paid(mobile_page, test_data, setup):
     page.get_by_test_id("attach-save").click()
     expect(toast(page)).to_contain_text("rattaché avec succès")
     card = _item_card(page, setup["unknown_payer"])
-    expect(card.get_by_test_id("ha-state")).to_contain_text("Rattaché")
+    expect(card.get_by_test_id("ha-linked-competition")).to_have_text(setup["competition"]["nom"])
     expect(card).to_contain_text("manuel")
 
     go_to(page, "competitions")
@@ -107,8 +107,8 @@ def test_manual_link_marks_member_paid(mobile_page, test_data, setup):
     eventually(stored)
 
 
-def test_ignore_and_restore_a_payment(mobile_page, test_data, setup):
-    page = open_screen(mobile_page)
+def test_ignore_and_restore_a_payment(page, test_data, setup):
+    page = open_screen(page)
     _sync(page)
     card = _item_card(page, setup["no_competition"])
     card.get_by_test_id("ha-open").click()
@@ -138,10 +138,10 @@ def test_ignore_and_restore_a_payment(mobile_page, test_data, setup):
     eventually(restored)
 
 
-def test_linking_pass_goes_from_one_pending_payment_to_the_next(mobile_page, test_data, setup):
+def test_linking_pass_goes_from_one_pending_payment_to_the_next(page, test_data, setup):
     """« Rattacher les paiements en attente »: the pending payments of the list shown, one after another, each decision
     saved at once, then a summary."""
-    page = open_screen(mobile_page)
+    page = open_screen(page)
     _sync(page)
     page.get_by_test_id("ha-filter-all").click()
     page.get_by_test_id("ha-search").fill(setup["tag"])
@@ -175,10 +175,10 @@ def test_competition_links_open_the_competition(page, setup):
     expect(page.get_by_test_id("detail-name")).to_have_text(nom)
 
 
-def test_resync_keeps_coach_decisions(mobile_page, test_data, setup):
+def test_resync_keeps_coach_decisions(page, test_data, setup):
     """A new sync rewrites HelloAsso's fields only: manual links and ignored lines survive."""
     member = setup["members"][1]
-    page = open_screen(mobile_page)
+    page = open_screen(page)
     _sync(page)
     _link(page, setup, setup["unknown_payer"], member)
     _item_card(page, setup["no_competition"]).get_by_test_id("ha-open").click()
