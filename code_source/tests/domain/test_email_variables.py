@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from domain.email_variables import render_template
+from domain.email_variables import render_template, template_error, to_keys, to_labels
 
 
 def test_render_template_fills_each_variable() -> None:
@@ -51,3 +51,31 @@ def test_render_template_escapes_values_for_html() -> None:
 def test_render_template_leaves_braces_of_html_and_unknown_tokens() -> None:
     text = '{<b>Prénom</b>} {style="a"} {inconnu} {Prénom\n}'
     assert render_template(text, {"first_name": "Alex"}) == text
+
+
+def test_to_keys_stores_lenient_labels_and_former_spellings_as_keys() -> None:
+    text = "Bonjour { prénom } {NOM}, {nom_competition} : {Lien WhatsApp}\n{bloc_whatsapp} {inconnu} <a href=\"x\">{N° de licence}</a>"
+    assert to_keys(text) == (
+        "Bonjour {first_name} {last_name}, {name_competition} : {whatsapp_link}\n"
+        "Voici le lien du groupe WhatsApp dédié à cette compétition : {whatsapp_link} {inconnu} <a href=\"x\">{num_licence}</a>"
+    )
+
+
+def test_to_labels_shows_keys_and_former_spellings_as_labels() -> None:
+    assert to_labels("{first_name} {Prénom} {whatapp_Id} {amount} {inconnu}") == "{Prénom} {Prénom} {Lien WhatsApp} {Montant de l'adhésion} {inconnu}"
+
+
+def test_labels_and_keys_round_trip() -> None:
+    stored = "Bonjour {first_name} {last_name} ({num_licence}, {tarif}, {season}, {amount}) {name_competition} {whatsapp_link}"
+    assert to_keys(to_labels(stored)) == stored
+
+
+def test_template_error_names_unknown_tokens_and_lists_the_valid_labels() -> None:
+    message = template_error(["Bonjour {Prenon}", "{ prénom } {bloc_whatsapp} {Prenon} {date limite}"])
+    assert message is not None
+    assert message.startswith("Variables inconnues : {Prenon}, {date limite}.")
+    assert "{Prénom}" in message and "{Lien WhatsApp}" in message
+
+
+def test_template_error_accepts_known_tokens_and_html() -> None:
+    assert template_error(['{PRENOM} {nom_competition} <a href="https://x.fr">{style="a"}</a>']) is None

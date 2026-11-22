@@ -109,6 +109,49 @@ export function renderTemplate(text: string, values: VariableValues, options: { 
   });
 }
 
+function rewrite(text: string, show: (key: VariableKey) => string): string {
+  return expandAliases(text).replace(TOKEN, (whole, name: string) => {
+    const key = findVariable(name);
+    return key === undefined ? whole : `{${show(key)}}`;
+  });
+}
+
+/** The text as stored: each variable written with its key ({first_name}), whatever the spelling typed. */
+export function toKeys(text: string): string {
+  return rewrite(text, (key) => key);
+}
+
+/** The text as users read it: each variable written with its French label ({Prénom}). */
+export function toLabels(text: string): string {
+  return rewrite(text, (key) => VARIABLES[key].label);
+}
+
+/** The variables a template of this kind may use (all of them without a kind). */
+export function variablesOf(kind?: TemplateKind): TemplateVariable[] {
+  return TEMPLATE_VARIABLES.filter((variable) => kind === undefined || variable.kinds.includes(kind));
+}
+
+/** Why a template whose subject and body are `texts` cannot be saved, or null: the tokens that are no variable,
+    then the valid ones (the server checks again with the same words). */
+export function templateError(texts: readonly string[], kind?: TemplateKind): string | null {
+  const unknown: string[] = [];
+  for (const text of texts) {
+    for (const match of expandAliases(text).matchAll(TOKEN)) {
+      if (findVariable(match[1] ?? "") === undefined && !unknown.includes(match[0])) {
+        unknown.push(match[0]);
+      }
+    }
+  }
+  if (!unknown.length) {
+    return null;
+  }
+  const valid = variablesOf(kind)
+    .map((variable) => `{${variable.label}}`)
+    .join(", ");
+  const title = unknown.length === 1 ? "Variable inconnue" : "Variables inconnues";
+  return `${title} : ${unknown.join(", ")}. Variables possibles : ${valid}.`;
+}
+
 /** 15 -> « 15 », 15.5 -> « 15,50 », no currency sign (domain/utils.format_amount). */
 export function amountText(amount: number | string | null | undefined): string {
   if (amount == null || (typeof amount === "string" && !amount.trim())) {

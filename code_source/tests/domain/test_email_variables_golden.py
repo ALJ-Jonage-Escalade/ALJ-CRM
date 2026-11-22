@@ -11,7 +11,7 @@ import pytest
 
 from api.communications.email import get_email_variables
 from domain.email_personalization import template_values
-from domain.email_variables import render_template
+from domain.email_variables import render_template, template_error, to_keys, to_labels
 from paths import CODE_ROOT
 
 GOLDEN_PATH = Path(CODE_ROOT) / "frontend" / "src" / "lib" / "templateVariables.golden.json"
@@ -36,3 +36,13 @@ def test_amount_cases(case: dict[str, Any]) -> None:  # Any: JSON
 def test_name_cases(case: dict[str, Any]) -> None:  # Any: JSON
     values = template_values({"first_name": case["first_name"], "last_name": case["last_name"]})
     assert [values["first_name"], values["last_name"]] == case["expected"]
+
+
+@pytest.mark.parametrize("case", GOLDEN["convert"], ids=lambda case: case["text"][:30])
+def test_convert_cases(case: dict[str, Any]) -> None:  # Any: JSON
+    assert (to_keys(case["text"]), to_labels(case["text"])) == (case["keys"], case["labels"])
+
+
+@pytest.mark.parametrize("case", GOLDEN["errors"], ids=lambda case: case["texts"][0][:30])
+def test_error_cases(case: dict[str, Any]) -> None:  # Any: JSON
+    assert template_error(case["texts"], case.get("kind")) == case["expected"]

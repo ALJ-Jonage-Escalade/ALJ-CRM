@@ -2,7 +2,7 @@
    insertion of variables and HTML tags in the body (texts of the former web/bureau/communications.html). */
 import type { EmailTemplate } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
-import { DEMO_VALUES, renderTemplate, TEMPLATE_VARIABLES } from "../../lib/templateVariables";
+import { DEMO_VALUES, renderTemplate, templateError as variablesError } from "../../lib/templateVariables";
 
 /** The club's default sender, sent by the server (infrastructure/mail/senders.py). */
 export type Sender = Pick<EmailTemplate, "sender_email" | "sender_name">;
@@ -18,8 +18,6 @@ export function newTemplate(name: string, sender: Sender): EmailTemplate {
   };
 }
 
-/** The variables offered in the editor; the preview fills them with the demo values. */
-export const VARIABLES = TEMPLATE_VARIABLES.map((variable) => `{${variable.key}}`);
 export const PREVIEW_TO = "Alex MARTIN <alex.martin@example.com>";
 
 export interface Preview {
@@ -49,7 +47,8 @@ export function templateError(template: EmailTemplate): string | null {
   if (!looksLikeEmail(template.sender_email.trim())) {
     return "⚠️ L'adresse d'expédition doit être une adresse e-mail valide.";
   }
-  return null;
+  const unknown = variablesError([template.subject, template.body]);
+  return unknown ? `⚠️ ${unknown}` : null;
 }
 
 /** Why a new template cannot take this name, or null (the server checks again). */
@@ -67,35 +66,4 @@ export function newNameError(name: string, templates: readonly EmailTemplate[]):
 /** The template shown first: the requested one, else the instalment reminder, else the first. */
 export function initialTemplate(templates: readonly EmailTemplate[], wanted?: string): EmailTemplate | undefined {
   return templates.find((t) => t.name === wanted) ?? templates.find((t) => t.name.toLowerCase().includes("echeance")) ?? templates[0];
-}
-
-/** A text field after an edit, with the selection to restore. */
-export interface Edit {
-  value: string;
-  start: number;
-  end: number;
-}
-
-/** Replaces the selection with the text; the cursor goes after it. */
-export function insertText(value: string, start: number, end: number, text: string): Edit {
-  const at = start + text.length;
-  return { value: value.slice(0, start) + text + value.slice(end), start: at, end: at };
-}
-
-/** Puts the tags around the selection ("texte" when nothing is selected), which stays selected. */
-export function wrapSelection(value: string, start: number, end: number, open: string, close: string): Edit {
-  const selected = value.slice(start, end) || "texte";
-  const from = start + open.length;
-  return { value: value.slice(0, start) + open + selected + close + value.slice(end), start: from, end: from + selected.length };
-}
-
-/** The link's address, or null for an empty answer (the prompt starts with "https://"). */
-export function linkTarget(answer: string | null): string | null {
-  const url = answer?.trim() ?? "";
-  return url && url !== "https://" ? url : null;
-}
-
-/** Escapes the address for the href attribute. */
-export function linkTags(url: string): [string, string] {
-  return [`<a href="${url.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">`, "</a>"];
 }

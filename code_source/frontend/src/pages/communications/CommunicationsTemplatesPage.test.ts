@@ -90,6 +90,31 @@ describe("CommunicationsTemplatesPage", () => {
     expect(byId("toast")!.textContent).toBe("💾 Modèle « Relance finale » enregistré avec succès !");
   });
 
+  it("shows the variables as French labels and saves them as keys", async () => {
+    const { wrapper, writes, value } = render({
+      ...ANSWERS,
+      "GET /api/email-templates": () => templatesAnswer([{ ...RELANCE, body: "Bonjour {first_name},\n{bloc_whatsapp}" }, ECHEANCE]),
+    });
+    await flushPromises();
+    await wrapper.find('[data-testid="template-select"]').setValue("Relance");
+    expect(value("subject")).toBe("Rappel {Prénom}");
+    expect(value("body")).toBe("Bonjour {Prénom},\nVoici le lien du groupe WhatsApp dédié à cette compétition : {Lien WhatsApp}");
+    await wrapper.find('[data-testid="body"]').setValue("Bonjour { PRENOM } {Nom de la compétition}");
+    await wrapper.find('[data-testid="template-save"]').trigger("click");
+    await flushPromises();
+    expect(writes()[0]!.body).toMatchObject({ subject: "Rappel {first_name}", body: "Bonjour {first_name} {name_competition}" });
+  });
+
+  it("does not save a template with an unknown variable", async () => {
+    const { wrapper, writes, byId } = render();
+    await flushPromises();
+    await wrapper.find('[data-testid="body"]').setValue("Bonjour {Prenon}");
+    expect(byId("body-error")!.textContent).toContain("Variable inconnue : {Prenon}.");
+    await wrapper.find("form").trigger("submit");
+    expect(writes()).toEqual([]);
+    expect(byId("toast")!.textContent).toContain("Variable inconnue : {Prenon}. Variables possibles : {Prénom}");
+  });
+
   it("does not send an invalid template", async () => {
     const { wrapper, writes, byId } = render();
     await flushPromises();

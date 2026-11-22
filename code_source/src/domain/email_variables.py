@@ -12,7 +12,7 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass
-from typing import Literal, Mapping, Optional
+from typing import Callable, Iterable, Literal, Mapping, Optional
 
 from domain.utils import normalize_name
 
@@ -126,3 +126,37 @@ def render_template(text: Optional[str], values: Mapping[str, str], escape_html:
     if len(kept) != sum(len(line) for line in lines):
         kept = re.sub(r"\n{3,}", "\n\n", kept)
     return TOKEN.sub(value_of, kept)
+
+
+def _rewrite(text: str, show: Callable[[TemplateVariable], str]) -> str:
+    """The text with its former spellings expanded and each known token written as show(variable)."""
+    def rewrite(match: re.Match[str]) -> str:
+        variable = find_variable(match.group(1))
+        return match.group(0) if variable is None else "{" + show(variable) + "}"
+
+    return TOKEN.sub(rewrite, expand_aliases(text or ""))
+
+
+def to_keys(text: str) -> str:
+    """The text as stored: each variable written with its key ({first_name}), whatever the spelling typed."""
+    return _rewrite(text, lambda variable: variable.key)
+
+
+def to_labels(text: str) -> str:
+    """The text as users read it: each variable written with its French label ({Prénom})."""
+    return _rewrite(text, lambda variable: variable.label)
+
+
+def template_error(texts: Iterable[str], kind: Optional[TemplateKind] = None) -> Optional[str]:
+    """Why a template whose subject and body are `texts` cannot be saved (None: it can): the tokens that are no
+    variable, followed by the valid ones. `kind`: only the variables of this template kind are valid."""
+    unknown: list[str] = []
+    for text in texts:
+        for match in TOKEN.finditer(expand_aliases(text or "")):
+            if find_variable(match.group(1)) is None and match.group(0) not in unknown:
+                unknown.append(match.group(0))
+    if not unknown:
+        return None
+    valid = ", ".join("{" + variable.label + "}" for variable in VARIABLES if kind is None or kind in variable.kinds)
+    title = "Variable inconnue" if len(unknown) == 1 else "Variables inconnues"
+    return f"{title} : {', '.join(unknown)}. Variables possibles : {valid}."

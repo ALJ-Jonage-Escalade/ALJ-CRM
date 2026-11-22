@@ -10,6 +10,7 @@ import UiToast from "../../components/ui/UiToast.vue";
 import { useToast } from "../../composables/toast";
 import { CLIENT_KEY, errorText } from "../../lib/client";
 import { createCommunicationsApi, type EmailTemplate } from "../../services/communications";
+import { toKeys, toLabels } from "../../lib/templateVariables";
 import EmailPreview from "./EmailPreview.vue";
 import { initialTemplate, newNameError, newTemplate, preview, type Sender } from "./editor";
 import TemplateForm from "./TemplateForm.vue";
@@ -34,7 +35,8 @@ const shown = computed(() => (draft.value ? preview(draft.value, defaultSender.v
 
 function select(template: EmailTemplate | undefined): void {
   selected.value = template?.name ?? "";
-  draft.value = template ? { ...template } : null;
+  // Edited with the variables' labels ({Prénom}); saved with their keys
+  draft.value = template ? { ...template, subject: toLabels(template.subject), body: toLabels(template.body) } : null;
 }
 
 async function loadTemplates(wanted?: string): Promise<void> {
@@ -62,7 +64,12 @@ async function save(): Promise<void> {
   const template = draft.value!;
   saving.value = true;
   try {
-    const saved = await communicationsApi.saveEmailTemplate({ ...template, old_name: selected.value });
+    const saved = await communicationsApi.saveEmailTemplate({
+      ...template,
+      subject: toKeys(template.subject),
+      body: toKeys(template.body),
+      old_name: selected.value,
+    });
     toast.show(`💾 Modèle « ${saved.template.name} » enregistré avec succès !`);
     await loadTemplates(saved.template.name);
   } catch (e) {

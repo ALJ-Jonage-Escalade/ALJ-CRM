@@ -1,0 +1,48 @@
+"""Saving the e-mail templates of the Communications page (admin): checks, variables stored as keys."""
+
+from __future__ import annotations
+
+from typing import TypedDict
+
+from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.email_variables import template_error, to_keys
+from domain.errors import Conflict, InvalidRequest
+from infrastructure.sqlite.email_templates import EmailTemplateRepository
+
+
+class SavedTemplate(TypedDict):
+    name: str
+    subject: str
+    body: str
+    sender_email: str
+    sender_name: str
+
+
+def _same_name(a: str, b: str) -> bool:
+    return a.casefold() == b.casefold()
+
+
+def save_template(name: str, subject: str, body: str, sender_email: str = "", sender_name: str = "",
+                  old_name: str = "") -> SavedTemplate:
+    """Creates the template, or updates the one named `old_name` (renamed to `name`). Its variables are stored as keys
+    ({Prénom} → {first_name}); an unknown one is refused (InvalidRequest), as a name taken by another template
+    (Conflict). An empty sender falls back to the club's default."""
+    if not name:
+        raise InvalidRequest("Le nom du modèle est obligatoire.")
+    if not subject:
+        raise InvalidRequest("Le sujet du modèle est obligatoire.")
+    if sender_email and ("@" not in sender_email or "." not in sender_email):
+        raise InvalidRequest("L'adresse d'expédition doit être une adresse e-mail valide.")
+    problem = template_error([subject, body])
+    if problem:
+        raise InvalidRequest(problem, "invalid_variable")
+    # A new name must not take another template's (the save would overwrite it, or fail on a rename)
+    if not (old_name and _same_name(old_name, name)):
+        others = (t["name"] for t in EmailTemplateRepository.get_email_templates() if t["name"] != old_name)
+        if any(_same_name(other, name) for other in others):
+            raise Conflict(f"Un modèle nommé « {name} » existe déjà.", "duplicate_name")
+
+    saved = SavedTemplate(name=name, subject=to_keys(subject), body=to_keys(body),
+                          sender_email=sender_email or DEFAULT_SENDER_EMAIL, sender_name=sender_name or DEFAULT_SENDER_NAME)
+    EmailTemplateRepository.save_email_template(old_name=old_name or None, **saved)
+    return saved

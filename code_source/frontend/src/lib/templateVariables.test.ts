@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import goldenText from "./templateVariables.golden.json?raw";
-import { DEMO_VALUES, firstNameText, lastNameText, renderTemplate, TEMPLATE_VARIABLES, amountText } from "./templateVariables";
+import {
+  amountText,
+  DEMO_VALUES,
+  firstNameText,
+  lastNameText,
+  renderTemplate,
+  TEMPLATE_VARIABLES,
+  templateError,
+  toKeys,
+  toLabels,
+  type TemplateKind,
+} from "./templateVariables";
 
 /** The cases shared with the server (tests/domain/test_email_variables_golden.py): both must give the same text. */
 interface Golden {
@@ -8,6 +19,8 @@ interface Golden {
   render: { text: string; values: Record<string, string>; html?: boolean; expected: string }[];
   amounts: { amount: number | null; expected: string }[];
   names: { first_name: string; last_name: string; expected: [string, string] }[];
+  convert: { text: string; keys: string; labels: string }[];
+  errors: { texts: string[]; kind?: TemplateKind; expected: string | null }[];
 }
 const golden = JSON.parse(goldenText) as Golden;
 
@@ -26,6 +39,14 @@ describe("template variables, as the server", () => {
 
   it.each(golden.names)("writes $first_name $last_name", (c) => {
     expect([firstNameText(c.first_name), lastNameText(c.last_name)]).toEqual(c.expected);
+  });
+
+  it.each(golden.convert)("converts %#", (c) => {
+    expect([toKeys(c.text), toLabels(c.text)]).toEqual([c.keys, c.labels]);
+  });
+
+  it.each(golden.errors)("validates %#", (c) => {
+    expect(templateError(c.texts, c.kind)).toBe(c.expected);
   });
 
   it("has a demo value for each variable", () => {

@@ -109,6 +109,23 @@ class TestTemplateRoutes(unittest.TestCase):
         self.assertEqual(required_role("POST", "/api/whatsapp-template"), Role.ADMIN)
         self.assertEqual(required_role("GET", "/api/email-templates"), Role.COACH)
 
+    def test_save_stores_variables_as_keys_and_refuses_unknown_ones(self):
+        """Labels, lenient spellings and former names are stored as keys; an unknown variable is refused."""
+        self._temp_database("test_tpl_variables.db")
+        client = TestClient(app)
+        payload = {"name": "Relance", "subject": "Rappel { prénom }", "body": "Bonjour {Prénom} {NOM},\n{bloc_whatsapp}"}
+        saved = client.post("/api/email-templates", json=payload).json()["template"]
+        self.assertEqual(saved["subject"], "Rappel {first_name}")
+        self.assertEqual(saved["body"], "Bonjour {first_name} {last_name},\n"
+                                        "Voici le lien du groupe WhatsApp dédié à cette compétition : {whatsapp_link}")
+        stored = next(t for t in client.get("/api/email-templates").json()["templates"] if t["name"] == "Relance")
+        self.assertEqual(stored["body"], saved["body"])
+
+        refused = client.post("/api/email-templates", json={**payload, "body": "Bonjour {Prenon}"})
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("{Prenon}", refused.json()["message"])
+        self.assertIn("{Prénom}", refused.json()["message"])
+
     def test_variables_route_lists_each_variable_with_its_label_kinds_and_aliases(self):
         """GET /api/email-templates/variables: the registry, for admins only."""
         from infrastructure.security.api_auth import required_role
