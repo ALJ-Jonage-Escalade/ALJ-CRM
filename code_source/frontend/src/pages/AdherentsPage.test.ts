@@ -477,7 +477,7 @@ describe("AdherentsPage", () => {
     inBody("record-email")!.click();
     await flushPromises();
     const select = inBody("email-template") as HTMLSelectElement;
-    expect([...select.options].map((option) => option.textContent!.trim())).toEqual([
+    expect([...select.options].map((option) => option.textContent.trim())).toEqual([
       "-- E-mail libre / personnalisé --",
       "Bienvenue",
       "Relance",
@@ -485,7 +485,7 @@ describe("AdherentsPage", () => {
     expect(select.value).toBe("Relance");
     expect((inBody("email-subject") as HTMLInputElement).value).toBe("Rappel {Prénom}");
     expect((inBody("email-body") as HTMLTextAreaElement).value).toBe("Bonjour {Prénom}, {Montant de l'adhésion} €");
-    const offered = [...inBody("email-body-variables")!.querySelectorAll("button")].map((b) => b.textContent!.trim());
+    const offered = [...inBody("email-body-variables")!.querySelectorAll("button")].map((b) => b.textContent.trim());
     expect(offered).toContain("{Montant de l'adhésion}");
     expect(offered).not.toContain("{Nom de la compétition}");
     inBody("email-send")!.click();
@@ -567,12 +567,18 @@ describe("AdherentsPage", () => {
     expect(inBody("attestation-pdf")!.getAttribute("src")).toBe("blob:pdf");
     expect((inBody("attestation-to") as HTMLInputElement).value).toBe("parent@example.org");
     expect((inBody("attestation-subject") as HTMLInputElement).value).toContain("Attestation de paiement");
+    expect((inBody("attestation-body") as HTMLTextAreaElement).value).toContain("Bonjour {Prénom},");
     inBody("attestation-send")!.click();
     await flushPromises();
     expect(writes().map((w) => w.path)).toEqual(["/api/attestations/preview", "/api/attestations/send"]);
     expect(writes()[0]!.body).toEqual({ purchase_id: 11, season: "2026-2027" });
     expect(writes()[1]!.body).toEqual(
-      expect.objectContaining({ purchase_id: 11, to_email: "parent@example.org", template_name: "Attestation échéance" }),
+      expect.objectContaining({
+        purchase_id: 11,
+        to_email: "parent@example.org",
+        template_name: "Attestation échéance",
+        body: expect.stringContaining("Bonjour {first_name},") as unknown,
+      }),
     );
     expect(document.querySelector("#toast")!.textContent).toContain("Attestation envoyée avec succès");
   });

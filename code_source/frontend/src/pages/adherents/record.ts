@@ -11,6 +11,7 @@ import { PASSPORT_COLOURS, passportMarks } from "../../lib/passports";
 import { SEX_LABELS, sexLabel, type Sex } from "../../lib/sex";
 import { normKey } from "../../lib/text";
 import { amountText, firstNameText, lastNameText, type VariableKey } from "../../lib/templateVariables";
+import { initialOfKind, templatesOfKind } from "../../lib/emailTemplates";
 import type { MemberStatus } from "../../services/members";
 import { diplomes, isYes, STATUSES, type Creneau, type Member } from "./members";
 
@@ -437,11 +438,13 @@ export const DEFAULT_ATTESTATION_TEMPLATE: EmailTemplate = {
   kind: "attestation",
 };
 
-/** Templates offered for the certificate e-mail, the « échéance » one first chosen. */
+/** Templates offered for the certificate e-mail (the certificate ones), the default one first chosen, else the
+    « échéance » one. */
 export function attestationTemplates(templates: readonly EmailTemplate[]): { list: EmailTemplate[]; initial: EmailTemplate } {
   const isEcheance = (t: EmailTemplate) => normKey(t.name).includes("echeance");
-  const list = templates.some(isEcheance) ? [...templates] : [DEFAULT_ATTESTATION_TEMPLATE, ...templates];
-  return { list, initial: list.find(isEcheance) ?? list[0]! };
+  const offered = templatesOfKind(templates, "attestation");
+  const list = offered.some(isEcheance) ? offered : [DEFAULT_ATTESTATION_TEMPLATE, ...offered];
+  return { list, initial: initialOfKind(list, "attestation", (candidates) => candidates.find(isEcheance)) ?? list[0]! };
 }
 
 /** Why no certificate can be made for this membership, or null (the server checks again). */

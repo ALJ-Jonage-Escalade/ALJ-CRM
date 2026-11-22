@@ -295,6 +295,10 @@ describe("e-mail and certificate", () => {
     expect(attestationTemplates([]).initial).toBe(DEFAULT_ATTESTATION_TEMPLATE);
     const own = { ...DEFAULT_ATTESTATION_TEMPLATE, name: "Attestation Échéance 2026" };
     expect(attestationTemplates([own])).toEqual({ list: [own], initial: own });
+    // Only the certificate templates, the kind's default first
+    const standard = { ...DEFAULT_ATTESTATION_TEMPLATE, name: "Attestation standard", is_default: true };
+    const member = { ...DEFAULT_ATTESTATION_TEMPLATE, name: "Relance échéance", kind: "adherent" as const, is_default: true };
+    expect(attestationTemplates([own, standard, member])).toEqual({ list: [own, standard], initial: standard });
   });
 
   it("refuses cancelled or unpaid memberships, sends to the payer first", () => {
