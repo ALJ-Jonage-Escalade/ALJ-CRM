@@ -32,6 +32,9 @@ def test_mobile_campaign(mobile_page, mailpit, competition):
     page = open_screen(mobile_page)
     accept_dialogs(page)
     open_competition(page, competition["nom"])
+    # In the « Plus » menu on a phone, not next to « Modifier »
+    expect(page.get_by_test_id("detail-actions").get_by_test_id("email-comp")).to_have_count(0)
+    page.get_by_test_id("detail-more").click()
     page.get_by_test_id("email-comp").click()
     expect(page.get_by_test_id("email-dialog")).to_be_visible()
     expect(page.get_by_test_id("email-count")).to_have_text("2 destinataires avec une adresse e-mail")

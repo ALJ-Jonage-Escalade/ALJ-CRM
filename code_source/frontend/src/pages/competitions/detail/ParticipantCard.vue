@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* A competitor of the competition. */
+/* A competitor of the competition (no « Présent » switch, as in the table: ParticipantRow). */
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import { telHref } from "../../../lib/text";
 import { hasPaid, isCancelled, paymentBadge, rankingText, type Row } from "../competitions";
@@ -90,22 +90,6 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       <UiBadge v-else :color="row.selectionne ? 'blue' : 'slate'" variant="soft" data-testid="participe">
         {{ row.selectionne ? "✅ Participe" : "— Ne participe pas" }}
       </UiBadge>
-      <label
-        v-if="canWrite"
-        :class="[
-          'inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-bold',
-          row.present ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500',
-        ]"
-      >
-        <input
-          type="checkbox"
-          data-testid="present-switch"
-          class="size-4 accent-green-600"
-          :checked="row.present"
-          @change="onToggle('present', $event)"
-        />
-        Présent
-      </label>
       <span
         v-if="row.queued.selectionne || row.queued.present"
         data-testid="queued"

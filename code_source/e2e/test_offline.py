@@ -101,8 +101,7 @@ def test_change_made_offline_is_sent_later(mobile_page, test_data, competition):
         card = participant_card(page, member)
         card.get_by_test_id("participe-switch").click()
         expect(card.get_by_test_id("queued")).to_be_visible()
-        card.get_by_test_id("present-switch").click()  # the same competitor, the other flag
-        expect(page.locator("#sync-info")).to_contain_text("2 modifications à envoyer")
+        expect(page.locator("#sync-info")).to_contain_text("1 modification à envoyer")
         expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (0)")
         assert participant(test_data, competition)["selectionne"] is True  # not sent yet
         # Kept on the device: still there after a restart without network (the page itself needs the network to
@@ -117,7 +116,7 @@ def test_change_made_offline_is_sent_later(mobile_page, test_data, competition):
 
     def sent():
         p = participant(test_data, competition)
-        assert (p["selectionne"], p.get("present")) == (False, True)
+        assert p["selectionne"] is False
     eventually(sent)
     expect(participant_card(page, member).get_by_test_id("queued")).to_have_count(0)
     assert queued(page) == []
@@ -171,7 +170,7 @@ def test_logout_with_changes_not_sent_asks_first(mobile_page, competition):
     open_competition(page, competition["nom"])
     go_offline(page, context, competition)
     try:
-        participant_card(page, member).get_by_test_id("present-switch").click()
+        participant_card(page, member).get_by_test_id("participe-switch").click()
         expect(participant_card(page, member).get_by_test_id("queued")).to_be_visible()
         open_menu(page)
         page.locator("#logout-btn").click()

@@ -411,9 +411,10 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
       </div>
       <p class="mb-2 text-xs text-slate-500" data-testid="participant-count">{{ countLine(kpis, filter, shown.length) }}</p>
 
+      <!-- On a computer only: a long read, for whoever learns the tool -->
       <details
         v-if="canWrite"
-        class="mb-3 rounded-lg border border-slate-200 bg-slate-50 text-xs leading-relaxed"
+        class="mb-3 hidden rounded-lg border border-slate-200 bg-slate-50 text-xs leading-relaxed md:block"
         data-testid="actions-guide"
       >
         <summary class="cursor-pointer px-3.5 py-2 font-bold text-slate-800 select-none">
