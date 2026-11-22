@@ -687,6 +687,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/email-templates/variables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Email Variables
+         * @description The variables templates may use, with their French label, kinds, demo value and former spellings.
+         */
+        get: operations["get_email_variables_api_email_templates_variables_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/email-templates/{template_name}": {
         parameters: {
             query?: never;
@@ -2822,6 +2842,36 @@ export interface components {
             sender_suggestions: string[];
             /** Club Contact Email */
             club_contact_email: string;
+        };
+        /**
+         * EmailVariable
+         * @description A template variable: `key` is stored in the templates, `label` is what users read and type ({Prénom});
+         *     `aliases`: former spellings still accepted in saved templates.
+         */
+        EmailVariable: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "first_name" | "last_name" | "num_licence" | "tarif" | "season" | "amount" | "problemes" | "name_competition" | "no_competition" | "date_competition" | "montant_competition" | "whatsapp_link";
+            /** Label */
+            label: string;
+            /** Kinds */
+            kinds: ("adherent" | "attestation" | "competition")[];
+            /** Demo */
+            demo: string;
+            /** Aliases */
+            aliases: string[];
+        };
+        /** EmailVariables */
+        EmailVariables: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Variables */
+            variables: components["schemas"]["EmailVariable"][];
         };
         /**
          * EmergencyContact
@@ -7074,6 +7124,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    get_email_variables_api_email_templates_variables_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailVariables"];
                 };
             };
         };

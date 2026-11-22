@@ -109,6 +109,17 @@ class TestTemplateRoutes(unittest.TestCase):
         self.assertEqual(required_role("POST", "/api/whatsapp-template"), Role.ADMIN)
         self.assertEqual(required_role("GET", "/api/email-templates"), Role.COACH)
 
+    def test_variables_route_lists_each_variable_with_its_label_kinds_and_aliases(self):
+        """GET /api/email-templates/variables: the registry, for admins only."""
+        from infrastructure.security.api_auth import required_role
+        variables = {v["key"]: v for v in TestClient(app).get("/api/email-templates/variables").json()["variables"]}
+        self.assertEqual(variables["first_name"]["label"], "Prénom")
+        self.assertEqual(variables["amount"]["kinds"], ["adherent", "attestation"])
+        self.assertEqual(variables["name_competition"]["aliases"], ["nom_competition"])
+        self.assertIn("bloc_whatsapp", variables["whatsapp_link"]["aliases"])
+        self.assertEqual(variables["montant_competition"]["demo"], "15,50")
+        self.assertEqual(required_role("GET", "/api/email-templates/variables"), Role.ADMIN)
+
     def test_apply_template_variables_adherents_extension(self):
         """Les variables {tarif} et {season} sont correctement résolues pour les adhérents."""
         from domain.email_personalization import apply_template_variables

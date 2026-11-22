@@ -1,5 +1,5 @@
 import type { EmailTemplate } from "../../services/communications";
-import { fillTemplate } from "../../lib/text";
+import { DEMO_VALUES, renderTemplate } from "../../lib/templateVariables";
 import { describe, expect, it } from "vitest";
 import {
   initialTemplate,
@@ -9,7 +9,6 @@ import {
   newNameError,
   newTemplate,
   preview,
-  DEMO_VALUES,
   templateError,
   VARIABLES,
   wrapSelection,
@@ -34,7 +33,9 @@ describe("preview", () => {
   });
 
   it("ignores the case of variable names and keeps unknown ones", () => {
-    expect(fillTemplate("{FIRST_NAME} {Nom} {Prénom} {inconnue} {season}", DEMO_VALUES)).toBe("Alex MARTIN Alex {inconnue} 2026-2027");
+    expect(preview({ ...TEMPLATE, body: "{FIRST_NAME} {Nom} {Prénom} {inconnue} {season}" }, CLUB_SENDER).body).toBe(
+      "Alex MARTIN Alex {inconnue} 2026-2027",
+    );
   });
 
   it("falls back to the club's sender and placeholders", () => {
@@ -47,9 +48,9 @@ describe("preview", () => {
 
   it("offers every variable of the demo member", () => {
     expect(VARIABLES).toContain("{montant_competition}");
-    expect(VARIABLES).toContain("{competition_deadline}");
+    expect(VARIABLES).toContain("{amount}");
     for (const v of VARIABLES) {
-      expect(fillTemplate(v, DEMO_VALUES)).not.toBe(v);
+      expect(renderTemplate(v, DEMO_VALUES)).not.toBe(v);
     }
   });
 });

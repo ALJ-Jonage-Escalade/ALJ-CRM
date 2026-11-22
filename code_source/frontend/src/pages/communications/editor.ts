@@ -2,7 +2,7 @@
    insertion of variables and HTML tags in the body (texts of the former web/bureau/communications.html). */
 import type { EmailTemplate } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
-import { fillTemplate } from "../../lib/text";
+import { DEMO_VALUES, renderTemplate, TEMPLATE_VARIABLES } from "../../lib/templateVariables";
 
 /** The club's default sender, sent by the server (infrastructure/mail/senders.py). */
 export type Sender = Pick<EmailTemplate, "sender_email" | "sender_name">;
@@ -18,27 +18,9 @@ export function newTemplate(name: string, sender: Sender): EmailTemplate {
   };
 }
 
-/** Variables replaced when the e-mail is sent (domain/utils.apply_template_variables), with the preview's values. */
-export const DEMO_MEMBER: Record<string, string> = {
-  first_name: "Alex",
-  last_name: "MARTIN",
-  tarif: "Cours Ados 2 (Mercredi 17h30)",
-  season: "2026-2027",
-  amount: "195.00 €",
-  num_licence: "847291",
-  nom_competition: "Championnat Régional Bloc",
-  date_competition: "15/11/2026",
-  competition_deadline: "08/11/2026",
-  montant_competition: "15.00 €",
-};
-export const VARIABLES = Object.keys(DEMO_MEMBER).map((name) => `{${name}}`);
+/** The variables offered in the editor; the preview fills them with the demo values. */
+export const VARIABLES = TEMPLATE_VARIABLES.map((variable) => `{${variable.key}}`);
 export const PREVIEW_TO = "Alex MARTIN <alex.martin@example.com>";
-
-// Former names of the first two variables, still found in old templates
-const ALIASES: Record<string, string> = { prénom: DEMO_MEMBER.first_name!, nom: DEMO_MEMBER.last_name! };
-
-/** The values the preview fills a template with: the demo member, under the current and the former names. */
-export const DEMO_VALUES: Readonly<Record<string, string>> = { ...ALIASES, ...DEMO_MEMBER };
 
 export interface Preview {
   from: string;
@@ -51,8 +33,8 @@ export function preview(template: EmailTemplate, defaultSender: Sender): Preview
   const email = template.sender_email.trim() || defaultSender.sender_email;
   return {
     from: `${name} <${email}>`,
-    subject: fillTemplate(template.subject, DEMO_VALUES) || "(Sans objet)",
-    body: fillTemplate(template.body, DEMO_VALUES) || "(Message vide)",
+    subject: renderTemplate(template.subject, DEMO_VALUES) || "(Sans objet)",
+    body: renderTemplate(template.body, DEMO_VALUES) || "(Message vide)",
   };
 }
 

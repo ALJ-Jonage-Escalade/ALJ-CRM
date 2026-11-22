@@ -145,6 +145,8 @@ def required_role(method: str, path: str) -> Optional[Role]:
         return Role.ADMIN  # attestations réservées aux administrateurs
     if path.startswith("/api/members") and method not in ("GET", "HEAD"):
         return Role.ADMIN  # modification des fiches réservée aux administrateurs
+    if path == "/api/email-templates/variables":
+        return Role.ADMIN  # the template editor's list of variables (Communications page)
     if path.startswith("/api/email-templates") and method not in ("GET", "HEAD"):
         return Role.ADMIN  # modification des templates d'emails réservée aux administrateurs
     if path.startswith("/api/whatsapp-template") and method not in ("GET", "HEAD"):

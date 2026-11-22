@@ -8,7 +8,7 @@ import { CLIENT_KEY, errorText } from "../../lib/client";
 import { createCommunicationsApi, type EmailTemplate } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
-import { fillTemplate } from "../../lib/text";
+import { renderTemplate } from "../../lib/templateVariables";
 import { memberVariables, signatureText } from "./record";
 import { dialogs } from "../../composables/dialogs";
 
@@ -37,7 +37,7 @@ function useTemplate(): void {
 
 const preview = computed(
   () =>
-    `Sujet : ${fillTemplate(subject.value, values.value)}\n\n${fillTemplate(body.value, values.value)}${signature.value ? `\n\n---\n${signatureText(props.clubContactEmail)}` : ""}`,
+    `Sujet : ${renderTemplate(subject.value, values.value)}\n\n${renderTemplate(body.value, values.value)}${signature.value ? `\n\n---\n${signatureText(props.clubContactEmail)}` : ""}`,
 );
 
 async function send(): Promise<void> {

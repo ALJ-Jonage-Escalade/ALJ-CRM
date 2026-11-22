@@ -8,11 +8,12 @@ from fastapi.responses import JSONResponse
 
 from api.communications.schemas import (
     EmailDispatch, EmailSendRequest, EmailStatus, EmailTemplate,
-    EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate,
+    EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate, EmailVariable, EmailVariables,
 )
 from api.auth.me import author_of
 from api.responses import error, error_responses
 from services.communications.email_dispatch import EmailDispatchService
+from domain.email_variables import VARIABLES, aliases_of
 from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.security.api_auth import Role, has_role
@@ -35,6 +36,14 @@ def get_email_templates() -> EmailTemplates | JSONResponse:
         sender_suggestions=list(SENDER_SUGGESTIONS),
         club_contact_email=CLUB_CONTACT_EMAIL,
     )
+
+
+@router.get("/api/email-templates/variables", response_model=EmailVariables)
+def get_email_variables() -> EmailVariables:
+    """The variables templates may use, with their French label, kinds, demo value and former spellings."""
+    return EmailVariables(status="success", variables=[
+        EmailVariable(key=v.key, label=v.label, kinds=list(v.kinds), demo=v.demo, aliases=aliases_of(v.key)) for v in VARIABLES
+    ])
 
 
 def _same_name(a: str, b: str) -> bool:

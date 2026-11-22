@@ -11,7 +11,7 @@ import { createCommunicationsApi, type EmailTemplate } from "../../services/comm
 import { saveFile } from "../../lib/download";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
-import { fillTemplate } from "../../lib/text";
+import { renderTemplate } from "../../lib/templateVariables";
 import { attestationFileName, attestationProblem, attestationRecipient, attestationTemplates, memberVariables } from "./record";
 import { dialogs } from "../../composables/dialogs";
 
@@ -28,8 +28,8 @@ const signature = ref(true);
 
 function useTemplate(): void {
   const t = choices.value.list.find((x) => x.name === templateName.value) ?? choices.value.initial;
-  subject.value = fillTemplate(t.subject, memberVariables(props.member));
-  body.value = fillTemplate(t.body, memberVariables(props.member));
+  subject.value = renderTemplate(t.subject, memberVariables(props.member));
+  body.value = renderTemplate(t.body, memberVariables(props.member));
 }
 useTemplate();
 

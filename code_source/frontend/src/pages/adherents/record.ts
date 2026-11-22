@@ -10,6 +10,7 @@ import { COUNTRY_CHOICES, knownChoice, NATIONALITY_CHOICES } from "../../lib/cou
 import { PASSPORT_COLOURS, passportMarks } from "../../lib/passports";
 import { SEX_LABELS, sexLabel, type Sex } from "../../lib/sex";
 import { normKey } from "../../lib/text";
+import { amountText, firstNameText, lastNameText, type VariableKey } from "../../lib/templateVariables";
 import type { MemberStatus } from "../../services/members";
 import { diplomes, isYes, STATUSES, type Creneau, type Member } from "./members";
 
@@ -403,21 +404,21 @@ export function withDateTag(comment: string, today: Date = new Date()): string {
 
 // ---------------------------------------------------------------- E-mail and certificate
 
-/** Values of the template variables for the member (domain/utils.apply_template_variables). */
-export function memberVariables(member: Member): Record<string, string> {
-  const first = member.first_name.toLowerCase().replace(/(^|[\s\-'’])(\p{L})/gu, (_, sep: string, l: string) => sep + l.toUpperCase());
-  const last = member.last_name.toUpperCase();
+/** Values of the template variables for the member, as the server fills them (domain/email_personalization.py). */
+export function memberVariables(member: Member): Record<VariableKey, string> {
   return {
-    first_name: first,
-    last_name: last,
-    prénom: first,
-    nom: last,
+    first_name: firstNameText(member.first_name),
+    last_name: lastNameText(member.last_name),
     num_licence: member.licence_ffme,
     tarif: member.tarif_name,
     season: member.season_name,
-    saison: member.season_name,
-    amount: member.amount != null ? `${member.amount} €` : "",
-    montant: member.amount != null ? `${member.amount} €` : "",
+    amount: amountText(member.amount),
+    problemes: "",
+    name_competition: "",
+    no_competition: "",
+    date_competition: "",
+    montant_competition: "",
+    whatsapp_link: "",
   };
 }
 

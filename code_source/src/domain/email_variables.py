@@ -3,8 +3,8 @@ to users, template kinds that may use it, demo value of the previews), and the r
 
 A token is `{…}` with no `<`, `>`, `"` or line break inside, so HTML and links in a body are never taken for one.
 Tokens are matched leniently: case, accents and extra spaces do not matter, and the former spellings (aliases) of
-saved templates still work. The frontend mirrors this module (frontend/src/lib/templateVariables.ts); the shared
-cases are in tests/fixtures_shared/email_variables_golden.json.
+saved templates still work. The frontend mirrors this module (frontend/src/lib/templateVariables.ts); both are
+checked against the same cases, frontend/src/lib/templateVariables.golden.json.
 """
 
 from __future__ import annotations
@@ -86,6 +86,11 @@ def expand_aliases(text: str) -> str:
     return TOKEN.sub(lambda match: _ALIASES_BY_NAME.get(_fold(match.group(1)), match.group(0)), text)
 
 
+def aliases_of(key: VariableKey) -> list[str]:
+    """The former spellings standing for this variable (alone or within a sentence)."""
+    return [alias for alias, text in ALIASES.items() if "{" + key + "}" in text]
+
+
 def find_variable(name: str) -> Optional[TemplateVariable]:
     """The variable a token's name stands for (its key or its label, leniently), or None."""
     return _BY_NAME.get(_fold(name))
@@ -116,7 +121,7 @@ def render_template(text: Optional[str], values: Mapping[str, str], escape_html:
         text = value(variable)
         return html.escape(text).replace("\n", "<br>\n") if escape_html else text
 
-    lines = expand_aliases(str(text)).splitlines(keepends=True)
+    lines = re.split(r"(?<=\n)", expand_aliases(str(text)))
     kept = "".join(line for line in lines if not is_dropped(line))
     if len(kept) != sum(len(line) for line in lines):
         kept = re.sub(r"\n{3,}", "\n\n", kept)

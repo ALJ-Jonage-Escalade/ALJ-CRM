@@ -10,6 +10,7 @@ from typing import List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from api.request_body import RequestBody
+from domain.email_variables import TemplateKind, VariableKey
 
 
 class EmailTemplate(BaseModel):
@@ -28,6 +29,21 @@ class EmailTemplates(BaseModel):
     default_sender_name: str
     sender_suggestions: List[str]
     club_contact_email: str
+
+
+class EmailVariable(BaseModel):
+    """A template variable: `key` is stored in the templates, `label` is what users read and type ({Prénom});
+    `aliases`: former spellings still accepted in saved templates."""
+    key: VariableKey
+    label: str
+    kinds: List[TemplateKind]
+    demo: str
+    aliases: List[str]
+
+
+class EmailVariables(BaseModel):
+    status: Literal["success"]
+    variables: List[EmailVariable]
 
 
 class EmailTemplateUpdate(RequestBody):

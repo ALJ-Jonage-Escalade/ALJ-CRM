@@ -1,10 +1,11 @@
 /* E-mail to the competitors of a competition: the audience, a preview with the competition's variables (the server
-   fills them again when sending: infrastructure/mail/dispatch.py get_competition_context), the request body. */
+   fills them again when sending: services/communications/email_dispatch.py get_competition_context), the request body. */
 import type { EmailTemplate } from "../../../services/communications";
 import type { Schemas } from "../../../lib/client";
 import { looksLikeEmail } from "../../../lib/email";
 import { formatDayText } from "../../../lib/format";
-import { deadlineOf, type Competition, type Row } from "../competitions";
+import { amountText, firstNameText, lastNameText, type VariableKey } from "../../../lib/templateVariables";
+import type { Competition, Row } from "../competitions";
 
 export type Audience = "selected" | "unpaid" | "all";
 
@@ -36,45 +37,23 @@ export function defaultTemplate(templates: readonly EmailTemplate[]): EmailTempl
   );
 }
 
-/** 15 -> « 15 », 15.5 -> « 15,50 » (domain/utils.format_amount). */
-export function amountText(prix: number | null | undefined): string {
-  if (prix == null) {
-    return "";
-  }
-  const t = Number(prix).toFixed(2).replace(".", ",");
-  return t.endsWith(",00") ? t.slice(0, -3) : t;
-}
-
-/** The WhatsApp link variable and its historical spellings (including the "whatapp" typo). */
-const WHATSAPP_LINK_KEYS = ["whatsapp_link", "whatsapp_id", "whatapp_id", "whatapp_link"];
-
-export function variables(competition: Competition, row: Row | undefined): Record<string, string> {
+/** Values of the template variables for a competitor, as the server fills them (services/communications/email_dispatch.py). */
+export function variables(competition: Competition, row: Row | undefined): Record<VariableKey, string> {
   const start = formatDayText(competition.date_competition ?? "");
   const end = formatDayText(competition.date_fin ?? "");
-  const whatsappLink = (competition.whatsapp_link ?? "").trim();
-  const dateFormatted = !end || end === start || !start ? start : `${start} au ${end}`;
-  const deadlineFormatted = formatDayText(deadlineOf(competition));
-  const lieu = (competition.lieu ?? "").trim();
   return {
-    first_name: (row?.prenom ?? "").trim(),
-    last_name: (row?.nom ?? "").trim().toUpperCase(),
-    prenom: (row?.prenom ?? "").trim(),
-    nom: (row?.nom ?? "").trim().toUpperCase(),
+    first_name: firstNameText(row?.prenom ?? ""),
+    last_name: lastNameText(row?.nom ?? ""),
     num_licence: row?.num_licence ?? "",
-    nom_competition: competition.nom ?? "",
+    tarif: "",
+    season: "",
+    amount: "",
+    problemes: "",
     name_competition: competition.nom ?? "",
-    competition_nom: competition.nom ?? "",
     no_competition: competition.id_ffme ?? "",
+    date_competition: !end || end === start || !start ? start : `${start} au ${end}`,
     montant_competition: amountText(competition.prix),
-    date_competition: dateFormatted,
-    competition_date: dateFormatted,
-    competition_deadline: deadlineFormatted,
-    deadline: deadlineFormatted,
-    lieu,
-    competition_lieu: lieu,
-    // Other spellings that saved templates may use (lower case: names are not case sensitive)
-    ...Object.fromEntries(WHATSAPP_LINK_KEYS.map((key) => [key, whatsappLink])),
-    bloc_whatsapp: whatsappLink ? `Voici le lien du groupe WhatsApp dédié à cette compétition : ${whatsappLink}` : "",
+    whatsapp_link: (competition.whatsapp_link ?? "").trim(),
   };
 }
 

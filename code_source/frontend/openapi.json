@@ -2732,6 +2732,25 @@
         }
       }
     },
+    "/api/email-templates/variables": {
+      "get": {
+        "summary": "Get Email Variables",
+        "description": "The variables templates may use, with their French label, kinds, demo value and former spellings.",
+        "operationId": "get_email_variables_api_email_templates_variables_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVariables"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/email-templates/{template_name}": {
       "delete": {
         "summary": "Delete Email Template Api",
@@ -7606,6 +7625,87 @@
         ],
         "title": "EmailTemplates",
         "description": "default_sender_*: used by the server when a template's sender is empty. club_contact_email: shown in the e-mail signature."
+      },
+      "EmailVariable": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "first_name",
+              "last_name",
+              "num_licence",
+              "tarif",
+              "season",
+              "amount",
+              "problemes",
+              "name_competition",
+              "no_competition",
+              "date_competition",
+              "montant_competition",
+              "whatsapp_link"
+            ],
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kinds": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "adherent",
+                "attestation",
+                "competition"
+              ]
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "demo": {
+            "type": "string",
+            "title": "Demo"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "kinds",
+          "demo",
+          "aliases"
+        ],
+        "title": "EmailVariable",
+        "description": "A template variable: `key` is stored in the templates, `label` is what users read and type ({Prénom});\n`aliases`: former spellings still accepted in saved templates."
+      },
+      "EmailVariables": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "variables": {
+            "items": {
+              "$ref": "#/components/schemas/EmailVariable"
+            },
+            "type": "array",
+            "title": "Variables"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "variables"
+        ],
+        "title": "EmailVariables"
       },
       "EmergencyContact": {
         "properties": {

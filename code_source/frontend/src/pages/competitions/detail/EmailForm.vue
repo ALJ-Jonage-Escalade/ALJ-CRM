@@ -9,7 +9,8 @@ import { CLIENT_KEY, errorText } from "../../../lib/client";
 import { createCommunicationsApi, type EmailTemplate } from "../../../services/communications";
 import type { Competition, Row } from "../competitions";
 import { audience, AUDIENCES, defaultTemplate, hasEmail, sendBody, sentMessage, variables, type Audience } from "./email";
-import { fillTemplate, plural } from "../../../lib/text";
+import { plural } from "../../../lib/text";
+import { renderTemplate } from "../../../lib/templateVariables";
 import { dialogs } from "../../../composables/dialogs";
 
 const props = defineProps<{ competition: Competition; rows: readonly Row[] }>();
@@ -80,7 +81,7 @@ const preview = computed(() => {
     return "";
   }
   const values = variables(props.competition, first);
-  return `Sujet : ${fillTemplate(subject.value, values)}\n\n${fillTemplate(body.value, values)}`;
+  return `Sujet : ${renderTemplate(subject.value, values)}\n\n${renderTemplate(body.value, values)}`;
 });
 
 function take(id: number | null | undefined): void {

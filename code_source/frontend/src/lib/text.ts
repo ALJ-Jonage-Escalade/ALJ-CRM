@@ -17,9 +17,3 @@ export function telHref(phone: string): string {
 export function plural(count: number, many = "s", one = ""): string {
   return count > 1 ? many : one;
 }
-
-/** An e-mail template's text with its {variables} replaced, as the server sends it (domain/utils.apply_template_variables):
-    names are not case sensitive, unknown ones are kept. */
-export function fillTemplate(text: string, values: Readonly<Record<string, string>>): string {
-  return text.replace(/\{([^{}]+)\}/g, (whole, name: string) => values[name.toLowerCase()] ?? whole);
-}
