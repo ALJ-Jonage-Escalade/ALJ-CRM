@@ -21,8 +21,8 @@
     "check:api": "openapi-typescript openapi.json -o src/lib/api-schema.ts --default-non-nullable false --check"
   },
   "dependencies": {
-    "@firebase/app": "0.16.6",
-    "@firebase/auth": "1.13.10",
+    "@firebase/app": "0.16.7",
+    "@firebase/auth": "1.13.11",
     "@tanstack/vue-table": "9.3.1",
     "chart.js": "4.6.1",
     "leaflet": "1.9.4",
@@ -45,7 +45,7 @@
     "@vitest/eslint-plugin": "1.6.28",
     "@vue/eslint-config-prettier": "10.2.0",
     "@vue/eslint-config-typescript": "14.9.0",
-    "@vue/test-utils": "2.5.1",
+    "@vue/test-utils": "2.6.0",
     "eslint": "10.15.0",
     "eslint-plugin-vue": "10.12.1",
     "fake-indexeddb": "6.2.8",
