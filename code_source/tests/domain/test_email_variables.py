@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from domain.email_variables import render_template, template_error, to_keys, to_labels
+from domain.email_variables import infer_kind, needs_fixing, render_template, template_error, to_keys, to_labels
 
 
 def test_render_template_fills_each_variable() -> None:
@@ -79,3 +79,32 @@ def test_template_error_names_unknown_tokens_and_lists_the_valid_labels() -> Non
 
 def test_template_error_accepts_known_tokens_and_html() -> None:
     assert template_error(['{PRENOM} {nom_competition} <a href="https://x.fr">{style="a"}</a>']) is None
+
+
+@pytest.mark.parametrize(("name", "kind"), [
+    ("Compétition - 1er Inscription", "competition"),
+    ("Relance competition", "competition"),
+    ("Attestation standard", "attestation"),
+    ("Rappel échéance", "attestation"),
+    ("Adhésion : informations à corriger", "adherent"),
+    ("Relance inscription", "adherent"),
+])
+def test_infer_kind_follows_the_name_rules(name: str, kind: str) -> None:
+    assert infer_kind(name) == kind
+
+
+def test_template_error_refuses_a_variable_of_another_kind() -> None:
+    message = template_error(["Bonjour {Prénom}, {Nom de la compétition} {whatapp_Id} {Montant de l'adhésion}"], "attestation")
+    assert message is not None
+    assert message.startswith("Variables non disponibles pour un modèle Attestation : {Nom de la compétition}, {whatapp_Id}.")
+    assert "{Montant de l'adhésion}" in message.split("Variables possibles :")[1]
+    assert "{Lien WhatsApp}" not in message.split("Variables possibles :")[1]
+    assert template_error(["{Nom de la compétition} {Prénom}"], "competition") is None
+
+
+def test_needs_fixing_flags_invalid_former_or_non_canonical_tokens() -> None:
+    assert not needs_fixing("Bonjour {first_name}", "{whatsapp_link}", "competition")
+    assert needs_fixing("Bonjour {first_name}", "{bloc_whatsapp}", "competition")
+    assert needs_fixing("Bonjour {Prénom}", "", "adherent")
+    assert needs_fixing("Bonjour", "{name_competition}", "adherent")
+    assert needs_fixing("Bonjour", "{competition_deadline}", "competition")

@@ -41,7 +41,7 @@ describe("competition e-mail", () => {
   });
 
   it("offers the club's competition template first", () => {
-    const t = (name: string) => ({ name, subject: "", body: "", sender_email: "", sender_name: "" });
+    const t = (name: string) => ({ name, subject: "", body: "", sender_email: "", sender_name: "", kind: "competition" as const });
     expect(defaultTemplate([t("Bienvenue"), t("Compétition - relance"), t("Compétition - 1er Inscription")])!.name).toBe(
       "Compétition - 1er Inscription",
     );

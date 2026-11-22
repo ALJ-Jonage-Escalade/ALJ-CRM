@@ -2751,7 +2751,11 @@ export interface components {
             /** Sender */
             sender: string;
         };
-        /** EmailTemplate */
+        /**
+         * EmailTemplate
+         * @description subject and body: the variables written with their keys ({first_name}). kind: inferred from the name for a
+         *     template saved before kinds existed. needs_fixing: it holds a variable it may not use, or a former spelling.
+         */
         EmailTemplate: {
             /** Name */
             name: string;
@@ -2763,6 +2767,16 @@ export interface components {
             sender_email: string;
             /** Sender Name */
             sender_name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "adherent" | "attestation" | "competition";
+            /**
+             * Needs Fixing
+             * @default false
+             */
+            needs_fixing?: boolean;
         };
         /** EmailTemplateDeleted */
         EmailTemplateDeleted: {
@@ -2788,7 +2802,8 @@ export interface components {
         /**
          * EmailTemplateUpdate
          * @description old_name: the template's current name, to rename it; empty for a new template.
-         *     An empty sender falls back to the club's default address and name.
+         *     An empty sender falls back to the club's default address and name; no kind, to the one of its name.
+         *     The variables may be written with their labels ({Prénom}): they are stored with their keys.
          */
         EmailTemplateUpdate: {
             /**
@@ -2821,6 +2836,8 @@ export interface components {
              * @default
              */
             sender_name?: string;
+            /** Kind */
+            kind?: ("adherent" | "attestation" | "competition") | null;
         };
         /**
          * EmailTemplates

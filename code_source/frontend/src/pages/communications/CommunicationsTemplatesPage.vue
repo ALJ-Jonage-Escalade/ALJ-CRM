@@ -10,7 +10,7 @@ import UiToast from "../../components/ui/UiToast.vue";
 import { useToast } from "../../composables/toast";
 import { CLIENT_KEY, errorText } from "../../lib/client";
 import { createCommunicationsApi, type EmailTemplate } from "../../services/communications";
-import { toKeys, toLabels } from "../../lib/templateVariables";
+import { KIND_LABELS, toKeys, toLabels, type TemplateKind } from "../../lib/templateVariables";
 import EmailPreview from "./EmailPreview.vue";
 import { initialTemplate, newNameError, newTemplate, preview, type Sender } from "./editor";
 import TemplateForm from "./TemplateForm.vue";
@@ -32,6 +32,12 @@ const saving = ref(false);
 const defaultSender = ref<Sender>({ sender_email: "", sender_name: "" });
 const senderSuggestions = ref<string[]>([]);
 const shown = computed(() => (draft.value ? preview(draft.value, defaultSender.value) : null));
+/** The templates by kind, in the order of the kinds. */
+const groups = computed(() =>
+  (Object.entries(KIND_LABELS) as [TemplateKind, string][])
+    .map(([kind, label]) => ({ kind, label, templates: templates.value.filter((t) => t.kind === kind) }))
+    .filter((group) => group.templates.length),
+);
 
 function select(template: EmailTemplate | undefined): void {
   selected.value = template?.name ?? "";
@@ -61,13 +67,17 @@ function onSelect(event: Event): void {
 }
 
 async function save(): Promise<void> {
-  const template = draft.value!;
+  // needs_fixing is told by the server, not saved
+  const { name, subject, body, sender_email, sender_name, kind } = draft.value!;
   saving.value = true;
   try {
     const saved = await communicationsApi.saveEmailTemplate({
-      ...template,
-      subject: toKeys(template.subject),
-      body: toKeys(template.body),
+      name,
+      sender_email,
+      sender_name,
+      kind,
+      subject: toKeys(subject),
+      body: toKeys(body),
       old_name: selected.value,
     });
     toast.show(`💾 Modèle « ${saved.template.name} » enregistré avec succès !`);
@@ -99,7 +109,7 @@ async function create(): Promise<void> {
   creatingBusy.value = true;
   try {
     const sender = draft.value ?? defaultSender.value;
-    await communicationsApi.saveEmailTemplate(newTemplate(name, sender));
+    await communicationsApi.saveEmailTemplate(newTemplate(name, sender, draft.value?.kind));
     creating.value = false;
     toast.show(`➕ Nouveau modèle « ${name} » créé avec succès !`);
     await loadTemplates(name);
@@ -190,7 +200,11 @@ onMounted(() => {
               class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[13px] font-semibold"
               @change="onSelect"
             >
-              <option v-for="t in templates" :key="t.name" :value="t.name">{{ t.name }}</option>
+              <optgroup v-for="group in groups" :key="group.kind" :label="group.label">
+                <option v-for="t in group.templates" :key="t.name" :value="t.name">
+                  {{ t.needs_fixing ? `${t.name} ⚠️ à corriger` : t.name }}
+                </option>
+              </optgroup>
             </select>
           </div>
           <div class="flex gap-1.5">

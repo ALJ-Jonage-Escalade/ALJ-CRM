@@ -40,7 +40,7 @@ class TestTemplateRoutes(unittest.TestCase):
         }
         res_save = client.post("/api/email-templates", json=payload).json()
         self.assertEqual(res_save["status"], "success")
-        self.assertEqual(res_save["template"], payload)
+        self.assertEqual(res_save["template"], {**payload, "kind": "adherent", "needs_fixing": False})
         self.assertIn("Test Nouveau Modèle", names())
 
         # 2. Renommage du modèle (old_name -> name)
@@ -113,7 +113,8 @@ class TestTemplateRoutes(unittest.TestCase):
         """Labels, lenient spellings and former names are stored as keys; an unknown variable is refused."""
         self._temp_database("test_tpl_variables.db")
         client = TestClient(app)
-        payload = {"name": "Relance", "subject": "Rappel { prénom }", "body": "Bonjour {Prénom} {NOM},\n{bloc_whatsapp}"}
+        payload = {"name": "Relance", "subject": "Rappel { prénom }", "body": "Bonjour {Prénom} {NOM},\n{bloc_whatsapp}",
+                   "kind": "competition"}
         saved = client.post("/api/email-templates", json=payload).json()["template"]
         self.assertEqual(saved["subject"], "Rappel {first_name}")
         self.assertEqual(saved["body"], "Bonjour {first_name} {last_name},\n"
@@ -125,6 +126,39 @@ class TestTemplateRoutes(unittest.TestCase):
         self.assertEqual(refused.status_code, 400)
         self.assertIn("{Prenon}", refused.json()["message"])
         self.assertIn("{Prénom}", refused.json()["message"])
+
+    def test_templates_have_a_kind_saved_or_inferred_from_their_name(self):
+        """A template saved before kinds existed gets one from its name; a saved kind is kept; the variables must
+        belong to the kind."""
+        self._temp_database("test_tpl_kinds.db")
+        client = TestClient(app)
+
+        def listed():
+            return {t["name"]: t for t in client.get("/api/email-templates").json()["templates"]}
+
+        shipped = listed()
+        self.assertEqual(shipped["Compétition - 1er Inscription"]["kind"], "competition")
+        self.assertEqual(shipped["Attestation échéance"]["kind"], "attestation")
+        self.assertEqual(shipped["Relance inscription"]["kind"], "adherent")
+        self.assertFalse(shipped["Relance inscription"]["needs_fixing"])
+
+        client.post("/api/email-templates", json={"name": "Infos", "subject": "Infos", "body": "{Nom de la compétition}",
+                                                  "kind": "competition"})
+        client.post("/api/email-templates", json={"name": "Attestation 2", "subject": "A", "body": "{Montant de l'adhésion}"})
+        self.assertEqual((listed()["Infos"]["kind"], listed()["Attestation 2"]["kind"]), ("competition", "attestation"))
+
+        refused = client.post("/api/email-templates", json={"name": "Infos", "old_name": "Infos", "subject": "Infos",
+                                                            "body": "{Nom de la compétition}", "kind": "adherent"})
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("Variable non disponible pour un modèle Adhérent : {Nom de la compétition}.", refused.json()["message"])
+
+    def test_templates_with_former_or_foreign_variables_need_fixing(self):
+        self._temp_database("test_tpl_fixing.db")
+        from infrastructure.sqlite.email_templates import EmailTemplateRepository
+        EmailTemplateRepository.save_email_template("Vieux", "Sujet {Prénom}", "Lien : {whatapp_Id} {competition_deadline}")
+        template = next(t for t in TestClient(app).get("/api/email-templates").json()["templates"] if t["name"] == "Vieux")
+        self.assertEqual(template["kind"], "adherent")
+        self.assertTrue(template["needs_fixing"])
 
     def test_variables_route_lists_each_variable_with_its_label_kinds_and_aliases(self):
         """GET /api/email-templates/variables: the registry, for admins only."""

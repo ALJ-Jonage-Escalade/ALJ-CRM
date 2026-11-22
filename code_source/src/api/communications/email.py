@@ -13,7 +13,7 @@ from api.communications.schemas import (
 from api.auth.me import author_of
 from api.responses import error, error_responses
 from services.communications.email_dispatch import EmailDispatchService
-from services.communications.email_templates import save_template
+from services.communications.email_templates import list_templates, save_template
 from domain.email_variables import VARIABLES, aliases_of
 from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
 from infrastructure.security.secret_store import SecretStore
@@ -26,9 +26,7 @@ router = APIRouter()
 @router.get("/api/email-templates", response_model=EmailTemplates, responses=error_responses(500))
 def get_email_templates() -> EmailTemplates | JSONResponse:
     """Retourne la liste des modèles d'e-mails configurés."""
-    rows = EmailDispatchService.list_templates()
-    # Old rows may hold NULL columns
-    templates = [EmailTemplate(**{field: str(row.get(field) or "") for field in EmailTemplate.model_fields}) for row in rows]
+    templates = [EmailTemplate(**template) for template in list_templates()]
     return EmailTemplates(
         status="success",
         templates=templates,
@@ -51,7 +49,7 @@ def get_email_variables() -> EmailVariables:
 def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved:
     """Crée ou met à jour un modèle d'e-mail dans la BDD SQLite (synchronisé avec Firestore)."""
     saved = save_template(name=data.name, subject=data.subject, body=data.body, sender_email=data.sender_email,
-                          sender_name=data.sender_name, old_name=data.old_name)
+                          sender_name=data.sender_name, old_name=data.old_name, kind=data.kind)
     return EmailTemplateSaved(status="success", message=f"Modèle d'e-mail '{data.name}' enregistré avec succès.",
                               template=EmailTemplate(**saved))
 

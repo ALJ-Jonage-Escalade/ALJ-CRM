@@ -6,6 +6,7 @@ import type { EmailTemplate } from "../../services/communications";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
 import TemplateField from "../../components/TemplateField.vue";
+import { KIND_LABELS, type TemplateKind } from "../../lib/templateVariables";
 import { templateError, type Sender } from "./editor";
 
 /** defaultSender: what the server puts when the sender is left empty, shown as placeholder. */
@@ -14,6 +15,7 @@ const emit = defineEmits<{ save: []; invalid: [message: string] }>();
 /** The template being edited, its variables written with their labels. */
 const draft = defineModel<EmailTemplate>({ required: true });
 const signature = defineModel<boolean>("signature", { default: true });
+const KINDS = Object.entries(KIND_LABELS) as [TemplateKind, string][];
 
 function submit(): void {
   const error = templateError(draft.value);
@@ -40,6 +42,17 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
         placeholder="Titre du modèle…"
         :class="[INPUT, 'font-bold text-club-blue']"
       />
+      <div class="mt-2.5 grid gap-3 sm:grid-cols-[1fr_1.2fr]">
+        <div>
+          <label for="template-kind" :class="LABEL">Type de modèle</label>
+          <select id="template-kind" v-model="draft.kind" data-testid="template-kind" :class="INPUT">
+            <option v-for="[kind, label] in KINDS" :key="kind" :value="kind">{{ label }}</option>
+          </select>
+        </div>
+        <p v-if="draft.needs_fixing" data-testid="template-needs-fixing" class="self-end text-xs font-semibold text-amber-700">
+          ⚠️ À corriger : ce modèle contient une variable ancienne ou non disponible pour son type. Vérifiez-le puis enregistrez-le.
+        </p>
+      </div>
     </UiCard>
 
     <UiCard class="flex flex-col gap-2.5">
@@ -73,8 +86,21 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
         </div>
       </div>
 
-      <TemplateField id="subject" v-model="draft.subject" label="Objet de l'e-mail *" placeholder="Sujet de votre message…" />
-      <TemplateField id="body" v-model="draft.body" label="Corps du message *" multiline placeholder="Saisissez le corps du message…" />
+      <TemplateField
+        id="subject"
+        v-model="draft.subject"
+        :kind="draft.kind"
+        label="Objet de l'e-mail *"
+        placeholder="Sujet de votre message…"
+      />
+      <TemplateField
+        id="body"
+        v-model="draft.body"
+        :kind="draft.kind"
+        label="Corps du message *"
+        multiline
+        placeholder="Saisissez le corps du message…"
+      />
 
       <label class="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-slate-700">
         <input v-model="signature" type="checkbox" data-testid="signature" class="accent-accent" />

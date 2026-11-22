@@ -147,16 +147,60 @@ def to_labels(text: str) -> str:
     return _rewrite(text, lambda variable: variable.label)
 
 
+KIND_LABELS: dict[TemplateKind, str] = {"adherent": "Adhérent", "attestation": "Attestation", "competition": "Compétition"}
+
+
+def infer_kind(name: str) -> TemplateKind:
+    """The kind of a template saved before kinds existed, from its name (the rules the screens used to pick one)."""
+    folded = _fold(name)
+    if "competition" in folded:
+        return "competition"
+    if "attestation" in folded or "echeance" in folded:
+        return "attestation"
+    return "adherent"
+
+
+def _variables_in(name: str) -> Optional[list[TemplateVariable]]:
+    """The variables a token stands for (several for a former sentence), or None when it is no variable."""
+    expansion = _ALIASES_BY_NAME.get(_fold(name))
+    if expansion is None:
+        variable = find_variable(name)
+        return None if variable is None else [variable]
+    return [variable for match in TOKEN.finditer(expansion) if (variable := find_variable(match.group(1))) is not None]
+
+
+def _listed(tokens: list[str], one: str, many: str) -> str:
+    return f"{one if len(tokens) == 1 else many} : {', '.join(tokens)}."
+
+
 def template_error(texts: Iterable[str], kind: Optional[TemplateKind] = None) -> Optional[str]:
     """Why a template whose subject and body are `texts` cannot be saved (None: it can): the tokens that are no
-    variable, followed by the valid ones. `kind`: only the variables of this template kind are valid."""
+    variable, those of another kind, then the valid ones. `kind`: only the variables of this template kind are valid."""
     unknown: list[str] = []
+    other_kind: list[str] = []
     for text in texts:
-        for match in TOKEN.finditer(expand_aliases(text or "")):
-            if find_variable(match.group(1)) is None and match.group(0) not in unknown:
-                unknown.append(match.group(0))
-    if not unknown:
+        for match in TOKEN.finditer(text or ""):
+            token = match.group(0)
+            variables = _variables_in(match.group(1))
+            if variables is None:
+                if token not in unknown:
+                    unknown.append(token)
+            elif kind is not None and any(kind not in variable.kinds for variable in variables) and token not in other_kind:
+                other_kind.append(token)
+    if not unknown and not other_kind:
         return None
+    parts = []
+    if unknown:
+        parts.append(_listed(unknown, "Variable inconnue", "Variables inconnues"))
+    if other_kind and kind is not None:
+        label = KIND_LABELS[kind]
+        parts.append(_listed(other_kind, f"Variable non disponible pour un modèle {label}",
+                             f"Variables non disponibles pour un modèle {label}"))
     valid = ", ".join("{" + variable.label + "}" for variable in VARIABLES if kind is None or kind in variable.kinds)
-    title = "Variable inconnue" if len(unknown) == 1 else "Variables inconnues"
-    return f"{title} : {', '.join(unknown)}. Variables possibles : {valid}."
+    return f"{' '.join(parts)} Variables possibles : {valid}."
+
+
+def needs_fixing(subject: str, body: str, kind: TemplateKind) -> bool:
+    """Whether a saved template should be edited again: a variable it may not use, or one not written with its key
+    (a former spelling, still sent correctly until the template is saved again)."""
+    return template_error([subject, body], kind) is not None or to_keys(subject) != subject or to_keys(body) != body

@@ -14,11 +14,15 @@ from domain.email_variables import TemplateKind, VariableKey
 
 
 class EmailTemplate(BaseModel):
+    """subject and body: the variables written with their keys ({first_name}). kind: inferred from the name for a
+    template saved before kinds existed. needs_fixing: it holds a variable it may not use, or a former spelling."""
     name: str
     subject: str
     body: str
     sender_email: str
     sender_name: str
+    kind: TemplateKind
+    needs_fixing: bool = False
 
 
 class EmailTemplates(BaseModel):
@@ -48,13 +52,15 @@ class EmailVariables(BaseModel):
 
 class EmailTemplateUpdate(RequestBody):
     """old_name: the template's current name, to rename it; empty for a new template.
-    An empty sender falls back to the club's default address and name."""
+    An empty sender falls back to the club's default address and name; no kind, to the one of its name.
+    The variables may be written with their labels ({Prénom}): they are stored with their keys."""
     name: str = ""
     old_name: str = ""
     subject: str = ""
     body: str = ""
     sender_email: str = ""
     sender_name: str = ""
+    kind: Optional[TemplateKind] = None
 
 
 class EmailTemplateSaved(BaseModel):

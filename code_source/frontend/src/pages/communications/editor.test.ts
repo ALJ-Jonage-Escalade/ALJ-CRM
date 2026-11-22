@@ -8,6 +8,7 @@ const TEMPLATE: EmailTemplate = {
   body: "Bonjour {first_name}",
   sender_email: "competitions@alj-escalade.fr",
   sender_name: "ALJ Compétitions",
+  kind: "adherent",
 };
 const CLUB_SENDER = { sender_email: "inscription@alj-escalade.fr", sender_name: "Amicale Laïque Jonage - Inscriptions" };
 

@@ -131,25 +131,60 @@ export function variablesOf(kind?: TemplateKind): TemplateVariable[] {
   return TEMPLATE_VARIABLES.filter((variable) => kind === undefined || variable.kinds.includes(kind));
 }
 
-/** Why a template whose subject and body are `texts` cannot be saved, or null: the tokens that are no variable,
-    then the valid ones (the server checks again with the same words). */
+/** The French name of each template kind. */
+export const KIND_LABELS: Readonly<Record<TemplateKind, string>> = {
+  adherent: "Adhérent",
+  attestation: "Attestation",
+  competition: "Compétition",
+};
+
+/** The variables a token stands for (several for a former sentence), or undefined when it is no variable. */
+function variablesIn(name: string): VariableKey[] | undefined {
+  const expansion = ALIASES_BY_NAME.get(fold(name));
+  if (expansion === undefined) {
+    const key = findVariable(name);
+    return key === undefined ? undefined : [key];
+  }
+  return [...expansion.matchAll(TOKEN)].map((match) => findVariable(match[1] ?? "")).filter((key) => key !== undefined);
+}
+
+function listed(tokens: readonly string[], one: string, many: string): string {
+  return `${tokens.length === 1 ? one : many} : ${tokens.join(", ")}.`;
+}
+
+/** Why a template whose subject and body are `texts` cannot be saved, or null: the tokens that are no variable, those
+    of another kind, then the valid ones (the server checks again with the same words). */
 export function templateError(texts: readonly string[], kind?: TemplateKind): string | null {
   const unknown: string[] = [];
+  const otherKind: string[] = [];
   for (const text of texts) {
-    for (const match of expandAliases(text).matchAll(TOKEN)) {
-      if (findVariable(match[1] ?? "") === undefined && !unknown.includes(match[0])) {
-        unknown.push(match[0]);
+    for (const match of text.matchAll(TOKEN)) {
+      const token = match[0];
+      const keys = variablesIn(match[1] ?? "");
+      if (keys === undefined) {
+        if (!unknown.includes(token)) {
+          unknown.push(token);
+        }
+      } else if (kind !== undefined && keys.some((key) => !VARIABLES[key].kinds.includes(kind)) && !otherKind.includes(token)) {
+        otherKind.push(token);
       }
     }
   }
-  if (!unknown.length) {
+  if (!unknown.length && !otherKind.length) {
     return null;
+  }
+  const parts: string[] = [];
+  if (unknown.length) {
+    parts.push(listed(unknown, "Variable inconnue", "Variables inconnues"));
+  }
+  if (otherKind.length && kind !== undefined) {
+    const label = KIND_LABELS[kind];
+    parts.push(listed(otherKind, `Variable non disponible pour un modèle ${label}`, `Variables non disponibles pour un modèle ${label}`));
   }
   const valid = variablesOf(kind)
     .map((variable) => `{${variable.label}}`)
     .join(", ");
-  const title = unknown.length === 1 ? "Variable inconnue" : "Variables inconnues";
-  return `${title} : ${unknown.join(", ")}. Variables possibles : ${valid}.`;
+  return `${parts.join(" ")} Variables possibles : ${valid}.`;
 }
 
 /** 15 -> « 15 », 15.5 -> « 15,50 », no currency sign (domain/utils.format_amount). */

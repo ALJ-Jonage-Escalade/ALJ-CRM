@@ -434,6 +434,7 @@ export const DEFAULT_ATTESTATION_TEMPLATE: EmailTemplate = {
   body: "Bonjour {first_name},\n\nNous avons le plaisir de vous transmettre en pièce jointe l'attestation de paiement pour votre adhésion ou celle de votre enfant à la section escalade de l'Amicale Laïque de Jonage.\n\nSportivement,\nL'équipe ALJ Escalade",
   sender_email: "",
   sender_name: "",
+  kind: "attestation",
 };
 
 /** Templates offered for the certificate e-mail, the « échéance » one first chosen. */

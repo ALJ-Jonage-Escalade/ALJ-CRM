@@ -209,6 +209,16 @@
     {
       "texts": ["{PRENOM} {nom_competition} <a href=\"https://x.fr\">{style=\"a\"}</a>"],
       "expected": null
+    },
+    {
+      "texts": ["Bonjour {Prénom}, {Nom de la compétition} {whatapp_Id} {Montant de l'adhésion} {Prenon}"],
+      "kind": "attestation",
+      "expected": "Variable inconnue : {Prenon}. Variables non disponibles pour un modèle Attestation : {Nom de la compétition}, {whatapp_Id}. Variables possibles : {Prénom}, {Nom}, {N° de licence}, {Tarif}, {Saison}, {Montant de l'adhésion}."
+    },
+    {
+      "texts": ["{Nom de la compétition} {bloc_whatsapp} {Prénom}"],
+      "kind": "competition",
+      "expected": null
     }
   ]
 }

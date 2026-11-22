@@ -5,8 +5,31 @@ import { type ApiFetch } from "../../lib/api";
 import CommunicationsTemplatesPage from "./CommunicationsTemplatesPage.vue";
 import { dialogs } from "../../composables/dialogs";
 
-const RELANCE = { name: "Relance", subject: "Rappel {first_name}", body: "Bonjour", sender_email: "a@alj.example", sender_name: "ALJ" };
-const ECHEANCE = { name: "Rappel echeance", subject: "Échéance", body: "Payez", sender_email: "b@alj.example", sender_name: "ALJ" };
+const RELANCE = {
+  name: "Relance",
+  subject: "Rappel {first_name}",
+  body: "Bonjour",
+  sender_email: "a@alj.example",
+  sender_name: "ALJ",
+  kind: "adherent",
+};
+const ECHEANCE = {
+  name: "Rappel echeance",
+  subject: "Échéance",
+  body: "Payez",
+  sender_email: "b@alj.example",
+  sender_name: "ALJ",
+  kind: "attestation",
+};
+const COUPE = {
+  name: "Coupe",
+  subject: "{name_competition}",
+  body: "Lien : {whatapp_Id}",
+  sender_email: "c@alj.example",
+  sender_name: "ALJ",
+  kind: "competition",
+  needs_fixing: true,
+};
 
 /** The /api/email-templates answer: the templates and the club's sender settings. */
 function templatesAnswer(templates: unknown[]): Response {
@@ -93,7 +116,8 @@ describe("CommunicationsTemplatesPage", () => {
   it("shows the variables as French labels and saves them as keys", async () => {
     const { wrapper, writes, value } = render({
       ...ANSWERS,
-      "GET /api/email-templates": () => templatesAnswer([{ ...RELANCE, body: "Bonjour {first_name},\n{bloc_whatsapp}" }, ECHEANCE]),
+      "GET /api/email-templates": () =>
+        templatesAnswer([{ ...RELANCE, kind: "competition", body: "Bonjour {first_name},\n{bloc_whatsapp}" }, ECHEANCE]),
     });
     await flushPromises();
     await wrapper.find('[data-testid="template-select"]').setValue("Relance");
@@ -113,6 +137,48 @@ describe("CommunicationsTemplatesPage", () => {
     await wrapper.find("form").trigger("submit");
     expect(writes()).toEqual([]);
     expect(byId("toast")!.textContent).toContain("Variable inconnue : {Prenon}. Variables possibles : {Prénom}");
+  });
+
+  it("lists the templates by kind, those to fix marked", async () => {
+    const { byId } = render({ ...ANSWERS, "GET /api/email-templates": () => templatesAnswer([COUPE, RELANCE, ECHEANCE]) });
+    await flushPromises();
+    const groups = [...byId("template-select")!.querySelectorAll("optgroup")].map((group) => [
+      group.label,
+      [...group.querySelectorAll("option")].map((option) => option.textContent.trim()),
+    ]);
+    expect(groups).toEqual([
+      ["Adhérent", ["Relance"]],
+      ["Attestation", ["Rappel echeance"]],
+      ["Compétition", ["Coupe ⚠️ à corriger"]],
+    ]);
+  });
+
+  it("offers the variables of the template's kind, and saves the kind chosen", async () => {
+    const { wrapper, writes, byId } = render({ ...ANSWERS, "GET /api/email-templates": () => templatesAnswer([COUPE, RELANCE, ECHEANCE]) });
+    await flushPromises();
+    await wrapper.find('[data-testid="template-select"]').setValue("Coupe");
+    expect(byId("template-needs-fixing")).not.toBeNull();
+    expect((byId("body") as HTMLTextAreaElement).value).toBe("Lien : {Lien WhatsApp}");
+    const offered = () => [...byId("body-variables")!.querySelectorAll("button")].map((b) => b.textContent.trim());
+    expect(offered()).toContain("{Nom de la compétition}");
+    expect(offered()).not.toContain("{Montant de l'adhésion}");
+
+    await wrapper.find('[data-testid="template-kind"]').setValue("adherent");
+    expect(offered()).not.toContain("{Nom de la compétition}");
+    expect(byId("subject-error")!.textContent).toContain("Variable non disponible pour un modèle Adhérent : {Nom de la compétition}.");
+    await wrapper.find("form").trigger("submit");
+    expect(writes()).toEqual([]);
+
+    await wrapper.find('[data-testid="template-kind"]').setValue("competition");
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(writes()[0]!.body).toEqual({
+      ...COUPE,
+      needs_fixing: undefined,
+      subject: "{name_competition}",
+      body: "Lien : {whatsapp_link}",
+      old_name: "Coupe",
+    });
   });
 
   it("does not send an invalid template", async () => {
