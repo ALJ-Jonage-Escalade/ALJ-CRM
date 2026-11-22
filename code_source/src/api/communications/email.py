@@ -49,7 +49,8 @@ def get_email_variables() -> EmailVariables:
 def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved:
     """Crée ou met à jour un modèle d'e-mail dans la BDD SQLite (synchronisé avec Firestore)."""
     saved = save_template(name=data.name, subject=data.subject, body=data.body, sender_email=data.sender_email,
-                          sender_name=data.sender_name, old_name=data.old_name, kind=data.kind)
+                          sender_name=data.sender_name, old_name=data.old_name, kind=data.kind,
+                          is_default=data.is_default)
     return EmailTemplateSaved(status="success", message=f"Modèle d'e-mail '{data.name}' enregistré avec succès.",
                               template=EmailTemplate(**saved))
 

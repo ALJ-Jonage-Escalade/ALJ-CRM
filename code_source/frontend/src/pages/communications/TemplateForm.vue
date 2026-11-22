@@ -3,19 +3,32 @@
    italic / underline / link tags inserted at the cursor). Submitting checks the template first: "save" when it can be saved, else "invalid"
    with the reason. */
 import type { EmailTemplate } from "../../services/communications";
+import { computed, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
 import TemplateField from "../../components/TemplateField.vue";
 import { KIND_LABELS, type TemplateKind } from "../../lib/templateVariables";
 import { templateError, type Sender } from "./editor";
 
-/** defaultSender: what the server puts when the sender is left empty, shown as placeholder. */
-defineProps<{ saving?: boolean; defaultSender: Sender; senderSuggestions: readonly string[] }>();
+/** defaultSender: what the server puts when the sender is left empty, shown as placeholder; saved: the template as
+    the server has it (none for a template being created). */
+const props = defineProps<{ saving?: boolean; defaultSender: Sender; senderSuggestions: readonly string[]; saved?: EmailTemplate }>();
 const emit = defineEmits<{ save: []; invalid: [message: string] }>();
 /** The template being edited, its variables written with their labels. */
 const draft = defineModel<EmailTemplate>({ required: true });
 const signature = defineModel<boolean>("signature", { default: true });
 const KINDS = Object.entries(KIND_LABELS) as [TemplateKind, string][];
+
+/** A default template moved to another kind is no longer a default (the server drops the mark too). */
+const defaultDropped = computed(() => Boolean(props.saved?.is_default) && draft.value.kind !== props.saved?.kind);
+watch(
+  () => draft.value.kind,
+  () => {
+    if (props.saved?.is_default) {
+      draft.value.is_default = !defaultDropped.value;
+    }
+  },
+);
 
 function submit(): void {
   const error = templateError(draft.value);
@@ -48,6 +61,15 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
           <select id="template-kind" v-model="draft.kind" data-testid="template-kind" :class="INPUT">
             <option v-for="[kind, label] in KINDS" :key="kind" :value="kind">{{ label }}</option>
           </select>
+        </div>
+        <div class="self-end">
+          <label class="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-slate-700">
+            <input v-model="draft.is_default" type="checkbox" data-testid="template-default" class="accent-accent" />
+            Modèle par défaut pour ce type
+          </label>
+          <p v-if="defaultDropped" data-testid="template-default-dropped" class="mt-0.5 text-xs text-amber-700">
+            Avec ce type, il n'est plus le modèle par défaut de son ancien type.
+          </p>
         </div>
         <p v-if="draft.needs_fixing" data-testid="template-needs-fixing" class="self-end text-xs font-semibold text-amber-700">
           ⚠️ À corriger : ce modèle contient une variable ancienne ou non disponible pour son type. Vérifiez-le puis enregistrez-le.

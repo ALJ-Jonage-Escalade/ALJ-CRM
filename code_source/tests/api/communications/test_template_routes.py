@@ -40,7 +40,7 @@ class TestTemplateRoutes(unittest.TestCase):
         }
         res_save = client.post("/api/email-templates", json=payload).json()
         self.assertEqual(res_save["status"], "success")
-        self.assertEqual(res_save["template"], {**payload, "kind": "adherent", "needs_fixing": False})
+        self.assertEqual(res_save["template"], {**payload, "kind": "adherent", "is_default": False, "needs_fixing": False})
         self.assertIn("Test Nouveau Modèle", names())
 
         # 2. Renommage du modèle (old_name -> name)
@@ -151,6 +151,31 @@ class TestTemplateRoutes(unittest.TestCase):
                                                             "body": "{Nom de la compétition}", "kind": "adherent"})
         self.assertEqual(refused.status_code, 400)
         self.assertIn("Variable non disponible pour un modèle Adhérent : {Nom de la compétition}.", refused.json()["message"])
+
+    def test_one_default_template_per_kind(self):
+        """Marking a default unmarks the previous one of its kind; a rename keeps the mark, a kind change drops it."""
+        self._temp_database("test_tpl_default.db")
+        client = TestClient(app)
+
+        def defaults():
+            return sorted((t["kind"], t["name"]) for t in client.get("/api/email-templates").json()["templates"] if t["is_default"])
+
+        def save(**fields):
+            response = client.post("/api/email-templates", json={"subject": "Sujet", "body": "Bonjour", **fields})
+            self.assertEqual(response.status_code, 200, response.text)
+
+        self.assertEqual(defaults(), [])
+        save(name="A", kind="adherent", is_default=True)
+        save(name="B", kind="adherent", is_default=True)
+        save(name="C", kind="competition", is_default=True)
+        self.assertEqual(defaults(), [("adherent", "B"), ("competition", "C")])
+
+        save(name="B2", old_name="B", kind="adherent")  # renamed, default kept
+        self.assertEqual(defaults(), [("adherent", "B2"), ("competition", "C")])
+        save(name="C", old_name="C", kind="attestation")  # another kind: no longer a default
+        self.assertEqual(defaults(), [("adherent", "B2")])
+        save(name="B2", old_name="B2", kind="adherent", is_default=False)
+        self.assertEqual(defaults(), [])
 
     def test_templates_with_former_or_foreign_variables_need_fixing(self):
         self._temp_database("test_tpl_fixing.db")

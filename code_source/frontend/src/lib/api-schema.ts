@@ -2773,6 +2773,11 @@ export interface components {
              */
             kind: "adherent" | "attestation" | "competition";
             /**
+             * Is Default
+             * @default false
+             */
+            is_default?: boolean;
+            /**
              * Needs Fixing
              * @default false
              */
@@ -2803,6 +2808,8 @@ export interface components {
          * EmailTemplateUpdate
          * @description old_name: the template's current name, to rename it; empty for a new template.
          *     An empty sender falls back to the club's default address and name; no kind, to the one of its name.
+         *     is_default: makes it its kind's default (the previous one loses it); when not given, a template keeps its
+         *     mark, unless its kind changes.
          *     The variables may be written with their labels ({Prénom}): they are stored with their keys.
          */
         EmailTemplateUpdate: {
@@ -2838,6 +2845,8 @@ export interface components {
             sender_name?: string;
             /** Kind */
             kind?: ("adherent" | "attestation" | "competition") | null;
+            /** Is Default */
+            is_default?: boolean | null;
         };
         /**
          * EmailTemplates

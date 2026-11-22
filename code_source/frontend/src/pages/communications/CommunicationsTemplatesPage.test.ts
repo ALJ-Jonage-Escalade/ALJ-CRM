@@ -181,6 +181,30 @@ describe("CommunicationsTemplatesPage", () => {
     });
   });
 
+  it("marks a template as its kind's default, and tells when a kind change drops the mark", async () => {
+    const answers = { ...ANSWERS, "GET /api/email-templates": () => templatesAnswer([{ ...RELANCE, is_default: true }, ECHEANCE]) };
+    const { wrapper, writes, byId } = render(answers);
+    await flushPromises();
+    const options = [...byId("template-select")!.querySelectorAll("option")].map((option) => option.textContent!.trim());
+    expect(options).toEqual(["Relance ★ par défaut", "Rappel echeance"]);
+
+    await wrapper.find('[data-testid="template-select"]').setValue("Relance");
+    const box = () => byId("template-default") as HTMLInputElement;
+    expect(box().checked).toBe(true);
+    expect(byId("template-default-dropped")).toBeNull();
+    await wrapper.find('[data-testid="template-kind"]').setValue("attestation");
+    expect(box().checked).toBe(false);
+    expect(byId("template-default-dropped")!.textContent).toContain("n'est plus le modèle par défaut");
+    await wrapper.find('[data-testid="template-kind"]').setValue("adherent");
+    expect(box().checked).toBe(true);
+
+    await wrapper.find('[data-testid="template-select"]').setValue("Rappel echeance");
+    await wrapper.find('[data-testid="template-default"]').setValue(true);
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(writes()[0]!.body).toMatchObject({ name: "Rappel echeance", kind: "attestation", is_default: true });
+  });
+
   it("does not send an invalid template", async () => {
     const { wrapper, writes, byId } = render();
     await flushPromises();

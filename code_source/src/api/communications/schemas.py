@@ -22,6 +22,7 @@ class EmailTemplate(BaseModel):
     sender_email: str
     sender_name: str
     kind: TemplateKind
+    is_default: bool = False  # the template its kind's screen opens first
     needs_fixing: bool = False
 
 
@@ -53,6 +54,8 @@ class EmailVariables(BaseModel):
 class EmailTemplateUpdate(RequestBody):
     """old_name: the template's current name, to rename it; empty for a new template.
     An empty sender falls back to the club's default address and name; no kind, to the one of its name.
+    is_default: makes it its kind's default (the previous one loses it); when not given, a template keeps its
+    mark, unless its kind changes.
     The variables may be written with their labels ({Prénom}): they are stored with their keys."""
     name: str = ""
     old_name: str = ""
@@ -61,6 +64,7 @@ class EmailTemplateUpdate(RequestBody):
     sender_email: str = ""
     sender_name: str = ""
     kind: Optional[TemplateKind] = None
+    is_default: Optional[bool] = None
 
 
 class EmailTemplateSaved(BaseModel):

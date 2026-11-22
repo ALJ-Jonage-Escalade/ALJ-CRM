@@ -130,6 +130,8 @@ def _ensure_email_templates(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
     _add_missing_column(conn, cursor, "email_templates", "sender_name", "TEXT DEFAULT ''")
     # adherent | attestation | competition; empty for a template saved before kinds existed (inferred from its name)
     _add_missing_column(conn, cursor, "email_templates", "kind", "TEXT DEFAULT ''")
+    # 1: the template a screen opens first for its kind (at most one per kind)
+    _add_missing_column(conn, cursor, "email_templates", "is_default", "INTEGER DEFAULT 0")
 
     # Renseigner l'adresse et le nom d'expédition par défaut sur les modèles qui n'en ont pas encore
     for column, default in (("sender_email", DEFAULT_SENDER_EMAIL), ("sender_name", DEFAULT_SENDER_NAME)):

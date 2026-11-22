@@ -18,6 +18,7 @@ class SavedTemplate(TypedDict):
     sender_email: str
     sender_name: str
     kind: TemplateKind
+    is_default: bool
 
 
 class ListedTemplate(SavedTemplate):
@@ -40,7 +41,7 @@ def list_templates() -> list[ListedTemplate]:
         listed.append(ListedTemplate(name=str(row.get("name") or ""), subject=subject, body=body,
                                      sender_email=str(row.get("sender_email") or ""),
                                      sender_name=str(row.get("sender_name") or ""), kind=kind,
-                                     needs_fixing=needs_fixing(subject, body, kind)))
+                                     is_default=bool(row.get("is_default")), needs_fixing=needs_fixing(subject, body, kind)))
     return listed
 
 
@@ -49,10 +50,12 @@ def _same_name(a: str, b: str) -> bool:
 
 
 def save_template(name: str, subject: str, body: str, sender_email: str = "", sender_name: str = "",
-                  old_name: str = "", kind: Optional[TemplateKind] = None) -> SavedTemplate:
+                  old_name: str = "", kind: Optional[TemplateKind] = None, is_default: Optional[bool] = None) -> SavedTemplate:
     """Creates the template, or updates the one named `old_name` (renamed to `name`). Its variables are stored as keys
     ({Prénom} → {first_name}); an unknown one or one of another kind is refused (InvalidRequest), as a name taken by
-    another template (Conflict). An empty sender falls back to the club's default; no kind, to the one of its name."""
+    another template (Conflict). An empty sender falls back to the club's default; no kind, to the one of its name.
+    is_default: the default of its kind (the previous one loses it in the same write); not given, the template keeps
+    its mark unless its kind changes."""
     if not name:
         raise InvalidRequest("Le nom du modèle est obligatoire.")
     if not subject:
@@ -63,14 +66,17 @@ def save_template(name: str, subject: str, body: str, sender_email: str = "", se
     problem = template_error([subject, body], template_kind)
     if problem:
         raise InvalidRequest(problem, "invalid_variable")
+    rows = EmailTemplateRepository.get_email_templates()
     # A new name must not take another template's (the save would overwrite it, or fail on a rename)
     if not (old_name and _same_name(old_name, name)):
-        others = (t["name"] for t in EmailTemplateRepository.get_email_templates() if t["name"] != old_name)
-        if any(_same_name(other, name) for other in others):
+        if any(_same_name(row["name"], name) for row in rows if row["name"] != old_name):
             raise Conflict(f"Un modèle nommé « {name} » existe déjà.", "duplicate_name")
+    if is_default is None:
+        current = next((row for row in rows if row["name"] == (old_name or name)), None)
+        is_default = bool(current and current.get("is_default") and kind_of(current) == template_kind)
 
     saved = SavedTemplate(name=name, subject=to_keys(subject), body=to_keys(body),
                           sender_email=sender_email or DEFAULT_SENDER_EMAIL, sender_name=sender_name or DEFAULT_SENDER_NAME,
-                          kind=template_kind)
+                          kind=template_kind, is_default=is_default)
     EmailTemplateRepository.save_email_template(old_name=old_name or None, **saved)
     return saved

@@ -7498,6 +7498,11 @@
             ],
             "title": "Kind"
           },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          },
           "needs_fixing": {
             "type": "boolean",
             "title": "Needs Fixing",
@@ -7605,12 +7610,23 @@
               }
             ],
             "title": "Kind"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Default"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "EmailTemplateUpdate",
-        "description": "old_name: the template's current name, to rename it; empty for a new template.\nAn empty sender falls back to the club's default address and name; no kind, to the one of its name.\nThe variables may be written with their labels ({Prénom}): they are stored with their keys."
+        "description": "old_name: the template's current name, to rename it; empty for a new template.\nAn empty sender falls back to the club's default address and name; no kind, to the one of its name.\nis_default: makes it its kind's default (the previous one loses it); when not given, a template keeps its\nmark, unless its kind changes.\nThe variables may be written with their labels ({Prénom}): they are stored with their keys."
       },
       "EmailTemplates": {
         "properties": {

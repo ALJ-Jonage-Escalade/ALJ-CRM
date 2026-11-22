@@ -32,6 +32,10 @@ const saving = ref(false);
 const defaultSender = ref<Sender>({ sender_email: "", sender_name: "" });
 const senderSuggestions = ref<string[]>([]);
 const shown = computed(() => (draft.value ? preview(draft.value, defaultSender.value) : null));
+/** A template in the list: its name, then whether it is its kind's default or needs fixing. */
+function optionText(template: EmailTemplate): string {
+  return [template.name, template.is_default && "★ par défaut", template.needs_fixing && "⚠️ à corriger"].filter(Boolean).join(" ");
+}
 /** The templates by kind, in the order of the kinds. */
 const groups = computed(() =>
   (Object.entries(KIND_LABELS) as [TemplateKind, string][])
@@ -68,7 +72,7 @@ function onSelect(event: Event): void {
 
 async function save(): Promise<void> {
   // needs_fixing is told by the server, not saved
-  const { name, subject, body, sender_email, sender_name, kind } = draft.value!;
+  const { name, subject, body, sender_email, sender_name, kind, is_default } = draft.value!;
   saving.value = true;
   try {
     const saved = await communicationsApi.saveEmailTemplate({
@@ -76,6 +80,7 @@ async function save(): Promise<void> {
       sender_email,
       sender_name,
       kind,
+      is_default,
       subject: toKeys(subject),
       body: toKeys(body),
       old_name: selected.value,
@@ -202,7 +207,7 @@ onMounted(() => {
             >
               <optgroup v-for="group in groups" :key="group.kind" :label="group.label">
                 <option v-for="t in group.templates" :key="t.name" :value="t.name">
-                  {{ t.needs_fixing ? `${t.name} ⚠️ à corriger` : t.name }}
+                  {{ optionText(t) }}
                 </option>
               </optgroup>
             </select>
@@ -233,6 +238,7 @@ onMounted(() => {
         :saving="saving"
         :default-sender="defaultSender"
         :sender-suggestions="senderSuggestions"
+        :saved="templates.find((t) => t.name === selected)"
         @save="save"
         @invalid="toast.show"
       />
