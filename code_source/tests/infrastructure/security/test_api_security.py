@@ -95,7 +95,7 @@ class TestRoles(unittest.TestCase):
         self.assertIsNone(r("POST", "/webhooks/helloasso"))
         self.assertIsNone(r("OPTIONS", "/api/send-email"))
         for path in ("/api/send-email", "/api/helloasso/sync", "/api/email-status",
-                     "/api/reports/pivot-records", "/docs", "/openapi.json", "/api/une-route-future"):
+                     "/api/reports/member-stats", "/docs", "/openapi.json", "/api/une-route-future"):
             self.assertEqual(r("GET", path), Role.COACH, path)
         self.assertEqual(r("POST", "/api/planning/item"), Role.COACH)
         self.assertEqual(r("DELETE", "/api/planning/item/3"), Role.COACH)

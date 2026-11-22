@@ -952,7 +952,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/reports/pivot-records": {
+    "/api/reports/member-stats": {
         parameters: {
             query?: never;
             header?: never;
@@ -960,10 +960,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Pivot Records
-         * @description Members of a season for the pivot table of the Outils page ("Toutes les saisons": every season).
+         * Get Member Stats
+         * @description Every purchase of every season, without names: the page filters the season and counts people itself.
          */
-        get: operations["get_pivot_records_api_reports_pivot_records_get"];
+        get: operations["get_member_stats_api_reports_member_stats_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3978,6 +3978,42 @@ export interface components {
             creneaux: components["schemas"]["Creneau"][];
         };
         /**
+         * MemberStatsRecord
+         * @description A purchase as a row of the member statistics, without names. age: at the start of the row's season, None
+         *     without a birth date; status: Validé, Annulé, Refusé or the status as written; returning: already a member;
+         *     order_month: YYYY-MM or « Inconnue ».
+         */
+        MemberStatsRecord: {
+            /** User Id */
+            user_id: number;
+            /** @description None when not given (the page labels it) */
+            sex: components["schemas"]["Sex"] | null;
+            /** Age */
+            age: number | null;
+            /** Age Band */
+            age_band: string;
+            /** City */
+            city: string;
+            /** Group */
+            group: string;
+            /** Status */
+            status: string;
+            /** Season */
+            season: string;
+            /** Returning */
+            returning: boolean;
+            /** Order Month */
+            order_month: string;
+        };
+        /**
+         * MemberStatsRecords
+         * @description Every purchase of every season (cancelled and refused ones included).
+         */
+        MemberStatsRecords: {
+            /** Records */
+            records: components["schemas"]["MemberStatsRecord"][];
+        };
+        /**
          * MemberUpdate
          * @description The purchase (one membership of a season) and its member; purchase_id is enough, the others are fallbacks.
          */
@@ -4448,47 +4484,6 @@ export interface components {
              * @description Ids of the competitions archived
              */
             archived: number[];
-        };
-        /**
-         * PivotRecord
-         * @description A member (one purchase) as a row of the pivot table. The JSON keys are the French field names shown by the
-         *     table (aliases); age: at the start of the row's season, None when the birth date is unknown.
-         */
-        PivotRecord: {
-            /** Nom */
-            Nom: string;
-            /** Prénom */
-            "Pr\u00E9nom": string;
-            /** @description None when not given (the page labels it) */
-            Sexe: components["schemas"]["Sex"] | null;
-            /** Âge */
-            "\u00C2ge": number | null;
-            /** Tranche D'Âge */
-            "Tranche d'\u00C2ge": string;
-            /** Ville */
-            Ville: string;
-            /** Groupe / Tarif */
-            "Groupe / Tarif": string;
-            /** Statut */
-            Statut: string;
-            /** Saison */
-            Saison: string;
-            /** Type D'Adhésion */
-            "Type d'Adh\u00E9sion": string;
-            /** Date D'Inscription */
-            "Date d'Inscription": string;
-            /** Mois D'Inscription */
-            "Mois d'Inscription": string;
-        };
-        /**
-         * PivotRecords
-         * @description Members of a season for the pivot table. season: the season actually read (the active one for "active").
-         */
-        PivotRecords: {
-            /** Season */
-            season: string;
-            /** Records */
-            records: components["schemas"]["PivotRecord"][];
         };
         /**
          * PlanningSlot
@@ -7754,11 +7749,9 @@ export interface operations {
             };
         };
     };
-    get_pivot_records_api_reports_pivot_records_get: {
+    get_member_stats_api_reports_member_stats_get: {
         parameters: {
-            query?: {
-                season?: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -7771,25 +7764,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PivotRecords"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["MemberStatsRecords"];
                 };
             };
             /** @description Internal Server Error */

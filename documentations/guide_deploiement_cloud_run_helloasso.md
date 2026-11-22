@@ -315,7 +315,7 @@ Vérifiez dans la PWA mobile que l'adhérent Lucas MARTIN passe immédiatement e
    - Cliquez sur **« ✉️ E-mail »** : composez un message avec modèle et visualisez l'aperçu dynamique.
    - Cliquez sur **« 📄 Attestation »** : prévisualisez l'attestation PDF générée par WeasyPrint en mémoire, téléchargez-la ou envoyez-la en un clic par e-mail.
 4. Accédez à la page **Outils** (`/bureau/outils`) :
-   - Basculez entre la **Carte géographique interactive** (Leaflet) et l'**Analyse des effectifs** (Tableau Croisé Dynamique avec sélecteur de saison).
+   - Basculez entre la **Carte géographique interactive** (Leaflet) et les **Statistiques** (graphiques des adhérents par saison et des compétitions).
 
 ---
 

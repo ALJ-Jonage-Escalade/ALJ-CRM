@@ -222,7 +222,8 @@ type Answer = (body: unknown, url: URL) => Response;
 const ANSWERS: Record<string, Answer> = {
   "GET /api/seasons": () => json({ seasons: ["2026-2027", "2025-2026"], active: "2026-2027" }),
   "GET /api/reports/map-points": (_, url) => json({ season: url.searchParams.get("season"), points: POINTS }),
-  "GET /api/reports/pivot-records": (_, url) => json({ season: url.searchParams.get("season"), records: [] }),
+  "GET /api/reports/member-stats": () => json({ records: [] }),
+  "GET /api/competitions": () => json([]),
   "GET /api/presence/config": () => json(CONFIG),
   "POST /api/presence/export": () => file("Feuilles.xlsx"),
   "GET /api/ffme/stats": (_, url) => json(url.searchParams.get("include_termine") === "false" ? STATS_WITHOUT_TERMINE : STATS),
@@ -267,7 +268,11 @@ const ANSWERS: Record<string, Answer> = {
     }),
 };
 
+/** The members map, no longer the index sub-page. */
+const MAP = "/bureau/outils/map";
+
 async function render(role: Role = "admin", path = "/bureau/outils") {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null); // jsdom draws no canvas (Statistiques charts)
   const calls: { method: string; path: string; body?: unknown }[] = [];
   const api: ApiFetch = vi.fn(async (url: string, init?: RequestInit) => {
     const u = new URL(url, "http://alj.test");
@@ -294,7 +299,7 @@ async function render(role: Role = "admin", path = "/bureau/outils") {
   const all = (id: string) => [...document.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`)];
   // The sub-menu links are stubbed (PageLink): opened through the router, as PageLink does
   const open = async (sub: string) => {
-    await router.push(sub === "map" ? "/bureau/outils" : `/bureau/outils/${sub}`);
+    await router.push(sub === "stats" ? "/bureau/outils" : `/bureau/outils/${sub}`);
     await flushPromises();
   };
   const sent = (method: string, path: string) => calls.filter((c) => c.method === method && c.path.startsWith(path));
@@ -315,7 +320,7 @@ afterEach(() => {
 
 describe("OutilsPage", () => {
   it("shows the members map of the active season, filtered by group", async () => {
-    const { byId, all, sent } = await render();
+    const { byId, all, sent } = await render("admin", MAP);
     expect(sent("GET", "/api/reports/map-points").map((c) => c.path)).toEqual(["/api/reports/map-points?season=2026-2027"]);
     await vi.waitFor(() => expect(byId("map-stats")!.textContent.trim()).toBe("3 adhérents répartis sur 2 adresses"));
     expect(byId("map-groups")!.textContent.trim()).toBe("🧗 Tous les groupes ▾");
@@ -344,7 +349,7 @@ describe("OutilsPage", () => {
     ANSWERS["GET /api/reports/map-points"] = () =>
       json({ season: "2026-2027", points: [{ address: "", lat: 45.8, lon: 5.05, members: [{ name: hostile, group: hostile }] }] });
     try {
-      const { byId, all } = await render();
+      const { byId, all } = await render("admin", MAP);
       await vi.waitFor(() => expect(byId("map-stats")).not.toBeNull());
       byId("map-groups")!.click();
       await flushPromises();
@@ -361,8 +366,8 @@ describe("OutilsPage", () => {
     }
   });
 
-  it("reloads the map for another season, then keeps it while showing the pivot table", async () => {
-    const { byId, open, sent } = await render();
+  it("reloads the map for another season, then keeps it while showing the statistics", async () => {
+    const { byId, open, sent } = await render("admin", MAP);
     const season = byId<HTMLSelectElement>("map-season")!;
     expect([...season.options].map((o) => o.value)).toEqual(["2026-2027", "2025-2026", "Toutes les saisons"]);
     season.value = "Toutes les saisons";
@@ -370,60 +375,25 @@ describe("OutilsPage", () => {
     await flushPromises();
     expect(sent("GET", "/api/reports/map-points").at(-1)!.path).toBe("/api/reports/map-points?season=Toutes%20les%20saisons");
 
-    await open("pivot");
-    expect(byId("sub-side-pivot")!.getAttribute("aria-current")).toBe("page");
-    await vi.waitFor(() => expect(byId("pivot-table")).not.toBeNull());
-    expect(sent("GET", "/api/reports/pivot-records").map((c) => c.path)).toEqual(["/api/reports/pivot-records?season=2026-2027"]);
-    const pivotSeason = byId<HTMLSelectElement>("pivot-season")!;
-    pivotSeason.value = "Toutes les saisons";
-    pivotSeason.dispatchEvent(new Event("change"));
-    await flushPromises();
-    expect(sent("GET", "/api/reports/pivot-records").at(-1)!.path).toBe("/api/reports/pivot-records?season=Toutes%20les%20saisons");
-    byId("tools-refresh")!.click();
-    await flushPromises();
-    expect(sent("GET", "/api/reports/pivot-records")).toHaveLength(3);
-    expect(byId("toast")!.textContent).toBe("🔄 Tableau croisé dynamique réactualisé.");
+    await open("stats");
+    expect(byId("sub-side-stats")!.getAttribute("aria-current")).toBe("page");
+    expect(sent("GET", "/api/reports/member-stats")).toHaveLength(1);
 
     // The map stays loaded: back to it, no new request
     await open("map");
     expect(byId("sub-side-map")!.getAttribute("aria-current")).toBe("page");
     expect(sent("GET", "/api/reports/map-points")).toHaveLength(2);
-    byId("tools-refresh")!.click();
-    await flushPromises();
-    expect(sent("GET", "/api/reports/map-points")).toHaveLength(3);
-    expect(byId("toast")!.textContent).toBe("🔄 Carte réactualisée.");
   });
 
-  it("offers the reload only on the sub-pages showing data that can go stale", async () => {
-    const { byId, open } = await render("admin");
-    expect(byId("tools-refresh")).not.toBeNull();
-    for (const sub of ["ffme-import", "helloasso-import", "cles"]) {
-      await open(sub);
-      expect(byId(`pane-${sub}`), sub).not.toBeNull();
-      expect(byId("tools-refresh"), sub).toBeNull();
-    }
-    for (const sub of ["pivot", "stats", "presence", "ffme", "map"]) {
-      await open(sub);
-      expect(byId("tools-refresh"), sub).not.toBeNull();
-    }
-  });
-
-  it("says when the map or the pivot table fails", async () => {
+  it("says when the map fails", async () => {
     const mapPoints = ANSWERS["GET /api/reports/map-points"]!;
-    const pivot = ANSWERS["GET /api/reports/pivot-records"]!;
     ANSWERS["GET /api/reports/map-points"] = () => json({ status: "error", message: "Erreur interne" }, 500);
-    ANSWERS["GET /api/reports/pivot-records"] = () => json({ status: "error", message: "Erreur interne" }, 500);
     try {
-      const { byId, open } = await render();
+      const { byId } = await render("admin", MAP);
       await vi.waitFor(() => expect(byId("map-status")!.textContent).toContain("❌ Impossible de charger la carte"));
       expect(byId("map-stats")).toBeNull();
-      await open("pivot");
-      await vi.waitFor(() =>
-        expect(byId("pivot-status")!.textContent.trim()).toBe("❌ Impossible de charger le tableau croisé dynamique : Erreur interne"),
-      );
     } finally {
       ANSWERS["GET /api/reports/map-points"] = mapPoints;
-      ANSWERS["GET /api/reports/pivot-records"] = pivot;
     }
   });
 
@@ -442,7 +412,7 @@ describe("OutilsPage", () => {
     expect(coach.byId("sub-side-ffme-import")).toBeNull();
     expect(coach.byId("pane-ffme-import")).toBeNull();
     expect(document.getElementById("refused-page")!.textContent).toContain("Import FFME est réservée aux administrateurs");
-    expect(coach.byId("sub-side-map")!.getAttribute("aria-current")).toBe("page");
+    expect(coach.byId("sub-side-stats")!.getAttribute("aria-current")).toBe("page");
     expect(document.querySelector("h1")!.textContent).toBe("Outils");
   });
 

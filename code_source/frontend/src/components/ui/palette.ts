@@ -31,3 +31,18 @@ export const SOFT: Record<BadgeColor, string> = {
   sky: "border-sky-200 bg-sky-50 text-sky-700",
   teal: "border-teal-200 bg-teal-50 text-teal-700",
 };
+
+/** The colour as CSS (charts: Chart.js draws on a canvas, Tailwind classes do not apply); the 600 shades, slate 400. */
+export const HEX: Record<BadgeColor, string> = {
+  slate: "#94a3b8",
+  green: "#16a34a",
+  amber: "#d97706",
+  orange: "#ea580c",
+  red: "#dc2626",
+  pink: "#db2777",
+  violet: "#7c3aed",
+  indigo: "#4f46e5",
+  blue: "#2563eb",
+  sky: "#0284c7",
+  teal: "#0d9488",
+};

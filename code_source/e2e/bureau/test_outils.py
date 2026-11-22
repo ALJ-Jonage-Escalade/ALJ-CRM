@@ -1,4 +1,4 @@
-"""Office portal, Outils page (Vue app): members map, pivot table, attendance sheets, FFME export and import;
+"""Office portal, Outils page (Vue app): members map, statistics, attendance sheets, FFME export and import;
 Google token warning of every office page."""
 import csv
 import io
@@ -35,7 +35,7 @@ def _saved(download, folder):
 def test_members_map(page):
     """Map of the members' addresses (Leaflet). The e2e setup pre-fills the geocache, so the
     server never calls Nominatim."""
-    _open(page)
+    _open(page, "admin", "map")
     expect(page.get_by_test_id("map-stats")).to_contain_text("réparti", timeout=30_000)
     expect(page.get_by_test_id("map-view").locator(".leaflet-tile-pane")).to_be_attached()
     # Members are shown as markers grouped in clusters; a cluster zooms in down to the markers, a marker opens its popup
@@ -56,51 +56,16 @@ def test_members_map(page):
     expect(page.get_by_test_id("map-groups")).to_contain_text("Aucun groupe sélectionné")
     page.keyboard.press("Escape")
 
-    page.get_by_test_id("tools-refresh").click()
-    expect(page.get_by_test_id("toast")).to_contain_text("Carte réactualisée")
 
-
-def _shown_on_top(locator) -> bool:
-    """True when the element is the one drawn at its centre (not clipped nor covered)."""
-    return locator.evaluate("""el => {
-        const box = el.getBoundingClientRect();
-        return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
-    }""")
-
-
-def test_pivot_table_by_season(page):
-    _open(page)
-    sub_menu_entry(page, "pivot").click()
-    page.wait_for_url("**/bureau/outils/pivot")
-    expect(sub_menu_entry(page, "pivot")).to_have_attribute("aria-current", "page")
-    table = page.get_by_test_id("pivot-table")
-    expect(table.locator("table.pvtTable")).to_be_visible(timeout=30_000)
-    expect(table.locator("table.pvtTable")).to_contain_text("Totaux")
-    seasons = page.get_by_test_id("pivot-season").locator("option")
-    expect(seasons).to_have_count(3)  # the two seeded seasons + all seasons
-
-    # The value filter of a field opens over the table, not clipped by it
-    triangle = table.locator(".pvtAttr", has_text="Statut").locator(".pvtTriangle")
-    triangle.click()
-    filter_box = table.locator(".pvtFilterBox")
-    expect(filter_box).to_be_visible()
-    assert _shown_on_top(filter_box)
-    triangle.click()
-    expect(filter_box).to_be_hidden()
-
-    # The renderer chosen is kept across season changes and visits
-    table.locator(".pvtRenderers select").select_option("Carte de chaleur")
-    with page.expect_response(lambda r: "/api/reports/pivot-records?season=2025-2026" in r.url and r.ok):
-        page.get_by_test_id("pivot-season").select_option("2025-2026")
-    expect(table.locator(".pvtRenderers select")).to_have_value("Carte de chaleur")
-    with page.expect_response(lambda r: "/api/reports/pivot-records?season=Toutes%20les%20saisons" in r.url and r.ok):
-        page.get_by_test_id("pivot-season").select_option("Toutes les saisons")
-    expect(table.locator("table.pvtTable")).to_be_visible()
-
-    page.reload()
-    expect(page.get_by_test_id("pivot-table").locator(".pvtRenderers select")).to_have_value("Carte de chaleur", timeout=30_000)
-    page.get_by_test_id("pivot-reset").click()
-    expect(page.get_by_test_id("pivot-table").locator(".pvtRenderers select")).to_have_value("Tableau")
+def test_member_statistics(page):
+    """Statistiques: the charts are drawn by Chart.js in a real browser, the breakdown opens under its chart."""
+    _open(page, "coach")  # the index sub-page
+    expect(page.get_by_test_id("chart-sex").locator("tbody tr")).not_to_have_count(0, timeout=30_000)  # seeded members
+    canvas = page.get_by_test_id("chart-sex").locator("canvas")
+    expect(canvas).to_be_visible()
+    assert canvas.evaluate("el => el.width > 0 && el.height > 0")
+    page.get_by_test_id("detail-sex").click()
+    expect(page.get_by_test_id("chart-sex-detail").locator("canvas")).to_be_visible()
 
 
 # ---------------------------------------------------------------------------

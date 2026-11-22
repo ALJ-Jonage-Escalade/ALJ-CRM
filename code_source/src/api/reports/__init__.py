@@ -1,4 +1,4 @@
-"""Reports of the Outils page in the Vue app (members map, pivot table), read from the SQLite cache."""
+"""Reports of the Outils page in the Vue app (members map, statistics), read from the SQLite cache."""
 
 from __future__ import annotations
 

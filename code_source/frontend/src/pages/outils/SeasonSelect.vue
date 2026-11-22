@@ -1,6 +1,6 @@
 <script setup lang="ts">
-/* Season read by a tool of the Outils page (map, pivot table): one of the seasons, or every season. */
-defineProps<{ seasons: string[]; label: string; testid: string }>();
+/* Season read by a tool of the Outils page (map, statistics): one of the seasons, or every season (allSeasons). */
+withDefaults(defineProps<{ seasons: string[]; label: string; testid: string; allSeasons?: boolean }>(), { allSeasons: true });
 const season = defineModel<string>({ required: true });
 
 /** Understood by the server as every season (MemberRepository.load_direct_data). */
@@ -16,7 +16,7 @@ const ALL_SEASONS = "Toutes les saisons";
       :data-testid="testid"
     >
       <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
-      <option :value="ALL_SEASONS">{{ ALL_SEASONS }}</option>
+      <option v-if="allSeasons" :value="ALL_SEASONS">{{ ALL_SEASONS }}</option>
     </select>
   </label>
 </template>

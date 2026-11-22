@@ -117,13 +117,13 @@ from api.members import helloasso_import, members, seasons
 from api.ffme import ffme
 from api.keys import keys
 from api.integrations import cloud_db, google_auth, helloasso, helloasso_campaigns
-from api.reports import map as members_map, pivot
+from api.reports import map as members_map, member_stats
 from api.web import health, pages, pwa
 from api.responses import service_error_handler
 from domain.errors import ServiceError
 for _api in (competitions, participants, coaches, competition_members, helloasso_items,
              results, competition_email_log, email_log, members, seasons, helloasso_import, email, whatsapp, attestations,
-             planning, presence, members_map, pivot, ffme, keys,
+             planning, presence, members_map, member_stats, ffme, keys,
              helloasso, helloasso_campaigns, google_auth, cloud_db, me, access,
              pages, pwa, health):
     app.include_router(_api.router)

@@ -100,9 +100,8 @@ export const PAGES = [
     screen: "any",
     offlineRead: false,
     children: [
-      { id: "map", label: "Carte", path: "", access: "staff", offline: "none" },
-      { id: "pivot", label: "TCD", path: "pivot", access: "staff", offline: "none" },
-      { id: "stats", label: "Statistiques", path: "stats", access: "staff", offline: "none" },
+      { id: "stats", label: "Statistiques", path: "", access: "staff", offline: "none" },
+      { id: "map", label: "Carte", path: "map", access: "staff", offline: "none" },
       { id: "presence", label: "Fiches de présence", path: "presence", access: "staff", offline: "none" },
       { id: "ffme", label: "Export FFME", path: "ffme", access: "staff", offline: "none" },
       { id: "ffme-import", label: "Import FFME", path: "ffme-import", access: "admin", offline: "none" },

@@ -36,9 +36,10 @@ const upcomingComps = computed(() =>
     .slice(0, 3),
 );
 
+// Only competitions already over (archived or not): an upcoming or undated one never shows here
 const pastResultsComps = computed(() =>
   comps.value
-    .filter((c) => isPast(c, today) || isArchived(c) || (c.participants || []).some((p: Participant) => p.classement || p.resultat_ffme))
+    .filter((c) => isPast(c, today))
     .sort((a, b) => (b.date_competition || "").localeCompare(a.date_competition || ""))
     .slice(0, 3),
 );

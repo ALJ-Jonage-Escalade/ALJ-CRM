@@ -149,8 +149,8 @@ describe("app routes", () => {
   });
 
   it.each([
-    ["/bureau/outils", "outils", "map"],
-    ["/bureau/outils/pivot", "outils-pivot", "pivot"],
+    ["/bureau/outils", "outils", "stats"],
+    ["/bureau/outils/map", "outils-map", "map"],
     ["/bureau/outils/ffme-import", "outils-ffme-import", "ffme-import"],
   ])("open the Outils sub-page %s, kept mounted while switching", async (path, name, sub) => {
     const router = createAppRouter(fakeAuth(signedIn("coach")).auth, createMemoryHistory());
@@ -169,7 +169,7 @@ describe("app routes", () => {
 
   it.each([
     ["/bureau/outils?tab=ffme-import", "/bureau/outils/ffme-import"],
-    ["/bureau/outils?tab=map", "/bureau/outils?tab=map"],
+    ["/bureau/outils?tab=map", "/bureau/outils/map"],
     ["/bureau/competitions?section=bilan", "/bureau/competitions/bilan"],
     ["/competitions?section=helloasso&id=3", "/competitions/helloasso?id=3"],
     ["/bureau/competitions?section=inconnue", "/bureau/competitions?section=inconnue"],

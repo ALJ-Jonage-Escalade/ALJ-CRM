@@ -18,7 +18,7 @@
 | Google Contacts sync (labels per group, address choice) | Gmail contacts | `infrastructure/google/contacts.py`, `infrastructure/google/gmail_auth.py`, `pages/gmail_contact.py` | No | Would need the Contacts scope on the web OAuth client. |
 | WhatsApp QR code per slot | Groups | `pages/groups.py` | Partly: `infrastructure/qrcodes/` | The WhatsApp invitation text exists (`/api/whatsapp-template`), but there is no QR generation in the UI. |
 | Address quality: list of unrecognised addresses, suggested correction, manual geocoding | Reports | `pages/reports.py` | Partly: `server.geocode_missing_addresses` (background) | The web has the map (Outils), but no correction screen. |
-| Dashboard (statistics, recent activity) | Dashboard | `pages/dashboard.py`, `components/qt_charts.py` | No: `GET /api/dashboard` (never called by any page) deleted (2026-11-08, desloppify batch 3) | `/bureau/` is a link portal; the pivot table (Outils page) covers part of the statistics. |
+| Dashboard (statistics, recent activity) | Dashboard | `pages/dashboard.py`, `components/qt_charts.py` | No: `GET /api/dashboard` (never called by any page) deleted (2026-11-08, desloppify batch 3) | `/bureau/` is a link portal; Outils › Statistiques covers the member and competition statistics (Chart.js). |
 | Word (.docx) attestations, batch generation into a folder | Documents | `exports/attestation_word.py`, `doc/template/ATTESTATION DE PAIEMENT_adulte.docx` | No | The web generates and sends PDF attestations one member at a time (`/api/attestations/preview`, `/send`); no batch download. |
 | Built-in help centre (input files, sync cycle) | Help | `pages/help.py` | No | |
 
@@ -38,7 +38,7 @@
 | Slots: instructors, HelloAsso tariffs, birth-year limits, weekly view, planning export | Planning (`PlanningPage.vue`) |
 | Competitions, coaches, HelloAsso payment matching, reminders, CSV exports | Compétitions (`CompetitionsPage.vue`), `/api/competitions/*` |
 | E-mail templates, WhatsApp invitation text | Communications (`CommunicationsPage.vue`) |
-| Map, pivot table | Outils (`MembersMap.vue` with `/api/reports/map-points`; `PivotPane.vue` with `/api/reports/pivot-records`) |
+| Map, statistics | Outils (`MembersMap.vue` with `/api/reports/map-points`; `MemberStatsPane.vue` with `/api/reports/member-stats`; the pivot table was removed in 2026-11, unused) |
 | Google OAuth connection / token test | Paramètres (`ParametresPage.vue`, `/api/auth/google/*`) |
 | HelloAsso sync | `/api/helloasso/sync` |
 | HelloAsso membership campaign → members (former `exports/membership_excel.update_membership_excel` pipeline, removed) | Outils › Import HelloAsso (`HelloAssoImportPane.vue`) → `/api/helloasso/memberships/preview`, `/api/helloasso/memberships/import` |
