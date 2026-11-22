@@ -1,5 +1,6 @@
 <script setup lang="ts">
-/* Season, search and date chips above the competition list (the calendar keeps the search only). */
+/* Season, search and date chips above the competition list (the calendar keeps the search only). The default slot goes
+   at the end of the season's line (phones: the creation button). */
 import type { When } from "../competitions";
 
 defineProps<{
@@ -35,6 +36,7 @@ const chip = (active: boolean) => [
         <option v-for="s in seasons" :key="s" :value="s">{{ s }}</option>
       </select>
     </div>
+    <slot />
   </div>
 
   <div class="flex flex-wrap items-center gap-1.5 mb-2">

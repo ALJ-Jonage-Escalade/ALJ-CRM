@@ -15,6 +15,7 @@ import {
   canOpen,
   OFFLINE_PAGES,
   PAGES,
+  pageScreen,
   pageVerdict,
   REFUSED_QUERY,
   shownOn,
@@ -114,6 +115,9 @@ const subMenu = computed<SubNavItem[]>(() => {
     ? listed.map(({ sub, verdict }) => ({ id: sub.id, label: sub.label, href: subHref(props.page, sub), disabled: verdict === "disabled" }))
     : [];
 });
+/* Phones: no strip on the pages listed there (Compétitions keeps its main page only, its sub-pages are for a computer);
+   an office page opened by its address keeps it */
+const subStrip = computed(() => (pageScreen(props.page) === "desktop" ? subMenu.value : []));
 const subAllowed = computed(() => !current.value || current.value.verdict === "allow");
 watch(
   () => current.value?.verdict,
@@ -338,7 +342,7 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
         <h1 class="m-0 text-xl font-bold md:text-[22px]">{{ heading }}</h1>
         <span id="sync-info" class="text-[13px] text-slate-500">{{ props.sync }}</span>
       </header>
-      <SubNav v-if="subMenu.length" :items="subMenu" :current="props.sub" variant="strip" class="mb-3 flex print:hidden md:hidden" />
+      <SubNav v-if="subStrip.length" :items="subStrip" :current="props.sub" variant="strip" class="mb-3 flex print:hidden md:hidden" />
 
       <div
         v-show="googleExpired"

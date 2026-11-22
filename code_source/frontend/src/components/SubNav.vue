@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* Sub-menu of an office page (plans/sub-menus.md): nested under the page in the desktop side menu, a strip of chips
-   under the title on phones. AppShell draws both and hides one by screen width. A disabled entry stays listed (online
+   under the title on phones (none on Compétitions, which keeps its main page there). AppShell draws both and hides one
+   by screen width. A disabled entry stays listed (online
    only, offline): the menu keeps its shape when the network drops. */
 import PageLink from "./PageLink.vue";
 

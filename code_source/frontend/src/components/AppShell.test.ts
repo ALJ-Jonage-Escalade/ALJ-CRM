@@ -273,13 +273,19 @@ describe("AppShell sub-menu", () => {
   const offline: AuthState = { status: "error", user: USER, message: "x", offline: true };
 
   /** The competitions page on one of its sub-pages, with a router (sent back to the index route). */
-  async function renderSub(state: AuthState, sub: string, staffCopy: boolean | null = false, path = `/bureau/competitions/${sub}`) {
+  async function renderSub(
+    state: AuthState,
+    sub: string,
+    staffCopy: boolean | null = false,
+    path = `/bureau/competitions/${sub}`,
+    page: PageId = "competitions",
+  ) {
     const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/:any(.*)*", component: { render: () => null } }] });
     await router.push(path);
     const auth = fakeAuth(state);
     const api: ApiFetch = vi.fn(async () => new Response(JSON.stringify({ status: "ok" })));
     const wrapper = mount(AppShell, {
-      props: { page: "competitions", title: "Compétitions", sub, staffCopy },
+      props: { page, title: "Compétitions", sub, staffCopy },
       slots: { default: '<p id="page-body">contenu</p>' },
       global: {
         plugins: [router],
@@ -301,15 +307,20 @@ describe("AppShell sub-menu", () => {
     return { wrapper, router, entries };
   }
 
-  it("lists the sub-pages under the open page, on the side and as a strip, the open one current", async () => {
+  it("lists the sub-pages under the open page in the side menu, the open one current, without a strip on Compétitions", async () => {
     const { wrapper, entries } = await renderSub(signedIn("coach"), "bilan");
     expect(entries("side")).toEqual(["competitions", "helloasso", "bilan", "coachs"]);
-    expect(entries("strip")).toEqual(["competitions", "helloasso", "bilan", "coachs"]);
+    expect(wrapper.find('[data-testid="subnav-strip"]').exists()).toBe(false); // phones: the main page only
     expect(wrapper.find('[data-testid="sub-side-bilan"]').attributes("aria-current")).toBe("page");
     expect(wrapper.find('nav a[data-page="competitions"]').attributes("aria-current")).toBe("true");
     expect(wrapper.find("h1").text()).toBe("Bilan");
     expect(document.title).toBe("Bilan · Compétitions — ALJ Escalade");
     expect(wrapper.find("#page-body").exists()).toBe(true);
+  });
+
+  it("lists the sub-pages of an office page as a strip for phones too", async () => {
+    const { entries } = await renderSub(signedIn("coach"), "tableau", false, "/bureau/planning/tableau", "planning");
+    expect(entries("strip")).toEqual(["semaine", "tableau"]);
   });
 
   it("shows no sub-menu to a role seeing a single sub-page", async () => {
