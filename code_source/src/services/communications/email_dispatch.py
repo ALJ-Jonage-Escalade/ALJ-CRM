@@ -57,6 +57,89 @@ def render_email(subject: str, body: str, recipient: Dict[str, Any], competition
     return RenderedEmail(subject=apply_template_variables(subject, person, competition), body_plain=body_plain, body_html=body_html)
 
 
+def _recipients_by_id(recipient_ids: List[int]) -> List[Dict[str, Any]]:  # Any: recipient fields (id may be None)
+    """Recipients from member ids: the members database first, the competitions directory as a fallback."""
+    members_by_id = MemberRepository.get_users_by_ids(recipient_ids)
+    directory_by_id = {a["id"]: a for a in member_directory.list_members()}
+    resolved: List[Dict[str, Any]] = []
+    for member_id in recipient_ids:
+        member = members_by_id.get(member_id)
+        if member:
+            resolved.append({
+                "id": member_id,
+                "first_name": member["first_name"] or "",
+                "last_name": member["last_name"] or "",
+                "email": (member["email_primary"] or member["email_secondary"] or "").strip(),
+                "licence_ffme": member["licence_ffme"] or "",
+            })
+        elif member_id in directory_by_id:
+            entry = directory_by_id[member_id]
+            resolved.append({
+                "id": member_id,
+                "first_name": entry.get("prenom") or "",
+                "last_name": entry.get("nom") or "",
+                "email": entry.get("email") or "",
+                "licence_ffme": entry.get("num_licence") or "",
+            })
+    return resolved
+
+
+def _direct_recipients(recipients_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:  # Any: recipients sent by the page
+    """Recipients given directly, keeping those with an e-mail address."""
+    resolved: List[Dict[str, Any]] = []
+    for recipient in recipients_data:
+        email = str(recipient.get("email") or "").strip()
+        if email and "@" in email:
+            resolved.append({
+                "id": recipient.get("id"),
+                "first_name": recipient.get("first_name") or recipient.get("prenom") or "",
+                "last_name": recipient.get("last_name") or recipient.get("nom") or "",
+                "email": email,
+                "licence_ffme": recipient.get("licence_ffme") or recipient.get("num_licence") or "",
+            })
+    return resolved
+
+
+def _fill_from_template(template: Optional[Dict[str, Any]], subject: Optional[str], body: Optional[str],  # Any: a template row
+                        sender_email: Optional[str], sender_name: Optional[str],
+                        ) -> tuple[str, str, Optional[str], Optional[str]]:
+    """Subject, body, sender e-mail and name: the given values, the template's for those left empty."""
+    if not template:
+        return subject or "", body or "", sender_email, sender_name
+    return (subject or template.get("subject") or "", body or template.get("body") or "",
+            sender_email or template.get("sender_email"), sender_name or template.get("sender_name"))
+
+
+def _send_to_recipient(recipient: Dict[str, Any], subject: str, body: str, competition: Dict[str, str],  # Any: a resolved recipient
+                       add_signature: bool, from_email: Optional[str], from_name: Optional[str],
+                       ) -> tuple[Dict[str, Any], LoggedRecipient, Optional[str]]:
+    """Sends the e-mail to one recipient: its detail row, its log entry and the subject it got (None: not rendered)."""
+    to_email = recipient.get("email")
+    full_name = f"{recipient.get('first_name', '')} {recipient.get('last_name', '')}".strip()
+    detail: Dict[str, Any] = {"id": recipient.get("id"), "name": full_name, "email": to_email}
+    if not to_email or "@" not in to_email:
+        error = "Adresse e-mail invalide ou absente"
+        return ({**detail, "status": "error", "error": error},
+                logged_recipient(to_email or "", full_name, recipient.get("id"), error), None)
+
+    rendered = render_email(subject, body, recipient, competition, add_signature)
+    try:
+        EmailSender.send_email(
+            to_email=to_email,
+            subject=rendered["subject"],
+            body=rendered["body_plain"],
+            html_body=rendered["body_html"],
+            inline_images=get_inline_images() if add_signature else None,
+            from_email=from_email,
+            from_name=from_name
+        )
+    except MailError as ex:  # this recipient only: the others are still sent
+        logger.warning("[EMAIL_DISPATCH] Envoi impossible à %s : %s", to_email, ex)
+        return ({**detail, "status": "error", "error": SEND_FAILED},
+                logged_recipient(to_email, full_name, recipient.get("id"), SEND_FAILED), rendered["subject"])
+    return {**detail, "status": "sent"}, logged_recipient(to_email, full_name, recipient.get("id")), rendered["subject"]
+
+
 class EmailDispatchService:
     """Service d'orchestration pour l'envoi d'e-mails personnalisés."""
 
@@ -160,50 +243,8 @@ class EmailDispatchService:
         - d'une liste d'identifiants (adherent_id / user_id) ;
         - d'une liste de dictionnaires fournis directement.
         """
-        resolved: List[Dict[str, Any]] = []
-
-        # 1. Traitement par identifiants
-        if recipient_ids:
-            # Charger les profils depuis la base adhérents
-            all_users = MemberRepository.get_users_by_ids(recipient_ids)
-            # Charger les profils depuis la base compétitions en secours
-            comp_adh = {a["id"]: a for a in member_directory.list_members()}
-
-            for uid in recipient_ids:
-                u_row = all_users.get(uid)
-                if u_row:
-                    email_dest = (u_row["email_primary"] or u_row["email_secondary"] or "").strip()
-                    resolved.append({
-                        "id": uid,
-                        "first_name": u_row["first_name"] or "",
-                        "last_name": u_row["last_name"] or "",
-                        "email": email_dest,
-                        "licence_ffme": u_row["licence_ffme"] or "",
-                    })
-                elif uid in comp_adh:
-                    a_info = comp_adh[uid]
-                    resolved.append({
-                        "id": uid,
-                        "first_name": a_info.get("prenom") or "",
-                        "last_name": a_info.get("nom") or "",
-                        "email": a_info.get("email") or "",
-                        "licence_ffme": a_info.get("num_licence") or "",
-                    })
-
-        # 2. Destinataires directs
-        if recipients_data:
-            for r in recipients_data:
-                em = str(r.get("email") or "").strip()
-                if em and "@" in em:
-                    resolved.append({
-                        "id": r.get("id"),
-                        "first_name": r.get("first_name") or r.get("prenom") or "",
-                        "last_name": r.get("last_name") or r.get("nom") or "",
-                        "email": em,
-                        "licence_ffme": r.get("licence_ffme") or r.get("num_licence") or "",
-                    })
-
-        return resolved
+        resolved = _recipients_by_id(recipient_ids) if recipient_ids else []
+        return resolved + _direct_recipients(recipients_data or [])
 
     @classmethod
     def dispatch_emails(
@@ -222,21 +263,9 @@ class EmailDispatchService:
         """Sends the e-mail to each recipient, with its variables replaced, and records the send in the e-mail log
         (`log_notice` when it could not be). A failed recipient does not stop the others (status "partial").
         InvalidRequest: nothing to send; UpstreamUnavailable: every e-mail failed (recorded too)."""
-        subj_tmpl = subject or ""
-        body_tmpl = body or ""
-        default_from_email = sender_email
-        default_from_name = sender_name
-
-        if template_name:
-            t = cls.get_template_by_name(template_name)
-            if t:
-                subj_tmpl = subj_tmpl or t.get("subject") or ""
-                body_tmpl = body_tmpl or t.get("body") or ""
-                if not default_from_email:
-                    default_from_email = t.get("sender_email")
-                if not default_from_name:
-                    default_from_name = t.get("sender_name")
-
+        template = cls.get_template_by_name(template_name) if template_name else None
+        subj_tmpl, body_tmpl, default_from_email, default_from_name = _fill_from_template(
+            template, subject, body, sender_email, sender_name)
         if not subj_tmpl or not body_tmpl:
             raise InvalidRequest("Le sujet et le corps de l'e-mail ne peuvent pas être vides.")
 
@@ -246,59 +275,18 @@ class EmailDispatchService:
 
         comp_ctx = cls.get_competition_context(competition_id)
 
-        sent_count = 0
-        errors_count = 0
         details = []
         logged: List[LoggedRecipient] = []
         subjects: List[str] = []
-
         for dest in destinataires:
-            to_email = dest.get("email")
-            full_name = f"{dest.get('first_name', '')} {dest.get('last_name', '')}".strip()
-
-            if not to_email or "@" not in to_email:
-                logged.append(logged_recipient(to_email or "", full_name, dest.get("id"), "Adresse e-mail invalide ou absente"))
-                errors_count += 1
-                details.append({
-                    "id": dest.get("id"),
-                    "name": full_name,
-                    "email": to_email,
-                    "status": "error",
-                    "error": "Adresse e-mail invalide ou absente"
-                })
-                continue
-
-            rendered = render_email(subj_tmpl, body_tmpl, dest, comp_ctx, add_signature)
-            subjects.append(rendered["subject"])
-            try:
-                EmailSender.send_email(
-                    to_email=to_email,
-                    subject=rendered["subject"],
-                    body=rendered["body_plain"],
-                    html_body=rendered["body_html"],
-                    inline_images=get_inline_images() if add_signature else None,
-                    from_email=default_from_email,
-                    from_name=default_from_name
-                )
-                sent_count += 1
-                logged.append(logged_recipient(to_email, full_name, dest.get("id")))
-                details.append({
-                    "id": dest.get("id"),
-                    "name": full_name,
-                    "email": to_email,
-                    "status": "sent"
-                })
-            except MailError as ex:  # this recipient only: the others are still sent
-                logger.warning("[EMAIL_DISPATCH] Envoi impossible à %s : %s", to_email, ex)
-                errors_count += 1
-                logged.append(logged_recipient(to_email, full_name, dest.get("id"), SEND_FAILED))
-                details.append({
-                    "id": dest.get("id"),
-                    "name": full_name,
-                    "email": to_email,
-                    "status": "error",
-                    "error": SEND_FAILED,
-                })
+            detail, logged_entry, sent_subject = _send_to_recipient(dest, subj_tmpl, body_tmpl, comp_ctx, add_signature,
+                                                                    default_from_email, default_from_name)
+            details.append(detail)
+            logged.append(logged_entry)
+            if sent_subject is not None:
+                subjects.append(sent_subject)
+        sent_count = sum(1 for detail in details if detail["status"] == "sent")
+        errors_count = len(details) - sent_count
 
         # The subject as the first recipient got it: a personalised one differs per recipient
         log_notice = record_send("competition_email" if competition_id else "member_email", author, logged,

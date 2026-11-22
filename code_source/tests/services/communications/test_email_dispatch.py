@@ -12,7 +12,7 @@ _src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from domain.errors import UpstreamUnavailable
+from domain.errors import InvalidRequest, UpstreamUnavailable
 from infrastructure.mail.sender import MailError
 from services.communications import email_log
 from services.communications.email_dispatch import EmailDispatchService, render_email
@@ -152,6 +152,68 @@ class TestEmailDispatchService(unittest.TestCase):
                     patch("api.communications.email.SecretStore.get_secret", side_effect=lambda key, s=secrets: s.get(key, "")):
                 status = get_email_status()
                 self.assertEqual((status.configured, status.mode, status.sender), (configured, mode, sender))
+
+
+DISPATCH = "services.communications.email_dispatch"
+
+
+@patch("infrastructure.mail.sender.EmailSender.send_email")
+class TestEmailDispatchInputs(unittest.TestCase):
+    """Recipients from member ids, template defaults and the requests refused before any send."""
+
+    def test_recipient_ids_use_the_members_database_then_the_competition_directory(self, mock_send):
+        members = {1: {"first_name": "Alice", "last_name": "DURAND", "email_primary": "",
+                       "email_secondary": " alice@example.com ", "licence_ffme": None},
+                   3: {"first_name": "Carl", "last_name": "SANS", "email_primary": None, "email_secondary": None,
+                       "licence_ffme": ""}}
+        directory = [{"id": 2, "prenom": "Bob", "nom": "LEFEVRE", "email": "bob@example.com", "num_licence": "222"}]
+        with patch(f"{DISPATCH}.MemberRepository.get_users_by_ids", return_value=members), \
+                patch(f"{DISPATCH}.member_directory.list_members", return_value=directory):
+            res = EmailDispatchService.dispatch_emails(subject="Info", body="Licence {num_licence}",
+                                                       recipient_ids=[1, 2, 3, 4], add_signature=False)
+        self.assertEqual([(d["id"], d["email"], d["status"]) for d in res["details"]],
+                         [(1, "alice@example.com", "sent"), (2, "bob@example.com", "sent"), (3, "", "error")])
+        self.assertEqual(mock_send.call_count, 2)
+        self.assertEqual(mock_send.call_args.kwargs["body"], "Licence 222")
+
+    def test_template_fills_the_fields_left_empty(self, mock_send):
+        template = {"name": "Relance Compétition", "subject": "Relance {first_name}", "body": "Bonjour",
+                    "sender_email": "bureau@example.org", "sender_name": "Bureau"}
+        with patch.object(EmailDispatchService, "list_templates", return_value=[template]):
+            EmailDispatchService.dispatch_emails(template_name="relance competition", body="Message propre",
+                                                 recipients=[{"first_name": "Alice", "email": "a@example.com"}],
+                                                 add_signature=False)
+        sent = mock_send.call_args.kwargs
+        self.assertEqual((sent["subject"], sent["body"]), ("Relance Alice", "Message propre"))
+        self.assertEqual((sent["from_email"], sent["from_name"]), ("bureau@example.org", "Bureau"))
+
+    def test_unknown_template_and_no_subject_is_refused(self, mock_send):
+        with patch.object(EmailDispatchService, "list_templates", return_value=[]), self.assertRaises(InvalidRequest):
+            EmailDispatchService.dispatch_emails(template_name="Absent", body="Bonjour", recipients=[{"email": "a@example.com"}])
+        mock_send.assert_not_called()
+
+    def test_no_recipient_with_an_address_is_refused(self, mock_send):
+        with self.assertRaises(InvalidRequest):
+            EmailDispatchService.dispatch_emails(subject="Info", body="Bonjour", recipients=[{"email": "sans-arobase"}])
+        mock_send.assert_not_called()
+
+    def test_unknown_competition_gives_no_variables(self, _send):
+        with patch(f"{DISPATCH}.competitions.get_competition_doc", return_value=None):
+            self.assertEqual(EmailDispatchService.get_competition_context(99), {})
+
+
+class TestKnownMemberEmails(unittest.TestCase):
+    """Addresses a coach may write to: the members database and the competition directory, lower-cased."""
+
+    def test_members_and_directory_are_merged(self):
+        with patch(f"{DISPATCH}.MemberRepository.list_contact_emails", return_value={"alice@example.com"}), \
+                patch(f"{DISPATCH}.member_directory.list_members", return_value=[{"email": " Bob@Example.com "}, {}]):
+            self.assertEqual(EmailDispatchService.known_member_emails(), {"alice@example.com", "bob@example.com"})
+
+    def test_directory_down_keeps_the_members_database(self):
+        with patch(f"{DISPATCH}.MemberRepository.list_contact_emails", return_value={"alice@example.com"}), \
+                patch(f"{DISPATCH}.member_directory.list_members", side_effect=ConnectionError("Firestore down")):
+            self.assertEqual(EmailDispatchService.known_member_emails(), {"alice@example.com"})
 
 
 if __name__ == "__main__":

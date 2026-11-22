@@ -394,23 +394,23 @@ def upsert_order_v2(cur: sqlite3.Cursor, order_ref: str, order_date: object, sta
     return cur.lastrowid
 
 
-def _has_better_sibling_purchase(cur: sqlite3.Cursor, user_id: Optional[int], order_id: Optional[int], score: int) -> bool:
-    """Vrai si une autre purchase du même user dans la même saison a un score de statut
-    strictement supérieur. Reproduit la sémantique legacy : une inscription moins
-    prioritaire (annulée / liste d'attente) ne doit jamais masquer une inscription active."""
+def _season_sibling_scores(cur: sqlite3.Cursor, user_id: Optional[int], order_id: Optional[int]) -> list[tuple[int, int]]:
+    """(purchase_id, score de priorité) des autres purchases du même user dans la même saison.
+    Lecture par index : valable pour un sqlite3.Row comme pour un tuple."""
     cur.execute("""
-        SELECT p.status, p.tarif_name, p.amount
+        SELECT p.id, p.status, p.tarif_name, p.amount
         FROM purchases p JOIN orders o ON o.id = p.order_id
         WHERE p.user_id = ? AND o.season_id = (SELECT season_id FROM orders WHERE id = ?)
           AND p.id != ?
     """, (user_id, order_id, order_id))
-    for r in cur.fetchall():
-        sibling_status = r["status"] if isinstance(r, sqlite3.Row) else r[0]
-        sibling_tarif = r["tarif_name"] if isinstance(r, sqlite3.Row) else r[1]
-        sibling_amount = r["amount"] if isinstance(r, sqlite3.Row) else r[2]
-        if purchase_priority_score(sibling_status, sibling_tarif, sibling_amount) > score:
-            return True
-    return False
+    return [(row[0], purchase_priority_score(row[1], row[2], row[3])) for row in cur.fetchall()]
+
+
+def _has_better_sibling_purchase(cur: sqlite3.Cursor, user_id: Optional[int], order_id: Optional[int], score: int) -> bool:
+    """Vrai si une autre purchase du même user dans la même saison a un score de statut
+    strictement supérieur. Reproduit la sémantique legacy : une inscription moins
+    prioritaire (annulée / liste d'attente) ne doit jamais masquer une inscription active."""
+    return any(sibling_score > score for _, sibling_score in _season_sibling_scores(cur, user_id, order_id))
 
 
 def insert_purchase_v2(cur: sqlite3.Cursor, order_id: Optional[int], user_id: Optional[int], rec: MemberRecord,
@@ -432,11 +432,8 @@ def insert_purchase_v2(cur: sqlite3.Cursor, order_id: Optional[int], user_id: Op
                 (order_id, user_id))
     found = cur.fetchone()
     if found:
-        ex_status = str(found["status"] or "").strip() if isinstance(found, sqlite3.Row) else str(found[1] or "")
-        ex_tarif = str(found["tarif_name"] or "") if isinstance(found, sqlite3.Row) else str(found[2] or "")
-        ex_amt = float(found["amount"] or 0.0) if isinstance(found, sqlite3.Row) else float(found[3] or 0.0)
-        purchase_id = found["id"] if isinstance(found, sqlite3.Row) else found[0]
-        if purchase_priority_score(ex_status, ex_tarif, ex_amt) > new_score:
+        purchase_id = found[0]  # index: valable pour un sqlite3.Row comme pour un tuple
+        if purchase_priority_score(found[1], found[2], found[3]) > new_score:
             return None
         if _has_better_sibling_purchase(cur, user_id, order_id, new_score):
             return None
@@ -454,20 +451,10 @@ def insert_purchase_v2(cur: sqlite3.Cursor, order_id: Optional[int], user_id: Op
 
     # Sémantique legacy d'écrasement : la nouvelle inscription plus prioritaire remplace
     # les inscriptions STRICTEMENT moins prioritaires du même user dans la même saison.
-    cur.execute("""
-        SELECT p.id, p.status, p.tarif_name, p.amount
-        FROM purchases p JOIN orders o ON o.id = p.order_id
-        WHERE p.user_id = ? AND o.season_id = (SELECT season_id FROM orders WHERE id = ?)
-          AND p.id != ?
-    """, (user_id, order_id, order_id))
-    for r in cur.fetchall():
-        sib_id = r["id"] if isinstance(r, sqlite3.Row) else r[0]
-        sib_s = r["status"] if isinstance(r, sqlite3.Row) else r[1]
-        sib_t = r["tarif_name"] if isinstance(r, sqlite3.Row) else r[2]
-        sib_a = r["amount"] if isinstance(r, sqlite3.Row) else r[3]
-        if purchase_priority_score(sib_s, sib_t, sib_a) < new_score:
-            cur.execute("DELETE FROM purchase_options WHERE purchase_id=?", (sib_id,))
-            cur.execute("DELETE FROM purchases WHERE id=?", (sib_id,))
+    for sibling_id, sibling_score in _season_sibling_scores(cur, user_id, order_id):
+        if sibling_score < new_score:
+            cur.execute("DELETE FROM purchase_options WHERE purchase_id=?", (sibling_id,))
+            cur.execute("DELETE FROM purchases WHERE id=?", (sibling_id,))
 
     cur.execute("""
         INSERT INTO purchases (order_id, user_id, tarif_name, amount, status, status_normalized,
