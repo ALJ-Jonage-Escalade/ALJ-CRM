@@ -1,5 +1,6 @@
 <script setup lang="ts">
-/* E-mail to one member from the record (coaches and admins; the server lets a coach write to known members only): a template or a free text, the variables replaced in a live preview,
+/* E-mail to one member from the record (coaches and admins; the server lets a coach write to known members only): a
+   member template (the default one first) or a free text, written with the variables' labels and replaced in a live preview,
    sent through /api/send-email (the server replaces the variables again and adds the signature). */
 import { computed, inject, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
@@ -8,7 +9,9 @@ import { CLIENT_KEY, errorText } from "../../lib/client";
 import { createCommunicationsApi, type EmailTemplate } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
-import { renderTemplate } from "../../lib/templateVariables";
+import { renderTemplate, templateError, toKeys, toLabels } from "../../lib/templateVariables";
+import { initialOfKind, templatesOfKind } from "../../lib/emailTemplates";
+import TemplateField from "../../components/TemplateField.vue";
 import { memberVariables, signatureText } from "./record";
 import { dialogs } from "../../composables/dialogs";
 
@@ -19,7 +22,9 @@ const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 
 const to = computed(() => props.member.email_primary.trim());
 const canSend = computed(() => looksLikeEmail(to.value));
-const templateName = ref("");
+const offered = computed(() => templatesOfKind(props.templates, "adherent"));
+const templateName = ref(initialOfKind(props.templates, "adherent", () => undefined)?.name ?? "");
+/** Subject and body with the variables' labels ({Prénom}); sent with their keys. */
 const subject = ref("");
 const body = ref("");
 const signature = ref(true);
@@ -27,13 +32,14 @@ const sending = ref(false);
 const problem = ref("");
 
 function useTemplate(): void {
-  const t = props.templates.find((x) => x.name === templateName.value);
+  const t = offered.value.find((x) => x.name === templateName.value);
   if (!t) {
     return;
   }
-  subject.value = t.subject;
-  body.value = t.body;
+  subject.value = toLabels(t.subject);
+  body.value = toLabels(t.body);
 }
+useTemplate();
 
 const preview = computed(
   () =>
@@ -44,6 +50,11 @@ async function send(): Promise<void> {
   problem.value = "";
   if (!subject.value.trim() || !body.value.trim()) {
     problem.value = "⚠️ Veuillez renseigner le sujet et le message.";
+    return;
+  }
+  const unknown = templateError([subject.value, body.value], "adherent");
+  if (unknown) {
+    problem.value = `⚠️ ${unknown}`;
     return;
   }
   const m = props.member;
@@ -59,8 +70,8 @@ async function send(): Promise<void> {
   sending.value = true;
   try {
     await communicationsApi.sendEmail({
-      subject: subject.value.trim(),
-      body: body.value.trim(),
+      subject: toKeys(subject.value.trim()),
+      body: toKeys(body.value.trim()),
       add_signature: signature.value,
       recipients: [
         {
@@ -100,24 +111,11 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
       <label for="email-template" :class="label">Modèle d'e-mail</label>
       <select id="email-template" v-model="templateName" data-testid="email-template" :class="field" @change="useTemplate">
         <option value="">-- E-mail libre / personnalisé --</option>
-        <option v-for="t in templates" :key="t.name" :value="t.name">{{ t.name }}</option>
+        <option v-for="t in offered" :key="t.name" :value="t.name">{{ t.name }}</option>
       </select>
     </div>
-    <div>
-      <label for="email-subject" :class="label">Sujet *</label>
-      <input
-        id="email-subject"
-        v-model="subject"
-        data-testid="email-subject"
-        type="text"
-        placeholder="Sujet de votre message…"
-        :class="field"
-      />
-    </div>
-    <div>
-      <label for="email-body" :class="label">Message * (variables : {first_name}, {last_name}, {num_licence}, {tarif}, {season})</label>
-      <textarea id="email-body" v-model="body" data-testid="email-body" rows="6" placeholder="Bonjour {first_name}, …" :class="field" />
-    </div>
+    <TemplateField id="email-subject" v-model="subject" kind="adherent" label="Sujet *" placeholder="Sujet de votre message…" />
+    <TemplateField id="email-body" v-model="body" kind="adherent" label="Message *" multiline :rows="6" placeholder="Bonjour {Prénom}, …" />
     <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-slate-700">
       <input v-model="signature" type="checkbox" data-testid="email-signature" class="accent-accent" />
       Ajouter la signature officielle ALJ Escalade
