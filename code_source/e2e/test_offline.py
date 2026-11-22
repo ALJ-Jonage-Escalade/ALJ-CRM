@@ -11,6 +11,7 @@ import re
 import pytest
 from playwright.sync_api import expect
 
+from helpers.auth import open_menu
 from helpers.competitions import go_to, open_competition, open_screen, participant_card, sub_menu_entry, toast
 from helpers.data import eventually, unique_name
 from helpers.offline import owner, put_queued, queued, stored, wait_stored
@@ -172,6 +173,7 @@ def test_logout_with_changes_not_sent_asks_first(mobile_page, competition):
     try:
         participant_card(page, member).get_by_test_id("present-switch").click()
         expect(participant_card(page, member).get_by_test_id("queued")).to_be_visible()
+        open_menu(page)
         page.locator("#logout-btn").click()
         cancel_dialog(page, "1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?")  # kept signed in
         expect(page.locator("#logout-btn")).to_be_visible()
@@ -190,6 +192,7 @@ def test_logout_with_changes_not_sent_asks_first(mobile_page, competition):
 def test_logout_wipes_the_store(mobile_page, competition):
     page = open_screen(mobile_page)
     wait_stored(page, "competitors")
+    open_menu(page)
     page.locator("#logout-btn").click()
     expect(page.locator("#gate-login")).to_be_visible()
 

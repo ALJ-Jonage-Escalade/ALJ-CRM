@@ -34,23 +34,21 @@ export interface SubPage {
 /** Office pages, in menu order. offlineRead: the page shows the copy kept on the device when the role cannot be checked
     for lack of network (verdict "offline"). */
 export const PAGES = [
-  { id: "accueil", icon: "🏠", label: "Accueil", short: "Accueil", href: "/bureau/", access: "staff", screen: "any", offlineRead: false },
+  { id: "accueil", icon: "🏠", label: "Accueil", href: "/bureau/", access: "staff", screen: "any", offlineRead: false },
   {
     id: "adherents",
     icon: "👥",
     label: "Adhérents",
-    short: "Adhérents",
     href: "/bureau/adherents",
     access: "staff",
     screen: "desktop",
     offlineRead: false,
   },
-  { id: "annuaire", icon: "📇", label: "Annuaire", short: "Annuaire", href: "/index", access: "staff", screen: "phone", offlineRead: true },
+  { id: "annuaire", icon: "📇", label: "Annuaire", href: "/index", access: "staff", screen: "phone", offlineRead: true },
   {
     id: "communications",
     icon: "✉️",
     label: "Communications",
-    short: "Messages",
     href: "/bureau/communications",
     access: "admin",
     screen: "desktop",
@@ -65,7 +63,6 @@ export const PAGES = [
     id: "competitions",
     icon: "🏆",
     label: "Compétitions",
-    short: "Compét.",
     href: "/bureau/competitions",
     access: "viewer",
     screen: "any",
@@ -81,7 +78,6 @@ export const PAGES = [
     id: "planning",
     icon: "📅",
     label: "Planning",
-    short: "Planning",
     href: "/bureau/planning",
     access: "staff",
     screen: "desktop",
@@ -95,7 +91,6 @@ export const PAGES = [
     id: "outils",
     icon: "🛠️",
     label: "Outils",
-    short: "Outils",
     href: "/bureau/outils",
     access: "staff",
     screen: "desktop",
@@ -114,7 +109,6 @@ export const PAGES = [
     id: "parametres",
     icon: "⚙️",
     label: "Paramètres",
-    short: "Réglages",
     href: "/bureau/parametres",
     access: "admin",
     screen: "desktop",
@@ -129,7 +123,6 @@ export const PAGES = [
     id: "administration",
     icon: "🔐",
     label: "Administration",
-    short: "Admin",
     href: "/bureau/administration",
     access: "admin",
     screen: "desktop",
@@ -141,7 +134,6 @@ export const PAGES = [
   id: string;
   icon: string;
   label: string;
-  short: string;
   href: string;
   access: Access;
   screen: Screen;
