@@ -270,9 +270,13 @@ export function participantRows(
 
 export type ParticipantFilter = "all" | "selected" | "unpaid" | "notInvited";
 
-export function filterRows(rows: readonly Row[], filter: ParticipantFilter, search = ""): Row[] {
+/** group: one slot group only (phones), every group when empty. */
+export function filterRows(rows: readonly Row[], filter: ParticipantFilter, search = "", group = ""): Row[] {
   const q = normKey(search);
   return rows.filter((r) => {
+    if (group && r.group !== group) {
+      return false;
+    }
     if (filter === "selected" && !r.selectionne) {
       return false;
     }
@@ -302,7 +306,18 @@ export function groupRows(rows: readonly Row[]): [string, Row[]][] {
     .map(([g, list]) => [g, list.sort(byName)]);
 }
 
-export function countLine(counts: Counts, filter: ParticipantFilter, shown: number): string {
+/** Phones, on a competition day: one filter per slot group (the groups compete one after the other), for the groups
+    with at least one competitor taking part, in the order of the list; n: the competitors of the group. */
+export function groupFilters(rows: readonly Row[]): { group: string; n: number }[] {
+  return groupRows(rows)
+    .filter(([, list]) => list.some((r) => r.selectionne))
+    .map(([group, list]) => ({ group, n: list.length }));
+}
+
+export function countLine(counts: Counts, filter: ParticipantFilter, shown: number, group = ""): string {
+  if (group) {
+    return `${shown} compétiteur${plural(shown)} en « ${group} »`;
+  }
   if (filter === "selected") {
     return `${counts.selected} compétiteur${plural(counts.selected)} sélectionné${plural(counts.selected)}`;
   }

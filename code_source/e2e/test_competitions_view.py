@@ -66,7 +66,12 @@ def test_phone_list_then_competition(mobile_page, competition):
     expect(row.get_by_test_id("participe-switch")).to_be_checked()
     expect(row.get_by_test_id("payment-badge")).to_be_visible()
     expect(row.get_by_test_id("emergency-link")).to_have_count(1)
-    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (1)")
+    # Filtered by slot group on a phone (the competition day), not by registration
+    expect(page.get_by_test_id("filter-selected")).to_have_count(0)
+    expect(page.get_by_test_id("participant-search")).to_have_count(0)
+    expect(page.get_by_test_id("filter-group")).to_have_count(1)
+    page.get_by_test_id("filter-group").click()
+    expect(row).to_be_visible()
     assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"), "no horizontal scroll"
     page.get_by_test_id("back-link").click()
     expect(card(page, SEEDED_COMPETITION)).to_be_visible()
