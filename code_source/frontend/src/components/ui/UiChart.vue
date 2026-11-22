@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /* A pie, bar or line chart (Chart.js, only the parts used are registered) with its figures in a visually hidden table: screen
-   readers read the table, and the tests too (jsdom draws no canvas). A click anywhere on the chart emits `select`. */
+   readers read the table, and the tests too (jsdom draws no canvas). A click anywhere on the chart emits `select`.
+   Long axis labels keep their beginning; hovering a bar, a slice or an axis label highlights it and writes its whole
+   label and figures on the line under the chart (instead of a floating tooltip). */
 import {
   ArcElement,
   BarController,
@@ -13,9 +15,9 @@ import {
   LineElement,
   PieController,
   PointElement,
-  Tooltip,
 } from "chart.js";
-import { onBeforeUnmount, onMounted, useTemplateRef, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue";
+import { figure, hoverText, shortLabel } from "./chartText";
 
 Chart.register(
   ArcElement,
@@ -28,7 +30,6 @@ Chart.register(
   LineElement,
   PieController,
   PointElement,
-  Tooltip,
 );
 
 export interface ChartDataset {
@@ -58,6 +59,12 @@ const emit = defineEmits<{ select: [] }>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 let chart: Chart | null = null;
+/** The whole label and figures of the hovered value, empty when nothing is hovered. */
+const hovered = ref("");
+
+/** Characters an axis label may hold: Chart.js gives an axis half of the chart's width (about 7 px per character). */
+const AXIS_SHARE = 0.5;
+const CHARACTER_WIDTH = 7;
 
 function chartData() {
   return {
@@ -78,6 +85,16 @@ onMounted(() => {
     return; // no canvas support (tests): the table still holds the figures
   }
   const scale = { stacked: props.stacked, beginAtZero: true };
+  const categoryScale = {
+    ...scale,
+    ticks: {
+      callback(this: { chart: Chart; getLabelForValue: (value: number) => string }, value: number | string) {
+        const width = this.chart.width * AXIS_SHARE;
+        return shortLabel(this.getLabelForValue(Number(value)), Math.max(6, Math.floor(width / CHARACTER_WIDTH)));
+      },
+    },
+  };
+  const categoryAxis = props.horizontal ? "y" : "x";
   chart = new Chart(context, {
     type: props.type,
     data: chartData(),
@@ -85,15 +102,40 @@ onMounted(() => {
       responsive: true,
       maintainAspectRatio: false,
       indexAxis: props.horizontal ? "y" : "x",
-      scales: props.type === "pie" ? {} : { x: scale, y: scale },
-      plugins: {
-        legend: { display: props.type === "pie" || props.datasets.length > 1, position: "bottom" },
-        tooltip: { callbacks: props.unit ? { label: (item) => `${item.dataset.label ?? ""} : ${item.formattedValue} ${props.unit}` } : {} },
-      },
+      scales: props.type === "pie" ? {} : { x: scale, y: scale, [categoryAxis]: categoryScale },
+      events: ["click"], // the hover is ours (it also covers the axis labels, outside Chart.js' chart area)
+      plugins: { legend: { display: props.type === "pie" || props.datasets.length > 1, position: "bottom" } },
       onClick: () => emit("select"),
     },
   });
+  canvas.value?.addEventListener("mousemove", hover);
+  canvas.value?.addEventListener("mouseleave", leave);
 });
+
+/** A slice under the pointer; for bars and lines, the row (or column) of the pointer, axis label included. */
+function hover(event: MouseEvent) {
+  if (!chart) {
+    return;
+  }
+  const elements =
+    props.type === "pie"
+      ? chart.getElementsAtEventForMode(event, "nearest", { intersect: true }, false)
+      : chart.getElementsAtEventForMode(event, "index", { intersect: false, axis: props.horizontal ? "y" : "x" }, false);
+  const index = elements[0]?.index;
+  const text = index === undefined ? "" : hoverText(props.labels[index] ?? "", props.datasets, index, props.unit);
+  if (text === hovered.value) {
+    return; // same value still hovered: no redraw, the highlight stays still
+  }
+  hovered.value = text;
+  chart.setActiveElements(elements.map(({ datasetIndex, index: elementIndex }) => ({ datasetIndex, index: elementIndex })));
+  chart.update();
+}
+
+function leave() {
+  hovered.value = "";
+  chart?.setActiveElements([]);
+  chart?.update();
+}
 
 watch(
   () => [props.labels, props.datasets],
@@ -106,14 +148,19 @@ watch(
   { deep: true },
 );
 
-onBeforeUnmount(() => chart?.destroy());
-
-const cell = (value: number | undefined) => `${value ?? 0}${props.unit ? ` ${props.unit}` : ""}`;
+onBeforeUnmount(() => {
+  canvas.value?.removeEventListener("mousemove", hover);
+  canvas.value?.removeEventListener("mouseleave", leave);
+  chart?.destroy();
+});
 </script>
 
 <template>
-  <figure class="relative h-64">
-    <canvas ref="canvas" role="img" :aria-label="title" class="cursor-pointer" />
+  <figure class="flex h-64 flex-col">
+    <div class="relative min-h-0 flex-1">
+      <canvas ref="canvas" role="img" :aria-label="title" class="cursor-pointer" />
+    </div>
+    <figcaption class="h-5 truncate pt-1 text-xs font-medium text-slate-600" aria-hidden="true">{{ hovered }}</figcaption>
     <table class="sr-only">
       <caption>
         {{ title }}
@@ -127,7 +174,7 @@ const cell = (value: number | undefined) => `${value ?? 0}${props.unit ? ` ${pro
       <tbody>
         <tr v-for="(label, index) in labels" :key="label">
           <th scope="row">{{ label }}</th>
-          <td v-for="dataset in datasets" :key="dataset.label">{{ cell(dataset.data[index]) }}</td>
+          <td v-for="dataset in datasets" :key="dataset.label">{{ figure(dataset.data[index], unit) }}</td>
         </tr>
       </tbody>
     </table>
