@@ -4,7 +4,9 @@ import os
 import sqlite3
 import sys
 import tempfile
+import time
 import unittest
+from unittest import mock
 
 _test_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _src_dir = os.path.join(os.path.dirname(_test_dir), "src")
@@ -17,6 +19,7 @@ from infrastructure.firestore.cloud_sync.cache import connect, pending_count, se
 from infrastructure.firestore.client import FirestoreConflictError  # noqa: E402
 from infrastructure.firestore.cloud_sync.common import collection_for, ts_key  # noqa: E402
 from infrastructure.firestore.cloud_sync.sync import flush, pull  # noqa: E402
+from infrastructure.firestore.competitions import member_directory  # noqa: E402
 from infrastructure.sqlite.connection import SqliteDatabase  # noqa: E402
 from infrastructure.sqlite.email_templates import EmailTemplateRepository  # noqa: E402
 from infrastructure.sqlite.members import MemberRepository  # noqa: E402
@@ -322,6 +325,147 @@ class CloudDatabaseTest(unittest.TestCase):
         rep = self.sync(self.a)
         self.assertFalse(rep.get("pulled"))
         self.assertFalse(rep.get("pushed"))
+
+
+class BrokenStore(FakeStore):
+    """Firestore unreachable: every read and write fails."""
+
+    def _fail(self, *args, **kwargs):
+        raise ConnectionError("Firestore unreachable")
+
+    list_all = list_modified_since = get_many = commit = _fail
+
+
+class CloudDatabaseEntryPointsTest(unittest.TestCase):
+    """CloudDatabase.sync / flush_only / after_write / ensure_fresh / status / cache_ready over the in-memory store."""
+
+    STATE = ("_store", "_last_report", "_last_error", "_last_sync", "_last_pull", "_projection_dirty")
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        source = os.path.join(self.tmp, "source.db")
+        _seed(source)
+        self.store = FakeStore()
+        import_database(source, self.store)
+        self.path = os.path.join(self.tmp, "cache.db")
+        build_cache(self.path, self.store)
+        saved_path = SqliteDatabase.get_db_path()
+        self.addCleanup(SqliteDatabase.set_db_path, saved_path)
+        SqliteDatabase.set_db_path(self.path)
+        for name in self.STATE:
+            self.addCleanup(setattr, CloudDatabase, name, getattr(CloudDatabase, name))
+        CloudDatabase._store = self.store
+        CloudDatabase._last_error = ""
+        CloudDatabase._last_pull = 0.0
+        CloudDatabase._projection_dirty = False
+
+    def edit_city(self, city):
+        conn = SqliteDatabase.get_connection()
+        conn.execute("UPDATE users SET city = ? WHERE id = 1", (city,))
+        conn.commit()
+        conn.close()
+
+    def pending(self):
+        return CloudDatabase.status()["pending"]
+
+    def replication_on(self):
+        patcher = mock.patch.dict(os.environ, {"ALJ_CACHE_REPLICATION": "on"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_sync_sends_local_edits_and_receives_remote_ones(self):
+        self.edit_city("Lyon")
+        self.store.remote_patch("users", 2, city="Décines")
+        report = CloudDatabase.sync()
+        self.assertEqual((report.get("pushed"), report.get("pulled")), (1, 1))
+        self.assertEqual(self.store.docs[("crm_users", "1")]["fields"]["city"], "Lyon")
+        conn = sqlite3.connect(self.path)
+        self.addCleanup(conn.close)
+        self.assertEqual(conn.execute("SELECT city FROM users WHERE id = 2").fetchone()[0], "Décines")
+        self.assertEqual(CloudDatabase.status()["last_error"], "")
+        self.assertGreater(CloudDatabase._last_pull, 0)
+
+    def test_full_sync_rebuilds_the_cache(self):
+        progress = mock.Mock()
+        report = CloudDatabase.sync(full=True, progress=progress)
+        self.assertTrue(report["full"])
+        self.assertTrue(cache_is_valid(self.path, self.store.project_id))
+        self.assertEqual(progress.call_count, 3)
+
+    def test_sync_without_cache_builds_it(self):
+        os.remove(self.path)
+        self.assertFalse(CloudDatabase.cache_ready())
+        self.assertTrue(CloudDatabase.sync()["full"])
+        self.assertTrue(CloudDatabase.cache_ready())
+
+    def test_sync_failure_is_reported_not_raised(self):
+        CloudDatabase._store = BrokenStore()
+        report = CloudDatabase.sync()
+        self.assertEqual(report["errors"], ["Firestore unreachable"])
+        self.assertEqual(CloudDatabase.status()["last_error"], "Firestore unreachable")
+
+    def test_flush_only_sends_pending_edits(self):
+        self.edit_city("Lyon")
+        self.assertEqual(self.pending(), 1)
+        self.assertEqual(CloudDatabase.flush_only().get("pushed"), 1)
+        self.assertEqual(self.pending(), 0)
+
+    def test_flush_only_failure_keeps_the_edit_pending(self):
+        self.edit_city("Lyon")
+        CloudDatabase._store = BrokenStore()
+        self.assertEqual(CloudDatabase.flush_only()["errors"], ["Firestore unreachable"])
+        self.assertEqual(self.pending(), 1)
+
+    def test_flush_only_on_invalid_cache_does_nothing(self):
+        os.remove(self.path)
+        self.assertEqual(CloudDatabase.flush_only(), {})
+
+    def test_after_write_without_replication_sends_nothing(self):
+        self.edit_city("Lyon")
+        self.assertTrue(CloudDatabase.after_write())
+        self.assertEqual(self.pending(), 1)
+
+    def test_after_write_sends_and_rebuilds_the_directory_when_members_changed(self):
+        self.replication_on()
+        self.edit_city("Lyon")
+        with mock.patch.object(member_directory, "rebuild_member_directory", return_value={}) as rebuild:
+            self.assertTrue(CloudDatabase.after_write())
+        rebuild.assert_called_once()
+        self.assertFalse(CloudDatabase._projection_dirty)
+        self.assertEqual(self.pending(), 0)
+
+    def test_after_write_reports_a_failed_send(self):
+        self.replication_on()
+        self.edit_city("Lyon")
+        CloudDatabase._store = BrokenStore()
+        with mock.patch.object(member_directory, "directory_outdated", return_value=False):
+            self.assertFalse(CloudDatabase.after_write())
+
+    def test_directory_stays_dirty_when_its_rebuild_fails(self):
+        CloudDatabase._projection_dirty = True
+        with mock.patch.object(member_directory, "rebuild_member_directory", side_effect=ConnectionError("down")):
+            CloudDatabase.refresh_projection()
+        self.assertTrue(CloudDatabase._projection_dirty)
+
+    def test_ensure_fresh_pulls_only_when_stale(self):
+        self.replication_on()
+        with mock.patch.object(CloudDatabase, "sync") as sync:
+            CloudDatabase.ensure_fresh()
+            sync.assert_called_once()
+            sync.reset_mock()
+            CloudDatabase._last_pull = time.time()
+            CloudDatabase.ensure_fresh()
+            sync.assert_not_called()
+
+    def test_ensure_fresh_without_replication_does_nothing(self):
+        with mock.patch.object(CloudDatabase, "sync") as sync:
+            CloudDatabase.ensure_fresh()
+        sync.assert_not_called()
+
+    def test_cache_ready_is_false_for_a_corrupt_file(self):
+        with open(self.path, "wb") as corrupt:
+            corrupt.write(b"not a database" * 100)
+        self.assertFalse(CloudDatabase.cache_ready())
 
 
 if __name__ == "__main__":
