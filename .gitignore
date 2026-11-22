@@ -60,3 +60,8 @@ code_source/frontend/coverage/
 .coverage.*
 coverage.xml
 htmlcov/
+
+# ===== Outils locaux (index repowise, config éditeur) =====
+.repowise/
+.vscode/
+.claude/CLAUDE.local.md
