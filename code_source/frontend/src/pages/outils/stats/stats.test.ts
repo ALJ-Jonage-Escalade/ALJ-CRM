@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Competition, Participant } from "../../competitions/competitions";
-import { competitorGrowthText, participationRateText, seasonStats } from "./stats";
+import { participationRateText, seasonParticipation, seasonStats } from "./stats";
 
 const entrant = (adherentId: number, change: Partial<Participant> = {}): Participant => ({
   adherent_id: adherentId,
@@ -37,10 +37,14 @@ describe("stats", () => {
     expect(participationRateText([])).toBe("—");
   });
 
-  it("compares the oldest and the most recent season, a dash with a single one", () => {
-    const seasons = seasonStats(LIST);
-    expect(competitorGrowthText(seasons)).toBe("+200 %");
-    expect(competitorGrowthText(seasons.slice(0, 1))).toBe("—");
-    expect(competitorGrowthText([])).toBe("—");
+  it("counts the competitions of the season the club took part in so far, and their selected competitors", () => {
+    const list = [
+      ...LIST,
+      competition(5, "2026-12-01", [entrant(2, { selectionne: false })]), // nobody selected
+      competition(6, "2027-05-01", [entrant(1), entrant(2)]), // still to come
+    ];
+
+    expect(seasonParticipation(list, "2027-04-01")).toEqual({ competitions: 2, competitors: 4 });
+    expect(seasonParticipation(list, "2028-01-01")).toEqual({ competitions: 0, competitors: 0 });
   });
 });

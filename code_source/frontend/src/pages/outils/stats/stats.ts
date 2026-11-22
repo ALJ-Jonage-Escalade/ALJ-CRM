@@ -1,6 +1,6 @@
 /* Statistics of the competitions (Outils › Statistiques), computed from the competitions the server returns: podiums
    and competitors per season, presence of the selected competitors. Nothing is shown that the data does not hold. */
-import { seasonOf, type Competition } from "../../competitions/competitions";
+import { seasonOf, todayIso, type Competition } from "../../competitions/competitions";
 
 /** The medal counted for a podium rank. */
 const MEDAL_OF_RANK = { 1: "gold", 2: "silver", 3: "bronze" } as const;
@@ -59,13 +59,19 @@ export function participationRateText(competitions: readonly Competition[]): str
   return `${Math.round((present / selected.length) * 100)} %`;
 }
 
-/** « +63 % » from the oldest to the most recent of the seasons (most recent first), « — » without two seasons to compare. */
-export function competitorGrowthText(seasons: readonly SeasonStats[]): string {
-  const latest = seasons[0];
-  const oldest = seasons[seasons.length - 1];
-  if (!latest || !oldest || latest === oldest || !oldest.competitors) {
-    return "—";
-  }
-  const growth = Math.round(((latest.competitors - oldest.competitors) / oldest.competitors) * 100);
-  return `${growth > 0 ? "+" : ""}${growth} %`;
+/** The club's participation in the season of `today` (YYYY-MM-DD), up to `today`. */
+export interface SeasonParticipation {
+  /** Competitions with at least one selected competitor */
+  competitions: number;
+  /** Selected competitors added over these competitions (a member in two competitions counts twice) */
+  competitors: number;
+}
+
+export function seasonParticipation(competitions: readonly Competition[], today: string = todayIso()): SeasonParticipation {
+  const season = seasonOf(today);
+  const selectedCounts = competitions
+    .filter((competition) => seasonOf(competition.date_competition) === season && (competition.date_competition ?? "") <= today)
+    .map((competition) => (competition.participants ?? []).filter((participant) => participant.selectionne).length)
+    .filter((selected) => selected > 0);
+  return { competitions: selectedCounts.length, competitors: selectedCounts.reduce((sum, selected) => sum + selected, 0) };
 }

@@ -70,6 +70,7 @@ async function render(answer: () => Promise<Response> | Response = () => json({ 
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   document.body.innerHTML = "";
 });
@@ -134,5 +135,13 @@ describe("OutilsStatsPage, competitions", () => {
 
     expect(figures("chart-podiums")).toEqual(["2025-2026: 0: 1: 0", "2026-2027: 1: 0: 1"]);
     expect(figures("chart-competitors")).toEqual(["2025-2026: 1", "2026-2027: 2"]);
+  });
+
+  it("counts the competitions of the current season and their competitors", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-22T12:00:00") });
+    const { byId } = await render();
+
+    expect(byId("kpi-competitions")!.textContent).toContain("1");
+    expect(byId("kpi-competitors")!.textContent).toContain("2");
   });
 });
