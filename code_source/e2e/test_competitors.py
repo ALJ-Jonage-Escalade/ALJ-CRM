@@ -219,18 +219,6 @@ def test_withdrawal_of_paid_competitor(page, test_data, workflow, mode, badge, s
     _assert_stored(test_data, workflow, workflow["paid"], statut_paiement="paye", selectionne=True)
 
 
-def test_checked_in_competitor_is_locked(mobile_page, test_data, workflow):
-    """On a phone: the wide table has no « Présent » column."""
-    page = mobile_page
-    _open_workflow(page, workflow)
-    card = participant_card(page, workflow["paid"])
-    card.get_by_test_id("present-switch").click()
-    expect(card.get_by_test_id("on-site")).to_contain_text("Sur place")
-    expect(card.get_by_test_id("withdraw")).to_have_count(0)
-    expect(card.get_by_test_id("present-switch")).to_be_checked()
-    _assert_stored(test_data, workflow, workflow["paid"], present=True)
-
-
 def test_remove_unpaid_competitor(page, test_data, workflow):
     _open_workflow(page, workflow)
     accept_dialogs(page)

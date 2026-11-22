@@ -61,6 +61,7 @@ def test_phone_list_then_competition(mobile_page, competition):
     expect(page).to_have_url(re.compile(rf"/competitions\?id={competition['id']}$"))
     expect(card(page, SEEDED_COMPETITION)).to_be_hidden()  # one at a time on a phone
     expect(page.get_by_test_id("subnav-strip")).to_have_count(0)  # the main page only: the sub-pages are for a computer
+    expect(page.get_by_test_id("actions-guide")).to_be_hidden()  # a computer read
     row = participant(page, competition["member"])
     expect(row.get_by_test_id("participe-switch")).to_be_checked()
     expect(row.get_by_test_id("payment-badge")).to_be_visible()

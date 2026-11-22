@@ -1,6 +1,6 @@
 <script setup lang="ts">
-/* The actions on one competition, for coaches and admins: edit, e-mail its competitors, the « Plus » menu (load the
-   « Compétition » group, MyCompet results, exports, archive, remove the never invited, delete). What changes the list
+/* The actions on one competition, for coaches and admins: edit, e-mail its competitors (in the « Plus » menu on a
+   phone, where writing an e-mail is rare), the « Plus » menu (load the « Compétition » group, MyCompet results, exports, archive, remove the never invited, delete). What changes the list
    of competitors is the detail's (emitted); the competition itself, its results and exports are handled here. */
 import { inject, ref } from "vue";
 import { useRouter } from "vue-router";
@@ -10,6 +10,7 @@ import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
 import UiMenu from "../../../components/ui/UiMenu.vue";
 import UiMenuItem from "../../../components/ui/UiMenuItem.vue";
 import { dialogs } from "../../../composables/dialogs";
+import { useWideLayout } from "../../../composables/media";
 import { CLIENT_KEY, errorText, type Schemas } from "../../../lib/client";
 import { csvBlob } from "../../../lib/csv";
 import { saveExport, saveFile } from "../../../lib/download";
@@ -24,6 +25,7 @@ const emit = defineEmits<{ email: []; loadGroup: []; removeNotInvited: [] }>();
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const writer = inject(WRITER_KEY)!;
 const router = useRouter();
+const wide = useWideLayout();
 
 // ---------------------------------------------------------------- The competition
 
@@ -129,8 +131,11 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
 <template>
   <div class="mt-2.5 flex flex-wrap gap-1.5 lg:mt-0 lg:max-w-[45%] lg:shrink-0 lg:justify-end" data-testid="detail-actions">
     <UiButton variant="muted" small data-testid="edit-comp" @click="editing = true">✏️ Modifier</UiButton>
-    <UiButton variant="muted" small data-testid="email-comp" @click="emit('email')">✉️ Envoyer un email aux compétiteurs</UiButton>
+    <UiButton v-if="wide" variant="muted" small data-testid="email-comp" @click="emit('email')">
+      ✉️ Envoyer un email aux compétiteurs
+    </UiButton>
     <UiMenu label="⋯ Plus" small :busy="fetching && 'Recherche MyCompet…'" aria-label="Plus d'actions" data-testid="detail-more">
+      <UiMenuItem v-if="!wide" data-testid="email-comp" @select="emit('email')">✉️ Envoyer un email aux compétiteurs</UiMenuItem>
       <UiMenuItem data-testid="load-group" @select="emit('loadGroup')">🧗 Charger le groupe « Compétition »</UiMenuItem>
       <UiMenuItem data-testid="fetch-results" @select="fetchResults()">🏆 Trouver les résultats</UiMenuItem>
       <UiMenuItem data-testid="export-csv" :disabled="!rows.length" @select="exportCsv">📥 Export CSV</UiMenuItem>
