@@ -8,7 +8,7 @@ import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
 import UiDialog from "../../../components/ui/UiDialog.vue";
-import { useMediaQuery } from "../../../composables/media";
+import { useMediaQuery, XL_LAYOUT_QUERY } from "../../../composables/media";
 import { CLIENT_KEY } from "../../../lib/client";
 import { createCompetitionsApi } from "../../../services/competitions";
 import { formatEuros } from "../../../lib/format";
@@ -64,7 +64,7 @@ const writer = inject(WRITER_KEY)!;
 const c = computed(() => props.competition);
 const kpis = computed(() => counts(props.rows));
 /* Wide screens: the competitors in a table, as on the former desktop page; cards elsewhere */
-const wide = useMediaQuery("(min-width: 1280px)");
+const wide = useMediaQuery(XL_LAYOUT_QUERY);
 const filter = ref<ParticipantFilter>("all");
 const search = ref("");
 const shown = computed(() => filterRows(props.rows, filter.value, search.value));

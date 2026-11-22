@@ -1,11 +1,10 @@
 <script setup lang="ts">
-/* HelloAsso view */
+/* HelloAsso view: the payments in a table (a computer page: phones list the competitions only). */
 import { computed, inject, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialog from "../../../components/ui/UiDialog.vue";
-import { useMediaQuery } from "../../../composables/media";
 import { localStorageOrNone } from "../../../lib/localStorage";
 import { CLIENT_KEY } from "../../../lib/client";
 import { createCompetitionsApi } from "../../../services/competitions";
@@ -31,7 +30,6 @@ import {
   type PassTally,
 } from "./helloasso";
 import { WRITER_KEY } from "../writer";
-import { plural } from "../../../lib/text";
 
 const props = defineProps<{
   items: readonly HelloAssoItem[] | null;
@@ -46,7 +44,6 @@ const client = inject(CLIENT_KEY)!;
 const competitionsApi = createCompetitionsApi(client);
 const integrationsApi = createIntegrationsApi(client);
 const writer = inject(WRITER_KEY)!;
-const wide = useMediaQuery("(min-width: 1280px)");
 
 const HELLOASSO_HIDE_IGNORED_STORAGE = "alj_ha_hide_ignored"; // same choice as on the former page
 function readHide(): boolean {
@@ -76,7 +73,6 @@ const shownRows = computed(() =>
 );
 const totalAmount = computed(() => all.value.reduce((sum, it) => sum + Number(it.montant ?? 0), 0));
 const compName = computed(() => new Map(props.competitions.map((c) => [c.id, c.nom])));
-const memberName = computed(() => new Map(props.members.map((m) => [m.id, `${m.nom} ${m.prenom}`])));
 const FILTERS = computed(() => [
   { id: "all" as const, label: "📋 Tous", n: hideIgnored.value ? count.value.all - count.value.ignored : count.value.all },
   { id: "unlinked" as const, label: "⚠️ En attente", n: count.value.unlinked },
@@ -210,7 +206,7 @@ const chip = (active: boolean) => [
 
 <template>
   <section aria-label="Paiements HelloAsso" data-testid="helloasso-pane">
-    <div v-if="wide" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="m-0 text-[17px] font-bold text-slate-800">🧾 Paiements HelloAsso & Rapprochement</h2>
@@ -372,143 +368,6 @@ const chip = (active: boolean) => [
         </table>
       </div>
     </div>
-
-    <template v-else>
-      <div class="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div
-          v-for="k in [
-            { l: 'Paiements', v: count.all, c: 'text-slate-800' },
-            { l: 'Rattachés', v: count.linked, c: 'text-green-600' },
-            { l: 'En attente', v: count.unlinked, c: 'text-amber-600' },
-            { l: 'Ignorés', v: count.ignored, c: 'text-slate-500' },
-          ]"
-          :key="k.l"
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center"
-        >
-          <div :class="['text-xl font-extrabold', k.c]">{{ k.v }}</div>
-          <div class="text-[11px] font-semibold text-slate-500">{{ k.l }}</div>
-        </div>
-      </div>
-      <div class="mb-3 flex flex-wrap items-center gap-2">
-        <UiButton data-testid="ha-sync" :busy="syncing && 'Synchro…'" @click="sync">🔄 Synchroniser</UiButton>
-        <UiButton variant="muted" data-testid="ha-first" @click="startPass">
-          🔗 Rattacher les paiements en attente ({{ pending.length }})
-        </UiButton>
-        <input
-          v-model="search"
-          type="search"
-          data-testid="ha-search"
-          placeholder="Rechercher (nom, commande, licence…)"
-          class="min-w-48 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[13px]"
-        />
-      </div>
-      <div class="mb-2 flex flex-wrap items-center gap-1.5">
-        <button
-          v-for="f in FILTERS"
-          :key="f.id"
-          type="button"
-          :data-testid="`ha-filter-${f.id}`"
-          :aria-pressed="filter === f.id"
-          :class="chip(filter === f.id)"
-          @click="filter = f.id"
-        >
-          {{ f.label }} ({{ f.n }})
-        </button>
-        <label class="ml-auto inline-flex items-center gap-1.5 text-xs text-slate-600">
-          <input v-model="hideIgnored" type="checkbox" data-testid="ha-hide-ignored" />
-          Masquer les ignorés dans « Tous »
-        </label>
-      </div>
-      <p class="mb-2 text-xs text-slate-500" data-testid="ha-count">
-        {{
-          items
-            ? `${shown.length} paiement${plural(shown.length)}`
-            : loading
-              ? "⏳ Chargement des paiements…"
-              : "Paiements HelloAsso indisponibles (réseau ?)."
-        }}
-      </p>
-
-      <ul class="grid gap-2 xl:grid-cols-2">
-        <li
-          v-for="it in shown"
-          :key="it.id_item"
-          data-testid="ha-item"
-          :class="[
-            'rounded-xl border border-l-4 border-slate-200 bg-white px-3.5 py-2.5 shadow-sm',
-            isLinked(it) ? 'border-l-green-600' : isIgnored(it) ? 'border-l-slate-400 opacity-75' : 'border-l-red-500',
-          ]"
-        >
-          <div class="flex items-start justify-between gap-2">
-            <span class="min-w-0">
-              <b class="block text-[14.5px]">{{ displayName(it) }}</b>
-              <span class="block text-xs text-slate-500">
-                Commande
-                <b>#{{ itemInfo(it).orderId || "—" }}</b>
-                · 📅 {{ day(itemInfo(it).date) }}
-              </span>
-            </span>
-            <span class="text-right">
-              <b class="block text-[15px]">{{ formatEuros(it.montant) }}</b>
-              <UiBadge :color="isLinked(it) ? 'green' : isIgnored(it) ? 'slate' : 'amber'" data-testid="ha-state">
-                {{ isLinked(it) ? "✅ Rattaché" : isIgnored(it) ? "🚫 Ignoré" : "⚠️ En attente" }}
-              </UiBadge>
-            </span>
-          </div>
-          <div class="mt-1.5 rounded-md bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
-            <template v-if="itemInfo(it).fields.length">
-              <div v-for="(f, i) in itemInfo(it).fields" :key="i">
-                {{ f.name }} :
-                <b class="text-slate-800">{{ f.answer || "—" }}</b>
-              </div>
-            </template>
-            <template v-else>
-              <div>
-                🪪 Licence saisie :
-                <b class="text-slate-800">{{ it.licence_saisie || "— non renseignée —" }}</b>
-              </div>
-              <div>
-                🏆 Compétition saisie :
-                <b class="text-slate-800">{{ it.competition_saisie || "— non renseignée —" }}</b>
-              </div>
-            </template>
-            <div v-if="it.commentaire" class="mt-0.5 italic">💬 {{ it.commentaire }}</div>
-          </div>
-          <div class="mt-1.5 flex items-center justify-between gap-2 text-xs">
-            <span class="min-w-0">
-              <template v-if="isLinked(it)">
-                <b>Épreuve :</b>
-                <RouterLink
-                  v-if="compName.has(it.competition_id!)"
-                  :to="{ path: listPath, query: { id: String(it.competition_id) } }"
-                  data-testid="ha-linked-competition"
-                  class="text-accent no-underline hover:underline"
-                >
-                  {{ compName.get(it.competition_id!) }}
-                </RouterLink>
-                <template v-else>#{{ it.competition_id }}</template>
-                ·
-                <b>Athlète :</b>
-                {{ memberName.get(it.adherent_id!) ?? `#${it.adherent_id}` }}
-                <span class="text-slate-500">({{ it.source || "auto" }})</span>
-              </template>
-              <span v-else-if="isIgnored(it)" class="text-slate-500">
-                🚫 Ignoré
-                <template v-if="it.ignored_by">par {{ it.ignored_by }}</template>
-                <template v-if="it.ignore_motif">· {{ it.ignore_motif }}</template>
-              </span>
-              <span v-else class="font-semibold text-red-600">⚠️ À attribuer à une compétition et un athlète</span>
-            </span>
-            <UiButton :variant="isLinked(it) || isIgnored(it) ? 'muted' : 'primary'" small data-testid="ha-open" @click="open = it">
-              {{ isLinked(it) ? "🔗 Modifier" : isIgnored(it) ? "🔍 Détails" : "🔗 Rattacher" }}
-            </UiButton>
-          </div>
-        </li>
-        <li v-if="items && !shown.length" class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500">
-          Aucun paiement HelloAsso {{ filter === "unlinked" ? "en attente de rattachement" : filter === "ignored" ? "ignoré" : "trouvé" }}.
-        </li>
-      </ul>
-    </template>
 
     <UiDialog v-model:open="dialogOpen" :title="dialogTitle" wide data-testid="attach-dialog">
       <AttachForm

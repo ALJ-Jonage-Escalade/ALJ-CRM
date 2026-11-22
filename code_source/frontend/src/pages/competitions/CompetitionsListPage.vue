@@ -6,7 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
 import { dialogs } from "../../composables/dialogs";
-import { useMediaQuery, WIDE_LAYOUT_QUERY } from "../../composables/media";
+import { useWideLayout } from "../../composables/media";
 import { CLIENT_KEY, type Schemas } from "../../lib/client";
 import { plural } from "../../lib/text";
 import { createCompetitionsApi } from "../../services/competitions";
@@ -53,7 +53,7 @@ watch(selectedId, (id) => {
 const selected = computed(() => all.value.find((c) => String(c.id) === selectedId.value));
 /* Side by side (Tailwind's md), the first competition of the list opens by itself instead of an empty detail; not on a
    phone, where the detail would hide the list */
-const sideBySide = useMediaQuery(WIDE_LAYOUT_QUERY);
+const sideBySide = useWideLayout();
 // Phones have no view switcher: back to the cards when the window narrows to a phone layout
 watch(sideBySide, (wide) => {
   if (!wide) {

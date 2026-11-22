@@ -8,7 +8,6 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from helpers.auth import login_as
 from helpers.data import unique_name
 from helpers.members import ROWS, displayed_count, find, open_members, open_record, record_dialog
 from helpers.dialogs import accept_dialogs
@@ -151,18 +150,6 @@ def test_nothing_stored_on_the_device(page, people):
     # of the directory and the competitions page only knows its owner here (to be wiped for another account)
     assert people[0]["nom"].lower() not in (stored["local"] + stored["session"]).lower()
     assert resource_names(page) == []
-
-
-def test_phone_shows_stacked_cards(mobile_page, people):
-    page = mobile_page
-    page.goto("/bureau/adherents")
-    login_as(page, "admin")
-    card = page.get_by_test_id("data-card").first
-    expect(card).to_be_visible(timeout=20_000)
-    expect(page.get_by_test_id("data-table")).to_be_hidden()
-    page.get_by_test_id("member-search").fill(people[0]["nom"])
-    expect(page.get_by_test_id("data-card").filter(has_text=people[0]["prenom"])).to_be_visible()
-    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "no horizontal scroll"
 
 
 def test_record_opens_from_the_list(page, people):

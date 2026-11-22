@@ -1,5 +1,6 @@
 <script setup lang="ts">
-/* Table view of the slots: columns on a wide screen, one card per slot on a phone, with edit and delete buttons. */
+/* Table view of the slots, one row per slot with edit and delete buttons (a computer page: phones list the competitions
+   only). */
 import UiBadge from "../../components/ui/UiBadge.vue";
 import type { BadgeColor } from "../../components/ui/palette";
 import { slotKind, type Kind, type Slot } from "./slots";
@@ -15,12 +16,12 @@ const KIND_COLOR: Record<Kind, BadgeColor> = {
   autonome: "slate",
 };
 
-const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_76px_minmax(0,1fr)_minmax(0,1.3fr)_40px_84px] md:items-start md:gap-3";
+const COLUMNS = "grid grid-cols-[120px_minmax(0,1.3fr)_110px_76px_minmax(0,1fr)_minmax(0,1.3fr)_40px_84px] items-start gap-3";
 </script>
 
 <template>
   <div class="rounded-xl border border-slate-200 bg-white text-[12.5px] shadow-sm">
-    <div :class="['hidden border-b border-slate-200 bg-slate-50 px-3 py-2 font-bold', COLUMNS]" aria-hidden="true">
+    <div :class="['border-b border-slate-200 bg-slate-50 px-3 py-2 font-bold', COLUMNS]" aria-hidden="true">
       <span>Jour & horaires</span>
       <span>Groupe & catégorie</span>
       <span>Type</span>
@@ -35,7 +36,7 @@ const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_76px_minmax(0
         v-for="slot in slots"
         :key="slot.id"
         data-testid="slot-row"
-        :class="['flex flex-col gap-1.5 border-b border-slate-100 px-3 py-2.5 last:border-b-0', COLUMNS]"
+        :class="['border-b border-slate-100 px-3 py-2.5 last:border-b-0', COLUMNS]"
       >
         <div class="font-semibold">
           <div>{{ slot.jour || "—" }}</div>
@@ -51,15 +52,14 @@ const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_76px_minmax(0
         <div>
           <UiBadge :color="KIND_COLOR[slotKind(slot)]" variant="soft">{{ slot.type || "cours" }}</UiBadge>
         </div>
-        <div data-testid="slot-seance-autonome-cell" class="md:text-center">
+        <div data-testid="slot-seance-autonome-cell" class="text-center">
           <span v-if="slot.seance_autonome" title="Sur la fiche de présence autonome">
             ✅
-            <span class="text-xs md:sr-only">Séance autonome</span>
+            <span class="sr-only">Séance autonome</span>
           </span>
-          <span v-else class="hidden text-[11px] text-slate-500 md:inline">—</span>
+          <span v-else class="text-[11px] text-slate-500">—</span>
         </div>
         <div class="text-xs">
-          <span class="text-slate-500 md:hidden">👤</span>
           {{ slot.encadrants.join(", ") || "—" }}
         </div>
         <div class="flex flex-wrap gap-1">
@@ -68,7 +68,7 @@ const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_76px_minmax(0
           </span>
           <span v-if="!slot.helloasso_tarifs.length" class="text-slate-500">Aucun tarif lié</span>
         </div>
-        <div class="md:text-center">
+        <div class="text-center">
           <a
             v-if="slot.whatsapp_link"
             :href="slot.whatsapp_link"
@@ -78,11 +78,11 @@ const COLUMNS = "md:grid md:grid-cols-[120px_minmax(0,1.3fr)_110px_76px_minmax(0
             class="no-underline"
           >
             🟢
-            <span class="md:sr-only">Groupe WhatsApp</span>
+            <span class="sr-only">Groupe WhatsApp</span>
           </a>
-          <span v-else class="hidden text-[11px] text-slate-500 md:inline">—</span>
+          <span v-else class="text-[11px] text-slate-500">—</span>
         </div>
-        <div class="flex gap-1.5 md:justify-center">
+        <div class="flex justify-center gap-1.5">
           <button
             type="button"
             data-testid="slot-edit"

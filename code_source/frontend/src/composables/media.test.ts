@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { effectScope } from "vue";
-import { useMediaQuery } from "./media";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { useMediaQuery, WIDE_LAYOUT_QUERY } from "./media";
 
 /** A MediaQueryList whose matching the test changes. */
 function fakeMediaList(initial: boolean) {
@@ -38,4 +41,10 @@ describe("useMediaQuery", () => {
     media.change(true);
     expect(wide.value).toBe(false);
   });
+});
+
+it("uses the same phone/computer breakpoint as Tailwind's md in styles.css", () => {
+  // Read from the disk: the tests do not load CSS (an import gives an empty text)
+  const stylesCss = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../styles.css"), "utf8");
+  expect(stylesCss).toContain(`@custom-variant md (@media ${WIDE_LAYOUT_QUERY});`);
 });
