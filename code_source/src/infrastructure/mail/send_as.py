@@ -9,16 +9,10 @@ from __future__ import annotations
 import requests
 
 from infrastructure.google.drive import GoogleDriveClient
-from infrastructure.mail.sender import MailError
+from infrastructure.mail.sender import MailError, uses_gmail
 from infrastructure.security.secret_store import SecretStore
 
 SEND_AS_TIMEOUT_SECONDS = 10
-
-
-def uses_gmail() -> bool:
-    """The Gmail API sends when the club's OAuth account is configured; SMTP otherwise."""
-    return bool(SecretStore.get_secret("GMAIL_USER_EMAIL") and SecretStore.get_secret("GMAIL_CLIENT_ID")
-                and SecretStore.get_secret("GMAIL_REFRESH_TOKEN"))
 
 
 def sending_account() -> str:
