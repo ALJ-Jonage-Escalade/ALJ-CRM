@@ -132,6 +132,6 @@ on templates: what the sender list means and why a send is refused.
 
 ### Acceptance criteria
 
-- [ ] No reference to `GMAIL_SENDER_EMAIL` left in the docs
-- [ ] The guide explains how to add an alias and how it shows up in the CRM
-- [ ] `dev/README.md` mentions `SMTP_SENDER_ALIASES` for testing senders in Mailpit
+- [x] No reference to `GMAIL_SENDER_EMAIL` left in the docs
+- [x] The guide explains how to add an alias and how it shows up in the CRM
+- [x] `dev/README.md` mentions `SMTP_SENDER_ALIASES` for testing senders in Mailpit

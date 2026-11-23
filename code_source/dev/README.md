@@ -45,6 +45,10 @@ jamais ajouté en mode dev.
 - **E-mails** : l'application envoie par son SMTP habituel, dirigé par `dev.env` vers **Mailpit**, qui les garde
   sans jamais les relayer. Lecture (HTML, pièces jointes PDF) : http://localhost:8025, ou
   `docker compose -f dev/docker-compose.yml logs -f mailpit`. Messages perdus au redémarrage du conteneur.
+- **Expéditeurs** : le compte d'envoi est `SMTP_FROM_EMAIL` ; `SMTP_SENDER_ALIASES` (dans `dev.env`) joue le rôle des
+  alias Gmail « Envoyer des e-mails en tant que » de la production. Un modèle ou un e-mail libre ne peut partir que de
+  l'une de ces adresses (sinon : refusé) ; Mailpit montre l'adresse choisie dans « From ». Modifier la variable puis
+  relancer le serveur suffit (pas de cache en dev).
 - **Garde-fou** : `run_server.sh` lance `check_env.py`, qui lit la configuration effective (y compris les `.env`
   du dépôt, prioritaires sur `dev.env`) et refuse de démarrer si l'API Gmail est active ou si le SMTP n'est pas local.
 - **Persistance** : l'émulateur exporte ses données dans `dev/.emulator-data/` à l'arrêt
