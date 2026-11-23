@@ -3,9 +3,7 @@ import datetime
 import hashlib
 import json
 import re
-from typing import Any, Dict, List, Optional, Tuple
-
-from domain.members.sex import parse_sex
+from typing import Any, List, Optional, Tuple
 
 # Tables synchronisées (les tables legacy `adherents` / `adherents_seasons`,
 # remplacées par le schéma v2, ne sont pas migrées).
@@ -39,17 +37,6 @@ TOMBSTONE_FIELDS = {"emergency_contacts": ("user_id",)}
 
 def collection_for(table: str) -> str:
     return f"{COLLECTION_PREFIX}{table}"
-
-
-def upgrade_legacy_fields(table: str, fields: Dict[str, Any]) -> Dict[str, Any]:
-    """Fields of a document written before a column was renamed, read under the new name.
-
-    users.gender (free text) became users.sex (FFME code, plans/sex-enum.md): documents keep
-    `gender` until scripts/migrate_gender_to_sex.py has run; a value not understood reads as None."""
-    if table == "users" and "sex" not in fields and "gender" in fields:
-        sex = parse_sex(fields["gender"])
-        return {**fields, "sex": sex.value if sex else None}
-    return fields
 
 
 def quote_field_path(name: str) -> str:

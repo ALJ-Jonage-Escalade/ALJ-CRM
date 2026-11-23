@@ -53,19 +53,6 @@ class TestParticipants(ApiTestCase):
         competition_store.invalidate_cache()
         self.assertIsNone(self.listed_participant(3)["sex"])
 
-    def test_sex_of_older_rows_and_directory(self):
-        """Rows written before plans/sex-enum.md hold a copied `gender` (dropped); directory documents not
-        rewritten since hold `gender` (read as a code)."""
-        self.seed_adherent(3, gender="Femme")
-        participants.add_participant(self.comp, 3)
-        doc = documents.load_comp_doc(self.comp)
-        doc["participants"][0]["gender"] = "Homme"
-        self.fake.upsert_document("competitions", doc["_doc_id"], {k: v for k, v in doc.items() if k != "_doc_id"})
-        competition_store.invalidate_cache()
-        participant = self.listed_participant(3)
-        self.assertEqual(participant["sex"], "F")
-        self.assertNotIn("gender", participant)
-
     def reads_during(self, method, url, body=None):
         """(response, competition documents read, coaches collection reads) of one request."""
         member_directory.adherent_map()  # member directory already cached, as on a warm server

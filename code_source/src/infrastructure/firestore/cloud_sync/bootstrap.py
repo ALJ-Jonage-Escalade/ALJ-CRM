@@ -26,7 +26,6 @@ from infrastructure.firestore.cloud_sync.common import (
     collection_for,
     doc_id_for,
     ts_key,
-    upgrade_legacy_fields,
 )
 from infrastructure.sqlite.connection import SqliteDatabase
 
@@ -72,7 +71,7 @@ def build_cache(path: str, store, schema_factory: Callable[[str], None] = create
                         wm = d["modified_at"]
                     if d["deleted"]:
                         continue
-                    fields = upgrade_legacy_fields(t, d["fields"])
+                    fields = d["fields"]
                     remote = {c: fields[c] for c in cols if c in fields}
                     _upsert_row(conn, t, cols, pk, remote)
                     _set_base(conn, t, _pk_string(conn, [remote[c] for c in pk]), remote, d["update_time"])

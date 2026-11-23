@@ -263,9 +263,8 @@ def _adherent_as_legacy_dict(doc: dict[str, Any]) -> dict[str, Any]:
 
 
 def sex_code(doc: dict[str, Any]) -> str | None:
-    """FFME code of a directory document; `gender`: documents written before the rename (plans/sex-enum.md),
-    until the directory is next rewritten."""
-    sex = parse_sex(doc.get("sex") if "sex" in doc else doc.get("gender"))
+    """FFME code of a directory document (None: not given or not understood)."""
+    sex = parse_sex(doc.get("sex"))
     return sex.value if sex else None
 
 

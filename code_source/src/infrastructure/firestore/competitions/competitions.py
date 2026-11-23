@@ -65,13 +65,9 @@ def _member_sexes() -> dict[int, str | None]:
 
 
 def _with_member_sex(doc: dict[str, Any], sexes: dict[int, str | None]) -> dict[str, Any]:
-    """The API document with each participant's `sex` read from its member (the copy older rows hold,
-    `gender`, is dropped). Participant maps are copied: `doc` may share them with a cached document."""
-    participants = []
-    for participant in doc.get("participants") or []:
-        row = {k: v for k, v in participant.items() if k != "gender"}
-        row["sex"] = sexes.get(participant.get("adherent_id"))
-        participants.append(row)
+    """The API document with each participant's `sex` read from its member.
+    Participant maps are copied: `doc` may share them with a cached document."""
+    participants = [{**participant, "sex": sexes.get(participant.get("adherent_id"))} for participant in doc.get("participants") or []]
     return {**doc, "participants": participants}
 
 

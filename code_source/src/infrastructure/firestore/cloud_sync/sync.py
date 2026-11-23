@@ -31,7 +31,6 @@ from infrastructure.firestore.cloud_sync.common import (
     doc_id_for,
     ts_key,
     ts_minus,
-    upgrade_legacy_fields,
 )
 
 def renumber_row(conn, store, table: str, old_id: int, report: Dict[str, Any]) -> int:
@@ -79,7 +78,7 @@ def apply_remote_docs(conn, store, table: str, docs: List[Dict[str, Any]], repor
                     conn.execute("DELETE FROM _fs_changes WHERE tbl = ? AND pk = ?", (table, pk_str))
                     report["pulled"] = report.get("pulled", 0) + 1
                     continue
-                fields = upgrade_legacy_fields(table, d["fields"])
+                fields = d["fields"]
                 remote = {c: fields[c] for c in cols if c in fields}
                 if dirty and base is None and local is not None:
                     # Même ID créé sur deux postes : renuméroter la ligne locale.

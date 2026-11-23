@@ -1,5 +1,4 @@
-"""Reading data written before users.gender became users.sex (plans/sex-enum.md): Firestore documents and
-existing SQLite databases."""
+"""Reading SQLite databases written before users.gender became users.sex (plans/sex-enum.md)."""
 
 from __future__ import annotations
 
@@ -7,23 +6,7 @@ import sqlite3
 
 import pytest
 
-from infrastructure.firestore.cloud_sync.common import upgrade_legacy_fields
 from infrastructure.sqlite.schema_v2 import rename_gender_column, sex_code
-
-
-@pytest.mark.parametrize(("fields", "sex"), [
-    ({"id": 1, "gender": "Femme"}, "F"),
-    ({"id": 1, "gender": "m"}, "H"),
-    ({"id": 1, "gender": "X"}, None),             # not understood: not given (the migration reports it)
-    ({"id": 1, "gender": "Homme", "sex": "F"}, "F"),  # written by the new version since: it wins
-])
-def test_upgrade_legacy_fields_users(fields: dict, sex: str | None) -> None:
-    assert upgrade_legacy_fields("users", fields)["sex"] == sex
-
-
-def test_upgrade_legacy_fields_other_tables_untouched() -> None:
-    assert upgrade_legacy_fields("orders", {"gender": "Femme"}) == {"gender": "Femme"}
-    assert "sex" not in upgrade_legacy_fields("users", {"id": 1})
 
 
 def _old_database(tracked: bool) -> sqlite3.Connection:
