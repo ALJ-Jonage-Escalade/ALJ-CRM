@@ -15,7 +15,7 @@ _src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from domain.email_personalization import apply_template_variables  # noqa: E402
+from domain.email_personalization import apply_template_variables, personalized_html  # noqa: E402
 from infrastructure.mail.sender import sanitize_email_header  # noqa: E402
 from services.communications.email_dispatch import EmailDispatchService, render_email  # noqa: E402
 from support.fake_access import grant_roles  # noqa: E402
@@ -45,9 +45,9 @@ class TestPersonalisedHtml(unittest.TestCase):
     def test_plain_text_keeps_raw_value(self):
         self.assertEqual(self._preview("Hi {first_name}", "R&D")["body_plain"], "Hi R&D")
 
-    def test_escape_option(self):
+    def test_html_part_escapes_values(self):
         member = {"first_name": "<b>x</b>", "last_name": "y"}
-        self.assertEqual(apply_template_variables("{first_name}", member, escape_html=True), "&lt;B&gt;X&lt;/B&gt;")
+        self.assertEqual(personalized_html("{first_name}", member, lambda text: text), "&lt;B&gt;X&lt;/B&gt;")
         self.assertEqual(apply_template_variables("{first_name}", member), "<B>X</B>")
 
 

@@ -16,7 +16,7 @@ from domain.club_emails import CLUB_SENDER_DOMAIN
 from domain.competitions.models import Competition, default_deadline
 from domain.email_log import LoggedRecipient
 from domain.errors import InvalidRequest, UpstreamUnavailable
-from domain.email_personalization import apply_template_variables, template_recipient
+from domain.email_personalization import apply_template_variables, personalized_html, template_recipient
 from domain.utils import format_amount, format_period, normalize_name
 from infrastructure.firestore.competitions import competitions, member_directory
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
@@ -45,8 +45,8 @@ def render_email(subject: str, body: str, recipient: Dict[str, Any], competition
     body_plain = apply_template_variables(body, person, competition, extra_values=extra_values)
     if add_signature:
         body_plain += "\n\n" + build_signature_plain()
-    body_html = apply_template_variables(build_email_html(body, add_signature=add_signature, image_src_mode="cid"),
-                                         person, competition, escape_html=True, extra_values=extra_values)
+    body_html = personalized_html(body, person, lambda text: build_email_html(text, add_signature=add_signature, image_src_mode="cid"),
+                                  competition, extra_values)
     return RenderedEmail(subject=apply_template_variables(subject, person, competition, extra_values=extra_values),
                          body_plain=body_plain, body_html=body_html)
 

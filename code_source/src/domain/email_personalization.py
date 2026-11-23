@@ -3,9 +3,9 @@ taken from the recipient and, for a competition e-mail, from the competition."""
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional, TypedDict
+from typing import Any, Callable, Mapping, Optional, TypedDict
 
-from domain.email_variables import render_template
+from domain.email_variables import render_html, render_template
 from domain.utils import format_amount
 
 
@@ -52,11 +52,15 @@ def template_values(recipient: TemplateRecipient, competition_context: Optional[
 
 def apply_template_variables(text: Optional[str], recipient: TemplateRecipient,
                              competition_context: Optional[Mapping[str, Any]] = None,  # Any: context values, shown as text
-                             escape_html: bool = False, extra_values: Optional[Mapping[str, str]] = None) -> str:
+                             extra_values: Optional[Mapping[str, str]] = None) -> str:
     """The subject or body with its variables filled for this recipient (see template_values); an empty value leaves
-    nothing, and the line of an empty WhatsApp link goes away.
+    nothing, and the line of an empty WhatsApp link goes away."""
+    return render_template(text, template_values(recipient, competition_context, extra_values))
 
-    escape_html=True: values are HTML-escaped, for a template already converted to HTML
-    (member data comes from the public HelloAsso form and must never add markup).
-    """
-    return render_template(text, template_values(recipient, competition_context, extra_values), escape_html=escape_html)
+
+def personalized_html(body: Optional[str], recipient: TemplateRecipient, to_html: Callable[[str], str],
+                      competition_context: Optional[Mapping[str, Any]] = None,  # Any: context values, shown as text
+                      extra_values: Optional[Mapping[str, str]] = None) -> str:
+    """The HTML part of a body for this recipient: to_html builds it from the template, then it is filled with
+    escaped values (member data comes from the public HelloAsso form and must never add markup)."""
+    return render_html(body, template_values(recipient, competition_context, extra_values), to_html)

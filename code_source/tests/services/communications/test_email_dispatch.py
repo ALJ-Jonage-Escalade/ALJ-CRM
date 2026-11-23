@@ -48,6 +48,14 @@ class TestEmailDispatchService(unittest.TestCase):
         self.assertIn("https://chat.whatsapp.com/testgroup", rendered["body_plain"])
         self.assertIn("<div", rendered["body_html"])
 
+    def test_render_drops_the_empty_whatsapp_line_of_the_html_part_only(self):
+        """The line goes away before the body becomes HTML (one line joined by <br>), not the whole body."""
+        recipient = {"first_name": "léo", "last_name": "martin", "email": "leo@example.com"}
+        rendered = render_email("Sujet", "Bonjour {first_name}\n{bloc_whatsapp}\nFin", recipient, {"whatsapp_link": ""},
+                                add_signature=False)
+        self.assertEqual(rendered["body_plain"], "Bonjour Léo\nFin")
+        self.assertIn(">Bonjour Léo<br>Fin</div>", rendered["body_html"])
+
     def test_get_competition_context_includes_whatsapp_link(self):
         fake_doc = {
             "id": 12, "nom": "Coupe Bugey", "id_ffme": "12345", "prix": 15.0,

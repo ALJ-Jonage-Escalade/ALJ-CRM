@@ -97,37 +97,48 @@ def find_variable(name: str) -> Optional[TemplateVariable]:
     return _BY_NAME.get(_fold(name))
 
 
-def render_template(text: Optional[str], values: Mapping[str, str], escape_html: bool = False) -> str:
-    """The text with each known variable replaced by its value (an empty string when missing); unknown tokens are
-    left as written. escape_html=True: values are HTML-escaped (their line breaks become <br>), for a body already
-    converted to HTML: member data comes from the public HelloAsso form and must never add markup."""
-    if not text:
-        return ""
+def _value(variable: TemplateVariable, values: Mapping[str, str]) -> str:
+    return str(values.get(variable.key) or "").strip()
 
-    def value(variable: TemplateVariable) -> str:
-        return str(values.get(variable.key) or "").strip()
 
+def drop_empty_lines(text: str, values: Mapping[str, str]) -> str:
+    """The text, its former spellings expanded, without the lines showing a variable that removes its line when
+    empty (the WhatsApp link); the blank lines left are merged."""
     def is_dropped(line: str) -> bool:
-        """A line showing a variable that removes its line when empty (the WhatsApp link)."""
         for match in TOKEN.finditer(line):
             variable = find_variable(match.group(1))
-            if variable is not None and variable.removes_line_when_empty and not value(variable):
+            if variable is not None and variable.removes_line_when_empty and not _value(variable, values):
                 return True
         return False
+
+    lines = re.split(r"(?<=\n)", expand_aliases(text))
+    kept_lines = [line for line in lines if not is_dropped(line)]
+    kept = "".join(kept_lines)
+    return re.sub(r"\n{3,}", "\n\n", kept) if len(kept_lines) != len(lines) else kept
+
+
+def render_template(text: Optional[str], values: Mapping[str, str], escape_html: bool = False) -> str:
+    """The text with each known variable replaced by its value (an empty string when missing), the line of an empty
+    WhatsApp link removed; unknown tokens are left as written. escape_html=True: values are HTML-escaped (their line
+    breaks become <br>), for a text already HTML: member data comes from the public HelloAsso form and must never add
+    markup. A body to convert to HTML goes through render_html, which removes the lines before."""
+    if not text:
+        return ""
 
     def value_of(match: re.Match[str]) -> str:
         variable = find_variable(match.group(1))
         if variable is None:
             return match.group(0)
-        filled = value(variable)
+        filled = _value(variable, values)
         return html.escape(filled).replace("\n", "<br>\n") if escape_html else filled
 
-    lines = re.split(r"(?<=\n)", expand_aliases(str(text)))
-    kept_lines = [line for line in lines if not is_dropped(line)]
-    kept = "".join(kept_lines)
-    if len(kept_lines) != len(lines):
-        kept = re.sub(r"\n{3,}", "\n\n", kept)
-    return TOKEN.sub(value_of, kept)
+    return TOKEN.sub(value_of, drop_empty_lines(str(text), values))
+
+
+def render_html(text: Optional[str], values: Mapping[str, str], to_html: Callable[[str], str]) -> str:
+    """The HTML of a body: its empty lines removed while it is still text (to_html joins the lines with <br>), then
+    converted by to_html, then filled with escaped values."""
+    return render_template(to_html(drop_empty_lines(str(text or ""), values)), values, escape_html=True)
 
 
 def _rewrite(text: str, show: Callable[[TemplateVariable], str]) -> str:
