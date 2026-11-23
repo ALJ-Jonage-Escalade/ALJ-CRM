@@ -13,7 +13,7 @@ import logging
 from typing import Any, Dict, List, Optional, TypedDict
 
 from domain.club_emails import CLUB_SENDER_DOMAIN
-from domain.competitions.models import Competition
+from domain.competitions.models import Competition, default_deadline
 from domain.email_log import LoggedRecipient
 from domain.errors import InvalidRequest, UpstreamUnavailable
 from domain.email_personalization import apply_template_variables, template_recipient
@@ -205,11 +205,13 @@ class EmailDispatchService:
         comp = Competition.from_row(doc)
 
         whatsapp_link = str(getattr(comp, "whatsapp_link", "") or "").strip()
+        deadline = comp.deadline or default_deadline(comp.date_competition)
         return {
             "no_competition": str(comp.id_ffme or ""),
             "name_competition": comp.nom,
             "montant_competition": format_amount(comp.prix),
             "date_competition": format_period(comp.date_competition, comp.date_fin),
+            "competition_deadline": format_period(deadline) if deadline else "",
             "whatsapp_link": whatsapp_link,
         }
 

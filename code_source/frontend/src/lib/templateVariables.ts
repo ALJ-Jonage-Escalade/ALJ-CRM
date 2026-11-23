@@ -24,6 +24,7 @@ const VARIABLES: Record<VariableKey, Omit<TemplateVariable, "key" | "aliases">> 
   name_competition: { label: "Nom de la compétition", kinds: ["competition"], demo: "Championnat Régional Bloc" },
   no_competition: { label: "N° de la compétition", kinds: ["competition"], demo: "2026-RA-0142" },
   date_competition: { label: "Date de la compétition", kinds: ["competition"], demo: "15/11/2026" },
+  competition_deadline: { label: "Date limite d'inscription", kinds: ["competition"], demo: "08/11/2026" },
   montant_competition: { label: "Montant de la compétition", kinds: ["competition"], demo: "15,50" },
   whatsapp_link: { label: "Lien WhatsApp", kinds: ["competition"], demo: "https://chat.whatsapp.com/demo" },
 };

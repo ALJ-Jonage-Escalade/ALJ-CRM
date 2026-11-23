@@ -418,6 +418,7 @@ export function memberVariables(member: Member): Record<VariableKey, string> {
     name_competition: "",
     no_competition: "",
     date_competition: "",
+    competition_deadline: "",
     montant_competition: "",
     whatsapp_link: "",
   };

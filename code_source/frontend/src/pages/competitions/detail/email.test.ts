@@ -38,6 +38,8 @@ describe("competition e-mail", () => {
       "Léo MARTIN : Coupe n°EVT-9 du 14/03/2027 au 15/03/2027, 15,50 €. Voici le lien du groupe WhatsApp dédié à cette compétition : https://chat {inconnu}",
     );
     expect(variables({ ...COMP, date_fin: "2027-03-14" }, undefined).date_competition).toBe("14/03/2027");
+    expect(variables(COMP, undefined).competition_deadline).toBe("07/03/2027");
+    expect(variables({ ...COMP, deadline: "2027-03-05" }, undefined).competition_deadline).toBe("05/03/2027");
   });
 
   it("offers the club's competition template first", () => {

@@ -59,6 +59,13 @@ class TestEmailDispatchService(unittest.TestCase):
             self.assertEqual(ctx["whatsapp_link"], "https://chat.whatsapp.com/abc")
             self.assertEqual(ctx["name_competition"], "Coupe Bugey")
 
+    def test_get_competition_context_gives_the_registration_deadline(self):
+        doc = {"id": 12, "nom": "Coupe Bugey", "date_competition": "2026-10-03"}
+        for deadline, expected in (("", "26/09/2026"), ("2026-09-20", "20/09/2026")):
+            with self.subTest(deadline=deadline), \
+                    patch("services.communications.email_dispatch.competitions.get_competition_doc", return_value={**doc, "deadline": deadline}):
+                self.assertEqual(EmailDispatchService.get_competition_context(12)["competition_deadline"], expected)
+
     @patch("infrastructure.mail.sender.EmailSender.send_email")
     def test_dispatch_emails_success(self, mock_send):
         mock_send.return_value = True

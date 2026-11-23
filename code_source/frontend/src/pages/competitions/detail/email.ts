@@ -5,7 +5,7 @@ import type { Schemas } from "../../../lib/client";
 import { looksLikeEmail } from "../../../lib/email";
 import { formatDayText } from "../../../lib/format";
 import { amountText, firstNameText, lastNameText, type VariableKey } from "../../../lib/templateVariables";
-import type { Competition, Row } from "../competitions";
+import { deadlineOf, type Competition, type Row } from "../competitions";
 
 export type Audience = "selected" | "unpaid" | "all";
 
@@ -49,6 +49,7 @@ export function variables(competition: Competition, row: Row | undefined): Recor
     name_competition: competition.nom ?? "",
     no_competition: competition.id_ffme ?? "",
     date_competition: !end || end === start || !start ? start : `${start} au ${end}`,
+    competition_deadline: formatDayText(deadlineOf(competition)),
     montant_competition: amountText(competition.prix),
     whatsapp_link: (competition.whatsapp_link ?? "").trim(),
   };

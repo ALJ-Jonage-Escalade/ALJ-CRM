@@ -44,7 +44,8 @@ def template_values(recipient: TemplateRecipient, competition_context: Optional[
         "season": str(recipient.get("season_name") or ""),
         "amount": format_amount(recipient.get("amount")),
     }
-    for key in ("name_competition", "no_competition", "date_competition", "montant_competition", "whatsapp_link"):
+    for key in ("name_competition", "no_competition", "date_competition", "competition_deadline", "montant_competition",
+                "whatsapp_link"):
         values[key] = str(context.get(key) or "")
     return {**values, **(extra_values or {})}
 

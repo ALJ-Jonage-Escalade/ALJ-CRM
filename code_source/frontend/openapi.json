@@ -7689,6 +7689,7 @@
               "name_competition",
               "no_competition",
               "date_competition",
+              "competition_deadline",
               "montant_competition",
               "whatsapp_link"
             ],

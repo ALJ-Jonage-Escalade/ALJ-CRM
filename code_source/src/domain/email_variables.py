@@ -21,7 +21,7 @@ TEMPLATE_KINDS: tuple[TemplateKind, ...] = ("adherent", "attestation", "competit
 
 VariableKey = Literal[
     "first_name", "last_name", "num_licence", "tarif", "season", "amount", "problemes",
-    "name_competition", "no_competition", "date_competition", "montant_competition", "whatsapp_link",
+    "name_competition", "no_competition", "date_competition", "competition_deadline", "montant_competition", "whatsapp_link",
 ]
 
 ALL_KINDS: tuple[TemplateKind, ...] = TEMPLATE_KINDS
@@ -47,6 +47,7 @@ VARIABLES: tuple[TemplateVariable, ...] = (
     TemplateVariable("name_competition", "Nom de la compétition", ("competition",), "Championnat Régional Bloc"),
     TemplateVariable("no_competition", "N° de la compétition", ("competition",), "2026-RA-0142"),
     TemplateVariable("date_competition", "Date de la compétition", ("competition",), "15/11/2026"),
+    TemplateVariable("competition_deadline", "Date limite d'inscription", ("competition",), "08/11/2026"),
     TemplateVariable("montant_competition", "Montant de la compétition", ("competition",), "15,50"),
     TemplateVariable("whatsapp_link", "Lien WhatsApp", ("competition",), "https://chat.whatsapp.com/demo",
                      removes_line_when_empty=True),

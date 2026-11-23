@@ -2879,7 +2879,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "first_name" | "last_name" | "num_licence" | "tarif" | "season" | "amount" | "problemes" | "name_competition" | "no_competition" | "date_competition" | "montant_competition" | "whatsapp_link";
+            key: "first_name" | "last_name" | "num_licence" | "tarif" | "season" | "amount" | "problemes" | "name_competition" | "no_competition" | "date_competition" | "competition_deadline" | "montant_competition" | "whatsapp_link";
             /** Label */
             label: string;
             /** Kinds */

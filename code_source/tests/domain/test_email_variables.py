@@ -107,4 +107,5 @@ def test_needs_fixing_flags_invalid_former_or_non_canonical_tokens() -> None:
     assert needs_fixing("Bonjour {first_name}", "{bloc_whatsapp}", "competition")
     assert needs_fixing("Bonjour {Prénom}", "", "adherent")
     assert needs_fixing("Bonjour", "{name_competition}", "adherent")
-    assert needs_fixing("Bonjour", "{competition_deadline}", "competition")
+    assert not needs_fixing("Bonjour", "{competition_deadline}", "competition")
+    assert needs_fixing("Bonjour", "{lieu}", "competition")
