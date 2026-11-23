@@ -34,7 +34,8 @@ def get_email_templates() -> EmailTemplates | JSONResponse:
         templates=templates,
         default_sender_email=senders["account"],
         default_sender_name=DEFAULT_SENDER_NAME,
-        sender_suggestions=senders["aliases"],
+        sender_aliases=senders["aliases"],
+        sender_aliases_error=senders["error"],
         club_contact_email=CLUB_CONTACT_EMAIL,
     )
 

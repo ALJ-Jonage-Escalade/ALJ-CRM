@@ -92,11 +92,11 @@ When the list is partial, the editor shows `sender_aliases_error`.
 
 ### Acceptance criteria
 
-- [ ] `GET /api/email-templates` exposes `sender_aliases`, `sender_aliases_error`, `sender_allowed`; OpenAPI / TS schema regenerated
-- [ ] Saving a template with a sender outside the list → 400 with the address in the message; empty sender accepted
-- [ ] The editor offers only the default and the aliases; the placeholder / default label shows the real account address
-- [ ] A template holding `inscription@` while it is not an alias shows the warning in the list and the editor
-- [ ] Gmail unreachable: the editor shows the reason and offers only the default (and the current value, flagged)
+- [x] `GET /api/email-templates` exposes `sender_aliases`, `sender_aliases_error`, `sender_allowed`; OpenAPI / TS schema regenerated
+- [x] Saving a template with a sender outside the list → 400 with the address in the message; empty sender accepted
+- [x] The editor offers only the default and the aliases; the placeholder / default label shows the real account address
+- [x] A template holding `inscription@` while it is not an alias shows the warning in the list and the editor
+- [x] Gmail unreachable: the editor shows the reason and offers only the default (and the current value, flagged)
 
 ---
 

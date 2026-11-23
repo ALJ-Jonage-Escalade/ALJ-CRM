@@ -7507,6 +7507,11 @@
             "type": "boolean",
             "title": "Needs Fixing",
             "default": false
+          },
+          "sender_allowed": {
+            "type": "boolean",
+            "title": "Sender Allowed",
+            "default": true
           }
         },
         "type": "object",
@@ -7519,7 +7524,7 @@
           "kind"
         ],
         "title": "EmailTemplate",
-        "description": "subject and body: the variables written with their keys ({first_name}). kind: inferred from the name for a\ntemplate saved before kinds existed. needs_fixing: it holds a variable it may not use, or a former spelling."
+        "description": "subject and body: the variables written with their keys ({first_name}). kind: inferred from the name for a\ntemplate saved before kinds existed. needs_fixing: it holds a variable it may not use, or a former spelling.\nsender_email: empty for the sending account. sender_allowed: false when it is no longer the account nor one of its\naliases (its sends are refused until it is changed)."
       },
       "EmailTemplateDeleted": {
         "properties": {
@@ -7650,12 +7655,17 @@
             "type": "string",
             "title": "Default Sender Name"
           },
-          "sender_suggestions": {
+          "sender_aliases": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Sender Suggestions"
+            "title": "Sender Aliases"
+          },
+          "sender_aliases_error": {
+            "type": "string",
+            "title": "Sender Aliases Error",
+            "default": ""
           },
           "club_contact_email": {
             "type": "string",
@@ -7668,11 +7678,11 @@
           "templates",
           "default_sender_email",
           "default_sender_name",
-          "sender_suggestions",
+          "sender_aliases",
           "club_contact_email"
         ],
         "title": "EmailTemplates",
-        "description": "default_sender_*: used by the server when a template's sender is empty. club_contact_email: shown in the e-mail signature."
+        "description": "default_sender_*: used by the server when a template's sender is empty (the address: the sending account).\nsender_aliases: every address an e-mail may leave from, the account first; sender_aliases_error: why the list holds\nonly the account (aliases unreadable), else empty. club_contact_email: shown in the e-mail signature."
       },
       "EmailVariable": {
         "properties": {

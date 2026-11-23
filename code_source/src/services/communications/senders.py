@@ -51,16 +51,32 @@ def forget_allowed_senders() -> None:
     _cache.invalidate()
 
 
+def _matching(senders: AllowedSenders, sender_email: str) -> Optional[str]:
+    """The allowed address this sender is (case ignored); the account when empty; None when not allowed."""
+    wanted = sender_email.strip().lower()
+    if not wanted:
+        return senders["account"]
+    return next((address for address in senders["aliases"] if address.lower() == wanted), None)
+
+
+def is_allowed_sender(sender_email: Optional[str], senders: Optional[AllowedSenders] = None) -> bool:
+    """An empty sender (the account), the account or one of its aliases. `senders`: the list already read."""
+    return _matching(senders or allowed_senders(), sender_email or "") is not None
+
+
+def refusal(sender_email: str, senders: Optional[AllowedSenders] = None) -> str:
+    """Why this sender may not be used, and what to do about it."""
+    senders = senders or allowed_senders()
+    hint = f" ({senders['error']})" if senders["error"] else ""
+    return (f"Adresse d'expédition non autorisée : {sender_email.strip()}. Ajoutez-la comme alias « Envoyer des e-mails en "
+            f"tant que » du compte {senders['account']}, ou choisissez une autre adresse{hint}.")
+
+
 def resolve_sender(sender_email: Optional[str]) -> str:
     """The address to send from: the account when empty, else the allowed address it matches.
     Forbidden when it is neither the account nor one of its verified aliases."""
     senders = allowed_senders()
-    wanted = (sender_email or "").strip()
-    if not wanted:
-        return senders["account"]
-    for address in senders["aliases"]:
-        if address.lower() == wanted.lower():
-            return address
-    hint = f" ({senders['error']})" if senders["error"] else ""
-    raise Forbidden(f"Adresse d'expédition non autorisée : {wanted}. Ajoutez-la comme alias « Envoyer des e-mails en "
-                    f"tant que » du compte {senders['account']}, ou choisissez une autre adresse{hint}.", "sender_not_allowed")
+    address = _matching(senders, sender_email or "")
+    if address is None:
+        raise Forbidden(refusal(sender_email or "", senders), "sender_not_allowed")
+    return address

@@ -10,9 +10,16 @@ import TemplateField from "../../components/TemplateField.vue";
 import { KIND_LABELS, type TemplateKind } from "../../lib/templateVariables";
 import { templateError, type Sender } from "./editor";
 
-/** defaultSender: what the server puts when the sender is left empty, shown as placeholder; saved: the template as
-    the server has it (none for a template being created). */
-const props = defineProps<{ saving?: boolean; defaultSender: Sender; senderSuggestions: readonly string[]; saved?: EmailTemplate }>();
+/** defaultSender: the sending account (used when the sender is left empty) and the club's name; senderAliases: every
+    address an e-mail may leave from, the account first; aliasesError: why only the account is listed; saved: the
+    template as the server has it (none for a template being created). */
+const props = defineProps<{
+  saving?: boolean;
+  defaultSender: Sender;
+  senderAliases: readonly string[];
+  aliasesError?: string;
+  saved?: EmailTemplate;
+}>();
 const emit = defineEmits<{ save: []; invalid: [message: string] }>();
 /** The template being edited, its variables written with their labels. */
 const draft = defineModel<EmailTemplate>({ required: true });
@@ -29,6 +36,18 @@ watch(
     }
   },
 );
+
+const sameAddress = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase();
+/** The sender may be used: empty (the account), the account or one of its aliases. */
+const senderAllowed = computed(
+  () => !draft.value.sender_email.trim() || props.senderAliases.some((a) => sameAddress(a, draft.value.sender_email)),
+);
+/** The addresses offered after the default: the aliases, and the saved sender when it is not one of them (flagged). */
+const senderChoices = computed(() => {
+  const aliases = props.senderAliases.filter((address) => !sameAddress(address, props.defaultSender.sender_email));
+  const current = draft.value.sender_email;
+  return current && !aliases.some((address) => address === current) ? [...aliases, current] : aliases;
+});
 
 function submit(): void {
   const error = templateError(draft.value);
@@ -82,18 +101,17 @@ const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
       <div class="grid gap-3 sm:grid-cols-[1.2fr_1fr]">
         <div>
           <label for="sender-email" :class="LABEL">Expéditeur (De) *</label>
-          <input
-            id="sender-email"
-            v-model="draft.sender_email"
-            type="email"
-            list="sender-suggestions"
-            data-testid="sender-email"
-            :placeholder="defaultSender.sender_email"
-            :class="INPUT"
-          />
-          <datalist id="sender-suggestions" data-testid="sender-suggestions">
-            <option v-for="address in senderSuggestions" :key="address" :value="address" />
-          </datalist>
+          <select id="sender-email" v-model="draft.sender_email" data-testid="sender-email" :class="INPUT">
+            <option value="">Par défaut ({{ defaultSender.sender_email }})</option>
+            <option v-for="address in senderChoices" :key="address" :value="address">{{ address }}</option>
+          </select>
+          <p v-if="!senderAllowed" data-testid="sender-not-allowed" class="mt-0.5 text-xs font-semibold text-amber-700">
+            ⚠️ Cette adresse n'est pas un alias d'envoi du compte {{ defaultSender.sender_email }} : les envois de ce modèle sont refusés.
+            Choisissez-en une autre, ou ajoutez-la comme alias dans Gmail.
+          </p>
+          <p v-if="aliasesError" data-testid="sender-aliases-error" class="mt-0.5 text-xs text-amber-700">
+            Seul le compte d'envoi est proposé : {{ aliasesError }}
+          </p>
         </div>
         <div>
           <label for="sender-name" :class="LABEL">Nom d'affichage</label>

@@ -10,9 +10,20 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security.api_auth import Role
 from server import app
+from services.communications.senders import forget_allowed_senders
+
+
+# The sending account and its aliases (SMTP mode): the only senders a template may hold
+SENDING_ACCOUNT = {"SMTP_USER": "dev", "SMTP_FROM_EMAIL": "office@hogwarts.example",
+                   "SMTP_SENDER_ALIASES": "minerva@hogwarts.example,test@alj-escalade.fr"}
 
 
 class TestTemplateRoutes(unittest.TestCase):
+    def setUp(self):
+        account = patch.dict(os.environ, SENDING_ACCOUNT)
+        account.start()
+        self.addCleanup(account.stop)
+
     def _temp_database(self, name):
         """SqliteDatabase on an empty database for the test."""
         from infrastructure.sqlite.connection import SqliteDatabase
@@ -41,7 +52,8 @@ class TestTemplateRoutes(unittest.TestCase):
         }
         res_save = client.post("/api/email-templates", json=payload).json()
         self.assertEqual(res_save["status"], "success")
-        self.assertEqual(res_save["template"], {**payload, "kind": "adherent", "is_default": False, "needs_fixing": False})
+        self.assertEqual(res_save["template"], {**payload, "kind": "adherent", "is_default": False, "needs_fixing": False,
+                                                       "sender_allowed": True})
         self.assertIn("Test Nouveau Modèle", names())
 
         # 2. Renommage du modèle (old_name -> name)
@@ -82,15 +94,31 @@ class TestTemplateRoutes(unittest.TestCase):
         # An empty sender stays empty: the e-mails leave from the sending account
         saved = client.post("/api/email-templates", json={**base, "name": "Défaut"}).json()["template"]
         self.assertEqual(saved["sender_email"], "")
-        with patch.dict(os.environ, {"SMTP_USER": "dev", "SMTP_FROM_EMAIL": "office@hogwarts.example",
-                                     "SMTP_SENDER_ALIASES": "minerva@hogwarts.example"}):
-            listed = client.get("/api/email-templates").json()
+        listed = client.get("/api/email-templates").json()
         self.assertEqual(listed["templates"][0]["sender_email"], "")
         # The Vue app takes the club's sender settings from this answer instead of its own copy
         self.assertEqual(listed["default_sender_email"], "office@hogwarts.example")
         self.assertEqual(listed["default_sender_name"], "Amicale Laïque Jonage - Inscriptions")
-        self.assertEqual(listed["sender_suggestions"], ["office@hogwarts.example", "minerva@hogwarts.example"])
+        self.assertEqual(listed["sender_aliases"], ["office@hogwarts.example", "minerva@hogwarts.example", "test@alj-escalade.fr"])
+        self.assertEqual(listed["sender_aliases_error"], "")
         self.assertEqual(listed["club_contact_email"], "contact@alj-escalade.fr")
+
+    def test_a_sender_that_is_not_an_alias_is_refused_on_save_and_flagged_when_already_saved(self):
+        self._temp_database("test_tpl_aliases.db")
+        client = TestClient(app)
+        base = {"name": "Relance", "subject": "Sujet", "body": "Corps"}
+
+        refused = client.post("/api/email-templates", json={**base, "sender_email": "inscription@alj-escalade.fr"})
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("inscription@alj-escalade.fr", refused.json()["message"])
+        self.assertEqual(client.post("/api/email-templates", json={**base, "sender_email": "Minerva@hogwarts.example"}).status_code, 200)
+
+        # Saved before the alias was removed: kept, but flagged
+        forget_allowed_senders()
+        with patch.dict(os.environ, {"SMTP_SENDER_ALIASES": ""}):
+            listed = {t["name"]: t for t in client.get("/api/email-templates").json()["templates"]}
+        self.assertFalse(listed["Relance"]["sender_allowed"])
+        self.assertTrue(listed["Attestation standard"]["sender_allowed"])  # shipped: empty sender, the account
 
     def test_whatsapp_template_endpoints(self):
         """GET et POST /api/whatsapp-template enregistrent et lisent le texte WhatsApp."""

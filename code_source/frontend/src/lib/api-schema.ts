@@ -2757,6 +2757,8 @@ export interface components {
          * EmailTemplate
          * @description subject and body: the variables written with their keys ({first_name}). kind: inferred from the name for a
          *     template saved before kinds existed. needs_fixing: it holds a variable it may not use, or a former spelling.
+         *     sender_email: empty for the sending account. sender_allowed: false when it is no longer the account nor one of its
+         *     aliases (its sends are refused until it is changed).
          */
         EmailTemplate: {
             /** Name */
@@ -2784,6 +2786,11 @@ export interface components {
              * @default false
              */
             needs_fixing?: boolean;
+            /**
+             * Sender Allowed
+             * @default true
+             */
+            sender_allowed?: boolean;
         };
         /** EmailTemplateDeleted */
         EmailTemplateDeleted: {
@@ -2852,7 +2859,9 @@ export interface components {
         };
         /**
          * EmailTemplates
-         * @description default_sender_*: used by the server when a template's sender is empty. club_contact_email: shown in the e-mail signature.
+         * @description default_sender_*: used by the server when a template's sender is empty (the address: the sending account).
+         *     sender_aliases: every address an e-mail may leave from, the account first; sender_aliases_error: why the list holds
+         *     only the account (aliases unreadable), else empty. club_contact_email: shown in the e-mail signature.
          */
         EmailTemplates: {
             /**
@@ -2866,8 +2875,13 @@ export interface components {
             default_sender_email: string;
             /** Default Sender Name */
             default_sender_name: string;
-            /** Sender Suggestions */
-            sender_suggestions: string[];
+            /** Sender Aliases */
+            sender_aliases: string[];
+            /**
+             * Sender Aliases Error
+             * @default
+             */
+            sender_aliases_error?: string;
             /** Club Contact Email */
             club_contact_email: string;
         };
