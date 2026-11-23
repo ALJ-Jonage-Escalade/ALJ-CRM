@@ -30,7 +30,11 @@ const colorOf = (label: string, index: number) => CATEGORY_COLORS[label] ?? CYCL
 const open = ref(false);
 const mode = ref<"count" | "percent">("count");
 
-const slices = computed(() => countBy(props.members, props.dimension));
+/** A pie lists its slices largest first (legend included); a tie keeps the dimension's order. Bars keep their order. */
+const slices = computed(() => {
+  const counted = countBy(props.members, props.dimension);
+  return props.type === "pie" ? [...counted].sort((a, b) => b.count - a.count) : counted;
+});
 const datasets = computed(() => [
   {
     label: "Adhérents",

@@ -80,7 +80,7 @@ describe("OutilsStatsPage, members", () => {
   it("shows the gender of the season's members, and another season without a new request", async () => {
     const { calls, byId, figures } = await render();
 
-    expect(figures("chart-sex")).toEqual(["Femmes: 1", "Hommes: 2"]);
+    expect(figures("chart-sex")).toEqual(["Hommes: 2", "Femmes: 1"]);
 
     const season = byId("stats-season") as HTMLSelectElement;
     season.value = "2025-2026";

@@ -63,13 +63,14 @@ const percentText = (value: number | null) => (value === null ? "—" : `${value
     </p>
     <p v-else-if="loadError" data-testid="member-stats-error" role="alert" class="text-[13px] text-red-700">⚠️ {{ loadError }}</p>
     <template v-else-if="records">
-      <div class="grid gap-3 grid-cols-2 sm:grid-cols-4">
+      <div class="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         <UiCard
           v-for="card in [
             { id: 'members', label: 'Adhérents', value: String(cards.members) },
             { id: 'new', label: 'Nouveaux', value: percentText(cards.newPercent) },
             { id: 'age', label: 'Âge moyen', value: cards.averageAge === null ? '—' : `${cards.averageAge} ans` },
             { id: 'cancelled', label: 'Inscriptions annulées', value: String(cards.cancelled) },
+            { id: 'waiting', label: `Liste d'attente`, value: String(cards.waiting) },
           ]"
           :key="card.id"
           class="text-center"
