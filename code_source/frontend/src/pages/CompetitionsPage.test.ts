@@ -23,7 +23,15 @@ const LEO = {
   commande_helloasso: "CMD-1",
   updated_at: "t1",
 };
-const ZOE = { adherent_id: 2, nom: "DURAND", prenom: "Zoé", selectionne: true, statut_paiement: "en_attente", updated_at: "t2" };
+const ZOE = {
+  adherent_id: 2,
+  nom: "DURAND",
+  prenom: "Zoé",
+  sex: "F" as const,
+  selectionne: true,
+  statut_paiement: "en_attente",
+  updated_at: "t2",
+};
 const MAX = { adherent_id: 3, nom: "ABEL", prenom: "Max", selectionne: false, statut_paiement: "non_invite", updated_at: "t3" };
 const COMPETITIONS: Competition[] = [
   {
@@ -220,11 +228,15 @@ describe("CompetitionsPage", () => {
     const { byId, all } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
     await settle();
     expect([byId("filter-selected").exists(), byId("participant-search").exists()]).toEqual([false, false]);
-    expect(all("filter-group").map((b) => b.text())).toEqual(["Compét. U14 (1)", "Compét. U18 (1)"]);
-    await all("filter-group")[1]!.trigger("click");
+    expect(
+      byId("group-filter")
+        .findAll("option")
+        .map((o) => o.text()),
+    ).toEqual(["📋 Tous (3)", "Compét. U14 - F (1)", "Compét. U18 (1)"]);
+    await byId("group-filter").setValue("Compét. U18");
     expect(all("participant-name").map((n) => n.text())).toEqual(["MARTIN Léo"]);
     expect(byId("participant-count").text()).toBe("1 compétiteur en « Compét. U18 »");
-    await byId("filter-all").trigger("click");
+    await byId("group-filter").setValue("");
     expect(all("participant-name")).toHaveLength(3);
   });
 

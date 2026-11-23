@@ -71,11 +71,18 @@ const wide = useMediaQuery(XL_LAYOUT_QUERY);
 const computerFilters = useWideLayout();
 const filter = ref<ParticipantFilter>("all");
 const shownGroup = ref("");
-const groupChips = computed(() => groupFilters(props.rows));
+const groupOptions = computed(() => groupFilters(props.rows));
 const activeFilter = computed<ParticipantFilter>(() => (computerFilters.value ? filter.value : "all"));
 const activeGroup = computed(() =>
-  !computerFilters.value && groupChips.value.some((g) => g.group === shownGroup.value) ? shownGroup.value : "",
+  !computerFilters.value && groupOptions.value.some((g) => g.group === shownGroup.value) ? shownGroup.value : "",
 );
+/* The select shows activeGroup, not shownGroup: a group gone from the list (competitor removed) shows « Tous » */
+const pickedGroup = computed({
+  get: () => activeGroup.value,
+  set: (group: string) => {
+    shownGroup.value = group;
+  },
+});
 const search = ref("");
 const shown = computed(() => filterRows(props.rows, activeFilter.value, computerFilters.value ? search.value : "", activeGroup.value));
 const groups = computed(() => groupRows(shown.value));
@@ -412,22 +419,10 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
             {{ f.label }} ({{ f.n }})
           </button>
         </template>
-        <template v-else>
-          <button type="button" data-testid="filter-all" :aria-pressed="!activeGroup" :class="chip(!activeGroup)" @click="shownGroup = ''">
-            📋 Tous ({{ kpis.all }})
-          </button>
-          <button
-            v-for="g in groupChips"
-            :key="g.group"
-            type="button"
-            data-testid="filter-group"
-            :aria-pressed="activeGroup === g.group"
-            :class="chip(activeGroup === g.group)"
-            @click="shownGroup = g.group"
-          >
-            {{ g.group }} ({{ g.n }})
-          </button>
-        </template>
+        <select v-else v-model="pickedGroup" data-testid="group-filter" aria-label="Groupe de créneau" :class="[field, 'w-full']">
+          <option value="">📋 Tous ({{ kpis.all }})</option>
+          <option v-for="g in groupOptions" :key="g.group" :value="g.group">{{ g.group }} ({{ g.n }})</option>
+        </select>
         <input
           v-if="!wide && computerFilters"
           v-model="search"
