@@ -88,26 +88,86 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }
 
-/** The text with each known variable replaced by its value (nothing when empty), as the server sends it; the line of
-    an empty WhatsApp link goes away; unknown tokens are kept. `html`: values escaped, their line breaks as <br>. */
-export function renderTemplate(text: string, values: VariableValues, options: { html?: boolean } = {}): string {
-  const valueOf = (key: VariableKey): string => (values[key] ?? "").trim();
+/** The text, its former spellings expanded, without the lines of an empty WhatsApp link (domain/email_variables.drop_empty_lines). */
+function dropEmptyLines(text: string, values: VariableValues): string {
   const isDropped = (line: string): boolean =>
     [...line.matchAll(TOKEN)].some((match) => {
       const key = findVariable(match[1] ?? "");
-      return key !== undefined && REMOVES_LINE_WHEN_EMPTY.includes(key) && !valueOf(key);
+      return key !== undefined && REMOVES_LINE_WHEN_EMPTY.includes(key) && !(values[key] ?? "").trim();
     });
   const lines = expandAliases(text).split(/(?<=\n)/);
   const kept = lines.filter((line) => !isDropped(line));
-  const joined = kept.length === lines.length ? kept.join("") : kept.join("").replace(/\n{3,}/g, "\n\n");
-  return joined.replace(TOKEN, (whole, name: string) => {
+  return kept.length === lines.length ? kept.join("") : kept.join("").replace(/\n{3,}/g, "\n\n");
+}
+
+/** The text with each known variable replaced by its value (nothing when empty), as the server sends it; the line of
+    an empty WhatsApp link goes away; unknown tokens are kept. `html`: values escaped, their line breaks as <br>, for a
+    text already HTML (a body to convert goes through renderHtml). */
+export function renderTemplate(text: string, values: VariableValues, options: { html?: boolean } = {}): string {
+  return dropEmptyLines(text, values).replace(TOKEN, (whole, name: string) => {
     const key = findVariable(name);
     if (key === undefined) {
       return whole;
     }
-    const value = valueOf(key);
+    const value = (values[key] ?? "").trim();
     return options.html ? escapeHtml(value).replace(/\n/g, "<br>\n") : value;
   });
+}
+
+const LINK_OPEN = '&lt;a href="';
+const LINK_HREF_END = '"&gt;';
+const LINK_CLOSE = "&lt;/a&gt;";
+
+function linkHtml(url: string, linkText: string): string {
+  return /^(https?:\/\/|mailto:)/i.test(url) ? `<a href="${url}" target="_blank" style="color:#2563EB;">${linkText}</a>` : linkText;
+}
+
+/** The escaped <a href="…">…</a> links put back, in one left-to-right scan (infrastructure/mail/html_body._restore_links). */
+function restoreLinks(escaped: string): string {
+  const out: string[] = [];
+  let pos = 0;
+  for (;;) {
+    const start = escaped.indexOf(LINK_OPEN, pos);
+    if (start < 0) {
+      break;
+    }
+    const urlStart = start + LINK_OPEN.length;
+    const urlEnd = escaped.indexOf('"', urlStart);
+    if (urlEnd < 0) {
+      break;
+    }
+    if (!escaped.startsWith(LINK_HREF_END, urlEnd)) {
+      out.push(escaped.slice(pos, urlStart)); // a quote not closing the tag: not a link
+      pos = urlStart;
+      continue;
+    }
+    const textStart = urlEnd + LINK_HREF_END.length;
+    const textEnd = escaped.indexOf(LINK_CLOSE, textStart);
+    if (textEnd < 0) {
+      break;
+    }
+    out.push(escaped.slice(pos, start), linkHtml(escaped.slice(urlStart, urlEnd), escaped.slice(textStart, textEnd)));
+    pos = textEnd + LINK_CLOSE.length;
+  }
+  out.push(escaped.slice(pos));
+  return out.join("");
+}
+
+/** A body typed by users as safe HTML, as the server sends it (infrastructure/mail/html_body.text_to_html): everything
+    escaped, then <b>, <i>, <u>, <br> and the http(s) / mailto links put back, line breaks as <br>. */
+function textToHtml(text: string): string {
+  let escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  for (const tag of ["b", "i", "u"]) {
+    escaped = escaped.replaceAll(`&lt;${tag}&gt;`, `<${tag}>`).replaceAll(`&lt;/${tag}&gt;`, `</${tag}>`);
+  }
+  escaped = escaped.replaceAll("&lt;br&gt;", "<br>").replaceAll("&lt;br /&gt;", "<br>");
+  return restoreLinks(escaped).replace(/\r\n/g, "\n").replace(/\n/g, "<br>");
+}
+
+/** The HTML part of the e-mail for a body (without its frame and signature), as the server sends it
+    (domain/email_variables.render_html): safe to show with v-html, nothing typed or filled adds other markup. */
+export function renderHtml(text: string, values: VariableValues): string {
+  return renderTemplate(textToHtml(dropEmptyLines(text, values)), values, { html: true });
 }
 
 function rewrite(text: string, show: (key: VariableKey) => string): string {

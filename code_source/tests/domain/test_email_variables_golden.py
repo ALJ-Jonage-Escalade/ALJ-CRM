@@ -11,7 +11,8 @@ import pytest
 
 from api.communications.email import get_email_variables
 from domain.email_personalization import template_values
-from domain.email_variables import render_template, template_error, to_keys, to_labels
+from domain.email_variables import render_html, render_template, template_error, to_keys, to_labels
+from infrastructure.mail.html_body import text_to_html
 from paths import CODE_ROOT
 
 GOLDEN_PATH = Path(CODE_ROOT) / "frontend" / "src" / "lib" / "templateVariables.golden.json"
@@ -25,6 +26,12 @@ def test_the_variable_list_is_the_one_the_frontend_copies() -> None:
 @pytest.mark.parametrize("case", GOLDEN["render"], ids=lambda case: case["text"][:30])
 def test_render_cases(case: dict[str, Any]) -> None:  # Any: JSON
     assert render_template(case["text"], case["values"], escape_html=case.get("html", False)) == case["expected"]
+
+
+@pytest.mark.parametrize("case", GOLDEN["html"], ids=lambda case: case["text"][:30])
+def test_html_cases(case: dict[str, Any]) -> None:  # Any: JSON
+    """The HTML part of the e-mail sent (without its frame and signature), as the previews show it."""
+    assert render_html(case["text"], case["values"], text_to_html) == case["expected"]
 
 
 @pytest.mark.parametrize("case", GOLDEN["amounts"], ids=lambda case: str(case["amount"]))

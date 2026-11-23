@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* The e-mail as the demo member would receive it. The body is shown as text: the HTML tags stay visible. */
+/* The e-mail as the demo member would receive it, its body formatted as the HTML part sent (bold, links…). */
 import { PREVIEW_TO, type Preview } from "./editor";
 
 defineProps<{ preview: Preview; signature: boolean }>();
@@ -21,7 +21,8 @@ defineProps<{ preview: Preview; signature: boolean }>();
         <span data-testid="preview-subject" class="font-bold text-club-blue">{{ preview.subject }}</span>
       </div>
     </div>
-    <div data-testid="preview-body" class="leading-relaxed break-words whitespace-pre-wrap">{{ preview.body }}</div>
+    <!-- eslint-disable-next-line vue/no-v-html -- renderHtml escapes everything but the tags the server sends -->
+    <div data-testid="preview-body" class="leading-relaxed break-words" v-html="preview.body" />
     <div
       v-if="signature"
       data-testid="preview-signature"

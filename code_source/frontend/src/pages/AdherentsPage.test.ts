@@ -506,7 +506,7 @@ describe("AdherentsPage", () => {
             {
               name: "Rappel",
               subject: "Rappel {first_name}",
-              body: "Bonjour {first_name}",
+              body: 'Bonjour {first_name}, <b>voir</b> <a href="https://alj.example/fiche">la fiche</a>',
               sender_email: "",
               sender_name: "",
               kind: "adherent",
@@ -530,6 +530,9 @@ describe("AdherentsPage", () => {
     await flushPromises();
     expect(inBody("email-preview")!.textContent).toContain("Sujet : Rappel Léa");
     expect(inBody("email-preview")!.textContent).toContain("club@alj.example");
+    const link = inBody("email-preview")!.querySelector("a");
+    expect([link?.getAttribute("href"), link?.textContent]).toEqual(["https://alj.example/fiche", "la fiche"]);
+    expect(inBody("email-preview")!.querySelector("b")?.textContent).toBe("voir");
     inBody("email-send")!.click();
     await flushPromises();
     expect(writes()[0]).toEqual(expect.objectContaining({ path: "/api/send-email" }));

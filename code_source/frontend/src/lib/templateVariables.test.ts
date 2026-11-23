@@ -5,6 +5,7 @@ import {
   DEMO_VALUES,
   firstNameText,
   lastNameText,
+  renderHtml,
   renderTemplate,
   TEMPLATE_VARIABLES,
   templateError,
@@ -17,6 +18,7 @@ import {
 interface Golden {
   variables: { key: string; label: string; kinds: string[]; demo: string; aliases: string[] }[];
   render: { text: string; values: Record<string, string>; html?: boolean; expected: string }[];
+  html: { text: string; values: Record<string, string>; expected: string }[];
   amounts: { amount: number | null; expected: string }[];
   names: { first_name: string; last_name: string; expected: [string, string] }[];
   convert: { text: string; keys: string; labels: string }[];
@@ -31,6 +33,10 @@ describe("template variables, as the server", () => {
 
   it.each(golden.render)("renders %#", (c) => {
     expect(renderTemplate(c.text, c.values, { html: c.html })).toBe(c.expected);
+  });
+
+  it.each(golden.html)("builds the HTML part %#", (c) => {
+    expect(renderHtml(c.text, c.values)).toBe(c.expected);
   });
 
   it.each(golden.amounts)("formats the amount $amount", (c) => {

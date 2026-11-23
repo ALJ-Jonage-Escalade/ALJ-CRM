@@ -82,13 +82,17 @@ afterEach(() => {
 
 describe("CommunicationsTemplatesPage", () => {
   it("opens the instalment reminder, with its preview and the WhatsApp text", async () => {
-    const { byId, value } = render();
+    const { wrapper, byId, value } = render();
     await flushPromises();
     expect(value("template-select")).toBe("Rappel echeance");
     expect(value("template-name")).toBe("Rappel echeance");
     expect(value("subject")).toBe("Échéance");
     expect(byId("preview-from")!.textContent).toBe("ALJ <b@alj.example>");
     expect(value("whatsapp")).toBe("Rejoignez le groupe");
+    await wrapper.find('[data-testid="body"]').setValue('Bonjour {Prénom}, <a href="https://alj.example">le site</a>');
+    expect(byId("preview-body")!.innerHTML).toBe(
+      'Bonjour Alex, <a href="https://alj.example" target="_blank" style="color:#2563EB;">le site</a>',
+    );
   });
 
   it("saves a renamed template under its former name, then shows it", async () => {

@@ -11,7 +11,7 @@ import { createCommunicationsApi, type EmailTemplate } from "../../../services/c
 import type { Competition, Row } from "../competitions";
 import { audience, AUDIENCES, defaultTemplate, hasEmail, sendBody, sentMessage, variables, type Audience } from "./email";
 import { plural } from "../../../lib/text";
-import { renderTemplate, templateError, toKeys, toLabels } from "../../../lib/templateVariables";
+import { renderHtml, renderTemplate, templateError, toKeys, toLabels } from "../../../lib/templateVariables";
 import { initialOfKind, templatesOfKind } from "../../../lib/emailTemplates";
 import TemplateField from "../../../components/TemplateField.vue";
 import { dialogs } from "../../../composables/dialogs";
@@ -62,13 +62,14 @@ void (async () => {
   }
 })();
 
+/** The e-mail of the first recipient: its subject as text, its body as the HTML part sent. */
 const preview = computed(() => {
   const first = reachable.value[0];
   if (!first) {
-    return "";
+    return null;
   }
   const values = variables(props.competition, first);
-  return `Sujet : ${renderTemplate(subject.value, values)}\n\n${renderTemplate(body.value, values)}`;
+  return { subject: renderTemplate(subject.value, values), body: renderHtml(body.value, values) };
 });
 
 function take(id: number | null | undefined): void {
@@ -182,10 +183,14 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
     />
     <div v-if="preview">
       <span :class="label">Aperçu pour {{ reachable[0]!.prenom }} {{ reachable[0]!.nom }}</span>
-      <pre
-        class="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-sans text-xs whitespace-pre-wrap"
+      <div
+        class="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs break-words"
         data-testid="email-preview"
-        >{{ preview }}</pre>
+      >
+        <p class="mb-3">Sujet : {{ preview.subject }}</p>
+        <!-- eslint-disable-next-line vue/no-v-html -- renderHtml escapes everything but the tags the server sends -->
+        <div v-html="preview.body" />
+      </div>
     </div>
     <p v-if="problem" role="alert" class="text-[13px] font-semibold text-red-700" data-testid="email-problem">{{ problem }}</p>
     <UiDialogActions>

@@ -9,7 +9,7 @@ import { CLIENT_KEY, errorText } from "../../lib/client";
 import { createCommunicationsApi, type EmailTemplate } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
-import { renderTemplate, templateError, toKeys, toLabels } from "../../lib/templateVariables";
+import { renderHtml, renderTemplate, templateError, toKeys, toLabels } from "../../lib/templateVariables";
 import { initialOfKind, templatesOfKind } from "../../lib/emailTemplates";
 import TemplateField from "../../components/TemplateField.vue";
 import { memberVariables, signatureText } from "./record";
@@ -41,10 +41,8 @@ function useTemplate(): void {
 }
 useTemplate();
 
-const preview = computed(
-  () =>
-    `Sujet : ${renderTemplate(subject.value, values.value)}\n\n${renderTemplate(body.value, values.value)}${signature.value ? `\n\n---\n${signatureText(props.clubContactEmail)}` : ""}`,
-);
+const previewSubject = computed(() => renderTemplate(subject.value, values.value));
+const previewBody = computed(() => renderHtml(body.value, values.value));
 
 async function send(): Promise<void> {
   problem.value = "";
@@ -124,9 +122,12 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
       <div :class="label">👁 Aperçu</div>
       <div
         data-testid="email-preview"
-        class="max-h-40 overflow-y-auto rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-[12.5px] leading-normal whitespace-pre-wrap"
+        class="max-h-40 overflow-y-auto rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-[12.5px] leading-normal break-words"
       >
-        {{ preview }}
+        <p class="mb-3">Sujet : {{ previewSubject }}</p>
+        <!-- eslint-disable-next-line vue/no-v-html -- renderHtml escapes everything but the tags the server sends -->
+        <div v-html="previewBody" />
+        <p v-if="signature" class="mt-3 border-t border-slate-300 pt-2 whitespace-pre-wrap">{{ signatureText(clubContactEmail) }}</p>
       </div>
     </div>
     <p v-if="problem" role="alert" data-testid="email-problem" class="text-xs font-bold text-red-600">{{ problem }}</p>

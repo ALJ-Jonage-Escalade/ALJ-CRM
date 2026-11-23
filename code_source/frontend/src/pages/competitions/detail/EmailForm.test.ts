@@ -78,6 +78,9 @@ describe("competition e-mail form", () => {
     expect(labels).toContain("{Nom de la compétition}");
     expect(labels).not.toContain("{Montant de l'adhésion}");
     expect(wrapper.find('[data-testid="email-preview"]').text()).toContain("Sujet : Coupe");
+    await wrapper.find('[data-testid="email-body"]').setValue('Inscris-toi <a href="https://alj.example/coupe">ici</a>, {Prénom}');
+    const link = wrapper.find('[data-testid="email-preview"] a');
+    expect([link.attributes("href"), link.text()]).toEqual(["https://alj.example/coupe", "ici"]);
 
     await wrapper.find('[data-testid="email-body"]').setValue("Bonjour {Prenon}");
     await wrapper.find("form").trigger("submit");

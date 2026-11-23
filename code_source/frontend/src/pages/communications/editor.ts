@@ -2,7 +2,7 @@
    insertion of variables and HTML tags in the body (texts of the former web/bureau/communications.html). */
 import type { EmailTemplate } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
-import { DEMO_VALUES, renderTemplate, templateError as variablesError, type TemplateKind } from "../../lib/templateVariables";
+import { DEMO_VALUES, renderHtml, renderTemplate, templateError as variablesError, type TemplateKind } from "../../lib/templateVariables";
 
 /** The club's default sender, sent by the server (infrastructure/mail/senders.py). */
 export type Sender = Pick<EmailTemplate, "sender_email" | "sender_name">;
@@ -25,6 +25,7 @@ export const PREVIEW_TO = "Alex MARTIN <alex.martin@example.com>";
 export interface Preview {
   from: string;
   subject: string;
+  /** HTML, as the e-mail's HTML part (renderHtml): safe to show with v-html. */
   body: string;
 }
 
@@ -34,7 +35,7 @@ export function preview(template: EmailTemplate, defaultSender: Sender): Preview
   return {
     from: `${name} <${email}>`,
     subject: renderTemplate(template.subject, DEMO_VALUES) || "(Sans objet)",
-    body: renderTemplate(template.body, DEMO_VALUES) || "(Message vide)",
+    body: renderHtml(template.body, DEMO_VALUES) || "(Message vide)",
   };
 }
 

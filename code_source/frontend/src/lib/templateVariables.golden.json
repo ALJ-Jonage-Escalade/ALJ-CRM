@@ -227,5 +227,66 @@
       "kind": "competition",
       "expected": null
     }
+  ],
+  "html": [
+    {
+      "text": "Texte <b>gras</b>, <i>italique</i> et <u>souligné</u>.\nLigne 2",
+      "values": {},
+      "expected": "Texte <b>gras</b>, <i>italique</i> et <u>souligné</u>.<br>Ligne 2"
+    },
+    {
+      "text": "Bonjour {Prénom}, visitez <a href=\"https://www.alj-escalade.fr\">notre site</a> !",
+      "values": {
+        "first_name": "Alex"
+      },
+      "expected": "Bonjour Alex, visitez <a href=\"https://www.alj-escalade.fr\" target=\"_blank\" style=\"color:#2563EB;\">notre site</a> !"
+    },
+    {
+      "text": "<a href=\"mailto:contact@alj-escalade.fr\">Écrivez-nous</a>",
+      "values": {},
+      "expected": "<a href=\"mailto:contact@alj-escalade.fr\" target=\"_blank\" style=\"color:#2563EB;\">Écrivez-nous</a>"
+    },
+    {
+      "text": "<a href=\"javascript:alert(1)\">Cliquez</a>",
+      "values": {},
+      "expected": "Cliquez"
+    },
+    {
+      "text": "<a href=\"https://a.fr\">A</a> puis <a href=\"https://c.fr\">C",
+      "values": {},
+      "expected": "<a href=\"https://a.fr\" target=\"_blank\" style=\"color:#2563EB;\">A</a> puis &lt;a href=\"https://c.fr\"&gt;C"
+    },
+    {
+      "text": "A & B <script>x</script> \"cités\" l'été<br>C",
+      "values": {},
+      "expected": "A &amp; B &lt;script&gt;x&lt;/script&gt; \"cités\" l'été<br>C"
+    },
+    {
+      "text": "Bonjour {first_name}",
+      "values": {
+        "first_name": "<a href=\"x\">R&D</a> l'été\n2"
+      },
+      "expected": "Bonjour &lt;a href=&quot;x&quot;&gt;R&amp;D&lt;/a&gt; l&#x27;été<br>\n2"
+    },
+    {
+      "text": "Bonjour {Prénom}\n\n{bloc_whatsapp}\n\nFin",
+      "values": {
+        "first_name": "Alex",
+        "whatsapp_link": ""
+      },
+      "expected": "Bonjour Alex<br><br>Fin"
+    },
+    {
+      "text": "Groupe : {Lien WhatsApp}\nFin",
+      "values": {
+        "whatsapp_link": "https://chat.whatsapp.com/demo"
+      },
+      "expected": "Groupe : https://chat.whatsapp.com/demo<br>Fin"
+    },
+    {
+      "text": "Inconnue : {inconnue} {a<b}",
+      "values": {},
+      "expected": "Inconnue : {inconnue} {a&lt;b}"
+    }
   ]
 }
