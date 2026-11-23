@@ -3,6 +3,7 @@
 import { HEX } from "../../../components/ui/palette";
 import type { Schemas } from "../../../lib/client";
 import { isWaiting } from "../../adherents/members";
+import { normKey } from "../../../lib/text";
 
 export type MemberStatsRecord = Schemas["MemberStatsRecord"];
 
@@ -169,6 +170,8 @@ export function breakdown(members: readonly SeasonMember[], dimension: Dimension
 export interface MemberCards {
   members: number;
   newPercent: number | null;
+  /** Members with at least one autonomous group (a tariff naming « autonome »), in percent */
+  autonomousPercent: number | null;
   /** Average of the known ages, one decimal */
   averageAge: number | null;
   /** Purchases cancelled in the season (a member who registered again is still counted) */
@@ -185,6 +188,10 @@ export function memberCards(members: readonly SeasonMember[], records: readonly 
   return {
     members: members.length,
     newPercent: percentOf(members.filter((member) => !member.returning).length, members.length),
+    autonomousPercent: percentOf(
+      members.filter((member) => member.groups.some((group) => normKey(group).includes("autonom"))).length,
+      members.length,
+    ),
     averageAge: ages.length ? Math.round((ages.reduce((sum, age) => sum + age, 0) / ages.length) * 10) / 10 : null,
     cancelled: records.filter((record) => record.season === season && record.status === "Annulé").length,
     waiting: new Set(records.filter((record) => isValidated(record, season) && isWaiting(record.group)).map((record) => record.user_id))
