@@ -58,3 +58,5 @@ node_modules/
 
 # FFME import test file, written by dev/seed/seed_emulator.py
 dev/seed/ffme_licencies_dev.xlsx
+
+.claude/CLAUDE.md
