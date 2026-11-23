@@ -84,7 +84,7 @@ const DIMENSIONS: Record<Dimension, DimensionRule> = {
   season: { values: (member) => [member.season], order: byText },
 };
 
-/** A validated purchase of the season, left out of the members when it is a waiting list (« Liste d'attente… »). */
+/** A validated purchase of the season (waiting lists included: the callers tell them apart with `isWaiting`). */
 const isValidated = (record: MemberStatsRecord, season: string): boolean => record.season === season && record.status === "Validé";
 
 /** The validated members of the season, one per person, their groups merged; waiting lists left out. */
