@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -78,15 +79,17 @@ class TestTemplateRoutes(unittest.TestCase):
         # Saving a template under its own name, or changing the case of it, is fine
         self.assertEqual(client.post("/api/email-templates", json={**base, "old_name": "Relance"}).status_code, 200)
         self.assertEqual(client.post("/api/email-templates", json={**base, "name": "RELANCE", "old_name": "Relance"}).status_code, 200)
-        # An empty sender falls back to the club's address
+        # An empty sender stays empty: the e-mails leave from the sending account
         saved = client.post("/api/email-templates", json={**base, "name": "Défaut"}).json()["template"]
-        self.assertEqual(saved["sender_email"], "inscription@alj-escalade.fr")
-        listed = client.get("/api/email-templates").json()
-        self.assertEqual(listed["templates"][0]["sender_email"], "inscription@alj-escalade.fr")
+        self.assertEqual(saved["sender_email"], "")
+        with patch.dict(os.environ, {"SMTP_USER": "dev", "SMTP_FROM_EMAIL": "office@hogwarts.example",
+                                     "SMTP_SENDER_ALIASES": "minerva@hogwarts.example"}):
+            listed = client.get("/api/email-templates").json()
+        self.assertEqual(listed["templates"][0]["sender_email"], "")
         # The Vue app takes the club's sender settings from this answer instead of its own copy
-        self.assertEqual(listed["default_sender_email"], "inscription@alj-escalade.fr")
+        self.assertEqual(listed["default_sender_email"], "office@hogwarts.example")
         self.assertEqual(listed["default_sender_name"], "Amicale Laïque Jonage - Inscriptions")
-        self.assertIn("contact@alj-escalade.fr", listed["sender_suggestions"])
+        self.assertEqual(listed["sender_suggestions"], ["office@hogwarts.example", "minerva@hogwarts.example"])
         self.assertEqual(listed["club_contact_email"], "contact@alj-escalade.fr")
 
     def test_whatsapp_template_endpoints(self):

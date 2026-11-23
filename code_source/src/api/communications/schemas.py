@@ -148,7 +148,8 @@ class EmailRecipient(RequestBody):
 
 
 class EmailSendRequest(RequestBody):
-    """template_name: a saved template, whose subject, body and sender fill what is left empty here.
+    """template_name: a saved template, whose subject and body fill what is left empty here and whose sender is used;
+    sender_email: the sender of a free-text e-mail (never with a template). Empty: the sending account.
     recipient_ids: members of the cache; recipients: people given by the page (both may be used)."""
     template_name: str = ""
     subject: str = ""

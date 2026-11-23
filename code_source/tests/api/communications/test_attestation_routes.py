@@ -6,7 +6,11 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from domain.errors import Forbidden
 from infrastructure.security.api_auth import Role
+from infrastructure.sqlite.email_templates import EmailTemplateRepository
+
+SMTP_ACCOUNT = {"SMTP_USER": "dev", "SMTP_FROM_EMAIL": "office@hogwarts.example"}
 
 
 class TestAttestationRoutes(unittest.TestCase):
@@ -93,7 +97,8 @@ class TestAttestationRoutes(unittest.TestCase):
             conn.close()
 
             # The member, its amount and payer are read from the database: only the purchase is sent
-            with patch("infrastructure.mail.sender.EmailSender.send_email", return_value=True) as mock_send:
+            with patch("infrastructure.mail.sender.EmailSender.send_email", return_value=True) as mock_send, \
+                    patch.dict(os.environ, SMTP_ACCOUNT):
                 res = send_attestation("2026-2027", 30, "jean.dupont@example.com", "admin@alj.example")
 
             self.assertTrue(res["email_sent_date"])
@@ -104,7 +109,7 @@ class TestAttestationRoutes(unittest.TestCase):
             # Vérifier les paramètres de l'envoi d'e-mail (conforme desktop)
             mock_send.assert_called_once()
             _, kwargs = mock_send.call_args
-            self.assertEqual(kwargs.get("from_email"), "inscription@alj-escalade.fr")
+            self.assertEqual(kwargs.get("from_email"), "office@hogwarts.example")  # the shipped template: the account
             self.assertEqual(kwargs.get("from_name"), "Amicale Laïque Jonage - Inscriptions")
             self.assertIn("Attestation de paiement", kwargs.get("subject", ""))
             self.assertIsNotNone(kwargs.get("html_body"))
@@ -122,6 +127,14 @@ class TestAttestationRoutes(unittest.TestCase):
                 send_attestation("2026-2027", 30, "jean.dupont@example.com", "admin@alj.example",
                                  body="Montant {amount} € ({Tarif}, {season})", add_signature=False)
             self.assertEqual(mock_send.call_args.kwargs["body"], "Montant 180 € (Adulte, 2026-2027)")
+
+            # A template whose sender is not an alias of the account: refused, nothing sent
+            EmailTemplateRepository.save_email_template("Attestation alias", "Attestation", "Bonjour",
+                                                        sender_email="inscription@alj-escalade.fr", kind="attestation")
+            with patch("infrastructure.mail.sender.EmailSender.send_email", return_value=True) as mock_send, \
+                    patch.dict(os.environ, SMTP_ACCOUNT), self.assertRaises(Forbidden):
+                send_attestation("2026-2027", 30, "jean.dupont@example.com", "admin@alj.example", template_name="Attestation alias")
+            mock_send.assert_not_called()
         finally:
             SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)

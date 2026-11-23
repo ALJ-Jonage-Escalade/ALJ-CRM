@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Optional, TypedDict
 
-from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.club_emails import DEFAULT_SENDER_NAME
 from domain.email_variables import TEMPLATE_KINDS, TemplateKind, infer_kind, needs_fixing, template_error, to_keys
 from domain.errors import Conflict, InvalidRequest
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
@@ -53,7 +53,7 @@ def save_template(name: str, subject: str, body: str, sender_email: str = "", se
                   old_name: str = "", kind: Optional[TemplateKind] = None, is_default: Optional[bool] = None) -> SavedTemplate:
     """Creates the template, or updates the one named `old_name` (renamed to `name`). Its variables are stored as keys
     ({Prénom} → {first_name}); an unknown one or one of another kind is refused (InvalidRequest), as a name taken by
-    another template (Conflict). An empty sender falls back to the club's default; no kind, to the one of its name.
+    another template (Conflict). An empty sender is the sending account, an empty name the club's; no kind, to the one of its name.
     is_default: the default of its kind (the previous one loses it in the same write); not given, the template keeps
     its mark unless its kind changes."""
     if not name:
@@ -76,7 +76,7 @@ def save_template(name: str, subject: str, body: str, sender_email: str = "", se
         is_default = bool(current and current.get("is_default") and kind_of(current) == template_kind)
 
     saved = SavedTemplate(name=name, subject=to_keys(subject), body=to_keys(body),
-                          sender_email=sender_email or DEFAULT_SENDER_EMAIL, sender_name=sender_name or DEFAULT_SENDER_NAME,
+                          sender_email=sender_email, sender_name=sender_name or DEFAULT_SENDER_NAME,
                           kind=template_kind, is_default=is_default)
     EmailTemplateRepository.save_email_template(old_name=old_name or None, **saved)
     return saved

@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from infrastructure.firestore.access_store import RoleEntry
 from infrastructure.mail.sender import EmailSender
-from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.club_emails import DEFAULT_SENDER_NAME
 from infrastructure.security.role_directory import normalized_email, parsed
 from services.access.rules import AccessRules
 from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
@@ -100,7 +100,7 @@ def send_invitation(rules: AccessRules, entry: RoleEntry, author: str, page_url:
     try:
         text, html = invitation_email(entry, inviter_name(rules, author), app_link(page_url))
         send(to_email=entry["email"], subject=SUBJECT, body=text, html_body=html,
-             from_email=DEFAULT_SENDER_EMAIL, from_name=DEFAULT_SENDER_NAME)
+             from_name=DEFAULT_SENDER_NAME)  # from the sending account
     except Exception as e:  # mailer down, bad configuration: the invitation stays
         logger.warning("Invitation de %s : e-mail non envoyé", entry["email"], exc_info=True)
         record_send("access_invitation", author, [logged_recipient(entry["email"], entry["display_name"], error=SEND_FAILED)], SUBJECT)

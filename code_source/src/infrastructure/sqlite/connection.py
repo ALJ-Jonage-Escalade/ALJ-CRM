@@ -14,7 +14,7 @@ import sqlite3
 import time
 from typing import Optional
 
-from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.club_emails import DEFAULT_SENDER_NAME
 from infrastructure.sqlite import schema_v2
 from paths import ROOT_DIR, data_root
 
@@ -23,17 +23,17 @@ logger = logging.getLogger("alj")
 _DEFAULT_EMAIL_TEMPLATES = [
     ("Attestation standard", "Attestation de paiement escalade - Amicale Laïque de Jonage",
      "Bonjour {first_name},\n\nNous avons le plaisir de vous transmettre en pièce jointe l'attestation de paiement pour votre adhésion ou celle de votre enfant à la section escalade de l'Amicale Laïque de Jonage pour la saison.\n\nSportivement,\nL'équipe ALJ Escalade",
-     DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME),
+     "", DEFAULT_SENDER_NAME),
     ("Relance inscription", "Rappel : Finalisation de votre inscription ALJ Escalade",
      "Bonjour {first_name},\n\nSauf erreur de notre part, il nous manque encore certains éléments pour finaliser votre dossier d'adhésion pour la saison.\nNous vous invitons à vous connecter sur votre espace licencié pour vérifier le statut de votre certificat médical.\n\nSportivement,\nL'équipe ALJ Escalade",
-     DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME)
+     "", DEFAULT_SENDER_NAME)
 ]
 
 _ATTESTATION_ECHEANCE_TEMPLATE = (
     "Attestation échéance",
     "Attestation de paiement et d'échéance - Amicale Laïque de Jonage",
     "Bonjour {first_name},\n\nNous avons le plaisir de vous transmettre en pièce jointe l'attestation de paiement pour votre adhésion ou celle de votre enfant à la section escalade de l'Amicale Laïque de Jonage.\n\nSportivement,\nL'équipe ALJ Escalade",
-    DEFAULT_SENDER_EMAIL,
+    "",  # empty sender: the sending account
     DEFAULT_SENDER_NAME
 )
 
@@ -42,14 +42,14 @@ _COMPETITION_EMAIL_TEMPLATES = [
         "Compétition - 1er Inscription",
         "[ALJ] Inscription Compétition {name_competition} du {date_competition}",
         "Bonjour,\nComme {first_name} l'a vu avec son entraineur, notre équipe encadrante lui propose de participer à la prochaine compétition d'escalade {name_competition} !\nCette compétition se déroule à la date du : {date_competition}.\nAfin de finaliser et régulariser son inscription, nous vous invitons à effectuer le règlement via notre page HelloAsso.\nVoici la démarche à suivre :\nRendez-vous sur le site HelloAsso <a href=\"https://www.helloasso.com/associations/amicale-laique-de-jonage/evenements/regularisation-inscription-competiteurs-2026-2027\">helloasso.com/</a>\n1- Procédez au règlement d'un montant de {montant_competition} €.\n2- Indiquer le nom de la compétition {name_competition}\n3- Indiquez le numéro de la compétition : {no_competition}\n4- Saisissez le numéro de licence de votre enfant : {num_licence}\n\nVoici le lien du groupe WhatsApp dédié à cette compétition : {whatsapp_link}\n\nMerci de réaliser cette démarche dans les meilleurs délais afin que l'inscription de votre enfant soit validée à temps auprès des organisateurs.\nSi vous rencontrez le moindre problème ou si vous avez des questions, n'hésitez pas à nous contacter en répondant à ce message.\nSportivement,\nL'équipe d'encadrement",
-        DEFAULT_SENDER_EMAIL,
+        "",  # empty sender: the sending account
         DEFAULT_SENDER_NAME
     ),
     (
         "Compétition - relance",
         "[ALJ] Inscription Compétition {name_competition} du {date_competition} [Relance]",
         "Bonjour,\nComme {first_name} l'a vu avec son entraineur, notre équipe encadrante lui propose de participer à la prochaine compétition d'escalade {name_competition} !\nCette compétition se déroule à la date du : {date_competition}.\nAfin de finaliser et régulariser son inscription, nous vous invitons à effectuer le règlement via notre page HelloAsso.\nVoici la démarche à suivre :\nRendez-vous sur le site HelloAsso <a href=\"https://www.helloasso.com/associations/amicale-laique-de-jonage/evenements/regularisation-inscription-competiteurs-2026-2027\">helloasso.com/</a>\n1- Procédez au règlement d'un montant de {montant_competition} €.\n2- Indiquer le nom de la compétition {name_competition}\n3- Indiquez le numéro de la compétition : {no_competition}\n4- Saisissez le numéro de licence de votre enfant : {num_licence}\n\nVoici le lien du groupe WhatsApp dédié à cette compétition : {whatsapp_link}\n\nMerci de réaliser cette démarche dans les meilleurs délais afin que l'inscription de votre enfant soit validée à temps auprès des organisateurs.\nSi vous rencontrez le moindre problème ou si vous avez des questions, n'hésitez pas à nous contacter en répondant à ce message.\n\nSportivement,\nL'équipe d'encadrement",
-        DEFAULT_SENDER_EMAIL,
+        "",  # empty sender: the sending account
         DEFAULT_SENDER_NAME
     )
 ]
@@ -64,7 +64,7 @@ CORRECTION_REQUEST_EMAIL_TEMPLATE = (
     "licences FFME, nous avons relevé des informations qui semblent erronées ou manquantes :\n\n{problemes}\n\nPourriez-vous nous "
     "indiquer les bonnes valeurs en répondant simplement à cet e-mail ? Nous corrigerons le dossier nous-mêmes.\n\nSportivement,\n"
     "L'équipe ALJ Escalade",
-    DEFAULT_SENDER_EMAIL,
+    "",  # empty sender: the sending account
     DEFAULT_SENDER_NAME,
 )
 
@@ -133,8 +133,8 @@ def _ensure_email_templates(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
     # 1: the template a screen opens first for its kind (at most one per kind)
     _add_missing_column(conn, cursor, "email_templates", "is_default", "INTEGER DEFAULT 0")
 
-    # Renseigner l'adresse et le nom d'expédition par défaut sur les modèles qui n'en ont pas encore
-    for column, default in (("sender_email", DEFAULT_SENDER_EMAIL), ("sender_name", DEFAULT_SENDER_NAME)):
+    # The club's display name on the templates without one (an empty sender address stays empty: the sending account)
+    for column, default in (("sender_name", DEFAULT_SENDER_NAME),):
         cursor.execute(f"SELECT COUNT(*) FROM email_templates WHERE {column} IS NULL OR TRIM({column}) = ''")  # noqa: S608 - noms de table/colonne littéraux du code
         if cursor.fetchone()[0] > 0:
             cursor.execute(f"UPDATE email_templates SET {column} = ? WHERE {column} IS NULL OR TRIM({column}) = ''", (default,))  # noqa: S608 - noms de table/colonne littéraux du code

@@ -11,9 +11,11 @@ from support.api_case import ApiTestCase
 from support.helloasso_items import ha_item, ha_refunded_payment
 from support.member_db import MemberDbTestCase
 
+from domain.members.correction_request import CORRECTION_REQUEST_TEMPLATE
 from infrastructure.helloasso.api import HelloAssoApiError
 from infrastructure.security.api_auth import Role, required_role
 from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.email_templates import EmailTemplateRepository
 from services.communications import email_log
 
 CAMPAIGN = "adhesion-escalade-2026-2027-amicale-laique-escalade-2"
@@ -502,6 +504,9 @@ class TestCorrectionRequests(HelloAssoImportTestCase):
         self.send_email = sent.start()
         self.addCleanup(sent.stop)
         self.store = email_log.current_store()  # the in-memory log of tests/conftest.py
+        account = patch.dict(os.environ, {"SMTP_USER": "dev", "SMTP_FROM_EMAIL": "office@hogwarts.example"})
+        account.start()
+        self.addCleanup(account.stop)
 
     def test_the_preview_shows_an_example_email_and_sends_nothing(self) -> None:
         response = self.client.post(f"{REQUESTS}/preview", json={"item_ids": [1, 2]})
@@ -520,11 +525,20 @@ class TestCorrectionRequests(HelloAssoImportTestCase):
         self.assertEqual((response.json()["sent"], response.json()["failed"]), (1, 0))
         [call] = self.send_email.call_args_list
         self.assertEqual((call.kwargs["to_email"], call.kwargs["cc"], call.kwargs["reply_to"]),
-                         ("parent@terrier.example", ["ginny@poudlard.example"], "inscription@alj-escalade.fr"))
+                         ("parent@terrier.example", ["ginny@poudlard.example"], "office@hogwarts.example"))
         self.assertIn("&lt;b&gt;06&lt;/b&gt;", call.kwargs["html_body"])  # a typed value never adds markup
         [logged] = self.store.entries
         self.assertEqual((logged["kind"], logged["helloasso_order_refs"], logged["helloasso_item_ids"]),
                          ("correction_request", ["777"], [1, 2]))
+
+    def test_a_template_sender_that_is_not_an_alias_is_refused(self) -> None:
+        EmailTemplateRepository.save_email_template(CORRECTION_REQUEST_TEMPLATE, "Sujet", "Bonjour {problemes}",
+                                                    sender_email="inscription@alj-escalade.fr")
+
+        response = self.client.post(REQUESTS, json={"item_ids": [1, 2]})
+
+        self.assertEqual((response.status_code, response.json()["code"]), (403, "sender_not_allowed"))
+        self.send_email.assert_not_called()
 
     def test_a_request_without_any_problem_is_refused(self) -> None:
         self.items = [ha_item(3, "LOVEGOOD", "Luna", customFields=[])]

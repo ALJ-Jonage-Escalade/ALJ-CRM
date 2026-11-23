@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.club_emails import DEFAULT_SENDER_NAME
 from infrastructure.sqlite.connection import SqliteDatabase
 
 
@@ -33,7 +33,7 @@ class EmailTemplateRepository:
         Enregistre ou met à jour un template d'email dans la BDD
         (avec son adresse et son nom d'affichage d'expédition, son type : adherent, attestation ou competition).
         Si old_name est fourni et différent de name, le template existant est renommé.
-        Une adresse / un nom vide retombe sur les valeurs par défaut du club.
+        An empty address stays empty (the sending account); an empty name falls back to the club's.
         is_default : le modèle par défaut de son type ; les autres modèles du type perdent ce rôle dans la même écriture.
         A database failure is rolled back and raised.
         """
@@ -41,7 +41,7 @@ class EmailTemplateRepository:
         conn = SqliteDatabase.get_connection()
         cursor = conn.cursor()
         try:
-            values = (subject.strip(), body.strip(), (sender_email or "").strip() or DEFAULT_SENDER_EMAIL,
+            values = (subject.strip(), body.strip(), (sender_email or "").strip(),
                       (sender_name or "").strip() or DEFAULT_SENDER_NAME, kind, int(is_default))
             new_name = name.strip()
             clean_old = (old_name or "").strip()

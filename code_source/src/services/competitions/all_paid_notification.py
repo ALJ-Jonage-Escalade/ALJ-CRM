@@ -10,7 +10,6 @@ import html
 import logging
 from typing import List
 
-from domain.club_emails import DEFAULT_SENDER_EMAIL
 from domain.email_log import SYSTEM_AUTHOR
 from domain.competitions.models import PAIEMENT_PAYE, Competition, Participant
 from infrastructure.firestore.app_settings import AppSettingsRepository
@@ -59,7 +58,6 @@ def check_and_notify_all_paid(competition_id: int) -> bool:
             subject=subject,
             body=build_all_paid_email_text(competition, selected),
             html_body=build_all_paid_email_html(competition, selected),
-            from_email=DEFAULT_SENDER_EMAIL,
             from_name="ALJ Escalade - Compétitions",
         )
     except MailError:  # the payments are recorded; the e-mail is tried again on the next notification

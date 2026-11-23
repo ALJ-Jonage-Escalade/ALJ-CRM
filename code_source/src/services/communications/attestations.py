@@ -7,15 +7,16 @@ import datetime
 import logging
 from typing import Optional, TypedDict
 
-from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_NAME
 from domain.email_personalization import apply_template_variables, personalized_html, template_recipient
-from domain.errors import Forbidden, InvalidRequest, UpstreamUnavailable
+from domain.errors import InvalidRequest, UpstreamUnavailable
 from exports.attestation import attestation_error, build_attestation, get_safe_pdf_filename, render_attestation_pdf
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
 from infrastructure.mail.sender import EmailSender, MailError
 from infrastructure.sqlite.members import MemberRepository
 from services.communications.email_dispatch import EmailDispatchService
 from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
+from services.communications.senders import resolve_sender
 from services.documents import Doc
 from services.members.members import MemberService
 
@@ -57,7 +58,7 @@ def attestation_pdf(member: Doc) -> bytes:
 def send_attestation(season: Optional[str], purchase_id: int, to_email: str, author: str, template_name: str = "",
                      subject: str = "", body: str = "", add_signature: bool = True) -> AttestationEmail:
     """Sends the member's certificate to `to_email` (an empty subject or body falls back to the template), then
-    records the sent date on the purchase. Raises InvalidRequest, NotFound, Forbidden (sender outside the club) and
+    records the sent date on the purchase. Raises InvalidRequest, NotFound, Forbidden (a sender that is not the account nor one of its aliases) and
     UpstreamUnavailable (the e-mail did not leave)."""
     if not to_email or "@" not in to_email:
         raise InvalidRequest("Adresse e-mail du destinataire invalide ou manquante.")
@@ -72,9 +73,7 @@ def send_attestation(season: Optional[str], purchase_id: int, to_email: str, aut
     final_subject = apply_template_variables(raw_subject, recipient)
     final_body = apply_template_variables(raw_body, recipient)
 
-    sender_email = (template.get("sender_email") if template else None) or DEFAULT_SENDER_EMAIL
-    if not EmailDispatchService.is_allowed_sender(sender_email):
-        raise Forbidden(f"Adresse d'expédition non autorisée : {sender_email}")
+    sender_email = resolve_sender(template.get("sender_email") if template else None)
     sender_name = (template.get("sender_name") if template else None) or DEFAULT_SENDER_NAME
 
     # HTML built from the template, then personalised with escaped values

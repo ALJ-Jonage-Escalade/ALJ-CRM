@@ -22,7 +22,7 @@ for _path in (_SRC_DIR, _TESTS_DIR):
 # even if the developer loaded them into their shell.
 _DEV_ENV_KEYS = ("ALJ_ENV", "FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST",
                  "ALJ_DATA_DIR",
-                 "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM_EMAIL",
+                 "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM_EMAIL", "SMTP_SENDER_ALIASES",
                  "GMAIL_USER_EMAIL", "GMAIL_CLIENT_ID", "GMAIL_REFRESH_TOKEN")
 
 
@@ -75,3 +75,12 @@ def email_log_store():
     email_log.install(store)
     yield store
     email_log.install(None)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_allowed_senders():
+    """The allowed senders are read again by every test (they follow its environment variables)."""
+    from services.communications.senders import forget_allowed_senders
+    forget_allowed_senders()
+    yield
+    forget_allowed_senders()

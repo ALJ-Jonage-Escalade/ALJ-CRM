@@ -199,7 +199,7 @@ class TestGmailDelivery(unittest.TestCase):
 
 
 class TestSendPermissions(unittest.TestCase):
-    """A coach may only write to known members/payers; nobody may send as a foreign address."""
+    """A coach may only write to known members/payers (the sender is checked by services.communications.senders)."""
 
     KNOWN = {"harry.potter@hogwarts.example", "molly.weasley@hogwarts.example"}
 
@@ -208,9 +208,8 @@ class TestSendPermissions(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def reason(self, emails, sender=None, is_admin=False):
-        return EmailDispatchService.unauthorized_send_reason(
-            [{"email": e} for e in emails], sender, is_admin=is_admin)
+    def reason(self, emails, is_admin=False):
+        return EmailDispatchService.unauthorized_send_reason([{"email": e} for e in emails], is_admin=is_admin)
 
     def test_coach_known_recipients(self):
         self.assertIsNone(self.reason(["Harry.Potter@hogwarts.example", "molly.weasley@hogwarts.example"]))
@@ -220,10 +219,6 @@ class TestSendPermissions(unittest.TestCase):
 
     def test_admin_any_recipient(self):
         self.assertIsNone(self.reason(["anyone@example.com"], is_admin=True))
-
-    def test_sender_allowlist(self):
-        self.assertIsNone(self.reason([], sender="inscription@alj-escalade.fr"))
-        self.assertIsNotNone(self.reason([], sender="president@evil.example", is_admin=True))
 
 
 class TestSendEmailRoute(unittest.TestCase):
@@ -249,6 +244,13 @@ class TestSendEmailRoute(unittest.TestCase):
         resp, dispatch = self._send(coach, {"subject": "s", "body": "b",
                                             "recipients": [{"email": "spy@evil.example"}]})
         self.assertEqual(resp.status_code, 403)
+        dispatch.assert_not_called()
+
+    def test_template_and_sender_together_refused(self):
+        admin = {"sub": "a", "email": "albus@alj-escalade.fr", "email_verified": True}
+        resp, dispatch = self._send(admin, {"template_name": "Relance", "sender_email": "office@hogwarts.example",
+                                            "recipients": [{"email": "harry.potter@hogwarts.example"}]})
+        self.assertEqual(resp.status_code, 400)
         dispatch.assert_not_called()
 
     def test_coach_to_member_allowed(self):
