@@ -1,48 +1,34 @@
 <script setup lang="ts">
-/* Edits an e-mail template: name, sender, subject and body, with the variables and the bold / italic / underline / link
-   tags inserted at the cursor. Submitting checks the template first: "save" when it can be saved, else "invalid"
+/* Edits an e-mail template: name, sender, subject and body (TemplateField: the variables' labels and the bold /
+   italic / underline / link tags inserted at the cursor). Submitting checks the template first: "save" when it can be saved, else "invalid"
    with the reason. */
 import type { EmailTemplate } from "../../services/communications";
-import { nextTick, ref, useTemplateRef } from "vue";
+import { computed, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiCard from "../../components/ui/UiCard.vue";
-import { insertText, linkTags, linkTarget, templateError, VARIABLES, wrapSelection, type Edit, type Sender } from "./editor";
-import { dialogs } from "../../composables/dialogs";
+import TemplateField from "../../components/TemplateField.vue";
+import { KIND_LABELS, type TemplateKind } from "../../lib/templateVariables";
+import { templateError, type Sender } from "./editor";
 
-/** defaultSender: what the server puts when the sender is left empty, shown as placeholder. */
-defineProps<{ saving?: boolean; defaultSender: Sender; senderSuggestions: readonly string[] }>();
+/** defaultSender: what the server puts when the sender is left empty, shown as placeholder; saved: the template as
+    the server has it (none for a template being created). */
+const props = defineProps<{ saving?: boolean; defaultSender: Sender; senderSuggestions: readonly string[]; saved?: EmailTemplate }>();
 const emit = defineEmits<{ save: []; invalid: [message: string] }>();
+/** The template being edited, its variables written with their labels. */
 const draft = defineModel<EmailTemplate>({ required: true });
 const signature = defineModel<boolean>("signature", { default: true });
+const KINDS = Object.entries(KIND_LABELS) as [TemplateKind, string][];
 
-const showVariables = ref(false);
-const body = useTemplateRef<HTMLTextAreaElement>("body");
-
-async function edit(change: (value: string, start: number, end: number) => Edit): Promise<void> {
-  const area = body.value!;
-  const result = change(draft.value.body, area.selectionStart, area.selectionEnd);
-  draft.value.body = result.value;
-  await nextTick();
-  area.focus();
-  area.setSelectionRange(result.start, result.end);
-}
-
-const insertVariable = (name: string) => edit((v, s, e) => insertText(v, s, e, name));
-const wrap = (tag: string) => edit((v, s, e) => wrapSelection(v, s, e, `<${tag}>`, `</${tag}>`));
-
-async function addLink(): Promise<void> {
-  const url = linkTarget(
-    await dialogs.prompt({
-      title: "Insérer un lien",
-      label: "URL du lien (ex : https://www.alj-escalade.fr)",
-      value: "https://",
-      confirmLabel: "Insérer",
-    }),
-  );
-  if (url) {
-    void edit((v, s, e) => wrapSelection(v, s, e, ...linkTags(url)));
-  }
-}
+/** A default template moved to another kind is no longer a default (the server drops the mark too). */
+const defaultDropped = computed(() => Boolean(props.saved?.is_default) && draft.value.kind !== props.saved?.kind);
+watch(
+  () => draft.value.kind,
+  () => {
+    if (props.saved?.is_default) {
+      draft.value.is_default = !defaultDropped.value;
+    }
+  },
+);
 
 function submit(): void {
   const error = templateError(draft.value);
@@ -53,15 +39,8 @@ function submit(): void {
   }
 }
 
-const FORMATS = [
-  { tag: "b", label: "B", title: "Gras", testid: "format-bold", class: "" },
-  { tag: "i", label: "I", title: "Italique", testid: "format-italic", class: "italic" },
-  { tag: "u", label: "U", title: "Souligné", testid: "format-underline", class: "underline" },
-];
 const INPUT = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[13px]";
 const LABEL = "mb-1 block text-[11.5px] font-semibold text-slate-500 uppercase";
-const TOOL =
-  "cursor-pointer rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50";
 </script>
 
 <template>
@@ -76,6 +55,26 @@ const TOOL =
         placeholder="Titre du modèle…"
         :class="[INPUT, 'font-bold text-club-blue']"
       />
+      <div class="mt-2.5 grid gap-3 sm:grid-cols-[1fr_1.2fr]">
+        <div>
+          <label for="template-kind" :class="LABEL">Type de modèle</label>
+          <select id="template-kind" v-model="draft.kind" data-testid="template-kind" :class="INPUT">
+            <option v-for="[kind, label] in KINDS" :key="kind" :value="kind">{{ label }}</option>
+          </select>
+        </div>
+        <div class="self-end">
+          <label class="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-slate-700">
+            <input v-model="draft.is_default" type="checkbox" data-testid="template-default" class="accent-accent" />
+            Modèle par défaut pour ce type
+          </label>
+          <p v-if="defaultDropped" data-testid="template-default-dropped" class="mt-0.5 text-xs text-amber-700">
+            Avec ce type, il n'est plus le modèle par défaut de son ancien type.
+          </p>
+        </div>
+        <p v-if="draft.needs_fixing" data-testid="template-needs-fixing" class="self-end text-xs font-semibold text-amber-700">
+          ⚠️ À corriger : ce modèle contient une variable ancienne ou non disponible pour son type. Vérifiez-le puis enregistrez-le.
+        </p>
+      </div>
     </UiCard>
 
     <UiCard class="flex flex-col gap-2.5">
@@ -109,76 +108,21 @@ const TOOL =
         </div>
       </div>
 
-      <div>
-        <label for="subject" :class="LABEL">Objet de l'e-mail *</label>
-        <input
-          id="subject"
-          v-model="draft.subject"
-          type="text"
-          data-testid="subject"
-          placeholder="Sujet de votre message…"
-          :class="INPUT"
-        />
-      </div>
-
-      <div>
-        <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <label for="body" :class="[LABEL, 'mb-0']">Corps du message *</label>
-          <button
-            type="button"
-            :class="TOOL"
-            :aria-expanded="showVariables"
-            aria-controls="variables"
-            data-testid="variables-toggle"
-            @click="showVariables = !showVariables"
-          >
-            { } Variables disponibles
-          </button>
-        </div>
-        <div
-          v-show="showVariables"
-          id="variables"
-          data-testid="variables"
-          class="mb-2 rounded-md border border-slate-300 bg-slate-50 px-2.5 py-2"
-        >
-          <p class="mb-1.5 text-[11px] text-slate-500">Cliquez sur une variable pour l'insérer dans le texte :</p>
-          <div class="flex flex-wrap gap-1.5">
-            <button
-              v-for="name in VARIABLES"
-              :key="name"
-              type="button"
-              class="cursor-pointer rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] hover:border-accent hover:text-accent"
-              @click="insertVariable(name)"
-            >
-              {{ name }}
-            </button>
-          </div>
-        </div>
-        <div class="mb-1.5 flex gap-1.5" role="toolbar" aria-label="Mise en forme">
-          <button
-            v-for="f in FORMATS"
-            :key="f.tag"
-            type="button"
-            :title="f.title"
-            :aria-label="f.title"
-            :data-testid="f.testid"
-            :class="[TOOL, f.class]"
-            @click="wrap(f.tag)"
-          >
-            {{ f.label }}
-          </button>
-          <button type="button" title="Insérer un lien web" data-testid="format-link" :class="TOOL" @click="addLink">🔗 Lien</button>
-        </div>
-        <textarea
-          id="body"
-          ref="body"
-          v-model="draft.body"
-          rows="11"
-          data-testid="body"
-          placeholder="Saisissez le corps du message…"
-          :class="[INPUT, 'leading-normal']"
-        />
-      </div>
+      <TemplateField
+        id="subject"
+        v-model="draft.subject"
+        :kind="draft.kind"
+        label="Objet de l'e-mail *"
+        placeholder="Sujet de votre message…"
+      />
+      <TemplateField
+        id="body"
+        v-model="draft.body"
+        :kind="draft.kind"
+        label="Corps du message *"
+        multiline
+        placeholder="Saisissez le corps du message…"
+      />
 
       <label class="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-slate-700">
         <input v-model="signature" type="checkbox" data-testid="signature" class="accent-accent" />

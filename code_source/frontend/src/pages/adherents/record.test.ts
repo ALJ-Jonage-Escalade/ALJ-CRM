@@ -1,4 +1,4 @@
-import { fillTemplate } from "../../lib/text";
+import { renderTemplate } from "../../lib/templateVariables";
 import { describe, expect, it } from "vitest";
 import { member } from "./members.fixture";
 import {
@@ -286,8 +286,8 @@ describe("e-mail and certificate", () => {
   const m = member({ first_name: "LÉA-MARIE", last_name: "dupont", licence_ffme: "123456", amount: 180, season_name: "2026-2027" });
 
   it("replaces the variables, names case-insensitive, unknown ones kept", () => {
-    expect(fillTemplate("{Prénom} {NOM} {num_licence} {montant} {saison} {inconnue}", memberVariables(m))).toBe(
-      "Léa-Marie DUPONT 123456 180 € 2026-2027 {inconnue}",
+    expect(renderTemplate("{Prénom} {NOM} {num_licence} {amount} € {saison} {inconnue} {name_competition}.", memberVariables(m))).toBe(
+      "Léa-Marie DUPONT 123456 180 € 2026-2027 {inconnue} .",
     );
   });
 
@@ -295,6 +295,10 @@ describe("e-mail and certificate", () => {
     expect(attestationTemplates([]).initial).toBe(DEFAULT_ATTESTATION_TEMPLATE);
     const own = { ...DEFAULT_ATTESTATION_TEMPLATE, name: "Attestation Échéance 2026" };
     expect(attestationTemplates([own])).toEqual({ list: [own], initial: own });
+    // Only the certificate templates, the kind's default first
+    const standard = { ...DEFAULT_ATTESTATION_TEMPLATE, name: "Attestation standard", is_default: true };
+    const member = { ...DEFAULT_ATTESTATION_TEMPLATE, name: "Relance échéance", kind: "adherent" as const, is_default: true };
+    expect(attestationTemplates([own, standard, member])).toEqual({ list: [own, standard], initial: standard });
   });
 
   it("refuses cancelled or unpaid memberships, sends to the payer first", () => {

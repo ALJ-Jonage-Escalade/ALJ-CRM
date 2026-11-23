@@ -2732,6 +2732,25 @@
         }
       }
     },
+    "/api/email-templates/variables": {
+      "get": {
+        "summary": "Get Email Variables",
+        "description": "The variables templates may use, with their French label, kinds, demo value and former spellings.",
+        "operationId": "get_email_variables_api_email_templates_variables_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVariables"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/email-templates/{template_name}": {
       "delete": {
         "summary": "Delete Email Template Api",
@@ -7271,12 +7290,23 @@
             "type": "string",
             "title": "Season",
             "default": ""
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "EmailRecipient",
-        "description": "A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…)."
+        "description": "A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…).\namount: the membership amount, in euros."
       },
       "EmailSendDetail": {
         "properties": {
@@ -7458,6 +7488,25 @@
           "sender_name": {
             "type": "string",
             "title": "Sender Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "adherent",
+              "attestation",
+              "competition"
+            ],
+            "title": "Kind"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          },
+          "needs_fixing": {
+            "type": "boolean",
+            "title": "Needs Fixing",
+            "default": false
           }
         },
         "type": "object",
@@ -7466,9 +7515,11 @@
           "subject",
           "body",
           "sender_email",
-          "sender_name"
+          "sender_name",
+          "kind"
         ],
-        "title": "EmailTemplate"
+        "title": "EmailTemplate",
+        "description": "subject and body: the variables written with their keys ({first_name}). kind: inferred from the name for a\ntemplate saved before kinds existed. needs_fixing: it holds a variable it may not use, or a former spelling."
       },
       "EmailTemplateDeleted": {
         "properties": {
@@ -7543,12 +7594,39 @@
             "type": "string",
             "title": "Sender Name",
             "default": ""
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "adherent",
+                  "attestation",
+                  "competition"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Default"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "EmailTemplateUpdate",
-        "description": "old_name: the template's current name, to rename it; empty for a new template.\nAn empty sender falls back to the club's default address and name."
+        "description": "old_name: the template's current name, to rename it; empty for a new template.\nAn empty sender falls back to the club's default address and name; no kind, to the one of its name.\nis_default: makes it its kind's default (the previous one loses it); when not given, a template keeps its\nmark, unless its kind changes.\nThe variables may be written with their labels ({Prénom}): they are stored with their keys."
       },
       "EmailTemplates": {
         "properties": {
@@ -7595,6 +7673,88 @@
         ],
         "title": "EmailTemplates",
         "description": "default_sender_*: used by the server when a template's sender is empty. club_contact_email: shown in the e-mail signature."
+      },
+      "EmailVariable": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "first_name",
+              "last_name",
+              "num_licence",
+              "tarif",
+              "season",
+              "amount",
+              "problemes",
+              "name_competition",
+              "no_competition",
+              "date_competition",
+              "competition_deadline",
+              "montant_competition",
+              "whatsapp_link"
+            ],
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kinds": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "adherent",
+                "attestation",
+                "competition"
+              ]
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "demo": {
+            "type": "string",
+            "title": "Demo"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "kinds",
+          "demo",
+          "aliases"
+        ],
+        "title": "EmailVariable",
+        "description": "A template variable: `key` is stored in the templates, `label` is what users read and type ({Prénom});\n`aliases`: former spellings still accepted in saved templates."
+      },
+      "EmailVariables": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "variables": {
+            "items": {
+              "$ref": "#/components/schemas/EmailVariable"
+            },
+            "type": "array",
+            "title": "Variables"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "variables"
+        ],
+        "title": "EmailVariables"
       },
       "EmergencyContact": {
         "properties": {

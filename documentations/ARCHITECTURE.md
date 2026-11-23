@@ -54,7 +54,7 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   ├── server.py            ← entrée WEB/API : assemble l'app FastAPI (middlewares, routeurs de api/), aucune route
 │   │   ├── paths.py             ← CODE_ROOT / ROOT_DIR / data_root() / template_path() (à utiliser, ne jamais recalculer)
 │   │   ├── domain/              ← Python pur : members/, competitions/ + constants, utils, validators, club_emails,
-│   │   │                          email_personalization, errors
+│   │   │                          email_variables, email_personalization, errors
 │   │   ├── api/                 ← routeurs FastAPI, un fichier par domaine, rangés par thème (voir §4)
 │   │   ├── services/            ← cas d'usage, rangés comme api/ : access/, activities/, communications/,
 │   │   │                          competitions/ (dont webhook HelloAsso), keys/, members/ (dont import FFME), reports/
@@ -87,7 +87,8 @@ ALJ-CRM/                         ← racine du dépôt
 - **`domain/`** — règles métier en Python, sans accès au réseau ni au stockage, et sans effet à l'import.
   Rangé en `members/` (modèles, liste web, `age_rules`, `planning_groups`), `competitions/` (modèles,
   `matching` HelloAsso) ; à la racine `constants`, `utils`, `validators`, `errors` (erreurs métier levées par les
-  services), `club_emails` (adresses du club), `email_personalization` (variables `{…}` des e-mails).
+  services), `club_emails` (adresses du club), `email_variables` (liste unique des variables `{…}` des modèles d'e-mails,
+  rendu), `email_personalization` (leurs valeurs pour un destinataire et une compétition).
 - **`services/`** — cas d'usage : un routeur lit la requête, appelle une fonction de service et met en forme la
   réponse ; le service valide, orchestre les dépôts et lève `domain.errors` (traduites en statuts HTTP par
   `api/responses.py`). Exemples : `competitions/helloasso_webhook.py` (notifications HelloAsso),

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* E-mail to the competitors of a competition (coaches and admins): the audience (a recipient can be taken out), a
-   template of the club or a free text, a preview for the first recipient, then POST /api/send-email: the server
+   competition template of the club (its default first) or a free text, written with the variables' labels, a preview
+   for the first recipient, then POST /api/send-email: the server
    replaces the variables for each one and adds the signature. */
 import { computed, inject, ref, watch } from "vue";
 import UiButton from "../../../components/ui/UiButton.vue";
@@ -9,7 +10,10 @@ import { CLIENT_KEY, errorText } from "../../../lib/client";
 import { createCommunicationsApi, type EmailTemplate } from "../../../services/communications";
 import type { Competition, Row } from "../competitions";
 import { audience, AUDIENCES, defaultTemplate, hasEmail, sendBody, sentMessage, variables, type Audience } from "./email";
-import { fillTemplate, plural } from "../../../lib/text";
+import { plural } from "../../../lib/text";
+import { renderHtml, renderTemplate, templateError, toKeys, toLabels } from "../../../lib/templateVariables";
+import { initialOfKind, templatesOfKind } from "../../../lib/emailTemplates";
+import TemplateField from "../../../components/TemplateField.vue";
 import { dialogs } from "../../../composables/dialogs";
 
 const props = defineProps<{ competition: Competition; rows: readonly Row[] }>();
@@ -22,46 +26,30 @@ const recipients = computed(() => audience(props.rows, who.value).filter((r) => 
 const reachable = computed(() => recipients.value.filter(hasEmail));
 watch(who, () => (removed.value = new Set()));
 
+/** The club's competition templates. */
 const templates = ref<EmailTemplate[]>([]);
 const templateName = ref("");
+/** Subject and body with the variables' labels ({Prénom}); sent with their keys. */
 const subject = ref("");
 const body = ref("");
-const bodyTextarea = ref<HTMLTextAreaElement | null>(null);
 const sending = ref(false);
 const problem = ref("");
 const notConfigured = ref(false);
 
-function insertTag(tag: string, endTag = ""): void {
-  const el = bodyTextarea.value;
-  if (!el) {
-    body.value += tag + endTag;
-    return;
-  }
-  const start = el.selectionStart ?? body.value.length;
-  const end = el.selectionEnd ?? body.value.length;
-  const before = body.value.substring(0, start);
-  const selected = body.value.substring(start, end);
-  const after = body.value.substring(end);
-  body.value = before + tag + selected + (endTag || "") + after;
-}
-
-function insertVariable(varName: string): void {
-  insertTag(`{${varName}}`);
-}
-
 function useTemplate(): void {
   const t = templates.value.find((x) => x.name === templateName.value);
   if (t) {
-    [subject.value, body.value] = [t.subject, t.body];
+    [subject.value, body.value] = [toLabels(t.subject), toLabels(t.body)];
   }
 }
 
 void (async () => {
   try {
-    templates.value = (await communicationsApi.emailTemplates()).templates;
+    const all = (await communicationsApi.emailTemplates()).templates;
+    templates.value = templatesOfKind(all, "competition");
     // On a slow network the user may have started writing: the default template must not replace their text
     if (!subject.value.trim() && !body.value.trim()) {
-      templateName.value = defaultTemplate(templates.value)?.name ?? "";
+      templateName.value = initialOfKind(all, "competition", defaultTemplate)?.name ?? "";
       useTemplate();
     }
   } catch {
@@ -74,13 +62,14 @@ void (async () => {
   }
 })();
 
+/** The e-mail of the first recipient: its subject as text, its body as the HTML part sent. */
 const preview = computed(() => {
   const first = reachable.value[0];
   if (!first) {
-    return "";
+    return null;
   }
   const values = variables(props.competition, first);
-  return `Sujet : ${fillTemplate(subject.value, values)}\n\n${fillTemplate(body.value, values)}`;
+  return { subject: renderTemplate(subject.value, values), body: renderHtml(body.value, values) };
 });
 
 function take(id: number | null | undefined): void {
@@ -91,6 +80,11 @@ async function send(): Promise<void> {
   problem.value = "";
   if (!subject.value.trim() || !body.value.trim()) {
     problem.value = "⚠️ Veuillez renseigner le sujet et le message.";
+    return;
+  }
+  const unknown = templateError([subject.value, body.value], "competition");
+  if (unknown) {
+    problem.value = `⚠️ ${unknown}`;
     return;
   }
   const n = reachable.value.length;
@@ -109,7 +103,9 @@ async function send(): Promise<void> {
   }
   sending.value = true;
   try {
-    const result = await communicationsApi.sendEmail(sendBody(props.competition, reachable.value, subject.value, body.value));
+    const result = await communicationsApi.sendEmail(
+      sendBody(props.competition, reachable.value, toKeys(subject.value), toKeys(body.value)),
+    );
     // A refused request (400) or a sending where every e-mail failed (502) is thrown by unwrap(), caught below
     emit("sent", sentMessage(result));
   } catch (e) {
@@ -169,77 +165,32 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
         <option v-for="t in templates" :key="t.name" :value="t.name">{{ t.name }}</option>
       </select>
     </div>
-    <div>
-      <label for="ce-subject" :class="label">Objet</label>
-      <input
-        id="ce-subject"
-        v-model="subject"
-        data-testid="email-subject"
-        :class="field"
-        placeholder="ex. Convocation — Championnat de bloc"
-      />
-    </div>
-    <div>
-      <div class="flex flex-wrap items-center justify-between gap-1 mb-1">
-        <label for="ce-body" :class="label">Message</label>
-        <!-- Barre d'outils texte enrichi -->
-        <div class="flex items-center gap-1 text-xs">
-          <button
-            type="button"
-            class="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100 font-bold"
-            title="Gras"
-            @click="insertTag('<b>', '</b>')"
-          >
-            B
-          </button>
-          <button
-            type="button"
-            class="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100 italic"
-            title="Italique"
-            @click="insertTag('<i>', '</i>')"
-          >
-            I
-          </button>
-          <button
-            type="button"
-            class="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100"
-            title="Liste à puces"
-            @click="insertTag('\n• ')"
-          >
-            • Liste
-          </button>
-        </div>
-      </div>
-      <textarea
-        id="ce-body"
-        ref="bodyTextarea"
-        v-model="body"
-        rows="7"
-        data-testid="email-body"
-        :class="field"
-        placeholder="Rédigez votre message…"
-      />
-      <!-- Insertion des variables de publipostage -->
-      <div class="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
-        <span class="font-semibold">Insérer :</span>
-        <button
-          v-for="v in ['prenom', 'nom', 'competition_nom', 'competition_date', 'competition_lieu']"
-          :key="v"
-          type="button"
-          class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10.5px] text-slate-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer border border-slate-200"
-          :data-testid="`insert-var-${v}`"
-          @click="insertVariable(v)"
-        >
-          {`{${v}}`}
-        </button>
-      </div>
-    </div>
+    <TemplateField
+      id="email-subject"
+      v-model="subject"
+      kind="competition"
+      label="Objet"
+      placeholder="ex. Convocation — Championnat de bloc"
+    />
+    <TemplateField
+      id="email-body"
+      v-model="body"
+      kind="competition"
+      label="Message"
+      multiline
+      :rows="7"
+      placeholder="Rédigez votre message…"
+    />
     <div v-if="preview">
       <span :class="label">Aperçu pour {{ reachable[0]!.prenom }} {{ reachable[0]!.nom }}</span>
-      <pre
-        class="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-sans text-xs whitespace-pre-wrap"
+      <div
+        class="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs break-words"
         data-testid="email-preview"
-        >{{ preview }}</pre>
+      >
+        <p class="mb-3">Sujet : {{ preview.subject }}</p>
+        <!-- eslint-disable-next-line vue/no-v-html -- renderHtml escapes everything but the tags the server sends -->
+        <div v-html="preview.body" />
+      </div>
     </div>
     <p v-if="problem" role="alert" class="text-[13px] font-semibold text-red-700" data-testid="email-problem">{{ problem }}</p>
     <UiDialogActions>

@@ -17,6 +17,7 @@ from infrastructure.mail.sender import MailError
 from services.communications import email_log
 from services.communications.email_dispatch import EmailDispatchService, render_email
 from api.communications.email import get_email_templates, get_email_status
+from infrastructure.sqlite.connection import _COMPETITION_EMAIL_TEMPLATES
 
 
 class TestEmailDispatchService(unittest.TestCase):
@@ -47,6 +48,14 @@ class TestEmailDispatchService(unittest.TestCase):
         self.assertIn("https://chat.whatsapp.com/testgroup", rendered["body_plain"])
         self.assertIn("<div", rendered["body_html"])
 
+    def test_render_drops_the_empty_whatsapp_line_of_the_html_part_only(self):
+        """The line goes away before the body becomes HTML (one line joined by <br>), not the whole body."""
+        recipient = {"first_name": "léo", "last_name": "martin", "email": "leo@example.com"}
+        rendered = render_email("Sujet", "Bonjour {first_name}\n{bloc_whatsapp}\nFin", recipient, {"whatsapp_link": ""},
+                                add_signature=False)
+        self.assertEqual(rendered["body_plain"], "Bonjour Léo\nFin")
+        self.assertIn(">Bonjour Léo<br>Fin</div>", rendered["body_html"])
+
     def test_get_competition_context_includes_whatsapp_link(self):
         fake_doc = {
             "id": 12, "nom": "Coupe Bugey", "id_ffme": "12345", "prix": 15.0,
@@ -58,13 +67,12 @@ class TestEmailDispatchService(unittest.TestCase):
             self.assertEqual(ctx["whatsapp_link"], "https://chat.whatsapp.com/abc")
             self.assertEqual(ctx["name_competition"], "Coupe Bugey")
 
-    def test_get_competition_context_includes_place(self):
-        """The place is a pass-through field of the document (not in the domain model)."""
-        fake_doc = {"id": 12, "nom": "Coupe Bugey", "lieu": " CUSSET "}
-        with patch("services.communications.email_dispatch.competitions.get_competition_doc", return_value=fake_doc):
-            ctx = EmailDispatchService.get_competition_context(12)
-            self.assertEqual(ctx["lieu"], "CUSSET")
-            self.assertEqual(ctx["competition_lieu"], "CUSSET")
+    def test_get_competition_context_gives_the_registration_deadline(self):
+        doc = {"id": 12, "nom": "Coupe Bugey", "date_competition": "2026-10-03"}
+        for deadline, expected in (("", "26/09/2026"), ("2026-09-20", "20/09/2026")):
+            with self.subTest(deadline=deadline), \
+                    patch("services.communications.email_dispatch.competitions.get_competition_doc", return_value={**doc, "deadline": deadline}):
+                self.assertEqual(EmailDispatchService.get_competition_context(12)["competition_deadline"], expected)
 
     @patch("infrastructure.mail.sender.EmailSender.send_email")
     def test_dispatch_emails_success(self, mock_send):
@@ -186,6 +194,23 @@ class TestEmailDispatchInputs(unittest.TestCase):
         sent = mock_send.call_args.kwargs
         self.assertEqual((sent["subject"], sent["body"]), ("Relance Alice", "Message propre"))
         self.assertEqual((sent["from_email"], sent["from_name"]), ("bureau@example.org", "Bureau"))
+
+    def test_member_e_mail_fills_group_season_and_amount(self, mock_send):
+        recipient = {"first_name": "alice", "email": "a@example.com", "tarif": "Ados", "season": "2026-2027", "amount": "195.5"}
+        EmailDispatchService.dispatch_emails(subject="Rappel", body="{tarif} {season} : {amount} €", recipients=[recipient],
+                                             add_signature=False)
+        self.assertEqual(mock_send.call_args.kwargs["body"], "Ados 2026-2027 : 195,50 €")
+
+    def test_shipped_competition_templates_leave_no_raw_token(self, mock_send):
+        competition = {"name_competition": "Coupe", "no_competition": "42", "date_competition": "15/11/2026",
+                       "montant_competition": "15", "whatsapp_link": ""}
+        for _name, subject, body, *_sender in _COMPETITION_EMAIL_TEMPLATES:
+            with self.subTest(template=_name), patch.object(EmailDispatchService, "get_competition_context", return_value=competition):
+                EmailDispatchService.dispatch_emails(subject=subject, body=body, competition_id=7, add_signature=False,
+                                                     recipients=[{"first_name": "alice", "email": "a@example.com"}])
+                sent = mock_send.call_args.kwargs
+                self.assertNotRegex(sent["subject"] + sent["body"] + sent["html_body"], r"\{[^{}<>\"\n]+\}")
+                self.assertNotIn("WhatsApp", sent["body"])
 
     def test_unknown_template_and_no_subject_is_refused(self, mock_send):
         with patch.object(EmailDispatchService, "list_templates", return_value=[]), self.assertRaises(InvalidRequest):

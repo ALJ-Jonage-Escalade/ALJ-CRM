@@ -8,11 +8,13 @@ from fastapi.responses import JSONResponse
 
 from api.communications.schemas import (
     EmailDispatch, EmailSendRequest, EmailStatus, EmailTemplate,
-    EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate,
+    EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate, EmailVariable, EmailVariables,
 )
 from api.auth.me import author_of
 from api.responses import error, error_responses
 from services.communications.email_dispatch import EmailDispatchService
+from services.communications.email_templates import list_templates, save_template
+from domain.email_variables import VARIABLES, aliases_of
 from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.security.api_auth import Role, has_role
@@ -24,9 +26,7 @@ router = APIRouter()
 @router.get("/api/email-templates", response_model=EmailTemplates, responses=error_responses(500))
 def get_email_templates() -> EmailTemplates | JSONResponse:
     """Retourne la liste des modèles d'e-mails configurés."""
-    rows = EmailDispatchService.list_templates()
-    # Old rows may hold NULL columns
-    templates = [EmailTemplate(**{field: str(row.get(field) or "") for field in EmailTemplate.model_fields}) for row in rows]
+    templates = [EmailTemplate(**template) for template in list_templates()]
     return EmailTemplates(
         status="success",
         templates=templates,
@@ -37,45 +37,22 @@ def get_email_templates() -> EmailTemplates | JSONResponse:
     )
 
 
-def _same_name(a: str, b: str) -> bool:
-    return a.casefold() == b.casefold()
+@router.get("/api/email-templates/variables", response_model=EmailVariables)
+def get_email_variables() -> EmailVariables:
+    """The variables templates may use, with their French label, kinds, demo value and former spellings."""
+    return EmailVariables(status="success", variables=[
+        EmailVariable(key=v.key, label=v.label, kinds=list(v.kinds), demo=v.demo, aliases=aliases_of(v.key)) for v in VARIABLES
+    ])
 
 
 @router.post("/api/email-templates", response_model=EmailTemplateSaved, responses=error_responses(400, 409, 500))
-def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved | JSONResponse:
+def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved:
     """Crée ou met à jour un modèle d'e-mail dans la BDD SQLite (synchronisé avec Firestore)."""
-    if not data.name:
-        return error(400, "Le nom du modèle est obligatoire.")
-    if not data.subject:
-        return error(400, "Le sujet du modèle est obligatoire.")
-    if data.sender_email and ("@" not in data.sender_email or "." not in data.sender_email):
-        return error(400, "L'adresse d'expédition doit être une adresse e-mail valide.")
-    # A new name must not take another template's (the save would overwrite it, or fail on a rename)
-    if not (data.old_name and _same_name(data.old_name, data.name)):
-        others = (t["name"] for t in EmailTemplateRepository.get_email_templates() if t["name"] != data.old_name)
-        if any(_same_name(other, data.name) for other in others):
-            return error(409, f"Un modèle nommé « {data.name} » existe déjà.", "duplicate_name")
-
-    EmailTemplateRepository.save_email_template(
-        name=data.name,
-        subject=data.subject,
-        body=data.body,
-        sender_email=data.sender_email,
-        sender_name=data.sender_name,
-        old_name=data.old_name or None,
-    )
-
-    return EmailTemplateSaved(
-        status="success",
-        message=f"Modèle d'e-mail '{data.name}' enregistré avec succès.",
-        template=EmailTemplate(
-            name=data.name,
-            subject=data.subject,
-            body=data.body,
-            sender_email=data.sender_email or DEFAULT_SENDER_EMAIL,
-            sender_name=data.sender_name or DEFAULT_SENDER_NAME,
-        ),
-    )
+    saved = save_template(name=data.name, subject=data.subject, body=data.body, sender_email=data.sender_email,
+                          sender_name=data.sender_name, old_name=data.old_name, kind=data.kind,
+                          is_default=data.is_default)
+    return EmailTemplateSaved(status="success", message=f"Modèle d'e-mail '{data.name}' enregistré avec succès.",
+                              template=EmailTemplate(**saved))
 
 
 @router.delete("/api/email-templates/{template_name}", response_model=EmailTemplateDeleted, responses=error_responses(400, 404, 500))

@@ -116,6 +116,12 @@ class TestAttestationRoutes(unittest.TestCase):
             conn.close()
             self.assertIsNotNone(row["email_sent_date"])
             self.assertEqual(row["email_sent_date"], res["email_sent_date"])
+
+            # The membership's amount and group fill their variables
+            with patch("infrastructure.mail.sender.EmailSender.send_email", return_value=True) as mock_send:
+                send_attestation("2026-2027", 30, "jean.dupont@example.com", "admin@alj.example",
+                                 body="Montant {amount} € ({Tarif}, {season})", add_signature=False)
+            self.assertEqual(mock_send.call_args.kwargs["body"], "Montant 180 € (Adulte, 2026-2027)")
         finally:
             SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)

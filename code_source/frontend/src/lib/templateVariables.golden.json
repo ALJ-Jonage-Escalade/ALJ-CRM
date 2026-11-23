@@ -1,0 +1,292 @@
+{
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "Prénom",
+      "kinds": ["adherent", "attestation", "competition"],
+      "demo": "Alex",
+      "aliases": []
+    },
+    {
+      "key": "last_name",
+      "label": "Nom",
+      "kinds": ["adherent", "attestation", "competition"],
+      "demo": "MARTIN",
+      "aliases": []
+    },
+    {
+      "key": "num_licence",
+      "label": "N° de licence",
+      "kinds": ["adherent", "attestation", "competition"],
+      "demo": "847291",
+      "aliases": []
+    },
+    {
+      "key": "tarif",
+      "label": "Tarif",
+      "kinds": ["adherent", "attestation", "competition"],
+      "demo": "Cours Ados 2 (Mercredi 17h30)",
+      "aliases": []
+    },
+    {
+      "key": "season",
+      "label": "Saison",
+      "kinds": ["adherent", "attestation", "competition"],
+      "demo": "2026-2027",
+      "aliases": []
+    },
+    {
+      "key": "amount",
+      "label": "Montant de l'adhésion",
+      "kinds": ["adherent", "attestation"],
+      "demo": "195",
+      "aliases": []
+    },
+    {
+      "key": "problemes",
+      "label": "Problèmes à corriger",
+      "kinds": ["adherent"],
+      "demo": "- Date de naissance manquante",
+      "aliases": []
+    },
+    {
+      "key": "name_competition",
+      "label": "Nom de la compétition",
+      "kinds": ["competition"],
+      "demo": "Championnat Régional Bloc",
+      "aliases": ["nom_competition"]
+    },
+    {
+      "key": "no_competition",
+      "label": "N° de la compétition",
+      "kinds": ["competition"],
+      "demo": "2026-RA-0142",
+      "aliases": []
+    },
+    {
+      "key": "date_competition",
+      "label": "Date de la compétition",
+      "kinds": ["competition"],
+      "demo": "15/11/2026",
+      "aliases": []
+    },
+    {
+      "key": "competition_deadline",
+      "label": "Date limite d'inscription",
+      "kinds": ["competition"],
+      "demo": "08/11/2026",
+      "aliases": []
+    },
+    {
+      "key": "montant_competition",
+      "label": "Montant de la compétition",
+      "kinds": ["competition"],
+      "demo": "15,50",
+      "aliases": []
+    },
+    {
+      "key": "whatsapp_link",
+      "label": "Lien WhatsApp",
+      "kinds": ["competition"],
+      "demo": "https://chat.whatsapp.com/demo",
+      "aliases": ["whatapp_id", "whatsapp_id", "whatapp_link", "bloc_whatsapp", "bloc_whatapp", "whatsapp_bloc"]
+    }
+  ],
+  "render": [
+    {
+      "text": "Bonjour {first_name} {Nom} ({ N° de LICENCE }), {tarif} {season} : {amount} €",
+      "values": {
+        "first_name": "Alex",
+        "last_name": "MARTIN",
+        "num_licence": "847291",
+        "tarif": "Ados",
+        "season": "2026-2027",
+        "amount": "195,50"
+      },
+      "expected": "Bonjour Alex MARTIN (847291), Ados 2026-2027 : 195,50 €"
+    },
+    {
+      "text": "{PRENOM} {prénom} {First_Name} {prenom}",
+      "values": {
+        "first_name": "Léa"
+      },
+      "expected": "Léa Léa Léa Léa"
+    },
+    {
+      "text": "{nom_competition} n°{no_competition}\n{bloc_whatsapp}\nFin",
+      "values": {
+        "name_competition": "Coupe",
+        "no_competition": "42",
+        "whatsapp_link": "https://chat.whatsapp.com/abc"
+      },
+      "expected": "Coupe n°42\nVoici le lien du groupe WhatsApp dédié à cette compétition : https://chat.whatsapp.com/abc\nFin"
+    },
+    {
+      "text": "Bonjour,\n\nGroupe : {whatapp_Id}\n\n{bloc_whatsapp}\n\nFin {tarif}.",
+      "values": {
+        "whatsapp_link": "",
+        "tarif": ""
+      },
+      "expected": "Bonjour,\n\nFin ."
+    },
+    {
+      "text": "{<b>Prénom</b>} {style=\"a\"} {inconnu} {Prénom\n}",
+      "values": {
+        "first_name": "Alex"
+      },
+      "expected": "{<b>Prénom</b>} {style=\"a\"} {inconnu} {Prénom\n}"
+    },
+    {
+      "text": "<b>{first_name}</b>",
+      "values": {
+        "first_name": "<a href=\"x\">R&D</a>"
+      },
+      "html": true,
+      "expected": "<b>&lt;a href=&quot;x&quot;&gt;R&amp;D&lt;/a&gt;</b>"
+    },
+    {
+      "text": "{problemes}",
+      "values": {
+        "problemes": "- un\n- deux"
+      },
+      "html": true,
+      "expected": "- un<br>\n- deux"
+    }
+  ],
+  "amounts": [
+    {
+      "amount": 15,
+      "expected": "15"
+    },
+    {
+      "amount": 15.5,
+      "expected": "15,50"
+    },
+    {
+      "amount": 195.456,
+      "expected": "195,46"
+    },
+    {
+      "amount": 0,
+      "expected": "0"
+    },
+    {
+      "amount": null,
+      "expected": ""
+    }
+  ],
+  "names": [
+    {
+      "first_name": "camille",
+      "last_name": "durand",
+      "expected": ["Camille", "DURAND"]
+    },
+    {
+      "first_name": " jean-pierre ",
+      "last_name": "de la tour",
+      "expected": ["Jean-Pierre", "DE LA TOUR"]
+    },
+    {
+      "first_name": "ÉLODIE",
+      "last_name": "Lefèvre",
+      "expected": ["Élodie", "LEFÈVRE"]
+    }
+  ],
+  "convert": [
+    {
+      "text": "Bonjour { prénom } {NOM}, {nom_competition} : {Lien WhatsApp}\n{bloc_whatsapp} {inconnu} <a href=\"x\">{N° de licence}</a>",
+      "keys": "Bonjour {first_name} {last_name}, {name_competition} : {whatsapp_link}\nVoici le lien du groupe WhatsApp dédié à cette compétition : {whatsapp_link} {inconnu} <a href=\"x\">{num_licence}</a>",
+      "labels": "Bonjour {Prénom} {Nom}, {Nom de la compétition} : {Lien WhatsApp}\nVoici le lien du groupe WhatsApp dédié à cette compétition : {Lien WhatsApp} {inconnu} <a href=\"x\">{N° de licence}</a>"
+    },
+    {
+      "text": "{first_name} {whatapp_Id} {amount} {montant_competition} {problemes}",
+      "keys": "{first_name} {whatsapp_link} {amount} {montant_competition} {problemes}",
+      "labels": "{Prénom} {Lien WhatsApp} {Montant de l'adhésion} {Montant de la compétition} {Problèmes à corriger}"
+    }
+  ],
+  "errors": [
+    {
+      "texts": ["Bonjour {Prenon}", "{ prénom } {bloc_whatsapp} {Prenon} {date limite}"],
+      "expected": "Variables inconnues : {Prenon}, {date limite}. Variables possibles : {Prénom}, {Nom}, {N° de licence}, {Tarif}, {Saison}, {Montant de l'adhésion}, {Problèmes à corriger}, {Nom de la compétition}, {N° de la compétition}, {Date de la compétition}, {Date limite d'inscription}, {Montant de la compétition}, {Lien WhatsApp}."
+    },
+    {
+      "texts": ["{inconnu}"],
+      "expected": "Variable inconnue : {inconnu}. Variables possibles : {Prénom}, {Nom}, {N° de licence}, {Tarif}, {Saison}, {Montant de l'adhésion}, {Problèmes à corriger}, {Nom de la compétition}, {N° de la compétition}, {Date de la compétition}, {Date limite d'inscription}, {Montant de la compétition}, {Lien WhatsApp}."
+    },
+    {
+      "texts": ["{PRENOM} {nom_competition} <a href=\"https://x.fr\">{style=\"a\"}</a>"],
+      "expected": null
+    },
+    {
+      "texts": ["Bonjour {Prénom}, {Nom de la compétition} {whatapp_Id} {Montant de l'adhésion} {Prenon}"],
+      "kind": "attestation",
+      "expected": "Variable inconnue : {Prenon}. Variables non disponibles pour un modèle Attestation : {Nom de la compétition}, {whatapp_Id}. Variables possibles : {Prénom}, {Nom}, {N° de licence}, {Tarif}, {Saison}, {Montant de l'adhésion}."
+    },
+    {
+      "texts": ["{Nom de la compétition} {bloc_whatsapp} {Prénom}"],
+      "kind": "competition",
+      "expected": null
+    }
+  ],
+  "html": [
+    {
+      "text": "Texte <b>gras</b>, <i>italique</i> et <u>souligné</u>.\nLigne 2",
+      "values": {},
+      "expected": "Texte <b>gras</b>, <i>italique</i> et <u>souligné</u>.<br>Ligne 2"
+    },
+    {
+      "text": "Bonjour {Prénom}, visitez <a href=\"https://www.alj-escalade.fr\">notre site</a> !",
+      "values": {
+        "first_name": "Alex"
+      },
+      "expected": "Bonjour Alex, visitez <a href=\"https://www.alj-escalade.fr\" target=\"_blank\" style=\"color:#2563EB;\">notre site</a> !"
+    },
+    {
+      "text": "<a href=\"mailto:contact@alj-escalade.fr\">Écrivez-nous</a>",
+      "values": {},
+      "expected": "<a href=\"mailto:contact@alj-escalade.fr\" target=\"_blank\" style=\"color:#2563EB;\">Écrivez-nous</a>"
+    },
+    {
+      "text": "<a href=\"javascript:alert(1)\">Cliquez</a>",
+      "values": {},
+      "expected": "Cliquez"
+    },
+    {
+      "text": "<a href=\"https://a.fr\">A</a> puis <a href=\"https://c.fr\">C",
+      "values": {},
+      "expected": "<a href=\"https://a.fr\" target=\"_blank\" style=\"color:#2563EB;\">A</a> puis &lt;a href=\"https://c.fr\"&gt;C"
+    },
+    {
+      "text": "A & B <script>x</script> \"cités\" l'été<br>C",
+      "values": {},
+      "expected": "A &amp; B &lt;script&gt;x&lt;/script&gt; \"cités\" l'été<br>C"
+    },
+    {
+      "text": "Bonjour {first_name}",
+      "values": {
+        "first_name": "<a href=\"x\">R&D</a> l'été\n2"
+      },
+      "expected": "Bonjour &lt;a href=&quot;x&quot;&gt;R&amp;D&lt;/a&gt; l&#x27;été<br>\n2"
+    },
+    {
+      "text": "Bonjour {Prénom}\n\n{bloc_whatsapp}\n\nFin",
+      "values": {
+        "first_name": "Alex",
+        "whatsapp_link": ""
+      },
+      "expected": "Bonjour Alex<br><br>Fin"
+    },
+    {
+      "text": "Groupe : {Lien WhatsApp}\nFin",
+      "values": {
+        "whatsapp_link": "https://chat.whatsapp.com/demo"
+      },
+      "expected": "Groupe : https://chat.whatsapp.com/demo<br>Fin"
+    },
+    {
+      "text": "Inconnue : {inconnue} {a<b}",
+      "values": {},
+      "expected": "Inconnue : {inconnue} {a&lt;b}"
+    }
+  ]
+}

@@ -5,8 +5,31 @@ import { type ApiFetch } from "../../lib/api";
 import CommunicationsTemplatesPage from "./CommunicationsTemplatesPage.vue";
 import { dialogs } from "../../composables/dialogs";
 
-const RELANCE = { name: "Relance", subject: "Rappel {first_name}", body: "Bonjour", sender_email: "a@alj.example", sender_name: "ALJ" };
-const ECHEANCE = { name: "Rappel echeance", subject: "Échéance", body: "Payez", sender_email: "b@alj.example", sender_name: "ALJ" };
+const RELANCE = {
+  name: "Relance",
+  subject: "Rappel {first_name}",
+  body: "Bonjour",
+  sender_email: "a@alj.example",
+  sender_name: "ALJ",
+  kind: "adherent",
+};
+const ECHEANCE = {
+  name: "Rappel echeance",
+  subject: "Échéance",
+  body: "Payez",
+  sender_email: "b@alj.example",
+  sender_name: "ALJ",
+  kind: "attestation",
+};
+const COUPE = {
+  name: "Coupe",
+  subject: "{name_competition}",
+  body: "Lien : {whatapp_Id}",
+  sender_email: "c@alj.example",
+  sender_name: "ALJ",
+  kind: "competition",
+  needs_fixing: true,
+};
 
 /** The /api/email-templates answer: the templates and the club's sender settings. */
 function templatesAnswer(templates: unknown[]): Response {
@@ -59,13 +82,17 @@ afterEach(() => {
 
 describe("CommunicationsTemplatesPage", () => {
   it("opens the instalment reminder, with its preview and the WhatsApp text", async () => {
-    const { byId, value } = render();
+    const { wrapper, byId, value } = render();
     await flushPromises();
     expect(value("template-select")).toBe("Rappel echeance");
     expect(value("template-name")).toBe("Rappel echeance");
     expect(value("subject")).toBe("Échéance");
     expect(byId("preview-from")!.textContent).toBe("ALJ <b@alj.example>");
     expect(value("whatsapp")).toBe("Rejoignez le groupe");
+    await wrapper.find('[data-testid="body"]').setValue('Bonjour {Prénom}, <a href="https://alj.example">le site</a>');
+    expect(byId("preview-body")!.innerHTML).toBe(
+      'Bonjour Alex, <a href="https://alj.example" target="_blank" style="color:#2563EB;">le site</a>',
+    );
   });
 
   it("saves a renamed template under its former name, then shows it", async () => {
@@ -88,6 +115,98 @@ describe("CommunicationsTemplatesPage", () => {
       },
     ]);
     expect(byId("toast")!.textContent).toBe("💾 Modèle « Relance finale » enregistré avec succès !");
+  });
+
+  it("shows the variables as French labels and saves them as keys", async () => {
+    const { wrapper, writes, value } = render({
+      ...ANSWERS,
+      "GET /api/email-templates": () =>
+        templatesAnswer([{ ...RELANCE, kind: "competition", body: "Bonjour {first_name},\n{bloc_whatsapp}" }, ECHEANCE]),
+    });
+    await flushPromises();
+    await wrapper.find('[data-testid="template-select"]').setValue("Relance");
+    expect(value("subject")).toBe("Rappel {Prénom}");
+    expect(value("body")).toBe("Bonjour {Prénom},\nVoici le lien du groupe WhatsApp dédié à cette compétition : {Lien WhatsApp}");
+    await wrapper.find('[data-testid="body"]').setValue("Bonjour { PRENOM } {Nom de la compétition}");
+    await wrapper.find('[data-testid="template-save"]').trigger("click");
+    await flushPromises();
+    expect(writes()[0]!.body).toMatchObject({ subject: "Rappel {first_name}", body: "Bonjour {first_name} {name_competition}" });
+  });
+
+  it("does not save a template with an unknown variable", async () => {
+    const { wrapper, writes, byId } = render();
+    await flushPromises();
+    await wrapper.find('[data-testid="body"]').setValue("Bonjour {Prenon}");
+    expect(byId("body-error")!.textContent).toContain("Variable inconnue : {Prenon}.");
+    await wrapper.find("form").trigger("submit");
+    expect(writes()).toEqual([]);
+    expect(byId("toast")!.textContent).toContain("Variable inconnue : {Prenon}. Variables possibles : {Prénom}");
+  });
+
+  it("lists the templates by kind, those to fix marked", async () => {
+    const { byId } = render({ ...ANSWERS, "GET /api/email-templates": () => templatesAnswer([COUPE, RELANCE, ECHEANCE]) });
+    await flushPromises();
+    const groups = [...byId("template-select")!.querySelectorAll("optgroup")].map((group) => [
+      group.label,
+      [...group.querySelectorAll("option")].map((option) => option.textContent.trim()),
+    ]);
+    expect(groups).toEqual([
+      ["Adhérent", ["Relance"]],
+      ["Attestation", ["Rappel echeance"]],
+      ["Compétition", ["Coupe ⚠️ à corriger"]],
+    ]);
+  });
+
+  it("offers the variables of the template's kind, and saves the kind chosen", async () => {
+    const { wrapper, writes, byId } = render({ ...ANSWERS, "GET /api/email-templates": () => templatesAnswer([COUPE, RELANCE, ECHEANCE]) });
+    await flushPromises();
+    await wrapper.find('[data-testid="template-select"]').setValue("Coupe");
+    expect(byId("template-needs-fixing")).not.toBeNull();
+    expect((byId("body") as HTMLTextAreaElement).value).toBe("Lien : {Lien WhatsApp}");
+    const offered = () => [...byId("body-variables")!.querySelectorAll("button")].map((b) => b.textContent.trim());
+    expect(offered()).toContain("{Nom de la compétition}");
+    expect(offered()).not.toContain("{Montant de l'adhésion}");
+
+    await wrapper.find('[data-testid="template-kind"]').setValue("adherent");
+    expect(offered()).not.toContain("{Nom de la compétition}");
+    expect(byId("subject-error")!.textContent).toContain("Variable non disponible pour un modèle Adhérent : {Nom de la compétition}.");
+    await wrapper.find("form").trigger("submit");
+    expect(writes()).toEqual([]);
+
+    await wrapper.find('[data-testid="template-kind"]').setValue("competition");
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(writes()[0]!.body).toEqual({
+      ...COUPE,
+      needs_fixing: undefined,
+      subject: "{name_competition}",
+      body: "Lien : {whatsapp_link}",
+      old_name: "Coupe",
+    });
+  });
+
+  it("marks a template as its kind's default, and tells when a kind change drops the mark", async () => {
+    const answers = { ...ANSWERS, "GET /api/email-templates": () => templatesAnswer([{ ...RELANCE, is_default: true }, ECHEANCE]) };
+    const { wrapper, writes, byId } = render(answers);
+    await flushPromises();
+    const options = [...byId("template-select")!.querySelectorAll("option")].map((option) => option.textContent.trim());
+    expect(options).toEqual(["Relance ★ par défaut", "Rappel echeance"]);
+
+    await wrapper.find('[data-testid="template-select"]').setValue("Relance");
+    const box = () => byId("template-default") as HTMLInputElement;
+    expect(box().checked).toBe(true);
+    expect(byId("template-default-dropped")).toBeNull();
+    await wrapper.find('[data-testid="template-kind"]').setValue("attestation");
+    expect(box().checked).toBe(false);
+    expect(byId("template-default-dropped")!.textContent).toContain("n'est plus le modèle par défaut");
+    await wrapper.find('[data-testid="template-kind"]').setValue("adherent");
+    expect(box().checked).toBe(true);
+
+    await wrapper.find('[data-testid="template-select"]').setValue("Rappel echeance");
+    await wrapper.find('[data-testid="template-default"]').setValue(true);
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(writes()[0]!.body).toMatchObject({ name: "Rappel echeance", kind: "attestation", is_default: true });
   });
 
   it("does not send an invalid template", async () => {

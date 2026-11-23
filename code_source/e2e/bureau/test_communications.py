@@ -53,8 +53,9 @@ def test_template_lifecycle(page):
     page.reload()
     _open(page)
     page.get_by_test_id("template-select").select_option(name)
-    expect(page.get_by_test_id("subject")).to_have_value("Training camp for {first_name}")
-    expect(page.get_by_test_id("body")).to_have_value("Hello {first_name}, see you at the camp.")
+    # Saved with the keys, shown with the French labels
+    expect(page.get_by_test_id("subject")).to_have_value("Training camp for {Prénom}")
+    expect(page.get_by_test_id("body")).to_have_value("Hello {Prénom}, see you at the camp.")
     expect(page.get_by_test_id("sender-email")).to_have_value("competitions@alj-escalade.fr")
 
     renamed = unique_name("E2E Renamed")
@@ -107,9 +108,9 @@ def test_variables_formatting_and_preview(page):
     _create(page, unique_name("E2E Template"))
     body = page.get_by_test_id("body")
     body.fill("")
-    page.get_by_test_id("variables-toggle").click()
-    page.get_by_test_id("variables").get_by_role("button", name="{first_name}").click()
-    expect(body).to_have_value("{first_name}")
+    page.get_by_test_id("body-variables-toggle").click()
+    page.get_by_test_id("body-variables").get_by_role("button", name="{Prénom}").click()
+    expect(body).to_have_value("{Prénom}")
     # Live preview renders the variables with the demo member
     expect(page.get_by_test_id("preview-body")).to_have_text("Alex")
     page.get_by_test_id("subject").fill("Licence {num_licence}")
@@ -119,10 +120,10 @@ def test_variables_formatting_and_preview(page):
     expect(page.get_by_test_id("preview-from")).to_have_text("ALJ Compétitions <competitions@alj-escalade.fr>")
 
     body.fill("")
-    page.get_by_test_id("format-bold").click()
+    page.get_by_test_id("body-format-bold").click()
     expect(body).to_have_value("<b>texte</b>")
     body.fill("")
-    page.get_by_test_id("format-link").click()
+    page.get_by_test_id("body-format-link").click()
     answer_prompt(page, "https://www.alj-escalade.fr")
     expect(body).to_have_value('<a href="https://www.alj-escalade.fr">texte</a>')
 

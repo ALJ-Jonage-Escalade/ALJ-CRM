@@ -687,6 +687,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/email-templates/variables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Email Variables
+         * @description The variables templates may use, with their French label, kinds, demo value and former spellings.
+         */
+        get: operations["get_email_variables_api_email_templates_variables_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/email-templates/{template_name}": {
         parameters: {
             query?: never;
@@ -2601,6 +2621,7 @@ export interface components {
         /**
          * EmailRecipient
          * @description A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…).
+         *     amount: the membership amount, in euros.
          */
         EmailRecipient: {
             /** Id */
@@ -2635,6 +2656,8 @@ export interface components {
              * @default
              */
             season?: string;
+            /** Amount */
+            amount?: number | null;
         };
         /**
          * EmailSendDetail
@@ -2728,7 +2751,11 @@ export interface components {
             /** Sender */
             sender: string;
         };
-        /** EmailTemplate */
+        /**
+         * EmailTemplate
+         * @description subject and body: the variables written with their keys ({first_name}). kind: inferred from the name for a
+         *     template saved before kinds existed. needs_fixing: it holds a variable it may not use, or a former spelling.
+         */
         EmailTemplate: {
             /** Name */
             name: string;
@@ -2740,6 +2767,21 @@ export interface components {
             sender_email: string;
             /** Sender Name */
             sender_name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "adherent" | "attestation" | "competition";
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default?: boolean;
+            /**
+             * Needs Fixing
+             * @default false
+             */
+            needs_fixing?: boolean;
         };
         /** EmailTemplateDeleted */
         EmailTemplateDeleted: {
@@ -2765,7 +2807,10 @@ export interface components {
         /**
          * EmailTemplateUpdate
          * @description old_name: the template's current name, to rename it; empty for a new template.
-         *     An empty sender falls back to the club's default address and name.
+         *     An empty sender falls back to the club's default address and name; no kind, to the one of its name.
+         *     is_default: makes it its kind's default (the previous one loses it); when not given, a template keeps its
+         *     mark, unless its kind changes.
+         *     The variables may be written with their labels ({Prénom}): they are stored with their keys.
          */
         EmailTemplateUpdate: {
             /**
@@ -2798,6 +2843,10 @@ export interface components {
              * @default
              */
             sender_name?: string;
+            /** Kind */
+            kind?: ("adherent" | "attestation" | "competition") | null;
+            /** Is Default */
+            is_default?: boolean | null;
         };
         /**
          * EmailTemplates
@@ -2819,6 +2868,36 @@ export interface components {
             sender_suggestions: string[];
             /** Club Contact Email */
             club_contact_email: string;
+        };
+        /**
+         * EmailVariable
+         * @description A template variable: `key` is stored in the templates, `label` is what users read and type ({Prénom});
+         *     `aliases`: former spellings still accepted in saved templates.
+         */
+        EmailVariable: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "first_name" | "last_name" | "num_licence" | "tarif" | "season" | "amount" | "problemes" | "name_competition" | "no_competition" | "date_competition" | "competition_deadline" | "montant_competition" | "whatsapp_link";
+            /** Label */
+            label: string;
+            /** Kinds */
+            kinds: ("adherent" | "attestation" | "competition")[];
+            /** Demo */
+            demo: string;
+            /** Aliases */
+            aliases: string[];
+        };
+        /** EmailVariables */
+        EmailVariables: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Variables */
+            variables: components["schemas"]["EmailVariable"][];
         };
         /**
          * EmergencyContact
@@ -7071,6 +7150,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    get_email_variables_api_email_templates_variables_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailVariables"];
                 };
             };
         };

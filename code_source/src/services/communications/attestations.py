@@ -8,7 +8,7 @@ import logging
 from typing import Optional, TypedDict
 
 from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
-from domain.email_personalization import apply_template_variables, template_recipient
+from domain.email_personalization import apply_template_variables, personalized_html, template_recipient
 from domain.errors import Forbidden, InvalidRequest, UpstreamUnavailable
 from exports.attestation import attestation_error, build_attestation, get_safe_pdf_filename, render_attestation_pdf
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
@@ -78,8 +78,8 @@ def send_attestation(season: Optional[str], purchase_id: int, to_email: str, aut
     sender_name = (template.get("sender_name") if template else None) or DEFAULT_SENDER_NAME
 
     # HTML built from the template, then personalised with escaped values
-    html_body = apply_template_variables(
-        build_email_html(raw_body, add_signature=True, image_src_mode="cid"), recipient, escape_html=True
+    html_body = personalized_html(
+        raw_body, recipient, lambda text: build_email_html(text, add_signature=True, image_src_mode="cid")
     ) if add_signature else None
     plain_body = final_body + ("\n\n" + build_signature_plain() if add_signature else "")
 

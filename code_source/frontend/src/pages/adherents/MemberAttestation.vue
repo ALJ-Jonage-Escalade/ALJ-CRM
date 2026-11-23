@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /* Payment certificate of a membership (admins): the PDF made by the server (stamp and signature) shown in a frame,
-   downloaded, or sent by e-mail with a template; the server then records the sent date. The server reads the amount,
-   payer and status of the membership itself: only the purchase is sent. Nothing is kept: the PDF lives in memory while
-   the pane is open. */
+   downloaded, or sent by e-mail with a certificate template (written with the variables' labels, filled by the server);
+   the server then records the sent date. The server reads the amount, payer and status of the membership itself: only
+   the purchase is sent. Nothing is kept: the PDF lives in memory while the pane is open. */
 import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
@@ -11,8 +11,9 @@ import { createCommunicationsApi, type EmailTemplate } from "../../services/comm
 import { saveFile } from "../../lib/download";
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
-import { fillTemplate } from "../../lib/text";
-import { attestationFileName, attestationProblem, attestationRecipient, attestationTemplates, memberVariables } from "./record";
+import { templateError, toKeys, toLabels } from "../../lib/templateVariables";
+import TemplateField from "../../components/TemplateField.vue";
+import { attestationFileName, attestationProblem, attestationRecipient, attestationTemplates } from "./record";
 import { dialogs } from "../../composables/dialogs";
 
 const props = defineProps<{ member: Member; templates: readonly EmailTemplate[] }>();
@@ -22,14 +23,15 @@ const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 const choices = computed(() => attestationTemplates(props.templates));
 const templateName = ref(choices.value.initial.name);
 const to = ref(attestationRecipient(props.member));
+/** Subject and body with the variables' labels ({Prénom}); the server fills them, from their keys, when sending. */
 const subject = ref("");
 const body = ref("");
 const signature = ref(true);
 
 function useTemplate(): void {
   const t = choices.value.list.find((x) => x.name === templateName.value) ?? choices.value.initial;
-  subject.value = fillTemplate(t.subject, memberVariables(props.member));
-  body.value = fillTemplate(t.body, memberVariables(props.member));
+  subject.value = toLabels(t.subject);
+  body.value = toLabels(t.body);
 }
 useTemplate();
 
@@ -86,6 +88,11 @@ async function send(): Promise<void> {
     problem.value = "⚠️ Le sujet et le corps de l'e-mail ne peuvent pas être vides.";
     return;
   }
+  const unknown = templateError([subject.value, body.value], "attestation");
+  if (unknown) {
+    problem.value = `⚠️ ${unknown}`;
+    return;
+  }
   if (
     !(await dialogs.confirm({
       title: "Envoyer l'attestation",
@@ -102,8 +109,8 @@ async function send(): Promise<void> {
       season: props.member.season_name,
       to_email: recipient,
       template_name: templateName.value,
-      subject: subject.value.trim(),
-      body: body.value.trim(),
+      subject: toKeys(subject.value.trim()),
+      body: toKeys(body.value.trim()),
       add_signature: signature.value,
     });
     emit("sent", `✅ Attestation envoyée avec succès à ${recipient} !`);
@@ -151,14 +158,8 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
             :class="field"
           />
         </div>
-        <div>
-          <label for="attestation-subject" :class="label">Sujet *</label>
-          <input id="attestation-subject" v-model="subject" data-testid="attestation-subject" type="text" :class="field" />
-        </div>
-        <div>
-          <label for="attestation-body" :class="label">Message d'accompagnement *</label>
-          <textarea id="attestation-body" v-model="body" data-testid="attestation-body" rows="7" :class="field" />
-        </div>
+        <TemplateField id="attestation-subject" v-model="subject" kind="attestation" label="Sujet *" />
+        <TemplateField id="attestation-body" v-model="body" kind="attestation" label="Message d'accompagnement *" multiline :rows="7" />
         <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-slate-700">
           <input v-model="signature" type="checkbox" class="accent-accent" />
           Ajouter la signature officielle ALJ Escalade

@@ -10,14 +10,20 @@ from typing import List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from api.request_body import RequestBody
+from domain.email_variables import TemplateKind, VariableKey
 
 
 class EmailTemplate(BaseModel):
+    """subject and body: the variables written with their keys ({first_name}). kind: inferred from the name for a
+    template saved before kinds existed. needs_fixing: it holds a variable it may not use, or a former spelling."""
     name: str
     subject: str
     body: str
     sender_email: str
     sender_name: str
+    kind: TemplateKind
+    is_default: bool = False  # the template its kind's screen opens first
+    needs_fixing: bool = False
 
 
 class EmailTemplates(BaseModel):
@@ -30,15 +36,35 @@ class EmailTemplates(BaseModel):
     club_contact_email: str
 
 
+class EmailVariable(BaseModel):
+    """A template variable: `key` is stored in the templates, `label` is what users read and type ({Prénom});
+    `aliases`: former spellings still accepted in saved templates."""
+    key: VariableKey
+    label: str
+    kinds: List[TemplateKind]
+    demo: str
+    aliases: List[str]
+
+
+class EmailVariables(BaseModel):
+    status: Literal["success"]
+    variables: List[EmailVariable]
+
+
 class EmailTemplateUpdate(RequestBody):
     """old_name: the template's current name, to rename it; empty for a new template.
-    An empty sender falls back to the club's default address and name."""
+    An empty sender falls back to the club's default address and name; no kind, to the one of its name.
+    is_default: makes it its kind's default (the previous one loses it); when not given, a template keeps its
+    mark, unless its kind changes.
+    The variables may be written with their labels ({Prénom}): they are stored with their keys."""
     name: str = ""
     old_name: str = ""
     subject: str = ""
     body: str = ""
     sender_email: str = ""
     sender_name: str = ""
+    kind: Optional[TemplateKind] = None
+    is_default: Optional[bool] = None
 
 
 class EmailTemplateSaved(BaseModel):
@@ -109,7 +135,8 @@ class EmailStatus(BaseModel):
 
 
 class EmailRecipient(RequestBody):
-    """A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…)."""
+    """A recipient given by the page; its fields are also the template variables ({first_name}, {tarif}…).
+    amount: the membership amount, in euros."""
     id: Optional[int] = None
     first_name: str = ""
     last_name: str = ""
@@ -117,6 +144,7 @@ class EmailRecipient(RequestBody):
     num_licence: str = ""
     tarif: str = ""
     season: str = ""
+    amount: Optional[float] = None
 
 
 class EmailSendRequest(RequestBody):

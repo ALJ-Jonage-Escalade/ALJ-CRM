@@ -451,6 +451,50 @@ describe("AdherentsPage", () => {
     expect(router.currentRoute.value.query).toEqual({ id: "9", saison: "2026-2027", achat: "90" });
   });
 
+  it("offers the member templates only, the default one chosen, with labels, and sends keys", async () => {
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const template = (name: string, kind: string, is_default = false) => ({
+      name,
+      kind,
+      is_default,
+      subject: "Rappel {first_name}",
+      body: "Bonjour {first_name}, {amount} €",
+      sender_email: "",
+      sender_name: "",
+    });
+    const answers: Record<string, Answer> = {
+      ...ANSWERS,
+      "GET /api/email-templates": () =>
+        json({
+          status: "success",
+          templates: [template("Bienvenue", "adherent"), template("Relance", "adherent", true), template("Coupe", "competition", true)],
+          club_contact_email: "club@alj.example",
+        }),
+      "POST /api/send-email": () => json({ status: "success", sent_count: 1 }),
+    };
+    const { inBody, writes } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027");
+    await flushPromises();
+    inBody("record-email")!.click();
+    await flushPromises();
+    const select = inBody("email-template") as HTMLSelectElement;
+    expect([...select.options].map((option) => option.textContent.trim())).toEqual([
+      "-- E-mail libre / personnalisé --",
+      "Bienvenue",
+      "Relance",
+    ]);
+    expect(select.value).toBe("Relance");
+    expect((inBody("email-subject") as HTMLInputElement).value).toBe("Rappel {Prénom}");
+    expect((inBody("email-body") as HTMLTextAreaElement).value).toBe("Bonjour {Prénom}, {Montant de l'adhésion} €");
+    const offered = [...inBody("email-body-variables")!.querySelectorAll("button")].map((b) => b.textContent.trim());
+    expect(offered).toContain("{Montant de l'adhésion}");
+    expect(offered).not.toContain("{Nom de la compétition}");
+    inBody("email-send")!.click();
+    await flushPromises();
+    expect(writes()[0]!.body).toEqual(
+      expect.objectContaining({ subject: "Rappel {first_name}", body: "Bonjour {first_name}, {amount} €" }),
+    );
+  });
+
   it.each<Role>(["admin", "coach"])("sends an e-mail from the record (%s)", async (role) => {
     vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
     const answers: Record<string, Answer> = {
@@ -458,7 +502,16 @@ describe("AdherentsPage", () => {
       "GET /api/email-templates": () =>
         json({
           status: "success",
-          templates: [{ name: "Rappel", subject: "Rappel {first_name}", body: "Bonjour {first_name}", sender_email: "", sender_name: "" }],
+          templates: [
+            {
+              name: "Rappel",
+              subject: "Rappel {first_name}",
+              body: 'Bonjour {first_name}, <b>voir</b> <a href="https://alj.example/fiche">la fiche</a>',
+              sender_email: "",
+              sender_name: "",
+              kind: "adherent",
+            },
+          ],
           club_contact_email: "club@alj.example",
         }),
       "POST /api/send-email": () => json({ status: "success", sent_count: 1 }),
@@ -477,11 +530,17 @@ describe("AdherentsPage", () => {
     await flushPromises();
     expect(inBody("email-preview")!.textContent).toContain("Sujet : Rappel Léa");
     expect(inBody("email-preview")!.textContent).toContain("club@alj.example");
+    const link = inBody("email-preview")!.querySelector("a");
+    expect([link?.getAttribute("href"), link?.textContent]).toEqual(["https://alj.example/fiche", "la fiche"]);
+    expect(inBody("email-preview")!.querySelector("b")?.textContent).toBe("voir");
     inBody("email-send")!.click();
     await flushPromises();
     expect(writes()[0]).toEqual(expect.objectContaining({ path: "/api/send-email" }));
     expect(writes()[0]!.body).toEqual(
-      expect.objectContaining({ subject: "Rappel {first_name}", recipients: [expect.objectContaining({ email: "lea@example.org" })] }),
+      expect.objectContaining({
+        subject: "Rappel {first_name}",
+        recipients: [expect.objectContaining({ email: "lea@example.org", tarif: "Adulte loisir", amount: null })],
+      }),
     );
     expect(document.querySelector("#toast")!.textContent).toContain("E-mail envoyé avec succès");
     expect(inBody("record-dialog")).toBeNull(); // back to the record in the panel
@@ -511,12 +570,18 @@ describe("AdherentsPage", () => {
     expect(inBody("attestation-pdf")!.getAttribute("src")).toBe("blob:pdf");
     expect((inBody("attestation-to") as HTMLInputElement).value).toBe("parent@example.org");
     expect((inBody("attestation-subject") as HTMLInputElement).value).toContain("Attestation de paiement");
+    expect((inBody("attestation-body") as HTMLTextAreaElement).value).toContain("Bonjour {Prénom},");
     inBody("attestation-send")!.click();
     await flushPromises();
     expect(writes().map((w) => w.path)).toEqual(["/api/attestations/preview", "/api/attestations/send"]);
     expect(writes()[0]!.body).toEqual({ purchase_id: 11, season: "2026-2027" });
     expect(writes()[1]!.body).toEqual(
-      expect.objectContaining({ purchase_id: 11, to_email: "parent@example.org", template_name: "Attestation échéance" }),
+      expect.objectContaining({
+        purchase_id: 11,
+        to_email: "parent@example.org",
+        template_name: "Attestation échéance",
+        body: expect.stringContaining("Bonjour {first_name},") as unknown,
+      }),
     );
     expect(document.querySelector("#toast")!.textContent).toContain("Attestation envoyée avec succès");
   });

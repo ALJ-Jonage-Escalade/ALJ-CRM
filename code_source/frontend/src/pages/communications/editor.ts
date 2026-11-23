@@ -2,15 +2,17 @@
    insertion of variables and HTML tags in the body (texts of the former web/bureau/communications.html). */
 import type { EmailTemplate } from "../../services/communications";
 import { looksLikeEmail } from "../../lib/email";
-import { fillTemplate } from "../../lib/text";
+import { DEMO_VALUES, renderHtml, renderTemplate, templateError as variablesError, type TemplateKind } from "../../lib/templateVariables";
 
 /** The club's default sender, sent by the server (infrastructure/mail/senders.py). */
 export type Sender = Pick<EmailTemplate, "sender_email" | "sender_name">;
 
-/** Contents of a new template; the sender is the one being edited (empty: the server puts the club's default). */
-export function newTemplate(name: string, sender: Sender): EmailTemplate {
+/** Contents of a new template; the sender and kind are those of the template being edited (an empty sender: the
+    server puts the club's default). */
+export function newTemplate(name: string, sender: Sender, kind: TemplateKind = "adherent"): EmailTemplate {
   return {
     name,
+    kind,
     subject: "Sujet du courriel",
     body: "Bonjour {first_name},\n\nSaisissez votre texte ici.\n\nSportivement,\nL'équipe ALJ Escalade",
     sender_email: sender.sender_email.trim(),
@@ -18,31 +20,12 @@ export function newTemplate(name: string, sender: Sender): EmailTemplate {
   };
 }
 
-/** Variables replaced when the e-mail is sent (domain/utils.apply_template_variables), with the preview's values. */
-export const DEMO_MEMBER: Record<string, string> = {
-  first_name: "Alex",
-  last_name: "MARTIN",
-  tarif: "Cours Ados 2 (Mercredi 17h30)",
-  season: "2026-2027",
-  amount: "195.00 €",
-  num_licence: "847291",
-  nom_competition: "Championnat Régional Bloc",
-  date_competition: "15/11/2026",
-  competition_deadline: "08/11/2026",
-  montant_competition: "15.00 €",
-};
-export const VARIABLES = Object.keys(DEMO_MEMBER).map((name) => `{${name}}`);
 export const PREVIEW_TO = "Alex MARTIN <alex.martin@example.com>";
-
-// Former names of the first two variables, still found in old templates
-const ALIASES: Record<string, string> = { prénom: DEMO_MEMBER.first_name!, nom: DEMO_MEMBER.last_name! };
-
-/** The values the preview fills a template with: the demo member, under the current and the former names. */
-export const DEMO_VALUES: Readonly<Record<string, string>> = { ...ALIASES, ...DEMO_MEMBER };
 
 export interface Preview {
   from: string;
   subject: string;
+  /** HTML, as the e-mail's HTML part (renderHtml): safe to show with v-html. */
   body: string;
 }
 
@@ -51,8 +34,8 @@ export function preview(template: EmailTemplate, defaultSender: Sender): Preview
   const email = template.sender_email.trim() || defaultSender.sender_email;
   return {
     from: `${name} <${email}>`,
-    subject: fillTemplate(template.subject, DEMO_VALUES) || "(Sans objet)",
-    body: fillTemplate(template.body, DEMO_VALUES) || "(Message vide)",
+    subject: renderTemplate(template.subject, DEMO_VALUES) || "(Sans objet)",
+    body: renderHtml(template.body, DEMO_VALUES) || "(Message vide)",
   };
 }
 
@@ -67,7 +50,8 @@ export function templateError(template: EmailTemplate): string | null {
   if (!looksLikeEmail(template.sender_email.trim())) {
     return "⚠️ L'adresse d'expédition doit être une adresse e-mail valide.";
   }
-  return null;
+  const unknown = variablesError([template.subject, template.body], template.kind);
+  return unknown ? `⚠️ ${unknown}` : null;
 }
 
 /** Why a new template cannot take this name, or null (the server checks again). */
@@ -85,35 +69,4 @@ export function newNameError(name: string, templates: readonly EmailTemplate[]):
 /** The template shown first: the requested one, else the instalment reminder, else the first. */
 export function initialTemplate(templates: readonly EmailTemplate[], wanted?: string): EmailTemplate | undefined {
   return templates.find((t) => t.name === wanted) ?? templates.find((t) => t.name.toLowerCase().includes("echeance")) ?? templates[0];
-}
-
-/** A text field after an edit, with the selection to restore. */
-export interface Edit {
-  value: string;
-  start: number;
-  end: number;
-}
-
-/** Replaces the selection with the text; the cursor goes after it. */
-export function insertText(value: string, start: number, end: number, text: string): Edit {
-  const at = start + text.length;
-  return { value: value.slice(0, start) + text + value.slice(end), start: at, end: at };
-}
-
-/** Puts the tags around the selection ("texte" when nothing is selected), which stays selected. */
-export function wrapSelection(value: string, start: number, end: number, open: string, close: string): Edit {
-  const selected = value.slice(start, end) || "texte";
-  const from = start + open.length;
-  return { value: value.slice(0, start) + open + selected + close + value.slice(end), start: from, end: from + selected.length };
-}
-
-/** The link's address, or null for an empty answer (the prompt starts with "https://"). */
-export function linkTarget(answer: string | null): string | null {
-  const url = answer?.trim() ?? "";
-  return url && url !== "https://" ? url : null;
-}
-
-/** Escapes the address for the href attribute. */
-export function linkTags(url: string): [string, string] {
-  return [`<a href="${url.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">`, "</a>"];
 }

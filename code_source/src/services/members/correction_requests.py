@@ -67,7 +67,7 @@ def _requests(item_ids: Sequence[int], chosen_campaign: Optional[str]) -> list[C
 def _render(request: CorrectionRequest, template: _Template) -> RenderedEmail:
     payer = {"first_name": request.payer_first_name, "last_name": request.payer_last_name}
     return render_email(template["subject"], template["body"], payer, {}, add_signature=True,
-                        extra_variables={PROBLEMS_VARIABLE: request.problems})
+                        extra_values={PROBLEMS_VARIABLE: request.problems})
 
 
 def example(item_ids: Sequence[int], chosen_campaign: Optional[str] = None) -> CorrectionEmail:

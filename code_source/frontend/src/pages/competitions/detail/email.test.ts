@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { participantRows, type Competition } from "../competitions";
-import { fillTemplate } from "../../../lib/text";
-import { amountText, audience, defaultTemplate, sendBody, sentMessage, variables } from "./email";
+import { renderTemplate } from "../../../lib/templateVariables";
+import { audience, defaultTemplate, sendBody, sentMessage, variables } from "./email";
 
 const COMP: Competition = {
   id: 10,
@@ -30,25 +30,23 @@ describe("competition e-mail", () => {
   it("fills the competition's variables as the server does", () => {
     const values = variables(COMP, ROWS[0]);
     expect(
-      fillTemplate(
-        "{First_Name} {last_name} : {name_competition} n°{no_competition} du {date_competition}, deadline {competition_deadline}, {montant_competition} €. {bloc_whatsapp} {inconnu}",
+      renderTemplate(
+        "{First_Name} {last_name} : {name_competition} n°{no_competition} du {date_competition}, {montant_competition} €. {bloc_whatsapp} {inconnu}",
         values,
       ),
     ).toBe(
-      "Léo MARTIN : Coupe n°EVT-9 du 14/03/2027 au 15/03/2027, deadline 07/03/2027, 15,50 €. Voici le lien du groupe WhatsApp dédié à cette compétition : https://chat {inconnu}",
+      "Léo MARTIN : Coupe n°EVT-9 du 14/03/2027 au 15/03/2027, 15,50 €. Voici le lien du groupe WhatsApp dédié à cette compétition : https://chat {inconnu}",
     );
-    expect(values.competition_deadline).toBe("07/03/2027");
-    expect(variables({ ...COMP, deadline: "2027-03-05" }, undefined).competition_deadline).toBe("05/03/2027");
-    expect([amountText(15), amountText(15.5), amountText(null)]).toEqual(["15", "15,50", ""]);
     expect(variables({ ...COMP, date_fin: "2027-03-14" }, undefined).date_competition).toBe("14/03/2027");
+    expect(variables(COMP, undefined).competition_deadline).toBe("07/03/2027");
+    expect(variables({ ...COMP, deadline: "2027-03-05" }, undefined).competition_deadline).toBe("05/03/2027");
   });
 
   it("offers the club's competition template first", () => {
-    const t = (name: string) => ({ name, subject: "", body: "", sender_email: "", sender_name: "" });
+    const t = (name: string) => ({ name, subject: "", body: "", sender_email: "", sender_name: "", kind: "competition" as const });
     expect(defaultTemplate([t("Bienvenue"), t("Compétition - relance"), t("Compétition - 1er Inscription")])!.name).toBe(
       "Compétition - 1er Inscription",
     );
-    expect(defaultTemplate([t("Bienvenue"), t("Competition call-up")])!.name).toBe("Competition call-up");
     expect(defaultTemplate([t("Bienvenue")])!.name).toBe("Bienvenue");
     expect(defaultTemplate([])).toBeUndefined();
   });
