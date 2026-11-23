@@ -69,8 +69,9 @@ def test_phone_list_then_competition(mobile_page, competition):
     # Filtered by slot group on a phone (the competition day), not by registration
     expect(page.get_by_test_id("filter-selected")).to_have_count(0)
     expect(page.get_by_test_id("participant-search")).to_have_count(0)
-    expect(page.get_by_test_id("filter-group")).to_have_count(1)
-    page.get_by_test_id("filter-group").click()
+    group_filter = page.get_by_test_id("group-filter")
+    expect(group_filter.locator("option")).to_have_count(2)  # « Tous » and the competitor's group
+    group_filter.select_option(index=1)
     expect(row).to_be_visible()
     assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"), "no horizontal scroll"
     page.get_by_test_id("back-link").click()
