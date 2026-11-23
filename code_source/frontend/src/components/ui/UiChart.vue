@@ -2,7 +2,8 @@
 /* A pie, bar or line chart (Chart.js, only the parts used are registered) with its figures in a visually hidden table: screen
    readers read the table, and the tests too (jsdom draws no canvas). A click anywhere on the chart emits `select`.
    Long axis labels keep their beginning; hovering a bar, a slice or an axis label highlights it and writes its whole
-   label and figures on the line under the chart (instead of a floating tooltip). */
+   label and figures on the line under the chart (instead of a floating tooltip). A pie starts with its first slice on
+   the left. */
 import {
   ArcElement,
   BarController,
@@ -66,6 +67,14 @@ const hovered = ref("");
 const AXIS_SHARE = 0.5;
 const CHARACTER_WIDTH = 7;
 
+/** A pie turns so that its first slice (the largest when sorted) is centred on the left, the others following clockwise;
+    Chart.js counts degrees clockwise from the top. */
+function pieRotation(data: readonly number[]): number {
+  const total = data.reduce((sum, value) => sum + value, 0);
+  const firstAngle = total ? ((data[0] ?? 0) / total) * 360 : 0;
+  return 270 - firstAngle / 2;
+}
+
 function chartData() {
   return {
     labels: props.labels,
@@ -75,6 +84,7 @@ function chartData() {
       backgroundColor: dataset.colors,
       borderColor: props.type === "pie" ? "#fff" : dataset.colors, // white between the slices of a pie
       borderDash: dataset.dashed ? [6, 4] : [],
+      ...(props.type === "pie" ? { rotation: pieRotation(dataset.data) } : {}),
     })),
   };
 }

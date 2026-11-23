@@ -26,6 +26,7 @@ const COMPETITIONS = [
     id: 1,
     nom: "Coupe",
     date_competition: "2026-10-04",
+    prix: 12.5,
     participants: [
       { adherent_id: 1, nom: "N", prenom: "P", selectionne: true, classement: "1" },
       { adherent_id: 2, nom: "N", prenom: "P", selectionne: true, classement: "3" },
@@ -79,7 +80,7 @@ describe("OutilsStatsPage, members", () => {
   it("shows the gender of the season's members, and another season without a new request", async () => {
     const { calls, byId, figures } = await render();
 
-    expect(figures("chart-sex")).toEqual(["Femmes: 1", "Hommes: 2"]);
+    expect(figures("chart-sex")).toEqual(["Hommes: 2", "Femmes: 1"]);
 
     const season = byId("stats-season") as HTMLSelectElement;
     season.value = "2025-2026";
@@ -130,11 +131,10 @@ describe("OutilsStatsPage, members", () => {
 });
 
 describe("OutilsStatsPage, competitions", () => {
-  it("charts the podiums by medal and the selected competitors of the last seasons, oldest first", async () => {
-    const { figures } = await render();
+  it("adds up the podiums of the last seasons", async () => {
+    const { byId } = await render();
 
-    expect(figures("chart-podiums")).toEqual(["2025-2026: 0: 1: 0", "2026-2027: 1: 0: 1"]);
-    expect(figures("chart-competitors")).toEqual(["2025-2026: 1", "2026-2027: 2"]);
+    expect(byId("kpi-podiums")!.textContent).toContain("3");
   });
 
   it("counts the competitions of the current season and their competitors", async () => {
@@ -143,5 +143,14 @@ describe("OutilsStatsPage, competitions", () => {
 
     expect(byId("kpi-competitions")!.textContent).toContain("1");
     expect(byId("kpi-competitors")!.textContent).toContain("2");
+    expect(byId("kpi-unique-competitors")!.textContent).toContain("2");
+    expect(byId("kpi-budget")!.textContent).toContain("25,00");
+  });
+
+  it("charts the season's competitions per month", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-22T12:00:00") });
+    const { figures } = await render();
+
+    expect(figures("chart-competitions-per-month")).toContain("Oct.: 1");
   });
 });

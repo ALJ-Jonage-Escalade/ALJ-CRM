@@ -116,23 +116,29 @@ describe("member stats", () => {
     });
   });
 
-  it("sums up the season: members, new members in percent, average of the known ages, cancelled purchases", () => {
+  it("sums up the season: members, new and autonomous members in percent, average of the known ages, cancelled purchases, waiting lists apart", () => {
     const records = [
       purchase(1, { sex: "F", age: 10, returning: false }),
       purchase(1, { sex: "F", age: 10, returning: false, group: "Compétition" }),
-      purchase(2, { sex: "H", age: 41 }),
+      purchase(2, { sex: "H", age: 41, group: "Autonome adultes" }),
       purchase(3, { sex: "H", age: null }),
       purchase(4, { sex: "H", status: "Annulé" }),
       purchase(2, { sex: "H", status: "Annulé", group: "Compétition" }),
       purchase(5, { sex: "H", status: "Refusé" }),
       purchase(6, { status: "Annulé", season: "2025-2026" }),
+      purchase(7, { group: "Liste d'attente" }),
+      purchase(7, { group: "Liste d'attente collège" }),
+      purchase(3, { group: "Attente compétition" }),
+      purchase(8, { group: "Liste d'attente", status: "Annulé" }),
     ];
 
     expect(memberCards(seasonMembers(records, SEASON), records, SEASON)).toEqual({
       members: 3,
       newPercent: 33,
+      autonomousPercent: 33,
       averageAge: 25.5,
-      cancelled: 2,
+      cancelled: 3,
+      waiting: 2,
     });
   });
 

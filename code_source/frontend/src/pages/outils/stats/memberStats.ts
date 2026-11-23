@@ -1,7 +1,9 @@
 /* Member statistics of Outils › Statistiques (plans/stats-charts.md), counted from the rows of
-   /api/reports/member-stats: one person per season, validated purchases only. */
+   /api/reports/member-stats: one person per season, validated purchases only, waiting lists counted apart. */
 import { HEX } from "../../../components/ui/palette";
 import type { Schemas } from "../../../lib/client";
+import { isWaiting } from "../../adherents/members";
+import { normKey } from "../../../lib/text";
 
 export type MemberStatsRecord = Schemas["MemberStatsRecord"];
 
@@ -82,11 +84,14 @@ const DIMENSIONS: Record<Dimension, DimensionRule> = {
   season: { values: (member) => [member.season], order: byText },
 };
 
-/** The validated members of the season, one per person, their groups merged. */
+/** A validated purchase of the season (waiting lists included: the callers tell them apart with `isWaiting`). */
+const isValidated = (record: MemberStatsRecord, season: string): boolean => record.season === season && record.status === "Validé";
+
+/** The validated members of the season, one per person, their groups merged; waiting lists left out. */
 export function seasonMembers(records: readonly MemberStatsRecord[], season: string): SeasonMember[] {
   const members = new Map<number, SeasonMember>();
   for (const record of records) {
-    if (record.season !== season || record.status !== "Validé") {
+    if (!isValidated(record, season) || isWaiting(record.group)) {
       continue;
     }
     const member = members.get(record.user_id);
@@ -165,10 +170,14 @@ export function breakdown(members: readonly SeasonMember[], dimension: Dimension
 export interface MemberCards {
   members: number;
   newPercent: number | null;
+  /** Members with at least one autonomous group (a tariff naming « autonome »), in percent */
+  autonomousPercent: number | null;
   /** Average of the known ages, one decimal */
   averageAge: number | null;
   /** Purchases cancelled in the season (a member who registered again is still counted) */
   cancelled: number;
+  /** People with a validated waiting-list registration in the season, once each */
+  waiting: number;
 }
 
 const percentOf = (part: number, total: number): number | null => (total ? Math.round((part / total) * 100) : null);
@@ -179,8 +188,14 @@ export function memberCards(members: readonly SeasonMember[], records: readonly 
   return {
     members: members.length,
     newPercent: percentOf(members.filter((member) => !member.returning).length, members.length),
+    autonomousPercent: percentOf(
+      members.filter((member) => member.groups.some((group) => normKey(group).includes("autonom"))).length,
+      members.length,
+    ),
     averageAge: ages.length ? Math.round((ages.reduce((sum, age) => sum + age, 0) / ages.length) * 10) / 10 : null,
     cancelled: records.filter((record) => record.season === season && record.status === "Annulé").length,
+    waiting: new Set(records.filter((record) => isValidated(record, season) && isWaiting(record.group)).map((record) => record.user_id))
+      .size,
   };
 }
 

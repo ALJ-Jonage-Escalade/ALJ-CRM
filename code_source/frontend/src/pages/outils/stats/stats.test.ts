@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Competition, Participant } from "../../competitions/competitions";
-import { participationRateText, seasonParticipation, seasonStats } from "./stats";
+import { competitionsPerMonth, seasonParticipation, seasonPodiums } from "./stats";
 
 const entrant = (adherentId: number, change: Partial<Participant> = {}): Participant => ({
   adherent_id: adherentId,
@@ -24,27 +24,42 @@ const LIST = [
 ];
 
 describe("stats", () => {
-  it("counts podiums and selected competitors per season, most recent first, undated competitions left out", () => {
-    expect(seasonStats(LIST)).toEqual([
-      { season: "2026-2027", gold: 1, silver: 1, bronze: 1, podiums: 3, competitors: 3 },
-      { season: "2025-2026", gold: 1, silver: 1, bronze: 0, podiums: 2, competitors: 1 },
+  it("counts the podiums per season, most recent first, undated competitions left out", () => {
+    expect(seasonPodiums(LIST)).toEqual([
+      { season: "2026-2027", podiums: 3 },
+      { season: "2025-2026", podiums: 2 },
     ]);
-    expect(seasonStats(LIST, 1).map((s) => s.season)).toEqual(["2026-2027"]);
+    expect(seasonPodiums(LIST, 1).map((s) => s.season)).toEqual(["2026-2027"]);
   });
 
-  it("rates the presence of the selected competitors, a dash without any", () => {
-    expect(participationRateText(LIST)).toBe("67 %");
-    expect(participationRateText([])).toBe("—");
-  });
-
-  it("counts the competitions of the season the club took part in so far, and their selected competitors", () => {
+  it("counts every competition of the season, undated ones in the current season, their selected competitors and the distinct members among them", () => {
     const list = [
       ...LIST,
       competition(5, "2026-12-01", [entrant(2, { selectionne: false })]), // nobody selected
-      competition(6, "2027-05-01", [entrant(1), entrant(2)]), // still to come
+      competition(6, "2027-05-01", [entrant(1), entrant(2)]), // upcoming
     ];
 
-    expect(seasonParticipation(list, "2027-04-01")).toEqual({ competitions: 2, competitors: 4 });
-    expect(seasonParticipation(list, "2028-01-01")).toEqual({ competitions: 0, competitors: 0 });
+    expect(seasonParticipation(list, "2027-04-01")).toEqual({ competitions: 5, competitors: 7, uniqueCompetitors: 4 });
+    expect(seasonParticipation(list, "2028-01-01")).toEqual({ competitions: 1, competitors: 1, uniqueCompetitors: 1 });
+  });
+
+  it("counts the season's competitions per month, September to August, undated ones left out", () => {
+    const perMonth = competitionsPerMonth([...LIST, competition(5, "2027-08-30", []), competition(6, "2026-10-20", [])], "2026-11-23");
+
+    expect(perMonth.map((m) => m.month)).toEqual([
+      "Sept.",
+      "Oct.",
+      "Nov.",
+      "Déc.",
+      "Janv.",
+      "Févr.",
+      "Mars",
+      "Avr.",
+      "Mai",
+      "Juin",
+      "Juil.",
+      "Août",
+    ]);
+    expect(perMonth.map((m) => m.competitions)).toEqual([0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   });
 });

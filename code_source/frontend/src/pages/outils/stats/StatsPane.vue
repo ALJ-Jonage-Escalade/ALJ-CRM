@@ -1,15 +1,17 @@
 <script setup lang="ts">
-/* Outils › Statistiques, competitions: presence, podiums and competitors of the last seasons, from the competitions on the server. */
+/* Outils › Statistiques, competitions: competitions and competitors of the season, podiums of the last seasons, from the competitions on the server. */
 import { computed, inject, onMounted, ref } from "vue";
 import UiCard from "../../../components/ui/UiCard.vue";
 import UiChart from "../../../components/ui/UiChart.vue";
 import { HEX } from "../../../components/ui/palette";
 import { ApiError, CLIENT_KEY, errorText } from "../../../lib/client";
 import { createCompetitionsApi } from "../../../services/competitions";
+import { formatEuros } from "../../../lib/format";
+import { balances, totals } from "../../competitions/balance/balance";
 import { seasonOf, todayIso, type Competition } from "../../competitions/competitions";
-import { participationRateText, seasonParticipation, seasonStats } from "./stats";
+import { competitionsPerMonth, seasonParticipation, seasonPodiums } from "./stats";
 
-/** Seasons compared on the tiles and the two lists. */
+/** Seasons whose podiums are added on the tile. */
 const SEASON_COUNT = 3;
 
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
@@ -31,30 +33,20 @@ onMounted(load);
 const today = todayIso();
 const currentSeason = seasonOf(today);
 const participation = computed(() => seasonParticipation(competitions.value, today));
-const seasons = computed(() => seasonStats(competitions.value, SEASON_COUNT));
-const participationRate = computed(() => participationRateText(competitions.value));
-const podiumCount = computed(() => seasons.value.reduce((sum, season) => sum + season.podiums, 0));
-/** The charts read left to right, oldest season first. */
-const chartSeasons = computed(() => [...seasons.value].reverse());
-const seasonLabels = computed(() => chartSeasons.value.map((season) => season.season));
-const podiumDatasets = computed(() =>
-  (
-    [
-      ["Or", "gold", HEX.amber],
-      ["Argent", "silver", HEX.slate],
-      ["Bronze", "bronze", HEX.orange],
-    ] as const
-  ).map(([label, medal, colors]) => ({ label, data: chartSeasons.value.map((season) => season[medal]), colors })),
-);
-const competitorDatasets = computed(() => [
-  { label: "Compétiteurs", data: chartSeasons.value.map((season) => season.competitors), colors: HEX.blue },
+/** The « Total dû » of Compétitions › Bilan for the current season. */
+const budget = computed(() => totals(balances(competitions.value, currentSeason, today)).due);
+const seasons = computed(() => seasonPodiums(competitions.value, SEASON_COUNT));
+const perMonth = computed(() => competitionsPerMonth(competitions.value, today));
+const monthDatasets = computed(() => [
+  { label: "Compétitions", data: perMonth.value.map((month) => month.competitions), colors: HEX.blue },
 ]);
+const podiumCount = computed(() => seasons.value.reduce((sum, season) => sum + season.podiums, 0));
 </script>
 
 <template>
   <div class="flex flex-col gap-4" data-testid="stats-pane">
     <p v-if="loadError" data-testid="stats-load-error" role="alert" class="text-[13px] text-red-700">⚠️ {{ loadError }}</p>
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       <UiCard class="text-center">
         <div class="text-2xl font-black text-sky-700" data-testid="kpi-competitions">{{ participation.competitions }}</div>
         <div class="text-xs font-semibold uppercase text-slate-500 mt-1">Compétitions {{ currentSeason }}</div>
@@ -64,10 +56,12 @@ const competitorDatasets = computed(() => [
         <div class="text-xs font-semibold uppercase text-slate-500 mt-1">Compétiteurs {{ currentSeason }}</div>
       </UiCard>
       <UiCard class="text-center">
-        <div class="text-2xl font-black text-blue-700" data-testid="kpi-participation">
-          {{ participationRate }}
-        </div>
-        <div class="text-xs font-semibold uppercase text-slate-500 mt-1">Présence des sélectionnés</div>
+        <div class="text-2xl font-black text-violet-700" data-testid="kpi-unique-competitors">{{ participation.uniqueCompetitors }}</div>
+        <div class="text-xs font-semibold uppercase text-slate-500 mt-1">Compétiteurs uniques {{ currentSeason }}</div>
+      </UiCard>
+      <UiCard class="text-center">
+        <div class="text-2xl font-black text-emerald-700" data-testid="kpi-budget">{{ formatEuros(budget) }}</div>
+        <div class="text-xs font-semibold uppercase text-slate-500 mt-1">Budget total {{ currentSeason }}</div>
       </UiCard>
       <UiCard class="text-center">
         <div class="text-2xl font-black text-purple-700" data-testid="kpi-podiums">{{ seasons.length ? podiumCount : "—" }}</div>
@@ -75,33 +69,15 @@ const competitorDatasets = computed(() => [
       </UiCard>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-2">
-      <UiCard>
-        <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">🏆 Podiums par saison</h3>
-        <p v-if="!seasons.length" class="text-xs italic text-slate-400">Aucune compétition datée.</p>
-        <UiChart
-          v-else
-          type="bar"
-          stacked
-          title="Podiums par saison et par médaille"
-          data-testid="chart-podiums"
-          :labels="seasonLabels"
-          :datasets="podiumDatasets"
-        />
-      </UiCard>
-
-      <UiCard>
-        <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">📈 Compétiteurs sélectionnés par saison</h3>
-        <p v-if="!seasons.length" class="text-xs italic text-slate-400">Aucune compétition datée.</p>
-        <UiChart
-          v-else
-          type="bar"
-          title="Compétiteurs sélectionnés par saison"
-          data-testid="chart-competitors"
-          :labels="seasonLabels"
-          :datasets="competitorDatasets"
-        />
-      </UiCard>
-    </div>
+    <UiCard>
+      <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">📅 Compétitions par mois ({{ currentSeason }})</h3>
+      <UiChart
+        type="bar"
+        title="Compétitions par mois de la saison"
+        data-testid="chart-competitions-per-month"
+        :labels="perMonth.map((month) => month.month)"
+        :datasets="monthDatasets"
+      />
+    </UiCard>
   </div>
 </template>
