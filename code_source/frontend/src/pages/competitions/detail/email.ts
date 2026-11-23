@@ -55,9 +55,17 @@ export function variables(competition: Competition, row: Row | undefined): Recor
   };
 }
 
-/** Body of POST /api/send-email; the server checks a coach writes to known members only. */
-export function sendBody(competition: Competition, recipients: readonly Row[], subject: string, body: string): Schemas["EmailSendRequest"] {
+/** Body of POST /api/send-email; the server checks a coach writes to known members only. `sender`: the template's
+    name or the free text's sender (senderFields). */
+export function sendBody(
+  competition: Competition,
+  recipients: readonly Row[],
+  subject: string,
+  body: string,
+  sender: Pick<Schemas["EmailSendRequest"], "template_name" | "sender_email">,
+): Schemas["EmailSendRequest"] {
   return {
+    ...sender,
     subject: subject.trim(),
     body: body.trim(),
     competition_id: competition.id,

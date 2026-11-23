@@ -112,12 +112,12 @@ template's sender read-only (it already sends `template_name`).
 
 ### Acceptance criteria
 
-- [ ] With a template picked, the request has `template_name` and no `sender_email`; the e-mail leaves from the template's sender
-- [ ] With free text, the request has `sender_email` from the select and no `template_name`
-- [ ] A coach can pick any alias for free text; the recipient check still refuses unknown addresses
-- [ ] A template whose sender is not allowed: warning shown, send button disabled
-- [ ] Offline / template list unavailable: free text still sends as the account (offline path unchanged)
-- [ ] Vitest: `sendBody` builds each of the two request shapes
+- [x] With a template picked, the request has `template_name` and no `sender_email`; the e-mail leaves from the template's sender
+- [x] With free text, the request has `sender_email` from the select and no `template_name`
+- [x] A coach can pick any alias for free text; the recipient check still refuses unknown addresses
+- [x] A template whose sender is not allowed: warning shown, send button disabled
+- [x] Offline / template list unavailable: free text still sends as the account (offline path unchanged)
+- [x] Vitest: `sendBody` builds each of the two request shapes
 
 ---
 

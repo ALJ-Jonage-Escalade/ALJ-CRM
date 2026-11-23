@@ -12,8 +12,9 @@ import type { Competition, Row } from "../competitions";
 import { audience, AUDIENCES, defaultTemplate, hasEmail, sendBody, sentMessage, variables, type Audience } from "./email";
 import { plural } from "../../../lib/text";
 import { renderHtml, renderTemplate, templateError, toKeys, toLabels } from "../../../lib/templateVariables";
-import { initialOfKind, templatesOfKind } from "../../../lib/emailTemplates";
+import { initialOfKind, senderFields, templatesOfKind } from "../../../lib/emailTemplates";
 import TemplateField from "../../../components/TemplateField.vue";
+import EmailSenderField from "../../../components/EmailSenderField.vue";
 import { dialogs } from "../../../composables/dialogs";
 
 const props = defineProps<{ competition: Competition; rows: readonly Row[] }>();
@@ -29,6 +30,13 @@ watch(who, () => (removed.value = new Set()));
 /** The club's competition templates. */
 const templates = ref<EmailTemplate[]>([]);
 const templateName = ref("");
+const template = computed(() => templates.value.find((t) => t.name === templateName.value));
+/** The sending account, the addresses a free text may leave from, and the one chosen (empty: the account). */
+const account = ref("");
+const aliases = ref<string[]>([]);
+const senderEmail = ref("");
+/** A template whose sender the server no longer allows: its send would be refused. */
+const senderRefused = computed(() => template.value?.sender_allowed === false);
 /** Subject and body with the variables' labels ({Prénom}); sent with their keys. */
 const subject = ref("");
 const body = ref("");
@@ -45,7 +53,10 @@ function useTemplate(): void {
 
 void (async () => {
   try {
-    const all = (await communicationsApi.emailTemplates()).templates;
+    const answer = await communicationsApi.emailTemplates();
+    const all = answer.templates;
+    account.value = answer.default_sender_email ?? "";
+    aliases.value = answer.sender_aliases ?? [];
     templates.value = templatesOfKind(all, "competition");
     // On a slow network the user may have started writing: the default template must not replace their text
     if (!subject.value.trim() && !body.value.trim()) {
@@ -104,7 +115,13 @@ async function send(): Promise<void> {
   sending.value = true;
   try {
     const result = await communicationsApi.sendEmail(
-      sendBody(props.competition, reachable.value, toKeys(subject.value), toKeys(body.value)),
+      sendBody(
+        props.competition,
+        reachable.value,
+        toKeys(subject.value),
+        toKeys(body.value),
+        senderFields(template.value, senderEmail.value),
+      ),
     );
     // A refused request (400) or a sending where every e-mail failed (502) is thrown by unwrap(), caught below
     emit("sent", sentMessage(result));
@@ -165,6 +182,7 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
         <option v-for="t in templates" :key="t.name" :value="t.name">{{ t.name }}</option>
       </select>
     </div>
+    <EmailSenderField v-model="senderEmail" :template="template" :account="account" :aliases="aliases" />
     <TemplateField
       id="email-subject"
       v-model="subject"
@@ -195,7 +213,9 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
     <p v-if="problem" role="alert" class="text-[13px] font-semibold text-red-700" data-testid="email-problem">{{ problem }}</p>
     <UiDialogActions>
       <UiButton variant="muted" @click="emit('cancel')">Annuler</UiButton>
-      <UiButton type="submit" data-testid="email-send" :busy="sending && 'Envoi en cours…'">🚀 Envoyer ({{ reachable.length }})</UiButton>
+      <UiButton type="submit" data-testid="email-send" :disabled="senderRefused" :busy="sending && 'Envoi en cours…'">
+        🚀 Envoyer ({{ reachable.length }})
+      </UiButton>
     </UiDialogActions>
   </form>
 </template>

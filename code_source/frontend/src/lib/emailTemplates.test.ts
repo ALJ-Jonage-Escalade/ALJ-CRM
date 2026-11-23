@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EmailTemplate } from "../services/communications";
-import { initialOfKind, templatesOfKind } from "./emailTemplates";
+import { initialOfKind, senderFields, templatesOfKind } from "./emailTemplates";
 
 const t = (name: string, kind: EmailTemplate["kind"], is_default = false): EmailTemplate => ({
   name,
@@ -17,6 +17,14 @@ const TEMPLATES = [
   t("Relance", "competition", true),
   t("Attestation", "attestation"),
 ];
+
+describe("sender of a send request", () => {
+  it("is the template's when one is used, else the address chosen", () => {
+    expect(senderFields(t("Relance", "adherent"), "b@x.fr")).toEqual({ template_name: "Relance" });
+    expect(senderFields(undefined, "b@x.fr")).toEqual({ sender_email: "b@x.fr" });
+    expect(senderFields(undefined, "")).toEqual({ sender_email: "" }); // the sending account
+  });
+});
 
 describe("templates of a screen", () => {
   it("keeps the templates of the kind", () => {

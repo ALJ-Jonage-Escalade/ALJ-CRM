@@ -10,20 +10,32 @@ import { createCommunicationsApi, type EmailTemplate } from "../../services/comm
 import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
 import { renderHtml, renderTemplate, templateError, toKeys, toLabels } from "../../lib/templateVariables";
-import { initialOfKind, templatesOfKind } from "../../lib/emailTemplates";
+import { initialOfKind, senderFields, templatesOfKind } from "../../lib/emailTemplates";
 import TemplateField from "../../components/TemplateField.vue";
+import EmailSenderField from "../../components/EmailSenderField.vue";
 import { memberVariables, signatureText } from "./record";
 import { dialogs } from "../../composables/dialogs";
 
-const props = defineProps<{ member: Member; templates: readonly EmailTemplate[]; clubContactEmail: string }>();
+/** account: the sending account; aliases: the addresses a free text may leave from (both from /api/email-templates). */
+const props = defineProps<{
+  member: Member;
+  templates: readonly EmailTemplate[];
+  clubContactEmail: string;
+  account: string;
+  aliases: readonly string[];
+}>();
 const values = computed(() => memberVariables(props.member));
 const emit = defineEmits<{ sent: [message: string]; failed: [message: string]; cancel: [] }>();
 const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 
 const to = computed(() => props.member.email_primary.trim());
-const canSend = computed(() => looksLikeEmail(to.value));
 const offered = computed(() => templatesOfKind(props.templates, "adherent"));
 const templateName = ref(initialOfKind(props.templates, "adherent", () => undefined)?.name ?? "");
+const template = computed(() => offered.value.find((t) => t.name === templateName.value));
+/** The free text's sender; empty: the sending account. */
+const senderEmail = ref("");
+/** No address, or a template whose sender the server no longer allows (its send would be refused). */
+const canSend = computed(() => looksLikeEmail(to.value) && template.value?.sender_allowed !== false);
 /** Subject and body with the variables' labels ({Prénom}); sent with their keys. */
 const subject = ref("");
 const body = ref("");
@@ -68,6 +80,7 @@ async function send(): Promise<void> {
   sending.value = true;
   try {
     await communicationsApi.sendEmail({
+      ...senderFields(template.value, senderEmail.value),
       subject: toKeys(subject.value.trim()),
       body: toKeys(body.value.trim()),
       add_signature: signature.value,
@@ -112,6 +125,7 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
         <option v-for="t in offered" :key="t.name" :value="t.name">{{ t.name }}</option>
       </select>
     </div>
+    <EmailSenderField v-model="senderEmail" :template="template" :account="account" :aliases="aliases" />
     <TemplateField id="email-subject" v-model="subject" kind="adherent" label="Sujet *" placeholder="Sujet de votre message…" />
     <TemplateField id="email-body" v-model="body" kind="adherent" label="Message *" multiline :rows="6" placeholder="Bonjour {Prénom}, …" />
     <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-slate-700">
