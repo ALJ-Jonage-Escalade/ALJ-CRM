@@ -46,6 +46,7 @@ export function member(change: Partial<Member>): Member {
     ...Object.fromEntries(text.map((k) => [k, ""])),
     user_id: 1,
     purchase_id: 1,
+    helloasso_item_id: null,
     age: null,
     sex: null,
     amount: null,

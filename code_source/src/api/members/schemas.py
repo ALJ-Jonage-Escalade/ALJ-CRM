@@ -66,6 +66,7 @@ class Member(BaseModel):
     Names, city and phones are already formatted; status_norm is the French status label."""
     user_id: int
     purchase_id: int
+    helloasso_item_id: Optional[int] = Field(description="The HelloAsso registration the membership comes from, None when entered by hand")
     season_name: str
     last_name: str
     first_name: str
@@ -221,6 +222,19 @@ class MemberCreate(RequestBody):
 
 class MemberCreated(BaseModel):
     status: Literal["success"]
+    message: str
+    order_ref: str
+    season: str
+
+
+class HelloAssoDetach(BaseModel):
+    """Why the admin detaches a membership from its HelloAsso registration (required, kept in the import history)."""
+    reason: str
+
+
+class HelloAssoDetached(BaseModel):
+    """The membership deleted: its HelloAsso registration is to be attached again from the import."""
+    status: str
     message: str
     order_ref: str
     season: str

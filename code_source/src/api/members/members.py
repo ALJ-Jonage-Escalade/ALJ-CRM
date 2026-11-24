@@ -9,8 +9,11 @@ from typing import List, Optional
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from api.members.schemas import CompetitorContact, MemberCreate, MemberCreated, MemberList, MemberUpdate, MemberUpdated
+from api.auth.me import author_of
+from api.members.schemas import (CompetitorContact, HelloAssoDetach, HelloAssoDetached, MemberCreate, MemberCreated, MemberList,
+                                 MemberUpdate, MemberUpdated)
 from api.responses import error_responses, json_with_etag
+from services.members.helloasso_detach import detach_from_helloasso
 from services.members.members import MemberService as Service
 
 router = APIRouter(prefix="/api/members")
@@ -42,3 +45,11 @@ def add_member_api(data: MemberCreate) -> MemberCreated:
     order_ref, season = Service.add_member(member.model_dump(), data.season)
     return MemberCreated(status="success", message=f"Adhérent {member.first_name} {member.last_name} ajouté avec succès.",
                          order_ref=order_ref, season=season)
+
+
+@router.post("/purchases/{purchase_id}/detach-helloasso", response_model=HelloAssoDetached, responses=error_responses(400, 404))
+def detach_helloasso_api(purchase_id: int, data: HelloAssoDetach, request: Request) -> HelloAssoDetached:
+    """Deletes a membership linked to a HelloAsso registration (a wrong match of the import); the member is kept."""
+    detached = detach_from_helloasso(purchase_id, data.reason, author_of(request))
+    return HelloAssoDetached(status="success", message=f"Inscription HelloAsso détachée de {detached.member}.",
+                             order_ref=detached.order_ref, season=detached.season)

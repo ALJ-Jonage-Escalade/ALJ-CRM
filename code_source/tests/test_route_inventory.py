@@ -105,6 +105,7 @@ EXPECTED_ROUTES: dict[tuple[str, str], Optional[Role]] = {
     ("POST", "/api/members/add"): Role.ADMIN,
     ("GET", "/api/members/competitors"): Role.COACH,
     ("POST", "/api/members/create"): Role.ADMIN,
+    ("POST", "/api/members/purchases/{purchase_id}/detach-helloasso"): Role.ADMIN,
     ("POST", "/api/members/update"): Role.ADMIN,
     ("GET", "/api/planning"): Role.COACH,
     ("GET", "/api/planning/export"): Role.COACH,

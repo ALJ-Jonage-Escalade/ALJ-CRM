@@ -191,6 +191,7 @@ def member_row(row: Dict[str, Any], slots: Dict[str, Dict[str, str]],
         "passeport_orange": "",  # read by getMemberDiplomes; no such column in the database
         "user_id": row.get("user_id"),
         "purchase_id": row.get("purchase_id"),
+        "helloasso_item_id": row.get("helloasso_item_id"),
         "birth_date": birth,
         "age": age if age is not None and age >= 0 else None,
         "sex": parse_sex(row.get("sex")),

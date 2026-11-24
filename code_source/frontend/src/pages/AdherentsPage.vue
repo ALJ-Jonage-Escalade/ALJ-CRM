@@ -244,6 +244,14 @@ async function openAction(next: RecordAction): Promise<void> {
   await actions.value?.open(next);
 }
 
+/** The membership was deleted: its record closes (the season stays chosen) and the list is read again. */
+async function detached(message: string): Promise<void> {
+  const rest = Object.fromEntries(Object.entries(route.query).filter(([k]) => k !== "id" && k !== "achat"));
+  await router.replace({ query: rest });
+  await members.refresh();
+  toast.show(message, 12_000);
+}
+
 const tarifs = computed(() => tarifChoices(membersList.value?.creneaux ?? [], all.value));
 
 // Add (?ajout=1)
@@ -510,6 +518,7 @@ const linkButton =
           @email="openAction('email')"
           @attestation="openAction('attestation')"
           @edit="openAction('edit')"
+          @detach="openAction('detach')"
         >
           <template #status>
             <UiBadge :color="statusColor(record.status_norm)">{{ record.status_norm || "—" }}</UiBadge>
@@ -525,6 +534,7 @@ const linkButton =
       :admin="isAdmin(role)"
       :tarifs="tarifs"
       @changed="members.refresh()"
+      @detached="detached"
       @notify="toast.show"
     />
     <MemberAddDialog

@@ -1,23 +1,28 @@
 <script setup lang="ts">
-/* Read view of a member record: status, slot, every known field, call / write links. Coaches and admins can send an
-   e-mail; admins also get the payment certificate and the edit form, which the page opens in a dialog. compact: a narrow
-   column (the page's side panel), each label above its value. */
+/* Read view of a member record: status, slot, every known field. Admins get the edit form, which the page opens in a
+   dialog; the other actions are in the « Plus » menu: e-mail (coaches and admins), call, payment certificate and detach
+   from HelloAsso (admins, online only).
+   compact: a narrow column (the page's side panel), each label above its value. */
 import { computed, inject, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import UiBadge from "../../components/ui/UiBadge.vue";
 import UiButton from "../../components/ui/UiButton.vue";
+import UiMenu from "../../components/ui/UiMenu.vue";
+import UiMenuItem from "../../components/ui/UiMenuItem.vue";
 import { ApiError, CLIENT_KEY, errorText } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
 import { telHref } from "../../lib/text";
+import { useNetworkUp } from "../../composables/network";
 import { isCompetitor, type Member } from "./members";
 import { paymentBadge, type Competition, type Participant } from "../competitions/competitions";
 import { recordRows } from "./record";
 import { createCompetitionsApi } from "../../services/competitions";
 
 const props = defineProps<{ member: Member; admin: boolean; compact?: boolean }>();
-const emit = defineEmits<{ email: []; attestation: []; edit: [] }>();
+const emit = defineEmits<{ email: []; attestation: []; edit: []; detach: [] }>();
 
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
+const networkUp = useNetworkUp();
 const tab = ref<"general" | "competitions">("general");
 const competitions = ref<Competition[]>([]);
 /** Why the competitions tab is empty when the server refused or failed; offline, it just stays empty. */
@@ -43,6 +48,11 @@ const memberCompetitions = computed(() => {
 });
 
 const rows = computed(() => recordRows(props.member));
+
+/** Dials the number: a menu item cannot be a tel: link, so it opens the link itself. */
+function call(phone: string): void {
+  window.location.href = telHref(phone);
+}
 </script>
 
 <template>
@@ -65,28 +75,32 @@ const rows = computed(() => recordRows(props.member));
       </div>
     </div>
 
-    <div class="flex flex-wrap gap-2">
-      <UiButton small data-testid="record-email" title="Envoyer un e-mail à cet adhérent" @click="emit('email')">✉️ E-mail</UiButton>
-      <template v-if="admin">
-        <UiButton variant="muted" small data-testid="record-attestation" title="Attestation de paiement (PDF)" @click="emit('attestation')">
+    <div class="flex flex-wrap items-center gap-2" data-testid="record-actions">
+      <UiButton v-if="admin" variant="muted" small data-testid="record-edit" title="Modifier la fiche adhérent" @click="emit('edit')">
+        ✏️ Modifier
+      </UiButton>
+      <UiMenu label="⋯ Plus" small align="start" aria-label="Plus d'actions" data-testid="record-more">
+        <UiMenuItem data-testid="record-email" title="Envoyer un e-mail à cet adhérent" @select="emit('email')">✉️ E-mail</UiMenuItem>
+        <UiMenuItem v-if="member.phone" data-testid="record-call" @select="call(member.phone)">📞 Appeler</UiMenuItem>
+        <UiMenuItem v-if="admin" data-testid="record-attestation" title="Attestation de paiement (PDF)" @select="emit('attestation')">
           📄 Attestation
-        </UiButton>
-        <UiButton variant="muted" small data-testid="record-edit" title="Modifier la fiche adhérent" @click="emit('edit')">
-          ✏️ Modifier
-        </UiButton>
-      </template>
-      <span v-else data-testid="record-readonly" class="self-center text-[11.5px] text-slate-500 italic">
+        </UiMenuItem>
+        <UiMenuItem
+          v-if="admin && member.helloasso_item_id !== null"
+          danger
+          data-testid="record-detach"
+          :disabled="!networkUp"
+          :title="
+            networkUp ? 'Supprimer cette adhésion, issue d\'une inscription HelloAsso rattachée au mauvais adhérent' : 'Connexion requise'
+          "
+          @select="emit('detach')"
+        >
+          🔗 Détacher de HelloAsso
+        </UiMenuItem>
+      </UiMenu>
+      <span v-if="!admin" data-testid="record-readonly" class="text-[11.5px] text-slate-500 italic">
         👁️ Modification et attestation réservées aux administrateurs
       </span>
-    </div>
-    <div class="flex flex-wrap gap-2">
-      <a
-        v-if="member.phone"
-        :href="telHref(member.phone)"
-        class="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 no-underline"
-      >
-        📞 Appeler
-      </a>
     </div>
 
     <div class="flex border-b border-slate-200 text-xs font-semibold" data-testid="record-tabs">
