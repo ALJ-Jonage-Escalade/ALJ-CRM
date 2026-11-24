@@ -59,16 +59,12 @@ class MemberRepository:
     def list_flat_member_rows(cls, season: Optional[str]) -> List[MemberRow]:
         """Purchases of `season` (None: every season) from the flat member view, newest members first. Callers that
         need an order of their own sort the rows themselves (the FFME export, the attendance sheets)."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
+        with SqliteDatabase.connect() as conn:
             if season is None:
                 rows = conn.execute('SELECT * FROM v_member_flat ORDER BY "user_id" DESC').fetchall()
             else:
                 rows = conn.execute('SELECT * FROM v_member_flat WHERE season_name = ? ORDER BY "user_id" DESC',
                                     (season,)).fetchall()
-        finally:
-            conn.close()
         return [dict(row) for row in rows]
 
 
@@ -93,20 +89,16 @@ class MemberRepository:
 
     @classmethod
     def _query_member_rows(cls, where: str, params: tuple) -> List[MemberRow]:
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
+        with SqliteDatabase.connect() as conn:
             rows = [dict(r) for r in conn.execute(f"{cls._MEMBER_ROWS_SELECT} {cls._MEMBER_ROWS_FROM} WHERE {where}", params).fetchall()]
             contacts_by_user: Dict[int, List[Dict[str, str]]] = {}
             for contact in conn.execute(
                     f"SELECT user_id, name, phone FROM emergency_contacts WHERE user_id IN (SELECT p.user_id {cls._MEMBER_ROWS_FROM} WHERE {where}) "  # noqa: S608 - fragments SQL littéraux du code, valeurs en paramètres
                     "ORDER BY user_id, position, id", params).fetchall():
                 contacts_by_user.setdefault(contact["user_id"], []).append({"name": contact["name"] or "", "phone": contact["phone"] or ""})
-            for row in rows:
-                row["emergency_contacts"] = contacts_by_user.get(row["user_id"], [])
-            return rows
-        finally:
-            conn.close()
+        for row in rows:
+            row["emergency_contacts"] = contacts_by_user.get(row["user_id"], [])
+        return rows
 
     @classmethod
     def list_member_rows(cls, season_name: str) -> List[MemberRow]:
@@ -127,20 +119,11 @@ class MemberRepository:
     def upsert_members(cls, members: List[MemberRecord], season_name: str) -> int:
         """Insère ou met à jour un lot d'adhérents dans le schéma v2 (users / orders / purchases / purchase_options).
         Returns the number of purchases written; a database failure is rolled back and raised."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
-            cursor = conn.cursor()
-            stats = schema_v2.write_members_to_v2(cursor, members, season_name)
-            inserted_count = stats["purchases"]
-            conn.commit()
-            logger.info(f"[SQLITE] Synchro reussie : {inserted_count} adhesions enregistrees/mises a jour "
-                  f"pour la saison {season_name}. (v2: {stats})")
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        with SqliteDatabase.transaction() as conn:
+            stats = schema_v2.write_members_to_v2(conn.cursor(), members, season_name)
+        inserted_count = stats["purchases"]
+        logger.info(f"[SQLITE] Synchro reussie : {inserted_count} adhesions enregistrees/mises a jour "
+                    f"pour la saison {season_name}.")
         return inserted_count
 
 
@@ -154,9 +137,7 @@ class MemberRepository:
         Returns the order reference. InvalidRequest when a registration with a higher priority already exists;
         a database error is rolled back and raised.
         """
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
+        with SqliteDatabase.transaction() as conn:
             now = datetime.datetime.now()
             order_ref = f"MANUEL-{now.strftime('%Y%m%d-%H%M%S')}"
             payer_email = str(fields.get("email_primary") or "").strip()
@@ -203,42 +184,28 @@ class MemberRepository:
             cursor = conn.cursor()
             stats = schema_v2.write_members_to_v2(cursor, [rec], season_name)
             if not stats.get("purchases"):
-                conn.rollback()
                 raise InvalidRequest(HIGHER_PRIORITY_REGISTRATION)
-            conn.commit()
-            # Personal data (names) never goes to the logs: the order reference identifies the purchase
-            logger.info(f"[SQLITE] Manual member added ({order_ref}, season {season_name}).")
-            return order_ref
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        # Personal data (names) never goes to the logs: the order reference identifies the purchase
+        logger.info(f"[SQLITE] Manual member added ({order_ref}, season {season_name}).")
+        return order_ref
 
     @classmethod
     def count_members(cls) -> int:
         """Number of members (users) in the cache, every season."""
-        conn = SqliteDatabase.get_connection()
-        try:
+        with SqliteDatabase.connect() as conn:
             row = conn.execute("SELECT COUNT(*) FROM users").fetchone()
-            return row[0] if row else 0
-        finally:
-            conn.close()
+        return row[0] if row else 0
 
     @classmethod
     def list_contact_emails(cls) -> set[str]:
         """Every member and payer address in the database (lower-cased)."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
-            emails: set[str] = set()
+        emails: set[str] = set()
+        with SqliteDatabase.connect() as conn:
             for sql in ("SELECT email_primary, email_secondary FROM users", "SELECT payer_email FROM orders"):
                 for row in conn.execute(sql).fetchall():
                     emails.update(str(v).strip().lower() for v in tuple(row) if v)
-            emails.discard("")
-            return emails
-        finally:
-            conn.close()
+        emails.discard("")
+        return emails
 
     @classmethod
     def get_users_by_ids(cls, ids: List[int]) -> Dict[int, dict]:
@@ -246,28 +213,22 @@ class MemberRepository:
         ids = list(dict.fromkeys(ids or []))
         if not ids:
             return {}
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
-            placeholders = ",".join("?" * len(ids))
+        placeholders = ",".join("?" * len(ids))
+        with SqliteDatabase.connect() as conn:
             rows = conn.execute(
                 "SELECT id, first_name, last_name, email_primary, email_secondary, phone, licence_ffme "  # noqa: S608 - uniquement des marqueurs ?
                 f"FROM users WHERE id IN ({placeholders})",
                 ids,
             ).fetchall()
-            return {row["id"]: dict(row) for row in rows}
-        finally:
-            conn.close()
+        return {row["id"]: dict(row) for row in rows}
 
 
     @classmethod
     def update_email_sent_date(cls, order_ref: str, last_name: str, first_name: str, date_str: str, purchase_id: Optional[int] = None) -> bool:
         """Met à jour la date d'envoi d'e-mail sur les achats v2 de la commande.
         False when no purchase matches; a database failure is rolled back and raised."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
-        try:
+        with SqliteDatabase.transaction() as conn:
+            cursor = conn.cursor()
             if purchase_id:
                 cursor.execute("""
                     UPDATE purchases
@@ -275,8 +236,6 @@ class MemberRepository:
                     WHERE id = ?
                 """, (date_str, int(purchase_id)))
                 if cursor.rowcount > 0:
-                    conn.commit()
-                    logger.debug(f"[SQLITE] Date d'envoi d'e-mail enregistree pour l'achat #{purchase_id} : {date_str}")
                     return True
 
             cursor.execute("""
@@ -297,17 +256,10 @@ class MemberRepository:
                     WHERE order_id IN (SELECT id FROM orders WHERE order_ref = ?)
                 """, (date_str, str(order_ref).strip()))
                 rows_affected = cursor.rowcount
-            conn.commit()
-            if rows_affected > 0:
-                logger.debug(f"[SQLITE] Date d'envoi d'e-mail enregistree pour la commande {order_ref} : {date_str}")
-                return True
-            logger.info(f"[SQLITE] Aucun achat trouve pour la commande {order_ref} (achat #{purchase_id})")
-            return False
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        if rows_affected > 0:
+            return True
+        logger.info(f"[SQLITE] Aucun achat trouve pour la commande {order_ref} (achat #{purchase_id})")
+        return False
 
     @classmethod
     def update_member_fields(
@@ -327,67 +279,57 @@ class MemberRepository:
         if not fields:
             raise InvalidRequest("Aucun champ à mettre à jour.")
 
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
         try:
-            now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+            with SqliteDatabase.transaction() as conn:
+                cursor = conn.cursor()
+                now_iso = datetime.datetime.now().isoformat(timespec="seconds")
 
-            # Résolution de user_id si absent
-            resolved_uid = user_id
-            if resolved_uid is None and purchase_id:
-                row = cursor.execute("SELECT user_id FROM purchases WHERE id = ?", (int(purchase_id),)).fetchone()
-                if row:
-                    resolved_uid = row["user_id"]
+                # Résolution de user_id si absent
+                resolved_uid = user_id
+                if resolved_uid is None and purchase_id:
+                    row = cursor.execute("SELECT user_id FROM purchases WHERE id = ?", (int(purchase_id),)).fetchone()
+                    if row:
+                        resolved_uid = row["user_id"]
 
-            if resolved_uid is None and order_ref:
-                row = cursor.execute("""
-                    SELECT p.user_id FROM purchases p
-                    JOIN orders o ON o.id = p.order_id
-                    WHERE o.order_ref = ?
-                    LIMIT 1
-                """, (str(order_ref).strip(),)).fetchone()
-                if row:
-                    resolved_uid = row["user_id"]
+                if resolved_uid is None and order_ref:
+                    row = cursor.execute("""
+                        SELECT p.user_id FROM purchases p
+                        JOIN orders o ON o.id = p.order_id
+                        WHERE o.order_ref = ?
+                        LIMIT 1
+                    """, (str(order_ref).strip(),)).fetchone()
+                    if row:
+                        resolved_uid = row["user_id"]
 
-            user_updates = _user_column_updates(fields)
-            if user_updates and resolved_uid is not None:
-                sets = [f'"{col}" = ?' for col in user_updates.keys()]
-                sets.append('updated_at = ?')
-                params = list(user_updates.values()) + [now_iso, int(resolved_uid)]
-                cursor.execute(f'UPDATE users SET {", ".join(sets)} WHERE id = ?', params)  # noqa: S608 - columns from _user_column_updates' fixed lists
+                user_updates = _user_column_updates(fields)
+                if user_updates and resolved_uid is not None:
+                    sets = [f'"{col}" = ?' for col in user_updates.keys()]
+                    sets.append('updated_at = ?')
+                    params = list(user_updates.values()) + [now_iso, int(resolved_uid)]
+                    cursor.execute(f'UPDATE users SET {", ".join(sets)} WHERE id = ?', params)  # noqa: S608 - columns from _user_column_updates' fixed lists
 
-            if fields.get("emergency_contacts") is not None and resolved_uid is not None:
-                replace_emergency_contacts(cursor, int(resolved_uid), fields["emergency_contacts"], now_iso)
+                if fields.get("emergency_contacts") is not None and resolved_uid is not None:
+                    replace_emergency_contacts(cursor, int(resolved_uid), fields["emergency_contacts"], now_iso)
 
-            purchase_updates = _purchase_column_updates(fields)
-            if purchase_updates:
-                _update_purchases(cursor, purchase_updates, purchase_id, order_ref, resolved_uid, now_iso)
-            if "status" in purchase_updates:  # the order carries the status too
-                status_params = (purchase_updates["status"], purchase_updates["status_normalized"], now_iso)
-                if order_ref:
-                    cursor.execute("""
-                        UPDATE orders
-                        SET status = ?, status_normalized = ?, updated_at = ?
-                        WHERE order_ref = ?
-                    """, (*status_params, str(order_ref).strip()))
-                elif purchase_id:
-                    cursor.execute("""
-                        UPDATE orders
-                        SET status = ?, status_normalized = ?, updated_at = ?
-                        WHERE id = (SELECT order_id FROM purchases WHERE id = ?)
-                    """, (*status_params, int(purchase_id)))
-
-            conn.commit()
-            logger.debug(f"[SQLITE] Adhérent #{resolved_uid} mis à jour avec succès : {list(fields.keys())}")
+                purchase_updates = _purchase_column_updates(fields)
+                if purchase_updates:
+                    _update_purchases(cursor, purchase_updates, purchase_id, order_ref, resolved_uid, now_iso)
+                if "status" in purchase_updates:  # the order carries the status too
+                    status_params = (purchase_updates["status"], purchase_updates["status_normalized"], now_iso)
+                    if order_ref:
+                        cursor.execute("""
+                            UPDATE orders
+                            SET status = ?, status_normalized = ?, updated_at = ?
+                            WHERE order_ref = ?
+                        """, (*status_params, str(order_ref).strip()))
+                    elif purchase_id:
+                        cursor.execute("""
+                            UPDATE orders
+                            SET status = ?, status_normalized = ?, updated_at = ?
+                            WHERE id = (SELECT order_id FROM purchases WHERE id = ?)
+                        """, (*status_params, int(purchase_id)))
         except sqlite3.IntegrityError:
-            conn.rollback()
             raise InvalidRequest(DUPLICATE_MEMBER) from None
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
 
 
 # Member fields written as trimmed text, and the yes/no fields with their default

@@ -12,7 +12,8 @@ import logging
 import os
 import sqlite3
 import time
-from typing import Optional
+from contextlib import contextmanager
+from typing import Iterator, Optional
 
 from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.sqlite import schema_v2
@@ -202,6 +203,29 @@ class SqliteDatabase:
         # déclencheurs de suppression (suivi des modifications pour Firestore).
         conn.execute("PRAGMA recursive_triggers=ON")
         return conn
+
+    @classmethod
+    @contextmanager
+    def connect(cls) -> Iterator[sqlite3.Connection]:
+        """Connection to the application's database (schema applied first), closed when the block ends: for reads."""
+        cls.setup_database()
+        conn = cls.get_connection()
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+    @classmethod
+    @contextmanager
+    def transaction(cls) -> Iterator[sqlite3.Connection]:
+        """Like connect(), for writes: committed when the block ends, rolled back (and the error raised) when it fails."""
+        with cls.connect() as conn:
+            try:
+                yield conn
+            except BaseException:
+                conn.rollback()
+                raise
+            conn.commit()
 
     @classmethod
     def setup_database(cls, force: bool = False) -> None:

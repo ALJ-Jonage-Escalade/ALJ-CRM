@@ -7,6 +7,7 @@ from typing import List
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
+from api.auth.me import author_of
 from api.responses import STORAGE_ERRORS, SUCCESS, error_responses, json_with_etag
 from api.competitions.schemas.helloasso_items import ItemIgnore, ItemLink
 from api.competitions.schemas.views import Done, HelloAssoItem, ItemLinked
@@ -29,7 +30,5 @@ def link_helloasso_item(id_item: int, body: ItemLink) -> Doc:
 
 @router.put("/{id_item}/ignore", response_model=Done, responses=error_responses(404, *STORAGE_ERRORS))
 def ignore_helloasso_item(id_item: int, body: ItemIgnore, request: Request) -> Doc:
-    claims = getattr(request.state, "user", None) or {}
-    Service.ignore_item(id_item, body.ignore, body.motif, body.commentaire,
-                        by=str(claims.get("email") or ""))
+    Service.ignore_item(id_item, body.ignore, body.motif, body.commentaire, by=author_of(request))
     return SUCCESS

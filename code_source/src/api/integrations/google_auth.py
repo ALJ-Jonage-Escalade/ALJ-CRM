@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from api.integrations.schemas import (
     GoogleChecks, GoogleLoginStart, GoogleLoginUrl, GoogleStatus, GoogleTest, GoogleTokenUpdate, GoogleTokenUpdated, ServiceCheck,
 )
+from api.auth.me import author_of
 from api.responses import error, error_responses
 from services.integrations import google_account
 from services.integrations.google_account import DEFAULT_RETURN_TO, LoginFailed, safe_return_to
@@ -52,8 +53,7 @@ def _callback_url(request: Request) -> str:
 def google_auth_login(request: Request, data: GoogleLoginStart) -> GoogleLoginUrl | JSONResponse:
     """Starts the Google OAuth2 flow that replaces the club's refresh token (admins): answers Google's consent URL,
     with a signed state naming the admin, that the page then opens."""
-    claims = getattr(request.state, "user", None) or {}  # None: token check off (local server)
-    url = google_account.start_login(_callback_url(request), data.return_to, str(claims.get("email") or ""))
+    url = google_account.start_login(_callback_url(request), data.return_to, author_of(request))
     if url is None:
         return error(503, "Aucun identifiant client Google (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET) n'est configuré sur le serveur.")
     return GoogleLoginUrl(status="success", url=url)

@@ -13,7 +13,7 @@ from typing import List
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from api.responses import STORAGE_ERRORS, SUCCESS, XLSX, document_responses, error_responses, json_with_etag
+from api.responses import STORAGE_ERRORS, SUCCESS, XLSX, document_responses, error_responses, file_download, json_with_etag
 from api.competitions.schemas.competitions import CompetitionCreate, CompetitionFfmeLookup, CompetitionUpdate
 from api.competitions.schemas.views import Competition, Done, PastArchived
 from services.competitions.competitions import CompetitionService as Service
@@ -56,12 +56,7 @@ def archive_past_competitions() -> Doc:
 @router.get("/{competition_id}/export-excel", response_class=Response,
             responses={200: {"content": {XLSX: {}}, "description": "Classeur Excel"}, **error_responses(404, *STORAGE_ERRORS)})
 def export_competition_excel(competition_id: int) -> Response:
-    content = Service.export_excel(competition_id)
-    return Response(
-        content=content,
-        media_type=XLSX,
-        headers={"Content-Disposition": f'attachment; filename="competiteurs_{competition_id}.xlsx"'},
-    )
+    return file_download(Service.export_excel(competition_id), f"competiteurs_{competition_id}.xlsx", XLSX)
 
 
 @router.get("/{competition_id}/export-pdf", response_class=Response,
@@ -73,8 +68,4 @@ def export_competition_pdf(competition_id: int) -> Response:
     is_pdf = content.startswith(b"%PDF")
     media_type = "application/pdf" if is_pdf else "text/html; charset=utf-8"
     extension = "pdf" if is_pdf else "html"
-    return Response(
-        content=content,
-        media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="competiteurs_{competition_id}.{extension}"'},
-    )
+    return file_download(content, f"competiteurs_{competition_id}.{extension}", media_type)

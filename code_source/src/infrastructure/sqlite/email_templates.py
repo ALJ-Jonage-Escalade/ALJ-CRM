@@ -16,15 +16,10 @@ class EmailTemplateRepository:
         Retourne une liste de dicts : [{"name": ..., "subject": ..., "body": ..., "sender_email": ..., "sender_name": ...,
         "kind": ..., "is_default": 0|1}] (kind vide : modèle enregistré avant les types)
         """
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute("SELECT name, subject, body, sender_email, sender_name, kind, is_default FROM email_templates ORDER BY name ASC")
-            rows = cursor.fetchall()
-            return [dict(r) for r in rows]
-        finally:
-            conn.close()
+        with SqliteDatabase.connect() as conn:
+            rows = conn.execute("SELECT name, subject, body, sender_email, sender_name, kind, is_default FROM email_templates "
+                                "ORDER BY name ASC").fetchall()
+        return [dict(r) for r in rows]
 
     @classmethod
     def save_email_template(cls, name: str, subject: str, body: str, sender_email: str = "", sender_name: str = "",
@@ -37,10 +32,8 @@ class EmailTemplateRepository:
         is_default : le modèle par défaut de son type ; les autres modèles du type perdent ce rôle dans la même écriture.
         A database failure is rolled back and raised.
         """
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
-        try:
+        with SqliteDatabase.transaction() as conn:
+            cursor = conn.cursor()
             values = (subject.strip(), body.strip(), (sender_email or "").strip() or DEFAULT_SENDER_EMAIL,
                       (sender_name or "").strip() or DEFAULT_SENDER_NAME, kind, int(is_default))
             new_name = name.strip()
@@ -65,12 +58,6 @@ class EmailTemplateRepository:
             if is_default:
                 cursor.execute("UPDATE email_templates SET is_default = 0 WHERE kind = ? AND name != ? AND is_default != 0",
                                (kind, new_name))
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
 
     @classmethod
     def delete_email_template(cls, name: str) -> bool:
@@ -78,15 +65,5 @@ class EmailTemplateRepository:
         Supprime un template d'email de la BDD : False when no template has this name.
         A database failure is rolled back and raised.
         """
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute("DELETE FROM email_templates WHERE name = ?", (name.strip(),))
-            conn.commit()
-            return cursor.rowcount > 0
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        with SqliteDatabase.transaction() as conn:
+            return conn.execute("DELETE FROM email_templates WHERE name = ?", (name.strip(),)).rowcount > 0
