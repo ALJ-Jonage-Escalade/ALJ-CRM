@@ -225,7 +225,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertIn("non enregistrés", resp.text)
         self.assertNotIn("Réussie", resp.text)
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync")
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={})
     @patch("requests.post")
     @patch("requests.get")
     @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
@@ -284,7 +284,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertTrue(data["results"]["database"]["ok"])
         self.assertTrue(data["results"]["gmail"]["ok"])
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync")
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={})
     @patch("requests.post")
     @patch("requests.get")
     @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
@@ -340,7 +340,7 @@ class TestGoogleAuthCallbackFailures(unittest.TestCase):
         self.assertIn("invalid_grant &lt;b&gt;", resp.text)
         self.assertNotIn("Réussie", resp.text)
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", side_effect=ConnectionError("Firestore down"))
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"errors": ["Firestore down"]})
     @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
     @patch("requests.get", side_effect=requests.ConnectionError("userinfo down"))
     @patch("requests.post", return_value=http_response(200, {"access_token": "tok", "refresh_token": "refresh"}))
@@ -377,19 +377,19 @@ class TestGoogleAuthDiagnostic(unittest.TestCase):
         self.assertEqual(data["status"], "warning")
         self.assertFalse(data["results"]["oauth_token"]["ok"])
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.ensure_fresh", side_effect=ConnectionError("down"))
-    def test_database_failure_is_reported(self, _fresh, _token, _get):
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"errors": ["down"]})
+    def test_database_failure_is_reported(self, _sync, _token, _get):
         replication_on(self)
         data = self.results()
         self.assertEqual(data["status"], "warning")
         self.assertFalse(data["results"]["database"]["ok"])
         self.assertTrue(data["results"]["gmail"]["ok"])
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.ensure_fresh")
-    def test_synced_database_is_ok(self, mock_fresh, _token, _get):
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"pulled": 0})
+    def test_synced_database_is_ok(self, mock_sync, _token, _get):
         replication_on(self)
         self.assertTrue(self.results()["all_ok"])
-        mock_fresh.assert_called_once_with(max_age=10)
+        mock_sync.assert_called_once_with()
 
     def test_gmail_http_and_network_failures(self, _token, mock_get):
         for answer in ({"return_value": http_response(403, text="insufficientPermissions")},
@@ -431,12 +431,13 @@ class TestGoogleTokenUpdateFailures(unittest.TestCase):
     def test_unsaved_token_is_a_503(self, _set, _post, _creds):
         self.assertEqual(self.update(user_email="club@example.org").status_code, 503)
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", side_effect=ConnectionError("down"))
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"errors": ["down"]})
     @patch("requests.post", return_value=http_response(200, {"access_token": "tok"}))
     @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
     def test_saved_token_with_failed_sync_is_a_success(self, mock_set, _post, mock_sync, _creds):
         replication_on(self)
-        resp = self.update(client_id="new-cid", client_secret="new-sec", user_email="club@example.org")  # noqa: S106 - fake credential of the test
+        with self.assertLogs("alj", "WARNING"):
+            resp = self.update(client_id="new-cid", client_secret="new-sec", user_email="club@example.org")  # noqa: S106 - fake credential of the test
         self.assertEqual(resp.status_code, 200)
         mock_sync.assert_called_once()
         self.assertEqual(mock_set.call_args.args[0]["GMAIL_CLIENT_ID"], "new-cid")

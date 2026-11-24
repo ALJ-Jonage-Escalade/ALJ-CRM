@@ -317,7 +317,7 @@ def google_auth_callback(
     sync_ok = True
     if CloudDatabase.is_enabled():
         try:
-            CloudDatabase.sync()
+            sync_ok = not CloudDatabase.sync().get("errors")  # sync logs its own failures
         except Exception as se:  # the credentials are saved: report a pending sync, never fail the page
             sync_ok = False
             internal_error(se, "google_auth_callback sync")
@@ -366,9 +366,10 @@ def test_google_auth() -> GoogleTest:
     # 2. Test Accès BDD (Firestore)
     try:
         if CloudDatabase.is_enabled():
-            CloudDatabase.ensure_fresh(max_age=10)
-            results["database"]["ok"] = True
-            results["database"]["message"] = "Base Firestore synchronisée et opérationnelle."
+            sync_errors = CloudDatabase.sync().get("errors")  # sync logs the details
+            results["database"]["ok"] = not sync_errors
+            results["database"]["message"] = ("Synchronisation Firestore impossible (détails dans les journaux)." if sync_errors
+                                              else "Base Firestore synchronisée et opérationnelle.")
         else:
             results["database"]["ok"] = True
             results["database"]["message"] = "Base locale opérationnelle (réplication Firestore désactivée)."
@@ -453,8 +454,11 @@ def update_google_token(data: GoogleTokenUpdate) -> GoogleTokenUpdated | JSONRes
 
     if CloudDatabase.is_enabled():
         try:
-            CloudDatabase.sync()
+            sync_failed = bool(CloudDatabase.sync().get("errors"))  # sync logs the details
         except Exception:
-            logger.warning("Synchronisation Firestore après mise à jour du jeton Gmail échouée", exc_info=True)
+            sync_failed = True
+            logger.exception("Synchronisation Firestore après mise à jour du jeton Gmail : erreur inattendue")
+        if sync_failed:
+            logger.warning("Synchronisation Firestore après mise à jour du jeton Gmail échouée")
 
     return GoogleTokenUpdated(status="success", message="Jeton Google mis à jour et validé avec succès.", user_email=user_email)

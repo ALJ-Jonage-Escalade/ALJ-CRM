@@ -171,8 +171,10 @@ class CloudDatabase:
         if os.path.exists(path):
             try:
                 conn = connect(path)
-                pending = pending_count(conn)
-                conn.close()
+                try:
+                    pending = pending_count(conn)
+                finally:
+                    conn.close()
             except Exception:
                 logger.warning("Comptage des modifications en attente impossible", exc_info=True)
         return {"pending": pending, "last_error": cls._last_error, "last_sync": cls._last_sync}

@@ -132,7 +132,7 @@ def update_competition(competition_id: int, change: Callable[[Competition], obje
         FirestoreClient.update_fields(documents.COLLECTION_COMPETITIONS, existing.get("_doc_id") or str(comp.id),
                                       _info_fields(doc), expected_update_time=existing.get("_update_time"))
         return True
-    return bool(documents.with_retries(f"Épreuve #{competition_id}", attempt))
+    return documents.with_retries(f"Épreuve #{competition_id}", attempt)
 
 
 def delete_competition(competition_id: int) -> bool:

@@ -272,12 +272,6 @@ def _parse_dates_to_iso(date_str: str) -> tuple[str | None, str | None]:
     return start, end
 
 
-def _parse_date_to_iso(date_str: str) -> str | None:
-    """Convertit une date au format JJ/MM/AAAA en AAAA-MM-JJ pour les formulaires HTML."""
-    start, _ = _parse_dates_to_iso(date_str)
-    return start
-
-
 def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | None]:
     """Récupère les informations d'une compétition FFME sur MyCompet à partir de son numéro.
 

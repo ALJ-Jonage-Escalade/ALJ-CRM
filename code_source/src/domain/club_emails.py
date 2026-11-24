@@ -14,6 +14,9 @@ DEFAULT_SENDER_NAME = "Amicale Laïque Jonage - Inscriptions"
 # The club's official contact address, shown to members (e-mail signature, certificate) and put in the FFME export
 CLUB_CONTACT_EMAIL = f"contact@{CLUB_SENDER_DOMAIN}"
 
+# Default recipient of the daily competition results summary (replaced from the settings page)
+DEFAULT_RESULTS_NOTIFICATION_EMAIL = "david.lopez@alj-jonage.fr"
+
 # Addresses offered in the template editor's sender field
 SENDER_SUGGESTIONS = (
     DEFAULT_SENDER_EMAIL,

@@ -158,7 +158,7 @@ def record_results(competition_id: int | str, apply_rankings: Callable[[list[Par
                 expected_update_time=doc.get("_update_time"),
             )
         return matched
-    return documents.with_retries(f"Résultats de l'épreuve #{competition_id}", attempt) or 0
+    return documents.with_retries(f"Résultats de l'épreuve #{competition_id}", attempt)
 
 
 def update_participant(competition_id: int, adherent_id: int, change: RowChange,

@@ -16,9 +16,9 @@ _src_dir = os.path.join(_code_root, "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
+from domain.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL
 from services.competitions.results_batch import (
     CompetitionResultsBatchService,
-    DEFAULT_NOTIFICATION_EMAIL,
     apply_rankings,
 )
 from support.fake_firestore import use_fake_firestore
@@ -30,10 +30,10 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
         use_fake_firestore(self)  # notification e-mail setting
 
     def test_default_notification_email(self):
-        """L'adresse de notification par défaut est david.lopez@alj-jonage.fr."""
+        """Sans réglage, l'adresse de notification est celle par défaut du club."""
         email = CompetitionResultsBatchService.get_notification_email()
         self.assertIn("@", email)
-        self.assertEqual(email, DEFAULT_NOTIFICATION_EMAIL)
+        self.assertEqual(email, DEFAULT_RESULTS_NOTIFICATION_EMAIL)
 
     def test_set_and_get_custom_notification_email(self):
         """L'adresse de notification peut être mise à jour et rechargée depuis les réglages."""
@@ -43,7 +43,7 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
         self.assertEqual(CompetitionResultsBatchService.get_notification_email(), custom_email)
 
         # Nettoyage
-        CompetitionResultsBatchService.set_notification_email(DEFAULT_NOTIFICATION_EMAIL)
+        CompetitionResultsBatchService.set_notification_email(DEFAULT_RESULTS_NOTIFICATION_EMAIL)
 
     def test_set_and_get_multiple_notification_emails(self):
         """Plusieurs adresses de notification peuvent être enregistrées et normalisées."""
@@ -57,7 +57,7 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
         self.assertEqual(parsed, ["coach1@alj-jonage.fr", "coach2@alj-jonage.fr", "admin@alj-jonage.fr"])
 
         # Nettoyage
-        CompetitionResultsBatchService.set_notification_email(DEFAULT_NOTIFICATION_EMAIL)
+        CompetitionResultsBatchService.set_notification_email(DEFAULT_RESULTS_NOTIFICATION_EMAIL)
 
     def test_set_invalid_email_raises_error(self):
         """Une adresse sans @ ou invalide lève une ValueError."""

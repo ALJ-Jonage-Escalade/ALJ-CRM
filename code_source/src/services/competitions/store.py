@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import math
 import os
 from typing import Callable, List, ParamSpec, TypeVar
 
@@ -24,16 +25,19 @@ logger = logging.getLogger("alj")
 P = ParamSpec("P")
 R = TypeVar("R")
 
-# Writes through the services drop the cache at once; writes made elsewhere (results batch,
-# webhook, other instance) show up after CACHE_SECONDS (0 in the e2e tests, whose fixtures
-# write straight to Firestore).
-CACHE_SECONDS = float(os.environ.get("ALJ_COMPETITIONS_CACHE_SECONDS", "5"))
 _CACHE_KEY = "competitions"
-_competitions_cache: TimedCache[str, List[Doc]] = TimedCache(CACHE_SECONDS)
+_competitions_cache: TimedCache[str, List[Doc]] = TimedCache(math.inf)  # lifetime set per load
+
+
+def _cache_seconds() -> float:
+    """Writes through the services drop the cache at once; writes made elsewhere (results batch,
+    webhook, other instance) show up after this delay (0 in the e2e tests, whose fixtures
+    write straight to Firestore)."""
+    return float(os.environ.get("ALJ_COMPETITIONS_CACHE_SECONDS", "5"))
 
 
 def cached_competitions(load: Callable[[], List[Doc]]) -> List[Doc]:
-    return _competitions_cache.get_or_load(_CACHE_KEY, load)
+    return _competitions_cache.get_or_load_expiring(_CACHE_KEY, lambda: (load(), _cache_seconds()))
 
 
 def invalidate_cache() -> None:

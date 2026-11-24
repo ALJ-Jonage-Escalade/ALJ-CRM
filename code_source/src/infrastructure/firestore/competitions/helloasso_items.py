@@ -161,7 +161,7 @@ def set_item_ignored(id_item: int, ignore: bool, motif: str = "", commentaire: s
         FirestoreClient.update_fields(documents.COLLECTION_ITEMS, str(id_item), patch,
                                       expected_update_time=doc.get("_update_time"))
         return True
-    return bool(documents.with_retries(f"Article HelloAsso #{id_item}", attempt))
+    return documents.with_retries(f"Article HelloAsso #{id_item}", attempt)
 
 
 def list_item_docs() -> list[ItemDoc]:

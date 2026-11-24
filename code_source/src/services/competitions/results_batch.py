@@ -6,7 +6,7 @@ Exécute chaque jour (par exemple à 07h00) :
 2. Tente de récupérer automatiquement les résultats officiels depuis MyCompet FFME.
 3. Rapproche et met à jour les classements des compétiteurs du club.
 4. Envoie un e-mail de notification récapitulatif avec un tableau HTML soigné
-   à l'adresse configurée (par défaut : david.lopez@alj-jonage.fr).
+   à l'adresse configurée (par défaut : domain.club_emails.DEFAULT_RESULTS_NOTIFICATION_EMAIL).
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ if _src_dir not in sys.path:
 
 from domain.utils import normalize_name
 from infrastructure.mail.sender import EmailSender, MailError
-from domain.club_emails import DEFAULT_SENDER_EMAIL
+from domain.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL, DEFAULT_SENDER_EMAIL
 from domain.email_log import SYSTEM_AUTHOR
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
@@ -47,7 +47,6 @@ from services.communications.email_log import SEND_FAILED, logged_recipient, rec
 from services.competitions.store import invalidate_cache
 from domain.errors import InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
 
-DEFAULT_NOTIFICATION_EMAIL = "david.lopez@alj-jonage.fr"
 SETTING_NOTIFICATION_EMAIL = "RESULTATS_NOTIFICATION_EMAIL"
 SETTING_BATCH_LAST_RUN = "RESULTATS_BATCH_LAST_RUN"
 SETTING_BATCH_LAST_STATUS = "RESULTATS_BATCH_LAST_STATUS"
@@ -172,7 +171,7 @@ class CompetitionResultsBatchService:
                     return ", ".join(emails)
         except Exception:
             logger.warning("Lecture de l'e-mail de notification des résultats impossible", exc_info=True)
-        return DEFAULT_NOTIFICATION_EMAIL
+        return DEFAULT_RESULTS_NOTIFICATION_EMAIL
 
     @classmethod
     def set_notification_email(cls, email: str) -> bool:

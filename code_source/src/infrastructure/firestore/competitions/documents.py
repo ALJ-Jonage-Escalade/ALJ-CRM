@@ -70,19 +70,17 @@ def comp_sort_key(date_competition: Any, competition_id: Any) -> tuple[str, int]
     return str(date_competition or ""), int(competition_id or 0)
 
 
-def with_retries(what: str, attempt: Callable[[], _Result]) -> _Result | None:
+def with_retries(what: str, attempt: Callable[[], _Result]) -> _Result:
     """Runs `attempt()` again (re-reading inside it) when its conditional write lost a
-    race (FirestoreConflictError), up to _MAX_WRITE_ATTEMPTS times."""
-    for attempt_number in range(_MAX_WRITE_ATTEMPTS):
+    race (FirestoreConflictError), up to _MAX_WRITE_ATTEMPTS times; the last conflict propagates."""
+    for attempt_number in range(_MAX_WRITE_ATTEMPTS - 1):
         try:
             return attempt()
         except FirestoreConflictError:
-            if attempt_number == _MAX_WRITE_ATTEMPTS - 1:
-                raise
             logger.info(f"[FIRESTORE] {what} modifié(e) entre-temps : "
                         f"nouvelle tentative ({attempt_number + 2}/{_MAX_WRITE_ATTEMPTS})")
             time.sleep(0.2 * (attempt_number + 1))
-    return None
+    return attempt()
 
 
 def new_id() -> int:
