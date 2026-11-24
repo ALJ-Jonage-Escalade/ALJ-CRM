@@ -285,14 +285,8 @@ class SqliteDatabase:
         for statement in KEYS_DDL:
             cursor.execute(statement)
 
-        # Table de réglages clé/valeur, plus écrite par l'application (les réglages sont dans la
-        # collection Firestore `app_settings`) : conservée pour la réplication de crm_app_settings.
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS app_settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        );
-        """)
+        # Former key/value settings table: settings live only in the Firestore `app_settings` collection (issue #118)
+        cursor.execute("DROP TABLE IF EXISTS app_settings")
 
         # Schema version (PRAGMA user_version): 0 for a new file, tagged v2 here
         cursor.execute("PRAGMA user_version")
