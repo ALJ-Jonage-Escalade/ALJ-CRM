@@ -14,7 +14,17 @@ import { csvBlob } from "../../../lib/csv";
 import { saveFile } from "../../../lib/download";
 import { formatEuros } from "../../../lib/format";
 import { balanceCsv, balanceLabel, balances, searchBalances, totals, type Balance } from "./balance";
-import { shownDiscipline, disciplineColor, paymentBadge, periodText, seasonOf, seasons, todayIso, type Competition } from "../competitions";
+import {
+  shownDiscipline,
+  disciplineColor,
+  paymentBadge,
+  periodText,
+  rankingColor,
+  seasonOf,
+  seasons,
+  todayIso,
+  type Competition,
+} from "../competitions";
 import { plural } from "../../../lib/text";
 
 /** listPath: address of the competitions list (the page's index route), where a competition opens. */
@@ -235,7 +245,10 @@ const TONE_COLOR = { ok: "green", due: "red", credit: "violet" } satisfies Recor
               </div>
               <div class="flex flex-wrap items-center gap-3">
                 <span class="flex min-w-24 flex-col items-center text-xs font-bold text-slate-700">
-                  {{ l.ranking || "—" }}
+                  <UiBadge v-if="l.ranking" :color="rankingColor(l.participant)" variant="soft" data-testid="ranking">
+                    {{ l.ranking }}
+                  </UiBadge>
+                  <template v-else>—</template>
                   <span v-if="l.ranking && l.participant.categorie_ffme" class="text-[10.5px] font-semibold text-slate-500">
                     {{ l.participant.categorie_ffme }}
                   </span>

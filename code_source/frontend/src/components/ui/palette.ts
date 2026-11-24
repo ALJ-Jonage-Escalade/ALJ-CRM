@@ -1,6 +1,8 @@
 /* The colour names of the app's labels (badges, calendar bars) and their classes. A colour is a name of this palette,
-   never a Tailwind class: Tailwind only generates the classes written out in full in the source. */
-export type BadgeColor = "slate" | "green" | "amber" | "orange" | "red" | "pink" | "violet" | "indigo" | "blue" | "sky" | "teal";
+   never a Tailwind class: Tailwind only generates the classes written out in full in the source.
+   gold / silver / bronze: the podium of a competition result (1st, 2nd, 3rd). */
+export type BadgeColor =
+  "slate" | "green" | "amber" | "orange" | "red" | "pink" | "violet" | "indigo" | "blue" | "sky" | "teal" | "gold" | "silver" | "bronze";
 
 /** White text on a filled colour (a state). */
 export const SOLID: Record<BadgeColor, string> = {
@@ -15,6 +17,9 @@ export const SOLID: Record<BadgeColor, string> = {
   blue: "bg-blue-600",
   sky: "bg-sky-600",
   teal: "bg-teal-600",
+  gold: "bg-yellow-500",
+  silver: "bg-zinc-500",
+  bronze: "bg-orange-700",
 };
 
 /** Coloured text on a light tag with a border (a piece of information). */
@@ -30,6 +35,9 @@ export const SOFT: Record<BadgeColor, string> = {
   blue: "border-blue-200 bg-blue-50 text-blue-700",
   sky: "border-sky-200 bg-sky-50 text-sky-700",
   teal: "border-teal-200 bg-teal-50 text-teal-700",
+  gold: "border-yellow-300 bg-yellow-100 text-yellow-800",
+  silver: "border-zinc-300 bg-zinc-200 text-zinc-700",
+  bronze: "border-orange-300 bg-orange-100 text-orange-900",
 };
 
 /** The colour as CSS (charts: Chart.js draws on a canvas, Tailwind classes do not apply); the 600 shades, slate 400. */
@@ -45,4 +53,7 @@ export const HEX: Record<BadgeColor, string> = {
   blue: "#2563eb",
   sky: "#0284c7",
   teal: "#0d9488",
+  gold: "#eab308",
+  silver: "#71717a",
+  bronze: "#c2410c",
 };
