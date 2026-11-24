@@ -25,7 +25,7 @@ def detach_from_helloasso(purchase_id: int, reason: str, author: str) -> HelloAs
     if membership.item_id is None:
         raise InvalidRequest(f"L'adhésion {membership.season} de {membership.member} ne vient pas d'une inscription HelloAsso.")
     MembershipImportRepository.delete_membership(purchase_id)
-    MembershipImportHistory.record_detach(DetachHistoryEntry(
+    MembershipImportHistory.record(DetachHistoryEntry(
         kind="detach", at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), author=author,
         season=membership.season, item_id=membership.item_id, order_ref=membership.order_ref, user_id=membership.user_id,
         member=membership.member, purchase_id=membership.purchase_id, tarif=membership.tarif, amount=membership.amount,

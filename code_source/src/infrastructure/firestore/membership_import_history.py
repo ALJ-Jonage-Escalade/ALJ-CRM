@@ -59,15 +59,9 @@ class DetachHistoryEntry(TypedDict):
 class MembershipImportHistory:
 
     @staticmethod
-    def record(entry: ImportHistoryEntry) -> str:
-        """Writes the entry; returns its id (the date first, readable in the console, then a random part)."""
-        entry_id = f"{entry['at']}-{uuid.uuid4().hex[:8]}"
-        FirestoreClient.upsert_document(COLLECTION, entry_id, dict(entry))
-        return entry_id
-
-    @staticmethod
-    def record_detach(entry: DetachHistoryEntry) -> str:
-        """Writes the entry; returns its id, as record()."""
+    def record(entry: ImportHistoryEntry | DetachHistoryEntry) -> str:
+        """Writes the entry (an import or a detach); returns its id (the date first, readable in the console, then a
+        random part)."""
         entry_id = f"{entry['at']}-{uuid.uuid4().hex[:8]}"
         FirestoreClient.upsert_document(COLLECTION, entry_id, dict(entry))
         return entry_id
