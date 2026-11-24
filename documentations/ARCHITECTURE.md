@@ -124,7 +124,7 @@ Schéma v2 (SQLite, répliqué en Firestore sous `crm_<table>`) :
 `users` (identité stable inter-saisons) → `orders` (commande HelloAsso) → `purchases` (une inscription par saison)
 → `purchase_options` (assurances) ; `emergency_contacts` (liste ordonnée par `users`, le premier est le principal) ;
 + `seasons`, `planning` (créneaux/groupes avec bornes de naissance),
-`geocache`, `email_templates`, `app_settings`.
+`geocache`, `email_templates`.
 
 Autres collections Firestore : `competitions/{id}` (participants **embarqués**), `coaches`, `adherents` et
 `planning` (projections pour PWA/webhook, recalculées après modification), `app_settings`, `helloasso_items`.

@@ -11,7 +11,7 @@ from domain.members.sex import parse_sex
 # remplacées par le schéma v2, ne sont pas migrées).
 TRACKED_TABLES = (
     "seasons", "users", "emergency_contacts", "orders", "purchases", "purchase_options",
-    "planning", "email_templates", "app_settings", "geocache",
+    "planning", "email_templates", "geocache",
     "keys", "key_assignments", "key_events",  # club keys, plans/club-keys.md
 )
 COLLECTION_PREFIX = "crm_"

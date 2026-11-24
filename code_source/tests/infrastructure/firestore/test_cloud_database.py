@@ -108,7 +108,6 @@ def _seed(path):
             (100, 10, 1, 'Loisir', 150.0, 'Validated'), (101, 10, 2, 'Compétition', 210.5, 'Validated'),
             (102, 11, 1, 'Loisir', 140.0, 'Validated');
         INSERT INTO purchase_options (id, purchase_id, option_name, amount) VALUES (1, 100, 'Assurance Base', 11.0);
-        INSERT INTO app_settings (key, value) VALUES ('default_sender_name', 'ALJ');
         INSERT INTO geocache (address, lat, lon) VALUES ('1 rue de la Paix, 69330, JONAGE, France', 45.79, 5.04);
     """)
     conn.commit()

@@ -8,7 +8,7 @@ est stockée dans Firestore, projet `smart-amplifier-510811-n6`.
 | Table SQLite | Collection Firestore | ID du document |
 |---|---|---|
 | seasons, users, orders, purchases, purchase_options, planning, email_templates | `crm_<table>` | ID SQLite |
-| app_settings, geocache (clé texte) | `crm_<table>` | `h` + SHA-1 de la clé |
+| geocache (clé texte) | `crm_<table>` | `h` + SHA-1 de la clé |
 
 Chaque document contient les colonnes de la ligne, plus :
 `_modified_at` (horodatage serveur), `_modified_by` (poste), `_deleted` (ligne supprimée).
