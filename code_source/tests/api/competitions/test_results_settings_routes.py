@@ -39,7 +39,7 @@ class TestResultsSettingsRoutes(unittest.TestCase):
         self.assertEqual(up_res.get("notification_email"), "test.notif@alj-jonage.fr")
         bad = client.post("/api/settings/competitions-results", json={"notification_email": "pas-une-adresse"})
         self.assertEqual(bad.status_code, 400)
-        self.assertEqual(bad.json(), {"status": "error", "message": "Adresse e-mail de notification invalide."})
+        self.assertEqual(bad.json(), {"status": "error", "message": "Adresse e-mail de notification invalide.", "code": "invalid"})
 
         # 2b. POST avec plusieurs e-mails
         multi_res = client.post("/api/settings/competitions-results", json={"notification_email": "coach1@alj-jonage.fr, coach2@alj-jonage.fr"}).json()

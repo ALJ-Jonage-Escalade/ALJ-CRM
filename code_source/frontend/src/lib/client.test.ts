@@ -32,7 +32,7 @@ describe("createApiClient", () => {
   });
 
   it("sends JSON bodies and query parameters", async () => {
-    const { client, sent } = setup(() => json({ status: "success", notification_email: "n@x.fr", saved: true }));
+    const { client, sent } = setup(() => json({ status: "success", notification_email: "n@x.fr", window_days: 30 }));
     await unwrap(client.POST("/api/settings/competitions-results", { body: { notification_email: "n@x.fr" } }));
     expect(sent().init.method).toBe("POST");
     expect(sent().headers.get("Content-Type")).toBe("application/json");

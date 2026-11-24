@@ -63,10 +63,6 @@ FIELD_NEEDS_URL_NOTIFIED = "resultats_url_demandee_at"
 CompetitionStatus = Literal["found", "pending", "needs_url", "error"]
 
 
-class ResultsBatchError(RuntimeError):
-    """The competitions could not be read: the run did nothing (the route answers an error, not 200)."""
-
-
 class ClubAthlete(TypedDict):
     """A club member's result, for the summary e-mail and the report."""
     nom: str
@@ -149,14 +145,15 @@ class CompetitionResultsBatchService:
 
     @classmethod
     def parse_notification_emails(cls, raw: str) -> List[str]:
-        """Découpe et valide une liste d'adresses e-mail séparées par des virgules, points-virgules ou espaces."""
+        """Découpe et valide une liste d'adresses e-mail séparées par des virgules, points-virgules ou espaces
+        (InvalidRequest when one is not an address, or none is given)."""
         parts = [p.strip() for p in re.split(r"[,;\s]+", str(raw or "").strip()) if p.strip()]
         if not parts:
-            raise ValueError("Adresse e-mail de notification invalide.")
+            raise InvalidRequest("Adresse e-mail de notification invalide.")
         valid: List[str] = []
         for p in parts:
             if "@" not in p or "." not in p or len(p) < 5:
-                raise ValueError("Adresse e-mail de notification invalide.")
+                raise InvalidRequest("Adresse e-mail de notification invalide.")
             valid.append(p)
         return valid
 
@@ -174,17 +171,22 @@ class CompetitionResultsBatchService:
         return DEFAULT_RESULTS_NOTIFICATION_EMAIL
 
     @classmethod
-    def set_notification_email(cls, email: str) -> bool:
-        """Enregistre une ou plusieurs adresses e-mail de notification."""
-        valid = cls.parse_notification_emails(email)
-        clean = ", ".join(valid)
+    def update_settings(cls, notification_email: str, window_days: Optional[int] = None) -> None:
+        """Saves the notification addresses and, when given, the search window. Both are checked first: InvalidRequest
+        (nothing saved) when one is invalid; StorageUnavailable when Firestore fails."""
+        emails = cls.parse_notification_emails(notification_email)
+        if window_days is not None and not 1 <= window_days <= 365:
+            raise InvalidRequest("Fenêtre de recherche invalide : entre 1 et 365 jours.")
+        cls._save_setting(SETTING_NOTIFICATION_EMAIL, ", ".join(emails))
+        if window_days is not None:
+            cls._save_setting(SETTING_BATCH_WINDOW_DAYS, str(window_days))
 
+    @staticmethod
+    def _save_setting(key: str, value: str) -> None:
         try:
-            AppSettingsRepository.save(SETTING_NOTIFICATION_EMAIL, clean)
-            return True
+            AppSettingsRepository.save(key, value)
         except FirestoreError as e:
-            logger.warning(f"[BATCH_RESULTATS] Enregistrement de l'e-mail de notification impossible : {e}")
-            return False
+            raise StorageUnavailable("Enregistrement des réglages impossible (détails dans les journaux).") from e
 
     @classmethod
     def get_batch_status(cls) -> Dict[str, Any]:
@@ -198,18 +200,6 @@ class CompetitionResultsBatchService:
             "cron_schedule": "Tous les jours à 07h00",
             "window_days": cls.get_window_days(),
         }
-
-    @classmethod
-    def set_window_days(cls, days: int) -> bool:
-        """Saves the search window (ValueError outside 1..365)."""
-        if not 1 <= int(days) <= 365:
-            raise ValueError("Fenêtre de recherche invalide : entre 1 et 365 jours.")
-        try:
-            AppSettingsRepository.save(SETTING_BATCH_WINDOW_DAYS, str(int(days)))
-            return True
-        except FirestoreError:
-            logger.warning("Enregistrement du réglage %s impossible", SETTING_BATCH_WINDOW_DAYS, exc_info=True)
-            return False
 
     @classmethod
     def get_window_days(cls) -> int:
@@ -259,14 +249,14 @@ class CompetitionResultsBatchService:
                                   today: Optional[datetime.date] = None) -> List[Dict[str, Any]]:
         """Competitions ended in the last `window_days` days (None: the setting) without results, most recent first.
         `force`: every competition ended in the last FORCED_WINDOW_DAYS days (or the window, if longer), results or not.
-        ResultsBatchError when Firestore cannot be read."""
+        StorageUnavailable when Firestore cannot be read."""
         today = today or datetime.date.today()
         window = window_days if window_days is not None else cls.get_window_days()
         oldest = today - datetime.timedelta(days=max(window, FORCED_WINDOW_DAYS) if force else window)
         try:
             docs = competitions.list_competition_docs()
         except FirestoreError as e:
-            raise ResultsBatchError(f"Lecture des compétitions impossible : {e}") from e
+            raise StorageUnavailable("Lecture des compétitions impossible : le batch n'a rien fait (détails dans les journaux).") from e
 
         pending = []
         for doc in docs:
@@ -625,7 +615,7 @@ class CompetitionResultsBatchService:
         3. Met à jour les résultats des athlètes.
         4. Envoie l'e-mail récapitulatif si des résultats sont découverts (ou des URL à saisir, une fois).
         Stops between two competitions once `time_budget_s` is spent (`partial`: the next run goes on).
-        Raises ResultsBatchError when the competitions cannot be read.
+        Raises StorageUnavailable when the competitions cannot be read.
         """
         started = clock()
         now_iso = datetime.datetime.now().isoformat()
@@ -636,7 +626,7 @@ class CompetitionResultsBatchService:
 
         try:
             pending = cls.list_pending_competitions(force=force, window_days=window, today=today)
-        except ResultsBatchError:
+        except StorageUnavailable:
             logger.exception("[BATCH_RESULTATS] Lecture des compétitions impossible : rien n'a été fait")
             raise
         logger.info(f"[BATCH_RESULTATS] {len(pending)} compétition(s) éligible(s) sans résultats détectée(s) "

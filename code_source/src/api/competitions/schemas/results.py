@@ -34,7 +34,6 @@ class ResultsSettingsSaved(BaseModel):
     status: Literal["success"]
     notification_email: str
     window_days: int
-    saved: bool
 
 
 def _text(value: Any) -> str:  # Any: whatever the competition document or the scraper holds

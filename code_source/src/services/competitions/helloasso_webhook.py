@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 
 from domain.competitions.matching import auto_link_items, parse_campaign_identifier, summarize_items
 from domain.competitions.models import PAIEMENT_PAYE
+from domain.errors import Forbidden, UpstreamUnavailable
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.competitions import competitions, helloasso_items, member_directory, participants
 from infrastructure.helloasso import api as helloasso_api
@@ -44,15 +45,6 @@ Tuple_Items = Tuple[str, List[Dict[str, Any]]]
 
 # Nombre maximal d'articles relus par notification (garde-fou anti-abus)
 MAX_VERIFIED_ITEMS = 50
-
-
-class WebhookRejected(Exception):
-    """Notification refusée (code HTTP à renvoyer + message)."""
-
-    def __init__(self, status_code: int, message: str):
-        super().__init__(message)
-        self.status_code = status_code
-        self.message = message
 
 
 class HelloAssoWebhookService:
@@ -160,15 +152,16 @@ class HelloAssoWebhookService:
             return items
         except helloasso_api.HelloAssoApiError as e:
             # 503 : HelloAsso renverra la notification plus tard
-            raise WebhookRejected(503, f"Vérification auprès de HelloAsso impossible : {e}")
+            raise UpstreamUnavailable(f"Vérification auprès de HelloAsso impossible : {e}", "helloasso_unreachable") from e
 
     @classmethod
     @drops_cache  # writes competition documents outside the @write services
     def verify_and_reconcile_notification(cls, payload: Dict[str, Any], token: Optional[str] = None) -> Dict[str, Any]:
-        """Point d'entrée sécurisé du webhook (lève WebhookRejected en cas de refus)."""
+        """Point d'entrée sécurisé du webhook. Refusals: Forbidden (token missing or wrong), UpstreamUnavailable
+        (the notification cannot be checked: HelloAsso unreachable, or neither token nor API credentials configured)."""
         token_ok = cls.check_token(token)
         if token_ok is False:
-            raise WebhookRejected(401, "Jeton de notification HelloAsso absent ou invalide")
+            raise Forbidden("Jeton de notification HelloAsso absent ou invalide", "bad_token")
 
         if helloasso_api.credentials_configured():
             items = cls.fetch_verified_items(payload)
@@ -181,10 +174,10 @@ class HelloAssoWebhookService:
             report["verified"] = "token" if token_ok else "none"
             return report
 
-        raise WebhookRejected(
-            503,
+        raise UpstreamUnavailable(
             "Notification non vérifiable : configurez HELLOASSO_WEBHOOK_TOKEN "
             "ou les identifiants API HelloAsso sur le serveur.",
+            "not_verifiable",
         )
 
     @staticmethod

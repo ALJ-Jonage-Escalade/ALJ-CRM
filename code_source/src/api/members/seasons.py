@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Optional, Union
+from typing import Optional
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from api.members.schemas import Seasons, SeasonTarifs
 from api.responses import error_responses, json_with_etag
@@ -23,7 +23,7 @@ def list_seasons(request: Request) -> Response:
 
 
 @router.get("/api/season-tarifs", response_model=SeasonTarifs, responses=error_responses(400, 500))
-def get_season_tarifs_api(season: Optional[str] = None) -> Union[SeasonTarifs, JSONResponse]:
+def get_season_tarifs_api(season: Optional[str] = None) -> SeasonTarifs:
     """Retourne la liste des tarifs HelloAsso (groupes disponibles) d'une saison pour l'édition de créneau."""
     target_season = resolve_season(season)
     tarifs = SeasonRepository.get_season_tarifs(target_season)

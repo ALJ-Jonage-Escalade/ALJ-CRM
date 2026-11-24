@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from api.activities.schemas import PlanningSlot, PlanningSlotDeleted, PlanningSlotSaved, PlanningSlotUpdate
 from api.responses import XLSX, error_responses, file_download
@@ -24,20 +24,20 @@ def _slot(row: Dict[str, Any]) -> PlanningSlot:  # Any: a row of the planning ta
 
 
 @router.get("/api/planning", response_model=List[PlanningSlot], responses=error_responses(500))
-def get_planning() -> List[PlanningSlot] | JSONResponse:
+def get_planning() -> List[PlanningSlot]:
     """Récupère le planning depuis la BDD SQLite."""
     return [_slot(row) for row in planning.list_slots()]
 
 
 @router.post("/api/planning/item", response_model=PlanningSlotSaved, responses=error_responses(400, 500))
-def save_planning_item_api(item: PlanningSlotUpdate) -> PlanningSlotSaved | JSONResponse:
+def save_planning_item_api(item: PlanningSlotUpdate) -> PlanningSlotSaved:
     """Crée ou met à jour un créneau unique dans la table planning."""
     saved = planning.save_slot(item.model_dump())
     return PlanningSlotSaved(status="success", message="Créneau enregistré avec succès.", item=_slot(saved))
 
 
 @router.delete("/api/planning/item/{item_id}", response_model=PlanningSlotDeleted, responses=error_responses(404, 500))
-def delete_planning_item_api(item_id: int) -> PlanningSlotDeleted | JSONResponse:
+def delete_planning_item_api(item_id: int) -> PlanningSlotDeleted:
     """Supprime un créneau de planning par son ID."""
     planning.delete_slot(item_id)
     return PlanningSlotDeleted(status="success", message=f"Créneau #{item_id} supprimé avec succès.")

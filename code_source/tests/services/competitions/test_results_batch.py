@@ -17,6 +17,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from domain.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL
+from domain.errors import InvalidRequest
 from services.competitions.results_batch import (
     CompetitionResultsBatchService,
     apply_rankings,
@@ -38,31 +39,24 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
     def test_set_and_get_custom_notification_email(self):
         """L'adresse de notification peut être mise à jour et rechargée depuis les réglages."""
         custom_email = "notif.test@alj-jonage.fr"
-        ok = CompetitionResultsBatchService.set_notification_email(custom_email)
-        self.assertTrue(ok)
+        CompetitionResultsBatchService.update_settings(custom_email)
         self.assertEqual(CompetitionResultsBatchService.get_notification_email(), custom_email)
-
-        # Nettoyage
-        CompetitionResultsBatchService.set_notification_email(DEFAULT_RESULTS_NOTIFICATION_EMAIL)
 
     def test_set_and_get_multiple_notification_emails(self):
         """Plusieurs adresses de notification peuvent être enregistrées et normalisées."""
         emails_input = "coach1@alj-jonage.fr, coach2@alj-jonage.fr; admin@alj-jonage.fr"
-        ok = CompetitionResultsBatchService.set_notification_email(emails_input)
-        self.assertTrue(ok)
+        CompetitionResultsBatchService.update_settings(emails_input)
         expected = "coach1@alj-jonage.fr, coach2@alj-jonage.fr, admin@alj-jonage.fr"
         self.assertEqual(CompetitionResultsBatchService.get_notification_email(), expected)
 
         parsed = CompetitionResultsBatchService.parse_notification_emails(emails_input)
         self.assertEqual(parsed, ["coach1@alj-jonage.fr", "coach2@alj-jonage.fr", "admin@alj-jonage.fr"])
 
-        # Nettoyage
-        CompetitionResultsBatchService.set_notification_email(DEFAULT_RESULTS_NOTIFICATION_EMAIL)
-
     def test_set_invalid_email_raises_error(self):
-        """Une adresse sans @ ou invalide lève une ValueError."""
-        with self.assertRaises(ValueError):
-            CompetitionResultsBatchService.set_notification_email("adresse_invalide")
+        """Une adresse sans @ ou invalide est refusée (InvalidRequest), rien n'est enregistré."""
+        with self.assertRaises(InvalidRequest):
+            CompetitionResultsBatchService.update_settings("adresse_invalide")
+        self.assertEqual(CompetitionResultsBatchService.get_notification_email(), DEFAULT_RESULTS_NOTIFICATION_EMAIL)
 
     def test_is_competition_past(self):
         """Vérifie le calcul de date pour déterminer si une épreuve est passée."""

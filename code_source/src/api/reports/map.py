@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Union
-
 from fastapi import APIRouter, BackgroundTasks
-from fastapi.responses import JSONResponse
 
 from api.reports import resolve_report_season, season_read
 from api.reports.schemas import MapMember, MapPoint, MapPoints
@@ -17,7 +14,7 @@ router = APIRouter()
 
 
 @router.get("/api/reports/map-points", response_model=MapPoints, responses=error_responses(400, 500))
-def get_map_points(background_tasks: BackgroundTasks, season: str = "active") -> Union[MapPoints, JSONResponse]:
+def get_map_points(background_tasks: BackgroundTasks, season: str = "active") -> MapPoints:
     """Members of a season grouped by address, for the map of the Outils page ("Toutes les saisons": every season).
     The addresses missing from the geocache are geocoded in the background: they appear on the map once geocoded."""
     target_season = resolve_report_season(season)

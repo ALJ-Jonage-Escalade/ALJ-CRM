@@ -365,6 +365,7 @@ export interface paths {
         /**
          * Update Competitions Results Settings Api
          * @description Met à jour les adresses e-mail de notification des résultats (et la fenêtre de recherche, si fournie).
+         *     400: an address or the window is invalid, nothing is saved; 503: Firestore failed.
          */
         post: operations["update_competitions_results_settings_api_api_settings_competitions_results_post"];
         delete?: never;
@@ -1252,6 +1253,9 @@ export interface paths {
          *
          *     Authenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles
          *     auprès de l'API HelloAsso (voir HelloAssoWebhookService.verify_and_reconcile_notification).
+         *     A refusal answers 401 (token) or 503 (not checkable now: HelloAsso sends the notification again later). Any other
+         *     failure is never answered 200, so that it shows on HelloAsso's side: 503 when Firestore failed, else 500
+         *     (api.responses: service_error_handler, unhandled_error_middleware).
          */
         post: operations["webhook_helloasso_webhooks_helloasso_post"];
         delete?: never;
@@ -4914,8 +4918,6 @@ export interface components {
             notification_email: string;
             /** Window Days */
             window_days: number;
-            /** Saved */
-            saved: boolean;
         };
         /** ResultsSettingsUpdate */
         ResultsSettingsUpdate: {
@@ -6412,6 +6414,15 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
         };
     };
     competition_email_log_api_competitions__competition_id__email_log_get: {
@@ -6834,6 +6845,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
         };
     };
     save_membership_correction_api_helloasso_memberships_corrections__item_id___field__put: {
@@ -6897,6 +6917,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
         };
     };
     remove_membership_correction_api_helloasso_memberships_corrections__item_id___field__delete: {
@@ -6942,6 +6971,15 @@ export interface operations {
             };
             /** @description Bad Gateway */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7033,6 +7071,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
         };
     };
     send_correction_requests_api_helloasso_memberships_correction_requests_post: {
@@ -7077,6 +7124,15 @@ export interface operations {
             };
             /** @description Bad Gateway */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7137,6 +7193,15 @@ export interface operations {
             };
             /** @description Bad Gateway */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

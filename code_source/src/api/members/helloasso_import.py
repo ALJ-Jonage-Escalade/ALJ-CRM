@@ -89,21 +89,21 @@ def _preview(plan: ImportPlan) -> MembershipPreview:
     )
 
 
-@router.post("/api/helloasso/memberships/preview", response_model=MembershipPreview, responses=error_responses(400, 502))
+@router.post("/api/helloasso/memberships/preview", response_model=MembershipPreview, responses=error_responses(400, 502, 503))
 def preview_membership_import(data: Optional[MembershipPreviewRequest] = None) -> MembershipPreview:
     """Reads the membership campaign on HelloAsso and sorts its registrations for the active season. Writes nothing."""
     return _preview(Service.preview(data.campaign if data else None))
 
 
 @router.put("/api/helloasso/memberships/corrections/{item_id}/{field}", response_model=MembershipPreview,
-            responses=error_responses(400, 404, 502))
+            responses=error_responses(400, 404, 502, 503))
 def save_membership_correction(request: Request, item_id: int, field: IssueField, data: MembershipCorrectionRequest) -> MembershipPreview:
     """Saves the admin's correction of one field of a registration; answers the preview recomputed with it."""
     return _preview(Service.save_correction(item_id, field, data.value, author_of(request), data.campaign))
 
 
 @router.delete("/api/helloasso/memberships/corrections/{item_id}/{field}", response_model=MembershipPreview,
-               responses=error_responses(400, 502))
+               responses=error_responses(400, 502, 503))
 def remove_membership_correction(item_id: int, field: IssueField, campaign: Optional[str] = None) -> MembershipPreview:
     """Removes the correction of one field (HelloAsso's value applies again); answers the preview recomputed."""
     return _preview(Service.remove_correction(item_id, field, campaign))
@@ -117,14 +117,14 @@ def check_membership_value(data: MembershipValueCheckRequest) -> MembershipValue
 
 
 @router.post("/api/helloasso/memberships/correction-requests/preview", response_model=CorrectionRequestPreview,
-             responses=error_responses(400, 502))
+             responses=error_responses(400, 502, 503))
 def preview_correction_requests(data: CorrectionRequestBody) -> CorrectionRequestPreview:
     """The correction request of the first order of these registrations, as it would be sent. Sends nothing."""
     return CorrectionRequestPreview(status="success", example=CorrectionEmail(**correction_requests.example(data.item_ids, data.campaign)))
 
 
 @router.post("/api/helloasso/memberships/correction-requests", response_model=CorrectionRequestResult,
-             responses=error_responses(400, 502))
+             responses=error_responses(400, 502, 503))
 def send_correction_requests(request: Request, data: CorrectionRequestBody) -> CorrectionRequestResult:
     """Asks the families to fix their data: one e-mail per order, to the payer, recorded in the e-mail log."""
     return CorrectionRequestResult(status="success", **correction_requests.send(data.item_ids, author_of(request), data.campaign))
@@ -155,7 +155,7 @@ def _result(result: ImportResult) -> MembershipImportResult:
     )
 
 
-@router.post("/api/helloasso/memberships/import", response_model=MembershipImportResult, responses=error_responses(400, 409, 502))
+@router.post("/api/helloasso/memberships/import", response_model=MembershipImportResult, responses=error_responses(400, 409, 502, 503))
 def import_memberships(request: Request, data: MembershipImportRequest) -> MembershipImportResult:
     """Reads HelloAsso again and applies the admin's decisions to the recomputed plan, recorded in the history.
     Sends no e-mail."""

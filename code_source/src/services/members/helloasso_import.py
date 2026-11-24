@@ -30,7 +30,7 @@ from infrastructure.helloasso import api as helloasso_api
 from infrastructure.mail.mail_domains import MailDomainCheck
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.membership_import import AppliedWrite, MembershipImportRepository, MembershipWriteRefused
-from domain.errors import Conflict, InvalidRequest, NotFound, UpstreamUnavailable
+from domain.errors import Conflict, InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
 from services.members.seasons import SeasonService
 
 logger = logging.getLogger("alj")
@@ -66,7 +66,8 @@ def _corrections(season: str) -> Corrections:
     try:
         return MembershipCorrections.for_season(season)
     except FirestoreError as e:
-        raise UpstreamUnavailable(f"Corrections des inscriptions illisibles : {e}", "firestore_unavailable") from e
+        logger.error("Corrections des inscriptions illisibles : %s", e)
+        raise StorageUnavailable("Corrections des inscriptions illisibles (détails dans les journaux).") from e
 
 
 def _imported_item(entry: PlanEntry, action: str, decision: Optional[Decision]) -> ImportedItem:
@@ -165,7 +166,8 @@ class MembershipImportService:
         try:
             MembershipCorrections.save(season, item_id, correction)
         except FirestoreError as e:
-            raise UpstreamUnavailable(f"Correction non enregistrée : {e}", "firestore_unavailable") from e
+            logger.error("Correction non enregistrée : %s", e)
+            raise StorageUnavailable("Correction non enregistrée (détails dans les journaux).") from e
         return MembershipImportService._plan_of(season, campaign, records)
 
     @staticmethod
@@ -175,7 +177,8 @@ class MembershipImportService:
         try:
             MembershipCorrections.remove(season, item_id, field)
         except FirestoreError as e:
-            raise UpstreamUnavailable(f"Correction non annulée : {e}", "firestore_unavailable") from e
+            logger.error("Correction non annulée : %s", e)
+            raise StorageUnavailable("Correction non annulée (détails dans les journaux).") from e
         return MembershipImportService._plan(season, chosen_campaign)
 
     @staticmethod

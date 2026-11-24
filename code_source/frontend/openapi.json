@@ -1707,7 +1707,7 @@
       },
       "post": {
         "summary": "Update Competitions Results Settings Api",
-        "description": "Met à jour les adresses e-mail de notification des résultats (et la fenêtre de recherche, si fournie).",
+        "description": "Met à jour les adresses e-mail de notification des résultats (et la fenêtre de recherche, si fournie).\n400: an address or the window is invalid, nothing is saved; 503: Firestore failed.",
         "operationId": "update_competitions_results_settings_api_api_settings_competitions_results_post",
         "requestBody": {
           "content": {
@@ -1732,6 +1732,16 @@
           },
           "400": {
             "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -2254,6 +2264,16 @@
               }
             }
           },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2354,6 +2374,16 @@
             },
             "description": "Bad Gateway"
           },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2447,6 +2477,16 @@
               }
             },
             "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -2546,6 +2586,16 @@
               }
             }
           },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2597,6 +2647,16 @@
           },
           "502": {
             "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -2666,6 +2726,16 @@
           },
           "502": {
             "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4498,7 +4568,7 @@
       },
       "post": {
         "summary": "Webhook Helloasso",
-        "description": "Point de terminaison Webhook pour les notifications HelloAsso (Payment & Order).\nRéconcilie en temps réel le paiement avec les participants de la compétition.\n\nAuthenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles\nauprès de l'API HelloAsso (voir HelloAssoWebhookService.verify_and_reconcile_notification).",
+        "description": "Point de terminaison Webhook pour les notifications HelloAsso (Payment & Order).\nRéconcilie en temps réel le paiement avec les participants de la compétition.\n\nAuthenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles\nauprès de l'API HelloAsso (voir HelloAssoWebhookService.verify_and_reconcile_notification).\nA refusal answers 401 (token) or 503 (not checkable now: HelloAsso sends the notification again later). Any other\nfailure is never answered 200, so that it shows on HelloAsso's side: 503 when Firestore failed, else 500\n(api.responses: service_error_handler, unhandled_error_middleware).",
         "operationId": "webhook_helloasso_webhooks_helloasso_post",
         "parameters": [
           {
@@ -12186,18 +12256,13 @@
           "window_days": {
             "type": "integer",
             "title": "Window Days"
-          },
-          "saved": {
-            "type": "boolean",
-            "title": "Saved"
           }
         },
         "type": "object",
         "required": [
           "status",
           "notification_email",
-          "window_days",
-          "saved"
+          "window_days"
         ],
         "title": "ResultsSettingsSaved"
       },

@@ -24,7 +24,7 @@ router = APIRouter()
 
 
 @router.get("/api/email-templates", response_model=EmailTemplates, responses=error_responses(500))
-def get_email_templates() -> EmailTemplates | JSONResponse:
+def get_email_templates() -> EmailTemplates:
     """Retourne la liste des modèles d'e-mails configurés."""
     templates = [EmailTemplate(**template) for template in list_templates()]
     return EmailTemplates(
@@ -56,7 +56,7 @@ def save_email_template_api(data: EmailTemplateUpdate) -> EmailTemplateSaved:
 
 
 @router.delete("/api/email-templates/{template_name}", response_model=EmailTemplateDeleted, responses=error_responses(400, 404, 500))
-def delete_email_template_api(template_name: str) -> EmailTemplateDeleted | JSONResponse:
+def delete_email_template_api(template_name: str) -> EmailTemplateDeleted:
     """Supprime un modèle d'e-mail par son nom."""
     deleted_name = delete_template(urllib.parse.unquote(template_name))
     return EmailTemplateDeleted(status="success", message=f"Modèle '{deleted_name}' supprimé avec succès.")

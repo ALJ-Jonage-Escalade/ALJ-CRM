@@ -19,7 +19,7 @@ from api.competitions.schemas.results import (
 from api.competitions.schemas.views import ResultsFetched
 from api.responses import error, error_responses
 from infrastructure.security.api_auth import Role, has_role, is_scheduler
-from services.competitions.results_batch import CompetitionResultsBatchService, ResultsBatchError
+from services.competitions.results_batch import CompetitionResultsBatchService
 
 # Full paths: /api/competitions/... and /api/settings/...
 router = APIRouter()
@@ -45,11 +45,8 @@ async def api_cron_fetch_competition_results(
     is_admin = claims is None or (not is_scheduler(claims) and has_role(claims, Role.ADMIN))
     if (force or email) and not is_admin:
         return error(403, "Les options force et email sont réservées aux administrateurs.")
-    try:
-        report = await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
-        return BatchReport.model_validate(report)
-    except ResultsBatchError:
-        return error(503, "Lecture des compétitions impossible : le batch n'a rien fait (détails dans les journaux).")
+    report = await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
+    return BatchReport.model_validate(report)
 
 
 @router.post("/api/competitions/{competition_id}/fetch-results", response_model=ResultsFetched,
@@ -68,17 +65,10 @@ def get_competitions_results_settings_api() -> ResultsSettings:
     return ResultsSettings(status="success", **CompetitionResultsBatchService.get_batch_status())
 
 
-@router.post("/api/settings/competitions-results", response_model=ResultsSettingsSaved, responses=error_responses(400))
-def update_competitions_results_settings_api(data: ResultsSettingsUpdate) -> ResultsSettingsSaved | JSONResponse:
-    """Met à jour les adresses e-mail de notification des résultats (et la fenêtre de recherche, si fournie)."""
-    if data.window_days is not None and not 1 <= data.window_days <= 365:
-        return error(400, "Fenêtre de recherche invalide : entre 1 et 365 jours.")
-    try:
-        ok = CompetitionResultsBatchService.set_notification_email(data.notification_email)
-    except ValueError as e:
-        return error(400, str(e))
-
-    if data.window_days is not None:
-        ok = CompetitionResultsBatchService.set_window_days(data.window_days) and ok
+@router.post("/api/settings/competitions-results", response_model=ResultsSettingsSaved, responses=error_responses(400, 503))
+def update_competitions_results_settings_api(data: ResultsSettingsUpdate) -> ResultsSettingsSaved:
+    """Met à jour les adresses e-mail de notification des résultats (et la fenêtre de recherche, si fournie).
+    400: an address or the window is invalid, nothing is saved; 503: Firestore failed."""
+    CompetitionResultsBatchService.update_settings(data.notification_email, data.window_days)
     return ResultsSettingsSaved(status="success", notification_email=CompetitionResultsBatchService.get_notification_email(),
-                                window_days=CompetitionResultsBatchService.get_window_days(), saved=ok)
+                                window_days=CompetitionResultsBatchService.get_window_days())
