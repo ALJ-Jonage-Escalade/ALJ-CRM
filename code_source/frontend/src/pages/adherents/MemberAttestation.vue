@@ -13,15 +13,18 @@ import { looksLikeEmail } from "../../lib/email";
 import type { Member } from "./members";
 import { templateError, toKeys, toLabels } from "../../lib/templateVariables";
 import TemplateField from "../../components/TemplateField.vue";
+import EmailSenderField from "../../components/EmailSenderField.vue";
 import { attestationFileName, attestationProblem, attestationRecipient, attestationTemplates } from "./record";
 import { dialogs } from "../../composables/dialogs";
 
-const props = defineProps<{ member: Member; templates: readonly EmailTemplate[] }>();
+/** account: the sending account, shown as the sender of a template without its own. */
+const props = defineProps<{ member: Member; templates: readonly EmailTemplate[]; account: string }>();
 const emit = defineEmits<{ sent: [message: string]; failed: [message: string]; cancel: [] }>();
 const communicationsApi = createCommunicationsApi(inject(CLIENT_KEY)!);
 
 const choices = computed(() => attestationTemplates(props.templates));
 const templateName = ref(choices.value.initial.name);
+const template = computed(() => choices.value.list.find((x) => x.name === templateName.value) ?? choices.value.initial);
 const to = ref(attestationRecipient(props.member));
 /** Subject and body with the variables' labels ({Prénom}); the server fills them, from their keys, when sending. */
 const subject = ref("");
@@ -75,7 +78,7 @@ function download(): void {
 
 const sending = ref(false);
 const problem = ref("");
-const canSend = computed(() => !!pdf.value && looksLikeEmail(to.value.trim()));
+const canSend = computed(() => !!pdf.value && looksLikeEmail(to.value.trim()) && template.value.sender_allowed !== false);
 
 async function send(): Promise<void> {
   problem.value = "";
@@ -147,6 +150,7 @@ const field = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 te
             <option v-for="t in choices.list" :key="t.name" :value="t.name">{{ t.name }}</option>
           </select>
         </div>
+        <EmailSenderField :model-value="''" :template="template" :account="account" :aliases="[]" />
         <div>
           <label for="attestation-to" :class="label">Destinataire (payeur ou adhérent) *</label>
           <input

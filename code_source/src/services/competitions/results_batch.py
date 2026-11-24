@@ -30,7 +30,6 @@ if _src_dir not in sys.path:
 
 from domain.utils import normalize_name
 from infrastructure.mail.sender import EmailSender, MailError
-from domain.club_emails import DEFAULT_SENDER_EMAIL
 from domain.email_log import SYSTEM_AUTHOR
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
@@ -582,7 +581,6 @@ class CompetitionResultsBatchService:
                 subject=subject,
                 body=plain_body,
                 html_body=html_body,
-                from_email=DEFAULT_SENDER_EMAIL,
                 from_name="ALJ Escalade - Résultats Compétitions"
             )
         except MailError:  # the results are saved, only the e-mail is lost

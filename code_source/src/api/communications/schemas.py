@@ -15,7 +15,9 @@ from domain.email_variables import TemplateKind, VariableKey
 
 class EmailTemplate(BaseModel):
     """subject and body: the variables written with their keys ({first_name}). kind: inferred from the name for a
-    template saved before kinds existed. needs_fixing: it holds a variable it may not use, or a former spelling."""
+    template saved before kinds existed. needs_fixing: it holds a variable it may not use, or a former spelling.
+    sender_email: empty for the sending account. sender_allowed: false when it is no longer the account nor one of its
+    aliases (its sends are refused until it is changed)."""
     name: str
     subject: str
     body: str
@@ -24,15 +26,19 @@ class EmailTemplate(BaseModel):
     kind: TemplateKind
     is_default: bool = False  # the template its kind's screen opens first
     needs_fixing: bool = False
+    sender_allowed: bool = True
 
 
 class EmailTemplates(BaseModel):
-    """default_sender_*: used by the server when a template's sender is empty. club_contact_email: shown in the e-mail signature."""
+    """default_sender_*: used by the server when a template's sender is empty (the address: the sending account).
+    sender_aliases: every address an e-mail may leave from, the account first; sender_aliases_error: why the list holds
+    only the account (aliases unreadable), else empty. club_contact_email: shown in the e-mail signature."""
     status: Literal["success"]
     templates: List[EmailTemplate]
     default_sender_email: str
     default_sender_name: str
-    sender_suggestions: List[str]
+    sender_aliases: List[str]
+    sender_aliases_error: str = ""
     club_contact_email: str
 
 
@@ -148,7 +154,8 @@ class EmailRecipient(RequestBody):
 
 
 class EmailSendRequest(RequestBody):
-    """template_name: a saved template, whose subject, body and sender fill what is left empty here.
+    """template_name: a saved template, whose subject and body fill what is left empty here and whose sender is used;
+    sender_email: the sender of a free-text e-mail (never with a template). Empty: the sending account.
     recipient_ids: members of the cache; recipients: people given by the page (both may be used)."""
     template_name: str = ""
     subject: str = ""

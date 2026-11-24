@@ -52,8 +52,9 @@ describe("competition e-mail", () => {
   });
 
   it("sends to the recipients with an address, the secondary one when needed", () => {
-    const body = sendBody(COMP, audience(ROWS, "selected"), " Sujet ", "Texte ");
+    const body = sendBody(COMP, audience(ROWS, "selected"), " Sujet ", "Texte ", { template_name: "Relance" });
     expect(body).toEqual({
+      template_name: "Relance",
       subject: "Sujet",
       body: "Texte",
       competition_id: 10,

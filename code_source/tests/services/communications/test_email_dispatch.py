@@ -12,7 +12,8 @@ _src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from domain.errors import InvalidRequest, UpstreamUnavailable
+from domain.club_emails import DEFAULT_SENDER_NAME
+from domain.errors import Forbidden, InvalidRequest, UpstreamUnavailable
 from infrastructure.mail.sender import MailError
 from services.communications import email_log
 from services.communications.email_dispatch import EmailDispatchService, render_email
@@ -163,6 +164,7 @@ class TestEmailDispatchService(unittest.TestCase):
 
 
 DISPATCH = "services.communications.email_dispatch"
+SMTP_ACCOUNT = {"SMTP_USER": "dev", "SMTP_FROM_EMAIL": "office@hogwarts.example"}
 
 
 @patch("infrastructure.mail.sender.EmailSender.send_email")
@@ -187,13 +189,27 @@ class TestEmailDispatchInputs(unittest.TestCase):
     def test_template_fills_the_fields_left_empty(self, mock_send):
         template = {"name": "Relance Compétition", "subject": "Relance {first_name}", "body": "Bonjour",
                     "sender_email": "bureau@example.org", "sender_name": "Bureau"}
-        with patch.object(EmailDispatchService, "list_templates", return_value=[template]):
+        with patch.object(EmailDispatchService, "list_templates", return_value=[template]), \
+                patch.dict(os.environ, {**SMTP_ACCOUNT, "SMTP_SENDER_ALIASES": "bureau@example.org"}):
             EmailDispatchService.dispatch_emails(template_name="relance competition", body="Message propre",
                                                  recipients=[{"first_name": "Alice", "email": "a@example.com"}],
                                                  add_signature=False)
         sent = mock_send.call_args.kwargs
         self.assertEqual((sent["subject"], sent["body"]), ("Relance Alice", "Message propre"))
         self.assertEqual((sent["from_email"], sent["from_name"]), ("bureau@example.org", "Bureau"))
+
+    def test_template_sender_not_allowed_is_refused_before_any_send(self, mock_send):
+        template = {"name": "Relance", "subject": "Relance", "body": "Bonjour", "sender_email": "inscription@alj-escalade.fr"}
+        with patch.object(EmailDispatchService, "list_templates", return_value=[template]), \
+                patch.dict(os.environ, SMTP_ACCOUNT), self.assertRaises(Forbidden):
+            EmailDispatchService.dispatch_emails(template_name="Relance", recipients=[{"email": "a@example.com"}])
+        mock_send.assert_not_called()
+
+    def test_no_sender_sends_as_the_account_with_the_club_name(self, mock_send):
+        with patch.dict(os.environ, SMTP_ACCOUNT):
+            EmailDispatchService.dispatch_emails(subject="Info", body="Bonjour", recipients=[{"email": "a@example.com"}])
+        sent = mock_send.call_args.kwargs
+        self.assertEqual((sent["from_email"], sent["from_name"]), ("office@hogwarts.example", DEFAULT_SENDER_NAME))
 
     def test_member_e_mail_fills_group_season_and_amount(self, mock_send):
         recipient = {"first_name": "alice", "email": "a@example.com", "tarif": "Ados", "season": "2026-2027", "amount": "195.5"}

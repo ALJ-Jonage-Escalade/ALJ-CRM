@@ -97,7 +97,6 @@ CLIENT_ID="VOTRE_CLIENT_ID_HELLOASSO",\
 CLIENT_SECRET="VOTRE_CLIENT_SECRET_HELLOASSO",\
 CAMPAIGN_SLUG="adhesion-escalade-2026-2027-amicale-laique-escalade-2",\
 ACTIVE_SEASON="2026-2027",\
-GMAIL_SENDER_EMAIL="contact@alj-escalade.fr",\
 GOOGLE_PROJECT_ID="alj-2027"
 ```
 
@@ -144,6 +143,26 @@ gcloud run services update alj-escalade-api --region europe-west1 \
 - Les déploiements (section 7 et `deploy_cloud_run.sh`) gardent la variable.
 - Sans elle, le lien reprend l'adresse de la page de l'administrateur : une invitation envoyée depuis la révision de
   test (`--test`) pointerait alors vers l'URL de test, supprimée par `--cleanup`.
+
+### 📮 Adresses d'expédition des e-mails (alias Gmail)
+
+Tous les e-mails partent du compte Google connecté au CRM (`GMAIL_USER_EMAIL`, renseigné par la connexion OAuth de
+**Paramètres**, aujourd'hui `admin@alj-escalade.fr`). Un modèle peut partir d'une autre adresse du club
+(`inscription@`, `contact@`, `competitions@`…) **seulement si elle est un alias vérifié de ce compte** : Gmail
+remplacerait sinon l'expéditeur, et le CRM refuse donc l'envoi.
+
+Ajouter une adresse d'expédition :
+
+1. Dans Gmail, connecté en tant que compte d'envoi : **Paramètres › Comptes › Envoyer des e-mails en tant que ›
+   Ajouter une autre adresse e-mail**, puis valider le lien de confirmation reçu sur cette adresse.
+2. Quand Gmail l'indique comme vérifiée, elle apparaît (en 5 minutes au plus) dans la liste « Expéditeur » de
+   **Communications › Modèles**, et dans le champ « De » des e-mails en saisie libre.
+3. Un modèle qui garde une adresse non vérifiée est marqué « ⚠️ expéditeur non autorisé » et ses envois sont refusés :
+   choisir une autre adresse, ou finir la vérification.
+
+Sans jeton Gmail valide (liste des alias illisible), seul le compte lui-même est proposé et la raison est affichée dans
+l'éditeur ; reconnecter le compte Google dans **Paramètres**. En mode SMTP (sans Gmail), les alias sont la liste
+`SMTP_SENDER_ALIASES` (adresses séparées par des virgules), en plus de `SMTP_FROM_EMAIL`.
 
 ---
 

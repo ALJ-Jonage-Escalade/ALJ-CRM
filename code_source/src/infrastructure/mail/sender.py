@@ -35,6 +35,12 @@ def sanitize_email_header(value: object) -> str:
 SEND_TIMEOUT_SECONDS = 15
 
 
+def uses_gmail() -> bool:
+    """The Gmail API sends when the club's OAuth account is configured; SMTP otherwise."""
+    return bool(SecretStore.get_secret("GMAIL_USER_EMAIL") and SecretStore.get_secret("GMAIL_CLIENT_ID")
+                and SecretStore.get_secret("GMAIL_REFRESH_TOKEN"))
+
+
 class MailError(RuntimeError):
     """An e-mail could not be sent: no valid configuration, unreadable inline image, Gmail API or SMTP failure."""
 
@@ -130,7 +136,7 @@ class EmailSender:
         to_email = sanitize_email_header(to_email)  # may come from member data: no line break in the envelope
         cc = [sanitize_email_header(address) for address in cc if address.strip()]
         gmail_user = SecretStore.get_secret("GMAIL_USER_EMAIL")
-        use_gmail = bool(gmail_user and SecretStore.get_secret("GMAIL_CLIENT_ID") and SecretStore.get_secret("GMAIL_REFRESH_TOKEN"))
+        use_gmail = uses_gmail()
         smtp_user = SecretStore.get_secret("SMTP_USER")
         smtp_from = SecretStore.get_secret("SMTP_FROM_EMAIL") or smtp_user
         sender = sanitize_email_header(from_email) or (gmail_user if use_gmail else smtp_from)

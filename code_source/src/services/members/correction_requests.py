@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Sequence, TypedDict
 
-from domain.club_emails import DEFAULT_SENDER_EMAIL
 from domain.email_log import LoggedRecipient
 from domain.errors import InvalidRequest, UpstreamUnavailable
 from domain.members.correction_request import CORRECTION_REQUEST_TEMPLATE, PROBLEMS_VARIABLE, CorrectionRequest, correction_requests
@@ -20,6 +19,7 @@ from infrastructure.mail.sender import EmailSender, MailError
 from infrastructure.sqlite.connection import CORRECTION_REQUEST_EMAIL_TEMPLATE
 from services.communications.email_dispatch import EmailDispatchService, RenderedEmail, render_email
 from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
+from services.communications.senders import resolve_sender
 from services.members.helloasso_import import MembershipImportService
 
 logger = logging.getLogger("alj")
@@ -50,7 +50,7 @@ def _template() -> _Template:
     _name, subject, body, sender_email, sender_name = CORRECTION_REQUEST_EMAIL_TEMPLATE
     saved = EmailDispatchService.get_template_by_name(CORRECTION_REQUEST_TEMPLATE) or {}
     return _Template(subject=saved.get("subject") or subject, body=saved.get("body") or body,
-                     sender_email=saved.get("sender_email") or sender_email or DEFAULT_SENDER_EMAIL,
+                     sender_email=saved.get("sender_email") or sender_email,
                      sender_name=saved.get("sender_name") or sender_name)
 
 
@@ -79,9 +79,10 @@ def example(item_ids: Sequence[int], chosen_campaign: Optional[str] = None) -> C
 
 def send(item_ids: Sequence[int], author: str, chosen_campaign: Optional[str] = None) -> RequestOutcome:
     """Sends one e-mail per order, then records the send. A failed e-mail does not stop the others;
-    UpstreamUnavailable when none left (recorded too)."""
+    Forbidden when the template's sender is not allowed; UpstreamUnavailable when none left (recorded too)."""
     requests = _requests(item_ids, chosen_campaign)
     template = _template()
+    sender_email = resolve_sender(template["sender_email"])
     logged: List[LoggedRecipient] = []
     subjects: List[str] = []
     sent = 0
@@ -92,8 +93,8 @@ def send(item_ids: Sequence[int], author: str, chosen_campaign: Optional[str] = 
         try:
             EmailSender.send_email(to_email=request.payer_email, subject=rendered["subject"], body=rendered["body_plain"],
                                    html_body=rendered["body_html"], inline_images=get_inline_images(),
-                                   from_email=template["sender_email"], from_name=template["sender_name"], cc=list(request.cc),
-                                   reply_to=template["sender_email"])
+                                   from_email=sender_email, from_name=template["sender_name"], cc=list(request.cc),
+                                   reply_to=sender_email)
         except MailError as e:  # this order only: the others are still sent
             logger.warning("Demande de correction de la commande %s non envoyée : %s", request.order_ref, e)
             logged.append(logged_recipient(request.payer_email, payer_name, error=SEND_FAILED))

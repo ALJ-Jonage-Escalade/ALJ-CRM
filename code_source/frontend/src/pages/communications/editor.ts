@@ -1,14 +1,13 @@
 /* The e-mail template editor of the Communications page: checks before saving, live preview with a demo member,
    insertion of variables and HTML tags in the body (texts of the former web/bureau/communications.html). */
 import type { EmailTemplate } from "../../services/communications";
-import { looksLikeEmail } from "../../lib/email";
 import { DEMO_VALUES, renderHtml, renderTemplate, templateError as variablesError, type TemplateKind } from "../../lib/templateVariables";
 
-/** The club's default sender, sent by the server (infrastructure/mail/senders.py). */
+/** The default sender, sent by the server: the sending account and the club's display name. */
 export type Sender = Pick<EmailTemplate, "sender_email" | "sender_name">;
 
 /** Contents of a new template; the sender and kind are those of the template being edited (an empty sender: the
-    server puts the club's default). */
+    sending account). */
 export function newTemplate(name: string, sender: Sender, kind: TemplateKind = "adherent"): EmailTemplate {
   return {
     name,
@@ -46,9 +45,6 @@ export function templateError(template: EmailTemplate): string | null {
   }
   if (!template.subject.trim() || !template.body.trim()) {
     return "⚠️ Le sujet et le corps du message sont obligatoires.";
-  }
-  if (!looksLikeEmail(template.sender_email.trim())) {
-    return "⚠️ L'adresse d'expédition doit être une adresse e-mail valide.";
   }
   const unknown = variablesError([template.subject, template.body], template.kind);
   return unknown ? `⚠️ ${unknown}` : null;

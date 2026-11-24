@@ -14,8 +14,9 @@ from api.auth.me import author_of
 from api.responses import error, error_responses
 from services.communications.email_dispatch import EmailDispatchService
 from services.communications.email_templates import list_templates, save_template
+from services.communications.senders import allowed_senders
 from domain.email_variables import VARIABLES, aliases_of
-from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
+from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.security.api_auth import Role, has_role
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
@@ -27,12 +28,14 @@ router = APIRouter()
 def get_email_templates() -> EmailTemplates | JSONResponse:
     """Retourne la liste des modèles d'e-mails configurés."""
     templates = [EmailTemplate(**template) for template in list_templates()]
+    senders = allowed_senders()
     return EmailTemplates(
         status="success",
         templates=templates,
-        default_sender_email=DEFAULT_SENDER_EMAIL,
+        default_sender_email=senders["account"],
         default_sender_name=DEFAULT_SENDER_NAME,
-        sender_suggestions=list(SENDER_SUGGESTIONS),
+        sender_aliases=senders["aliases"],
+        sender_aliases_error=senders["error"],
         club_contact_email=CLUB_CONTACT_EMAIL,
     )
 
@@ -95,11 +98,13 @@ def get_email_status() -> EmailStatus:
 @router.post("/api/send-email", response_model=EmailDispatch, responses=error_responses(400, 403, 500, 502))
 def send_email_api(request: Request, data: EmailSendRequest) -> EmailDispatch | JSONResponse:
     """Envoie un e-mail personnalisé à chaque destinataire (Gmail API ou SMTP), avec les variables remplacées.
-    400: nothing to send (empty subject or body, no valid recipient); 502: every e-mail failed."""
+    400: nothing to send (empty subject or body, no valid recipient), or both a template and a sender; 403: a coach
+    writing to an unknown address, or a sender that is not the account nor one of its aliases; 502: every e-mail failed."""
+    if data.template_name and data.sender_email:
+        return error(400, "Un e-mail part soit de l'expéditeur de son modèle, soit de l'adresse choisie, pas des deux.")
     claims = getattr(request.state, "user", None)  # None: token check off (local dev server)
     recipients = [recipient.model_dump() for recipient in data.recipients]
-    reason = EmailDispatchService.unauthorized_send_reason(
-        recipients, data.sender_email or None, is_admin=claims is None or has_role(claims, Role.ADMIN))
+    reason = EmailDispatchService.unauthorized_send_reason(recipients, is_admin=claims is None or has_role(claims, Role.ADMIN))
     if reason:
         return error(403, reason)
     result = EmailDispatchService.dispatch_emails(

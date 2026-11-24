@@ -28,13 +28,21 @@ const selected = ref("");
 const draft = ref<EmailTemplate | null>(null);
 const signature = ref(true);
 const saving = ref(false);
-/** The club's default sender and the addresses offered, both from the server. */
+/** The default sender (the sending account), the addresses an e-mail may leave from and why that list is partial. */
 const defaultSender = ref<Sender>({ sender_email: "", sender_name: "" });
-const senderSuggestions = ref<string[]>([]);
+const senderAliases = ref<string[]>([]);
+const aliasesError = ref("");
 const shown = computed(() => (draft.value ? preview(draft.value, defaultSender.value) : null));
-/** A template in the list: its name, then whether it is its kind's default or needs fixing. */
+/** A template in the list: its name, then whether it is its kind's default, needs fixing or has a sender it may not use. */
 function optionText(template: EmailTemplate): string {
-  return [template.name, template.is_default && "★ par défaut", template.needs_fixing && "⚠️ à corriger"].filter(Boolean).join(" ");
+  return [
+    template.name,
+    template.is_default && "★ par défaut",
+    template.needs_fixing && "⚠️ à corriger",
+    template.sender_allowed === false && "⚠️ expéditeur non autorisé",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 /** The templates by kind, in the order of the kinds. */
 const groups = computed(() =>
@@ -54,7 +62,8 @@ async function loadTemplates(wanted?: string): Promise<void> {
     const answer = await communicationsApi.emailTemplates();
     templates.value = answer.templates;
     defaultSender.value = { sender_email: answer.default_sender_email, sender_name: answer.default_sender_name };
-    senderSuggestions.value = answer.sender_suggestions;
+    senderAliases.value = answer.sender_aliases;
+    aliasesError.value = answer.sender_aliases_error ?? "";
     loadError.value = "";
     select(initialTemplate(templates.value, wanted));
   } catch (e) {
@@ -71,7 +80,7 @@ function onSelect(event: Event): void {
 }
 
 async function save(): Promise<void> {
-  // needs_fixing is told by the server, not saved
+  // needs_fixing and sender_allowed are told by the server, not saved
   const { name, subject, body, sender_email, sender_name, kind, is_default } = draft.value!;
   saving.value = true;
   try {
@@ -237,7 +246,8 @@ onMounted(() => {
         v-model:signature="signature"
         :saving="saving"
         :default-sender="defaultSender"
-        :sender-suggestions="senderSuggestions"
+        :sender-aliases="senderAliases"
+        :aliases-error="aliasesError"
         :saved="templates.find((t) => t.name === selected)"
         @save="save"
         @invalid="toast.show"

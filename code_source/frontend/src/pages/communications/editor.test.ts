@@ -42,8 +42,7 @@ describe("templateError", () => {
     [{ name: " " }, "⚠️ Le titre du modèle ne peut pas être vide."],
     [{ subject: "" }, "⚠️ Le sujet et le corps du message sont obligatoires."],
     [{ body: "  " }, "⚠️ Le sujet et le corps du message sont obligatoires."],
-    [{ sender_email: "" }, "⚠️ L'adresse d'expédition doit être une adresse e-mail valide."],
-    [{ sender_email: "pas-une-adresse" }, "⚠️ L'adresse d'expédition doit être une adresse e-mail valide."],
+    [{ sender_email: "" }, null], // the sending account; the server checks the address against its aliases
   ])("%j", (change, message) => {
     expect(templateError({ ...TEMPLATE, ...change })).toBe(message);
   });

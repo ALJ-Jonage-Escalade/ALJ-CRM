@@ -47,6 +47,9 @@ const dialogOpen = computed({
 // E-mail templates, for the e-mail and the certificate, loaded once
 const templates = ref<EmailTemplate[]>([]);
 const clubContactEmail = ref("");
+/** The sending account and the addresses an e-mail may leave from. */
+const account = ref("");
+const aliases = ref<string[]>([]);
 let templatesLoaded = false;
 async function loadTemplates(): Promise<void> {
   if (templatesLoaded) {
@@ -57,6 +60,8 @@ async function loadTemplates(): Promise<void> {
     const answer = await communicationsApi.emailTemplates();
     templates.value = answer.templates;
     clubContactEmail.value = answer.club_contact_email;
+    account.value = answer.default_sender_email ?? "";
+    aliases.value = answer.sender_aliases ?? [];
   } catch (e) {
     templatesLoaded = false;
     console.warn("Modèles d'e-mails :", e);
@@ -129,6 +134,8 @@ defineExpose<RecordActions>({ open });
       :member="member"
       :templates="templates"
       :club-contact-email="clubContactEmail"
+      :account="account"
+      :aliases="aliases"
       @sent="sent"
       @failed="(message) => emit('notify', message, 9000)"
       @cancel="action = null"
@@ -147,6 +154,7 @@ defineExpose<RecordActions>({ open });
         v-else
         :member="member"
         :templates="templates"
+        :account="account"
         @sent="sent"
         @failed="(message) => emit('notify', message, 9000)"
         @cancel="action = null"

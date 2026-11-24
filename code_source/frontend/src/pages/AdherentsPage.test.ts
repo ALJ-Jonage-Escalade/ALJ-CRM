@@ -491,7 +491,7 @@ describe("AdherentsPage", () => {
     inBody("email-send")!.click();
     await flushPromises();
     expect(writes()[0]!.body).toEqual(
-      expect.objectContaining({ subject: "Rappel {first_name}", body: "Bonjour {first_name}, {amount} €" }),
+      expect.objectContaining({ template_name: "Relance", subject: "Rappel {first_name}", body: "Bonjour {first_name}, {amount} €" }),
     );
   });
 

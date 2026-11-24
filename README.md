@@ -91,6 +91,9 @@ en se connectant avec un compte Google de cette adresse dans les 7 jours.
 - Un bandeau orange « DEV » en bas de page confirme le branchement sur l'émulateur.
 - `dev/run_server.sh` refuse de démarrer si un `.env` du dépôt réactive Gmail ou un SMTP externe.
 - HelloAsso (synchro, import des adhésions) appelle l'API réelle : en erreur sans identifiants.
+- Expéditeur des e-mails : le compte d'envoi ou l'un de ses alias vérifiés (en dev : `SMTP_SENDER_ALIASES`), choisi
+  dans **Communications › Modèles** ou dans le champ « De » d'un e-mail libre ; toute autre adresse est refusée
+  (voir le guide de déploiement, « Adresses d'expédition des e-mails »).
 - Plus de détails : [code_source/dev/README.md](code_source/dev/README.md).
 
 ### Scripts Windows

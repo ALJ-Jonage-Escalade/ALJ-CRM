@@ -31,7 +31,7 @@ function mountForm(templates: unknown[] = [TEMPLATE]) {
   const api: ApiFetch = async (url, init) => {
     if (url.endsWith("/api/email-templates")) {
       await templatesAnswered;
-      return json({ status: "success", templates });
+      return json({ status: "success", templates, default_sender_email: "club@x.fr", sender_aliases: ["club@x.fr", "b@x.fr"] });
     }
     if (url.endsWith("/api/send-email")) {
       sent.push(JSON.parse(init?.body as string));
@@ -94,6 +94,47 @@ describe("competition e-mail form", () => {
     expect(sent).toEqual([
       expect.objectContaining({ subject: "{name_competition}", body: "Bonjour {first_name}, rendez-vous le {date_competition}" }),
     ]);
+  });
+
+  it("sends a template by its name, from the template's sender shown read-only", async () => {
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const { wrapper, release, sent } = mountForm([{ ...TEMPLATE, sender_email: "b@x.fr" }]);
+    release();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="email-from"]').text()).toContain("b@x.fr");
+    expect(wrapper.find('[data-testid="email-sender"]').exists()).toBe(false);
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(sent).toEqual([expect.objectContaining({ template_name: "Compétition - 1er Inscription" })]);
+    expect(sent[0]).not.toHaveProperty("sender_email");
+  });
+
+  it("sends a free text from the address chosen, the account by default", async () => {
+    vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
+    const { wrapper, release, sent } = mountForm();
+    release();
+    await flushPromises();
+    await wrapper.find('[data-testid="email-template"]').setValue("");
+    const offered = wrapper.findAll('[data-testid="email-sender"] option').map((option) => [option.attributes("value"), option.text()]);
+    expect(offered).toEqual([
+      ["", "Par défaut (club@x.fr)"],
+      ["b@x.fr", "b@x.fr"],
+    ]);
+    await wrapper.find('[data-testid="email-subject"]').setValue("Info");
+    await wrapper.find('[data-testid="email-body"]').setValue("Bonjour");
+    await wrapper.find('[data-testid="email-sender"]').setValue("b@x.fr");
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(sent).toEqual([expect.objectContaining({ sender_email: "b@x.fr" })]);
+    expect(sent[0]).not.toHaveProperty("template_name");
+  });
+
+  it("does not send a template whose sender is not allowed", async () => {
+    const { wrapper, release } = mountForm([{ ...TEMPLATE, sender_email: "inscription@x.fr", sender_allowed: false }]);
+    release();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="email-sender-not-allowed"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="email-send"]').attributes("disabled")).toBeDefined();
   });
 
   it("keeps what the user wrote before the templates arrived", async () => {

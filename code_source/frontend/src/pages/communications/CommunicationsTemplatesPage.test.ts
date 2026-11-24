@@ -29,16 +29,18 @@ const COUPE = {
   sender_name: "ALJ",
   kind: "competition",
   needs_fixing: true,
+  sender_allowed: false,
 };
 
 /** The /api/email-templates answer: the templates and the club's sender settings. */
-function templatesAnswer(templates: unknown[]): Response {
+function templatesAnswer(templates: unknown[], aliasesError = ""): Response {
   return json({
     status: "success",
     templates,
     default_sender_email: "club@alj.example",
     default_sender_name: "Club",
-    sender_suggestions: ["club@alj.example", "contact@alj.example"],
+    sender_aliases: ["club@alj.example", "a@alj.example", "b@alj.example"],
+    sender_aliases_error: aliasesError,
   });
 }
 
@@ -153,7 +155,7 @@ describe("CommunicationsTemplatesPage", () => {
     expect(groups).toEqual([
       ["Adhérent", ["Relance"]],
       ["Attestation", ["Rappel echeance"]],
-      ["Compétition", ["Coupe ⚠️ à corriger"]],
+      ["Compétition", ["Coupe ⚠️ à corriger ⚠️ expéditeur non autorisé"]],
     ]);
   });
 
@@ -179,6 +181,7 @@ describe("CommunicationsTemplatesPage", () => {
     expect(writes()[0]!.body).toEqual({
       ...COUPE,
       needs_fixing: undefined,
+      sender_allowed: undefined,
       subject: "{name_competition}",
       body: "Lien : {whatsapp_link}",
       old_name: "Coupe",
@@ -209,13 +212,23 @@ describe("CommunicationsTemplatesPage", () => {
     expect(writes()[0]!.body).toMatchObject({ name: "Rappel echeance", kind: "attestation", is_default: true });
   });
 
-  it("does not send an invalid template", async () => {
-    const { wrapper, writes, byId } = render();
+  it("keeps a saved sender that is no longer allowed, flagged, until another one is chosen", async () => {
+    const { wrapper, byId } = render({ ...ANSWERS, "GET /api/email-templates": () => templatesAnswer([COUPE, RELANCE, ECHEANCE]) });
     await flushPromises();
-    await wrapper.find('[data-testid="sender-email"]').setValue("pas-une-adresse");
-    await wrapper.find("form").trigger("submit");
-    expect(writes()).toEqual([]);
-    expect(byId("toast")!.textContent).toBe("⚠️ L'adresse d'expédition doit être une adresse e-mail valide.");
+    await wrapper.find('[data-testid="template-select"]').setValue("Coupe");
+    expect((byId("sender-email") as HTMLSelectElement).value).toBe("c@alj.example");
+    expect(byId("sender-not-allowed")).not.toBeNull();
+    await wrapper.find('[data-testid="sender-email"]').setValue("a@alj.example");
+    expect(byId("sender-not-allowed")).toBeNull();
+  });
+
+  it("says why only the account is offered", async () => {
+    const { byId } = render({
+      ...ANSWERS,
+      "GET /api/email-templates": () => templatesAnswer([RELANCE, ECHEANCE], "Gmail refuse de lister les alias d'envoi."),
+    });
+    await flushPromises();
+    expect(byId("sender-aliases-error")!.textContent).toContain("Gmail refuse de lister les alias d'envoi.");
   });
 
   it("shows the server's refusal", async () => {
@@ -252,14 +265,18 @@ describe("CommunicationsTemplatesPage", () => {
     expect(byId("new-template-dialog")).toBeNull();
   });
 
-  it("takes the sender suggestions and the default sender from the server", async () => {
+  it("offers the sending account by default, then its aliases, from the server", async () => {
     const { wrapper } = render();
     await flushPromises();
-    const offered = wrapper.findAll('[data-testid="sender-suggestions"] option').map((option) => option.attributes("value"));
-    expect(offered).toEqual(["club@alj.example", "contact@alj.example"]);
+    const offered = wrapper.findAll('[data-testid="sender-email"] option').map((option) => [option.attributes("value"), option.text()]);
+    expect(offered).toEqual([
+      ["", "Par défaut (club@alj.example)"],
+      ["a@alj.example", "a@alj.example"],
+      ["b@alj.example", "b@alj.example"],
+    ]);
+    expect(wrapper.find('[data-testid="sender-not-allowed"]').exists()).toBe(false);
     await wrapper.find('[data-testid="sender-email"]').setValue("");
     await wrapper.find('[data-testid="sender-name"]').setValue("");
-    expect(wrapper.find('[data-testid="sender-email"]').attributes("placeholder")).toBe("club@alj.example");
     expect(wrapper.find('[data-testid="preview-from"]').text()).toBe("Club <club@alj.example>");
   });
 

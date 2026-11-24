@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, TypedDict
 
-from domain.club_emails import CLUB_SENDER_DOMAIN
+from domain.club_emails import DEFAULT_SENDER_NAME
 from domain.competitions.models import Competition, default_deadline
 from domain.email_log import LoggedRecipient
 from domain.errors import InvalidRequest, UpstreamUnavailable
@@ -21,11 +21,11 @@ from domain.utils import format_amount, format_period, normalize_name
 from infrastructure.firestore.competitions import competitions, member_directory
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
 from infrastructure.mail.sender import EmailSender, MailError
-from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
 from infrastructure.sqlite.members import MemberRepository
 from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
+from services.communications.senders import resolve_sender
 
 logger = logging.getLogger("alj")
 
@@ -99,16 +99,17 @@ def _direct_recipients(recipients_data: List[Dict[str, Any]]) -> List[Dict[str, 
 
 def _fill_from_template(template: Optional[Dict[str, Any]], subject: Optional[str], body: Optional[str],  # Any: a template row
                         sender_email: Optional[str], sender_name: Optional[str],
-                        ) -> tuple[str, str, Optional[str], Optional[str]]:
-    """Subject, body, sender e-mail and name: the given values, the template's for those left empty."""
-    if not template:
-        return subject or "", body or "", sender_email, sender_name
-    return (subject or template.get("subject") or "", body or template.get("body") or "",
-            sender_email or template.get("sender_email"), sender_name or template.get("sender_name"))
+                        ) -> tuple[str, str, str, str]:
+    """Subject, body, sender e-mail and name: the given values, the template's for those left empty. The sender is
+    resolved (the account when empty; Forbidden when not allowed), the name falls back to the club's."""
+    if template:
+        subject, body = subject or template.get("subject"), body or template.get("body")
+        sender_email, sender_name = sender_email or template.get("sender_email"), sender_name or template.get("sender_name")
+    return subject or "", body or "", resolve_sender(sender_email), sender_name or DEFAULT_SENDER_NAME
 
 
 def _send_to_recipient(recipient: Dict[str, Any], subject: str, body: str, competition: Dict[str, str],  # Any: a resolved recipient
-                       add_signature: bool, from_email: Optional[str], from_name: Optional[str],
+                       add_signature: bool, from_email: str, from_name: str,
                        ) -> tuple[Dict[str, Any], LoggedRecipient, Optional[str]]:
     """Sends the e-mail to one recipient: its detail row, its log entry and the subject it got (None: not rendered)."""
     to_email = recipient.get("email")
@@ -141,16 +142,6 @@ class EmailDispatchService:
     """Service d'orchestration pour l'envoi d'e-mails personnalisés."""
 
     @classmethod
-    def is_allowed_sender(cls, sender_email: Optional[str]) -> bool:
-        """An empty sender (default account) or a club / configured address."""
-        email = (sender_email or "").strip().lower()
-        if not email:
-            return True
-        configured = {(SecretStore.get_secret(k) or "").strip().lower()
-                      for k in ("SMTP_FROM_EMAIL", "GMAIL_USER_EMAIL", "SMTP_USER")}
-        return email.endswith("@" + CLUB_SENDER_DOMAIN) or email in configured - {""}
-
-    @classmethod
     def known_member_emails(cls) -> set:
         """Every member and payer address known to the club database (lower-cased)."""
         emails = MemberRepository.list_contact_emails()
@@ -163,13 +154,9 @@ class EmailDispatchService:
 
     @classmethod
     def unauthorized_send_reason(cls, recipients: Optional[List[Dict[str, Any]]],
-                                 sender_email: Optional[str], is_admin: bool) -> Optional[str]:
-        """Reason to refuse a send request (None = allowed).
-
-        Coaches may only write to known members / payers; nobody may send as a foreign
-        address. Stops a compromised account from mailing anyone from the club's account."""
-        if not cls.is_allowed_sender(sender_email):
-            return f"Adresse d'expédition non autorisée : {sender_email}"
+                                 is_admin: bool) -> Optional[str]:
+        """Reason to refuse a send request (None = allowed): coaches may only write to known members / payers. Stops a
+        compromised account from mailing anyone from the club's account. (The sender is checked by dispatch_emails.)"""
         if is_admin or not recipients:
             return None
         known = cls.known_member_emails()
@@ -245,9 +232,10 @@ class EmailDispatchService:
     ) -> Dict[str, Any]:
         """Sends the e-mail to each recipient, with its variables replaced, and records the send in the e-mail log
         (`log_notice` when it could not be). A failed recipient does not stop the others (status "partial").
-        InvalidRequest: nothing to send; UpstreamUnavailable: every e-mail failed (recorded too)."""
+        InvalidRequest: nothing to send; Forbidden: a sender that is not the account nor one of its aliases;
+        UpstreamUnavailable: every e-mail failed (recorded too)."""
         template = cls.get_template_by_name(template_name) if template_name else None
-        subj_tmpl, body_tmpl, default_from_email, default_from_name = _fill_from_template(
+        subj_tmpl, body_tmpl, from_email, from_name = _fill_from_template(
             template, subject, body, sender_email, sender_name)
         if not subj_tmpl or not body_tmpl:
             raise InvalidRequest("Le sujet et le corps de l'e-mail ne peuvent pas être vides.")
@@ -263,7 +251,7 @@ class EmailDispatchService:
         subjects: List[str] = []
         for dest in destinataires:
             detail, logged_entry, sent_subject = _send_to_recipient(dest, subj_tmpl, body_tmpl, comp_ctx, add_signature,
-                                                                    default_from_email, default_from_name)
+                                                                    from_email, from_name)
             details.append(detail)
             logged.append(logged_entry)
             if sent_subject is not None:
