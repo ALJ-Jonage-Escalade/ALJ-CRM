@@ -3,6 +3,7 @@ a preview, per-row checkboxes, a row to review and the result screen (frontend/s
 
 Only people made up by the test are written: a first import creates one of them (another is left unchecked), a second
 one brings a renewal and an ambiguous registration of that same person, linked to them by hand."""
+import re
 import uuid
 
 import pytest
@@ -83,3 +84,18 @@ def test_import_from_the_membership_campaign(page, fake_helloasso):
     expect(page.get_by_test_id(ROWS)).to_have_count(3)  # one row per membership of the season
     page.get_by_test_id("member-search").fill(left_out)
     expect(page.get_by_test_id(ROWS)).to_have_count(0)
+
+
+def test_result_link_opens_the_created_member(page, fake_helloasso):
+    tag = uuid.uuid4().hex[:6].translate(str.maketrans("0123456789", "ghijklmnop"))
+    created = f"Chourave{tag}"
+    fake_helloasso.set([helloasso.membership_item("Pomona", created, "15/05/1970")])
+
+    _open(page)
+    _preview(page)
+    expect(_row(page, "new", created)).to_be_visible()
+    _import(page)
+    page.get_by_test_id("ha-created").get_by_role("link").click()
+
+    expect(page).to_have_url(re.compile(r"/bureau/adherents\?id=\d+&saison=[^&]+&achat=\d+"))
+    expect(page.get_by_test_id("record-name")).to_contain_text(created, ignore_case=True, timeout=20_000)
