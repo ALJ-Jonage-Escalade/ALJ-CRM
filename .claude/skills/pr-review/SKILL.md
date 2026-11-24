@@ -14,7 +14,7 @@ Quality review of the current branch vs `main`. Fix small things yourself; ask b
 - Read code around a hunk only where you need it (utils, callers). Don't read whole files.
 
 ## 2. Check
-- **Utils reused, not rebuilt:** `normalize_string` / `normalize_name` (`domain/utils.py`), `CODE_ROOT` / `ROOT_DIR` / `DATA_ROOT`
+- **Utils reused, not rebuilt:** `normalize_string` / `normalize_name` (`domain/utils.py`), `CODE_ROOT` / `ROOT_DIR` / `data_root()` / `template_path()`
   (`src/paths.py`), `domain/members/view.py` helpers, `schema_v2` scores, the repositories of `infrastructure/sqlite/`,
   `AppSettingsRepository`, `api.responses.error()`. In the frontend: `src/services/`, `src/lib/` (`text.ts`…),
   and the types from `api-schema.ts` instead of hand-written ones. Grep before you flag something as duplicated.

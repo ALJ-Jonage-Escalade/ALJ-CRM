@@ -16,8 +16,6 @@ description: >
 
 Maximise the **strict score** honestly. Your main cycle: **scan → plan → execute → rescan**. Follow the scan output's **INSTRUCTIONS FOR AGENTS** — don't substitute your own analysis.
 
-**Don't be lazy.** Do large refactors and small detailed fixes with equal energy. If it takes touching 20 files, touch 20 files. If it's a one-line change, make it. No task is too big or too small — fix things properly, not minimally.
-
 ## 2. The Workflow
 
 Three phases, repeated as a cycle.
@@ -71,9 +69,11 @@ desloppify plan focus <cluster>          # scope next to one cluster
 desloppify plan skip <pat>              # defer — hide from next
 ```
 
-### Phase 3: Execute — grind the queue to completion
+### Phase 3: Execute — one reviewed batch at a time
 
 Trust the plan and execute. Don't rescan mid-queue — finish the queue first.
+
+**Stop after each batch.** The user reviews every batch before the next one starts. Once a logical batch is committed, stop: list what changed (files, findings resolved, score movement) and wait for the user's go-ahead before taking the next item from `next`.
 
 **Branch first.** Create a dedicated branch — never commit health work directly to main:
 ```bash
@@ -94,13 +94,14 @@ desloppify next
 git add <files> && git commit -m "desloppify: fix 3 deferred_import findings"
 desloppify plan commit-log record      # moves findings uncommitted → committed, updates PR
 
-# 5. Push periodically
-git push -u origin desloppify/code-health
+# 5. Stop and report the batch; wait for the user's review
 
-# 6. Repeat until the queue is empty
+# 6. After the go-ahead, repeat until the queue is empty
 ```
 
-Score may temporarily drop after fixes — cascade effects are normal, keep going.
+Push only when the user asks.
+
+Score may temporarily drop after fixes — cascade effects are normal; mention it in the batch report rather than stopping the plan over it.
 If `next` suggests an auto-fixer, run `desloppify autofix <fixer> --dry-run` to preview, then apply.
 
 **When the queue is clear, go back to Phase 1.** New issues will surface, cascades will have resolved, priorities will have shifted. This is the cycle.
@@ -225,8 +226,8 @@ Directives are messages shown to agents at lifecycle phase transitions — use t
 
 ```bash
 desloppify directives                     # show all configured directives
-desloppify directives set execute "Switch to claude-sonnet-4-6. Focus on speed."
-desloppify directives set triage "Switch to claude-opus-4-6. Read carefully."
+desloppify directives set execute "Switch to <faster model>. Focus on speed."
+desloppify directives set triage "Switch to <stronger model>. Read carefully."
 desloppify directives set review "Use blind packet. Do not anchor on previous scores."
 desloppify directives unset execute       # remove a directive
 ```
@@ -249,15 +250,15 @@ desloppify scan --path . --reset-subjective       # reset subjective baseline to
 
 ## 4. Fix Tool Issues Upstream
 
-When desloppify itself appears wrong or inconsistent — a bug, a bad detection, a crash, confusing output — **fix it and open a PR**. If you can't confidently fix it, file an issue instead.
+When desloppify itself appears wrong or inconsistent — a bug, a bad detection, a crash, confusing output — tell the user, with a minimal repro (command, path, expected output, actual output), and carry on with the rest of the queue. Opening a PR or an issue on the public repository publishes it, so do it only when the user asks.
 
-### Fix and PR (preferred)
+### Fix and PR (when the user asks)
 
-Clone the tool repo to a temp directory, make the fix there, and verify it works against the project you're scanning before pushing.
+Clone the tool repo into the session scratchpad (not `/tmp`), make the fix there, and verify it works against the project you're scanning before pushing.
 
 ```bash
-git clone https://github.com/peteromallet/desloppify.git /tmp/desloppify-fix
-cd /tmp/desloppify-fix
+git clone https://github.com/peteromallet/desloppify.git <scratchpad>/desloppify-fix
+cd <scratchpad>/desloppify-fix
 git checkout -b fix/<short-description>
 ```
 
@@ -283,9 +284,9 @@ EOF
 )"
 ```
 
-Clean up after: `rm -rf /tmp/desloppify-fix`
+Clean up after: `rm -rf <scratchpad>/desloppify-fix`
 
-### File an issue (fallback)
+### File an issue (when the user asks)
 
 If the fix is unclear or the change needs discussion, open an issue at `https://github.com/peteromallet/desloppify/issues` with a minimal repro: command, path, expected output, actual output.
 
@@ -306,7 +307,7 @@ Use Claude subagents for subjective scoring work. **Do not use `--runner codex`*
 Run `desloppify review --prepare` first to generate review data, then use Claude subagents:
 
 1. **Prepare**: `desloppify review --prepare` — writes `query.json` and `.desloppify/review_packet_blind.json`.
-2. **Launch subagents**: Split the review across N parallel Claude subagents (one message, multiple Task calls). Each agent reviews a subset of dimensions.
+2. **Launch subagents**: Split the review across N parallel Claude subagents (one message, multiple Agent tool calls). Each agent reviews a subset of dimensions.
 3. **Merge & import**: Merge agent outputs, then `desloppify review --import merged.json --manual-override --attest "Claude subagents ran blind reviews against review_packet_blind.json" --scan-after-import`.
 
 #### How to split dimensions across subagents
@@ -314,7 +315,7 @@ Run `desloppify review --prepare` first to generate review data, then use Claude
 - Read `dimension_prompts` from `query.json` for dimensions with definitions and seed files.
 - Read `.desloppify/review_packet_blind.json` for the blind packet (no score targets, no anchoring data).
 - Group dimensions into 3-4 batches by theme (e.g., architecture, code quality, testing, conventions).
-- Launch one Task agent per batch with `subagent_type: "general-purpose"`. Each agent gets:
+- Launch one subagent (Agent tool) per batch with `subagent_type: "general-purpose"`. Each agent gets:
   - The codebase path and list of dimensions to score
   - The blind packet path to read
   - Instruction to score from code evidence only, not from targets
