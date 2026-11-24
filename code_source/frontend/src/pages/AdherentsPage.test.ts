@@ -64,6 +64,12 @@ const ANSWERS: Record<string, Answer> = {
   },
 };
 
+/** Opens the record's « Plus » menu: Reka UI opens it on pointerdown or the keyboard, not on a bare click. */
+async function openMore(inBody: (id: string) => HTMLElement | null): Promise<void> {
+  inBody("record-more")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await flushPromises();
+}
+
 async function render(role: Role = "admin", answers: Record<string, Answer> = ANSWERS, path = "/bureau/adherents") {
   const calls: { method: string; path: string; ifNoneMatch: string | null; body?: unknown }[] = [];
   const api: ApiFetch = vi.fn(async (url: string, init?: RequestInit) => {
@@ -227,6 +233,7 @@ describe("AdherentsPage", () => {
     expect(keyLink.getAttribute("href")).toBe("/bureau/outils/cles?cle=4");
     expect(inBody("record-readonly")).not.toBeNull();
     expect(inBody("record-edit")).toBeNull();
+    await openMore(inBody);
     expect(inBody("record-attestation")).toBeNull();
     expect(inBody("record-email")).not.toBeNull();
   });
@@ -311,6 +318,7 @@ describe("AdherentsPage", () => {
     };
     const { inBody, router, names } = await render("coach", answers);
     await flushPromises();
+    await openMore(inBody);
     inBody("record-email")!.click();
     await flushPromises();
     expect(router.currentRoute.value.query).toEqual({ id: "1", saison: "2026-2027", achat: "11" });
@@ -337,6 +345,7 @@ describe("AdherentsPage", () => {
     const { inBody } = await render("coach", answers);
     await flushPromises();
     expect(inBody("record-dialog")).toBeNull();
+    await openMore(inBody);
     inBody("record-email")!.click();
     await flushPromises();
     expect(inBody("record-dialog")!.textContent).toContain("E-mail à l'adhérent");
@@ -474,6 +483,7 @@ describe("AdherentsPage", () => {
     };
     const { inBody, writes } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027");
     await flushPromises();
+    await openMore(inBody);
     inBody("record-email")!.click();
     await flushPromises();
     const select = inBody("email-template") as HTMLSelectElement;
@@ -518,6 +528,7 @@ describe("AdherentsPage", () => {
     };
     const { inBody, writes } = await render(role, answers, "/bureau/adherents?id=1&saison=2026-2027");
     await flushPromises();
+    await openMore(inBody);
     inBody("record-email")!.click();
     await flushPromises();
     inBody("email-send")!.click();
@@ -565,6 +576,7 @@ describe("AdherentsPage", () => {
     };
     const { inBody, writes } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027");
     await flushPromises();
+    await openMore(inBody);
     inBody("record-attestation")!.click();
     await flushPromises();
     expect(inBody("attestation-pdf")!.getAttribute("src")).toBe("blob:pdf");
@@ -593,6 +605,7 @@ describe("AdherentsPage", () => {
     };
     const { inBody, writes } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027");
     await flushPromises();
+    await openMore(inBody);
     inBody("record-attestation")!.click();
     await flushPromises();
     expect(inBody("attestation-ineligible")!.textContent).toContain("le montant est nul");
