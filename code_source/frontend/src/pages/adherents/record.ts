@@ -128,7 +128,7 @@ export function tarifChoices(creneaux: readonly Creneau[], members: readonly Mem
 
 // ---------------------------------------------------------------- Actions on a record (MemberActionsDialog)
 
-export type RecordAction = "edit" | "email" | "attestation";
+export type RecordAction = "edit" | "email" | "attestation" | "detach";
 
 /** What MemberActionsDialog exposes to the page. */
 export interface RecordActions {

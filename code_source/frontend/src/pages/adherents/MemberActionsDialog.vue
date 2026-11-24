@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* The actions of the member record, in a dialog over the Adhérents page: the e-mail (coaches and admins), the edit
-   form and the payment certificate (admins). open(action) first loads what the action needs (the e-mail templates,
+   form, the payment certificate and the detach from HelloAsso (admins). open(action) first loads what the action needs (the e-mail templates,
    once; the edit form's draft). Another member selected closes the dialog. */
 import { computed, inject, ref, watch } from "vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
@@ -9,6 +9,7 @@ import { CLIENT_KEY, errorText } from "../../lib/client";
 import { createCommunicationsApi, type EmailTemplate } from "../../services/communications";
 import { createMembersApi } from "../../services/members";
 import MemberAttestation from "./MemberAttestation.vue";
+import MemberDetach from "./MemberDetach.vue";
 import MemberEmail from "./MemberEmail.vue";
 import MemberForm from "./MemberForm.vue";
 import type { Member } from "./members";
@@ -18,6 +19,8 @@ const props = defineProps<{ member: Member; admin: boolean; tarifs: readonly Tar
 const emit = defineEmits<{
   /** The member was changed or sent a certificate: the list is read again. */
   changed: [];
+  /** The membership was deleted (detached from HelloAsso): the record is to be closed. */
+  detached: [message: string];
   notify: [message: string, ms?: number];
 }>();
 
@@ -34,6 +37,7 @@ const TITLES: Record<RecordAction, string> = {
   edit: "✏️ Modifier la fiche",
   email: "✉️ E-mail à l'adhérent",
   attestation: "📄 Attestation de paiement",
+  detach: "🔗 Détacher de HelloAsso",
 };
 const dialogOpen = computed({
   get: () => action.value !== null,
@@ -74,6 +78,11 @@ async function open(next: RecordAction): Promise<void> {
     draft.value = draftOf(props.member);
   }
   action.value = next;
+}
+
+function detached(message: string): void {
+  action.value = null;
+  emit("detached", message);
 }
 
 function sent(message: string): void {
@@ -120,7 +129,7 @@ defineExpose<RecordActions>({ open });
     v-if="action"
     v-model:open="dialogOpen"
     :title="TITLES[action]"
-    :wide="action !== 'attestation'"
+    :wide="action === 'edit' || action === 'email'"
     :xl="action === 'attestation'"
     data-testid="record-dialog"
   >
@@ -141,6 +150,13 @@ defineExpose<RecordActions>({ open });
         :tarifs="tarifs"
         :saving="saving"
         @save="saveEdit"
+        @cancel="action = null"
+      />
+      <MemberDetach
+        v-else-if="action === 'detach'"
+        :member="member"
+        @detached="detached"
+        @failed="(message) => emit('notify', message, 9000)"
         @cancel="action = null"
       />
       <MemberAttestation

@@ -1,5 +1,6 @@
 """History of the HelloAsso membership imports, in Firestore: one write-once document per import (who, when, season,
-campaign, counts per bucket, each registration with the admin's decision and what was written).
+campaign, counts per bucket, each registration with the admin's decision and what was written), and one per membership
+detached from HelloAsso on the member record (`kind: "detach"`).
 
 Read and written by the server only (firestore.rules refuses every client). No `crm_` prefix: not copied into the
 SQLite cache. Dates are ISO 8601 strings in UTC: they sort as text.
@@ -39,11 +40,34 @@ class ImportHistoryEntry(TypedDict):
     items: List[ImportedItem]
 
 
+class DetachHistoryEntry(TypedDict):
+    """A membership detached from its HelloAsso registration from the member record (deleted), between two imports."""
+    kind: str  # "detach" (an import has no kind)
+    at: str
+    author: str  # e-mail of the admin
+    season: str
+    item_id: int
+    order_ref: str
+    user_id: int
+    member: str  # "LAST First", readable once the membership is deleted
+    purchase_id: int
+    tarif: str
+    amount: Optional[float]
+    reason: str
+
+
 class MembershipImportHistory:
 
     @staticmethod
     def record(entry: ImportHistoryEntry) -> str:
         """Writes the entry; returns its id (the date first, readable in the console, then a random part)."""
+        entry_id = f"{entry['at']}-{uuid.uuid4().hex[:8]}"
+        FirestoreClient.upsert_document(COLLECTION, entry_id, dict(entry))
+        return entry_id
+
+    @staticmethod
+    def record_detach(entry: DetachHistoryEntry) -> str:
+        """Writes the entry; returns its id, as record()."""
         entry_id = f"{entry['at']}-{uuid.uuid4().hex[:8]}"
         FirestoreClient.upsert_document(COLLECTION, entry_id, dict(entry))
         return entry_id

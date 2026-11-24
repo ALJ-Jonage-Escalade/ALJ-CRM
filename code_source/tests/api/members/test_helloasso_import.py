@@ -542,3 +542,80 @@ class TestCorrectionRequests(HelloAssoImportTestCase):
         self.assertEqual(rows[1]["last_request"]["author"], "serveur local")
         self.assertEqual(rows[1]["last_request"]["at"], self.store.entries[0]["at"])
         self.assertIsNone(rows[2]["last_request"])
+
+
+class TestMembershipDetachedFromHelloAsso(HelloAssoImportTestCase):
+    """A registration attached to the wrong member: the admin detaches it from the member record (#84)."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.items = [ha_item(1, "WEASLEY", "Molly", birth_date="30/10/1950")]
+        self.client.post("/api/members/create", json={"fields": {
+            "last_name": "WEASLEY", "first_name": "Ginny", "birth_date": "2013-08-11", "tarif_name": "Loisir collège"}})
+        [self.ginny] = self.ids("users")
+        attached = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {
+            "1": {"bucket": "new", "choice": f"attach:{self.ginny}", "comment": "Inscrite par sa mère"}}})
+        self.assertEqual(attached.status_code, 200, attached.text)
+        [self.purchase_id] = self.ids("purchases")
+
+    def ids(self, table: str) -> list[int]:
+        conn = SqliteDatabase.get_connection()
+        try:
+            return [int(row[0]) for row in conn.execute(f"SELECT id FROM {table}")]  # noqa: S608 - table names of the test
+        finally:
+            conn.close()
+
+    def detach(self, purchase_id: int, reason: str = "Mauvaise adhérente") -> Any:  # Any: the HTTP response
+        return self.client.post(f"/api/members/purchases/{purchase_id}/detach-helloasso", json={"reason": reason})
+
+    def test_detaching_deletes_the_membership_and_the_next_preview_sees_the_registration_again(self) -> None:
+        response = self.detach(self.purchase_id)
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual((self.count("users"), self.count("orders"), self.count("purchases")), (1, 0, 0))
+        [row] = self.client.post(PREVIEW).json()["rows"]
+        self.assertEqual(row["bucket"], "new")
+
+    def test_the_detach_is_recorded_in_the_import_history(self) -> None:
+        self.detach(self.purchase_id, reason=" Ginny n'est pas la bonne adhérente ")
+
+        [entry] = [entry for entry in self.fake.store["helloasso_membership_imports"].values() if entry.get("kind") == "detach"]
+        self.assertEqual({key: value for key, value in entry.items() if key != "at"}, {
+            "kind": "detach", "author": "serveur local", "season": "2026-2027", "item_id": 1, "order_ref": "501",
+            "user_id": self.ginny, "member": "WEASLEY Ginny", "purchase_id": self.purchase_id, "tarif": "Loisir collège",
+            "amount": 150.0, "reason": "Ginny n'est pas la bonne adhérente"})
+
+    def test_a_detach_without_reason_is_refused(self) -> None:
+        response = self.detach(self.purchase_id, reason=" ")
+
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("raison", response.json()["message"])
+        self.assertEqual(self.count("purchases"), 1)
+
+    def test_only_a_membership_from_helloasso_can_be_detached(self) -> None:
+        self.client.post("/api/members/create", json={"fields": {
+            "last_name": "LOVEGOOD", "first_name": "Luna", "birth_date": "2013-02-13", "tarif_name": "Loisir collège"}})
+        manual = max(self.ids("purchases"))
+
+        refused, unknown = self.detach(manual), self.detach(manual + 1)
+
+        self.assertEqual((refused.status_code, unknown.status_code), (400, 404), (refused.text, unknown.text))
+        self.assertIn("HelloAsso", refused.json()["message"])
+        self.assertEqual(self.count("purchases"), 2)
+
+    def test_the_order_of_a_sibling_is_kept(self) -> None:
+        self.items.append(ha_item(2, "WEASLEY", "Ron", birth_date="01/03/2012", order={"id": 501, "date": "2026-09-01T10:00:00+02:00"}))
+        self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {"2": {"bucket": "new", "choice": "import"}}})
+        self.assertEqual((self.count("orders"), self.count("purchases")), (1, 2))
+
+        self.detach(self.purchase_id)
+
+        self.assertEqual((self.count("orders"), self.count("purchases"), self.count("purchase_options")), (1, 1, 1))
+
+    def test_the_member_list_tells_which_membership_comes_from_helloasso(self) -> None:
+        self.client.post("/api/members/create", json={"fields": {
+            "last_name": "LOVEGOOD", "first_name": "Luna", "birth_date": "2013-02-13", "tarif_name": "Loisir collège"}})
+
+        members = self.client.get("/api/members", params={"season": "2026-2027"}).json()["members"]
+
+        self.assertEqual({m["first_name"]: m["helloasso_item_id"] for m in members}, {"Ginny": 1, "Luna": None})

@@ -2046,6 +2046,76 @@
         }
       }
     },
+    "/api/members/purchases/{purchase_id}/detach-helloasso": {
+      "post": {
+        "summary": "Detach Helloasso Api",
+        "description": "Deletes a membership linked to a HelloAsso registration (a wrong match of the import); the member is kept.",
+        "operationId": "detach_helloasso_api_api_members_purchases__purchase_id__detach_helloasso_post",
+        "parameters": [
+          {
+            "name": "purchase_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Purchase Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HelloAssoDetach"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HelloAssoDetached"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/seasons": {
       "get": {
         "summary": "List Seasons",
@@ -8681,6 +8751,49 @@
         "title": "HelloAssoCampaigns",
         "description": "competitions: Event forms of the \"Compétition\" activity; others: the other Event forms, for information.\nerror: HelloAsso unreachable (HTTP 200): the active campaigns are given, the lists are empty.\nwarning: the activity of some Event forms could not be read (they are listed in others)."
       },
+      "HelloAssoDetach": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "HelloAssoDetach",
+        "description": "Why the admin detaches a membership from its HelloAsso registration (required, kept in the import history)."
+      },
+      "HelloAssoDetached": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "order_ref": {
+            "type": "string",
+            "title": "Order Ref"
+          },
+          "season": {
+            "type": "string",
+            "title": "Season"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "order_ref",
+          "season"
+        ],
+        "title": "HelloAssoDetached",
+        "description": "The membership deleted: its HelloAsso registration is to be attached again from the import."
+      },
       "HelloAssoItem": {
         "properties": {
           "id_item": {
@@ -9631,6 +9744,18 @@
             "type": "integer",
             "title": "Purchase Id"
           },
+          "helloasso_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Helloasso Item Id",
+            "description": "The HelloAsso registration the membership comes from, None when entered by hand"
+          },
           "season_name": {
             "type": "string",
             "title": "Season Name"
@@ -9841,6 +9966,7 @@
         "required": [
           "user_id",
           "purchase_id",
+          "helloasso_item_id",
           "season_name",
           "last_name",
           "first_name",

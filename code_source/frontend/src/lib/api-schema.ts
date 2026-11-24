@@ -481,6 +481,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/members/purchases/{purchase_id}/detach-helloasso": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detach Helloasso Api
+         * @description Deletes a membership linked to a HelloAsso registration (a wrong match of the import); the member is kept.
+         */
+        post: operations["detach_helloasso_api_api_members_purchases__purchase_id__detach_helloasso_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons": {
         parameters: {
             query?: never;
@@ -3372,6 +3392,28 @@ export interface components {
             warning: string | null;
         };
         /**
+         * HelloAssoDetach
+         * @description Why the admin detaches a membership from its HelloAsso registration (required, kept in the import history).
+         */
+        HelloAssoDetach: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * HelloAssoDetached
+         * @description The membership deleted: its HelloAsso registration is to be attached again from the import.
+         */
+        HelloAssoDetached: {
+            /** Status */
+            status: string;
+            /** Message */
+            message: string;
+            /** Order Ref */
+            order_ref: string;
+            /** Season */
+            season: string;
+        };
+        /**
          * HelloAssoItem
          * @description An item of the HelloAsso mirror (`helloasso_items`) with the coach's link or ignore decision.
          */
@@ -3850,6 +3892,11 @@ export interface components {
             user_id: number;
             /** Purchase Id */
             purchase_id: number;
+            /**
+             * Helloasso Item Id
+             * @description The HelloAsso registration the membership comes from, None when entered by hand
+             */
+            helloasso_item_id: number | null;
             /** Season Name */
             season_name: string;
             /** Last Name */
@@ -6597,6 +6644,59 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_helloasso_api_api_members_purchases__purchase_id__detach_helloasso_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                purchase_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HelloAssoDetach"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HelloAssoDetached"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

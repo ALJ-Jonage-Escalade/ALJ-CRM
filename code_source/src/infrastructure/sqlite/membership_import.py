@@ -176,6 +176,26 @@ _SNAPSHOT_PURCHASES = """
 """
 
 
+@dataclass(frozen=True)
+class HelloAssoMembership:
+    """One purchase and the HelloAsso item it comes from (None for a membership not from HelloAsso)."""
+    purchase_id: int
+    user_id: int
+    member: str  # "LAST First"
+    season: str
+    order_ref: str
+    item_id: Optional[int]
+    tarif: str
+    amount: Optional[float]
+
+
+_MEMBERSHIP = """
+    SELECT p.id, p.user_id, u.last_name, u.first_name, s.name AS season, o.order_ref, p.helloasso_item_id, p.tarif_name, p.amount
+    FROM purchases p JOIN users u ON u.id = p.user_id JOIN orders o ON o.id = p.order_id LEFT JOIN seasons s ON s.id = o.season_id
+    WHERE p.id = ?
+"""
+
+
 class MembershipImportRepository:
 
     @classmethod
@@ -222,6 +242,44 @@ class MembershipImportRepository:
             conn.commit()
             logger.info("Import HelloAsso : %d inscription(s) écrite(s) pour la saison %s", len(applied), season)
             return applied
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @classmethod
+    def membership(cls, purchase_id: int) -> Optional[HelloAssoMembership]:
+        """The purchase and its HelloAsso item, None when there is no such purchase."""
+        SqliteDatabase.setup_database()
+        conn = SqliteDatabase.get_connection()
+        try:
+            row = conn.execute(_MEMBERSHIP, (purchase_id,)).fetchone()
+        finally:
+            conn.close()
+        if row is None:
+            return None
+        return HelloAssoMembership(purchase_id=row["id"], user_id=row["user_id"],
+                                   member=f"{row['last_name'] or ''} {row['first_name'] or ''}".strip(), season=row["season"] or "",
+                                   order_ref=str(row["order_ref"] or ""), item_id=row["helloasso_item_id"], tarif=row["tarif_name"] or "",
+                                   amount=row["amount"])
+
+    @classmethod
+    def delete_membership(cls, purchase_id: int) -> None:
+        """Deletes the purchase, its insurance options and its order when no other purchase uses it, in one
+        transaction. The member is left as is."""
+        SqliteDatabase.setup_database()
+        conn = SqliteDatabase.get_connection()
+        try:
+            cur = conn.cursor()
+            row = cur.execute("SELECT order_id FROM purchases WHERE id = ?", (purchase_id,)).fetchone()
+            if row is None:
+                return
+            cur.execute("DELETE FROM purchase_options WHERE purchase_id = ?", (purchase_id,))
+            cur.execute("DELETE FROM purchases WHERE id = ?", (purchase_id,))
+            cur.execute("DELETE FROM orders WHERE id = ? AND NOT EXISTS (SELECT 1 FROM purchases WHERE order_id = ?)", (row[0], row[0]))
+            conn.commit()
+            logger.info("Adhésion %d supprimée (détachée de HelloAsso)", purchase_id)
         except Exception:
             conn.rollback()
             raise

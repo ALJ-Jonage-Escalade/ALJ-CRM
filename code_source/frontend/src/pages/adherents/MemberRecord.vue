@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* Read view of a member record: status, slot, every known field. Admins get the edit form, which the page opens in a
-   dialog; the other actions are in the « Plus » menu: e-mail (coaches and admins), call, payment certificate (admins).
+   dialog; the other actions are in the « Plus » menu: e-mail (coaches and admins), call, payment certificate and detach
+   from HelloAsso (admins, online only).
    compact: a narrow column (the page's side panel), each label above its value. */
 import { computed, inject, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
@@ -11,15 +12,17 @@ import UiMenuItem from "../../components/ui/UiMenuItem.vue";
 import { ApiError, CLIENT_KEY, errorText } from "../../lib/client";
 import { formatDayText } from "../../lib/format";
 import { telHref } from "../../lib/text";
+import { useNetworkUp } from "../../composables/network";
 import { isCompetitor, type Member } from "./members";
 import { paymentBadge, type Competition, type Participant } from "../competitions/competitions";
 import { recordRows } from "./record";
 import { createCompetitionsApi } from "../../services/competitions";
 
 const props = defineProps<{ member: Member; admin: boolean; compact?: boolean }>();
-const emit = defineEmits<{ email: []; attestation: []; edit: [] }>();
+const emit = defineEmits<{ email: []; attestation: []; edit: []; detach: [] }>();
 
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
+const networkUp = useNetworkUp();
 const tab = ref<"general" | "competitions">("general");
 const competitions = ref<Competition[]>([]);
 /** Why the competitions tab is empty when the server refused or failed; offline, it just stays empty. */
@@ -81,6 +84,18 @@ function call(phone: string): void {
         <UiMenuItem v-if="member.phone" data-testid="record-call" @select="call(member.phone)">📞 Appeler</UiMenuItem>
         <UiMenuItem v-if="admin" data-testid="record-attestation" title="Attestation de paiement (PDF)" @select="emit('attestation')">
           📄 Attestation
+        </UiMenuItem>
+        <UiMenuItem
+          v-if="admin && member.helloasso_item_id !== null"
+          danger
+          data-testid="record-detach"
+          :disabled="!networkUp"
+          :title="
+            networkUp ? 'Supprimer cette adhésion, issue d\'une inscription HelloAsso rattachée au mauvais adhérent' : 'Connexion requise'
+          "
+          @select="emit('detach')"
+        >
+          🔗 Détacher de HelloAsso
         </UiMenuItem>
       </UiMenu>
       <span v-if="!admin" data-testid="record-readonly" class="text-[11.5px] text-slate-500 italic">

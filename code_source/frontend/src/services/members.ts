@@ -18,6 +18,14 @@ export function createMembersApi(client: ApiClient) {
   return {
     create: (body: Schemas["MemberCreate"]) => unwrap(client.POST("/api/members/create", { body })),
     update: (body: Schemas["MemberUpdate"]) => unwrap(client.POST("/api/members/update", { body })),
+    /** Deletes a membership linked to a HelloAsso registration (a wrong match of the import); the member is kept. */
+    detachHelloAsso: (purchaseId: number, reason: string) =>
+      unwrap(
+        client.POST("/api/members/purchases/{purchase_id}/detach-helloasso", {
+          params: { path: { purchase_id: purchaseId } },
+          body: { reason },
+        }),
+      ),
     /** Members of the active season (one row per membership). */
     list: () => unwrap(client.GET("/api/members")),
     seasons: () => unwrap(client.GET("/api/seasons")),

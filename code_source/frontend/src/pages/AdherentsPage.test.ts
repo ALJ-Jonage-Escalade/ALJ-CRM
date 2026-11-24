@@ -28,6 +28,8 @@ const ACTIVE: MemberList = {
       phone: "+33 6 12 34 56 78",
       email_primary: "lea@example.org",
       key: { id: 4, code: "12", given_on: "2026-09-12" },
+      order_ref: "501",
+      helloasso_item_id: 7,
     }),
     member({
       user_id: 2,
@@ -368,6 +370,66 @@ describe("AdherentsPage", () => {
     expect(inBody("record-missing")!.textContent).toBe("Adhérent introuvable dans la saison 2026-2027.");
   });
 
+  it("offers to detach a HelloAsso membership to admins only", async () => {
+    const shown = async (role: Role, achat: string): Promise<boolean> => {
+      const { inBody, wrapper } = await render(
+        role,
+        ANSWERS,
+        `/bureau/adherents?id=${achat === "11" ? 1 : 2}&saison=2026-2027&achat=${achat}`,
+      );
+      await flushPromises();
+      await openMore(inBody);
+      const found = inBody("record-detach") !== null;
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      wrapper.unmount();
+      return found;
+    };
+    expect(await shown("admin", "11")).toBe(true);
+    expect(await shown("admin", "12")).toBe(false); // entered by hand
+    expect(await shown("coach", "11")).toBe(false);
+  });
+
+  it("disables the detach offline: a deletion cannot wait for the network", async () => {
+    const { inBody } = await render("admin", ANSWERS, "/bureau/adherents?id=1&saison=2026-2027&achat=11");
+    await flushPromises();
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    window.dispatchEvent(new Event("offline"));
+    await openMore(inBody);
+    expect(inBody("record-detach")!.getAttribute("data-disabled")).not.toBeNull();
+    expect(inBody("record-detach")!.title).toBe("Connexion requise");
+  });
+
+  it("detaches a HelloAsso membership with a reason, then closes the record and reloads the list", async () => {
+    const answers = {
+      ...ANSWERS,
+      "POST /api/members/purchases/11/detach-helloasso": () =>
+        json({ status: "success", message: "ok", order_ref: "501", season: "2026-2027" }),
+    };
+    const { inBody, writes, calls, router } = await render("admin", answers, "/bureau/adherents?id=1&saison=2026-2027&achat=11");
+    await flushPromises();
+    await openMore(inBody);
+    inBody("record-detach")!.click();
+    await flushPromises();
+    expect(inBody("record-dialog")!.textContent).toContain("commande 501");
+    expect((inBody("detach-confirm") as HTMLButtonElement).disabled).toBe(true); // the reason is required
+
+    const reason = inBody("detach-reason") as HTMLTextAreaElement;
+    reason.value = "Inscription de Molly, pas de Léa";
+    reason.dispatchEvent(new Event("input"));
+    await flushPromises();
+    const polled = calls.filter((c) => c.path.startsWith("/api/members?")).length;
+    inBody("detach-confirm")!.click();
+    await flushPromises();
+
+    expect(writes()).toEqual([
+      expect.objectContaining({ path: "/api/members/purchases/11/detach-helloasso", body: { reason: "Inscription de Molly, pas de Léa" } }),
+    ]);
+    expect(router.currentRoute.value.query).toEqual({ saison: "2026-2027" });
+    expect(calls.filter((c) => c.path.startsWith("/api/members?")).length).toBeGreaterThan(polled);
+    expect(inBody("record-dialog")).toBeNull();
+    expect(document.querySelector("#toast")!.textContent).toContain("Outils › Import HelloAsso");
+  });
+
   it("edits a record: checks the fields, sends only the changes, then reloads the list", async () => {
     vi.spyOn(dialogs, "confirm").mockResolvedValue(true);
     const answers = { ...ANSWERS, "POST /api/members/update": () => json({ status: "success", message: "ok" }) };
@@ -393,7 +455,7 @@ describe("AdherentsPage", () => {
     expect(writes()).toEqual([
       expect.objectContaining({
         path: "/api/members/update",
-        body: { user_id: 1, purchase_id: 11, order_ref: "", fields: { phone: "06 99 88 77 66", badge_rouge: "Oui" } },
+        body: { user_id: 1, purchase_id: 11, order_ref: "501", fields: { phone: "06 99 88 77 66", badge_rouge: "Oui" } },
       }),
     ]);
     expect(calls.filter((c) => c.path.startsWith("/api/members")).length).toBeGreaterThan(1); // reloaded after the write

@@ -74,7 +74,7 @@ class MemberRepository:
 
     # One row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), the fields of the web member pages
     _MEMBER_ROWS_SELECT = """
-        SELECT u.id AS user_id, p.id AS purchase_id,
+        SELECT u.id AS user_id, p.id AS purchase_id, p.helloasso_item_id,
                u.last_name, u.first_name, u.birth_date, u.sex,
                u.address, u.zip_code, u.city, u.country, u.nationality, u.phone, u.email_primary, u.email_secondary,
                u.licence_ffme, u.health_commitment, u.photo_auth, u.badge_rouge, u.autonomie_bloc,
