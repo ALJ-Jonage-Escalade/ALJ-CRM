@@ -5,6 +5,7 @@ import sqlite3
 from typing import Any, Dict, List, NamedTuple, Optional
 
 from infrastructure.firestore.client import FirestoreConflictError
+from infrastructure.firestore.cloud_sync.rest_store import RestStore
 from infrastructure.firestore.cloud_sync.cache import (
     _Applying,
     _get_base,
@@ -35,7 +36,7 @@ from infrastructure.firestore.cloud_sync.common import (
     upgrade_legacy_fields,
 )
 
-def renumber_row(conn, store, table: str, old_id: int, report: SyncReport) -> int:
+def renumber_row(conn: sqlite3.Connection, store: RestStore, table: str, old_id: int, report: SyncReport) -> int:
     """Donne un nouvel identifiant à une ligne locale dont l'ID est déjà utilisé
     dans Firestore par une autre ligne (deux postes ont créé en même temps).
     Les références (REFERENCES) sont mises à jour ; les déclencheurs notent tout."""
@@ -51,7 +52,8 @@ def renumber_row(conn, store, table: str, old_id: int, report: SyncReport) -> in
     return new_id
 
 
-def apply_remote_docs(conn, store, table: str, docs: List[Dict[str, Any]], report: SyncReport):
+def apply_remote_docs(conn: sqlite3.Connection, store: RestStore, table: str, docs: List[Dict[str, Any]],  # Any: parsed documents
+                      report: SyncReport) -> None:
     """Intègre des documents Firestore dans le cache (fusion à 3 voies si besoin)."""
     if not docs:
         return
@@ -117,7 +119,7 @@ def apply_remote_docs(conn, store, table: str, docs: List[Dict[str, Any]], repor
 
 
 
-def pull(conn, store, report: Optional[SyncReport] = None) -> SyncReport:
+def pull(conn: sqlite3.Connection, store: RestStore, report: Optional[SyncReport] = None) -> SyncReport:
     """Récupère les documents modifiés depuis la dernière synchronisation."""
     report = report if report is not None else SyncReport()
     for table in tracked_tables(conn):
@@ -141,7 +143,7 @@ class PendingWrite(NamedTuple):
     row: Optional[Dict[str, Any]]  # Any: the cached row; None for a deletion
 
 
-def _build_write(conn, table: str, pk: List[str], pk_str: str, author: str
+def _build_write(conn: sqlite3.Connection, table: str, pk: List[str], pk_str: str, author: str
                  ) -> Optional[tuple[Dict[str, Any], Optional[Dict[str, Any]]]]:
     """The store write of a changed row and the row itself (None for a deletion), or None when there is nothing to
     send: a row deleted before it was ever sent, or a row unchanged since the last synchronised version."""
@@ -170,7 +172,7 @@ def _build_write(conn, table: str, pk: List[str], pk_str: str, author: str
 MAX_FLUSH_RETRIES = 3
 
 
-def flush(conn, store, author: str = "", report: Optional[SyncReport] = None,
+def flush(conn: sqlite3.Connection, store: RestStore, author: str = "", report: Optional[SyncReport] = None,
           _depth: int = 0) -> SyncReport:
     """Envoie les lignes modifiées localement vers Firestore."""
     report = report if report is not None else SyncReport()
