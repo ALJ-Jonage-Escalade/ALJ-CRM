@@ -20,6 +20,8 @@ import {
   participantCsv,
   participantRows,
   periodText,
+  podiumIcon,
+  rankingColor,
   rankingText,
   seasonOf,
   seasons,
@@ -215,8 +217,20 @@ describe("participants", () => {
     expect([hasPaid(leo!), hasPaid(zoe!), hasPaid({ ...leo!, statut_paiement: "annule_reporte" })]).toEqual([true, false, false]);
     expect([isNotInvited(max!), isNotInvited(zoe!)]).toEqual([true, false]);
     expect(rankingText(leo!)).toBe("🥇 1er");
-    expect(rankingText({ classement: "4", total_categorie: 23 })).toBe("🏅 4 / 23");
+    expect(rankingText({ classement: "4", total_categorie: 23 })).toBe("4 / 23");
+    expect(rankingText({ resultat_ffme: "12e" })).toBe("12e");
     expect(rankingText({})).toBe("");
+  });
+
+  it.each([
+    ["1", "🥇", "gold"],
+    ["2", "🥈", "silver"],
+    ["3", "🥉", "bronze"],
+    ["4", "", "slate"],
+    ["", "", "slate"],
+  ])("gives rank %s the medal %s and the %s pill", (classement, icon, color) => {
+    expect(podiumIcon({ classement })).toBe(icon);
+    expect(rankingColor({ classement })).toBe(color);
   });
 
   it("finds members to add, not listed yet", () => {

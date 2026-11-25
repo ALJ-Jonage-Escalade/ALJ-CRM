@@ -172,15 +172,35 @@ export const hasPaid = (participant: Participant): boolean =>
 export const isNotInvited = (participant: Participant): boolean =>
   !participant.selectionne && (!participant.statut_paiement || participant.statut_paiement === "non_invite") && !hasPaid(participant);
 
-/** « 🥇 1er », « 🏅 4 / 23 »… of a MyCompet result, empty without one. */
-export function rankingText(participant: Participant): string {
-  const r = String(participant.classement ?? "").trim();
-  if (!r) {
-    return participant.resultat_ffme ? `🏅 ${participant.resultat_ffme}` : "";
+const PODIUM: Record<string, { icon: string; color: BadgeColor }> = {
+  "1": { icon: "🥇", color: "gold" },
+  "2": { icon: "🥈", color: "silver" },
+  "3": { icon: "🥉", color: "bronze" },
+};
+
+const rankOf = (participant: Participant): string => String(participant.classement ?? "").trim();
+
+/** The medal of a podium place, empty off the podium or without a result. */
+export const podiumIcon = (participant: Participant): string => PODIUM[rankOf(participant)]?.icon ?? "";
+
+/** The pill colour of a result: gold, silver, bronze on the podium, light grey otherwise. */
+export const rankingColor = (participant: Participant): BadgeColor => PODIUM[rankOf(participant)]?.color ?? "slate";
+
+/** « 1er », « 4 / 23 »… of a MyCompet result (the FFME result without one), empty without either. */
+export function rankingLabel(participant: Participant): string {
+  const rank = rankOf(participant);
+  if (!rank) {
+    return String(participant.resultat_ffme ?? "");
   }
-  const icon = r === "1" ? "🥇" : r === "2" ? "🥈" : r === "3" ? "🥉" : "🏅";
   const total = Number(participant.total_categorie ?? 0);
-  return `${icon} ${r}${total > 0 ? ` / ${total}` : r === "1" ? "er" : "e"}`;
+  return `${rank}${total > 0 ? ` / ${total}` : rank === "1" ? "er" : "e"}`;
+}
+
+/** « 🥇 1er », « 4 / 23 »…: the label behind the medal of a podium place. */
+export function rankingText(participant: Participant): string {
+  const label = rankingLabel(participant);
+  const icon = podiumIcon(participant);
+  return label && icon ? `${icon} ${label}` : label;
 }
 
 export interface ContactCard {
@@ -343,7 +363,7 @@ export function participantCsv(rows: readonly Row[]): Cell[][] {
         p.prenom,
         p.num_licence,
         p.group === UNIDENTIFIED ? "" : p.group,
-        rankingText(p).replace(/^\S+ /, ""),
+        rankingLabel(p),
         p.selectionne ? "Oui" : "Non",
         paymentBadge(p.statut_paiement).label,
         p.montant_paye ? `${p.montant_paye} €` : "",

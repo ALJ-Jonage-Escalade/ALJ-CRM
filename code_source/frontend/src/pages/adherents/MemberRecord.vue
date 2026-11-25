@@ -14,7 +14,7 @@ import { formatDayText } from "../../lib/format";
 import { telHref } from "../../lib/text";
 import { useNetworkUp } from "../../composables/network";
 import { isCompetitor, type Member } from "./members";
-import { paymentBadge, type Competition, type Participant } from "../competitions/competitions";
+import { paymentBadge, rankingColor, rankingText, type Competition, type Participant } from "../competitions/competitions";
 import { recordRows } from "./record";
 import { createCompetitionsApi } from "../../services/competitions";
 
@@ -186,9 +186,9 @@ function call(phone: string): void {
           <UiBadge variant="soft" :color="paymentBadge(c.participant.statut_paiement).color" class="text-[11px]">
             {{ paymentBadge(c.participant.statut_paiement).label }}
           </UiBadge>
-          <span v-if="c.participant.classement" class="rounded bg-violet-50 px-1.5 py-0.5 font-bold text-violet-700">
-            🏅 Rang : {{ c.participant.classement }}
-          </span>
+          <UiBadge v-if="rankingText(c.participant)" variant="soft" :color="rankingColor(c.participant)" class="text-[11px]">
+            {{ rankingText(c.participant) }}
+          </UiBadge>
         </div>
       </div>
     </div>

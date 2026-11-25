@@ -4,7 +4,7 @@
    (« Sur place » once checked in). */
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import { telHref } from "../../../lib/text";
-import { hasPaid, isCancelled, paymentBadge, rankingText, type Row } from "../competitions";
+import { hasPaid, isCancelled, paymentBadge, rankingColor, rankingText, type Row } from "../competitions";
 import type { ContactState } from "./emailHistory";
 import LastContact from "./LastContact.vue";
 
@@ -64,7 +64,7 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       </span>
     </td>
     <td class="px-2.5 py-2 text-center">
-      <UiBadge v-if="rankingText(row)" color="amber" variant="soft" data-testid="ranking">{{ rankingText(row) }}</UiBadge>
+      <UiBadge v-if="rankingText(row)" :color="rankingColor(row)" variant="soft" data-testid="ranking">{{ rankingText(row) }}</UiBadge>
       <span v-else class="text-xs text-slate-400">—</span>
       <span v-if="rankingText(row) && row.categorie_ffme" class="block text-[10.5px] text-slate-500">{{ row.categorie_ffme }}</span>
     </td>

@@ -2,7 +2,7 @@
 /* A competitor of the competition. */
 import UiBadge from "../../../components/ui/UiBadge.vue";
 import { telHref } from "../../../lib/text";
-import { hasPaid, isCancelled, paymentBadge, rankingText, type Row } from "../competitions";
+import { hasPaid, isCancelled, paymentBadge, rankingColor, rankingText, type Row } from "../competitions";
 import type { ContactState } from "./emailHistory";
 import LastContact from "./LastContact.vue";
 
@@ -114,7 +114,7 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       >
         ⏳ à envoyer
       </span>
-      <UiBadge v-if="rankingText(row)" color="amber" variant="soft" data-testid="ranking">
+      <UiBadge v-if="rankingText(row)" :color="rankingColor(row)" variant="soft" data-testid="ranking">
         {{ rankingText(row) }}
         <template v-if="row.categorie_ffme">· {{ row.categorie_ffme }}</template>
       </UiBadge>

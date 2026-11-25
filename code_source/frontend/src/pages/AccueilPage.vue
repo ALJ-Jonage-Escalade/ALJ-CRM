@@ -8,7 +8,7 @@ import { CLIENT_KEY, ApiError, errorText } from "../lib/client";
 import { formatDayText } from "../lib/format";
 import { isAdmin } from "../lib/roles";
 import { createCompetitionsApi } from "../services/competitions";
-import { isArchived, isPast, todayIso, type Competition, type Participant } from "./competitions/competitions";
+import { isArchived, isPast, podiumIcon, rankingColor, todayIso, type Competition, type Participant } from "./competitions/competitions";
 
 const competitionsApi = createCompetitionsApi(inject(CLIENT_KEY)!);
 const comps = ref<Competition[]>([]);
@@ -115,17 +115,16 @@ const refused = computed(() => PAGES.find((p) => p.href === route.query[REFUSED_
                 v-if="(c.participants || []).filter((p: Participant) => p.classement || p.resultat_ffme).length"
                 class="flex flex-wrap gap-1 mt-1"
               >
-                <span
+                <UiBadge
                   v-for="(p, idx) in (c.participants || []).filter((p: Participant) => p.classement || p.resultat_ffme).slice(0, 3)"
                   :key="p.adherent_id ?? idx"
-                  class="rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[11px] font-medium text-slate-800"
+                  :color="rankingColor(p)"
+                  variant="soft"
+                  data-testid="past-result-ranking"
                 >
-                  <span v-if="p.classement === '1'">🥇</span>
-                  <span v-else-if="p.classement === '2'">🥈</span>
-                  <span v-else-if="p.classement === '3'">🥉</span>
-                  <span v-else>#{{ p.classement }}</span>
+                  {{ podiumIcon(p) || (p.classement ? `#${p.classement}` : "") }}
                   {{ p.prenom }} {{ p.nom }}
-                </span>
+                </UiBadge>
               </div>
               <div v-else class="text-[11px] text-slate-400 italic">{{ (c.participants || []).length }} participant(s)</div>
             </div>
