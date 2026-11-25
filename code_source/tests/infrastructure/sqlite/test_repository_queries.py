@@ -34,7 +34,6 @@ class TestRepositoryQueries(unittest.TestCase):
 
     def tearDown(self):
         SqliteDatabase.set_db_path(self.original_db_path)
-        SqliteDatabase._database_setup_done = False
         for suffix in ("", "-wal", "-shm"):
             if os.path.exists(self.test_db_path + suffix):
                 try:

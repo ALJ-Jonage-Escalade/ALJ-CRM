@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import math
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -48,7 +50,7 @@ def _request_access_token() -> Tuple[Optional[str], float]:
     return token, expires_in - TOKEN_EXPIRY_MARGIN_SECONDS
 
 
-def get_access_token():
+def get_access_token() -> Optional[str]:
     """Jeton d'accès OAuth2 HelloAsso, réutilisé jusqu'à peu avant son expiration (None si indisponible).
     Dev mode: a new one every time (no cache, as the access roles)."""
     if not all(client_credentials()):
@@ -80,19 +82,19 @@ class HelloAssoApiError(Exception):
     """Appel à l'API HelloAsso impossible (identifiants, réseau, erreur serveur).
     `code`: helloasso_credentials_missing or helloasso_unavailable."""
 
-    def __init__(self, message, code="helloasso_unavailable"):
+    def __init__(self, message: str, code: str = "helloasso_unavailable") -> None:
         super().__init__(message)
         self.message = message
         self.code = code
 
 
-def credentials_configured():
+def credentials_configured() -> bool:
     """Les identifiants API HelloAsso sont-ils disponibles ?"""
     return all(client_credentials())
 
 
-def _get_resource(path, params=None):
-    """GET authentifié sur l'API v5. Renvoie None si la ressource n'existe pas (404)."""
+def _get_resource(path: str, params: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:  # Any: HelloAsso JSON
+    """GET authentifié sur l'API v5. None when the id is unknown or not the organisation's (400/403/404)."""
     token = get_access_token()
     if not token:
         raise HelloAssoApiError("Jeton d'accès HelloAsso indisponible")
@@ -100,7 +102,7 @@ def _get_resource(path, params=None):
         response = requests.get(f"{runtime_env.helloasso_api_url()}{path}", headers={"Authorization": f"Bearer {token}"},
                                 params=params or {}, timeout=15)
     except requests.exceptions.RequestException as e:
-        raise HelloAssoApiError(f"API HelloAsso injoignable : {e}")
+        raise HelloAssoApiError(f"API HelloAsso injoignable : {e}") from e
     _drop_token_if_refused(response)
     if response.status_code in (400, 403, 404):
         return None  # identifiant inexistant ou n'appartenant pas à l'organisation
@@ -109,17 +111,17 @@ def _get_resource(path, params=None):
     return response.json()
 
 
-def get_item(item_id):
+def get_item(item_id: int | str) -> Optional[Dict[str, Any]]:  # Any: HelloAsso JSON
     """Article (inscription) avec champs personnalisés, payeur, commande et état."""
     return _get_resource(f"/items/{int(item_id)}", {"withDetails": "true"})
 
 
-def get_order(order_id):
+def get_order(order_id: int | str) -> Optional[Dict[str, Any]]:  # Any: HelloAsso JSON
     """Commande et ses articles."""
     return _get_resource(f"/orders/{int(order_id)}", {"withDetails": "true"})
 
 
-def get_payment(payment_id):
+def get_payment(payment_id: int | str) -> Optional[Dict[str, Any]]:  # Any: HelloAsso JSON
     """Paiement (référence la commande et les articles réglés)."""
     return _get_resource(f"/payments/{int(payment_id)}")
 
@@ -169,7 +171,7 @@ def get_public_form(form_type: str, form_slug: str, token: str) -> Dict[str, Any
     try:
         response = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=REQUEST_TIMEOUT_SECONDS)
     except requests.exceptions.RequestException as e:
-        raise HelloAssoApiError(f"API HelloAsso injoignable : {e}")
+        raise HelloAssoApiError(f"API HelloAsso injoignable : {e}") from e
     _drop_token_if_refused(response)
     if response.status_code >= 300:
         raise HelloAssoApiError(f"API HelloAsso : HTTP {response.status_code}")

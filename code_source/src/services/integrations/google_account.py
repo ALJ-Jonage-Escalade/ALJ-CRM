@@ -20,7 +20,7 @@ from domain.errors import InvalidRequest, StorageUnavailable, UpstreamUnavailabl
 from infrastructure import runtime_env
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.google import oauth
-from infrastructure.google.drive import GoogleDriveClient
+from infrastructure.google.drive import GoogleAuthError, GoogleDriveClient
 from infrastructure.security.secret_store import SecretPersistenceError, SecretStore
 
 logger = logging.getLogger("alj")
@@ -134,7 +134,7 @@ def connection() -> GoogleConnection:
     if configured:
         try:
             valid = bool(GoogleDriveClient.get_access_token())
-        except Exception:  # refused, revoked or unreachable: the page asks for a new connection
+        except GoogleAuthError:  # refused, revoked or unreachable: the page asks for a new connection
             logger.exception("[google_connection] Jeton Google refusé")
             error = "Jeton Google refusé ou expiré : reconnectez le compte Google (détails dans les journaux)."
     db_ready = CloudDatabase.cache_ready() if CloudDatabase.is_enabled() else False
@@ -248,7 +248,7 @@ def diagnose() -> Diagnostic:
     """Checks live, in order, that an access token can be made, the database syncs, and Gmail answers."""
     try:
         token = GoogleDriveClient.get_access_token()
-    except Exception:  # refused, revoked or unreachable: the other checks need the token
+    except GoogleAuthError:  # refused, revoked or unreachable: the other checks need the token
         logger.exception("[test_google_auth oauth] Jeton Google refusé")
         return Diagnostic(
             status="error",

@@ -150,30 +150,23 @@ def _ensure_email_templates(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
         conn.commit()
 
     # S'assurer de la présence du modèle d'email "Attestation échéance"
-    try:
-        cursor.execute("SELECT COUNT(*) FROM email_templates WHERE name = 'Attestation échéance' OR name = 'Attestation echéance' OR name = 'Attestation echeance'")
+    cursor.execute("SELECT COUNT(*) FROM email_templates WHERE name = 'Attestation échéance' OR name = 'Attestation echéance' OR name = 'Attestation echeance'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("""
+            INSERT INTO email_templates (name, subject, body, sender_email, sender_name)
+            VALUES (?, ?, ?, ?, ?)
+        """, _ATTESTATION_ECHEANCE_TEMPLATE)
+        conn.commit()
+
+    # S'assurer de la présence des modèles d'e-mails de compétition et de la demande de correction d'adhésion
+    for template in [*_COMPETITION_EMAIL_TEMPLATES, CORRECTION_REQUEST_EMAIL_TEMPLATE]:
+        cursor.execute("SELECT COUNT(*) FROM email_templates WHERE name = ?", (template[0],))
         if cursor.fetchone()[0] == 0:
             cursor.execute("""
                 INSERT INTO email_templates (name, subject, body, sender_email, sender_name)
                 VALUES (?, ?, ?, ?, ?)
-            """, _ATTESTATION_ECHEANCE_TEMPLATE)
+            """, template)
             conn.commit()
-    except Exception as e:
-        logger.warning(f"[SQLITE] Impossible de s'assurer de la présence du modèle d'email 'Attestation échéance' : {e}")
-
-    # S'assurer de la présence des modèles d'e-mails de compétition et de la demande de correction d'adhésion
-    for template in [*_COMPETITION_EMAIL_TEMPLATES, CORRECTION_REQUEST_EMAIL_TEMPLATE]:
-        cname = template[0]
-        try:
-            cursor.execute("SELECT COUNT(*) FROM email_templates WHERE name = ?", (cname,))
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("""
-                    INSERT INTO email_templates (name, subject, body, sender_email, sender_name)
-                    VALUES (?, ?, ?, ?, ?)
-                """, template)
-                conn.commit()
-        except Exception as e:
-            logger.warning(f"[SQLITE] Impossible d'assurer la présence du modèle '{cname}' : {e}")
 
 
 class SqliteDatabase:

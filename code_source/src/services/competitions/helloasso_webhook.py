@@ -134,7 +134,7 @@ class HelloAssoWebhookService:
             if not item_ids and data.get("id") is not None:
                 order_id = None
                 if event_type == "Payment":
-                    payment = helloasso_api.get_payment(data.get("id")) or {}
+                    payment = helloasso_api.get_payment(data["id"]) or {}
                     item_ids = cls._ids(payment.get("items"))
                     order_id = (payment.get("order") or {}).get("id")
                 elif event_type == "Order":

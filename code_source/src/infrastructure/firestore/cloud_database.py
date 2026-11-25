@@ -51,7 +51,7 @@ class CloudDatabase:
     """Point d'entrée : synchronisation du cache `database.db` avec Firestore."""
 
     _lock = threading.RLock()
-    _store = None
+    _store: Optional[RestStore] = None  # made at first use (store()); install() swaps it
     _last_report: SyncReport = {}
     _last_error = ""
     _last_sync = 0.0
@@ -65,7 +65,19 @@ class CloudDatabase:
         return os.environ.get(REPLICATION_ENV, "").strip().lower() != "off"
 
     @classmethod
-    def store(cls):
+    def install(cls, store: Optional[RestStore] = None) -> None:
+        """Swaps the Firestore store (None: a RestStore is made at first use) and forgets the sync bookkeeping
+        (last report, error, sync and pull times, directory to rebuild): the state of a new process. Tests use it."""
+        with cls._lock:
+            cls._store = store
+            cls._last_report = {}
+            cls._last_error = ""
+            cls._last_sync = 0.0
+            cls._last_pull = 0.0
+            cls._projection_dirty = False
+
+    @classmethod
+    def store(cls) -> RestStore:
         if cls._store is None:
             cls._store = RestStore()
         return cls._store
@@ -76,10 +88,8 @@ class CloudDatabase:
 
     @staticmethod
     def sync_author() -> str:
-        try:
-            return f"{os.environ.get('USERNAME') or os.environ.get('USER') or '?'}@{socket.gethostname()}"
-        except Exception:
-            return "?"
+        """Who wrote a change sent to Firestore: user@host of the process."""
+        return f"{os.environ.get('USERNAME') or os.environ.get('USER') or '?'}@{socket.gethostname()}"
 
     @classmethod
     def sync(cls, full: bool = False, progress: Optional[Callable[[str], None]] = None) -> SyncReport:

@@ -8,6 +8,11 @@ from paths import CODE_ROOT, ROOT_DIR
 
 logger = logging.getLogger("alj")
 
+
+class GoogleAuthError(Exception):
+    """No Google access token: credentials missing, refused by Google (revoked, expired) or Google unreachable."""
+
+
 class GoogleDriveClient:
     """The club's Google OAuth credentials (web client) and the access tokens made from them, for Gmail and
     Firestore's REST API."""
@@ -73,15 +78,17 @@ class GoogleDriveClient:
 
     @classmethod
     def get_access_token(cls, env_paths: Optional[List[str]] = None) -> str:
-        """Récupère un access token d'API Google à partir du refresh token.
+        """A Google API access token made from the refresh token; may rewrite the stored credentials (SecretStore).
 
         Si le jeton stocké est révoqué ('invalid_grant' : nouvelle autorisation OAuth2
         réalisée sans mise à jour des valeurs enregistrées), retente avec les identifiants
-        des fichiers .env puis répare automatiquement le SecretStore avec le jeton valide.
+        des fichiers .env puis répare automatiquement le SecretStore avec le jeton valide ; un nouveau refresh
+        token renvoyé par Google y est aussi enregistré.
+        Raises GoogleAuthError when no candidate gives a token (missing, refused or unreachable).
         """
         candidates = cls._iter_credential_candidates(env_paths=env_paths)
         if not candidates:
-            raise ValueError("Identifiants Google Cloud manquants pour l'obtention du jeton d'accès.")
+            raise GoogleAuthError("Identifiants Google Cloud manquants pour l'obtention du jeton d'accès.")
 
         url = "https://oauth2.googleapis.com/token"
         last_error = None
@@ -99,7 +106,11 @@ class GoogleDriveClient:
                 continue
 
             if response.status_code == 200:
-                resp_json = response.json()
+                try:
+                    resp_json = response.json()
+                except ValueError:
+                    last_error = "200 - réponse illisible"
+                    continue
                 repaired: Dict[str, str] = {}
                 new_refresh = resp_json.get("refresh_token")
                 if idx > 0:
@@ -118,4 +129,4 @@ class GoogleDriveClient:
 
             last_error = f"{response.status_code} - {response.text}"
 
-        raise Exception(f"Échec de l'obtention du token Google : {last_error}")
+        raise GoogleAuthError(f"Échec de l'obtention du token Google : {last_error}")

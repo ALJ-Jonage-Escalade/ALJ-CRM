@@ -46,16 +46,11 @@ def get_season_start_date(season=None):
     return datetime.date(start_year, SEASON_START_MONTH, SEASON_START_DAY)
 
 
-def age_at(birth_date, ref_date):
-    """Âge révolu à la date de référence (None si dates invalides)."""
+def age_at(birth_date: datetime.date | None, ref_date: datetime.date | None) -> int | None:
+    """Âge révolu à la date de référence (None si l'une des dates manque)."""
     if not birth_date or not ref_date:
         return None
-    try:
-        return ref_date.year - birth_date.year - (
-            (ref_date.month, ref_date.day) < (birth_date.month, birth_date.day)
-        )
-    except Exception:
-        return None
+    return ref_date.year - birth_date.year - ((ref_date.month, ref_date.day) < (birth_date.month, birth_date.day))
 
 
 def parse_birth_date(val):
@@ -155,7 +150,7 @@ def is_youth_group(planning_item, tarif_name="", bounds=None, season_start=None)
 
     if bounds is None:
         bounds = get_group_birth_bounds(planning_item)
-    min_bound = (bounds or (None, None))[0]
+    min_bound = bounds[0]
     if min_bound:
         oldest_age = age_at(min_bound, season_start)
         if oldest_age is not None and oldest_age < ADULT_AGE:

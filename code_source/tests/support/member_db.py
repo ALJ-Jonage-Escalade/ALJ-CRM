@@ -30,10 +30,8 @@ class MemberDbTestCase(unittest.TestCase):
 
         def restore():
             SqliteDatabase.set_db_path(original)
-            SqliteDatabase._database_setup_done = False
         self.addCleanup(restore)
         SqliteDatabase.set_db_path(os.path.join(self._tmp.name, "members.db"))
-        SqliteDatabase._database_setup_done = False
         SqliteDatabase.setup_database()
 
     def seed(self, ref, first_name, last_name, tarif, season="2026-2027", **extra):

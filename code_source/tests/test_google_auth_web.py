@@ -15,6 +15,7 @@ if _src_dir not in sys.path:
 import requests
 from fastapi.testclient import TestClient
 from server import app
+from infrastructure.google.drive import GoogleAuthError
 from infrastructure.security.secret_store import SecretPersistenceError
 
 XSS = '"><img src=x onerror=alert(1)>'
@@ -58,7 +59,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
                 return "test@alj-escalade.fr"
             return None
         mock_secret.side_effect = fake_secret
-        mock_get_tok.side_effect = Exception("400 - invalid_grant")
+        mock_get_tok.side_effect = GoogleAuthError("400 - invalid_grant")
 
         resp = self.client.get("/api/auth/google/status")
         self.assertEqual(resp.status_code, 200)
@@ -365,7 +366,7 @@ class TestGoogleAuthDiagnostic(unittest.TestCase):
         return self.client.post("/api/auth/google/test").json()
 
     def test_refused_token_skips_the_other_checks(self, mock_token, mock_get):
-        mock_token.side_effect = RuntimeError("invalid_grant")
+        mock_token.side_effect = GoogleAuthError("invalid_grant")
         data = self.results()
         self.assertEqual((data["status"], data["all_ok"]), ("error", False))
         self.assertIn("ignoré", data["results"]["gmail"]["message"])

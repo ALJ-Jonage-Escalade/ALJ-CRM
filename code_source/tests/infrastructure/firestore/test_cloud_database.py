@@ -245,8 +245,8 @@ class CloudDatabaseTest(unittest.TestCase):
         self.assertIsNone(self.row(self.b, "SELECT id FROM emergency_contacts WHERE id = 1"))
 
     def test_contact_edit_alone_asks_for_a_new_directory(self):
-        CloudDatabase._projection_dirty = False
-        self.addCleanup(setattr, CloudDatabase, "_projection_dirty", False)
+        CloudDatabase.install()
+        self.addCleanup(CloudDatabase.install)
         CloudDatabase._after_sync({"tables": ["emergency_contacts"]})
         self.assertTrue(CloudDatabase._projection_dirty)
 
@@ -338,7 +338,6 @@ class BrokenStore(FakeStore):
 class CloudDatabaseEntryPointsTest(unittest.TestCase):
     """CloudDatabase.sync / flush_only / after_write / ensure_fresh / status / cache_ready over the in-memory store."""
 
-    STATE = ("_store", "_last_report", "_last_error", "_last_sync", "_last_pull", "_projection_dirty")
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -351,12 +350,8 @@ class CloudDatabaseEntryPointsTest(unittest.TestCase):
         saved_path = SqliteDatabase.get_db_path()
         self.addCleanup(SqliteDatabase.set_db_path, saved_path)
         SqliteDatabase.set_db_path(self.path)
-        for name in self.STATE:
-            self.addCleanup(setattr, CloudDatabase, name, getattr(CloudDatabase, name))
-        CloudDatabase._store = self.store
-        CloudDatabase._last_error = ""
-        CloudDatabase._last_pull = 0.0
-        CloudDatabase._projection_dirty = False
+        self.addCleanup(CloudDatabase.install)
+        CloudDatabase.install(self.store)
 
     def edit_city(self, city):
         conn = SqliteDatabase.get_connection()
@@ -398,7 +393,7 @@ class CloudDatabaseEntryPointsTest(unittest.TestCase):
         self.assertTrue(CloudDatabase.cache_ready())
 
     def test_sync_failure_is_reported_not_raised(self):
-        CloudDatabase._store = BrokenStore()
+        CloudDatabase.install(BrokenStore())
         report = CloudDatabase.sync()
         self.assertEqual(report["errors"], ["Firestore unreachable"])
         self.assertEqual(CloudDatabase.status()["last_error"], "Firestore unreachable")
@@ -411,7 +406,7 @@ class CloudDatabaseEntryPointsTest(unittest.TestCase):
 
     def test_flush_only_failure_keeps_the_edit_pending(self):
         self.edit_city("Lyon")
-        CloudDatabase._store = BrokenStore()
+        CloudDatabase.install(BrokenStore())
         self.assertEqual(CloudDatabase.flush_only()["errors"], ["Firestore unreachable"])
         self.assertEqual(self.pending(), 1)
 
@@ -436,12 +431,12 @@ class CloudDatabaseEntryPointsTest(unittest.TestCase):
     def test_after_write_reports_a_failed_send(self):
         self.replication_on()
         self.edit_city("Lyon")
-        CloudDatabase._store = BrokenStore()
+        CloudDatabase.install(BrokenStore())
         with mock.patch.object(member_directory, "directory_outdated", return_value=False):
             self.assertFalse(CloudDatabase.after_write())
 
     def test_directory_stays_dirty_when_its_rebuild_fails(self):
-        CloudDatabase._projection_dirty = True
+        CloudDatabase._after_sync({"tables": ["users"]})
         with mock.patch.object(member_directory, "rebuild_member_directory", side_effect=ConnectionError("down")):
             CloudDatabase.refresh_projection()
         self.assertTrue(CloudDatabase._projection_dirty)

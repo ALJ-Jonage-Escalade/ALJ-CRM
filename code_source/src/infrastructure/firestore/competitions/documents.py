@@ -189,7 +189,7 @@ def load_comp_doc(competition_id: int | str) -> dict[str, Any] | None:
 
 
 def _coach_names(coach_ids: list[int], coaches: dict[int, str]) -> list[str]:
-    return [coaches[coach_id] for coach_id in coach_ids if coach_id is not None and coach_id in coaches]
+    return [coaches[coach_id] for coach_id in coach_ids if coach_id in coaches]
 
 
 def api_doc(doc: dict[str, Any], coaches: dict[int, str]) -> CompetitionDoc:

@@ -240,7 +240,6 @@ class EmailDispatchService:
             return {}
         comp = Competition.from_row(doc)
 
-        whatsapp_link = str(getattr(comp, "whatsapp_link", "") or "").strip()
         deadline = comp.deadline or default_deadline(comp.date_competition)
         return {
             "no_competition": str(comp.id_ffme or ""),
@@ -248,7 +247,7 @@ class EmailDispatchService:
             "montant_competition": format_amount(comp.prix),
             "date_competition": format_period(comp.date_competition, comp.date_fin),
             "competition_deadline": format_period(deadline) if deadline else "",
-            "whatsapp_link": whatsapp_link,
+            "whatsapp_link": comp.whatsapp_link.strip(),
         }
 
     @classmethod
