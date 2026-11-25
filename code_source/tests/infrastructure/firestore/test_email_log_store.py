@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from domain.email_log import EmailLogEntry, LoggedRecipient
+from domain.communications.email_log import EmailLogEntry, LoggedRecipient
 from infrastructure.firestore import email_log
 from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore.email_log import FirestoreEmailLogStore

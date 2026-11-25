@@ -1,4 +1,4 @@
-"""Types shared by the services and the API routes."""
+"""JSON-shaped types shared by the services and the API routes."""
 
 from __future__ import annotations
 

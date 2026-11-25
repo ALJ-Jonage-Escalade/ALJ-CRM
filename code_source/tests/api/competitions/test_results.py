@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from unittest.mock import patch
 
 from api.competitions.schemas.results import BatchReport
-from domain.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL
+from domain.communications.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL
 from domain.errors import UpstreamUnavailable
 from infrastructure.firestore.client import FirestoreClient, FirestoreConflictError, FirestoreError
 from infrastructure.firestore.competitions import documents

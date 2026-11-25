@@ -15,7 +15,7 @@ import time
 from contextlib import contextmanager
 from typing import Iterator, Optional
 
-from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.communications.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.sqlite import schema_v2
 from paths import ROOT_DIR, data_root
 

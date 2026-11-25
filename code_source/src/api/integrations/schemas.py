@@ -138,3 +138,17 @@ class HelloAssoCampaigns(BaseModel):
     others: List[HelloAssoCampaign]
     error: Optional[str]
     warning: Optional[str]
+
+
+class HelloAssoSyncStats(BaseModel):
+    nb_items: int
+    nb_auto: int
+    nb_manual: int
+    nb_applied: int
+    nb_unlinked: int
+
+
+class HelloAssoSync(BaseModel):
+    """The campaign was read completely and its payments linked (failures are HTTP errors, see the route)."""
+    status: Literal["success"]
+    stats: HelloAssoSyncStats

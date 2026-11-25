@@ -10,8 +10,8 @@ import html
 import logging
 from typing import List
 
-from domain.club_emails import DEFAULT_SENDER_EMAIL
-from domain.email_log import SYSTEM_AUTHOR
+from domain.communications.club_emails import DEFAULT_SENDER_EMAIL
+from domain.communications.email_log import SYSTEM_AUTHOR
 from domain.competitions.models import PAIEMENT_PAYE, Competition, Participant
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.competitions import competitions, participants

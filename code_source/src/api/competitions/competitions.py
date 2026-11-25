@@ -18,7 +18,7 @@ from api.competitions.schemas.competitions import CompetitionCreate, Competition
 from api.competitions.schemas.views import Competition, Done, PastArchived
 from services.competitions.competitions import CompetitionService as Service
 from infrastructure.firestore.competitions.documents import CompetitionDoc
-from services.documents import Doc
+from services.json_types import Doc
 
 router = APIRouter(prefix="/api/competitions")
 

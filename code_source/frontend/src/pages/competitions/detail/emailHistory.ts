@@ -1,4 +1,4 @@
-/* The e-mail log of a competition as its page shows it (server: domain/email_log.py): what to write on each competitor's
+/* The e-mail log of a competition as its page shows it (server: domain/communications/email_log.py): what to write on each competitor's
    row and the sends that included a competitor (kinds and shared helpers: lib/emailLog.ts). */
 import type { Schemas } from "../../../lib/client";
 import type { EmailLogEntry } from "../../../lib/emailLog";

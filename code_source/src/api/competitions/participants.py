@@ -17,7 +17,7 @@ from api.competitions.schemas.views import Competition, GroupLoaded
 from api.members.schemas import MemberStatus
 from api.responses import STORAGE_ERRORS, document_responses
 from infrastructure.firestore.competitions.documents import CompetitionDoc
-from services.documents import Doc
+from services.json_types import Doc
 from services.competitions.participants import ParticipantService as Service
 
 router = APIRouter(prefix="/api/competitions/{competition_id}")

@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from support.api_case import ApiTestCase
 
-from domain.email_log import EmailKind, EmailLogEntry
+from domain.communications.email_log import EmailKind, EmailLogEntry
 from services.communications import email_log
 from services.communications.email_log import logged_recipient
 

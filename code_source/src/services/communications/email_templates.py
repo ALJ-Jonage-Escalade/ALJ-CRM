@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from typing import Optional, TypedDict
 
-from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
-from domain.email_variables import TEMPLATE_KINDS, TemplateKind, infer_kind, needs_fixing, template_error, to_keys
+from domain.communications.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.communications.email_variables import TEMPLATE_KINDS, TemplateKind, infer_kind, needs_fixing, template_error, to_keys
 from domain.errors import Conflict, InvalidRequest, NotFound
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
 

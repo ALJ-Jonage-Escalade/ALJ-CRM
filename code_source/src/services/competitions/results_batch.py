@@ -6,7 +6,7 @@ Exécute chaque jour (par exemple à 07h00) :
 2. Tente de récupérer automatiquement les résultats officiels depuis MyCompet FFME.
 3. Rapproche et met à jour les classements des compétiteurs du club.
 4. Envoie un e-mail de notification récapitulatif avec un tableau HTML soigné
-   à l'adresse configurée (par défaut : domain.club_emails.DEFAULT_RESULTS_NOTIFICATION_EMAIL).
+   à l'adresse configurée (par défaut : domain.communications.club_emails.DEFAULT_RESULTS_NOTIFICATION_EMAIL).
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ import re
 import time
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypedDict
 
-from domain.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL, DEFAULT_SENDER_EMAIL
+from domain.communications.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL, DEFAULT_SENDER_EMAIL
 from domain.competitions.results import ClubAthlete, apply_rankings, end_date, has_results
-from domain.email_log import SYSTEM_AUTHOR
+from domain.communications.email_log import SYSTEM_AUTHOR
 from domain.errors import InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError

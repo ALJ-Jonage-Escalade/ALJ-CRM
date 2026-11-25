@@ -11,7 +11,7 @@ from api.auth.me import author_of
 from api.responses import STORAGE_ERRORS, SUCCESS, error_responses, json_with_etag
 from api.competitions.schemas.helloasso_items import ItemIgnore, ItemLink
 from api.competitions.schemas.views import Done, HelloAssoItem, ItemLinked
-from services.documents import Doc
+from services.json_types import Doc
 from services.competitions.helloasso_items import HelloAssoItemService as Service
 
 router = APIRouter(prefix="/api/helloasso/items")

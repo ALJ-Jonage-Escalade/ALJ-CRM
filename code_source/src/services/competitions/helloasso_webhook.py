@@ -28,7 +28,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 
-from domain.competitions.matching import auto_link_items, parse_campaign_identifier, summarize_items
+from domain.competitions.matching import auto_link_items, summarize_items
+from domain.helloasso_campaigns import parse_campaign_identifier
 from domain.competitions.models import PAIEMENT_PAYE
 from domain.errors import Forbidden, UpstreamUnavailable
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository

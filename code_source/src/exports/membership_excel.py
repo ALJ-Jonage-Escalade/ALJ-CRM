@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping
 
-from domain.club_emails import CLUB_CONTACT_EMAIL
+from domain.communications.club_emails import CLUB_CONTACT_EMAIL
 from domain.members.countries import FRANCE_CODE, parse_country
 from domain.members.sex import parse_sex
 from domain.members.view import is_cancelled

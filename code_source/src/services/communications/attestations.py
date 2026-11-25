@@ -7,8 +7,8 @@ import datetime
 import logging
 from typing import Optional, TypedDict
 
-from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
-from domain.email_personalization import apply_template_variables, personalized_html, template_recipient
+from domain.communications.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.communications.email_personalization import apply_template_variables, personalized_html, template_recipient
 from domain.errors import Forbidden, InvalidRequest, UpstreamUnavailable
 from exports.attestation import attestation_error, build_attestation, get_safe_pdf_filename, render_attestation_pdf
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images
@@ -16,7 +16,7 @@ from infrastructure.mail.sender import EmailSender, MailError
 from infrastructure.sqlite.members import MemberRepository
 from services.communications.email_dispatch import EmailDispatchService
 from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
-from services.documents import Doc
+from services.json_types import Doc
 from services.members.members import MemberService
 
 logger = logging.getLogger("alj")

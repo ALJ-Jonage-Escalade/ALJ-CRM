@@ -8,7 +8,7 @@ import datetime
 import unittest
 from unittest.mock import patch
 
-from domain.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL
+from domain.communications.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL
 from domain.competitions.results import apply_rankings, has_results, is_competition_past
 from domain.errors import InvalidRequest
 from services.competitions.results_batch import CompetitionResultsBatchService

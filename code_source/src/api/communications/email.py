@@ -15,8 +15,8 @@ from api.auth.me import author_of
 from api.responses import error, error_responses
 from services.communications.email_dispatch import EmailDispatchService, OutgoingEmail
 from services.communications.email_templates import delete_template, list_templates, save_template
-from domain.email_variables import VARIABLES, aliases_of
-from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
+from domain.communications.email_variables import VARIABLES, aliases_of
+from domain.communications.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.security.api_auth import Role, has_role
 

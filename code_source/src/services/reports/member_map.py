@@ -1,14 +1,23 @@
-"""Members map of the Outils page: members of a season grouped by geocoded address, from the SQLite cache."""
+"""Members map of the Outils page: members of a season grouped by geocoded address, from the SQLite cache, and the
+geocoding of the addresses missing from the geocache."""
 
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 
+import requests
+
 from domain.members.view import is_cancelled
 from domain.utils import clean_city_name
+from infrastructure.firestore.cloud_database import CloudDatabase
+from infrastructure.geocoding.nominatim import NOMINATIM_PAUSE_SECONDS, geocode_address
 from infrastructure.sqlite.geocache import GeocacheRepository
 from infrastructure.sqlite.members import MemberRepository
+
+logger = logging.getLogger("alj")
 
 
 @dataclass(frozen=True)
@@ -78,3 +87,25 @@ def member_map(season: Optional[str]) -> MemberMap:
     for point in points.values():
         point.members.sort(key=lambda m: (m.name, m.group))
     return MemberMap(points=list(points.values()), missing_addresses=sorted(missing_addresses))
+
+
+def geocode_missing_addresses(addresses: List[str]) -> None:
+    """Geocode the addresses missing from the cache, in the background, one request every 1.5 s."""
+    found_count = 0
+    for index, address in enumerate(addresses, start=1):
+        time.sleep(NOMINATIM_PAUSE_SECONDS)
+        try:
+            coordinates = geocode_address(address)
+        except (requests.RequestException, KeyError, ValueError) as exc:
+            # Members' addresses and coordinates are personal data: never in the logs
+            logger.warning("Geocoding failed for address %d/%d: %s", index, len(addresses), type(exc).__name__)
+            continue
+        if coordinates:
+            found_count += 1
+            GeocacheRepository.save_geocode(address, coordinates[0], coordinates[1])
+        else:
+            # Empty coordinates so that an unknown address is not requested again
+            GeocacheRepository.save_geocode(address, None, None)
+    if CloudDatabase.is_enabled():
+        CloudDatabase.flush_only()
+    logger.info("Geocoding done: %d of %d addresses found", found_count, len(addresses))

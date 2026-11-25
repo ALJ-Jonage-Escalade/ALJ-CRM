@@ -12,7 +12,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
-from api.competitions.schemas.views import HelloAssoSync, HelloAssoSyncStats
+from api.integrations.schemas import HelloAssoSync, HelloAssoSyncStats
 from api.responses import STORAGE_ERRORS, error_responses
 from domain.errors import Forbidden, UpstreamUnavailable
 from services.competitions.helloasso_items import HelloAssoItemService

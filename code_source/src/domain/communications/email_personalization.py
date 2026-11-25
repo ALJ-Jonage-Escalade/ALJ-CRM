@@ -1,11 +1,11 @@
-"""Personalisation of an e-mail's subject and body: the values of the {…} variables (domain/email_variables.py),
+"""Personalisation of an e-mail's subject and body: the values of the {…} variables (domain/communications/email_variables.py),
 taken from the recipient and, for a competition e-mail, from the competition."""
 
 from __future__ import annotations
 
 from typing import Any, Callable, Mapping, Optional, TypedDict
 
-from domain.email_variables import render_html, render_template
+from domain.communications.email_variables import render_html, render_template
 from domain.utils import format_amount
 
 

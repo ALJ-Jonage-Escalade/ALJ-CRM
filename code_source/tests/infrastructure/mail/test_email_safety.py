@@ -15,7 +15,7 @@ _src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from domain.email_personalization import apply_template_variables, personalized_html  # noqa: E402
+from domain.communications.email_personalization import apply_template_variables, personalized_html  # noqa: E402
 from infrastructure.mail.sender import sanitize_email_header  # noqa: E402
 from services.communications.email_dispatch import EmailDispatchService, render_email  # noqa: E402
 from support.fake_access import grant_roles  # noqa: E402

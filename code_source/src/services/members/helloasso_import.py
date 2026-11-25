@@ -20,7 +20,16 @@ from domain.members.helloasso_membership import (
 )
 from domain.members.import_corrections import Corrections, FieldCorrection, helloasso_value
 from domain.members.member_data_rules import DataIssue, DomainCheck, IssueField, MemberValues, check_member_data, season_start
-from domain.members.membership_import import Decision, ImportPlan, PlanEntry, StaleDecisions, apply_decisions, plan_membership_import
+from domain.communications.email_log import LastRequest
+from domain.members.membership_import import (
+    Decision,
+    ImportPlan,
+    PlanEntry,
+    StaleDecisions,
+    WriteAction,
+    apply_decisions,
+    plan_membership_import,
+)
 from infrastructure import runtime_env
 from infrastructure.firestore.app_settings import HELLOASSO_MEMBERSHIP_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.client import FirestoreError
@@ -31,6 +40,7 @@ from infrastructure.mail.mail_domains import MailDomainCheck
 from infrastructure.security.secret_store import SecretStore
 from infrastructure.sqlite.membership_import import AppliedWrite, MembershipImportRepository, MembershipWriteRefused
 from domain.errors import Conflict, InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
+from services.communications.email_log import last_correction_requests_by_item
 from services.members.seasons import SeasonService
 
 logger = logging.getLogger("alj")
@@ -40,10 +50,39 @@ CAMPAIGN_ENV = "CAMPAIGN_SLUG"
 
 
 @dataclass(frozen=True)
+class ImportPreview:
+    """What the preview page shows: the plan, and when each registration was last asked to be corrected."""
+    plan: ImportPlan
+    last_requests: dict[int, LastRequest]  # keyed by HelloAsso item id
+
+
+@dataclass(frozen=True)
+class ImportedRegistration:
+    """A registration the import wrote, with the name of the member it went to."""
+    applied: AppliedWrite
+    last_name: str
+    first_name: str
+    tarif_name: str
+
+
+@dataclass(frozen=True)
 class ImportResult:
     plan: ImportPlan  # the plan recomputed on confirm, the decisions applied to it
-    applied: list[AppliedWrite]
+    imported: list[ImportedRegistration]
     history_id: str
+
+
+def _imported_registration(applied: AppliedWrite, plan: ImportPlan) -> ImportedRegistration:
+    record = next(entry.record for entry in plan.entries if entry.item_id == applied.item_id)
+    last_name, first_name = record.last_name, record.first_name
+    if applied.action == WriteAction.ASSIGN:  # the member chosen: the HelloAsso name is someone else's
+        member = next(member for member in plan.members if member.user_id == applied.user_id)
+        last_name, first_name = member.last_name, member.first_name
+    return ImportedRegistration(applied, last_name, first_name, record.tarif_name)
+
+
+def _with_last_requests(plan: ImportPlan) -> ImportPreview:
+    return ImportPreview(plan, last_correction_requests_by_item())
 
 
 def _parse(reference: str) -> MembershipCampaign:
@@ -116,9 +155,14 @@ class MembershipImportService:
         return _parse((chosen or "").strip() or MembershipImportService.campaign_reference())
 
     @staticmethod
-    def preview(chosen_campaign: Optional[str] = None) -> ImportPlan:
+    def current_plan(chosen_campaign: Optional[str] = None) -> ImportPlan:
         """What the import would do now, for the active season. Writes nothing. `chosen_campaign`: see campaign()."""
         return MembershipImportService._plan(MembershipImportService.active_season(), chosen_campaign)
+
+    @staticmethod
+    def preview(chosen_campaign: Optional[str] = None) -> ImportPreview:
+        """The current plan (current_plan()) and the last correction requests, for the preview page."""
+        return _with_last_requests(MembershipImportService.current_plan(chosen_campaign))
 
     @staticmethod
     def import_(season: str, decisions: dict[int, Decision], author: str, chosen_campaign: Optional[str] = None) -> ImportResult:
@@ -146,15 +190,16 @@ class MembershipImportService:
         history_id = MembershipImportHistory.record(ImportHistoryEntry(
             at=_now(), author=author, season=plan.season,
             campaign=plan.campaign_slug, counts=plan.counts(), items=items))
-        return ImportResult(plan, applied, history_id)
+        return ImportResult(plan, [_imported_registration(written, plan) for written in applied], history_id)
 
     @staticmethod
     def last_import() -> Optional[ImportHistoryEntry]:
         return MembershipImportHistory.latest()
 
     @staticmethod
-    def save_correction(item_id: int, field: IssueField, value: str, author: str, chosen_campaign: Optional[str] = None) -> ImportPlan:
-        """Saves the admin's correction of one field of a registration of the active season; returns the plan
+    def save_correction(item_id: int, field: IssueField, value: str, author: str,
+                        chosen_campaign: Optional[str] = None) -> ImportPreview:
+        """Saves the admin's correction of one field of a registration of the active season; returns the preview
         recomputed with it. NotFound when the campaign has no such registration."""
         season = MembershipImportService.active_season()
         campaign, records = MembershipImportService._records(chosen_campaign)
@@ -168,18 +213,18 @@ class MembershipImportService:
         except FirestoreError as e:
             logger.error("Correction non enregistrée : %s", e)
             raise StorageUnavailable("Correction non enregistrée (détails dans les journaux).") from e
-        return MembershipImportService._plan_of(season, campaign, records)
+        return _with_last_requests(MembershipImportService._plan_of(season, campaign, records))
 
     @staticmethod
-    def remove_correction(item_id: int, field: IssueField, chosen_campaign: Optional[str] = None) -> ImportPlan:
-        """Removes the correction of one field (the HelloAsso value applies again); returns the plan recomputed."""
+    def remove_correction(item_id: int, field: IssueField, chosen_campaign: Optional[str] = None) -> ImportPreview:
+        """Removes the correction of one field (the HelloAsso value applies again); returns the preview recomputed."""
         season = MembershipImportService.active_season()
         try:
             MembershipCorrections.remove(season, item_id, field)
         except FirestoreError as e:
             logger.error("Correction non annulée : %s", e)
             raise StorageUnavailable("Correction non annulée (détails dans les journaux).") from e
-        return MembershipImportService._plan(season, chosen_campaign)
+        return _with_last_requests(MembershipImportService._plan(season, chosen_campaign))
 
     @staticmethod
     def check_value(field: IssueField, value: str) -> tuple[str, list[DataIssue]]:

@@ -12,7 +12,7 @@ import logging
 import threading
 from typing import Dict, Iterable, List, Optional, Sequence, TypedDict
 
-from domain.email_log import (
+from domain.communications.email_log import (
     Competitor,
     ContactSummary,
     EmailKind,

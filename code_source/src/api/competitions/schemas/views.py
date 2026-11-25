@@ -134,20 +134,6 @@ class ItemLinked(BaseModel):
     linked: bool = Field(description="The item now pays for a participant")
 
 
-class HelloAssoSyncStats(BaseModel):
-    nb_items: int
-    nb_auto: int
-    nb_manual: int
-    nb_applied: int
-    nb_unlinked: int
-
-
-class HelloAssoSync(BaseModel):
-    """The campaign was read completely and its payments linked (failures are HTTP errors, see the route)."""
-    status: Literal["success"]
-    stats: HelloAssoSyncStats
-
-
 class ResultsFetched(BaseModel):
     """MyCompet results matched to the participants (the competition is updated: reload it)."""
     status: Literal["success"]

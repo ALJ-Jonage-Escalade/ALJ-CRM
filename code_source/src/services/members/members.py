@@ -17,7 +17,7 @@ from infrastructure.sqlite.keys import KeyRepository
 from infrastructure.sqlite.members import MemberRepository
 from infrastructure.sqlite.planning import PlanningRepository
 from services.competitions.competitions import CompetitionService
-from services.documents import Doc
+from services.json_types import Doc
 from services.members.seasons import SeasonService
 
 

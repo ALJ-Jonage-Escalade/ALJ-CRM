@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from domain.members.planning_groups import is_autonomous_type
+from domain.activities.planning_groups import is_autonomous_type
 from infrastructure.sqlite.connection import SqliteDatabase
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List
 
-from domain.email_log import EmailKind, EmailLogEntry
+from domain.communications.email_log import EmailKind, EmailLogEntry
 
 
 class LogDown(RuntimeError):

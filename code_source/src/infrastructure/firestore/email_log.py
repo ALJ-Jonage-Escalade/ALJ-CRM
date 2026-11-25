@@ -12,7 +12,7 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional, Protocol
 
-from domain.email_log import EmailKind, EmailLogEntry, LoggedRecipient, is_email_kind, is_send_status
+from domain.communications.email_log import EmailKind, EmailLogEntry, LoggedRecipient, is_email_kind, is_send_status
 from infrastructure.firestore.client import META_KEYS, FirestoreClient
 
 logger = logging.getLogger("alj")

@@ -5,12 +5,12 @@ The response models are the API contract: the frontend's TypeScript types are ge
 
 from __future__ import annotations
 
-from typing import List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 from api.request_body import RequestBody
-from domain.email_variables import TemplateKind, VariableKey
+from domain.communications.email_variables import TemplateKind, VariableKey
 
 
 class EmailTemplate(BaseModel):
@@ -171,3 +171,33 @@ class EmailDispatch(BaseModel):
     total_recipients: int = 0
     details: List[EmailSendDetail] = []
     log_notice: Optional[str] = Field(None, description="Set when the e-mails left but the send is missing from the e-mail log")
+
+
+class LoggedRecipient(BaseModel):
+    member_id: Optional[int] = Field(None, description="None: an address outside the members (the club's inbox)")
+    email: str = Field(description="The address the e-mail was sent to, even if corrected since")
+    name: str = ""
+    status: Literal["sent", "failed"]
+    error: Optional[str] = None
+
+
+class EmailLogEntry(BaseModel):
+    """One send action (one click on « Envoyer », one webhook notification, one cron e-mail); no body stored."""
+    at: str = Field(description="ISO 8601 UTC")
+    author: str = Field(description="E-mail of the person who sent it, « system » for automatic sends")
+    kind: Literal["competition_email", "member_email", "competition_all_paid", "results_batch", "attestation",
+                  "access_invitation", "correction_request"]
+    template: str = ""
+    subject: str = ""
+    competition_ids: List[int] = []
+    member_ids: List[int] = []
+    recipients: List[LoggedRecipient] = []
+    helloasso_order_refs: List[str] = Field([], description="A correction request: the HelloAsso orders it is about")
+    helloasso_item_ids: List[int] = Field([], description="A correction request: the HelloAsso registrations it is about")
+
+
+class RecentEmailLog(BaseModel):
+    """The latest sends of the whole app, newest first (Communications › Historique des envois)."""
+    entries: List[EmailLogEntry]
+    competition_names: Dict[int, str] = Field(description="Name of each competition of these entries that still exists")
+    truncated: bool = Field(description="The cap was reached: older sends are not listed")

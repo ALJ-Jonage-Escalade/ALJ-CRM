@@ -7,8 +7,7 @@ from fastapi import APIRouter, BackgroundTasks
 from api.reports import resolve_report_season, season_read
 from api.reports.schemas import MapMember, MapPoint, MapPoints
 from api.responses import error_responses
-from infrastructure.geocoding import geocode_missing_addresses
-from services.reports.member_map import member_map
+from services.reports.member_map import geocode_missing_addresses, member_map
 
 router = APIRouter()
 

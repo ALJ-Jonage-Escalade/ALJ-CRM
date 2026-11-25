@@ -3,7 +3,7 @@ Service d'expédition et de rendu d'e-mails sécurisé (contexte Compétitions &
 
 Permet de :
 1. Charger les modèles de mails configurés dans le CRM (table email_templates).
-2. Résoudre les variables des modèles (domain/email_variables.py).
+2. Résoudre les variables des modèles (domain/communications/email_variables.py).
 3. Expédier les messages via l'API Gmail sécurisée du club (OAuth2) ou SMTP.
 """
 
@@ -13,11 +13,11 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Mapping, NotRequired, Optional, TypedDict
 
-from domain.club_emails import CLUB_SENDER_DOMAIN
+from domain.communications.club_emails import CLUB_SENDER_DOMAIN
 from domain.competitions.models import Competition, default_deadline
-from domain.email_log import LoggedRecipient
+from domain.communications.email_log import LoggedRecipient
 from domain.errors import InvalidRequest, UpstreamUnavailable
-from domain.email_personalization import TemplateRecipient, apply_template_variables, personalized_html, template_recipient
+from domain.communications.email_personalization import TemplateRecipient, apply_template_variables, personalized_html, template_recipient
 from domain.utils import format_amount, format_period, normalize_name
 from infrastructure.firestore.competitions import competitions, member_directory
 from infrastructure.mail.html_body import build_email_html, build_signature_plain, get_inline_images

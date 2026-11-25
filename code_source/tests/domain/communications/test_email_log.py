@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import pytest
 
-from domain.email_log import (
+from domain.communications.email_log import (
     Competitor,
     EmailKind,
     EmailLogEntry,

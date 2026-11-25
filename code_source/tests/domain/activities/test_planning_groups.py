@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from domain.members.planning_groups import (
+from domain.activities.planning_groups import (
     autonomous_sheet_extra_tarifs,
     forms_autonomous_sheet,
     is_autonomous_type,

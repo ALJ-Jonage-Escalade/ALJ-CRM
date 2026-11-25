@@ -1,10 +1,10 @@
-"""The e-mail template variables (domain/email_variables.py): rendering, aliases, empty values."""
+"""The e-mail template variables (domain/communications/email_variables.py): rendering, aliases, empty values."""
 
 from __future__ import annotations
 
 import pytest
 
-from domain.email_variables import infer_kind, needs_fixing, render_template, template_error, to_keys, to_labels
+from domain.communications.email_variables import infer_kind, needs_fixing, render_template, template_error, to_keys, to_labels
 
 
 def test_render_template_fills_each_variable() -> None:

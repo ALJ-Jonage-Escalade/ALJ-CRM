@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
+from domain.communications.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.sqlite.connection import SqliteDatabase
 
 
