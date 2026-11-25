@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from domain.competitions.models import STATUT_CLOSE
+from domain.competitions.models import CompetitionStatus
 from domain.constants import resolve_season
 from domain.errors import InvalidRequest, NotFound
 from domain.members import view as member_view
@@ -57,7 +57,7 @@ class MemberService:
         member data a coach's phone keeps offline. Taken from the active season,
         else from the participant's latest season (not registered again yet)."""
         ids = {adherent_id
-               for c in CompetitionService.list_competitions() if c.get("statut") != STATUT_CLOSE
+               for c in CompetitionService.list_competitions() if c.get("statut") != CompetitionStatus.CLOSE
                for p in c.get("participants") or [] if (adherent_id := p.get("adherent_id")) is not None}
         if not ids:
             return []

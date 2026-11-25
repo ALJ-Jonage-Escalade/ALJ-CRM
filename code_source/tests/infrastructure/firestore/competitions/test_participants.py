@@ -2,16 +2,12 @@
 
 import unittest
 from unittest.mock import patch
+
+from support.fake_firestore import FirestoreRepoTestCase
+
+from domain.competitions.models import Competition, PaymentStatus
 from infrastructure.firestore import client as fc
 from infrastructure.firestore.competitions import competitions, documents, participants
-from support.fake_firestore import FirestoreRepoTestCase
-from domain.competitions.models import (
-    Competition,
-    PAIEMENT_NON_INVITE,
-    PAIEMENT_PAYE,
-    PAIEMENT_ANNULE_PERDU,
-    PAIEMENT_ANNULE_REPORTE,
-)
 
 
 class TestParticipants(FirestoreRepoTestCase):
@@ -68,7 +64,7 @@ class TestParticipants(FirestoreRepoTestCase):
         p = parts[0]
         self.assertEqual(p.adherent_id, 101)
         self.assertFalse(p.selectionne)
-        self.assertEqual(p.statut_paiement, PAIEMENT_NON_INVITE)
+        self.assertEqual(p.statut_paiement, PaymentStatus.NON_INVITE)
 
     def test_load_competition_group_with_statuses(self):
         self.seed_adherent(103, nom="PETIT", tarif="Compétition U15", statut="En cours")
@@ -129,7 +125,7 @@ class TestModificationsConcurrentes(FirestoreRepoTestCase):
         participants.set_selection_doc(self.comp_id, 102, False)
         self.assertTrue(state["done"])
         parts = self._parts()
-        self.assertEqual(parts[101].statut_paiement, PAIEMENT_PAYE)   # pas écrasé
+        self.assertEqual(parts[101].statut_paiement, PaymentStatus.PAYE)   # pas écrasé
         self.assertEqual(parts[101].montant_paye, 15.0)
         self.assertFalse(parts[102].selectionne)                       # modification rejouée
         doc = self.fake.store["competitions"][str(self.comp_id)]
@@ -143,7 +139,7 @@ class TestModificationsConcurrentes(FirestoreRepoTestCase):
         self.assertTrue(state["done"])
         parts = self._parts()
         self.assertIn(103, parts)
-        self.assertEqual(parts[101].statut_paiement, PAIEMENT_PAYE)
+        self.assertEqual(parts[101].statut_paiement, PaymentStatus.PAYE)
 
     def test_conflit_persistant_leve_une_erreur(self):
         def always(collection_name, doc_id):
@@ -151,7 +147,7 @@ class TestModificationsConcurrentes(FirestoreRepoTestCase):
         self.fake.before_conditional_write = always
         with patch.object(documents.time, "sleep"):
             with self.assertRaises(fc.FirestoreConflictError):
-                participants.update_participant(self.comp_id, 101, lambda row: row.update(statut_paiement=PAIEMENT_PAYE))
+                participants.update_participant(self.comp_id, 101, lambda row: row.update(statut_paiement=PaymentStatus.PAYE))
 
     def test_modification_epreuve_ne_reecrit_pas_les_participants(self):
         comp = competitions.get_competition(self.comp_id)          # lu avant le paiement
@@ -159,7 +155,7 @@ class TestModificationsConcurrentes(FirestoreRepoTestCase):
         comp.prix = 20.0
         competitions.save_competition(comp)
         self.assertEqual(competitions.get_competition(self.comp_id).prix, 20.0)
-        self.assertEqual(self._parts()[101].statut_paiement, PAIEMENT_PAYE)
+        self.assertEqual(self._parts()[101].statut_paiement, PaymentStatus.PAYE)
 
     def test_add_participant_retourne_l_identifiant(self):
         self.seed_adherent(104, nom="PETIT", prenom="Zoé", licence="555666")
@@ -178,37 +174,37 @@ class TestAnnulationParticipantPaye(FirestoreRepoTestCase):
         participants.apply_helloasso_payment(self.comp_id, 101, 15.0, order_ref="CMD-1")
 
     def test_annule_reporte_garde_le_montant(self):
-        self.assertIsNotNone(participants.mark_cancelled_doc(self.comp_id, 101, PAIEMENT_ANNULE_REPORTE, "blessure"))
+        self.assertIsNotNone(participants.mark_cancelled_doc(self.comp_id, 101, PaymentStatus.ANNULE_REPORTE, "blessure"))
         p = participants.list_participants(self.comp_id)[0]
         self.assertFalse(p.selectionne)
-        self.assertEqual(p.statut_paiement, PAIEMENT_ANNULE_REPORTE)
+        self.assertEqual(p.statut_paiement, PaymentStatus.ANNULE_REPORTE)
         self.assertEqual(p.montant_paye, 15.0)
         self.assertEqual(p.note_paiement, "blessure")
 
 
     def test_annule_perdu_garde_le_montant(self):
-        self.assertIsNotNone(participants.mark_cancelled_doc(self.comp_id, 101, PAIEMENT_ANNULE_PERDU, "absence"))
+        self.assertIsNotNone(participants.mark_cancelled_doc(self.comp_id, 101, PaymentStatus.ANNULE_PERDU, "absence"))
         p = participants.list_participants(self.comp_id)[0]
         self.assertFalse(p.selectionne)
-        self.assertEqual(p.statut_paiement, PAIEMENT_ANNULE_PERDU)
+        self.assertEqual(p.statut_paiement, PaymentStatus.ANNULE_PERDU)
         self.assertEqual(p.montant_paye, 15.0)
 
 
     def test_resync_helloasso_ne_pas_repayer_un_annule(self):
-        participants.mark_cancelled_doc(self.comp_id, 101, PAIEMENT_ANNULE_REPORTE, "blessure")
+        participants.mark_cancelled_doc(self.comp_id, 101, PaymentStatus.ANNULE_REPORTE, "blessure")
         # Re-synchronisation HelloAsso (l'article payé est toujours validé) :
         # l'annulation explicite du coach ne doit pas être écrasée.
         self.assertFalse(participants.apply_helloasso_payment(self.comp_id, 101, 15.0, order_ref="CMD-1"))
         p = participants.list_participants(self.comp_id)[0]
-        self.assertEqual(p.statut_paiement, PAIEMENT_ANNULE_REPORTE)
+        self.assertEqual(p.statut_paiement, PaymentStatus.ANNULE_REPORTE)
         self.assertFalse(p.selectionne)
 
     def test_reactivation_par_re_ajout(self):
-        participants.mark_cancelled_doc(self.comp_id, 101, PAIEMENT_ANNULE_REPORTE, "blessure")
+        participants.mark_cancelled_doc(self.comp_id, 101, PaymentStatus.ANNULE_REPORTE, "blessure")
         participants.add_participant(self.comp_id, 101, selectionne=True)
         p = participants.list_participants(self.comp_id)[0]
         self.assertTrue(p.selectionne)
-        self.assertEqual(p.statut_paiement, PAIEMENT_PAYE)
+        self.assertEqual(p.statut_paiement, PaymentStatus.PAYE)
         self.assertEqual(p.montant_paye, 15.0)
         self.assertEqual(p.note_paiement, "blessure")
 

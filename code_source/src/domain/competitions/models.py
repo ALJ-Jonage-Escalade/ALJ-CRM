@@ -4,10 +4,12 @@ Modèles métier du module de gestion des compétitions (base partagée Firestor
 Ces modèles sont purs (aucune dépendance réseau ni stockage) : réutilisables par
 les services, le serveur web et les tests unitaires.
 """
+from __future__ import annotations
+
 import datetime
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, List, Mapping, Optional
+from typing import Any, List, Literal, Mapping, Optional, TypeVar
 
 class CompetitionStatus(StrEnum):
     """Life cycle of a competition (stored as its value)."""
@@ -26,11 +28,8 @@ class PaymentStatus(StrEnum):
     ANNULE_REPORTE = "annule_reporte"
 
 
-# Module-level names kept for the many callers; a StrEnum member compares and serialises as its text
-STATUT_EN_PREPARATION = CompetitionStatus.EN_PREPARATION
-STATUT_EN_COURS = CompetitionStatus.EN_COURS
-STATUT_CLOSE = CompetitionStatus.CLOSE
-STATUTS_COMPETITION = (STATUT_EN_PREPARATION, STATUT_EN_COURS, STATUT_CLOSE)
+# A StrEnum member compares and serialises as its text: stored documents keep plain strings
+STATUTS_COMPETITION = tuple(CompetitionStatus)
 
 # Coach slots of documents written before plan cleanup C2 (no `coach_ids` field): still read, never written.
 LEGACY_COACH_SLOTS = ("coach1_id", "coach2_id", "coach3_id")
@@ -55,35 +54,39 @@ def coach_ids_of(row: Mapping[str, Any]) -> List[int]:
 
 
 LIBELLES_STATUT_COMPETITION: dict[str, str] = {
-    STATUT_EN_PREPARATION: "En préparation",
-    STATUT_EN_COURS: "En cours",
-    STATUT_CLOSE: "Archivée",
+    CompetitionStatus.EN_PREPARATION: "En préparation",
+    CompetitionStatus.EN_COURS: "En cours",
+    CompetitionStatus.CLOSE: "Archivée",
 }
 
-PAIEMENT_NON_INVITE = PaymentStatus.NON_INVITE
-PAIEMENT_EN_ATTENTE = PaymentStatus.EN_ATTENTE
-PAIEMENT_PAYE = PaymentStatus.PAYE
-PAIEMENT_ANNULE_PERDU = PaymentStatus.ANNULE_PERDU
-PAIEMENT_ANNULE_REPORTE = PaymentStatus.ANNULE_REPORTE
-STATUTS_PAIEMENT = (
-    PAIEMENT_NON_INVITE, PAIEMENT_EN_ATTENTE, PAIEMENT_PAYE,
-    PAIEMENT_ANNULE_PERDU, PAIEMENT_ANNULE_REPORTE,
-)
+STATUTS_PAIEMENT = tuple(PaymentStatus)
 
 LIBELLES_STATUT_PAIEMENT: dict[str, str] = {
-    PAIEMENT_NON_INVITE: "Non invité",
-    PAIEMENT_EN_ATTENTE: "En attente",
-    PAIEMENT_PAYE: "Payé",
-    PAIEMENT_ANNULE_PERDU: "Annulé — perdu",
-    PAIEMENT_ANNULE_REPORTE: "Annulé — report",
+    PaymentStatus.NON_INVITE: "Non invité",
+    PaymentStatus.EN_ATTENTE: "En attente",
+    PaymentStatus.PAYE: "Payé",
+    PaymentStatus.ANNULE_PERDU: "Annulé — perdu",
+    PaymentStatus.ANNULE_REPORTE: "Annulé — report",
 }
 
 # Statuts « payé » réellement encaissés (money in) — l'annulation reportée
 # garde l'argent côté club mais ne compte plus comme participation due.
-PAIEMENT_STATUTS_ANNULES = (PAIEMENT_ANNULE_PERDU, PAIEMENT_ANNULE_REPORTE)
+PAIEMENT_STATUTS_ANNULES = (PaymentStatus.ANNULE_PERDU, PaymentStatus.ANNULE_REPORTE)
+# Status a cancelled participation takes (mark_cancelled_doc)
+CancelledStatus = Literal[PaymentStatus.ANNULE_PERDU, PaymentStatus.ANNULE_REPORTE]
+
+_Status = TypeVar("_Status", CompetitionStatus, PaymentStatus)
 
 
-def payment_status_after_toggle(statut_paiement: Optional[str], selectionne: bool) -> Optional[str]:
+def _stored_status(enum: type[_Status], value: object, default: _Status) -> _Status:
+    """A status read from a stored document: its enum member, `default` when blank or not a known value."""
+    try:
+        return enum(str(value or default))
+    except ValueError:
+        return default
+
+
+def payment_status_after_toggle(statut_paiement: Optional[str], selectionne: bool) -> Optional[PaymentStatus]:
     """Statut de paiement résultant de la bascule « Participe ».
 
     Règle : le paiement « payé » et les annulations ne sont JAMAIS modifiés par
@@ -91,15 +94,15 @@ def payment_status_after_toggle(statut_paiement: Optional[str], selectionne: boo
     passe « en attente » ; un « en attente » décoché repasse « non invité » ;
     un participant annulé re-coché repasse « payé » (réactivation).
     Retourne le nouveau statut, ou None s'il n'y a rien à changer."""
-    statut = str(statut_paiement or PAIEMENT_NON_INVITE)
+    statut = str(statut_paiement or PaymentStatus.NON_INVITE)
     if selectionne:
-        if statut == PAIEMENT_NON_INVITE:
-            return PAIEMENT_EN_ATTENTE
+        if statut == PaymentStatus.NON_INVITE:
+            return PaymentStatus.EN_ATTENTE
         if statut in PAIEMENT_STATUTS_ANNULES:
-            return PAIEMENT_PAYE
+            return PaymentStatus.PAYE
         return None
-    if statut == PAIEMENT_EN_ATTENTE:
-        return PAIEMENT_NON_INVITE
+    if statut == PaymentStatus.EN_ATTENTE:
+        return PaymentStatus.NON_INVITE
     return None
 
 LIBELLE_VERS_STATUT_PAIEMENT = {v: k for k, v in LIBELLES_STATUT_PAIEMENT.items()}
@@ -132,7 +135,7 @@ class Competition:
     date_fin: str = ""               # date de fin ISO ; vide = même jour que le début
     deadline: str = ""               # date limite d'inscription ISO, saisie à la main ; vide = 7j avant le début (default_deadline)
     prix: float = 0.0                # tarif d'inscription en euros
-    statut: str = STATUT_EN_PREPARATION
+    statut: CompetitionStatus = CompetitionStatus.EN_PREPARATION
     created_at: str = ""
     updated_at: str = ""
     coach_ids: List[int] = field(default_factory=list)  # ordered, no length limit
@@ -171,7 +174,7 @@ class Competition:
             date_fin=str(row.get("date_fin") or ""),
             deadline=str(row.get("deadline") or "").strip(),
             prix=float(row.get("prix") or 0.0),
-            statut=str(row.get("statut") or STATUT_EN_PREPARATION),
+            statut=_stored_status(CompetitionStatus, row.get("statut"), CompetitionStatus.EN_PREPARATION),
             created_at=str(row.get("created_at") or ""),
             updated_at=str(row.get("updated_at") or ""),
             coach_ids=coach_ids_of(row),
@@ -196,7 +199,7 @@ class Participant:
     tarif: str = ""
     selectionne: bool = False
     present: bool = False            # pointage sur place le jour de la compétition
-    statut_paiement: str = PAIEMENT_NON_INVITE
+    statut_paiement: PaymentStatus = PaymentStatus.NON_INVITE
     date_synchro_helloasso: str = ""
     montant_paye: float = 0.0
     commande_helloasso: str = ""     # n° de commande HelloAsso (renseigné à la synchro)
@@ -247,7 +250,7 @@ class Participant:
             tarif=str(row.get("tarif") or ""),
             selectionne=bool(sel) and str(sel) not in ("0", "Non", "non"),
             present=bool(row.get("present")),
-            statut_paiement=str(row.get("statut_paiement") or PAIEMENT_NON_INVITE),
+            statut_paiement=_stored_status(PaymentStatus, row.get("statut_paiement"), PaymentStatus.NON_INVITE),
             date_synchro_helloasso=str(row.get("date_synchro_helloasso") or ""),
             montant_paye=float(row.get("montant_paye") or 0.0),
             commande_helloasso=str(row.get("commande_helloasso") or ""),

@@ -12,7 +12,7 @@ from typing import List
 
 from domain.communications.club_emails import DEFAULT_SENDER_EMAIL
 from domain.communications.email_log import SYSTEM_AUTHOR
-from domain.competitions.models import PAIEMENT_PAYE, Competition, Participant
+from domain.competitions.models import Competition, Participant, PaymentStatus
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.competitions import competitions, participants
 from infrastructure.mail.sender import EmailSender, MailError
@@ -40,7 +40,7 @@ def check_and_notify_all_paid(competition_id: int) -> bool:
         return False
 
     setting_key = notified_setting_key(competition_id)
-    if any(str(p.statut_paiement or "").strip().lower() != PAIEMENT_PAYE for p in selected):
+    if any(str(p.statut_paiement or "").strip().lower() != PaymentStatus.PAYE for p in selected):
         AppSettingsRepository.save(setting_key, "")  # not all paid (again): notify at the next full payment
         return False
     if AppSettingsRepository.get(setting_key, ""):

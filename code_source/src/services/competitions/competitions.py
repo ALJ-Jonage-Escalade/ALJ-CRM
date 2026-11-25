@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, List
 
-from domain.competitions.models import Competition
+from domain.competitions.models import Competition, CompetitionStatus
 from exports.competitors_excel import export_competitors_excel
 from exports.competitors_pdf import export_competitors_pdf
 from infrastructure.firestore.competitions import competitions
@@ -28,6 +28,11 @@ def _extra(fields: Dict[str, Any]) -> Dict[str, Any]:
     return {k: fields[k] for k in PASS_THROUGH_FIELDS if k in fields}
 
 
+def _model_value(field: str, value: Any) -> Any:  # Any: a value of the validated body
+    """The value of a body field as the Competition model holds it: `statut` as its enum (the schema checked it)."""
+    return CompetitionStatus(value) if field == "statut" else value
+
+
 class CompetitionService:
 
     @staticmethod
@@ -39,7 +44,7 @@ class CompetitionService:
     @write
     def create_competition(fields: Dict[str, Any]) -> CompetitionDoc:
         """`fields`: validated body (api.competitions.schemas.competitions.CompetitionCreate)."""
-        comp = Competition(**{k: fields[k] for k in COMPETITION_FIELDS if k in fields})
+        comp = Competition(**{k: _model_value(k, fields[k]) for k in COMPETITION_FIELDS if k in fields})
         comp.coach_ids = list(fields.get("coach_ids") or [])
         new_id = competitions.save_competition(comp, _extra(fields))
         return require_competition(new_id)
@@ -52,7 +57,7 @@ class CompetitionService:
         def change(comp: Competition) -> None:
             for field in COMPETITION_FIELDS:
                 if fields.get(field) is not None:
-                    setattr(comp, field, fields[field])
+                    setattr(comp, field, _model_value(field, fields[field]))
             if "coach_ids" in fields:
                 comp.coach_ids = list(fields["coach_ids"] or [])
         if not competitions.update_competition(competition_id, change, _extra(fields)):

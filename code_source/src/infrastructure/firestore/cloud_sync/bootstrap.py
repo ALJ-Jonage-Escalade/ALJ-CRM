@@ -6,9 +6,9 @@ import sqlite3
 from typing import Any, Callable, Dict, List, Optional
 
 from infrastructure.firestore.cloud_sync.cache import (
-    _Applying,
     _pk_string,
     _set_base,
+    _TrackingSuspended,
     _upsert_row,
     connect,
     get_state,
@@ -50,36 +50,36 @@ def build_cache(path: str, store, schema_factory: Callable[[str], None] = create
                 backup_dir: Optional[str] = None) -> SyncReport:
     """Reconstruit intégralement le cache `path` depuis Firestore (remplacement atomique)."""
     report = SyncReport(loaded={})
-    tmp = path + ".building"
-    _remove_db_files(tmp)
-    schema_factory(tmp)
-    conn = connect(tmp)
+    building_path = path + ".building"
+    _remove_db_files(building_path)
+    schema_factory(building_path)
+    conn = connect(building_path)
     try:
         conn.execute("PRAGMA journal_mode=DELETE")
         conn.execute("BEGIN")
-        for t in TRACKED_TABLES:
-            if table_exists(conn, t):
-                conn.execute(f'DELETE FROM "{t}"')  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
+        for table in TRACKED_TABLES:
+            if table_exists(conn, table):
+                conn.execute(f'DELETE FROM "{table}"')  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
         conn.execute("COMMIT")
         install_tracking(conn)
         conn.execute("BEGIN")
-        with _Applying(conn):
-            for t in tracked_tables(conn):
-                cols, pk = table_columns(conn, t), table_pk(conn, t)
-                docs = store.list_all(collection_for(t))
-                n, wm = 0, "1970-01-01T00:00:00Z"
-                for d in docs:
-                    if d.get("modified_at") and ts_key(d["modified_at"]) > ts_key(wm):
-                        wm = d["modified_at"]
-                    if d["deleted"]:
+        with _TrackingSuspended(conn):
+            for table in tracked_tables(conn):
+                cols, pk = table_columns(conn, table), table_pk(conn, table)
+                docs = store.list_all(collection_for(table))
+                loaded_count, watermark = 0, "1970-01-01T00:00:00Z"
+                for doc in docs:
+                    if doc.get("modified_at") and ts_key(doc["modified_at"]) > ts_key(watermark):
+                        watermark = doc["modified_at"]
+                    if doc["deleted"]:
                         continue
-                    fields = upgrade_legacy_fields(t, d["fields"])
+                    fields = upgrade_legacy_fields(table, doc["fields"])
                     remote = {c: fields[c] for c in cols if c in fields}
-                    _upsert_row(conn, t, cols, pk, remote)
-                    _set_base(conn, t, _pk_string(conn, [remote[c] for c in pk]), remote, d["update_time"])
-                    n += 1
-                set_state(conn, f"wm:{t}", wm)
-                report["loaded"][t] = n
+                    _upsert_row(conn, table, cols, pk, remote)
+                    _set_base(conn, table, _pk_string(conn, [remote[c] for c in pk]), remote, doc["update_time"])
+                    loaded_count += 1
+                set_state(conn, f"wm:{table}", watermark)
+                report["loaded"][table] = loaded_count
         conn.execute("DELETE FROM _fs_changes")
         set_state(conn, "format", CACHE_FORMAT)
         set_state(conn, "project", store.project_id)
@@ -92,11 +92,11 @@ def build_cache(path: str, store, schema_factory: Callable[[str], None] = create
             os.makedirs(backup_dir, exist_ok=True)
             stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             try:
-                bk = sqlite3.connect(path)
-                dst = sqlite3.connect(os.path.join(backup_dir, f"database_avant_firestore_{stamp}.db"))
-                bk.backup(dst)
-                dst.close()
-                bk.close()
+                current_cache = sqlite3.connect(path)
+                backup_copy = sqlite3.connect(os.path.join(backup_dir, f"database_avant_firestore_{stamp}.db"))
+                current_cache.backup(backup_copy)
+                backup_copy.close()
+                current_cache.close()
             except Exception as e:
                 logger.warning(f"[CLOUD_DB] Sauvegarde de l'ancien cache impossible : {e}")
         for suffix in ("-wal", "-shm", "-journal"):
@@ -104,7 +104,7 @@ def build_cache(path: str, store, schema_factory: Callable[[str], None] = create
                 os.remove(path + suffix)
             except FileNotFoundError:
                 pass
-    os.replace(tmp, path)
+    os.replace(building_path, path)
     return report
 
 
@@ -133,15 +133,15 @@ def import_database(src_path: str, store, by: str = "migration") -> Dict[str, in
     conn.row_factory = sqlite3.Row
     counts = {}
     try:
-        for t in tracked_tables(conn):
-            pk = table_pk(conn, t)
+        for table in tracked_tables(conn):
+            pk = table_pk(conn, table)
             writes = []
-            for row in export_rows(conn, t):
-                writes.append({"collection": collection_for(t), "doc_id": doc_id_for([row[c] for c in pk]),
+            for row in export_rows(conn, table):
+                writes.append({"collection": collection_for(table), "doc_id": doc_id_for([row[c] for c in pk]),
                                "fields": row, "mask": None, "deleted": False, "by": by})
             for i in range(0, len(writes), COMMIT_CHUNK):
                 store.commit(writes[i:i + COMMIT_CHUNK])
-            counts[t] = len(writes)
+            counts[table] = len(writes)
     finally:
         conn.close()
     return counts

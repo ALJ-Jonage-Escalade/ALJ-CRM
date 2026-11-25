@@ -17,7 +17,7 @@ automatiquement : il est retourné dans `manual_review` pour correction manuelle
 import re
 from typing import NamedTuple, Optional
 
-from domain.competitions.models import PAIEMENT_PAYE
+from domain.competitions.models import PaymentStatus
 from domain.utils import normalize_name, normalize_string
 
 # États HelloAsso consideres comme un paiement valide
@@ -383,12 +383,12 @@ def _pending_count_and_missing_payments(participants: list, seen_participants: d
     for participant in participants:
         if not participant.get("selectionne"):
             continue
-        if participant.get("statut_paiement") == PAIEMENT_PAYE and participant.get("adherent_id") not in seen_participants:
+        if participant.get("statut_paiement") == PaymentStatus.PAYE and participant.get("adherent_id") not in seen_participants:
             # Déjà marqué payé en base sans paiement détecté sur cette campagne : signaler
             anomalies.append(_anomaly("paiement_absent", "avertissement", "Payé en base sans paiement HelloAsso",
                                       f"{participant.get('nom')} {participant.get('prenom')} est marqué « Payé » dans "
                                       f"la base mais aucun paiement correspondant n'a été trouvé sur la campagne."))
-        elif participant.get("statut_paiement") != PAIEMENT_PAYE:
+        elif participant.get("statut_paiement") != PaymentStatus.PAYE:
             pending_count += 1
     return pending_count, anomalies
 

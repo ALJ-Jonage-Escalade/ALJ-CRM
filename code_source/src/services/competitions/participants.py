@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from typing import Optional, Sequence, Tuple
 
-from domain.competitions.models import STATUT_CLOSE
+from domain.competitions.models import CancelledStatus, CompetitionStatus
+from domain.errors import Conflict, NotFound
 from infrastructure.firestore.competitions import competitions, participants
 from infrastructure.firestore.competitions.documents import CompetitionDoc
 from services.competitions.store import require_competition, write
-from domain.errors import Conflict, NotFound
 
 
 def _written(competition_id: int, doc: Optional[dict]) -> CompetitionDoc:
@@ -24,7 +24,7 @@ def _written(competition_id: int, doc: Optional[dict]) -> CompetitionDoc:
 def _require_open(competition_id: int) -> None:
     """Changes queued offline are refused on an archived competition (Conflict
     `competition_closed`); online changes keep working there."""
-    if require_competition(competition_id).get("statut") == STATUT_CLOSE:
+    if require_competition(competition_id).get("statut") == CompetitionStatus.CLOSE:
         raise Conflict("Compétition archivée : modification refusée.", "competition_closed")
 
 
@@ -89,9 +89,9 @@ class ParticipantService:
 
     @staticmethod
     @write
-    def cancel_participant(competition_id: int, adherent_id: int, payment_status: str,
+    def cancel_participant(competition_id: int, adherent_id: int, payment_status: CancelledStatus,
                            note: str) -> CompetitionDoc:
-        """`payment_status`: PAIEMENT_ANNULE_PERDU or PAIEMENT_ANNULE_REPORTE."""
+        """`payment_status`: PaymentStatus.ANNULE_PERDU (money kept) or ANNULE_REPORTE (credit)."""
         doc = participants.mark_cancelled_doc(competition_id, adherent_id, payment_status, note)
         if doc is None:
             raise NotFound("Compétition ou compétiteur introuvable.")

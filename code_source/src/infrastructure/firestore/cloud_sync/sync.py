@@ -5,14 +5,13 @@ import sqlite3
 from typing import Any, Dict, List, NamedTuple, Optional
 
 from infrastructure.firestore.client import FirestoreConflictError
-from infrastructure.firestore.cloud_sync.rest_store import RestStore
 from infrastructure.firestore.cloud_sync.cache import (
-    _Applying,
     _get_base,
     _pk_string,
     _read_row,
-    _Resume,
     _set_base,
+    _TrackingResumed,
+    _TrackingSuspended,
     _upsert_row,
     _where,
     get_state,
@@ -35,6 +34,8 @@ from infrastructure.firestore.cloud_sync.common import (
     ts_minus,
     upgrade_legacy_fields,
 )
+from infrastructure.firestore.cloud_sync.rest_store import RestStore
+
 
 def renumber_row(conn: sqlite3.Connection, store: RestStore, table: str, old_id: int, report: SyncReport) -> int:
     """Donne un nouvel identifiant à une ligne locale dont l'ID est déjà utilisé
@@ -61,46 +62,46 @@ def apply_remote_docs(conn: sqlite3.Connection, store: RestStore, table: str, do
     pk = table_pk(conn, table)
     conn.execute("BEGIN IMMEDIATE")
     try:
-        with _Applying(conn):
-            for d in docs:
-                vals = [d["fields"].get(c) for c in pk]
-                if any(v is None for v in vals):
+        with _TrackingSuspended(conn):
+            for doc in docs:
+                pk_values = [doc["fields"].get(c) for c in pk]
+                if any(v is None for v in pk_values):
                     continue
-                pk_str = _pk_string(conn, vals)
-                base, base_ut = _get_base(conn, table, pk_str)
-                if base_ut and ts_key(base_ut) >= ts_key(d["update_time"]):
+                pk_str = _pk_string(conn, pk_values)
+                base, base_update_time = _get_base(conn, table, pk_str)
+                if base_update_time and ts_key(base_update_time) >= ts_key(doc["update_time"]):
                     continue
                 dirty = conn.execute("SELECT 1 FROM _fs_changes WHERE tbl = ? AND pk = ?",
                                      (table, pk_str)).fetchone() is not None
-                local = _read_row(conn, table, pk, vals)
-                if d["deleted"]:
+                local = _read_row(conn, table, pk, pk_values)
+                if doc["deleted"]:
                     if base is None and dirty and local is not None:
                         # Ligne créée ici avec un ID supprimé ailleurs : on la garde.
                         continue
-                    conn.execute(f'DELETE FROM "{table}" WHERE {_where(pk)}', vals)  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
+                    conn.execute(f'DELETE FROM "{table}" WHERE {_where(pk)}', pk_values)  # noqa: S608 - noms de tables/colonnes issus de TRACKED_TABLES et PRAGMA table_info
                     conn.execute("DELETE FROM _fs_base WHERE tbl = ? AND pk = ?", (table, pk_str))
                     conn.execute("DELETE FROM _fs_changes WHERE tbl = ? AND pk = ?", (table, pk_str))
                     report["pulled"] = report.get("pulled", 0) + 1
                     continue
-                fields = upgrade_legacy_fields(table, d["fields"])
+                fields = upgrade_legacy_fields(table, doc["fields"])
                 remote = {c: fields[c] for c in cols if c in fields}
                 if dirty and base is None and local is not None:
                     # Même ID créé sur deux postes : renuméroter la ligne locale.
-                    if len(pk) == 1 and isinstance(vals[0], int):
-                        with _Resume(conn):
-                            renumber_row(conn, store, table, vals[0], report)
+                    if len(pk) == 1 and isinstance(pk_values[0], int):
+                        with _TrackingResumed(conn):
+                            renumber_row(conn, store, table, pk_values[0], report)
                         local = None
                     else:
                         merged = dict(remote)
                         merged.update(local)
                         _upsert_row(conn, table, cols, pk, merged)
-                        _set_base(conn, table, pk_str, remote, d["update_time"])
+                        _set_base(conn, table, pk_str, remote, doc["update_time"])
                         continue
                 if dirty and local is not None and base is not None:
                     merged = dict(remote)
-                    for c, v in local.items():
-                        if not _same(v, base.get(c)) and (c in base or v is not None):
-                            merged[c] = v
+                    for column, value in local.items():
+                        if not _same(value, base.get(column)) and (column in base or value is not None):
+                            merged[column] = value
                     _upsert_row(conn, table, cols, pk, merged)
                 elif dirty and local is None and base is not None:
                     pass  # supprimée ici : la suppression sera envoyée
@@ -108,9 +109,9 @@ def apply_remote_docs(conn: sqlite3.Connection, store: RestStore, table: str, do
                     try:
                         _upsert_row(conn, table, cols, pk, remote)
                     except sqlite3.IntegrityError as e:
-                        report.setdefault("errors", []).append(f"{table}/{d['id']} : {e}")
+                        report.setdefault("errors", []).append(f"{table}/{doc['id']} : {e}")
                         continue
-                _set_base(conn, table, pk_str, remote, d["update_time"])
+                _set_base(conn, table, pk_str, remote, doc["update_time"])
                 report["pulled"] = report.get("pulled", 0) + 1
         conn.execute("COMMIT")
     except Exception:
@@ -147,16 +148,16 @@ def _build_write(conn: sqlite3.Connection, table: str, pk: List[str], pk_str: st
                  ) -> Optional[tuple[Dict[str, Any], Optional[Dict[str, Any]]]]:
     """The store write of a changed row and the row itself (None for a deletion), or None when there is nothing to
     send: a row deleted before it was ever sent, or a row unchanged since the last synchronised version."""
-    vals = json.loads(pk_str)
-    row = _read_row(conn, table, pk, vals)
-    base, base_ut = _get_base(conn, table, pk_str)
-    write: Dict[str, Any] = {"collection": collection_for(table), "doc_id": doc_id_for(vals), "by": author}
+    pk_values = json.loads(pk_str)
+    row = _read_row(conn, table, pk, pk_values)
+    base, base_update_time = _get_base(conn, table, pk_str)
+    write: Dict[str, Any] = {"collection": collection_for(table), "doc_id": doc_id_for(pk_values), "by": author}
     if row is None:
         if base is None:
             return None
         kept = {c: base[c] for c in TOMBSTONE_FIELDS.get(table, ()) if c in base}
-        write.update(fields={**kept, **dict(zip(pk, vals, strict=False))}, mask=None, deleted=True,
-                     precondition={"updateTime": base_ut} if base_ut else None)
+        write.update(fields={**kept, **dict(zip(pk, pk_values, strict=False))}, mask=None, deleted=True,
+                     precondition={"updateTime": base_update_time} if base_update_time else None)
         return write, None
     if base is None:
         write.update(fields=row, mask=None, deleted=False, precondition=None, create=True)
@@ -165,7 +166,7 @@ def _build_write(conn: sqlite3.Connection, table: str, pk: List[str], pk_str: st
     if not diff:
         return None
     write.update(fields=diff, mask=list(diff.keys()), deleted=False,
-                 precondition={"updateTime": base_ut} if base_ut else {"exists": True})
+                 precondition={"updateTime": base_update_time} if base_update_time else {"exists": True})
     return write, row
 
 

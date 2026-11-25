@@ -19,13 +19,7 @@ import logging
 import time
 from typing import Any, Callable, Optional, TypedDict, TypeVar, cast
 
-from domain.competitions.models import (
-    LEGACY_COACH_SLOTS,
-    PAIEMENT_PAYE,
-    Competition,
-    coach_ids_of,
-    default_deadline,
-)
+from domain.competitions.models import LEGACY_COACH_SLOTS, Competition, PaymentStatus, coach_ids_of, default_deadline
 from infrastructure.firestore.client import (
     META_KEYS,
     FirestoreClient,
@@ -238,7 +232,7 @@ def build_comp_doc(doc: dict[str, Any] | None, comp: Competition) -> dict[str, A
         "date_fin": comp.date_fin or "",
         "deadline": (comp.deadline or "").strip(),
         "prix": float(comp.prix or 0.0),
-        "statut": comp.statut or "en_preparation",
+        "statut": comp.statut,
         "url_resultats": comp.url_resultats or "",
         "resultats_synced_at": comp.resultats_synced_at or "",
         "whatsapp_link": comp.whatsapp_link or "",
@@ -255,7 +249,7 @@ def recompute_counters(parts: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "nb_participants": len(parts),
         "nb_selectionnes": sum(1 for p in parts if p.get("selectionne")),
-        "nb_payes": sum(1 for p in parts if (p.get("statut_paiement") or "") == PAIEMENT_PAYE),
+        "nb_payes": sum(1 for p in parts if (p.get("statut_paiement") or "") == PaymentStatus.PAYE),
         "total_collecte": round(sum(float(p.get("montant_paye") or 0.0) for p in parts), 2),
     }
 

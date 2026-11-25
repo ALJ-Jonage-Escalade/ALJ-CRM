@@ -29,9 +29,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 
 from domain.competitions.matching import auto_link_items, summarize_items
-from domain.helloasso_campaigns import parse_campaign_identifier
-from domain.competitions.models import PAIEMENT_PAYE
+from domain.competitions.models import PaymentStatus
 from domain.errors import Forbidden, UpstreamUnavailable
+from domain.helloasso_campaigns import parse_campaign_identifier
 from infrastructure.firestore.app_settings import HELLOASSO_COMPETITION_CAMPAIGN, AppSettingsRepository
 from infrastructure.firestore.competitions import competitions, helloasso_items, member_directory, participants
 from infrastructure.helloasso import api as helloasso_api
@@ -367,7 +367,7 @@ class HelloAssoWebhookService:
             "montant": amount,
             "order_ref": order_ref,
             "licence": licence,
-            "status": PAIEMENT_PAYE,
+            "status": PaymentStatus.PAYE,
         }
 
 

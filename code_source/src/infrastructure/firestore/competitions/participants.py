@@ -7,20 +7,12 @@ from __future__ import annotations
 
 from typing import Any, Callable, Sequence
 
-from domain.competitions.models import (
-    PAIEMENT_ANNULE_PERDU,
-    PAIEMENT_EN_ATTENTE,
-    PAIEMENT_NON_INVITE,
-    PAIEMENT_PAYE,
-    PAIEMENT_STATUTS_ANNULES,
-    Participant,
-    payment_status_after_toggle,
-)
+from domain.competitions.models import PAIEMENT_STATUTS_ANNULES, CancelledStatus, Participant, PaymentStatus, payment_status_after_toggle
 from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore.competitions import documents, member_directory
 
 # Payment state of a participant added and selected explicitly
-DEFAULT_STATUT_NOUVEAU_PARTICIPANT = PAIEMENT_EN_ATTENTE
+DEFAULT_STATUT_NOUVEAU_PARTICIPANT = PaymentStatus.EN_ATTENTE
 
 # Order reference of a payment recorded by hand on the bureau page (cheque, cash)
 MANUAL_PAYMENT_REF = "Règlement manuel"
@@ -71,7 +63,7 @@ def list_participants(competition_id: int, selected_only: bool = False) -> list[
     rows = doc.get("participants") or []
     if selected_only:
         rows = [row for row in rows if row.get("selectionne")]
-    adherents = member_directory.adherent_map()
+    adherents = member_directory.members_by_id()
     result = []
     for stored in rows:
         row = dict(stored)
@@ -89,7 +81,7 @@ def list_participants(competition_id: int, selected_only: bool = False) -> list[
 
 
 def _new_participant_row(adherent_doc: dict[str, Any], selectionne: bool, statut: str | None = None) -> ParticipantRow:
-    status = statut or (DEFAULT_STATUT_NOUVEAU_PARTICIPANT if selectionne else PAIEMENT_NON_INVITE)
+    status = statut or (DEFAULT_STATUT_NOUVEAU_PARTICIPANT if selectionne else PaymentStatus.NON_INVITE)
     return {
         "participant_id": adherent_doc.get("id"),
         "adherent_id": adherent_doc.get("id"),
@@ -112,7 +104,7 @@ def _new_participant_row(adherent_doc: dict[str, Any], selectionne: bool, statut
 
 def new_participant(adherent_id: int, selectionne: bool) -> ParticipantRow:
     """New participant row for a member, copied from the `adherents` directory."""
-    adherent = member_directory.adherent_map().get(adherent_id) or {"id": adherent_id}
+    adherent = member_directory.members_by_id().get(adherent_id) or {"id": adherent_id}
     return _new_participant_row(adherent, selectionne)
 
 
@@ -205,7 +197,7 @@ def add_participant_doc(competition_id: int, adherent_id: int,
             return False
         participant["selectionne"] = True
         if cancelled:
-            participant["statut_paiement"] = PAIEMENT_PAYE   # reactivated: the money is already there
+            participant["statut_paiement"] = PaymentStatus.PAYE   # reactivated: the money is already there
         return None
     return update_participant(competition_id, adherent_id, change, add_missing=selectionne)
 
@@ -239,7 +231,7 @@ def set_selection_doc(competition_id: int, adherent_id: int, selectionne: bool,
     member must then be listed already."""
     def change(participant: ParticipantRow) -> None:
         if (refuse_unselect_paid and not selectionne
-                and (participant.get("statut_paiement") or "") == PAIEMENT_PAYE):
+                and (participant.get("statut_paiement") or "") == PaymentStatus.PAYE):
             raise ParticipantAlreadyPaid(adherent_id)
         participant["selectionne"] = bool(selectionne)
         new_status = payment_status_after_toggle(participant.get("statut_paiement"), selectionne)
@@ -263,22 +255,19 @@ def record_manual_payment_doc(competition_id: int, adherent_id: int, montant: fl
     """Payment received outside HelloAsso (cheque, cash): the participant is selected and
     paid. None when the member is not listed on the competition."""
     def change(participant: ParticipantRow) -> None:
-        participant.update(selectionne=True, statut_paiement=PAIEMENT_PAYE,
+        participant.update(selectionne=True, statut_paiement=PaymentStatus.PAYE,
                            montant_paye=float(montant), commande_helloasso=MANUAL_PAYMENT_REF)
     return update_participant(competition_id, adherent_id, change)
 
 
 def mark_cancelled_doc(competition_id: int, adherent_id: int,
-                       statut_annulation: str, note: str = "") -> dict[str, Any] | None:
+                       statut_annulation: CancelledStatus, note: str = "") -> dict[str, Any] | None:
     """Cancels the participation of a competitor who paid.
 
     - `statut_annulation`: 'annule_perdu' (money kept for good) or 'annule_reporte'
       (credit for a later competition);
     - the amount paid stays counted on the competition;
     - an explanatory comment is stored (note_paiement)."""
-    if statut_annulation not in PAIEMENT_STATUTS_ANNULES:
-        statut_annulation = PAIEMENT_ANNULE_PERDU
-
     def change(participant: ParticipantRow) -> None:
         participant["selectionne"] = False
         participant["statut_paiement"] = statut_annulation
@@ -296,7 +285,7 @@ def apply_helloasso_payment(competition_id: int, adherent_id: int, montant_paye:
         if (participant.get("statut_paiement") or "") in PAIEMENT_STATUTS_ANNULES:
             # Explicit cancellation by a coach: the HelloAsso sync must not overwrite it
             return False
-        participant["statut_paiement"] = PAIEMENT_PAYE
+        participant["statut_paiement"] = PaymentStatus.PAYE
         participant["montant_paye"] = float(montant_paye or 0.0)
         participant["commande_helloasso"] = str(order_ref or "")
         participant["updated_at"] = paid_at
@@ -319,7 +308,7 @@ def load_competition_group_doc(competition_id: int,
         for adherent in group:
             if adherent["id"] in existing:
                 continue
-            row = _new_participant_row(adherent, False, PAIEMENT_NON_INVITE)
+            row = _new_participant_row(adherent, False, PaymentStatus.NON_INVITE)
             row["updated_at"] = now
             rows.append(row)
             added["count"] += 1

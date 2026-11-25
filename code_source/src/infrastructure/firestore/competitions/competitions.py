@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, cast
 
-from domain.competitions.models import STATUT_CLOSE, Competition
+from domain.competitions.models import Competition, CompetitionStatus
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions import documents, member_directory
 
@@ -58,7 +58,7 @@ def _member_sexes() -> dict[int, str | None]:
     """{adherent id -> sex code} from the `adherents` directory: the single source of the participants'
     sex (plans/sex-enum.md D7). Empty when the directory cannot be read: the sexes show as not given."""
     try:
-        return {doc["id"]: member_directory.sex_code(doc) for doc in member_directory.adherents_raw() if doc.get("id") is not None}
+        return {doc["id"]: member_directory.sex_code(doc) for doc in member_directory.member_documents() if doc.get("id") is not None}
     except FirestoreError as e:
         logger.warning("Annuaire adhérents illisible, sexe des participants non renseigné : %s", e)
         return {}
@@ -86,10 +86,10 @@ def archive_past_competitions(today_iso: str) -> list[int]:
         end = str(doc.get("date_fin") or doc.get("date_competition") or "")
         if doc.get("id") is None or not end or end >= today_iso:
             continue
-        if (doc.get("statut") or "") == STATUT_CLOSE:
+        if (doc.get("statut") or "") == CompetitionStatus.CLOSE:
             continue
         FirestoreClient.update_fields(documents.COLLECTION_COMPETITIONS, str(doc["id"]),
-                                      {"statut": STATUT_CLOSE, "updated_at": documents.now_iso()})
+                                      {"statut": CompetitionStatus.CLOSE, "updated_at": documents.now_iso()})
         archived.append(doc["id"])
     return archived
 

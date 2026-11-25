@@ -326,20 +326,20 @@ def build_sqlite(path, fake, rng, coach_names):
 
 
 def seed_competitions(coach_ids):
-    from domain.competitions.models import STATUT_CLOSE, STATUT_EN_COURS, STATUT_EN_PREPARATION, Competition
+    from domain.competitions.models import Competition, CompetitionStatus
     from infrastructure.firestore.competitions import competitions, member_directory, participants
 
     snape, mcgonagall, flitwick = coach_ids[0], coach_ids[1], coach_ids[2]
     today = datetime.date.today()
     # id_ffme: the competition number members type on the HelloAsso form (automatic links)
     specs = [
-        ("Diagon Alley Bouldering Cup", "1203", today - datetime.timedelta(days=35), 12.0, STATUT_CLOSE, snape, None),
-        ("Hogwarts Lead Open", "1457", today + datetime.timedelta(days=12), 15.0, STATUT_EN_COURS, snape, mcgonagall),
-        ("Regional Championship U15-U19", "1622", today + datetime.timedelta(days=40), 20.0, STATUT_EN_PREPARATION, snape, flitwick),
-        ("Hogsmeade Friendly Contest", "", today + datetime.timedelta(days=75), 8.0, STATUT_EN_PREPARATION, mcgonagall, None),
+        ("Diagon Alley Bouldering Cup", "1203", today - datetime.timedelta(days=35), 12.0, CompetitionStatus.CLOSE, snape, None),
+        ("Hogwarts Lead Open", "1457", today + datetime.timedelta(days=12), 15.0, CompetitionStatus.EN_COURS, snape, mcgonagall),
+        ("Regional Championship U15-U19", "1622", today + datetime.timedelta(days=40), 20.0, CompetitionStatus.EN_PREPARATION, snape, flitwick),
+        ("Hogsmeade Friendly Contest", "", today + datetime.timedelta(days=75), 8.0, CompetitionStatus.EN_PREPARATION, mcgonagall, None),
         # Ended within the results batch window (30 days), unlike the 35-day-old cup: dev/seed/mycompet_state.py
         # publishes its results on the fake MyCompet
-        ("Gringotts Bouldering Open", "1688", today - datetime.timedelta(days=5), 12.0, STATUT_CLOSE, flitwick, None),
+        ("Gringotts Bouldering Open", "1688", today - datetime.timedelta(days=5), 12.0, CompetitionStatus.CLOSE, flitwick, None),
     ]
     competitors = [a["id"] for a in member_directory.list_members(competition_only=True, statuses=["Terminé"])]
     rng = random.Random(SEED)

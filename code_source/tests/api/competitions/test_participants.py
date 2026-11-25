@@ -4,11 +4,10 @@ from unittest.mock import patch
 
 from support.api_case import ApiTestCase
 
-from services.competitions import store as competition_store
-
-from domain.competitions.models import PAIEMENT_PAYE
-from infrastructure.firestore.competitions import competitions, documents, member_directory, participants
+from domain.competitions.models import PaymentStatus
 from infrastructure.firestore.client import FirestoreClient
+from infrastructure.firestore.competitions import competitions, documents, member_directory, participants
+from services.competitions import store as competition_store
 
 
 class TestParticipants(ApiTestCase):
@@ -68,7 +67,7 @@ class TestParticipants(ApiTestCase):
 
     def reads_during(self, method, url, body=None):
         """(response, competition documents read, coaches collection reads) of one request."""
-        member_directory.adherent_map()  # member directory already cached, as on a warm server
+        member_directory.members_by_id()  # member directory already cached, as on a warm server
         with patch.object(FirestoreClient, "get_document", wraps=self.fake.get_document) as get, \
                 patch.object(FirestoreClient, "list_documents", wraps=self.fake.list_documents) as lst:
             r = self.client.request(method, url, json=body)
@@ -112,7 +111,7 @@ class TestParticipants(ApiTestCase):
 
     def test_unselect_paid_participant_needs_cancellation(self):
         participants.add_participant(self.comp, 1)
-        participants.update_participant(self.comp, 1, lambda row: row.update(statut_paiement=PAIEMENT_PAYE))
+        participants.update_participant(self.comp, 1, lambda row: row.update(statut_paiement=PaymentStatus.PAYE))
         r = self.client.patch(self.url("/1"), json={"selectionne": False})
         self.assertEqual(r.status_code, 409)
         self.assertEqual(r.json()["code"], "already_paid")
