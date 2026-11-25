@@ -1,6 +1,6 @@
 """Plumbing shared by the services of the competition pages (Firestore-backed).
 
-- `storage` / `write`: decorators turning Firestore failures into domain.errors; a write
+- `storage` / `write` / `drops_cache`: decorators turning Firestore failures into domain.errors; a write
   also drops the competition list cache, since most writes change a competition document
   (participants, coach names, HelloAsso payments).
 - The competition list cache, shared by every poll of every open page.
@@ -58,18 +58,21 @@ def storage(fn: Callable[P, R]) -> Callable[P, R]:
     return wrapper
 
 
-def write(fn: Callable[P, R]) -> Callable[P, R]:
-    """A write: Firestore failures translated, and the list cache dropped even on failure
-    (a write can fail after part of it was applied)."""
-    wrapped = storage(fn)
-
+def drops_cache(fn: Callable[P, R]) -> Callable[P, R]:
+    """Drops the list cache after the call, even on failure (a write can fail after part of it was applied).
+    For the services writing competition documents with their own error handling (webhook, results batch)."""
     @functools.wraps(fn)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         try:
-            return wrapped(*args, **kwargs)
+            return fn(*args, **kwargs)
         finally:
             invalidate_cache()
     return wrapper
+
+
+def write(fn: Callable[P, R]) -> Callable[P, R]:
+    """A write: Firestore failures translated, and the list cache dropped even on failure."""
+    return drops_cache(storage(fn))
 
 
 def competition_not_found() -> NotFound:

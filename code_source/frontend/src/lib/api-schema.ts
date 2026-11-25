@@ -982,6 +982,7 @@ export interface paths {
         /**
          * Get Map Points
          * @description Members of a season grouped by address, for the map of the Outils page ("Toutes les saisons": every season).
+         *     The addresses missing from the geocache are geocoded in the background: they appear on the map once geocoded.
          */
         get: operations["get_map_points_api_reports_map_points_get"];
         put?: never;

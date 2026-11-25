@@ -24,7 +24,7 @@ CLIENT_SECRET = "mock_sec"
 def signed_state(**payload):
     """State as POST /api/auth/google/login makes it, signed with the mocked client secret."""
     import time
-    from api.integrations.google_auth import _sign_state
+    from services.integrations.google_account import sign_state as _sign_state
     return _sign_state({"ts": time.time(), **payload}, CLIENT_SECRET)
 
 
@@ -94,7 +94,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
     @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
     def test_login_answers_google_url_with_signed_state(self, mock_creds):
         import urllib.parse
-        from api.integrations.google_auth import _read_state
+        from services.integrations.google_account import read_state as _read_state
         mock_creds.return_value = ("client_id_test.apps.googleusercontent.com", CLIENT_SECRET)
         resp = self.client.post("/api/auth/google/login", json={"return_to": "/bureau/outils"})
         self.assertEqual(resp.status_code, 200)
@@ -112,7 +112,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertEqual(self.client.post("/api/auth/google/login", json={}).status_code, 503)
 
     def test_state_signature_and_expiry(self):
-        from api.integrations.google_auth import STATE_MAX_AGE, _read_state, _sign_state
+        from services.integrations.google_account import STATE_MAX_AGE, read_state as _read_state, sign_state as _sign_state
         state = _sign_state({"ts": 1000.0, "return_to": "/bureau"}, CLIENT_SECRET)
         self.assertEqual(_read_state(state, CLIENT_SECRET, now=1000.0 + STATE_MAX_AGE)["return_to"], "/bureau")
         self.assertIsNone(_read_state(state, CLIENT_SECRET, now=1001.0 + STATE_MAX_AGE))  # expired
@@ -194,7 +194,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
                 self.assertNotIn("<img", html)
 
     def test_safe_return_to(self):
-        from api.integrations.google_auth import DEFAULT_RETURN_TO, _safe_return_to
+        from services.integrations.google_account import DEFAULT_RETURN_TO, safe_return_to as _safe_return_to
         cases = {
             "/bureau/outils": "/bureau/outils",
             None: DEFAULT_RETURN_TO,

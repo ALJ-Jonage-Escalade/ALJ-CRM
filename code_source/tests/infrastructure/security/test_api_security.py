@@ -409,7 +409,7 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
 
     def test_coaches_change_single_planning_slots(self):
         coach = make_token(email=COACH)
-        with patch("api.activities.planning.PlanningRepository.delete_planning_item", return_value=True) as delete:
+        with patch("infrastructure.sqlite.planning.PlanningRepository.delete_planning_item", return_value=True) as delete:
             r = self.client.delete("/api/planning/item/1", headers={"Authorization": f"Bearer {coach}"})
             self.assertEqual(r.status_code, 200)
             delete.assert_called_once_with(1)

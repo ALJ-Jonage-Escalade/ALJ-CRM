@@ -79,7 +79,7 @@ def test_cloud_db_sync_returns_counters_only(client: TestClient) -> None:
     assert resp.status_code == 500
     body = resp.json()
     assert SECRET_DETAIL not in str(body)
-    assert body["result"] == {"pulled": 3, "pushed": 1, "full": True}
+    assert body == {"status": "error", "message": "Erreur de synchronisation (1 erreur(s), détails dans les journaux)."}
 
 
 def test_cloud_db_status_hides_last_error(client: TestClient) -> None:

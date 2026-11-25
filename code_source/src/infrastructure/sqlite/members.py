@@ -216,6 +216,16 @@ class MemberRepository:
             conn.close()
 
     @classmethod
+    def count_members(cls) -> int:
+        """Number of members (users) in the cache, every season."""
+        conn = SqliteDatabase.get_connection()
+        try:
+            row = conn.execute("SELECT COUNT(*) FROM users").fetchone()
+            return row[0] if row else 0
+        finally:
+            conn.close()
+
+    @classmethod
     def list_contact_emails(cls) -> set[str]:
         """Every member and payer address in the database (lower-cased)."""
         SqliteDatabase.setup_database()

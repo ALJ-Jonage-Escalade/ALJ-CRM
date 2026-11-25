@@ -260,23 +260,15 @@ TOWN_COORDINATES = {
 def fill_geocache(rng):
     """Fake coordinates for every address the map geocodes (the server's own map code lists them), so that the
     dev map has markers without calling Nominatim on made-up addresses."""
-    from api.reports.map import map_points
     from infrastructure.sqlite.geocache import GeocacheRepository
+    from services.reports.member_map import member_map
 
-    class Collect:
-        def __init__(self):
-            self.addresses = []
-
-        def add_task(self, func, addresses):
-            self.addresses.extend(addresses)
-
-    collect = Collect()
-    map_points("Toutes les saisons", collect)
-    for address in sorted(set(collect.addresses)):
+    addresses = member_map(None).missing_addresses  # every season
+    for address in addresses:
         town = next((t for t in TOWN_COORDINATES if f", {t}, France" in address), "HOGSMEADE")
         lat, lon = TOWN_COORDINATES[town]
         GeocacheRepository.save_geocode(address, lat + rng.uniform(-0.008, 0.008), lon + rng.uniform(-0.012, 0.012))
-    return len(collect.addresses)
+    return len(addresses)
 
 
 EMAIL_TEMPLATES = [

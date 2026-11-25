@@ -44,7 +44,7 @@ from infrastructure.mycompet.scraper import (
     normalize_result_url,
 )
 from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
-from services.competitions.store import invalidate_cache
+from services.competitions.store import drops_cache, invalidate_cache
 from domain.errors import InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
 
 SETTING_NOTIFICATION_EMAIL = "RESULTATS_NOTIFICATION_EMAIL"
@@ -614,6 +614,7 @@ class CompetitionResultsBatchService:
             logger.warning("[BATCH_RESULTATS] Mémorisation de la demande d'URL impossible (#%s)", comp.get("id"), exc_info=True)
 
     @classmethod
+    @drops_cache  # writes competition documents directly
     def run_daily_batch(cls, force: bool = False, to_email: Optional[str] = None, window_days: Optional[int] = None,
                         today: Optional[datetime.date] = None, time_budget_s: float = DEFAULT_TIME_BUDGET_SECONDS,
                         clock: Callable[[], float] = time.monotonic) -> Dict[str, Any]:

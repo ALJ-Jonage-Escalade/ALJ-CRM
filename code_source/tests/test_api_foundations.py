@@ -148,7 +148,7 @@ class TestSqliteCacheScope(unittest.TestCase):
     def test_cache_write_runs_on_refreshed_cache(self):
         r = self._assert_cache_around(
             "DELETE", "/api/planning/item/12",
-            "api.activities.planning.PlanningRepository.delete_planning_item",
+            "infrastructure.sqlite.planning.PlanningRepository.delete_planning_item",
             True)
         self.assertEqual(r.json()["status"], "success")
 
@@ -160,7 +160,7 @@ class TestSqliteCacheScope(unittest.TestCase):
                 patch.object(server.CloudDatabase, "is_enabled", return_value=True), \
                 patch.object(server.CloudDatabase, "ensure_fresh"), \
                 patch.object(server.CloudDatabase, "after_write", side_effect=[True, False]), \
-                patch("api.activities.planning.PlanningRepository.delete_planning_item", return_value=True), \
+                patch("infrastructure.sqlite.planning.PlanningRepository.delete_planning_item", return_value=True), \
                 self.assertLogs("alj", "ERROR"):
             replicated = client.delete("/api/planning/item/12")
             pending = client.delete("/api/planning/item/12")

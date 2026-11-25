@@ -17,7 +17,6 @@ from api.responses import STORAGE_ERRORS, error_responses, internal_error
 from infrastructure.firestore.client import FirestoreError
 from services.competitions.helloasso_items import HelloAssoItemService
 from services.competitions.helloasso_webhook import HelloAssoWebhookService, WebhookRejected
-from services.competitions.store import invalidate_cache
 
 logger = logging.getLogger("alj")
 router = APIRouter()
@@ -54,8 +53,6 @@ def webhook_helloasso(payload: Dict[str, Any] = Body(...),  # Any: HelloAsso's n
         return JSONResponse({"status": "error", "message": internal_error(e, "webhook_helloasso")}, status_code=503)
     except Exception as e:  # any other failure, possibly midway: an error status too, never 200
         return JSONResponse({"status": "error", "message": internal_error(e, "webhook_helloasso")}, status_code=500)
-    finally:
-        invalidate_cache()  # the webhook writes competition documents outside the @write services
 
 
 @router.post("/api/helloasso/sync", response_model=HelloAssoSync, responses=error_responses(400, 502, *STORAGE_ERRORS))

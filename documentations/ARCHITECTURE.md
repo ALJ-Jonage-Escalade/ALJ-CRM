@@ -57,7 +57,7 @@ ALJ-CRM/                         ← racine du dépôt
 │   │   │                          email_variables, email_personalization, errors
 │   │   ├── api/                 ← routeurs FastAPI, un fichier par domaine, rangés par thème (voir §4)
 │   │   ├── services/            ← cas d'usage, rangés comme api/ : access/, activities/, communications/,
-│   │   │                          competitions/ (dont webhook HelloAsso), keys/, members/ (dont import FFME), reports/
+│   │   │                          competitions/ (dont webhook HelloAsso), integrations/, keys/, members/ (dont import FFME), reports/
 │   │   ├── infrastructure/      ← accès externes, un dossier par système : security/ (auth API, secrets),
 │   │   │                          sqlite/, firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/
 │   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME), competitors_excel,
@@ -93,8 +93,10 @@ ALJ-CRM/                         ← racine du dépôt
   réponse ; le service valide, orchestre les dépôts et lève `domain.errors` (traduites en statuts HTTP par
   `api/responses.py`). Exemples : `competitions/helloasso_webhook.py` (notifications HelloAsso),
   `competitions/all_paid_notification.py`, `communications/email_dispatch.py`, `members/ffme.py` (export et import
-  FFME), `activities/presence.py`. Quelques routeurs plus anciens gardent encore de la logique ; elle rejoint un
-  service quand le routeur est modifié.
+  FFME), `activities/presence.py`, `activities/planning.py`, `reports/member_map.py` (carte des adhérents),
+  `integrations/google_account.py` (connexion Google du club ; appels HTTP à Google dans
+  `infrastructure/google/oauth.py`), `integrations/helloasso_campaigns.py`, `integrations/cloud_cache.py`. Quelques
+  routeurs plus anciens gardent encore de la logique ; elle rejoint un service quand le routeur est modifié.
 - **`infrastructure/`** — adaptateurs, un sous-dossier par système externe. Les plus structurants :
   - `sqlite/schema_v2.py` : DDL SQLite, normalisations, vue plate des adhérents `v_member_flat` (une ligne par achat, recréée à chaque démarrage).
   - `sqlite/connection.py` (`SqliteDatabase` : chemin, connexion, schéma, sauvegarde) et un repository par domaine :
@@ -149,7 +151,7 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
 | `competitions/` | `competitions`, `participants`, `coaches`, `members`, `helloasso_items`, `results` | `/api/competitions/*`, `/api/coaches`, `/api/competition-members`, `/api/helloasso/items` · résultats MyCompet (`/api/competitions/cron/fetch-results`, `/{id}/fetch-results`, `/api/settings/competitions-results`) |
 | `communications/` | `email`, `whatsapp`, `attestations` | `/api/email-templates` (GET/POST/DELETE), `/api/email-status`, `/api/send-email` · `/api/whatsapp-template` · `/api/attestations/preview`, `/send` (PDF en mémoire, admin) |
 | `activities/` | `planning`, `presence` | `/api/planning` (GET, `/item`, `/export`) · `/api/presence/config`, `/export` |
-| `reports/` | `map`, `member_stats` | `/api/reports/map-points` (points de la carte des adhérents, affichée par l'application Vue avec Leaflet) · `/api/reports/member-stats` (achats de toutes les saisons, sans nom, comptés par la page Outils › Statistiques avec Chart.js ; service `services/reports/member_stats.py`) |
+| `reports/` | `map`, `member_stats` | `/api/reports/map-points` (points de la carte des adhérents, affichée par l'application Vue avec Leaflet) · `/api/reports/member-stats` (achats de toutes les saisons, sans nom, comptés par la page Outils › Statistiques avec Chart.js) ; services `services/reports/member_map.py`, `member_stats.py` |
 | `ffme/` | `ffme` | `/api/ffme/stats`, `/export` (CSV), `/preview`, `/import` |
 | `integrations/` | `helloasso`, `helloasso_campaigns`, `google_auth`, `cloud_db` | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync`, `/api/helloasso/campaigns` · `/api/auth/google/*` · `/api/cloud-db/status`, `/sync` |
 | `admin/` | `access` | `/api/admin/access/roles` (liste des accès, invitations), `/history` |

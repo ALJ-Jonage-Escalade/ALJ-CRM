@@ -20,7 +20,6 @@ from api.competitions.schemas.views import ResultsFetched
 from api.responses import error, error_responses
 from infrastructure.security.api_auth import Role, has_role, is_scheduler
 from services.competitions.results_batch import CompetitionResultsBatchService, ResultsBatchError
-from services.competitions.store import invalidate_cache
 
 # Full paths: /api/competitions/... and /api/settings/...
 router = APIRouter()
@@ -51,8 +50,6 @@ async def api_cron_fetch_competition_results(
         return BatchReport.model_validate(report)
     except ResultsBatchError:
         return error(503, "Lecture des compétitions impossible : le batch n'a rien fait (détails dans les journaux).")
-    finally:
-        invalidate_cache()  # the batch writes competition documents directly
 
 
 @router.post("/api/competitions/{competition_id}/fetch-results", response_model=ResultsFetched,

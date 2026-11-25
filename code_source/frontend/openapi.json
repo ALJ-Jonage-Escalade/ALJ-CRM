@@ -3546,7 +3546,7 @@
     "/api/reports/map-points": {
       "get": {
         "summary": "Get Map Points",
-        "description": "Members of a season grouped by address, for the map of the Outils page (\"Toutes les saisons\": every season).",
+        "description": "Members of a season grouped by address, for the map of the Outils page (\"Toutes les saisons\": every season).\nThe addresses missing from the geocache are geocoded in the background: they appear on the map once geocoded.",
         "operationId": "get_map_points_api_reports_map_points_get",
         "parameters": [
           {

@@ -143,22 +143,16 @@ class TestData:
         never calls Nominatim. The addresses come from the server's own map code; the cache is
         pushed to Firestore (crm_geocache). Run before the server starts: it uses its SQLite file."""
         return self._run("""
-from api.reports.map import map_points
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.sqlite.geocache import GeocacheRepository
-
-class Collect:
-    addresses = []
-    def add_task(self, func, addresses):
-        self.addresses.extend(addresses)
+from services.reports.member_map import member_map
 
 CloudDatabase.sync(full=True)
-collect = Collect()
-map_points("Toutes les saisons", collect)  # every season: the map can show any of them
-for i, address in enumerate(sorted(set(collect.addresses))):
+missing = member_map(None).missing_addresses  # every season: the map can show any of them
+for i, address in enumerate(missing):
     GeocacheRepository.save_geocode(address, 45.79 + (i % 10) * 0.004, 5.04 + (i // 10) * 0.004)
 CloudDatabase.flush_only()
-result = len(set(collect.addresses))
+result = len(missing)
 """)
 
     def create_coach(self, nom: str) -> int:

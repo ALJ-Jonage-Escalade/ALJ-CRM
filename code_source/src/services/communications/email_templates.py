@@ -7,7 +7,7 @@ from typing import Optional, TypedDict
 
 from domain.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from domain.email_variables import TEMPLATE_KINDS, TemplateKind, infer_kind, needs_fixing, template_error, to_keys
-from domain.errors import Conflict, InvalidRequest
+from domain.errors import Conflict, InvalidRequest, NotFound
 from infrastructure.sqlite.email_templates import EmailTemplateRepository
 
 
@@ -80,3 +80,13 @@ def save_template(name: str, subject: str, body: str, sender_email: str = "", se
                           kind=template_kind, is_default=is_default)
     EmailTemplateRepository.save_email_template(old_name=old_name or None, **saved)
     return saved
+
+
+def delete_template(name: str) -> str:
+    """Deletes the template; returns its name, trimmed."""
+    clean_name = name.strip()
+    if not clean_name:
+        raise InvalidRequest("Nom de modèle invalide.")
+    if not EmailTemplateRepository.delete_email_template(clean_name):
+        raise NotFound(f"Modèle '{clean_name}' introuvable ou déjà supprimé.")
+    return clean_name

@@ -36,6 +36,7 @@ from infrastructure.helloasso import api as helloasso_api
 from infrastructure.security.api_auth import auth_enforced, constant_time_equals
 from infrastructure.security.secret_store import SecretStore
 from services.competitions.all_paid_notification import check_and_notify_all_paid
+from services.competitions.store import drops_cache
 
 logger = logging.getLogger("alj")
 
@@ -162,6 +163,7 @@ class HelloAssoWebhookService:
             raise WebhookRejected(503, f"Vérification auprès de HelloAsso impossible : {e}")
 
     @classmethod
+    @drops_cache  # writes competition documents outside the @write services
     def verify_and_reconcile_notification(cls, payload: Dict[str, Any], token: Optional[str] = None) -> Dict[str, Any]:
         """Point d'entrée sécurisé du webhook (lève WebhookRejected en cas de refus)."""
         token_ok = cls.check_token(token)
