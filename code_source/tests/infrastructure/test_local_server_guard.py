@@ -5,18 +5,12 @@ On Cloud Run (token check enforced) the guard is a no-op.
 """
 
 import os
-import sys
 import unittest
 from unittest.mock import patch
 
-_tests_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
+from fastapi.testclient import TestClient
 
-from fastapi.testclient import TestClient  # noqa: E402
-
-from infrastructure.security.api_auth import local_request_error  # noqa: E402
+from infrastructure.security.api_auth import local_request_error
 
 LOCAL = "127.0.0.1:8000"
 

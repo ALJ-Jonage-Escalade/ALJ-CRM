@@ -1,14 +1,9 @@
 import unittest
 import os
 import shutil
-import sys
 import tempfile
 
 # Ajustement du chemin pour importer les modules depuis 'src'
-_test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.members import MemberRepository

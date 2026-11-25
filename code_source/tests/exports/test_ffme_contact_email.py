@@ -3,15 +3,9 @@
 from __future__ import annotations
 
 import csv
-import os
-import sys
 from pathlib import Path
 
-_src_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-from exports.membership_excel import generate_ffme_csv  # noqa: E402
+from exports.membership_excel import generate_ffme_csv
 
 _MEMBER = {
     "first_name": "Neville",

@@ -5,20 +5,14 @@ formatting (<b>, links, line breaks) keeps working.
 """
 
 import os
-import sys
 import unittest
 from email import message_from_string
 from unittest.mock import MagicMock, patch
 
-_tests_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-from domain.communications.email_personalization import apply_template_variables, personalized_html  # noqa: E402
-from infrastructure.mail.sender import sanitize_email_header  # noqa: E402
-from services.communications.email_dispatch import EmailDispatchService, render_email  # noqa: E402
-from support.fake_access import grant_roles  # noqa: E402
+from domain.communications.email_personalization import apply_template_variables, personalized_html
+from infrastructure.mail.sender import sanitize_email_header
+from services.communications.email_dispatch import EmailDispatchService, render_email
+from support.fake_access import grant_roles
 
 EVIL_NAME = '<a href="https://evil.example">Pay here</a>'
 

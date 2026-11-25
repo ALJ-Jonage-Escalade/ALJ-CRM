@@ -7,16 +7,9 @@ Tests de sécurité de l'API Cloud Run :
 import datetime
 import os
 import re
-import sys
 import time
 import unittest
 from unittest.mock import MagicMock, patch
-
-_tests_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_code_root = os.path.dirname(_tests_dir)
-_src_dir = os.path.join(_code_root, "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 import jwt
 from cryptography import x509
@@ -25,6 +18,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 from fastapi.testclient import TestClient
 
+from paths import CODE_ROOT
 from infrastructure.helloasso import api as helloasso_api
 from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
@@ -175,7 +169,7 @@ class TestRoles(unittest.TestCase):
 
     def test_rules_hold_no_role_list(self):
         """firestore.rules denies every client: roles live in the access list only (plan phase 3)."""
-        with open(os.path.join(_code_root, "firestore", "firestore.rules"), encoding="utf-8") as f:
+        with open(os.path.join(CODE_ROOT, "firestore", "firestore.rules"), encoding="utf-8") as f:
             rules = f.read()
         self.assertNotIn("@", rules)
         self.assertNotIn("request.auth", rules)
@@ -185,14 +179,14 @@ class TestRoles(unittest.TestCase):
         personal = re.compile(r"[a-z0-9_.+-]+@(?:gmail|googlemail|orange|wanadoo|free|sfr|laposte|hotmail|outlook|live|yahoo"
                               r"|icloud|me|aol|gmx|protonmail|neuf|bbox)\.[a-z.]+")
         sources = []
-        for root in (os.path.join(_code_root, "src"), os.path.join(_code_root, "frontend", "src")):
+        for root in (os.path.join(CODE_ROOT, "src"), os.path.join(CODE_ROOT, "frontend", "src")):
             sources += [os.path.join(d, n) for d, _, names in os.walk(root) for n in names
                         if n.endswith((".py", ".ts", ".vue", ".js", ".html")) and not n.endswith(".test.ts")]
         self.assertGreater(len(sources), 50)
         found = []
         for path in sources:
             with open(path, encoding="utf-8") as f:
-                found += [f"{os.path.relpath(path, _code_root)}: {email}"
+                found += [f"{os.path.relpath(path, CODE_ROOT)}: {email}"
                           for email in personal.findall(f.read().lower())]
         self.assertEqual(found, [])
 

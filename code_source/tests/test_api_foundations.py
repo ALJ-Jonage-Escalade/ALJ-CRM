@@ -2,13 +2,8 @@
 
 import os
 import re
-import sys
 import unittest
 from unittest.mock import patch
-
-_src_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 from fastapi import FastAPI, Request
 from fastapi.routing import APIRoute

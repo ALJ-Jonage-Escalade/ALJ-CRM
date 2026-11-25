@@ -1,9 +1,4 @@
 import unittest
-import sys
-import os
-
-# Ajustement du chemin d'import
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src")))
 from domain.utils import normalize_string, normalize_name, normalize_key_part, clean_city_name, is_helloasso_url, clean_digits_only
 
 class TestDomainUtils(unittest.TestCase):

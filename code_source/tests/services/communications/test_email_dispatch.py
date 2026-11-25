@@ -2,15 +2,8 @@
 Tests unitaires pour le service d'expédition d'e-mails et les endpoints FastAPI associés.
 """
 
-import os
-import sys
 import unittest
 from unittest.mock import patch
-
-_tests_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 from domain.errors import InvalidRequest, UpstreamUnavailable
 from infrastructure.mail.sender import MailError

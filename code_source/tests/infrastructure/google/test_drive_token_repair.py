@@ -1,14 +1,9 @@
 """Tests de l'auto-réparation du refresh token Google (jeton enregistré périmé vs .env frais)."""
 import os
-import sys
 import unittest
 from unittest import mock
 
 # Ajustement du chemin d'import
-_test_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 from infrastructure.google.drive import GoogleAuthError, GoogleDriveClient
 from infrastructure.security.secret_store import SecretStore

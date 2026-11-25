@@ -13,14 +13,9 @@ import sys
 import unittest
 from unittest.mock import patch
 
-_tests_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_code_root = os.path.dirname(_tests_dir)
-_src_dir = os.path.join(_code_root, "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
 from fastapi.testclient import TestClient
 
+from paths import CODE_ROOT
 from infrastructure import runtime_env
 from infrastructure.firestore.cloud_sync.rest_store import RestStore
 from infrastructure.firestore.client import FirestoreClient
@@ -109,7 +104,7 @@ class TestDevMode(unittest.TestCase):
 
     def test_check_env_refuses_remote_helloasso(self):
         import importlib.util
-        spec = importlib.util.spec_from_file_location("check_env", os.path.join(_code_root, "dev", "check_env.py"))
+        spec = importlib.util.spec_from_file_location("check_env", os.path.join(CODE_ROOT, "dev", "check_env.py"))
         check_env = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(check_env)
         with _env(**DEV_ENV, SMTP_HOST="localhost", HELLOASSO_API_BASE_URL="https://api.helloasso.com/v5"):
@@ -152,7 +147,7 @@ class TestRuntimeConfigRoute(unittest.TestCase):
 class TestSeedGuard(unittest.TestCase):
 
     def test_rejected_outside_emulator(self):
-        sys.path.insert(0, os.path.join(_code_root, "dev", "seed"))
+        sys.path.insert(0, os.path.join(CODE_ROOT, "dev", "seed"))
         try:
             import seed_emulator
         finally:

@@ -1,13 +1,6 @@
 """Tests de l'export Excel du planning hebdomadaire (onglet Créneaux)."""
 import io
-import os
-import sys
 import unittest
-
-_test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 from exports.planning_excel import (
     parse_time_range, clean_group_label, _initials, coaches_text,

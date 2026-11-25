@@ -4,15 +4,9 @@ the deploy relies on (health check, HelloAsso webhook ping, root redirect).
 """
 
 import os
-import sys
 import unittest
 
-_tests_dir = os.path.dirname(os.path.abspath(__file__))
-_code_root = os.path.dirname(_tests_dir)
-_src_dir = os.path.join(_code_root, "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
+from paths import CODE_ROOT
 from domain.constants import APP_VERSION, get_active_season
 from api.web.health import health_check
 from api.web.pages import root_route
@@ -27,7 +21,7 @@ class TestDeploymentArtifacts(unittest.TestCase):
         import re
         import tomllib
 
-        with open(os.path.join(_code_root, "pyproject.toml"), "rb") as f:
+        with open(os.path.join(CODE_ROOT, "pyproject.toml"), "rb") as f:
             pyproject = tomllib.load(f)
 
         def names(requirements):
@@ -40,11 +34,11 @@ class TestDeploymentArtifacts(unittest.TestCase):
         all_groups = set().union(*(names(group) for group in pyproject["dependency-groups"].values()))
         for desktop_only in ("pywin32", "pyside6", "python-docx", "keyring"):
             self.assertNotIn(desktop_only, web_profile | all_groups)
-        self.assertTrue(os.path.isfile(os.path.join(_code_root, "uv.lock")), "uv.lock doit être versionné.")
+        self.assertTrue(os.path.isfile(os.path.join(CODE_ROOT, "uv.lock")), "uv.lock doit être versionné.")
 
     def test_requirements_docker(self):
         """Vérifie que requirements-docker.txt (export généré de uv.lock) exclut les paquets Windows lourds."""
-        req_docker_path = os.path.join(_code_root, "requirements-docker.txt")
+        req_docker_path = os.path.join(CODE_ROOT, "requirements-docker.txt")
         self.assertTrue(os.path.isfile(req_docker_path), "requirements-docker.txt doit exister.")
         with open(req_docker_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -73,7 +67,7 @@ class TestDeploymentArtifacts(unittest.TestCase):
 
     def test_dockerfile_configuration(self):
         """Vérifie la structure du Dockerfile pour Cloud Run."""
-        dockerfile_path = os.path.join(_code_root, "Dockerfile")
+        dockerfile_path = os.path.join(CODE_ROOT, "Dockerfile")
         self.assertTrue(os.path.isfile(dockerfile_path), "Dockerfile doit exister.")
         with open(dockerfile_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -89,16 +83,16 @@ class TestDeploymentArtifacts(unittest.TestCase):
 
     def test_dockerfile_python_matches_python_version_file(self):
         """The image runs the Python of .python-version (also read by the CI)."""
-        with open(os.path.join(_code_root, ".python-version"), encoding="utf-8") as f:
+        with open(os.path.join(CODE_ROOT, ".python-version"), encoding="utf-8") as f:
             expected = f.read().strip()
-        with open(os.path.join(_code_root, "Dockerfile"), encoding="utf-8") as f:
+        with open(os.path.join(CODE_ROOT, "Dockerfile"), encoding="utf-8") as f:
             content = f.read()
         self.assertIn(f"FROM python:{expected}-slim", content,
                       "Update the FROM line of the Dockerfile together with .python-version.")
 
     def test_dockerignore_security(self):
         """Vérifie que les secrets et fichiers de données sont rigoureusement exclus."""
-        ignore_path = os.path.join(_code_root, ".dockerignore")
+        ignore_path = os.path.join(CODE_ROOT, ".dockerignore")
         self.assertTrue(os.path.isfile(ignore_path), ".dockerignore doit exister.")
         with open(ignore_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -109,9 +103,9 @@ class TestDeploymentArtifacts(unittest.TestCase):
 
     def test_deploy_scripts_exist(self):
         """Vérifie la présence des scripts de déploiement Cloud Run."""
-        bat_path = os.path.join(_code_root, "scripts", "deploy_cloud_run.bat")
-        sh_path = os.path.join(_code_root, "scripts", "deploy_cloud_run.sh")
-        root_bat_path = os.path.join(os.path.dirname(_code_root), "scripts", "deploy_cloud_run.bat")
+        bat_path = os.path.join(CODE_ROOT, "scripts", "deploy_cloud_run.bat")
+        sh_path = os.path.join(CODE_ROOT, "scripts", "deploy_cloud_run.sh")
+        root_bat_path = os.path.join(os.path.dirname(CODE_ROOT), "scripts", "deploy_cloud_run.bat")
 
         self.assertTrue(os.path.isfile(bat_path), "deploy_cloud_run.bat doit exister dans code_source/scripts.")
         self.assertTrue(os.path.isfile(sh_path), "deploy_cloud_run.sh doit exister dans code_source/scripts.")

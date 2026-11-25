@@ -1,16 +1,9 @@
 """Tests unitaires des endpoints de renouvellement et de gestion Google OAuth2 pour l'application web."""
 import os
-import sys
 import json
 import base64
 import unittest
 from unittest.mock import patch, MagicMock
-
-_tests_dir = os.path.dirname(os.path.abspath(__file__))
-_code_root = os.path.dirname(_tests_dir)
-_src_dir = os.path.join(_code_root, "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 import requests
 from fastapi.testclient import TestClient

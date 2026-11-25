@@ -2,27 +2,21 @@
 import copy
 import os
 import sqlite3
-import sys
 import tempfile
 import time
 import unittest
 from unittest import mock
 
-_test_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_src_dir = os.path.join(os.path.dirname(_test_dir), "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-from infrastructure.firestore.cloud_database import CloudDatabase  # noqa: E402
-from infrastructure.firestore.cloud_sync.bootstrap import build_cache, cache_is_valid, create_schema, import_database  # noqa: E402
-from infrastructure.firestore.cloud_sync.cache import connect, pending_count, set_state  # noqa: E402
-from infrastructure.firestore.client import FirestoreConflictError  # noqa: E402
-from infrastructure.firestore.cloud_sync.common import collection_for, ts_key  # noqa: E402
-from infrastructure.firestore.cloud_sync.sync import flush, pull  # noqa: E402
-from infrastructure.firestore.competitions import member_directory  # noqa: E402
-from infrastructure.sqlite.connection import SqliteDatabase  # noqa: E402
-from infrastructure.sqlite.email_templates import EmailTemplateRepository  # noqa: E402
-from infrastructure.sqlite.members import MemberRepository  # noqa: E402
+from infrastructure.firestore.cloud_database import CloudDatabase
+from infrastructure.firestore.cloud_sync.bootstrap import build_cache, cache_is_valid, create_schema, import_database
+from infrastructure.firestore.cloud_sync.cache import connect, pending_count, set_state
+from infrastructure.firestore.client import FirestoreConflictError
+from infrastructure.firestore.cloud_sync.common import collection_for, ts_key
+from infrastructure.firestore.cloud_sync.sync import flush, pull
+from infrastructure.firestore.competitions import member_directory
+from infrastructure.sqlite.connection import SqliteDatabase
+from infrastructure.sqlite.email_templates import EmailTemplateRepository
+from infrastructure.sqlite.members import MemberRepository
 
 
 class FakeStore:

@@ -1,16 +1,13 @@
 """Tests for the SQLite repository queries that replaced raw SQL in services and pages."""
 import os
-import sys
 import unittest
 
-_test_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
+from paths import CODE_ROOT
 from infrastructure.sqlite.connection import SqliteDatabase
 from infrastructure.sqlite.members import MemberRepository
 from infrastructure.sqlite.seasons import SeasonRepository
+
+_test_dir = os.path.join(CODE_ROOT, "tests")
 
 BASE_MEMBER = {
     "order_date": "2026-09-01T10:00:00",

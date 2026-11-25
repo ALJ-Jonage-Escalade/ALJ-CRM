@@ -1,10 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import os
-import sys
-
 # Ajuster le chemin d'import
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../src")))
 from infrastructure.mycompet.scraper import scrape_competition_info_by_id
 from domain.errors import InvalidRequest, NotFound, UpstreamUnavailable
 
@@ -191,7 +187,6 @@ class TestMyCompetScraper(unittest.TestCase):
         self.assertEqual(_parse_dates_to_iso("07/11/2026"), ("2026-11-07", "2026-11-07"))
         self.assertEqual(_parse_dates_to_iso(""), (None, None))
         self.assertEqual(_parse_dates_to_iso(None), (None, None))
-
 
 
 if __name__ == "__main__":
