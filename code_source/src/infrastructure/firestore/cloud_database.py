@@ -36,7 +36,7 @@ from typing import Any, Callable, Dict, Optional
 
 from infrastructure.firestore.cloud_sync.bootstrap import build_cache, cache_is_valid
 from infrastructure.firestore.cloud_sync.cache import connect, get_state, install_tracking, pending_count
-from infrastructure.firestore.cloud_sync.common import CACHE_FORMAT
+from infrastructure.firestore.cloud_sync.common import CACHE_FORMAT, SyncReport
 from infrastructure.firestore.cloud_sync.rest_store import RestStore
 from infrastructure.firestore.cloud_sync.sync import flush, pull
 from infrastructure.firestore.competitions import member_directory
@@ -52,7 +52,7 @@ class CloudDatabase:
 
     _lock = threading.RLock()
     _store = None
-    _last_report: Dict[str, Any] = {}
+    _last_report: SyncReport = {}
     _last_error = ""
     _last_sync = 0.0
     _last_pull = 0.0
@@ -82,12 +82,12 @@ class CloudDatabase:
             return "?"
 
     @classmethod
-    def sync(cls, full: bool = False, progress: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
+    def sync(cls, full: bool = False, progress: Optional[Callable[[str], None]] = None) -> SyncReport:
         """Met le cache à jour : reconstruction si besoin (toujours si `full`), puis réception et envoi."""
         with cls._lock:
             path = cls.db_path()
             store = cls.store()
-            report: Dict[str, Any] = {}
+            report = SyncReport()
             try:
                 if full or not cache_is_valid(path, store.project_id):
                     if progress:
@@ -123,10 +123,10 @@ class CloudDatabase:
             return report
 
     @classmethod
-    def flush_only(cls) -> Dict[str, Any]:
+    def flush_only(cls) -> SyncReport:
         with cls._lock:
             path = cls.db_path()
-            report: Dict[str, Any] = {}
+            report = SyncReport()
             if not cache_is_valid(path, cls.store().project_id):
                 return report
             conn = connect(path)
@@ -143,7 +143,7 @@ class CloudDatabase:
             return report
 
     @classmethod
-    def _after_sync(cls, report: Dict[str, Any]):
+    def _after_sync(cls, report: SyncReport) -> None:
         if set(report.get("tables") or []) & {"users", "emergency_contacts", "orders", "purchases", "planning", "seasons"}:
             cls._projection_dirty = True
         if report.get("pushed") or report.get("deleted") or report.get("pulled"):

@@ -3,7 +3,7 @@ import datetime
 import hashlib
 import json
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 from domain.members.sex import parse_sex
 
@@ -15,6 +15,20 @@ TRACKED_TABLES = (
     "keys", "key_assignments", "key_events",  # club keys, plans/club-keys.md
 )
 COLLECTION_PREFIX = "crm_"
+
+
+class SyncReport(TypedDict, total=False):
+    """What a synchronisation did, filled in place by build_cache, pull and flush (a key is absent until set)."""
+    full: bool  # the cache was rebuilt from Firestore
+    loaded: Dict[str, int]  # rows loaded per table by the rebuild
+    pulled: int  # documents received
+    pushed: int  # rows sent
+    deleted: int  # deletions sent
+    conflicts: int  # writes refused by Firestore (changed elsewhere), merged then sent again
+    tables: List[str]  # tables whose local changes were sent
+    renumbered: List[str]  # local rows given a new id ("users 12 -> 40")
+    errors: List[str]
+
 MOD_FIELD = "_modified_at"
 DEL_FIELD = "_deleted"
 BY_FIELD = "_modified_by"

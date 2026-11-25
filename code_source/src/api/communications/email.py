@@ -13,7 +13,7 @@ from api.communications.schemas import (
 )
 from api.auth.me import author_of
 from api.responses import error, error_responses
-from services.communications.email_dispatch import EmailDispatchService
+from services.communications.email_dispatch import EmailDispatchService, OutgoingEmail
 from services.communications.email_templates import delete_template, list_templates, save_template
 from domain.email_variables import VARIABLES, aliases_of
 from domain.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
@@ -95,16 +95,8 @@ def send_email_api(request: Request, data: EmailSendRequest) -> EmailDispatch | 
         recipients, data.sender_email or None, is_admin=claims is None or has_role(claims, Role.ADMIN))
     if reason:
         return error(403, reason)
-    result = EmailDispatchService.dispatch_emails(
-        template_name=data.template_name or None,
-        subject=data.subject,
-        body=data.body,
-        recipient_ids=data.recipient_ids,
-        recipients=recipients,
-        competition_id=data.competition_id,
-        sender_email=data.sender_email or None,
-        sender_name=data.sender_name or None,
-        add_signature=data.add_signature,
-        author=author_of(request),
-    )
+    message = OutgoingEmail(template_name=data.template_name, subject=data.subject, body=data.body,
+                            sender_email=data.sender_email, sender_name=data.sender_name, add_signature=data.add_signature)
+    result = EmailDispatchService.dispatch_emails(message, recipient_ids=data.recipient_ids, recipients=recipients,
+                                                  competition_id=data.competition_id, author=author_of(request))
     return EmailDispatch.model_validate(result)

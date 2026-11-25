@@ -257,6 +257,8 @@ class TestSendEmailRoute(unittest.TestCase):
                                             "recipients": [{"email": "harry.potter@hogwarts.example"}]})
         self.assertEqual(resp.status_code, 200)
         dispatch.assert_called_once()
+        message = dispatch.call_args.args[0]
+        self.assertEqual((message.subject, message.body, message.add_signature), ("s", "b", True))
 
     def test_admin_to_any_address_allowed(self):
         admin = {"sub": "a", "email": "albus@alj-escalade.fr", "email_verified": True}

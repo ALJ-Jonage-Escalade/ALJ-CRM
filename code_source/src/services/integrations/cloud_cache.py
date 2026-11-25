@@ -70,5 +70,5 @@ def sync_cache(full: bool) -> Optional[CacheSync]:
     errors = report.get("errors") or []
     for err in errors:
         logger.warning(f"[CLOUD_DB] Synchronisation : {err}")
-    return CacheSync(pulled=int(report.get("pulled") or 0), pushed=int(report.get("pushed") or 0),
-                     full=bool(report.get("full")), error_count=len(errors))
+    return CacheSync(pulled=report.get("pulled", 0), pushed=report.get("pushed", 0), full=report.get("full", False),
+                     error_count=len(errors))

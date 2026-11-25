@@ -23,6 +23,7 @@ from infrastructure.firestore.cloud_sync.common import (
     CACHE_FORMAT,
     COMMIT_CHUNK,
     TRACKED_TABLES,
+    SyncReport,
     collection_for,
     doc_id_for,
     ts_key,
@@ -46,9 +47,9 @@ def _remove_db_files(path: str):
 
 
 def build_cache(path: str, store, schema_factory: Callable[[str], None] = create_schema,
-                backup_dir: Optional[str] = None) -> Dict[str, Any]:
+                backup_dir: Optional[str] = None) -> SyncReport:
     """Reconstruit intégralement le cache `path` depuis Firestore (remplacement atomique)."""
-    report: Dict[str, Any] = {"loaded": {}}
+    report = SyncReport(loaded={})
     tmp = path + ".building"
     _remove_db_files(tmp)
     schema_factory(tmp)

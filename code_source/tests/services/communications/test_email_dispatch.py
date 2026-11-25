@@ -15,7 +15,7 @@ if _src_dir not in sys.path:
 from domain.errors import InvalidRequest, UpstreamUnavailable
 from infrastructure.mail.sender import MailError
 from services.communications import email_log
-from services.communications.email_dispatch import EmailDispatchService, render_email
+from services.communications.email_dispatch import EmailDispatchService, OutgoingEmail, render_email
 from api.communications.email import get_email_templates, get_email_status
 from infrastructure.sqlite.connection import _COMPETITION_EMAIL_TEMPLATES
 
@@ -83,12 +83,9 @@ class TestEmailDispatchService(unittest.TestCase):
             {"id": 2, "first_name": "Bob", "last_name": "LEFEVRE", "email": "bob@example.com", "licence_ffme": "222222"}
         ]
 
-        res = EmailDispatchService.dispatch_emails(
-            subject="Information {first_name}",
-            body="Bonjour {first_name}, rappel licence {num_licence}.",
-            recipients=recipients,
-            add_signature=False
-        )
+        message = OutgoingEmail(subject="Information {first_name}", body="Bonjour {first_name}, rappel licence {num_licence}.",
+                                add_signature=False)
+        res = EmailDispatchService.dispatch_emails(message, recipients=recipients)
 
         self.assertEqual(res["status"], "success")
         self.assertEqual(res["sent_count"], 2)
@@ -105,8 +102,8 @@ class TestEmailDispatchService(unittest.TestCase):
             {"id": 2, "first_name": "Bob", "last_name": "DURAND", "email": "bob@example.com"},
             {"id": 3, "first_name": "Carl", "last_name": "SANS", "email": "pas-une-adresse"},
         ]
-        res = EmailDispatchService.dispatch_emails(subject="Rappel {first_name}", body="Bonjour", recipients=recipients,
-                                                   competition_id=7, add_signature=False, author="coach@alj.example")
+        res = EmailDispatchService.dispatch_emails(OutgoingEmail(subject="Rappel {first_name}", body="Bonjour", add_signature=False),
+            recipients=recipients, competition_id=7, author="coach@alj.example")
         self.assertEqual((res["status"], res["log_notice"]), ("partial", None))
         (entry,) = email_log.current_store().entries
         self.assertEqual((entry["kind"], entry["author"], entry["competition_ids"], entry["member_ids"]),
@@ -119,16 +116,16 @@ class TestEmailDispatchService(unittest.TestCase):
     @patch("infrastructure.mail.sender.EmailSender.send_email", side_effect=MailError("down"))
     def test_dispatch_all_failed_is_recorded(self, _send):
         with self.assertRaises(UpstreamUnavailable):
-            EmailDispatchService.dispatch_emails(subject="Info", body="Bonjour", recipients=[{"id": 1, "email": "a@example.com"}],
-                                                 add_signature=False)
+            EmailDispatchService.dispatch_emails(OutgoingEmail(subject="Info", body="Bonjour", add_signature=False),
+                recipients=[{"id": 1, "email": "a@example.com"}])
         (entry,) = email_log.current_store().entries
         self.assertEqual((entry["kind"], [r["status"] for r in entry["recipients"]]), ("member_email", ["failed"]))
 
     @patch("infrastructure.mail.sender.EmailSender.send_email")
     def test_dispatch_log_down_still_sent(self, _send):
         email_log.current_store().failing = True
-        res = EmailDispatchService.dispatch_emails(subject="Info", body="Bonjour", recipients=[{"id": 1, "email": "a@example.com"}],
-                                                   add_signature=False)
+        res = EmailDispatchService.dispatch_emails(OutgoingEmail(subject="Info", body="Bonjour", add_signature=False),
+            recipients=[{"id": 1, "email": "a@example.com"}])
         self.assertEqual((res["status"], res["sent_count"], res["log_notice"]), ("success", 1, email_log.NOT_RECORDED))
 
     def test_fastapi_templates_and_status_endpoints(self):
@@ -177,8 +174,8 @@ class TestEmailDispatchInputs(unittest.TestCase):
         directory = [{"id": 2, "prenom": "Bob", "nom": "LEFEVRE", "email": "bob@example.com", "num_licence": "222"}]
         with patch(f"{DISPATCH}.MemberRepository.get_users_by_ids", return_value=members), \
                 patch(f"{DISPATCH}.member_directory.list_members", return_value=directory):
-            res = EmailDispatchService.dispatch_emails(subject="Info", body="Licence {num_licence}",
-                                                       recipient_ids=[1, 2, 3, 4], add_signature=False)
+            res = EmailDispatchService.dispatch_emails(OutgoingEmail(subject="Info", body="Licence {num_licence}", add_signature=False),
+                recipient_ids=[1, 2, 3, 4])
         self.assertEqual([(d["id"], d["email"], d["status"]) for d in res["details"]],
                          [(1, "alice@example.com", "sent"), (2, "bob@example.com", "sent"), (3, "", "error")])
         self.assertEqual(mock_send.call_count, 2)
@@ -188,17 +185,16 @@ class TestEmailDispatchInputs(unittest.TestCase):
         template = {"name": "Relance Compétition", "subject": "Relance {first_name}", "body": "Bonjour",
                     "sender_email": "bureau@example.org", "sender_name": "Bureau"}
         with patch.object(EmailDispatchService, "list_templates", return_value=[template]):
-            EmailDispatchService.dispatch_emails(template_name="relance competition", body="Message propre",
-                                                 recipients=[{"first_name": "Alice", "email": "a@example.com"}],
-                                                 add_signature=False)
+            message = OutgoingEmail(template_name="relance competition", body="Message propre", add_signature=False)
+            EmailDispatchService.dispatch_emails(message, recipients=[{"first_name": "Alice", "email": "a@example.com"}])
         sent = mock_send.call_args.kwargs
         self.assertEqual((sent["subject"], sent["body"]), ("Relance Alice", "Message propre"))
         self.assertEqual((sent["from_email"], sent["from_name"]), ("bureau@example.org", "Bureau"))
 
     def test_member_e_mail_fills_group_season_and_amount(self, mock_send):
         recipient = {"first_name": "alice", "email": "a@example.com", "tarif": "Ados", "season": "2026-2027", "amount": "195.5"}
-        EmailDispatchService.dispatch_emails(subject="Rappel", body="{tarif} {season} : {amount} €", recipients=[recipient],
-                                             add_signature=False)
+        EmailDispatchService.dispatch_emails(OutgoingEmail(subject="Rappel", body="{tarif} {season} : {amount} €", add_signature=False),
+            recipients=[recipient])
         self.assertEqual(mock_send.call_args.kwargs["body"], "Ados 2026-2027 : 195,50 €")
 
     def test_shipped_competition_templates_leave_no_raw_token(self, mock_send):
@@ -206,20 +202,22 @@ class TestEmailDispatchInputs(unittest.TestCase):
                        "montant_competition": "15", "whatsapp_link": ""}
         for _name, subject, body, *_sender in _COMPETITION_EMAIL_TEMPLATES:
             with self.subTest(template=_name), patch.object(EmailDispatchService, "get_competition_context", return_value=competition):
-                EmailDispatchService.dispatch_emails(subject=subject, body=body, competition_id=7, add_signature=False,
-                                                     recipients=[{"first_name": "alice", "email": "a@example.com"}])
+                EmailDispatchService.dispatch_emails(OutgoingEmail(subject=subject, body=body, add_signature=False),
+                    competition_id=7, recipients=[{"first_name": "alice", "email": "a@example.com"}])
                 sent = mock_send.call_args.kwargs
                 self.assertNotRegex(sent["subject"] + sent["body"] + sent["html_body"], r"\{[^{}<>\"\n]+\}")
                 self.assertNotIn("WhatsApp", sent["body"])
 
     def test_unknown_template_and_no_subject_is_refused(self, mock_send):
         with patch.object(EmailDispatchService, "list_templates", return_value=[]), self.assertRaises(InvalidRequest):
-            EmailDispatchService.dispatch_emails(template_name="Absent", body="Bonjour", recipients=[{"email": "a@example.com"}])
+            EmailDispatchService.dispatch_emails(OutgoingEmail(template_name="Absent", body="Bonjour"),
+                recipients=[{"email": "a@example.com"}])
         mock_send.assert_not_called()
 
     def test_no_recipient_with_an_address_is_refused(self, mock_send):
         with self.assertRaises(InvalidRequest):
-            EmailDispatchService.dispatch_emails(subject="Info", body="Bonjour", recipients=[{"email": "sans-arobase"}])
+            EmailDispatchService.dispatch_emails(OutgoingEmail(subject="Info", body="Bonjour"),
+                recipients=[{"email": "sans-arobase"}])
         mock_send.assert_not_called()
 
     def test_unknown_competition_gives_no_variables(self, _send):

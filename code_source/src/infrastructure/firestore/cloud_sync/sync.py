@@ -26,6 +26,7 @@ from infrastructure.firestore.cloud_sync.common import (
     PULL_MARGIN_SECONDS,
     REFERENCES,
     TOMBSTONE_FIELDS,
+    SyncReport,
     _same,
     collection_for,
     doc_id_for,
@@ -34,7 +35,7 @@ from infrastructure.firestore.cloud_sync.common import (
     upgrade_legacy_fields,
 )
 
-def renumber_row(conn, store, table: str, old_id: int, report: Dict[str, Any]) -> int:
+def renumber_row(conn, store, table: str, old_id: int, report: SyncReport) -> int:
     """Donne un nouvel identifiant à une ligne locale dont l'ID est déjà utilisé
     dans Firestore par une autre ligne (deux postes ont créé en même temps).
     Les références (REFERENCES) sont mises à jour ; les déclencheurs notent tout."""
@@ -50,7 +51,7 @@ def renumber_row(conn, store, table: str, old_id: int, report: Dict[str, Any]) -
     return new_id
 
 
-def apply_remote_docs(conn, store, table: str, docs: List[Dict[str, Any]], report: Dict[str, Any]):
+def apply_remote_docs(conn, store, table: str, docs: List[Dict[str, Any]], report: SyncReport):
     """Intègre des documents Firestore dans le cache (fusion à 3 voies si besoin)."""
     if not docs:
         return
@@ -116,9 +117,9 @@ def apply_remote_docs(conn, store, table: str, docs: List[Dict[str, Any]], repor
 
 
 
-def pull(conn, store, report: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def pull(conn, store, report: Optional[SyncReport] = None) -> SyncReport:
     """Récupère les documents modifiés depuis la dernière synchronisation."""
-    report = report if report is not None else {}
+    report = report if report is not None else SyncReport()
     for table in tracked_tables(conn):
         watermark = get_state(conn, f"wm:{table}") or "1970-01-01T00:00:00Z"
         docs = store.list_modified_since(collection_for(table), ts_minus(watermark, PULL_MARGIN_SECONDS))
@@ -169,10 +170,10 @@ def _build_write(conn, table: str, pk: List[str], pk_str: str, author: str
 MAX_FLUSH_RETRIES = 3
 
 
-def flush(conn, store, author: str = "", report: Optional[Dict[str, Any]] = None,
-          _depth: int = 0) -> Dict[str, Any]:
+def flush(conn, store, author: str = "", report: Optional[SyncReport] = None,
+          _depth: int = 0) -> SyncReport:
     """Envoie les lignes modifiées localement vers Firestore."""
-    report = report if report is not None else {}
+    report = report if report is not None else SyncReport()
     changes = conn.execute("SELECT tbl, pk, seq FROM _fs_changes ORDER BY seq").fetchall()
     if not changes:
         return report
@@ -191,7 +192,7 @@ def flush(conn, store, author: str = "", report: Optional[Dict[str, Any]] = None
             continue
         pending.append(PendingWrite(table, pk_str, seq, built[0], built[1]))
 
-    def retry_or_give_up(error: str) -> Dict[str, Any]:
+    def retry_or_give_up(error: str) -> SyncReport:
         if _depth < MAX_FLUSH_RETRIES:
             return flush(conn, store, author, report, _depth + 1)
         report.setdefault("errors", []).append(error)
