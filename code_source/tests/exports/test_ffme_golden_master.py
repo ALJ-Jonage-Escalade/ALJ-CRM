@@ -87,7 +87,7 @@ class TestFFMEGoldenMaster(unittest.TestCase):
     @staticmethod
     def _copy_contact_columns_to_table(path):
         """A snapshot taken before plans/emergency-contacts.md holds the contacts in the users columns only:
-        they are copied the way scripts/migrate_emergency_contacts.py does, on the copy of the base."""
+        they are copied to the emergency_contacts table, on the copy of the base."""
         from domain.members.emergency_contacts import missing_contacts
         from infrastructure.sqlite import schema_v2
 

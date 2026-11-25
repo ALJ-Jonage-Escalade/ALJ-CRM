@@ -47,7 +47,7 @@ REFERENCES = {
     "purchases": [("purchase_options", "purchase_id")],
 }
 # Fields kept on a deleted document, besides its key: a tombstone of a contact says whose it was, and nothing about the
-# contact, so scripts/migrate_emergency_contacts.py does not bring back contacts an admin has removed.
+# contact.
 TOMBSTONE_FIELDS = {"emergency_contacts": ("user_id",)}
 
 
@@ -58,8 +58,8 @@ def collection_for(table: str) -> str:
 def upgrade_legacy_fields(table: str, fields: Dict[str, Any]) -> Dict[str, Any]:
     """Fields of a document written before a column was renamed, read under the new name.
 
-    users.gender (free text) became users.sex (FFME code, plans/sex-enum.md): documents keep
-    `gender` until scripts/migrate_gender_to_sex.py has run; a value not understood reads as None."""
+    users.gender (free text) became users.sex (FFME code, plans/sex-enum.md): documents written
+    before the rename hold `gender`; a value not understood reads as None."""
     if table == "users" and "sex" not in fields and "gender" in fields:
         sex = parse_sex(fields["gender"])
         return {**fields, "sex": sex.value if sex else None}

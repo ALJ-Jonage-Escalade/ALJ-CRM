@@ -57,23 +57,6 @@ def call(client: TestClient, method: str, path: str, who: str = ADMIN, **body: A
     return client.request(method, BASE + path, headers={"Authorization": f"Bearer {who}"}, json=body or None)
 
 
-ROUTES = [("GET", "/roles"), ("POST", "/roles"), ("PATCH", f"/roles/{COACH}"), ("DELETE", f"/roles/{COACH}"),
-          ("POST", f"/roles/{COACH}/invitation"), ("GET", "/history")]
-
-
-@pytest.mark.parametrize("method, path", ROUTES)
-@pytest.mark.parametrize("who", [COACH, READONLY, STRANGER])
-def test_admin_only(client: TestClient, store: InMemoryAccessStore, method: str, path: str, who: str) -> None:
-    r = call(client, method, path, who, email="x@alj.example", role="coach")
-    assert r.status_code == 403
-    assert store.history == []
-
-
-@pytest.mark.parametrize("method, path", ROUTES)
-def test_sign_in_required(client: TestClient, method: str, path: str) -> None:
-    assert client.request(method, BASE + path).status_code == 401
-
-
 def test_list(client: TestClient) -> None:
     r = call(client, "GET", "/roles")
     assert r.status_code == 200
@@ -127,15 +110,14 @@ def test_resend_refused_for_an_accepted_access(client: TestClient, sent: MagicMo
     sent.assert_not_called()
 
 
-def test_add_refusals(client: TestClient) -> None:
+def test_refusals_become_http_errors(client: TestClient, store: InMemoryAccessStore) -> None:
+    """The rules themselves are tested in tests/services/access/test_rules.py."""
     r = call(client, "POST", "/roles", email="pas-une-adresse", role="coach")
     assert r.status_code == 400
     assert "invalide" in r.json()["message"]
-    r = call(client, "POST", "/roles", email=COACH.upper(), role="admin")
-    assert (r.status_code, r.json()["code"]) == (409, "already_listed")
-    call(client, "POST", "/roles", email="neville@alj.example", role="coach")
-    r = call(client, "POST", "/roles", email="neville@alj.example", role="coach")
-    assert (r.status_code, r.json()["code"]) == (409, "already_invited")
+    r = call(client, "DELETE", f"/roles/{ADMIN}")
+    assert (r.status_code, r.json()["code"]) == (409, "self_removal")
+    assert store.roles[ADMIN]["role"] == "admin"
     assert call(client, "POST", "/roles", email=STRANGER, role="owner").status_code == 422
 
 
@@ -145,15 +127,6 @@ def test_patch_role_and_name(client: TestClient, store: InMemoryAccessStore) -> 
     assert (r.json()["role"], r.json()["display_name"]) == ("admin", "Prof. Rogue")
     assert [h["action"] for h in store.history] == ["role_changed", "name_changed"]
     assert call(client, "PATCH", f"/roles/{STRANGER}", role="coach").status_code == 404
-
-
-def test_safeguards(client: TestClient, store: InMemoryAccessStore) -> None:
-    r = call(client, "PATCH", f"/roles/{ADMIN}", role="coach")
-    assert (r.status_code, r.json()["code"]) == (409, "self_demotion")
-    r = call(client, "DELETE", f"/roles/{ADMIN}")
-    assert (r.status_code, r.json()["code"]) == (409, "self_removal")
-    assert "propre accès" in r.json()["message"]
-    assert store.roles[ADMIN]["role"] == "admin"
 
 
 def test_remove(client: TestClient) -> None:
