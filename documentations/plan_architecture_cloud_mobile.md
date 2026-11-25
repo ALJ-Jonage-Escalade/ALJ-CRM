@@ -11,7 +11,7 @@ Ce document consigne la feuille de route architecturale pour doter l'Amicale La�
 | Lot | Intitulé | Statut | Fichiers Clés & Livrables |
 |---|---|:---:|---|
 | **Lot 1** | **Micro-service Backend (Webhooks & Emails)** | ✅ **Terminé** | `src/infrastructure/helloasso_webhook_service.py`<br>`src/infrastructure/email_dispatch_service.py`<br>`src/server.py` (`/webhooks/helloasso`, `/api/send-email`, `/api/preview-email`)<br>`tests/test_helloasso_webhook.py`, `tests/test_email_dispatch_service.py` |
-| **Lot 2** | **Modélisation Firestore & Passerelle Desktop** | ✅ **Terminé** | `firestore.rules` (Règles Admin / Coach)<br>`src/infrastructure/firestore_sync.py` (Push/Pull REST v1)<br>~~`src/server.py` (`/api/firestore/push`, `/api/firestore/pull/{id}`)~~ (supprimés : lisaient/écrivaient l'ancienne `database_Competition.db` et risquaient d'écraser Firestore)<br>`tests/test_firestore_sync.py` |
+| **Lot 2** | **Modélisation Firestore & Passerelle Desktop** | ✅ **Terminé** | `firestore.rules` (Règles Admin / Coach)<br>~~`src/infrastructure/firestore_sync.py` (Push/Pull REST v1)~~ (supprimé : remplacé par `src/infrastructure/firestore/client.py` et `firestore/competitions/`)<br>~~`src/server.py` (`/api/firestore/push`, `/api/firestore/pull/{id}`)~~ (supprimés : lisaient/écrivaient l'ancienne `database_Competition.db` et risquaient d'écraser Firestore)<br>`tests/test_firestore_sync.py` |
 | **Lot 3** | **Application Web Mobile PWA (Design Existant)** | ✅ **Terminé** | `web/competitions.html` (Modale d'envoi d'e-mails, balises dynamiques, appels 1-clic `tel:`)<br>`web/manifest.webmanifest` & `web/sw.js` (PWA installable sur smartphone, cache hors-ligne)<br>`web/assets/logo.png`<br>`tests/test_mobile_pwa.py` |
 | **Lot 4** | **Déploiement Cloud Run & Recette en Production** | ✅ **Terminé** | `Dockerfile` Cloud Run multi-plateforme Linux<br>`requirements-docker.txt` (dépendances backend épurées)<br>`../.dockerignore` (sécurisation des secrets & BDD locales)<br>`deploy_cloud_run.bat` & `deploy_cloud_run.sh`<br>`docs/guide_deploiement_cloud_run_helloasso.md`<br>`tests/test_cloud_run_lot4.py` (routes `/health`, `/`, `GET /webhooks/helloasso`) |
 
@@ -66,10 +66,10 @@ Ce document consigne la feuille de route architecturale pour doter l'Amicale La�
 
 ### B. Modélisation Firestore & Synchronisation (Lot 2)
 - **Fichier de règles de sécurité :** `../code_source/firestore.rules` (accès sécurisé par rôle Coach / Admin).
-- **Service Python NoSQL :** `code_source/src/infrastructure/firestore_sync.py`
-  - Convertisseur de types bidirectionnel conforme à l'API Google Cloud Firestore REST v1 (sans dépendance C/gRPC lourde).
-  - Push des compétitions, participants, annuaire des adhérents et créneaux.
-  - Pull des sélections et modifications mobiles vers la BDD SQLite locale.
+- **Service Python NoSQL :** ~~`code_source/src/infrastructure/firestore_sync.py`~~ (supprimé), aujourd'hui :
+  - `code_source/src/infrastructure/firestore/client.py` : client REST v1 et convertisseur de types bidirectionnel (sans dépendance C/gRPC lourde).
+  - `code_source/src/infrastructure/firestore/competitions/` : compétitions, participants, annuaire des adhérents.
+  - ~~Pull des sélections et modifications mobiles vers la BDD SQLite locale~~ (supprimé avec le client bureau).
 
 ### C. Application Mobile PWA & Design Existant (Lot 3)
 - **Conservation de la charte graphique :** Palette sombre `#1E293B`, cartes blanches arrondies, boutons d'action bleu et vert, barre de navigation mobile fixe en bas d'écran.
