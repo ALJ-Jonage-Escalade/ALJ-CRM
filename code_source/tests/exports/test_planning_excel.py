@@ -10,7 +10,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from exports.planning_excel import (
-    parse_horaire, clean_group_label, _initiales, encadrants_text,
+    parse_time_range, clean_group_label, _initials, coaches_text,
     assign_lanes, export_planning_excel, export_planning_list_excel,
     fill_for_item,
 )
@@ -31,14 +31,14 @@ class TestFillForItem(unittest.TestCase):
 
 class TestParseHoraire(unittest.TestCase):
     def test_standard_formats(self):
-        self.assertEqual(parse_horaire("18:00 - 20:00"), (18 * 60, 20 * 60))
-        self.assertEqual(parse_horaire("17:00 18:00"), (17 * 60, 18 * 60))   # sans tiret
-        self.assertEqual(parse_horaire("9h30-12h"), (9 * 60 + 30, 12 * 60))
+        self.assertEqual(parse_time_range("18:00 - 20:00"), (18 * 60, 20 * 60))
+        self.assertEqual(parse_time_range("17:00 18:00"), (17 * 60, 18 * 60))   # sans tiret
+        self.assertEqual(parse_time_range("9h30-12h"), (9 * 60 + 30, 12 * 60))
 
     def test_invalid(self):
-        self.assertIsNone(parse_horaire(""))
-        self.assertIsNone(parse_horaire("18:00"))
-        self.assertIsNone(parse_horaire("20:00 - 18:00"))   # fin avant début
+        self.assertIsNone(parse_time_range(""))
+        self.assertIsNone(parse_time_range("18:00"))
+        self.assertIsNone(parse_time_range("20:00 - 18:00"))   # fin avant début
 
 
 class TestCleanGroupLabel(unittest.TestCase):
@@ -54,26 +54,26 @@ class TestCleanGroupLabel(unittest.TestCase):
 
 class TestInitiales(unittest.TestCase):
     def test_simple_and_composed(self):
-        self.assertEqual(_initiales("Camille DIDIER"), "C.D.")
-        self.assertEqual(_initiales("Clément de Lima Ferreira"), "C.D.L.F.")
+        self.assertEqual(_initials("Camille DIDIER"), "C.D.")
+        self.assertEqual(_initials("Clément de Lima Ferreira"), "C.D.L.F.")
 
     def test_empty(self):
-        self.assertEqual(_initiales(""), "")
-        self.assertEqual(_initiales("   "), "")
+        self.assertEqual(_initials(""), "")
+        self.assertEqual(_initials("   "), "")
 
 
 class TestEncadrantsText(unittest.TestCase):
     def test_full_names_when_space(self):
         label = "Compétition U11-U13"
         # bloc de 6 lignes : large
-        txt = encadrants_text(["Camille DIDIER", "Romain GOETHALS"], 6, label)
+        txt = coaches_text(["Camille DIDIER", "Romain GOETHALS"], 6, label)
         self.assertIn("Camille DIDIER", txt)
 
     def test_initials_when_narrow(self):
         label = "Compétition U11-U13"
         # bloc de 3 lignes : le libellé prend 2 lignes -> le nom complet ne tient
         # pas, les initiales (1 ligne) oui
-        txt = encadrants_text(["Camille DIDIER", "Romain GOETHALS"], 3, label)
+        txt = coaches_text(["Camille DIDIER", "Romain GOETHALS"], 3, label)
         self.assertNotIn("Camille DIDIER", txt)
         self.assertIn("C.D.", txt)
         self.assertIn("R.G.", txt)
@@ -81,11 +81,11 @@ class TestEncadrantsText(unittest.TestCase):
     def test_omitted_when_no_room(self):
         label = "Compétition U11-U13"
         # bloc de 2 lignes : libellé sur 2 lignes -> aucun encadrant possible
-        txt = encadrants_text(["Camille DIDIER", "Romain GOETHALS"], 2, label)
+        txt = coaches_text(["Camille DIDIER", "Romain GOETHALS"], 2, label)
         self.assertEqual(txt, "")
 
     def test_empty_list(self):
-        self.assertEqual(encadrants_text([], 6, "X"), "")
+        self.assertEqual(coaches_text([], 6, "X"), "")
 
 
 class TestAssignLanes(unittest.TestCase):

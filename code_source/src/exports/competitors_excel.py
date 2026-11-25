@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Mapping
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 from domain.competitions.models import LIBELLES_STATUT_PAIEMENT, PAIEMENT_NON_INVITE
 from domain.utils import format_amount
@@ -53,7 +54,7 @@ COLUMNS = [
 ]
 
 
-def payment_label(participant: Dict[str, Any]) -> str:
+def payment_label(participant: Mapping[str, Any]) -> str:
     """« Payé (15,50 €) », « En attente », « Annulé — perdu »… (labels of the domain model)."""
     status = str(participant.get("statut_paiement") or PAIEMENT_NON_INVITE)
     label = LIBELLES_STATUT_PAIEMENT.get(status, status)
@@ -61,104 +62,86 @@ def payment_label(participant: Dict[str, Any]) -> str:
     return f"{label} ({amount} €)" if amount else label
 
 
-def export_competitors_excel(comp: Mapping[str, Any], participants: List[Dict[str, Any]] | None = None) -> bytes:
-    """Génère le classeur Excel d'une compétition avec ses compétiteurs et retourne les octets."""
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Compétiteurs"
+HEADER_ROW = 4  # rows 1-2: competition title and details
+CENTERED_COLUMNS = (3, 4, 6, 7, 8, 9)  # Catégorie, Surclassement, Statut, Paiement, Date de naissance, Licence
 
-    # Propriétés de vue et impression (quadrillage activé)
-    ws.sheet_view.showGridLines = True
-    ws.page_setup.printGridlines = True
-    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
-    ws.page_setup.paperSize = ws.PAPERSIZE_A4
 
-    # 1. En-tête de la compétition
-    nom_comp = comp.get("nom") or "Compétition"
-    date_comp = comp.get("date_competition") or ""
-    date_fin = comp.get("date_fin") or date_comp
-    lieu = comp.get("lieu") or ""
-    disc = comp.get("type") or ""
+def _write_title(sheet: Worksheet, comp: Mapping[str, Any]) -> None:
+    """Rows 1-2: the competition's name, then its dates, venue and discipline."""
+    start_date = comp.get("date_competition") or ""
+    end_date = comp.get("date_fin") or start_date
+    venue = comp.get("lieu") or ""
+    discipline = comp.get("type") or ""
+    details = [f"Date : {start_date}" if not end_date or end_date == start_date else f"Dates : {start_date} au {end_date}"]
+    if venue:
+        details.append(f"Lieu : {venue}")
+    if discipline:
+        details.append(f"Discipline : {discipline}")
+    sheet.cell(row=1, column=1, value=f"ALJ Escalade — {comp.get('nom') or 'Compétition'}").font = FONT_TITLE
+    sheet.cell(row=2, column=1, value=" · ".join(details)).font = FONT_META
 
-    date_str = f"Date : {date_comp}" if not date_fin or date_fin == date_comp else f"Dates : {date_comp} au {date_fin}"
-    meta_parts = [date_str]
-    if lieu:
-        meta_parts.append(f"Lieu : {lieu}")
-    if disc:
-        meta_parts.append(f"Discipline : {disc}")
 
-    ws.cell(row=1, column=1, value=f"ALJ Escalade — {nom_comp}").font = FONT_TITLE
-    ws.cell(row=2, column=1, value=" · ".join(meta_parts)).font = FONT_META
+def _competitor_values(participant: Mapping[str, Any], default_discipline: str) -> list[str]:
+    """The cells of one competitor, in the order of COLUMNS."""
+    return [
+        str(participant.get("nom") or "").strip().upper(),
+        str(participant.get("prenom") or "").strip().title(),
+        str(participant.get("categorie_ffme") or participant.get("categorie") or "").strip(),
+        "Oui" if participant.get("surclassement") else "Non",
+        str(participant.get("discipline") or participant.get("creneau_groupe") or default_discipline or "").strip(),
+        "Sélectionné" if participant.get("selectionne") else "Non invité",
+        payment_label(participant),
+        str(participant.get("date_naissance") or participant.get("birth_date") or "").strip(),
+        str(participant.get("num_licence") or participant.get("licence_ffme") or "").strip(),
+        str(participant.get("email") or "").strip(),
+        str(participant.get("phone") or participant.get("telephone") or "").strip(),
+    ]
 
-    # 2. Ligne des titres de colonnes (Ligne 4)
-    start_row = 4
-    for col_idx, col_name in enumerate(COLUMNS, start=1):
-        cell = ws.cell(row=start_row, column=col_idx, value=col_name)
+
+def _write_competitors(sheet: Worksheet, participants: List[Dict[str, Any]], default_discipline: str) -> None:
+    """The header row, then one zebra row per competitor (the name in bold)."""
+    for column, title in enumerate(COLUMNS, start=1):
+        cell = sheet.cell(row=HEADER_ROW, column=column, value=title)
         cell.font = FONT_HEADER
         cell.fill = FILL_HEADER
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = BORDER_THIN
-
-    # 3. Données des compétiteurs
-    parts = participants if participants is not None else (comp.get("participants") or [])
-    current_row = start_row + 1
-
-    for row_idx, p in enumerate(parts):
-        is_zebra = row_idx % 2 == 1
-        fill = FILL_ZEBRA if is_zebra else FILL_WHITE
-
-        # Formatage des données
-        nom = str(p.get("nom") or "").strip().upper()
-        prenom = str(p.get("prenom") or "").strip().title()
-        cat = str(p.get("categorie_ffme") or p.get("categorie") or "").strip()
-        surclass = "Oui" if p.get("surclassement") else "Non"
-        discipline_val = str(p.get("discipline") or p.get("creneau_groupe") or disc or "").strip()
-        statut = "Sélectionné" if p.get("selectionne") else "Non invité"
-        paiement = payment_label(p)
-        dob = str(p.get("date_naissance") or p.get("birth_date") or "").strip()
-        licence = str(p.get("num_licence") or p.get("licence_ffme") or "").strip()
-        email = str(p.get("email") or "").strip()
-        phone = str(p.get("phone") or p.get("telephone") or "").strip()
-
-        row_values = [
-            nom,
-            prenom,
-            cat,
-            surclass,
-            discipline_val,
-            statut,
-            paiement,
-            dob,
-            licence,
-            email,
-            phone,
-        ]
-
-        for col_idx, val in enumerate(row_values, start=1):
-            cell = ws.cell(row=current_row, column=col_idx, value=val)
-            cell.font = FONT_DATA_BOLD if col_idx == 1 else FONT_DATA
+    for index, participant in enumerate(participants):
+        row = HEADER_ROW + 1 + index
+        fill = FILL_ZEBRA if index % 2 == 1 else FILL_WHITE
+        for column, value in enumerate(_competitor_values(participant, default_discipline), start=1):
+            cell = sheet.cell(row=row, column=column, value=value)
+            cell.font = FONT_DATA_BOLD if column == 1 else FONT_DATA
             cell.fill = fill
             cell.border = BORDER_THIN
-            if col_idx in (3, 4, 6, 7, 8, 9):
-                cell.alignment = Alignment(horizontal="center", vertical="center")
-            else:
-                cell.alignment = Alignment(vertical="center")
+            cell.alignment = (Alignment(horizontal="center", vertical="center") if column in CENTERED_COLUMNS
+                              else Alignment(vertical="center"))
 
-        current_row += 1
 
-    # 4. Ajustement automatique de la largeur des colonnes
-    for col in ws.columns:
-        max_len = 0
-        col_letter = get_column_letter(col[0].column)
-        for cell in col:
-            val_str = str(cell.value or "")
-            if cell.row < start_row:
-                continue
-            if len(val_str) > max_len:
-                max_len = len(val_str)
-        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+def _autosize_columns(sheet: Worksheet) -> None:
+    """Each column as wide as its longest value from the header row down (12 at least)."""
+    for column in sheet.columns:
+        longest = max((len(str(cell.value or "")) for cell in column if cell.row >= HEADER_ROW), default=0)
+        sheet.column_dimensions[get_column_letter(column[0].column)].width = max(longest + 4, 12)
 
-    neutralize_formulas(wb)
-    buf = io.BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
+
+def export_competitors_excel(comp: Mapping[str, Any], participants: List[Dict[str, Any]] | None = None) -> bytes:
+    """Génère le classeur Excel d'une compétition avec ses compétiteurs et retourne les octets."""
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Compétiteurs"
+    # Gridlines shown and printed, landscape A4
+    sheet.sheet_view.showGridLines = True
+    sheet.page_setup.printGridlines = True
+    sheet.page_setup.orientation = sheet.ORIENTATION_LANDSCAPE
+    sheet.page_setup.paperSize = sheet.PAPERSIZE_A4
+
+    _write_title(sheet, comp)
+    rows = participants if participants is not None else (comp.get("participants") or [])
+    _write_competitors(sheet, rows, comp.get("type") or "")
+    _autosize_columns(sheet)
+
+    neutralize_formulas(workbook)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()

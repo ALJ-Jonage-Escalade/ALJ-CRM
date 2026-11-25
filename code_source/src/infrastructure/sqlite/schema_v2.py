@@ -15,6 +15,7 @@ import logging
 import sqlite3
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple, Union
 
+from domain.members.helloasso_membership import INSURANCE_OPTIONS
 from domain.members.emergency_contacts import HELLOASSO_CONTACT_FIELDS, EmergencyContact, missing_contacts
 from domain.members.purchase_priority import purchase_priority_score, status_score
 from domain.members.sex import parse_sex
@@ -143,14 +144,8 @@ DYNAMIC_USER_FIELDS = [
 DOB_COLUMN = "champ_Date de naissance de l'adhérent"
 
 # (nom d'option cible, colonne has legacy, colonne montant legacy)
-OPTION_PAIRS = [
-    ("Assurance Base", "opt_Assurance Base", "opt_Montant Assurance Base"),
-    ("Assurance Base +", "opt_Assurance Base +", "opt_Montant Assurance Base +"),
-    ("Assurance Base ++", "opt_Assurance Base ++", "opt_Montant Assurance Base ++"),
-    ("Assurance Option ski de piste", "opt_Assurance Option ski de piste", "opt_Montant Assurance Option ski de piste"),
-    ("Assurance Option VTT", "opt_Assurance Option VTT", "opt_Montant Assurance Option VTT"),
-    ("Assurance Option Trail", "opt_Assurance Option Trail", "opt_Montant Assurance Option Trail"),
-]
+# (option, "has it" column, amount column) of the flat format, one per insurance of the club's list
+OPTION_PAIRS = [(option, f"opt_{option}", f"opt_Montant {option}") for option in INSURANCE_OPTIONS]
 
 
 def clean_legacy_text(val: object) -> Optional[str]:
@@ -523,6 +518,18 @@ def write_members_to_v2(cur: sqlite3.Cursor, members: Iterable[MemberRecord], se
 # Flat member view: one row per purchase (users ⨝ orders ⨝ purchases ⨝ seasons), with the insurance options as
 # opt_* columns. Read by the FFME export, the attendance sheets, the reports and the competitions' member directory.
 # The insurance options are read at user level (any purchase of the member carrying them).
+def _option_columns() -> str:
+    """Two columns of the flat view per insurance option: « Oui » when the member's purchase has it, and its amount."""
+    columns = []
+    for option, has_column, amount_column in OPTION_PAIRS:
+        for value, column in (("CASE WHEN po2.id IS NOT NULL THEN 'Oui' END", has_column), ("po2.amount", amount_column)):
+            columns.append(f"""    (SELECT {value}
+       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
+      WHERE p2.user_id = u.id AND po2.option_name = '{option.replace("'", "''")}' LIMIT 1) AS "{column}",""")  # noqa: S608 - option and column names from INSURANCE_OPTIONS
+    return "\n".join(columns)
+
+
+# Option names and column names come from INSURANCE_OPTIONS (code constants), never from data
 MEMBER_FLAT_VIEW_SQL = """
 CREATE VIEW IF NOT EXISTS v_member_flat AS
 SELECT
@@ -546,42 +553,7 @@ SELECT
     u.licence_ffme AS "licence_ffme",
     u.photo_auth AS "photo_auth",
     u.health_commitment AS "health_commitment",
-    (SELECT CASE WHEN po2.id IS NOT NULL THEN 'Oui' END
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Base' LIMIT 1) AS "opt_Assurance Base",
-    (SELECT po2.amount
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Base' LIMIT 1) AS "opt_Montant Assurance Base",
-    (SELECT CASE WHEN po2.id IS NOT NULL THEN 'Oui' END
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Base +' LIMIT 1) AS "opt_Assurance Base +",
-    (SELECT po2.amount
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Base +' LIMIT 1) AS "opt_Montant Assurance Base +",
-    (SELECT CASE WHEN po2.id IS NOT NULL THEN 'Oui' END
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Base ++' LIMIT 1) AS "opt_Assurance Base ++",
-    (SELECT po2.amount
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Base ++' LIMIT 1) AS "opt_Montant Assurance Base ++",
-    (SELECT CASE WHEN po2.id IS NOT NULL THEN 'Oui' END
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Option ski de piste' LIMIT 1) AS "opt_Assurance Option ski de piste",
-    (SELECT po2.amount
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Option ski de piste' LIMIT 1) AS "opt_Montant Assurance Option ski de piste",
-    (SELECT CASE WHEN po2.id IS NOT NULL THEN 'Oui' END
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Option VTT' LIMIT 1) AS "opt_Assurance Option VTT",
-    (SELECT po2.amount
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Option VTT' LIMIT 1) AS "opt_Montant Assurance Option VTT",
-    (SELECT CASE WHEN po2.id IS NOT NULL THEN 'Oui' END
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Option Trail' LIMIT 1) AS "opt_Assurance Option Trail",
-    (SELECT po2.amount
-       FROM purchase_options po2 JOIN purchases p2 ON p2.id = po2.purchase_id
-      WHERE p2.user_id = u.id AND po2.option_name = 'Assurance Option Trail' LIMIT 1) AS "opt_Montant Assurance Option Trail",
+{option_columns}
     u.badge_rouge AS "badge_rouge",
     u.autonomie_bloc AS "autonomie_bloc",
     u.raw_passports AS "raw_passports",
@@ -609,7 +581,7 @@ FROM purchases p
 JOIN users u ON u.id = p.user_id
 JOIN orders o ON o.id = p.order_id
 JOIN seasons s ON s.id = o.season_id
-"""
+""".replace("{option_columns}", _option_columns())
 
 
 # The key on the member record, replaced by Outils › Clés (plans/club-keys.md): dropped from existing caches

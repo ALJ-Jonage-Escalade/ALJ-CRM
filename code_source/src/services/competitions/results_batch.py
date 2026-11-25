@@ -91,14 +91,17 @@ class CompetitionResultsBatchService:
     def get_notification_email(cls) -> str:
         """Retourne l'e-mail ou les e-mails de notification configurés, ou l'adresse par défaut."""
         try:
-            val = AppSettingsRepository.get(SETTING_NOTIFICATION_EMAIL)
-            if val:
-                emails = [e.strip() for e in re.split(r"[,;\s]+", str(val).strip()) if e.strip() and "@" in e]
-                if emails:
-                    return ", ".join(emails)
-        except Exception:
+            stored = AppSettingsRepository.get(SETTING_NOTIFICATION_EMAIL)
+        except FirestoreError:
             logger.warning("Lecture de l'e-mail de notification des résultats impossible", exc_info=True)
-        return DEFAULT_RESULTS_NOTIFICATION_EMAIL
+            return DEFAULT_RESULTS_NOTIFICATION_EMAIL
+        if not stored:
+            return DEFAULT_RESULTS_NOTIFICATION_EMAIL
+        try:
+            return ", ".join(cls.parse_notification_emails(str(stored)))
+        except InvalidRequest:  # saved through update_settings, which checks it: only a hand edit gets here
+            logger.warning("Réglage %s invalide (%r) : adresse par défaut utilisée", SETTING_NOTIFICATION_EMAIL, stored)
+            return DEFAULT_RESULTS_NOTIFICATION_EMAIL
 
     @classmethod
     def update_settings(cls, notification_email: str, window_days: Optional[int] = None) -> None:
