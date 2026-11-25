@@ -328,6 +328,57 @@ class CompetitionResultsBatchService:
             logger.warning("[BATCH_RESULTATS] Mémorisation de la demande d'URL impossible (#%s)", comp.get("id"), exc_info=True)
 
     @classmethod
+    def _check_competition(cls, comp: CompetitionDoc, archive: List[ArchiveEntry]) -> Dict[str, Any]:
+        """Syncs one competition's results and returns its line for the summary (with its status)."""
+        cid = str(comp.get("id"))
+        nom = comp.get("nom") or "Compétition"
+        logger.debug(f"[BATCH_RESULTATS] Recherche des résultats pour #{cid} « {nom} »...")
+
+        outcome = cls.sync_results_for_competition(comp, archive)
+        if outcome["status"] == "found":
+            logger.info(f"[BATCH_RESULTATS] {outcome['matched_count']} athlète(s) classé(s) trouvé(s) pour « {nom} » !")
+        elif outcome["status"] == "error":
+            logger.warning("[BATCH_RESULTATS] « %s » : résultats illisibles ou non enregistrés, nouvel essai au prochain passage", nom)
+        elif outcome["status"] == "pending":
+            logger.debug(f"[BATCH_RESULTATS] Aucun résultat officiel disponible pour le moment pour « {nom} ».")
+        return {
+            "id": cid,
+            "nom": nom,
+            "date": comp.get("date_competition") or "",
+            "lieu": comp.get("lieu") or "",
+            "url": outcome["url"],
+            "athletes": outcome["athletes"],
+            "status": outcome["status"],
+        }
+
+    @staticmethod
+    def _batch_status_message(details: List[Dict[str, Any]], checked: int, found_count: int, remaining: int, *,
+                              email_sent: bool, email_due: bool, notification_email: str) -> str:
+        """One-line summary of the run, saved in the settings and shown on the results page."""
+        status_msg = f"{checked} vérifiée(s), {found_count} résultat(s) trouvé(s)"
+        to_enter = sum(1 for d in details if d["status"] == "needs_url")
+        if to_enter:
+            status_msg += f", {to_enter} URL à saisir"
+        failed = sum(1 for d in details if d["status"] == "error")
+        if failed:
+            status_msg += f", {failed} en erreur"
+        if remaining:
+            status_msg += f", {remaining} reportée(s) au prochain passage"
+        if email_sent:
+            status_msg += f" (E-mail envoyé à {notification_email})"
+        elif email_due:
+            status_msg += " (Échec envoi e-mail)"
+        return status_msg
+
+    @staticmethod
+    def _save_run_status(executed_at: str, status_msg: str) -> None:
+        try:
+            AppSettingsRepository.save(SETTING_BATCH_LAST_RUN, executed_at)
+            AppSettingsRepository.save(SETTING_BATCH_LAST_STATUS, status_msg)
+        except FirestoreError:
+            logger.warning("[BATCH_RESULTATS] Enregistrement du statut du batch impossible", exc_info=True)
+
+    @classmethod
     @drops_cache  # writes competition documents directly
     def run_daily_batch(cls, force: bool = False, to_email: Optional[str] = None, window_days: Optional[int] = None,
                         today: Optional[datetime.date] = None, time_budget_s: float = DEFAULT_TIME_BUDGET_SECONDS,
@@ -367,32 +418,13 @@ class CompetitionResultsBatchService:
             if clock() - started >= time_budget_s:
                 break
             checked += 1
-            cid = str(comp.get("id"))
-            nom = comp.get("nom") or "Compétition"
-            logger.debug(f"[BATCH_RESULTATS] Recherche des résultats pour #{cid} « {nom} »...")
-
-            outcome = cls.sync_results_for_competition(comp, archive)
-            item = {
-                "id": cid,
-                "nom": nom,
-                "date": comp.get("date_competition") or "",
-                "lieu": comp.get("lieu") or "",
-                "url": outcome["url"],
-                "athletes": outcome["athletes"],
-                "status": outcome["status"],
-            }
+            item = cls._check_competition(comp, archive)
             details.append(item)
-            if outcome["status"] == "found":
-                logger.info(f"[BATCH_RESULTATS] {outcome['matched_count']} athlète(s) classé(s) trouvé(s) pour « {nom} » !")
+            if item["status"] == "found":
                 results_found_list.append(item)
-            elif outcome["status"] == "needs_url":
-                if not comp.get(FIELD_NEEDS_URL_NOTIFIED):  # asked once, not every morning
-                    needs_url.append(item)
-                    needs_url_comps.append(comp)
-            elif outcome["status"] == "error":
-                logger.warning("[BATCH_RESULTATS] « %s » : résultats illisibles ou non enregistrés, nouvel essai au prochain passage", nom)
-            else:
-                logger.debug(f"[BATCH_RESULTATS] Aucun résultat officiel disponible pour le moment pour « {nom} ».")
+            elif item["status"] == "needs_url" and not comp.get(FIELD_NEEDS_URL_NOTIFIED):  # asked once, not every morning
+                needs_url.append(item)
+                needs_url_comps.append(comp)
 
         remaining = len(pending) - checked
         if remaining:
@@ -409,26 +441,10 @@ class CompetitionResultsBatchService:
         else:
             logger.info("[BATCH_RESULTATS] Aucun nouveau résultat à notifier aujourd'hui.")
 
-        # Enregistrement des statuts d'exécution
-        status_msg = f"{checked} vérifiée(s), {len(results_found_list)} résultat(s) trouvé(s)"
-        to_enter = sum(1 for d in details if d["status"] == "needs_url")
-        if to_enter:
-            status_msg += f", {to_enter} URL à saisir"
-        failed = sum(1 for d in details if d["status"] == "error")
-        if failed:
-            status_msg += f", {failed} en erreur"
-        if remaining:
-            status_msg += f", {remaining} reportée(s) au prochain passage"
-        if email_sent:
-            status_msg += f" (E-mail envoyé à {notification_email})"
-        elif results_found_list or needs_url:
-            status_msg += " (Échec envoi e-mail)"
-
-        try:
-            AppSettingsRepository.save(SETTING_BATCH_LAST_RUN, now_iso)
-            AppSettingsRepository.save(SETTING_BATCH_LAST_STATUS, status_msg)
-        except FirestoreError:
-            logger.warning("[BATCH_RESULTATS] Enregistrement du statut du batch impossible", exc_info=True)
+        status_msg = cls._batch_status_message(details, checked, len(results_found_list), remaining,
+                                               email_sent=email_sent, email_due=bool(results_found_list or needs_url),
+                                               notification_email=notification_email)
+        cls._save_run_status(now_iso, status_msg)
 
         return {
             "status": "success",

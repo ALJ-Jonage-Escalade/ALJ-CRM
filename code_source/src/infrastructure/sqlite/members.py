@@ -32,6 +32,58 @@ EXTRA_COLUMNS = {
 }
 
 
+# Optional fields of a manual addition: field -> (record column, default when empty); absent fields are not written
+MANUAL_OPTIONAL_TEXT_FIELDS = {
+    "email_secondary": ("champ_Deuxième adresse mail pour la réception des informations du club", ""),
+    "licence_ffme": ("champ_Numéro de Licence FFME (6 chiffres)", ""),
+    "badge_rouge": ("badge_rouge", "Non"),
+    "autonomie_bloc": ("autonomie_bloc", "Non"),
+    "photo_auth": ("champ_Autorisation d'utilisation de l'image (photos, vidéos)", "Oui"),
+}
+
+
+def _text(fields: Mapping[str, Any], *keys: str, default: str = "") -> str:
+    """The first non-empty value among `keys`, as stripped text (`default` when all are empty)."""
+    value = next((fields.get(key) for key in keys if fields.get(key)), None)
+    return str(value or default).strip()
+
+
+def _manual_member_record(fields: Mapping[str, Any], order_ref: str, order_date: str) -> Dict[str, Any]:
+    """The record of a manual addition, shaped like a HelloAsso export row (keys of schema_v2.write_members_to_v2)."""
+    payer_email = _text(fields, "email_primary")
+    rec: Dict[str, Any] = {
+        "order_ref": order_ref,
+        "order_date": order_date,
+        "status": _text(fields, "status", default="Validé"),
+        "tarif_name": _text(fields, "tarif_name"),
+        "amount": float(fields.get("amount") or 0.0),
+        "user_lastName": _text(fields, "last_name"),
+        "user_firstName": _text(fields, "first_name"),
+        schema_v2.DOB_COLUMN: _text(fields, "birth_date"),
+        "champ_Sexe": _text(fields, "sex"),
+        "champ_Téléphone ": _text(fields, "phone"),
+        "champ_Adresse mail pour la réception des informations du club": payer_email,
+        "champ_Adresse : numéro et nom de rue": _text(fields, "address"),
+        "champ_Code postal": _text(fields, "zip_code"),
+        "champ_Ville": _text(fields, "city"),
+        "champ_Pays": _text(fields, "country", default="France"),
+        "champ_Nationalité": _text(fields, "nationality"),
+        "payer_lastName": _text(fields, "payer_lastName", "payer_last_name", "last_name"),
+        "payer_firstName": _text(fields, "payer_firstName", "payer_first_name", "first_name"),
+        "payer_email": _text(fields, "payer_email", default=payer_email),
+        "is_modified": "Non",
+    }
+    for field, (column, default) in MANUAL_OPTIONAL_TEXT_FIELDS.items():
+        if field in fields:
+            rec[column] = _text(fields, field, default=default)
+    if "emergency_contacts" in fields:
+        rec["emergency_contacts"] = fields["emergency_contacts"] or []
+    comment = fields.get("commentaires_correctif") if "commentaires_correctif" in fields else fields.get("commentaire")
+    if comment is not None:
+        rec["commentaires_correctif"] = str(comment).strip()
+    return rec
+
+
 # A row of a member read: column -> value. Any: SQLite values (text, number or None) of many columns
 MemberRow = Dict[str, Any]
 # A flat member record to write (HelloAsso export keys, or the fields of a manual addition). Any: as above
@@ -140,46 +192,7 @@ class MemberRepository:
         with SqliteDatabase.transaction() as conn:
             now = datetime.datetime.now()
             order_ref = f"MANUEL-{now.strftime('%Y%m%d-%H%M%S')}"
-            payer_email = str(fields.get("email_primary") or "").strip()
-
-            rec = {
-                "order_ref": order_ref,
-                "order_date": now.strftime("%Y-%m-%d"),
-                "status": str(fields.get("status") or "Validé").strip(),
-                "tarif_name": str(fields.get("tarif_name") or "").strip(),
-                "amount": float(fields.get("amount") or 0.0),
-                "user_lastName": str(fields.get("last_name") or "").strip(),
-                "user_firstName": str(fields.get("first_name") or "").strip(),
-                schema_v2.DOB_COLUMN: str(fields.get("birth_date") or "").strip(),
-                "champ_Sexe": str(fields.get("sex") or "").strip(),
-                "champ_Téléphone ": str(fields.get("phone") or "").strip(),
-                "champ_Adresse mail pour la réception des informations du club": payer_email,
-                "champ_Adresse : numéro et nom de rue": str(fields.get("address") or "").strip(),
-                "champ_Code postal": str(fields.get("zip_code") or "").strip(),
-                "champ_Ville": str(fields.get("city") or "").strip(),
-                "champ_Pays": str(fields.get("country") or "France").strip(),
-                "champ_Nationalité": str(fields.get("nationality") or "").strip(),
-                "payer_lastName": str(fields.get("payer_lastName") or fields.get("payer_last_name") or fields.get("last_name") or "").strip(),
-                "payer_firstName": str(fields.get("payer_firstName") or fields.get("payer_first_name") or fields.get("first_name") or "").strip(),
-                "payer_email": str(fields.get("payer_email") or payer_email).strip(),
-                "is_modified": "Non",
-            }
-
-            if "email_secondary" in fields:
-                rec["champ_Deuxième adresse mail pour la réception des informations du club"] = str(fields.get("email_secondary") or "").strip()
-            if "licence_ffme" in fields:
-                rec["champ_Numéro de Licence FFME (6 chiffres)"] = str(fields.get("licence_ffme") or "").strip()
-            if "badge_rouge" in fields:
-                rec["badge_rouge"] = str(fields.get("badge_rouge") or "Non").strip()
-            if "autonomie_bloc" in fields:
-                rec["autonomie_bloc"] = str(fields.get("autonomie_bloc") or "Non").strip()
-            if "emergency_contacts" in fields:
-                rec["emergency_contacts"] = fields["emergency_contacts"] or []
-            if "photo_auth" in fields:
-                rec["champ_Autorisation d'utilisation de l'image (photos, vidéos)"] = str(fields.get("photo_auth") or "Oui").strip()
-            comment = fields.get("commentaires_correctif") if "commentaires_correctif" in fields else fields.get("commentaire")
-            if comment is not None:
-                rec["commentaires_correctif"] = str(comment).strip()
+            rec = _manual_member_record(fields, order_ref, now.strftime("%Y-%m-%d"))
 
             cursor = conn.cursor()
             stats = schema_v2.write_members_to_v2(cursor, [rec], season_name)
