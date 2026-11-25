@@ -12,6 +12,7 @@ import logging
 from infrastructure import runtime_env
 from infrastructure.firestore.access_store import AccessStore, HistoryEntry, RoleEntry
 from infrastructure.security.role_directory import Clock, RoleDirectory
+from infrastructure.security.roles import ADMIN
 from services.access.rules import BOOTSTRAP_AUTHOR, checked_email, iso
 from domain.errors import InvalidRequest
 
@@ -23,12 +24,12 @@ def bootstrap_admin(store: AccessStore, clock: Clock, email: str) -> bool:
     address = checked_email(email)
     at = iso(clock())
     created = store.create_role(RoleEntry(
-        email=address, role="admin", display_name="", last_sign_in_at=None,
+        email=address, role=ADMIN, display_name="", last_sign_in_at=None,
         created_at=at, created_by=BOOTSTRAP_AUTHOR, updated_at=at, updated_by=BOOTSTRAP_AUTHOR,
         invited_at=None, invitation_expires_at=None, invitation_sent_at=None, accepted_at=None))
     if created:
         store.add_history(HistoryEntry(at=at, author=BOOTSTRAP_AUTHOR, action="bootstrap", target_email=address,
-                                       old_role=None, new_role="admin"))
+                                       old_role=None, new_role=ADMIN))
     return created
 
 

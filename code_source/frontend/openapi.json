@@ -2983,7 +2983,7 @@
     "/api/send-email": {
       "post": {
         "summary": "Send Email Api",
-        "description": "Envoie un e-mail personnalisé à chaque destinataire (Gmail API ou SMTP), avec les variables remplacées.\n400: nothing to send (empty subject or body, no valid recipient); 502: every e-mail failed.",
+        "description": "Envoie un e-mail personnalisé à chaque destinataire (Gmail API ou SMTP), avec les variables remplacées.\n400: nothing to send (empty subject or body, no valid recipient); 502: every e-mail failed;\n503: the access list could not be read (admin-only sender check).",
         "operationId": "send_email_api_api_send_email_post",
         "requestBody": {
           "content": {
@@ -3038,6 +3038,16 @@
           },
           "502": {
             "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {

@@ -93,6 +93,26 @@ READONLY_READ_PREFIXES = ("/api/competitions", "/api/coaches", "/api/competition
 # Open to any signed-in account, whatever its role: the role is what the route answers. The token
 # is verified even when the checks are off (local server): the app shows the role it answers.
 SIGNED_IN_PATHS = frozenset({"/api/me"})
+# Admin-only areas: (path or prefix, writes only, what it holds). Every other route needs "coach".
+# writes_only=False: reads are admin-only too.
+ADMIN_AREAS: tuple[tuple[str, bool, str], ...] = (
+    ("/api/admin", False, "Administration: access list, requests, history"),
+    ("/api/attestations", False, "membership attestations"),
+    ("/api/members", True, "member edits"),
+    ("/api/email-templates/variables", False, "the template editor's list of variables (Communications page)"),
+    ("/api/email-templates", True, "e-mail template edits"),
+    ("/api/whatsapp-template", True, "WhatsApp template edits"),
+    ("/api/helloasso/campaigns", True, "choice of the active HelloAsso campaigns; the list stays readable"),
+    ("/api/settings", True, "general settings edits"),
+    ("/api/helloasso/memberships", False, "HelloAsso membership import: preview, import, history"),
+    ("/api/keys", True, "club keys (Outils › Clés): handed over by the admins, coaches read"),
+    ("/api/key-assignments", True, "club key assignments"),
+    ("/api/ffme", True, "FFME imports and edits"),
+    ("/api/auth/google/update-token", True, "replacing the club's Google credentials by hand"),
+    ("/api/auth/google/login", True, "replacing the club's Google credentials through OAuth"),
+    *((path, False, "results batch: an admin, or the Cloud Scheduler token (authorize_request)") for path in SCHEDULER_PATHS),
+    ("/api/cloud-db/sync", True, "SQLite cache rebuild (costly)"),
+)
 
 
 class AuthError(Exception):
@@ -125,8 +145,13 @@ def firebase_project_id() -> str:
     )
 
 
+def under(path: str, *prefixes: str) -> bool:
+    """Whether `path` is one of `prefixes` or below one of them ("/api/keys/3", not "/api/keysets")."""
+    return any(path == prefix or path.startswith(prefix + "/") for prefix in prefixes)
+
+
 def required_role(method: str, path: str) -> Optional[Role]:
-    """Rôle minimal exigé pour une requête (None = route publique)."""
+    """The lowest role a request needs (None: public route)."""
     method = (method or "GET").upper()
     if method == "OPTIONS":  # pré-vol CORS
         return None
@@ -134,39 +159,13 @@ def required_role(method: str, path: str) -> Optional[Role]:
         path = path.rstrip("/")
     if path in PUBLIC_PATHS:
         return None
-    if any(path == prefix or path.startswith(prefix + "/") for prefix in PUBLIC_PREFIXES):
+    if under(path, *PUBLIC_PREFIXES):
         return None
-    if method in ("GET", "HEAD") and any(path == ro_prefix or path.startswith(ro_prefix + "/")
-                                         for ro_prefix in READONLY_READ_PREFIXES):
+    reading = method in ("GET", "HEAD")
+    if reading and under(path, *READONLY_READ_PREFIXES):
         return Role.READONLY
-    if path == "/api/admin" or path.startswith("/api/admin/"):
-        return Role.ADMIN  # Administration (access list, requests, history): reads included
-    if path.startswith("/api/attestations"):
-        return Role.ADMIN  # attestations réservées aux administrateurs
-    if path.startswith("/api/members") and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # modification des fiches réservée aux administrateurs
-    if path == "/api/email-templates/variables":
-        return Role.ADMIN  # the template editor's list of variables (Communications page)
-    if path.startswith("/api/email-templates") and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # modification des templates d'emails réservée aux administrateurs
-    if path.startswith("/api/whatsapp-template") and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # modification du template WhatsApp réservée aux administrateurs
-    if path.startswith("/api/helloasso/campaigns") and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # choix des campagnes HelloAsso actives réservé aux administrateurs ; la liste reste lisible
-    if path.startswith("/api/settings") and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # modification des paramètres généraux réservée aux administrateurs
-    if path == "/api/helloasso/memberships" or path.startswith("/api/helloasso/memberships/"):
-        return Role.ADMIN  # import des adhésions HelloAsso (aperçu, import, historique) réservé aux administrateurs
-    if path.startswith(("/api/keys", "/api/key-assignments")) and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # club keys (Outils › Clés): handed over by the admins, coaches read
-    if path.startswith("/api/ffme") and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # imports et modifications FFME réservés aux administrateurs
-    if path in ("/api/auth/google/update-token", "/api/auth/google/login") and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # remplacement des identifiants Google du club (manuel ou OAuth) réservé aux administrateurs
-    if path in SCHEDULER_PATHS:
-        return Role.ADMIN  # results batch: an admin, or the Cloud Scheduler token (authorize_request)
-    if path == "/api/cloud-db/sync" and method not in ("GET", "HEAD"):
-        return Role.ADMIN  # reconstruction du cache SQLite (coûteuse) réservée aux administrateurs
+    if any(under(path, prefix) and not (writes_only and reading) for prefix, writes_only, _why in ADMIN_AREAS):
+        return Role.ADMIN
     return Role.COACH
 
 

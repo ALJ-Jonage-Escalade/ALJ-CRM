@@ -17,8 +17,8 @@ from api.competitions.schemas.results import (
     BatchReport, ResultsFetchRequest, ResultsSettings, ResultsSettingsSaved, ResultsSettingsUpdate,
 )
 from api.competitions.schemas.views import ResultsFetched
+from api.auth.me import is_admin
 from api.responses import error, error_responses
-from infrastructure.security.api_auth import Role, has_role, is_scheduler
 from services.competitions.results_batch import CompetitionResultsBatchService
 
 # Full paths: /api/competitions/... and /api/settings/...
@@ -41,9 +41,7 @@ async def api_cron_fetch_competition_results(
     `force` (every competition ended in the last year, results or not) and `email` (another recipient): admin only.
     503: the competitions could not be read, nothing was done (Cloud Scheduler shows the run as failed).
     """
-    claims = getattr(request.state, "user", None)  # None: token check off (local server)
-    is_admin = claims is None or (not is_scheduler(claims) and has_role(claims, Role.ADMIN))
-    if (force or email) and not is_admin:
+    if (force or email) and not is_admin(request):
         return error(403, "Les options force et email sont réservées aux administrateurs.")
     report = await run_in_threadpool(CompetitionResultsBatchService.run_daily_batch, force=force, to_email=email)
     return BatchReport.model_validate(report)

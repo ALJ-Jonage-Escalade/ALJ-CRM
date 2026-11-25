@@ -19,7 +19,7 @@ from infrastructure.security.roles import Role
 
 # (method, path) of every route -> the role it requires (None: public; "MOUNT" for the static file mounts, None too).
 # HEAD is left out (Starlette adds it to every GET). A new route must be added here with its role: writes default to
-# coach in api_auth.required_role, so an admin-only write needs its own branch there.
+# coach in api_auth.required_role, so an admin-only write needs an entry in its ADMIN_AREAS.
 EXPECTED_ROUTES: dict[tuple[str, str], Optional[Role]] = {
     ("GET", "/"): None,
     ("MOUNT", "/annuaire"): None,

@@ -11,14 +11,13 @@ from api.communications.schemas import (
     EmailDispatch, EmailSendRequest, EmailStatus, EmailTemplate,
     EmailTemplateDeleted, EmailTemplates, EmailTemplateSaved, EmailTemplateUpdate, EmailVariable, EmailVariables,
 )
-from api.auth.me import author_of
+from api.auth.me import author_of, is_admin
 from api.responses import error, error_responses
 from services.communications.email_dispatch import EmailDispatchService, OutgoingEmail
 from services.communications.email_templates import delete_template, list_templates, save_template
 from domain.communications.email_variables import VARIABLES, aliases_of
 from domain.communications.club_emails import CLUB_CONTACT_EMAIL, DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME, SENDER_SUGGESTIONS
 from infrastructure.security.secret_store import SecretStore
-from infrastructure.security.api_auth import Role, has_role
 
 router = APIRouter()
 
@@ -85,14 +84,14 @@ def get_email_status() -> EmailStatus:
     )
 
 
-@router.post("/api/send-email", response_model=EmailDispatch, responses=error_responses(400, 403, 500, 502))
+@router.post("/api/send-email", response_model=EmailDispatch, responses=error_responses(400, 403, 500, 502, 503))
 def send_email_api(request: Request, data: EmailSendRequest) -> EmailDispatch | JSONResponse:
     """Envoie un e-mail personnalisé à chaque destinataire (Gmail API ou SMTP), avec les variables remplacées.
-    400: nothing to send (empty subject or body, no valid recipient); 502: every e-mail failed."""
-    claims = getattr(request.state, "user", None)  # None: token check off (local dev server)
+    400: nothing to send (empty subject or body, no valid recipient); 502: every e-mail failed;
+    503: the access list could not be read (admin-only sender check)."""
     recipients = [recipient.model_dump() for recipient in data.recipients]
     reason = EmailDispatchService.unauthorized_send_reason(
-        recipients, data.sender_email or None, is_admin=claims is None or has_role(claims, Role.ADMIN))
+        recipients, data.sender_email or None, is_admin=is_admin(request))
     if reason:
         return error(403, reason)
     message = OutgoingEmail(template_name=data.template_name, subject=data.subject, body=data.body,

@@ -19,6 +19,7 @@ from infrastructure.firestore.access_store import RoleEntry
 from infrastructure.mail.sender import EmailSender
 from domain.communications.club_emails import DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_NAME
 from infrastructure.security.role_directory import normalized_email, parsed
+from infrastructure.security.roles import RoleName
 from services.access.rules import AccessRules
 from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
 
@@ -27,7 +28,7 @@ logger = logging.getLogger("alj")
 APP_PATH = "/bureau/"
 GOOGLE_SIGNUP_URL = "https://accounts.google.com/signup"
 SUBJECT = "Invitation au bureau de la section escalade ALJ"
-ROLE_LABELS = {"admin": "administrateur", "coach": "coach", "readonly": "lecture seule"}
+ROLE_LABELS: dict[RoleName, str] = {"admin": "administrateur", "coach": "coach", "readonly": "lecture seule"}
 
 # Sends one e-mail: EmailSender.send_email (keyword arguments), a fake in the tests
 Sender = Callable[..., None]  # EmailSender.send_email: raises MailError on failure
@@ -61,7 +62,7 @@ def expiry_date(entry: RoleEntry) -> str:
 def invitation_email(entry: RoleEntry, inviter: str, link: str) -> tuple[str, str]:
     """The text and HTML bodies of the invitation of this entry."""
     greeting = f"Bonjour {entry['display_name']}," if entry["display_name"] else "Bonjour,"
-    role = ROLE_LABELS.get(entry["role"], entry["role"])
+    role = ROLE_LABELS[entry["role"]]
     email = entry["email"]
     until = expiry_date(entry)
     text = (

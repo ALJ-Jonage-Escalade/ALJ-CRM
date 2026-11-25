@@ -14,9 +14,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from api.responses import error, error_responses
-from infrastructure.security.api_auth import ACCESS_UNAVAILABLE_MESSAGE, emulator_claims, role_for_claims, verified_email
+from domain.errors import StorageUnavailable
+from infrastructure.security.api_auth import (
+    ACCESS_UNAVAILABLE_MESSAGE, emulator_claims, has_role, is_scheduler, role_for_claims, verified_email,
+)
 from infrastructure.security.role_directory import AccessUnavailable
-from infrastructure.security.roles import ROLE_NAMES, RoleName
+from infrastructure.security.roles import ROLE_NAMES, Role, RoleName
 from services.access import rules as access_rules
 
 logger = logging.getLogger("alj")
@@ -41,6 +44,21 @@ def author_of(request: Request) -> str:
     """E-mail of the person making a change, kept for audit (the local server without token checks has none)."""
     claims = signed_in_claims(request)
     return str((claims or {}).get("email") or LOCAL_AUTHOR).strip().lower()
+
+
+def is_admin(request: Request) -> bool:
+    """Whether the caller is an admin, for a route open to coaches with admin-only options.
+    The local server without token checks counts as admin; Cloud Scheduler never does.
+    StorageUnavailable (503) when the access list cannot be read, as auth_middleware answers."""
+    claims = getattr(request.state, "user", None)  # None: token checks off (local server)
+    if claims is None:
+        return True
+    if is_scheduler(claims):
+        return False
+    try:
+        return has_role(claims, Role.ADMIN)
+    except AccessUnavailable as e:
+        raise StorageUnavailable(ACCESS_UNAVAILABLE_MESSAGE, "access_unavailable") from e
 
 
 def _record_sign_in(email: str) -> None:

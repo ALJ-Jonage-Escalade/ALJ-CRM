@@ -780,7 +780,8 @@ export interface paths {
         /**
          * Send Email Api
          * @description Envoie un e-mail personnalisé à chaque destinataire (Gmail API ou SMTP), avec les variables remplacées.
-         *     400: nothing to send (empty subject or body, no valid recipient); 502: every e-mail failed.
+         *     400: nothing to send (empty subject or body, no valid recipient); 502: every e-mail failed;
+         *     503: the access list could not be read (admin-only sender check).
          */
         post: operations["send_email_api_api_send_email_post"];
         delete?: never;
@@ -7478,6 +7479,15 @@ export interface operations {
             };
             /** @description Bad Gateway */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
