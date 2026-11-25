@@ -3,7 +3,7 @@ create, update under the optimistic lock, archive and delete."""
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from domain.competitions.models import STATUT_CLOSE, Competition
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
@@ -27,7 +27,7 @@ def get_competition(competition_id: int) -> Competition | None:
     return documents.comp_from_doc(doc) if doc else None
 
 
-def list_competition_docs() -> list[dict[str, Any]]:
+def list_competition_docs() -> list[documents.CompetitionDoc]:
     """Competition documents as stored (participants and counters included), most
     recent first: the shape the web pages use."""
     coaches = documents.coaches_map()
@@ -42,13 +42,13 @@ def get_stored_competition_doc(competition_id: int) -> dict[str, Any] | None:
     return documents.load_comp_doc(competition_id)
 
 
-def get_competition_doc(competition_id: int) -> dict[str, Any] | None:
+def get_competition_doc(competition_id: int) -> documents.CompetitionDoc | None:
     """The competition's document shaped for the web pages (see competition_api_doc), None when unknown."""
     doc = documents.load_comp_doc(competition_id)
     return competition_api_doc(doc) if doc else None
 
 
-def competition_api_doc(doc: dict[str, Any]) -> dict[str, Any]:
+def competition_api_doc(doc: dict[str, Any]) -> documents.CompetitionDoc:
     """Shape of get_competition_doc for a document already read or just written (the
     participant writes return it): saves reading it again."""
     return _with_member_sex(documents.api_doc(doc, documents.coaches_map()), _member_sexes())
@@ -64,15 +64,18 @@ def _member_sexes() -> dict[int, str | None]:
         return {}
 
 
-def _with_member_sex(doc: dict[str, Any], sexes: dict[int, str | None]) -> dict[str, Any]:
+def _with_member_sex(doc: documents.CompetitionDoc, sexes: dict[int, str | None]) -> documents.CompetitionDoc:
     """The API document with each participant's `sex` read from its member (the copy older rows hold,
     `gender`, is dropped). Participant maps are copied: `doc` may share them with a cached document."""
-    participants = []
+    participants: list[documents.ParticipantDoc] = []
     for participant in doc.get("participants") or []:
-        row = {k: v for k, v in participant.items() if k != "gender"}
-        row["sex"] = sexes.get(participant.get("adherent_id"))
+        row = cast(documents.ParticipantDoc, {k: v for k, v in participant.items() if k != "gender"})
+        adherent_id = participant.get("adherent_id")
+        row["sex"] = sexes.get(adherent_id) if adherent_id is not None else None
         participants.append(row)
-    return {**doc, "participants": participants}
+    shaped = doc.copy()
+    shaped["participants"] = participants
+    return shaped
 
 
 def archive_past_competitions(today_iso: str) -> list[int]:

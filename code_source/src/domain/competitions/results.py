@@ -4,7 +4,7 @@ MyCompet rankings to the club's participants."""
 from __future__ import annotations
 
 import datetime
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Mapping, Optional, TypedDict
 
 from domain.utils import normalize_name
 
@@ -21,7 +21,7 @@ class ClubAthlete(TypedDict):
     performance: str
 
 
-def end_date(competition: Dict[str, Any]) -> Optional[datetime.date]:  # Any: Firestore competition document
+def end_date(competition: Mapping[str, Any]) -> Optional[datetime.date]:  # Any: Firestore competition document
     """Last day of a competition (`date_fin`, else `date_competition`), None when unknown."""
     target = str(competition.get("date_fin") or "").strip() or str(competition.get("date_competition") or "").strip()
     try:
@@ -30,13 +30,13 @@ def end_date(competition: Dict[str, Any]) -> Optional[datetime.date]:  # Any: Fi
         return None
 
 
-def is_competition_past(competition: Dict[str, Any], today: Optional[datetime.date] = None) -> bool:  # Any: as above
+def is_competition_past(competition: Mapping[str, Any], today: Optional[datetime.date] = None) -> bool:  # Any: as above
     """True once the competition's last day has come."""
     ended = end_date(competition)
     return ended is not None and ended <= (today or datetime.date.today())
 
 
-def has_results(competition: Dict[str, Any]) -> bool:  # Any: as above
+def has_results(competition: Mapping[str, Any]) -> bool:  # Any: as above
     """True when results were synced and at least one participant has a ranking."""
     rows = competition.get("participants") or []
     has_rankings = any(str(row.get("classement") or "").strip() or str(row.get("resultat_ffme") or "").strip() for row in rows)

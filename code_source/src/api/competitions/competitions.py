@@ -17,6 +17,7 @@ from api.responses import STORAGE_ERRORS, SUCCESS, XLSX, document_responses, err
 from api.competitions.schemas.competitions import CompetitionCreate, CompetitionFfmeLookup, CompetitionUpdate
 from api.competitions.schemas.views import Competition, Done, PastArchived
 from services.competitions.competitions import CompetitionService as Service
+from infrastructure.firestore.competitions.documents import CompetitionDoc
 from services.documents import Doc
 
 router = APIRouter(prefix="/api/competitions")
@@ -33,12 +34,12 @@ def lookup_ffme_competition(id_ffme: str) -> Doc:
 
 
 @router.post("", status_code=201, response_model=None, responses=document_responses(Competition, *STORAGE_ERRORS, status=201))
-def create_competition(body: CompetitionCreate) -> Doc:
+def create_competition(body: CompetitionCreate) -> CompetitionDoc:
     return Service.create_competition(body.model_dump(exclude_none=True))
 
 
 @router.patch("/{competition_id}", response_model=None, responses=document_responses(Competition, 404, *STORAGE_ERRORS))
-def update_competition(competition_id: int, body: CompetitionUpdate) -> Doc:
+def update_competition(competition_id: int, body: CompetitionUpdate) -> CompetitionDoc:
     return Service.update_competition(competition_id, body.model_dump(exclude_unset=True))
 
 

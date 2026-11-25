@@ -10,7 +10,7 @@ Charte graphique ALJ Escalade :
 from __future__ import annotations
 
 import io
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping
 
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -61,7 +61,7 @@ def payment_label(participant: Dict[str, Any]) -> str:
     return f"{label} ({amount} €)" if amount else label
 
 
-def export_competitors_excel(comp: Dict[str, Any], participants: List[Dict[str, Any]] | None = None) -> bytes:
+def export_competitors_excel(comp: Mapping[str, Any], participants: List[Dict[str, Any]] | None = None) -> bytes:
     """Génère le classeur Excel d'une compétition avec ses compétiteurs et retourne les octets."""
     wb = openpyxl.Workbook()
     ws = wb.active

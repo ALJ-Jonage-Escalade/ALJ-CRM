@@ -162,7 +162,7 @@ class Competition:
         }
 
     @classmethod
-    def from_row(cls, row: dict) -> "Competition":
+    def from_row(cls, row: Mapping[str, Any]) -> "Competition":
         return cls(
             id=_optional_int(row.get("id")),
             id_ffme=str(row.get("id_ffme") or ""),

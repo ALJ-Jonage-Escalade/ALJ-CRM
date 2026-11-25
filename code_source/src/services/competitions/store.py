@@ -16,9 +16,9 @@ import os
 from typing import Callable, List, ParamSpec, TypeVar
 
 from infrastructure.firestore.competitions import competitions
+from infrastructure.firestore.competitions.documents import CompetitionDoc
 from infrastructure.firestore.client import FirestoreConflictError, FirestoreError
 from infrastructure.timed_cache import TimedCache
-from services.documents import Doc
 from domain.errors import Conflict, NotFound, StorageUnavailable
 
 logger = logging.getLogger("alj")
@@ -26,7 +26,7 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 _CACHE_KEY = "competitions"
-_competitions_cache: TimedCache[str, List[Doc]] = TimedCache(math.inf)  # lifetime set per load
+_competitions_cache: TimedCache[str, List[CompetitionDoc]] = TimedCache(math.inf)  # lifetime set per load
 
 
 def _cache_seconds() -> float:
@@ -36,7 +36,7 @@ def _cache_seconds() -> float:
     return float(os.environ.get("ALJ_COMPETITIONS_CACHE_SECONDS", "5"))
 
 
-def cached_competitions(load: Callable[[], List[Doc]]) -> List[Doc]:
+def cached_competitions(load: Callable[[], List[CompetitionDoc]]) -> List[CompetitionDoc]:
     return _competitions_cache.get_or_load_expiring(_CACHE_KEY, lambda: (load(), _cache_seconds()))
 
 
@@ -79,7 +79,7 @@ def competition_not_found() -> NotFound:
     return NotFound("Compétition introuvable.")
 
 
-def require_competition(competition_id: int) -> Doc:
+def require_competition(competition_id: int) -> CompetitionDoc:
     doc = competitions.get_competition_doc(competition_id)
     if doc is None:
         raise competition_not_found()

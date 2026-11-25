@@ -24,6 +24,7 @@ from domain.errors import InvalidRequest, NotFound, StorageUnavailable, Upstream
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions import competitions, documents, participants
+from infrastructure.firestore.competitions.documents import CompetitionDoc
 from infrastructure.mail.sender import EmailSender, MailError
 from infrastructure.mycompet.scraper import (
     ArchiveEntry,
@@ -151,7 +152,7 @@ class CompetitionResultsBatchService:
 
     @classmethod
     def list_pending_competitions(cls, force: bool = False, window_days: Optional[int] = None,
-                                  today: Optional[datetime.date] = None) -> List[Dict[str, Any]]:
+                                  today: Optional[datetime.date] = None) -> List[CompetitionDoc]:
         """Competitions ended in the last `window_days` days (None: the setting) without results, most recent first.
         `force`: every competition ended in the last FORCED_WINDOW_DAYS days (or the window, if longer), results or not.
         StorageUnavailable when Firestore cannot be read."""
@@ -174,7 +175,7 @@ class CompetitionResultsBatchService:
         return pending
 
     @classmethod
-    def find_result_url(cls, comp: Dict[str, Any], archive: List[ArchiveEntry]) -> Tuple[str, bool]:
+    def find_result_url(cls, comp: CompetitionDoc, archive: List[ArchiveEntry]) -> Tuple[str, bool]:
         """(URL, trusted) of a competition's results. An URL entered by hand is trusted; an archive line only when
         its date matches the competition's (a page of the same venue, an earlier season, matches the name too).
         ("", False): no line matches at all, the results are not published yet."""
@@ -189,7 +190,7 @@ class CompetitionResultsBatchService:
         return find_result_url_in_archives(archive, nom, lieu, date_debut, date_fin), False
 
     @classmethod
-    def sync_results_for_competition(cls, comp: Dict[str, Any], archive: List[ArchiveEntry],
+    def sync_results_for_competition(cls, comp: CompetitionDoc, archive: List[ArchiveEntry],
                                      club_keyword: str = "JONAGE") -> CompetitionOutcome:
         """Finds, fetches and writes the MyCompet results of one competition."""
         nom = comp.get("nom") or ""
@@ -305,7 +306,7 @@ class CompetitionResultsBatchService:
         return True
 
     @classmethod
-    def _load_archive(cls, pending: List[Dict[str, Any]]) -> List[ArchiveEntry]:
+    def _load_archive(cls, pending: List[CompetitionDoc]) -> List[ArchiveEntry]:
         """The FFME archive, read once per run, only when a competition has no results URL yet."""
         if all(str(c.get("url_resultats") or c.get("id_resultat_ffme") or "").strip() for c in pending):
             return []
@@ -316,10 +317,10 @@ class CompetitionResultsBatchService:
             return []
 
     @classmethod
-    def _mark_url_requested(cls, comp: Dict[str, Any], at: str) -> None:
+    def _mark_url_requested(cls, comp: CompetitionDoc, at: str) -> None:
         try:
             FirestoreClient.update_fields(documents.COLLECTION_COMPETITIONS,
-                                          comp.get("_doc_id") or str(comp["id"]), {FIELD_NEEDS_URL_NOTIFIED: at})
+                                          str(comp["id"]), {FIELD_NEEDS_URL_NOTIFIED: at})
         except FirestoreError:
             logger.warning("[BATCH_RESULTATS] Mémorisation de la demande d'URL impossible (#%s)", comp.get("id"), exc_info=True)
 
@@ -355,7 +356,7 @@ class CompetitionResultsBatchService:
         archive = cls._load_archive(pending)
         results_found_list: List[Dict[str, Any]] = []
         needs_url: List[Dict[str, Any]] = []
-        needs_url_comps: List[Dict[str, Any]] = []  # their documents, marked once the e-mail is sent
+        needs_url_comps: List[CompetitionDoc] = []  # their documents, marked once the e-mail is sent
         details: List[Dict[str, Any]] = []
         checked = 0
 

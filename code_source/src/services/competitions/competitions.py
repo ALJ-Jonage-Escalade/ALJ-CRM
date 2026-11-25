@@ -14,9 +14,9 @@ from domain.competitions.models import Competition
 from exports.competitors_excel import export_competitors_excel
 from exports.competitors_pdf import export_competitors_pdf
 from infrastructure.firestore.competitions import competitions
+from infrastructure.firestore.competitions.documents import CompetitionDoc
 from infrastructure.mycompet.scraper import scrape_competition_info_by_id
 from services.competitions.store import cached_competitions, competition_not_found, require_competition, storage, write
-from services.documents import Doc
 
 # Fields stored as given, outside the domain model (plan appendix B)
 PASS_THROUGH_FIELDS = ("lieu", "type")
@@ -32,12 +32,12 @@ class CompetitionService:
 
     @staticmethod
     @storage
-    def list_competitions() -> List[Doc]:
+    def list_competitions() -> List[CompetitionDoc]:
         return cached_competitions(competitions.list_competition_docs)
 
     @staticmethod
     @write
-    def create_competition(fields: Dict[str, Any]) -> Doc:
+    def create_competition(fields: Dict[str, Any]) -> CompetitionDoc:
         """`fields`: validated body (api.competitions.schemas.competitions.CompetitionCreate)."""
         comp = Competition(**{k: fields[k] for k in COMPETITION_FIELDS if k in fields})
         comp.coach_ids = list(fields.get("coach_ids") or [])
@@ -46,7 +46,7 @@ class CompetitionService:
 
     @staticmethod
     @write
-    def update_competition(competition_id: int, fields: Dict[str, Any]) -> Doc:
+    def update_competition(competition_id: int, fields: Dict[str, Any]) -> CompetitionDoc:
         """Partial update: only the fields given are changed (participants untouched), on the
         version of the document read (a concurrent write to other fields is kept)."""
         def change(comp: Competition) -> None:

@@ -11,14 +11,14 @@ from __future__ import annotations
 
 import html
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping
 
 from exports.competitors_excel import payment_label
 
 logger = logging.getLogger("alj")
 
 
-def generate_competitors_html(comp: Dict[str, Any], participants: List[Dict[str, Any]] | None = None) -> str:
+def generate_competitors_html(comp: Mapping[str, Any], participants: List[Dict[str, Any]] | None = None) -> str:
     """Génère le code HTML prêt pour conversion PDF / impression navigateur."""
     nom_comp = html.escape(str(comp.get("nom") or "Compétition"))
     date_comp = html.escape(str(comp.get("date_competition") or ""))
@@ -169,7 +169,7 @@ def generate_competitors_html(comp: Dict[str, Any], participants: List[Dict[str,
 </html>"""
 
 
-def export_competitors_pdf(comp: Dict[str, Any], participants: List[Dict[str, Any]] | None = None) -> bytes:
+def export_competitors_pdf(comp: Mapping[str, Any], participants: List[Dict[str, Any]] | None = None) -> bytes:
     """Génère le PDF des compétiteurs via WeasyPrint si disponible, ou retourne le HTML encodé."""
     html_content = generate_competitors_html(comp, participants)
     try:
