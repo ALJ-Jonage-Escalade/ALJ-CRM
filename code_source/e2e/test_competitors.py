@@ -45,8 +45,9 @@ def _assert_stored(test_data, competition, member, **expected):
     eventually(check)
 
 
-def test_counters_and_filters(mobile_page, competition, members):
-    page = open_screen(mobile_page)
+def test_counters_and_filters(page, competition, members):
+    """The registration filters, on a computer (a phone filters on the slot group: test_competitions_view.py)."""
+    open_screen(page, "admin", "/bureau/competitions")
     open_competition(page, competition["nom"])
     expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (3)")
     expect(page.get_by_test_id("filter-unpaid")).to_have_text("⏳ Paiement en attente (2)")
@@ -68,9 +69,9 @@ def test_counters_and_filters(mobile_page, competition, members):
     expect(participant_card(page, members["invited"])).to_be_visible()
 
 
-def test_select_invited_member(mobile_page, test_data, competition, members):
+def test_select_invited_member(page, test_data, competition, members):
     invited = members["invited"]
-    page = open_screen(mobile_page)
+    open_screen(page, "admin", "/bureau/competitions")
     open_competition(page, competition["nom"])
     participant_card(page, invited).get_by_test_id("participe-switch").click()
     expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (4)")
@@ -113,9 +114,9 @@ def test_closing_the_withdrawal_keeps_the_paid_member(mobile_page, competition, 
     expect(participant_card(page, paid).get_by_test_id("payment-badge")).to_have_text("Payé (12 €)")
 
 
-def test_add_member_outside_the_list(mobile_page, test_data, competition, members):
+def test_add_member_outside_the_list(page, test_data, competition, members):
     outsider = members["outsider"]
-    page = open_screen(mobile_page)
+    open_screen(page, "admin", "/bureau/competitions")
     open_competition(page, competition["nom"])
     page.get_by_test_id("add-competitor-btn").click()
     page.get_by_test_id("member-search").fill(outsider["nom"][:4])
@@ -127,11 +128,11 @@ def test_add_member_outside_the_list(mobile_page, test_data, competition, member
     _assert_stored(test_data, competition, outsider, selectionne=True)
 
 
-def test_load_competition_group(mobile_page, test_data):
+def test_load_competition_group(page, test_data):
     nom = unique_name("E2E Group")
     cid = test_data.create_competition(nom, date=_iso(41))
     group = test_data.competition_group()
-    page = open_screen(mobile_page)
+    open_screen(page, "admin", "/bureau/competitions")
     open_competition(page, nom)
     expect(page.get_by_test_id("participant-card")).to_have_count(0)
     page.get_by_test_id("detail-more").click()
@@ -217,18 +218,6 @@ def test_withdrawal_of_paid_competitor(page, test_data, workflow, mode, badge, s
     card.get_by_test_id("restore").click()
     expect(card.get_by_test_id("payment-badge")).to_have_text("Payé (12 €)")
     _assert_stored(test_data, workflow, workflow["paid"], statut_paiement="paye", selectionne=True)
-
-
-def test_checked_in_competitor_is_locked(mobile_page, test_data, workflow):
-    """On a phone: the wide table has no « Présent » column."""
-    page = mobile_page
-    _open_workflow(page, workflow)
-    card = participant_card(page, workflow["paid"])
-    card.get_by_test_id("present-switch").click()
-    expect(card.get_by_test_id("on-site")).to_contain_text("Sur place")
-    expect(card.get_by_test_id("withdraw")).to_have_count(0)
-    expect(card.get_by_test_id("present-switch")).to_be_checked()
-    _assert_stored(test_data, workflow, workflow["paid"], present=True)
 
 
 def test_remove_unpaid_competitor(page, test_data, workflow):

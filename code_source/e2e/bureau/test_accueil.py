@@ -5,28 +5,32 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import expect
 
-from helpers.auth import login_as
+from helpers.auth import login_as, open_menu
 
 VERSION = (Path(__file__).resolve().parents[2] / "VERSION").read_text(encoding="utf-8").strip()
 NAV = "nav[aria-label='Navigation principale']"
 
 
 def test_phone_layout(mobile_page):
-    """Bottom navigation bar, no horizontal scroll, version in the footer."""
+    """Menu button at the top right, version next to the club name, no horizontal scroll."""
     mobile_page.goto("/bureau/")
     login_as(mobile_page, "coach")
     expect(mobile_page.locator("#content")).to_be_visible()
     assert mobile_page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
 
+    # Menu button at the top right; the menu (pages, account, logout) opens under it
     viewport = mobile_page.viewport_size
-    nav = mobile_page.locator(NAV).bounding_box()
-    assert abs(nav["y"] + nav["height"] - viewport["height"]) <= 1, "navigation bar at the bottom of the screen"
-    assert nav["width"] == viewport["width"]
+    toggle = mobile_page.locator("#menu-toggle").bounding_box()
+    assert toggle["y"] < 80 and toggle["x"] + toggle["width"] > viewport["width"] - 40, "menu button at the top right"
+    expect(mobile_page.locator(NAV)).to_be_hidden()
+    open_menu(mobile_page)
+    expect(mobile_page.locator("#logout-btn")).to_be_visible()
     expect(mobile_page.locator(f"{NAV} a")).to_have_count(6)  # a coach: no Communications, no Paramètres
-    # The directory instead of Adhérents in the menu (both pages still open by their address)
-    expect(mobile_page.locator(f"{NAV} a").filter(visible=True)).to_have_count(5)
+    # Accueil, Compétitions and the directory only: the office pages stay on a computer (still open by their address)
+    expect(mobile_page.locator(f"{NAV} a").filter(visible=True)).to_have_count(3)
     expect(mobile_page.locator(f"{NAV} a[data-page='annuaire']")).to_be_visible()
     expect(mobile_page.locator(f"{NAV} a[data-page='adherents']")).to_be_hidden()
+    expect(mobile_page.locator(f"{NAV} a[data-page='planning']")).to_be_hidden()
     expect(mobile_page.get_by_text(f"v{VERSION}", exact=True).filter(visible=True)).to_be_visible()
 
 

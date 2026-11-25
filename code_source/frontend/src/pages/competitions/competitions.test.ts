@@ -12,7 +12,9 @@ import {
   draftErrors,
   draftOf,
   filterCompetitions,
+  countLine,
   filterRows,
+  groupFilters,
   groupRows,
   hasPaid,
   isNotInvited,
@@ -210,6 +212,36 @@ describe("participants", () => {
     expect(filterRows(rows, "notInvited").map((r) => r.nom)).toEqual(["ABEL"]);
     expect(filterRows(rows, "all", "zoe").map((r) => r.nom)).toEqual(["DURAND"]);
     expect(groupRows(rows).map(([g]) => g)).toEqual(["Compét. U14", "Compét. U18", UNIDENTIFIED]);
+  });
+
+  it("filters by slot group, offering the groups where someone takes part", () => {
+    const rows = participantRows(c, members, contacts);
+    // « Non identifiés »: nobody takes part, no filter
+    expect(groupFilters(rows)).toEqual([
+      { group: "Compét. U14", n: 1 },
+      { group: "Compét. U18", n: 1 },
+    ]);
+    expect(filterRows(rows, "all", "", "Compét. U14").map((r) => r.nom)).toEqual(["DURAND"]);
+    expect(countLine(counts(rows), "all", 1, "Compét. U14")).toBe("1 compétiteur en « Compét. U14 »");
+  });
+
+  it("splits a slot group by sex, girls first, unknown sex last", () => {
+    const climber = (adherent_id: number, sex: "F" | "H" | null, selectionne = true) => ({
+      adherent_id,
+      nom: `N${adherent_id}`,
+      sex,
+      selectionne,
+    });
+    const group = comp({ participants: [climber(1, "H"), climber(2, null), climber(3, "F"), climber(4, "H"), climber(5, "F", false)] });
+    const slots: MemberSlot[] = [1, 2, 3, 4, 5].map((id) => ({ id, creneau_groupe: "U11-U13" }));
+    const rows = participantRows(group, slots, []);
+    expect(groupFilters(rows)).toEqual([
+      { group: "U11-U13 - F", n: 2 },
+      { group: "U11-U13 - H", n: 2 },
+      { group: "U11-U13", n: 1 },
+    ]);
+    expect(filterRows(rows, "all", "", "U11-U13 - H").map((r) => r.adherent_id)).toEqual([1, 4]);
+    expect(filterRows(rows, "all", "", "U11-U13").map((r) => r.adherent_id)).toEqual([2]);
   });
 
   it("tells who paid, who was never invited, and their ranking", () => {

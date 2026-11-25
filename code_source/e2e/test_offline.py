@@ -11,6 +11,7 @@ import re
 import pytest
 from playwright.sync_api import expect
 
+from helpers.auth import open_menu
 from helpers.competitions import go_to, open_competition, open_screen, participant_card, sub_menu_entry, toast
 from helpers.data import eventually, unique_name
 from helpers.offline import owner, put_queued, queued, stored, wait_stored
@@ -75,19 +76,19 @@ def test_competitors_shown_offline_other_changes_refused(mobile_page, competitio
         mobile_page.context.set_offline(False)
 
 
-def test_coach_opens_bilan_offline_helloasso_waits_for_the_network(mobile_page, competition):
-    """Sub-pages offline (plans/sub-menus.md D6): Bilan reads the copy kept on a coach's phone, HelloAsso stays listed
+def test_coach_opens_bilan_offline_helloasso_waits_for_the_network(page, competition):
+    """Sub-pages offline (plans/sub-menus.md D6): Bilan reads the copy kept on a coach's device, HelloAsso stays listed
     but disabled."""
-    page = open_screen(mobile_page)
+    page = open_screen(page)
     open_competition(page, competition["nom"])
-    go_offline(page, mobile_page.context, competition)
+    go_offline(page, page.context, competition)
     try:
         go_to(page, "bilan")
         expect(page.get_by_test_id("balance-pane")).to_be_visible()
         expect(page).to_have_url(re.compile(r"/competitions/bilan$"))
         expect(sub_menu_entry(page, "helloasso")).to_have_attribute("aria-disabled", "true")
     finally:
-        mobile_page.context.set_offline(False)
+        page.context.set_offline(False)
 
 
 def test_change_made_offline_is_sent_later(mobile_page, test_data, competition):
@@ -100,9 +101,8 @@ def test_change_made_offline_is_sent_later(mobile_page, test_data, competition):
         card = participant_card(page, member)
         card.get_by_test_id("participe-switch").click()
         expect(card.get_by_test_id("queued")).to_be_visible()
-        card.get_by_test_id("present-switch").click()  # the same competitor, the other flag
-        expect(page.locator("#sync-info")).to_contain_text("2 modifications à envoyer")
-        expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (0)")
+        expect(page.locator("#sync-info")).to_contain_text("1 modification à envoyer")
+        expect(card.get_by_test_id("participe-switch")).not_to_be_checked()
         assert participant(test_data, competition)["selectionne"] is True  # not sent yet
         # Kept on the device: still there after a restart without network (the page itself needs the network to
         # load here: service workers are blocked)
@@ -116,7 +116,7 @@ def test_change_made_offline_is_sent_later(mobile_page, test_data, competition):
 
     def sent():
         p = participant(test_data, competition)
-        assert (p["selectionne"], p.get("present")) == (False, True)
+        assert p["selectionne"] is False
     eventually(sent)
     expect(participant_card(page, member).get_by_test_id("queued")).to_have_count(0)
     assert queued(page) == []
@@ -141,7 +141,7 @@ def test_change_made_offline_is_refused_when_changed_elsewhere(mobile_page, test
     expect(toast(page)).to_contain_text("modifié entre-temps sur un autre appareil")
     assert participant(test_data, competition)["selectionne"] is True
     expect(participant_card(page, member).get_by_test_id("queued")).to_have_count(0)
-    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (1)")
+    expect(participant_card(page, member).get_by_test_id("participe-switch")).to_be_checked()
 
 
 def test_change_queued_by_the_former_page_is_sent(mobile_page, test_data, competition):
@@ -170,8 +170,9 @@ def test_logout_with_changes_not_sent_asks_first(mobile_page, competition):
     open_competition(page, competition["nom"])
     go_offline(page, context, competition)
     try:
-        participant_card(page, member).get_by_test_id("present-switch").click()
+        participant_card(page, member).get_by_test_id("participe-switch").click()
         expect(participant_card(page, member).get_by_test_id("queued")).to_be_visible()
+        open_menu(page)
         page.locator("#logout-btn").click()
         cancel_dialog(page, "1 modification faite hors ligne pas encore envoyée sera perdue. Se déconnecter ?")  # kept signed in
         expect(page.locator("#logout-btn")).to_be_visible()
@@ -190,6 +191,7 @@ def test_logout_with_changes_not_sent_asks_first(mobile_page, competition):
 def test_logout_wipes_the_store(mobile_page, competition):
     page = open_screen(mobile_page)
     wait_stored(page, "competitors")
+    open_menu(page)
     page.locator("#logout-btn").click()
     expect(page.locator("#gate-login")).to_be_visible()
 

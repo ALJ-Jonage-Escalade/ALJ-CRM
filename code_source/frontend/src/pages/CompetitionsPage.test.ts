@@ -4,6 +4,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import { AUTH_KEY, type AuthState } from "../composables/auth";
+import { WIDE_LAYOUT_QUERY } from "../composables/media";
 import { API_KEY, type ApiFetch } from "../lib/api";
 import { CLIENT_KEY, createApiClient } from "../lib/client";
 import type { Role } from "../lib/roles";
@@ -22,7 +23,15 @@ const LEO = {
   commande_helloasso: "CMD-1",
   updated_at: "t1",
 };
-const ZOE = { adherent_id: 2, nom: "DURAND", prenom: "Zoé", selectionne: true, statut_paiement: "en_attente", updated_at: "t2" };
+const ZOE = {
+  adherent_id: 2,
+  nom: "DURAND",
+  prenom: "Zoé",
+  sex: "F" as const,
+  selectionne: true,
+  statut_paiement: "en_attente",
+  updated_at: "t2",
+};
 const MAX = { adherent_id: 3, nom: "ABEL", prenom: "Max", selectionne: false, statut_paiement: "non_invite", updated_at: "t3" };
 const COMPETITIONS: Competition[] = [
   {
@@ -168,8 +177,17 @@ let store: OfflineStore;
 beforeEach(() => {
   store = createOfflineStore({ indexedDB: new IDBFactory(), storage: localStorage });
 });
+/** A computer screen (jsdom has no matchMedia: a phone otherwise); undone after each test. */
+function onComputer(): void {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === WIDE_LAYOUT_QUERY,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   document.body.innerHTML = "";
 });
 
@@ -185,6 +203,7 @@ describe("CompetitionsPage", () => {
   });
 
   it("shows a competition's participants by group with payment status, contacts for coaches", async () => {
+    onComputer();
     const { byId, all } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
     await settle();
     expect(byId("detail-name").text()).toBe("Coupe du Rhône");
@@ -203,6 +222,22 @@ describe("CompetitionsPage", () => {
     expect(all("participant-name").map((n) => n.text())).toEqual(["DURAND Zoé"]);
     await byId("filter-notInvited").trigger("click");
     expect(all("participant-name").map((n) => n.text())).toEqual(["ABEL Max"]);
+  });
+
+  it("filters by slot group on a phone, where a competition day goes one group after the other", async () => {
+    const { byId, all } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
+    await settle();
+    expect([byId("filter-selected").exists(), byId("participant-search").exists()]).toEqual([false, false]);
+    expect(
+      byId("group-filter")
+        .findAll("option")
+        .map((o) => o.text()),
+    ).toEqual(["📋 Tous (3)", "Compét. U14 - F (1)", "Compét. U18 (1)"]);
+    await byId("group-filter").setValue("Compét. U18");
+    expect(all("participant-name").map((n) => n.text())).toEqual(["MARTIN Léo"]);
+    expect(byId("participant-count").text()).toBe("1 compétiteur en « Compét. U18 »");
+    await byId("group-filter").setValue("");
+    expect(all("participant-name")).toHaveLength(3);
   });
 
   it("offers each competitor the action their payment allows", async () => {
@@ -417,7 +452,6 @@ describe("CompetitionsPage", () => {
     expect(byId("when-upcoming").exists()).toBe(false);
     expect(byId("comp-season-filter").exists()).toBe(false);
     expect(all("calendar-comp-chip").map((c) => c.text())).toEqual(["Coupe du Rhône"]);
-    expect(all("calendar-agenda-item").map((c) => c.text())).toEqual([expect.stringContaining("Coupe du Rhône")]);
     await router.push("/competitions");
     await all("calendar-comp-chip")[0]!.trigger("click");
     await settle();
@@ -444,7 +478,7 @@ describe("CompetitionsPage", () => {
 
   it("opens the first competition of the list by itself when the list and the detail are side by side", async () => {
     vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query === "(min-width: 768px)",
+      matches: query === WIDE_LAYOUT_QUERY,
       addEventListener: () => {},
       removeEventListener: () => {},
     }));

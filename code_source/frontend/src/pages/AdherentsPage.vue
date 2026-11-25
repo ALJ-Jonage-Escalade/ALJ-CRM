@@ -469,29 +469,6 @@ const linkButton =
           <template v-else>—</template>
         </template>
         <template #cell-licence_ffme="{ value }">{{ value || "—" }}</template>
-
-        <template #card="{ row }">
-          <div class="flex items-start justify-between gap-2">
-            <RouterLink
-              :to="{ query: recordQuery(row) }"
-              data-testid="member-record"
-              class="min-w-0 font-bold text-slate-800 no-underline"
-              @click="panelOpen = true"
-            >
-              {{ row.last_name }} {{ row.first_name }}
-            </RouterLink>
-            <UiBadge :color="statusColor(row.status_norm)" class="shrink-0">{{ row.status_norm || "—" }}</UiBadge>
-          </div>
-          <div class="mt-0.5 text-xs text-slate-500">
-            {{ [row.creneau_groupe, row.city].filter(Boolean).join(" · ") || "—" }}
-            <span v-for="d in diplomes(row)" :key="d.type" :title="d.label" class="pl-1">{{ d.icon }}</span>
-          </div>
-          <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12.5px]">
-            <a v-if="row.phone" :href="telHref(row.phone)">📞 {{ row.phone }}</a>
-            <a v-if="row.email_primary" :href="`mailto:${row.email_primary}`" class="min-w-0 break-all">✉️ {{ row.email_primary }}</a>
-            <span v-if="row.licence_ffme" class="text-slate-500">🪪 {{ row.licence_ffme }}</span>
-          </div>
-        </template>
       </DataTable>
 
       <UiSidePanel

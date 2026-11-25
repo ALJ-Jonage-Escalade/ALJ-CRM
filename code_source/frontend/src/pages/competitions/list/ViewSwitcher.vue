@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* Cards, table or calendar: how the competition list is shown. */
+/* Cards, table or calendar: how the competition list is shown. On a computer only: phones show the cards. */
 import type { ViewMode } from "./filters";
 
 const viewMode = defineModel<ViewMode>({ required: true });
@@ -13,7 +13,7 @@ const VIEWS: { id: ViewMode; label: string }[] = [
 
 <template>
   <!-- Same look as the former section tabs of the page (before the sub-menu) -->
-  <div class="flex gap-1.5 overflow-x-auto" role="group" aria-label="Affichage des compétitions" data-testid="view-switcher">
+  <div class="hidden gap-1.5 overflow-x-auto md:flex" role="group" aria-label="Affichage des compétitions" data-testid="view-switcher">
     <button
       v-for="view in VIEWS"
       :key="view.id"

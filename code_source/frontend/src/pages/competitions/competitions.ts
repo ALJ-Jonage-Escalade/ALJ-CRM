@@ -290,9 +290,17 @@ export function participantRows(
 
 export type ParticipantFilter = "all" | "selected" | "unpaid" | "notInvited";
 
-export function filterRows(rows: readonly Row[], filter: ParticipantFilter, search = ""): Row[] {
+/** Phone filter of a competitor: the slot group split by sex (« Compét. U11-U13 - F »), as girls and boys compete
+    apart; the group alone when the sex is not known. */
+export const groupAndSex = (row: Pick<Row, "group" | "sex">): string => (row.sex ? `${row.group} - ${row.sex}` : row.group);
+
+/** group: one slot group and sex only (groupAndSex, phones), every group when empty. */
+export function filterRows(rows: readonly Row[], filter: ParticipantFilter, search = "", group = ""): Row[] {
   const q = normKey(search);
   return rows.filter((r) => {
+    if (group && groupAndSex(r) !== group) {
+      return false;
+    }
     if (filter === "selected" && !r.selectionne) {
       return false;
     }
@@ -322,7 +330,22 @@ export function groupRows(rows: readonly Row[]): [string, Row[]][] {
     .map(([g, list]) => [g, list.sort(byName)]);
 }
 
-export function countLine(counts: Counts, filter: ParticipantFilter, shown: number): string {
+/** Phones, on a competition day: one filter per slot group and sex (groupAndSex: they compete one after the other),
+    for those with at least one competitor taking part, in the order of the list (F before H, unknown sex last);
+    n: their competitors. */
+export function groupFilters(rows: readonly Row[]): { group: string; n: number }[] {
+  return groupRows(rows).flatMap(([group, list]) =>
+    (["F", "H", null] as const)
+      .map((sex) => ({ group: groupAndSex({ group, sex }), list: list.filter((r) => (r.sex ?? null) === sex) }))
+      .filter((option) => option.list.some((r) => r.selectionne))
+      .map((option) => ({ group: option.group, n: option.list.length })),
+  );
+}
+
+export function countLine(counts: Counts, filter: ParticipantFilter, shown: number, group = ""): string {
+  if (group) {
+    return `${shown} compétiteur${plural(shown)} en « ${group} »`;
+  }
   if (filter === "selected") {
     return `${counts.selected} compétiteur${plural(counts.selected)} sélectionné${plural(counts.selected)}`;
   }

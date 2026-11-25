@@ -8,7 +8,7 @@ import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
 import UiDialog from "../../../components/ui/UiDialog.vue";
-import { useMediaQuery } from "../../../composables/media";
+import { useMediaQuery, useWideLayout, XL_LAYOUT_QUERY } from "../../../composables/media";
 import { CLIENT_KEY } from "../../../lib/client";
 import { createCompetitionsApi } from "../../../services/competitions";
 import { formatEuros } from "../../../lib/format";
@@ -21,6 +21,7 @@ import {
   shownDiscipline,
   disciplineColor,
   filterRows,
+  groupFilters,
   groupRows,
   isArchived,
   isNotInvited,
@@ -64,10 +65,26 @@ const writer = inject(WRITER_KEY)!;
 const c = computed(() => props.competition);
 const kpis = computed(() => counts(props.rows));
 /* Wide screens: the competitors in a table, as on the former desktop page; cards elsewhere */
-const wide = useMediaQuery("(min-width: 1280px)");
+const wide = useMediaQuery(XL_LAYOUT_QUERY);
+/* A computer filters on the registration (participation, payment); a phone, used on the competition day, on the slot
+   group, as the groups compete one after the other (no search: a group is a short list) */
+const computerFilters = useWideLayout();
 const filter = ref<ParticipantFilter>("all");
+const shownGroup = ref("");
+const groupOptions = computed(() => groupFilters(props.rows));
+const activeFilter = computed<ParticipantFilter>(() => (computerFilters.value ? filter.value : "all"));
+const activeGroup = computed(() =>
+  !computerFilters.value && groupOptions.value.some((g) => g.group === shownGroup.value) ? shownGroup.value : "",
+);
+/* The select shows activeGroup, not shownGroup: a group gone from the list (competitor removed) shows « Tous » */
+const pickedGroup = computed({
+  get: () => activeGroup.value,
+  set: (group: string) => {
+    shownGroup.value = group;
+  },
+});
 const search = ref("");
-const shown = computed(() => filterRows(props.rows, filter.value, search.value));
+const shown = computed(() => filterRows(props.rows, activeFilter.value, computerFilters.value ? search.value : "", activeGroup.value));
 const groups = computed(() => groupRows(shown.value));
 const notInvited = computed(() => props.rows.filter(isNotInvited));
 const FILTERS = computed(() => [
@@ -389,19 +406,25 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           placeholder="Rechercher un compétiteur…"
           :class="[field, 'w-60']"
         />
-        <button
-          v-for="f in FILTERS"
-          :key="f.id"
-          type="button"
-          :data-testid="`filter-${f.id}`"
-          :aria-pressed="filter === f.id"
-          :class="chip(filter === f.id)"
-          @click="filter = f.id"
-        >
-          {{ f.label }} ({{ f.n }})
-        </button>
+        <template v-if="computerFilters">
+          <button
+            v-for="f in FILTERS"
+            :key="f.id"
+            type="button"
+            :data-testid="`filter-${f.id}`"
+            :aria-pressed="filter === f.id"
+            :class="chip(filter === f.id)"
+            @click="filter = f.id"
+          >
+            {{ f.label }} ({{ f.n }})
+          </button>
+        </template>
+        <select v-else v-model="pickedGroup" data-testid="group-filter" aria-label="Groupe de créneau" :class="[field, 'w-full']">
+          <option value="">📋 Tous ({{ kpis.all }})</option>
+          <option v-for="g in groupOptions" :key="g.group" :value="g.group">{{ g.group }} ({{ g.n }})</option>
+        </select>
         <input
-          v-if="!wide"
+          v-if="!wide && computerFilters"
           v-model="search"
           type="search"
           data-testid="participant-search"
@@ -409,11 +432,14 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           :class="[field, 'min-w-40 flex-1']"
         />
       </div>
-      <p class="mb-2 text-xs text-slate-500" data-testid="participant-count">{{ countLine(kpis, filter, shown.length) }}</p>
+      <p class="mb-2 text-xs text-slate-500" data-testid="participant-count">
+        {{ countLine(kpis, activeFilter, shown.length, activeGroup) }}
+      </p>
 
+      <!-- On a computer only: a long read, for whoever learns the tool -->
       <details
         v-if="canWrite"
-        class="mb-3 rounded-lg border border-slate-200 bg-slate-50 text-xs leading-relaxed"
+        class="mb-3 hidden rounded-lg border border-slate-200 bg-slate-50 text-xs leading-relaxed md:block"
         data-testid="actions-guide"
       >
         <summary class="cursor-pointer px-3.5 py-2 font-bold text-slate-800 select-none">

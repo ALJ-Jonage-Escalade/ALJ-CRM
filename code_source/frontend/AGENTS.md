@@ -45,6 +45,17 @@ All commands run from `code_source/frontend/`, Node version from `.nvmrc`.
 - `src/services/` the API calls, one file per server theme (see API services)
 - No global store (no Pinia): shared services are provided in `main.ts` (`provide(KEY, value)`) and injected
 
+## Phone vs computer
+
+- One breakpoint: Tailwind's `md`, redefined in `src/styles.css` (48rem, except a phone held sideways); in code,
+  `useWideLayout()` (`composables/media.ts`, same query, checked by `media.test.ts`). `xl` (`XL_LAYOUT_QUERY`) only
+  where a wide table fits next to a list. Never a pixel width typed in a component, never the user agent
+- Phones get Accueil, Compétitions (main page: the cards and a competition, no sub-menu, no table or calendar) and
+  the directory: `screen` in `lib/access.ts` lists a page on them. Every other page and sub-page is a computer page:
+  no phone layout (no cards, no `md:hidden` variants); it still opens by its address, its tables scroll sideways
+- Switch with CSS (`hidden md:flex`) when only visibility differs; with `useWideLayout()` and `v-if` when the
+  markup or state differs (one element at a time, so a test id is never found twice)
+
 ## Code style
 
 - `<script setup lang="ts">`, Composition API only; styling with Tailwind classes in the template

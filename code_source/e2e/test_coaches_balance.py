@@ -21,8 +21,8 @@ def _coach_card(page, nom):
     return page.get_by_test_id("coach-card").filter(has=page.get_by_test_id("coach-name").get_by_text(f"🏃 {nom}", exact=True))
 
 
-def test_create_rename_delete_coach(mobile_page, test_data):
-    page = open_screen(mobile_page)
+def test_create_rename_delete_coach(page, test_data):
+    page = open_screen(page)
     accept_dialogs(page)
     go_to(page, "coachs")
     nom = unique_name("E2E Coach")
@@ -47,13 +47,13 @@ def test_create_rename_delete_coach(mobile_page, test_data):
     eventually(deleted)
 
 
-def test_coach_changes_reach_competitions(mobile_page, test_data):
+def test_coach_changes_reach_competitions(page, test_data):
     """A renamed coach shows under the new name on their competitions; a deleted one leaves them."""
     coach = unique_name("E2E Coach")
     coach_id = test_data.create_coach(coach)
     comp = unique_name("E2E Coached")
     test_data.create_competition(comp, date="2027-06-01", coach_ids=[coach_id])
-    page = open_screen(mobile_page)
+    page = open_screen(page)
     accept_dialogs(page)
     expect(competition_card(page, comp)).to_contain_text(f"Coachs : {coach}")
 
@@ -86,7 +86,7 @@ def test_coach_opens_a_competition_they_follow(page):
     expect(sub_menu_entry(page, "competitions")).to_have_attribute("aria-current", "page")
 
 
-def test_balance_of_an_athlete(mobile_page, test_data):
+def test_balance_of_an_athlete(page, test_data):
     member = test_data.competition_group()[4]
     season, june = _season()
     due, paid_comp = unique_name("E2E Due"), unique_name("E2E Paid")
@@ -94,16 +94,17 @@ def test_balance_of_an_athlete(mobile_page, test_data):
     paid_id = test_data.create_competition(paid_comp, date=f"{june}-06-04", prix=10, participants=[member["id"]], selected=[member["id"]])
     test_data.mark_paid(paid_id, member["id"], 10.0)
 
-    page = open_screen(mobile_page)
+    page = open_screen(page)
     go_to(page, "bilan")
     expect(page.get_by_test_id("balance-season")).to_have_value(season)
     page.get_by_test_id("balance-search").fill(f"{member['nom']} {member['prenom']}")
     card = page.get_by_test_id("balance-card").filter(has_text=member["prenom"])
     expect(card).to_have_count(1)
-    expect(card.get_by_test_id("balance-lines")).to_contain_text(due)
-    expect(card.get_by_test_id("balance-lines")).to_contain_text(paid_comp)
     # Other competitions of the seed can add to the totals: check only what this test adds up to
     expect(card.get_by_test_id("balance-state")).to_contain_text("Reste dû")
+    card.click()  # the competitor's competitions in the panel beside the list
+    expect(page.get_by_test_id("balance-detail")).to_contain_text(due)
+    expect(page.get_by_test_id("balance-detail")).to_contain_text(paid_comp)
 
 
 def test_season_balance_export(page, test_data, tmp_path):

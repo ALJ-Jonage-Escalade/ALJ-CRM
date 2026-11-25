@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* Layout of every page: navigation (side menu on desktop, bottom bar on phones) with the signed-in account, header,
+/* Layout of every page: navigation (side menu on desktop, menu button at the top right on phones) with the signed-in account, header,
    and the sign-in / access gate. The page content is only rendered for a role allowed on the page (lib/access.ts),
    and the menu only lists those pages. Without any page to offer, the gate is shown alone, full screen.
    Element ids are the ones of the former web/shared/alj-shell.js: the e2e tests rely on them.
@@ -15,6 +15,7 @@ import {
   canOpen,
   OFFLINE_PAGES,
   PAGES,
+  pageScreen,
   pageVerdict,
   REFUSED_QUERY,
   shownOn,
@@ -33,7 +34,6 @@ import AppBrand from "./AppBrand.vue";
 import PageLink from "./PageLink.vue";
 import SubNav, { type SubNavItem } from "./SubNav.vue";
 import UiButton from "./ui/UiButton.vue";
-import VersionBadge from "./VersionBadge.vue";
 import { dialogs } from "../composables/dialogs";
 
 /** sync: freshness of the page's data, next to the title (Adhérents). A page readable offline (PAGES offlineRead) gets
@@ -86,6 +86,8 @@ const fullscreen = computed(() => {
     pageVerdict === "pending" || pageVerdict === "signIn" || pageVerdict === "noAccess" || (pageVerdict === "unverified" && !offline.value)
   );
 });
+// Phones: the menu panel, closed until the button (☰) opens it, and again on every navigation
+const menuOpen = ref(false);
 const signInError = inject(SIGN_IN_ERROR_KEY, ref(null));
 // Every page until the role is known, then only those the role may open (none outside the staff)
 const nav = computed(() => (state.value.status === "signedIn" ? PAGES.filter((p) => canOpen(role.value, p.access)) : PAGES));
@@ -101,6 +103,10 @@ const subs = computed(() =>
     verdict: subVerdict(state.value, sub, props.staffCopy === undefined ? false : props.staffCopy),
   })),
 );
+watch(
+  () => route?.fullPath,
+  () => (menuOpen.value = false),
+);
 const current = computed(() => subs.value.find(({ sub }) => sub.id === props.sub));
 // Listed with at least two entries: a role seeing a single one gets the page as without sub-menu
 const subMenu = computed<SubNavItem[]>(() => {
@@ -109,6 +115,9 @@ const subMenu = computed<SubNavItem[]>(() => {
     ? listed.map(({ sub, verdict }) => ({ id: sub.id, label: sub.label, href: subHref(props.page, sub), disabled: verdict === "disabled" }))
     : [];
 });
+/* Phones: no strip on the pages listed there (Compétitions keeps its main page only, its sub-pages are for a computer);
+   an office page opened by its address keeps it */
+const subStrip = computed(() => (pageScreen(props.page) === "desktop" ? subMenu.value : []));
 const subAllowed = computed(() => !current.value || current.value.verdict === "allow");
 watch(
   () => current.value?.verdict,
@@ -255,60 +264,85 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
   </div>
 
   <div v-else class="min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)] print:block">
-    <aside class="print:hidden md:sticky md:top-0 md:flex md:h-dvh md:flex-col md:gap-5 md:bg-side md:px-3 md:py-5 md:text-side-text">
-      <AppBrand class="hidden px-2 md:block" />
-      <nav
-        v-if="nav.length"
-        aria-label="Navigation principale"
-        class="fixed inset-x-0 bottom-0 z-40 flex h-16 justify-around border-t border-side-hover bg-side pb-[env(safe-area-inset-bottom)] md:static md:h-auto md:flex-col md:justify-start md:gap-0.5 md:border-0 md:pb-0"
-      >
-        <template v-for="item in nav" :key="item.id">
-          <!-- With its sub-menu open, the page is "section active" (lighter, aria-current="true"), the open sub-page is the
-               current page (accent) -->
-          <PageLink
-            :href="item.href"
-            :data-page="item.id"
-            :aria-current="item.id !== props.page ? undefined : subMenu.length ? 'true' : 'page'"
-            :class="[
-              shownOn(item.screen, 'flex'),
-              'min-w-0 flex-1 flex-col items-center justify-center gap-0.5 font-semibold text-side-text no-underline',
-              'md:flex-none md:flex-row md:justify-start md:gap-2 md:rounded-lg md:px-3 md:py-2.5',
-              item.id !== props.page
-                ? 'hover:text-white md:hover:bg-side-hover'
-                : subMenu.length
-                  ? 'text-white md:bg-side-hover'
-                  : 'text-white md:bg-accent',
-            ]"
-          >
-            <span aria-hidden="true" class="text-lg md:text-base">{{ item.icon }}</span>
-            <span class="max-w-full truncate text-[10px] md:hidden">{{ item.short }}</span>
-            <span class="hidden md:inline">{{ item.label }}</span>
-          </PageLink>
-          <SubNav
-            v-if="item.id === props.page && subMenu.length"
-            :items="subMenu"
-            :current="props.sub"
-            variant="side"
-            class="hidden md:flex"
-          />
-        </template>
-      </nav>
-      <!-- Signed-in account: foot of the side menu on desktop, top of the page on phones (the menu is a bottom bar) -->
+    <!-- Phones: a top bar with the club name and a menu button (☰); the pages and the account open in a panel under it.
+         Desktop: the side menu, always open. -->
+    <aside
+      class="sticky top-0 z-40 bg-side pt-[env(safe-area-inset-top)] text-side-text print:hidden md:flex md:h-dvh md:flex-col md:gap-5 md:px-3 md:py-5"
+    >
+      <div class="flex items-center justify-between gap-3 px-4 py-2 md:block md:px-2 md:py-0">
+        <AppBrand />
+        <button
+          id="menu-toggle"
+          type="button"
+          :aria-expanded="menuOpen"
+          aria-controls="menu-panel"
+          :aria-label="menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'"
+          class="-mr-2 flex size-11 items-center justify-center rounded-lg text-2xl text-slate-50 hover:bg-side-hover md:hidden"
+          @click="menuOpen = !menuOpen"
+        >
+          <span aria-hidden="true">{{ menuOpen ? "✕" : "☰" }}</span>
+        </button>
+      </div>
       <div
-        v-if="email"
-        class="flex items-center gap-2 px-4 pt-3 md:mt-auto md:flex-col md:items-start md:gap-2 md:border-t md:border-side-hover md:px-2 md:pt-4"
+        id="menu-panel"
+        :class="[
+          menuOpen ? 'flex' : 'hidden',
+          'absolute inset-x-0 top-full max-h-[calc(100dvh-4rem)] flex-col gap-3 overflow-y-auto border-t border-side-hover bg-side px-3 pt-2 pb-4 shadow-lg',
+          'md:static md:flex md:max-h-none md:flex-1 md:gap-5 md:overflow-visible md:border-0 md:p-0 md:shadow-none',
+        ]"
       >
-        <span id="who" class="min-w-0 text-xs break-words text-slate-500 md:text-slate-400">{{ who }}</span>
-        <UiButton id="logout-btn" variant="muted" small class="ml-auto shrink-0 md:ml-0" @click="logout">🚪 Se déconnecter</UiButton>
+        <nav v-if="nav.length" aria-label="Navigation principale" class="flex flex-col gap-0.5">
+          <template v-for="item in nav" :key="item.id">
+            <!-- With its sub-menu open, the page is "section active" (lighter, aria-current="true"), the open sub-page is the
+                 current page (accent) -->
+            <PageLink
+              :href="item.href"
+              :data-page="item.id"
+              :aria-current="item.id !== props.page ? undefined : subMenu.length ? 'true' : 'page'"
+              :class="[
+                shownOn(item.screen, 'flex'),
+                'items-center gap-2 rounded-lg px-3 py-2.5 font-semibold text-side-text no-underline',
+                item.id !== props.page
+                  ? 'hover:bg-side-hover hover:text-white'
+                  : subMenu.length
+                    ? 'bg-side-hover text-white'
+                    : 'bg-accent text-white',
+              ]"
+            >
+              <span aria-hidden="true">{{ item.icon }}</span>
+              {{ item.label }}
+            </PageLink>
+            <SubNav
+              v-if="item.id === props.page && subMenu.length"
+              :items="subMenu"
+              :current="props.sub"
+              variant="side"
+              class="hidden md:flex"
+            />
+          </template>
+        </nav>
+        <!-- Signed-in account: foot of the side menu on desktop, of the menu panel on phones -->
+        <div v-if="email" class="flex flex-col items-start gap-2 border-t border-side-hover px-2 pt-3 md:mt-auto md:pt-4">
+          <span id="who" class="min-w-0 text-xs break-words text-slate-400">{{ who }}</span>
+          <UiButton id="logout-btn" variant="muted" small @click="logout">🚪 Se déconnecter</UiButton>
+        </div>
       </div>
     </aside>
+    <!-- Phones: a tap outside the open menu closes it -->
+    <div
+      v-if="menuOpen"
+      data-testid="menu-backdrop"
+      aria-hidden="true"
+      class="fixed inset-0 z-30 bg-slate-900/40 md:hidden print:hidden"
+      @click="menuOpen = false"
+    />
 
-    <div class="min-w-0 px-4 pt-4 pb-28 md:px-7 md:pt-6 md:pb-10 print:p-0">
+    <div class="min-w-0 px-4 pt-4 pb-10 md:px-7 md:pt-6 md:pb-10 print:p-0">
       <header class="mb-4 flex print:hidden flex-wrap items-center gap-x-4 gap-y-2">
         <h1 class="m-0 text-xl font-bold md:text-[22px]">{{ heading }}</h1>
         <span id="sync-info" class="text-[13px] text-slate-500">{{ props.sync }}</span>
       </header>
-      <SubNav v-if="subMenu.length" :items="subMenu" :current="props.sub" variant="strip" class="mb-3 flex print:hidden md:hidden" />
+      <SubNav v-if="subStrip.length" :items="subStrip" :current="props.sub" variant="strip" class="mb-3 flex print:hidden md:hidden" />
 
       <div
         v-show="googleExpired"
@@ -385,11 +419,6 @@ defineSlots<{ default(props: { role: typeof role.value }): unknown }>();
       <div v-if="(access === 'allow' || access === 'offline') && subAllowed" id="content">
         <slot :role="role" />
       </div>
-
-      <p class="mt-8 text-center text-[11px] text-slate-400 md:hidden print:hidden">
-        🧗 ALJ Escalade ·
-        <VersionBadge />
-      </p>
     </div>
   </div>
 </template>

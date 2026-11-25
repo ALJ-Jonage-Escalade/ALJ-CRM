@@ -41,3 +41,9 @@ def login_as(page: Page, role: str) -> Account:
     page.wait_for_function("() => window.__aljE2E")
     page.evaluate(_SIGN_IN, [account.sub, account.email])
     return account
+
+
+def open_menu(page: Page) -> None:
+    """Phones: opens the menu panel (button ☰ at the top right), which holds the pages and the logout button."""
+    page.locator("#menu-toggle").click()
+    page.locator("#menu-panel").wait_for(state="visible")

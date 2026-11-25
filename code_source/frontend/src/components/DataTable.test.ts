@@ -44,7 +44,6 @@ function render(rows: Row[], pageSize = 50, extra: { hidden?: string[]; selected
           },
           {
             "cell-link": ({ row }: { row: Row }) => h("a", { href: `/r/${row.id}` }, "voir"),
-            card: ({ row }: { row: Row }) => h("b", row.name),
           },
         ),
     }),
@@ -67,10 +66,9 @@ describe("DataTable", () => {
     expect(wrapper.find('[data-testid="sort-link"]').exists()).toBe(false);
   });
 
-  it("renders the page's cell and card slots, and the empty message", async () => {
+  it("renders the page's cell slots, and the empty message", async () => {
     const { wrapper, data } = render(rowsOf(["Ana"]));
     expect(wrapper.find('[data-testid="data-row"] a').attributes("href")).toBe("/r/1");
-    expect(wrapper.find('[data-testid="data-card"]').text()).toBe("Ana");
     expect(wrapper.find('[data-testid="data-row"]').attributes("data-id")).toBe("1");
     data.value = [];
     await nextTick();
@@ -111,16 +109,15 @@ describe("DataTable", () => {
     expect(headers()).toEqual(["Nom ▲", "Date", "Âge", "Lien"]);
   });
 
-  it("marks the selected row and card, and reports clicks on a row or card but not on a link inside", async () => {
+  it("marks the selected row, and reports clicks on a row but not on a link inside", async () => {
     const clicked: string[] = [];
     const { wrapper } = render(rowsOf(["Ana", "Bob"]), 50, { selectedKey: "2", onRowClick: (r) => clicked.push(r.name) });
     const rows = wrapper.findAll('[data-testid="data-row"]');
     expect(rows.map((r) => r.attributes("aria-selected"))).toEqual(["false", "true"]);
-    expect(wrapper.findAll('[data-testid="data-card"]').map((c) => c.attributes("aria-current"))).toEqual([undefined, "true"]);
     await rows[0]!.find("td").trigger("click");
     rows[0]!.find("a").element.addEventListener("click", (e) => e.preventDefault()); // jsdom does not navigate
     await rows[0]!.find("a").trigger("click");
-    await wrapper.findAll('[data-testid="data-card"]')[1]!.trigger("click");
+    await rows[1]!.find("td").trigger("click");
     expect(clicked).toEqual(["Ana", "Bob"]);
   });
 

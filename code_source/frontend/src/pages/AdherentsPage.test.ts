@@ -1,5 +1,5 @@
 import { fakeAuth, json, provided } from "../test/harness";
-import { flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 import { createMemoryHistory, createRouter, type Router } from "vue-router";
@@ -117,6 +117,9 @@ afterEach(() => {
   vi.restoreAllMocks();
   document.body.innerHTML = "";
 });
+// Registered after the hook above so it runs first (after-hooks run in reverse): a page left mounted would still react
+// to window events (offline) and patch the DOM the hook above wiped, breaking the next test's page
+enableAutoUnmount(afterEach);
 
 describe("AdherentsPage", () => {
   it("lists the active season without the waiting list, with links to the member record", async () => {
@@ -125,7 +128,6 @@ describe("AdherentsPage", () => {
     expect(names()).toEqual(["DUPONT", "MARTIN"]);
     expect(byId("member-count").text()).toBe("2 adhérents affichés sur 3 (saison 2026-2027)");
     expect(byId("member-record").attributes("href")).toBe("/bureau/adherents?id=1&saison=2026-2027&achat=11");
-    expect(wrapper.find('a[href="tel:+33612345678"]').exists()).toBe(true);
     expect((byId("season-select").element as HTMLSelectElement).value).toBe("2026-2027");
     expect(byId("season-select").text()).toContain("2026-2027 (active)");
     expect(wrapper.find("#sync-info").text()).toBe("");

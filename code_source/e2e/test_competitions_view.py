@@ -10,7 +10,7 @@ import time
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.auth import ACCOUNTS, login_as
+from helpers.auth import ACCOUNTS, login_as, open_menu
 from helpers.data import unique_name
 from helpers.competitions import SEEDED_COMPETITION, sub_menu_entry
 from helpers.offline import owner, put_record, record, wait_stored
@@ -55,15 +55,24 @@ def participant(page: Page, member: dict):
 
 def test_phone_list_then_competition(mobile_page, competition):
     page = open_view(mobile_page)
+    expect(page.get_by_test_id("view-switcher")).to_be_hidden()  # the cards only: no table nor calendar on a phone
     card(page, competition["nom"]).click()
     expect(page.get_by_test_id("detail-name")).to_have_text(competition["nom"])
     expect(page).to_have_url(re.compile(rf"/competitions\?id={competition['id']}$"))
     expect(card(page, SEEDED_COMPETITION)).to_be_hidden()  # one at a time on a phone
+    expect(page.get_by_test_id("subnav-strip")).to_have_count(0)  # the main page only: the sub-pages are for a computer
+    expect(page.get_by_test_id("actions-guide")).to_be_hidden()  # a computer read
     row = participant(page, competition["member"])
     expect(row.get_by_test_id("participe-switch")).to_be_checked()
     expect(row.get_by_test_id("payment-badge")).to_be_visible()
     expect(row.get_by_test_id("emergency-link")).to_have_count(1)
-    expect(page.get_by_test_id("filter-selected")).to_have_text("✅ Participe : Oui (1)")
+    # Filtered by slot group on a phone (the competition day), not by registration
+    expect(page.get_by_test_id("filter-selected")).to_have_count(0)
+    expect(page.get_by_test_id("participant-search")).to_have_count(0)
+    group_filter = page.get_by_test_id("group-filter")
+    expect(group_filter.locator("option")).to_have_count(2)  # « Tous » and the competitor's group
+    group_filter.select_option(index=1)
+    expect(row).to_be_visible()
     assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"), "no horizontal scroll"
     page.get_by_test_id("back-link").click()
     expect(card(page, SEEDED_COMPETITION)).to_be_visible()
@@ -88,7 +97,9 @@ def test_both_addresses_show_the_same_screen(page):
 
 def test_readonly_sees_no_contacts_nor_management(mobile_page, competition):
     page = open_view(mobile_page, "readonly")
+    open_menu(page)
     expect(page.locator("nav a[data-page='competitions']")).to_be_visible()
+    page.locator("#menu-toggle").click()  # closed again
     card(page, competition["nom"]).click()
     expect(participant(page, competition["member"])).to_be_visible()
     expect(page.get_by_test_id("emergency-link")).to_have_count(0)

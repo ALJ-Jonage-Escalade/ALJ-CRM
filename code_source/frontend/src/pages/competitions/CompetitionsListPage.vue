@@ -6,7 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialog from "../../components/ui/UiDialog.vue";
 import { dialogs } from "../../composables/dialogs";
-import { useMediaQuery } from "../../composables/media";
+import { useWideLayout } from "../../composables/media";
 import { CLIENT_KEY, type Schemas } from "../../lib/client";
 import { plural } from "../../lib/text";
 import { createCompetitionsApi } from "../../services/competitions";
@@ -53,7 +53,13 @@ watch(selectedId, (id) => {
 const selected = computed(() => all.value.find((c) => String(c.id) === selectedId.value));
 /* Side by side (Tailwind's md), the first competition of the list opens by itself instead of an empty detail; not on a
    phone, where the detail would hide the list */
-const sideBySide = useMediaQuery("(min-width: 768px)");
+const sideBySide = useWideLayout();
+// Phones have no view switcher: back to the cards when the window narrows to a phone layout
+watch(sideBySide, (wide) => {
+  if (!wide) {
+    viewMode.value = "cards";
+  }
+});
 watch(
   [selectedId, current, viewMode, sideBySide],
   () => {
@@ -76,6 +82,13 @@ const rows = computed(() =>
 );
 
 const creating = ref(false);
+function startCreating(): void {
+  if (online.value) {
+    creating.value = true;
+  } else {
+    writer.toast("📴 Hors ligne : création impossible.");
+  }
+}
 const editingCompetition = ref<Competition | null>(null);
 const editDialogOpen = computed({
   get: () => Boolean(editingCompetition.value),
@@ -168,17 +181,10 @@ const listLine = computed(() => {
 </script>
 
 <template>
-  <!-- View mode and creation (hidden on phones while a competition is open) -->
-  <div :class="['mb-3 flex flex-wrap items-center justify-between gap-2', selected ? 'hidden md:flex' : '']">
+  <!-- Computer: view mode and creation above the list (phones: creation on the season's line, below) -->
+  <div class="mb-3 hidden flex-wrap items-center justify-between gap-2 md:flex">
     <ViewSwitcher v-model="viewMode" />
-    <UiButton
-      v-if="canWrite"
-      small
-      data-testid="create-comp"
-      @click="online ? (creating = true) : writer.toast('📴 Hors ligne : création impossible.')"
-    >
-      ➕ Ajouter une compétition
-    </UiButton>
+    <UiButton v-if="canWrite && sideBySide" small data-testid="create-comp" @click="startCreating">➕ Ajouter une compétition</UiButton>
   </div>
   <div
     class="flex flex-col md:grid md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-start md:gap-4 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]"
@@ -204,7 +210,9 @@ const listLine = computed(() => {
         v-model:when="when"
         :seasons="seasons"
         :calendar="viewMode === 'calendar'"
-      />
+      >
+        <UiButton v-if="canWrite && !sideBySide" small data-testid="create-comp" @click="startCreating">➕ Ajouter</UiButton>
+      </CompetitionFilters>
       <p class="pt-1 pb-1 mb-2 text-xs text-slate-500" data-testid="comp-count">{{ listLine }}</p>
 
       <div v-if="viewMode === 'table'" class="mb-3">
