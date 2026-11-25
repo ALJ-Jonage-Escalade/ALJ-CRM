@@ -6,8 +6,8 @@ import datetime
 import itertools
 from unittest.mock import patch
 
+from domain.competitions.results import has_results
 from domain.errors import StorageUnavailable, UpstreamUnavailable
-
 from infrastructure.firestore.client import FirestoreError
 from infrastructure.firestore.competitions import competitions
 from services.competitions.results_batch import (
@@ -81,7 +81,7 @@ class TestDailyBatch(BatchTestCase):
         self.assertEqual(bob["classement"], "5")
         self.assertNotIn("classement", other)
         self.assertEqual({k: ada[k] for k in ADA}, ADA)  # the other fields are left alone
-        self.assertTrue(Batch.has_results(doc))
+        self.assertTrue(has_results(doc))
         self.send_email.assert_called_once()
         body = self.send_email.call_args.kwargs["html_body"]
         self.assertIn("ZORBALT", body)

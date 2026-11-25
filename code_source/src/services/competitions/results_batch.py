@@ -12,29 +12,19 @@ Exécute chaque jour (par exemple à 07h00) :
 from __future__ import annotations
 
 import datetime
-import html as html_lib
 import logging
-import os
 import re
-import sys
 import time
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypedDict
 
-logger = logging.getLogger("alj")
-
-# Injection du dossier src dans sys.path si nécessaire
-_src_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-
-from domain.utils import normalize_name
-from infrastructure.mail.sender import EmailSender, MailError
 from domain.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL, DEFAULT_SENDER_EMAIL
+from domain.competitions.results import ClubAthlete, apply_rankings, end_date, has_results
 from domain.email_log import SYSTEM_AUTHOR
+from domain.errors import InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions import competitions, documents, participants
+from infrastructure.mail.sender import EmailSender, MailError
 from infrastructure.mycompet.scraper import (
     ArchiveEntry,
     fetch_and_parse_mycompet_results,
@@ -44,8 +34,10 @@ from infrastructure.mycompet.scraper import (
     normalize_result_url,
 )
 from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
+from services.competitions.results_email import results_email_html, results_email_subject, results_email_text
 from services.competitions.store import drops_cache, invalidate_cache
-from domain.errors import InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
+
+logger = logging.getLogger("alj")
 
 SETTING_NOTIFICATION_EMAIL = "RESULTATS_NOTIFICATION_EMAIL"
 SETTING_BATCH_LAST_RUN = "RESULTATS_BATCH_LAST_RUN"
@@ -63,18 +55,6 @@ FIELD_NEEDS_URL_NOTIFIED = "resultats_url_demandee_at"
 CompetitionStatus = Literal["found", "pending", "needs_url", "error"]
 
 
-class ClubAthlete(TypedDict):
-    """A club member's result, for the summary e-mail and the report."""
-    nom: str
-    prenom: str
-    num_licence: str
-    categorie: str
-    classement: str
-    total_categorie: int
-    resultat_ffme: str
-    performance: str
-
-
 class ResultsFetch(TypedDict):
     """Results fetched for one competition on a coach's request."""
     url: str
@@ -87,57 +67,6 @@ class CompetitionOutcome(TypedDict):
     matched_count: int
     athletes: List[ClubAthlete]
     url: str
-
-
-def _rank_sort_key(athlete: ClubAthlete) -> int:
-    try:
-        return int(athlete["classement"])
-    except ValueError:
-        return 9999
-
-
-def apply_rankings(participants: List[Dict[str, Any]], scraped: List[Dict[str, Any]],
-                   synced_at: str) -> List[ClubAthlete]:  # Any: Firestore participant rows and scraper rows
-    """Sets the ranking fields of the participants found in the scraped results (licence first, then name), in place.
-    Only those fields are changed. Returns the matched athletes, best ranked first."""
-    by_licence: Dict[str, Dict[str, Any]] = {}
-    by_name: Dict[str, Dict[str, Any]] = {}
-    for row in scraped:
-        licence = str(row.get("licence") or "").strip()
-        if licence:
-            by_licence[licence] = row
-        full_name = normalize_name(f"{row.get('nom') or ''} {row.get('prenom') or ''}")
-        if full_name:
-            by_name[full_name] = row
-
-    athletes: List[ClubAthlete] = []
-    for participant in participants:
-        licence = str(participant.get("num_licence") or "").strip()
-        full_name = normalize_name(f"{participant.get('nom') or ''} {participant.get('prenom') or ''}")
-        match = (by_licence.get(licence) if licence else None) or (by_name.get(full_name) if full_name else None)
-        if not match:
-            continue
-        rank = str(match.get("classement") or "").strip()
-        total = int(match.get("total_categorie") or 0)
-        suffix = f" / {total}" if total > 0 else "e"
-        participant["classement"] = rank
-        participant["total_categorie"] = total
-        participant["resultat_ffme"] = f"{rank}{suffix}" if rank else ""
-        participant["categorie_ffme"] = match.get("categorie") or ""
-        participant["performance_ffme"] = match.get("performance") or ""
-        participant["resultat_synced_at"] = synced_at
-        athletes.append(ClubAthlete(
-            nom=str(participant.get("nom") or match.get("nom") or ""),
-            prenom=str(participant.get("prenom") or match.get("prenom") or ""),
-            num_licence=licence or str(match.get("licence") or ""),
-            categorie=str(match.get("categorie") or participant.get("categorie") or ""),
-            classement=rank,
-            total_categorie=total,
-            resultat_ffme=participant["resultat_ffme"],
-            performance=str(match.get("performance") or ""),
-        ))
-    athletes.sort(key=_rank_sort_key)
-    return athletes
 
 
 class CompetitionResultsBatchService:
@@ -221,30 +150,6 @@ class CompetitionResultsBatchService:
         return days
 
     @classmethod
-    def end_date(cls, comp: Dict[str, Any]) -> Optional[datetime.date]:
-        """Last day of a competition (`date_fin`, else `date_competition`), None when unknown."""
-        target = str(comp.get("date_fin") or "").strip() or str(comp.get("date_competition") or "").strip()
-        try:
-            return datetime.date.fromisoformat(target[:10]) if target else None
-        except ValueError:
-            return None
-
-    @classmethod
-    def is_competition_past(cls, comp: Dict[str, Any], today: Optional[datetime.date] = None) -> bool:
-        """Vérifie si une compétition est déjà réalisée et terminée."""
-        ended = cls.end_date(comp)
-        return ended is not None and ended <= (today or datetime.date.today())
-
-    @classmethod
-    def has_results(cls, comp: Dict[str, Any]) -> bool:
-        """Vérifie si une compétition a déjà des résultats enregistrés."""
-        # Si un horodatage de synchronisation existe et au moins un classement est présent
-        synced_at = comp.get("resultats_synced_at")
-        parts = comp.get("participants") or []
-        has_rankings = any(bool(str(p.get("classement") or "").strip() or str(p.get("resultat_ffme") or "").strip()) for p in parts)
-        return bool(synced_at and has_rankings)
-
-    @classmethod
     def list_pending_competitions(cls, force: bool = False, window_days: Optional[int] = None,
                                   today: Optional[datetime.date] = None) -> List[Dict[str, Any]]:
         """Competitions ended in the last `window_days` days (None: the setting) without results, most recent first.
@@ -260,12 +165,12 @@ class CompetitionResultsBatchService:
 
         pending = []
         for doc in docs:
-            ended = cls.end_date(doc)
+            ended = end_date(doc)
             if doc.get("id") is None or ended is None or ended > today:
                 continue
-            if ended >= oldest and (force or not cls.has_results(doc)):
+            if ended >= oldest and (force or not has_results(doc)):
                 pending.append(doc)
-        pending.sort(key=lambda d: cls.end_date(d) or datetime.date.min, reverse=True)
+        pending.sort(key=lambda d: end_date(d) or datetime.date.min, reverse=True)
         return pending
 
     @classmethod
@@ -363,214 +268,29 @@ class CompetitionResultsBatchService:
         return ResultsFetch(url=canonical_url, total_scraped=len(scraped), matched_count=matched)
 
     @classmethod
-    def build_results_email_html(cls, comp_results_list: List[Dict[str, Any]],
-                                 needs_url: Optional[List[Dict[str, Any]]] = None) -> str:
-        """Génère un e-mail HTML soigné présentant les tableaux de résultats des compétitions.
-        `needs_url`: competitions whose results page could not be confirmed (listed for a manual fetch)."""
-        esc = html_lib.escape  # names and categories come from scraped MyCompet pages
-        comp_sections = []
-
-        for item in comp_results_list:
-            nom_comp = esc(item.get("nom") or "Compétition")
-            date_comp = item.get("date") or ""
-            lieu_comp = esc(item.get("lieu") or "")
-            url = esc(item.get("url") or "")
-            athletes = item.get("athletes") or []
-
-            # Formatage de la date si possible
-            date_formatted = date_comp
-            try:
-                d = datetime.date.fromisoformat(date_comp[:10])
-                date_formatted = d.strftime("%d/%m/%Y")
-            except (ValueError, TypeError):
-                pass
-
-            meta_parts = [p for p in [date_formatted, lieu_comp] if p]
-            meta_str = " · ".join(meta_parts)
-
-            rows_html = []
-            for ath in athletes:
-                cl = str(ath.get("classement") or "").strip()
-                tot = ath.get("total_categorie")
-                badge_style = "font-weight:700;"
-                medal = ""
-                if cl == "1":
-                    medal = "🥇 "
-                    badge_style += " color:#B45309; background:#FEF3C7; padding:2px 8px; border-radius:4px;"
-                elif cl == "2":
-                    medal = "🥈 "
-                    badge_style += " color:#475569; background:#F1F5F9; padding:2px 8px; border-radius:4px;"
-                elif cl == "3":
-                    medal = "🥉 "
-                    badge_style += " color:#9A3412; background:#FFEDD5; padding:2px 8px; border-radius:4px;"
-
-                rank_display = f"{medal}{esc(cl)}e" if cl else "—"
-                if tot and tot > 0 and cl:
-                    rank_display += f" / {tot}"
-
-                perf = esc(str(ath.get("performance") or "").strip() or "—")
-                cat = esc(str(ath.get("categorie") or "").strip() or "—")
-                lic = esc(str(ath.get("num_licence") or "").strip() or "—")
-                nom_prenom = f"<b>{esc(str(ath.get('nom') or '').upper())}</b> {esc(str(ath.get('prenom') or '').title())}"
-
-                rows_html.append(f"""
-                  <tr style="border-bottom:1px solid #E2E8F0;">
-                    <td style="padding:10px 12px; font-size:13.5px; color:#1E293B;">{nom_prenom}</td>
-                    <td style="padding:10px 12px; font-size:13px; color:#475569;">{cat}</td>
-                    <td style="padding:10px 12px; font-size:13.5px; text-align:center;"><span style="{badge_style}">{rank_display}</span></td>
-                    <td style="padding:10px 12px; font-size:12.5px; color:#64748B;">{perf}</td>
-                    <td style="padding:10px 12px; font-size:12px; color:#94A3B8; font-family:monospace;">{lic}</td>
-                  </tr>
-                """)
-
-            table_body = "".join(rows_html) if rows_html else '<tr><td colspan="5" style="padding:20px; text-align:center; color:#94A3B8;">Aucun athlète classé trouvé pour le club.</td></tr>'
-
-            url_btn = f'<a href="{url}" style="display:inline-block; font-size:12px; font-weight:600; color:#2563EB; text-decoration:none; margin-top:6px;" target="_blank">🔗 Voir les résultats officiels sur MyCompet FFME ➔</a>' if url else ''
-
-            comp_sections.append(f"""
-              <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; margin-bottom:24px; overflow:hidden; box-shadow:0 1px 3px rgba(15,23,42,0.06);">
-                <div style="background:#163A5F; color:#FFFFFF; padding:14px 18px;">
-                  <h2 style="margin:0; font-size:17px; font-weight:700;">🧗 {nom_comp}</h2>
-                  {f'<div style="font-size:12.5px; color:#93C5FD; margin-top:3px;">{meta_str}</div>' if meta_str else ''}
-                </div>
-                <div style="padding:16px 18px;">
-                  <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; text-align:left;">
-                      <thead>
-                        <tr style="background:#F8FAFC; border-bottom:2px solid #CBD5E1; font-size:12px; color:#475569; text-transform:uppercase;">
-                          <th style="padding:8px 12px;">Athlète</th>
-                          <th style="padding:8px 12px;">Catégorie</th>
-                          <th style="padding:8px 12px; text-align:center;">Classement</th>
-                          <th style="padding:8px 12px;">Performance</th>
-                          <th style="padding:8px 12px;">Licence</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {table_body}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div style="margin-top:12px; text-align:right;">
-                    {url_btn}
-                  </div>
-                </div>
-              </div>
-            """)
-
-        if needs_url:
-            items_html = "".join(
-                f'<li style="margin:4px 0;"><b>{esc(c.get("nom") or "Compétition")}</b> ({esc(c.get("date") or "")}) — '
-                f'page trouvée : <a href="{esc(c.get("url") or "")}" style="color:#2563EB;">{esc(c.get("url") or "")}</a></li>'
-                for c in needs_url)
-            comp_sections.append(f"""
-              <div style="background:#FFF7ED; border:1px solid #FDBA74; border-radius:10px; margin-bottom:24px; padding:14px 18px;">
-                <h2 style="margin:0 0 6px; font-size:16px; color:#9A3412;">✍️ URL à saisir manuellement</h2>
-                <p style="margin:0 0 8px; font-size:13px; color:#7C2D12;">Une page de résultats porte un nom proche, mais sa date
-                ne correspond pas à la compétition : rien n'a été enregistré. Vérifiez la page, puis renseignez l'URL depuis
-                « Trouver les résultats » sur la fiche de la compétition.</p>
-                <ul style="margin:0; padding-left:18px; font-size:13px;">{items_html}</ul>
-              </div>
-            """)
-
-        all_sections_html = "".join(comp_sections)
-        nb_comps = len(comp_results_list)
-        plural = "s" if nb_comps > 1 else ""
-
-        intro = (f"Les résultats officiels de {nb_comps} compétition{plural} viennent d'être synchronisés depuis MyCompet."
-                 if nb_comps else "Aucun nouveau résultat, mais des compétitions attendent leur URL de résultats.")
-        html = f"""<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Résultats de Compétition — ALJ Escalade</title>
-</head>
-<body style="margin:0; padding:20px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color:#F1F5F9; color:#1E293B;">
-  <div style="max-width:720px; margin:0 auto;">
-    
-    <!-- En-tête -->
-    <div style="background:linear-gradient(135deg, #163A5F 0%, #1E40AF 100%); color:#FFFFFF; padding:22px 24px; border-radius:12px 12px 0 0; text-align:center;">
-      <div style="font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#93C5FD; margin-bottom:4px;">Amicale Laïque de Jonage · Escalade</div>
-      <h1 style="margin:0; font-size:22px; font-weight:800;">🏆 Nouveaux Résultats de Compétition FFME</h1>
-      <p style="margin:8px 0 0; font-size:14px; color:#E0E7FF;">{intro}</p>
-    </div>
-
-    <!-- Contenu principal -->
-    <div style="background:#F8FAFC; padding:24px 20px; border-left:1px solid #E2E8F0; border-right:1px solid #E2E8F0;">
-      {all_sections_html}
-    </div>
-
-    <!-- Pied de page -->
-    <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-top:none; border-radius:0 0 12px 12px; padding:16px 20px; text-align:center; font-size:12px; color:#64748B;">
-      <p style="margin:0 0 6px;">
-        🤖 <b>Notification automatique</b> envoyée par le batch quotidien ALJ Escalade (07h00).
-      </p>
-      <p style="margin:0; font-size:11.5px; color:#94A3B8;">
-        Ces résultats sont désormais enregistrés dans la base et consultables directement sur la page Compétitions du club.
-      </p>
-    </div>
-
-  </div>
-</body>
-</html>
-"""
-        return html
-
-    @classmethod
-    def send_notification_email(cls, comp_results_list: List[Dict[str, Any]], to_email: Optional[str] = None,
+    def send_notification_email(cls, found: List[Dict[str, Any]], to_email: Optional[str] = None,
                                 needs_url: Optional[List[Dict[str, Any]]] = None) -> bool:
         """Envoie l'e-mail de synthèse avec les tableaux de résultats (et les URL à saisir)."""
         needs_url = needs_url or []
-        if not comp_results_list and not needs_url:
+        if not found and not needs_url:
             return False
 
         recipient_raw = (to_email or cls.get_notification_email()).strip()
         try:
             recipients = cls.parse_notification_emails(recipient_raw)
-        except ValueError:
+        except InvalidRequest:
             logger.warning("[BATCH_RESULTATS] Adresse de notification invalide : %r", recipient_raw)
             return False
-
         recipient = ", ".join(recipients)
+        subject = results_email_subject(found, needs_url)
 
-        nb_comps = len(comp_results_list)
-        if nb_comps == 1:
-            nom_c = comp_results_list[0].get("nom") or "Compétition"
-            subject = f"🏆 Résultats officiels disponibles : {nom_c}"
-        elif nb_comps > 1:
-            subject = f"🏆 Résultats officiels disponibles pour {nb_comps} compétitions"
-        else:
-            subject = f"✍️ Résultats de compétition : {len(needs_url)} URL à saisir manuellement"
-
-        html_body = cls.build_results_email_html(comp_results_list, needs_url=needs_url)
-
-        # Corps texte brut en repli
-        lines = [
-            f"ALJ Escalade - Nouveaux résultats officiels FFME ({nb_comps} compétition(s))",
-            "=" * 50,
-            ""
-        ]
-        for c in comp_results_list:
-            lines.append(f"Compétition : {c.get('nom')} ({c.get('date', '')})")
-            if c.get("url"):
-                lines.append(f"MyCompet : {c.get('url')}")
-            lines.append("Résultats du club :")
-            for ath in (c.get("athletes") or []):
-                lines.append(f" - {ath.get('nom')} {ath.get('prenom')} ({ath.get('categorie')}) : {ath.get('resultat_ffme')} [{ath.get('performance')}]")
-            lines.append("")
-        if needs_url:
-            lines.append("URL à saisir manuellement (date de la page différente de celle de la compétition) :")
-            lines.extend(f" - {c.get('nom')} ({c.get('date', '')}) : page trouvée {c.get('url')}" for c in needs_url)
-
-        plain_body = "\n".join(lines)
-
-        competition_ids = [int(c["id"]) for c in [*comp_results_list, *needs_url] if str(c.get("id") or "").isdigit()]
+        competition_ids = [int(c["id"]) for c in [*found, *needs_url] if str(c.get("id") or "").isdigit()]
         try:
             EmailSender.send_email(
                 to_email=recipient,
                 subject=subject,
-                body=plain_body,
-                html_body=html_body,
+                body=results_email_text(found, needs_url),
+                html_body=results_email_html(found, needs_url),
                 from_email=DEFAULT_SENDER_EMAIL,
                 from_name="ALJ Escalade - Résultats Compétitions"
             )
@@ -718,19 +438,3 @@ class CompetitionResultsBatchService:
             "notification_email": notification_email,
             "details": details
         }
-
-
-if __name__ == "__main__":
-    # Exécution directe CLI
-    import argparse
-    parser = argparse.ArgumentParser(description="Batch quotidien de récupération des résultats MyCompet FFME.")
-    parser.add_argument("--force", action="store_true", help="Forcer l'analyse même si déjà synchronisée")
-    parser.add_argument("--email", type=str, default="", help="Adresse e-mail de notification personnalisée")
-    args = parser.parse_args()
-
-    res = CompetitionResultsBatchService.run_daily_batch(force=args.force, to_email=args.email or None)
-    print("\n--- RAPPORT DU BATCH ---")
-    print(f"Date : {res['executed_at']}")
-    print(f"Compétitions analysées : {res['competitions_checked']}")
-    print(f"Résultats trouvés : {res['competitions_updated']}")
-    print(f"E-mail expédié : {'Oui' if res['email_sent'] else 'Non'}")
