@@ -117,12 +117,12 @@ class RestStore:
             resp = self._request("POST", url, json={"documents": names})
             if resp.status_code != 200:
                 raise FirestoreError(f"Lecture {collection} : HTTP {resp.status_code} - {resp.text[:200]}")
-            for r in resp.json():
-                if r.get("found"):
-                    d = self._parse_doc(r["found"])
-                    result[d["id"]] = d
-                elif r.get("missing"):
-                    result[r["missing"].rsplit("/", 1)[-1]] = None
+            for entry in resp.json():
+                if entry.get("found"):
+                    doc = self._parse_doc(entry["found"])
+                    result[doc["id"]] = doc
+                elif entry.get("missing"):
+                    result[entry["missing"].rsplit("/", 1)[-1]] = None
         return result
 
     def max_int_id(self, collection: str, field: str) -> int:
@@ -135,10 +135,10 @@ class RestStore:
         resp = self._request("POST", url, json=body)
         if resp.status_code != 200:
             raise FirestoreError(f"Requête {collection} : HTTP {resp.status_code} - {resp.text[:200]}")
-        for r in resp.json():
-            if r.get("document"):
-                v = self._parse_doc(r["document"])["fields"].get(field)
-                return int(v) if isinstance(v, int) else 0
+        for entry in resp.json():
+            if entry.get("document"):
+                value = self._parse_doc(entry["document"])["fields"].get(field)
+                return int(value) if isinstance(value, int) else 0
         return 0
 
     def commit(self, writes: List[Dict[str, Any]]) -> List[Dict[str, str]]:
@@ -149,28 +149,28 @@ class RestStore:
             return []
         url = f"{self._base}:commit"
         body = []
-        for w in writes:
-            fields = {k: python_to_firestore_value(v) for k, v in (w.get("fields") or {}).items()}
-            fields[DEL_FIELD] = {"booleanValue": bool(w.get("deleted"))}
-            fields[BY_FIELD] = {"stringValue": w.get("by") or ""}
+        for write in writes:
+            fields = {k: python_to_firestore_value(v) for k, v in (write.get("fields") or {}).items()}
+            fields[DEL_FIELD] = {"booleanValue": bool(write.get("deleted"))}
+            fields[BY_FIELD] = {"stringValue": write.get("by") or ""}
             op: Dict[str, Any] = {
-                "update": {"name": f"{self._root}/{w['collection']}/{w['doc_id']}", "fields": fields},
+                "update": {"name": f"{self._root}/{write['collection']}/{write['doc_id']}", "fields": fields},
                 "updateTransforms": [{"fieldPath": MOD_FIELD, "setToServerValue": "REQUEST_TIME"}],
             }
-            if w.get("mask") is not None:
-                paths = [quote_field_path(k) for k in w["mask"]] + [DEL_FIELD, BY_FIELD]
+            if write.get("mask") is not None:
+                paths = [quote_field_path(k) for k in write["mask"]] + [DEL_FIELD, BY_FIELD]
                 op["updateMask"] = {"fieldPaths": paths}
-            pre = w.get("precondition")
-            if pre:
-                op["currentDocument"] = pre
+            precondition = write.get("precondition")
+            if precondition:
+                op["currentDocument"] = precondition
             body.append(op)
         resp = self._request("POST", url, json={"writes": body})
         if resp.status_code == 200:
             out = []
-            for r in resp.json().get("writeResults", []):
-                tr = (r.get("transformResults") or [{}])[0]
-                out.append({"update_time": r.get("updateTime"),
-                            "modified_at": tr.get("timestampValue") or r.get("updateTime")})
+            for write_result in resp.json().get("writeResults", []):
+                transform_result = (write_result.get("transformResults") or [{}])[0]
+                out.append({"update_time": write_result.get("updateTime"),
+                            "modified_at": transform_result.get("timestampValue") or write_result.get("updateTime")})
             return out
         text = resp.text or ""
         if resp.status_code in (404, 409) or "FAILED_PRECONDITION" in text or "ALREADY_EXISTS" in text:

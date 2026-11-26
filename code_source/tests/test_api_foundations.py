@@ -2,13 +2,8 @@
 
 import os
 import re
-import sys
 import unittest
 from unittest.mock import patch
-
-_src_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 from fastapi import FastAPI, Request
 from fastapi.routing import APIRoute
@@ -148,7 +143,7 @@ class TestSqliteCacheScope(unittest.TestCase):
     def test_cache_write_runs_on_refreshed_cache(self):
         r = self._assert_cache_around(
             "DELETE", "/api/planning/item/12",
-            "api.activities.planning.PlanningRepository.delete_planning_item",
+            "infrastructure.sqlite.planning.PlanningRepository.delete_planning_item",
             True)
         self.assertEqual(r.json()["status"], "success")
 
@@ -160,7 +155,7 @@ class TestSqliteCacheScope(unittest.TestCase):
                 patch.object(server.CloudDatabase, "is_enabled", return_value=True), \
                 patch.object(server.CloudDatabase, "ensure_fresh"), \
                 patch.object(server.CloudDatabase, "after_write", side_effect=[True, False]), \
-                patch("api.activities.planning.PlanningRepository.delete_planning_item", return_value=True), \
+                patch("infrastructure.sqlite.planning.PlanningRepository.delete_planning_item", return_value=True), \
                 self.assertLogs("alj", "ERROR"):
             replicated = client.delete("/api/planning/item/12")
             pending = client.delete("/api/planning/item/12")

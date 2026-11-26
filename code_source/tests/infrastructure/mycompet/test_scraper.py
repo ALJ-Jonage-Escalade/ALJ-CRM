@@ -1,10 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import os
-import sys
-
 # Ajuster le chemin d'import
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../src")))
 from infrastructure.mycompet.scraper import scrape_competition_info_by_id
 from domain.errors import InvalidRequest, NotFound, UpstreamUnavailable
 
@@ -70,6 +66,16 @@ class TestMyCompetScraper(unittest.TestCase):
         self.assertEqual(chazot["classement"], "1")
         self.assertEqual(chazot["total_categorie"], 1)
         self.assertEqual(chazot["categorie"], "U15Homme")
+
+    def test_parse_results_keyword_quote_or_blank_matches_nobody(self):
+        """The keyword comes from the request: a quote no longer breaks the XPath, a blank one no longer takes everyone."""
+        from infrastructure.mycompet.scraper import parse_mycompet_results_html
+        page = ('<table><tr><td>1</td><td><a href="palmares_1.html"><strong>DUPONT Jean</strong><br>CLUB D\'ESCALADE</a>'
+                '</td></tr></table>')
+        for keyword in ("L'ALJ", "   "):
+            with self.subTest(keyword=keyword):
+                self.assertEqual(parse_mycompet_results_html(page, club_keyword=keyword), [])
+        self.assertEqual(len(parse_mycompet_results_html(page, club_keyword="d'escalade")), 1)
 
     def test_scrape_competition_info_invalid_id(self):
         with self.assertRaises(InvalidRequest):
@@ -181,7 +187,6 @@ class TestMyCompetScraper(unittest.TestCase):
         self.assertEqual(_parse_dates_to_iso("07/11/2026"), ("2026-11-07", "2026-11-07"))
         self.assertEqual(_parse_dates_to_iso(""), (None, None))
         self.assertEqual(_parse_dates_to_iso(None), (None, None))
-
 
 
 if __name__ == "__main__":

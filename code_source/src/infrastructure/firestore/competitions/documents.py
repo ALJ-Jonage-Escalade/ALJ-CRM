@@ -17,15 +17,9 @@ from __future__ import annotations
 import datetime
 import logging
 import time
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Optional, TypedDict, TypeVar, cast
 
-from domain.competitions.models import (
-    LEGACY_COACH_SLOTS,
-    PAIEMENT_PAYE,
-    Competition,
-    coach_ids_of,
-    default_deadline,
-)
+from domain.competitions.models import LEGACY_COACH_SLOTS, Competition, PaymentStatus, coach_ids_of, default_deadline
 from infrastructure.firestore.client import (
     META_KEYS,
     FirestoreClient,
@@ -49,6 +43,65 @@ _MAX_WRITE_ATTEMPTS = 5
 _Result = TypeVar("_Result")
 
 
+class ParticipantDoc(TypedDict, total=False):
+    """A participant row of a competition document as the pages get it (api.competitions.schemas.views.
+    CompetitionParticipant). Rows written by older versions may miss fields, hence total=False."""
+    participant_id: Optional[int]  # the member id again (written by every new row)
+    adherent_id: Optional[int]
+    nom: str
+    prenom: str
+    num_licence: str
+    tarif: str
+    phone: str
+    email: str
+    urgence_nom: str
+    urgence_tel: str
+    selectionne: bool
+    present: bool
+    statut_paiement: str
+    montant_paye: float
+    commande_helloasso: str
+    date_synchro_helloasso: str
+    note_paiement: str
+    classement: str
+    total_categorie: int | str
+    categorie_ffme: str
+    performance_ffme: str
+    resultat_ffme: str
+    resultat_synced_at: str
+    sex: Optional[str]
+    updated_at: str
+
+
+class CompetitionDoc(TypedDict, total=False):
+    """A competition document as the pages get it (api_doc: api.competitions.schemas.views.Competition), with its
+    stored counters and timestamps. Documents written by older versions may miss fields, hence total=False."""
+    id: int
+    id_ffme: str
+    nom: str
+    date_competition: str
+    date_fin: str
+    deadline: str
+    prix: float
+    statut: str
+    lieu: Optional[str]  # pass-through fields of the office page, stored as given
+    type: Optional[str]
+    whatsapp_link: str
+    url_resultats: str
+    id_resultat_ffme: str  # results page number entered before url_resultats existed
+    resultats_synced_at: str
+    resultats_url_demandee_at: str  # set once the results batch asked for the URL by e-mail
+    coach_ids: list[int]
+    coaches: list[str]  # names of coach_ids, resolved from the coaches collection
+    participants: list[ParticipantDoc]
+    nb_participants: int
+    nb_selectionnes: int
+    nb_payes: int
+    total_collecte: float
+    created_at: str
+    updated_at: str
+
+
 def now_iso() -> str:
     return datetime.datetime.now().isoformat(timespec="seconds")
 
@@ -70,19 +123,17 @@ def comp_sort_key(date_competition: Any, competition_id: Any) -> tuple[str, int]
     return str(date_competition or ""), int(competition_id or 0)
 
 
-def with_retries(what: str, attempt: Callable[[], _Result]) -> _Result | None:
+def with_retries(what: str, attempt: Callable[[], _Result]) -> _Result:
     """Runs `attempt()` again (re-reading inside it) when its conditional write lost a
-    race (FirestoreConflictError), up to _MAX_WRITE_ATTEMPTS times."""
-    for attempt_number in range(_MAX_WRITE_ATTEMPTS):
+    race (FirestoreConflictError), up to _MAX_WRITE_ATTEMPTS times; the last conflict propagates."""
+    for attempt_number in range(_MAX_WRITE_ATTEMPTS - 1):
         try:
             return attempt()
         except FirestoreConflictError:
-            if attempt_number == _MAX_WRITE_ATTEMPTS - 1:
-                raise
             logger.info(f"[FIRESTORE] {what} modifié(e) entre-temps : "
                         f"nouvelle tentative ({attempt_number + 2}/{_MAX_WRITE_ATTEMPTS})")
             time.sleep(0.2 * (attempt_number + 1))
-    return None
+    return attempt()
 
 
 def new_id() -> int:
@@ -132,14 +183,15 @@ def load_comp_doc(competition_id: int | str) -> dict[str, Any] | None:
 
 
 def _coach_names(coach_ids: list[int], coaches: dict[int, str]) -> list[str]:
-    return [coaches[coach_id] for coach_id in coach_ids if coach_id is not None and coach_id in coaches]
+    return [coaches[coach_id] for coach_id in coach_ids if coach_id in coaches]
 
 
-def api_doc(doc: dict[str, Any], coaches: dict[int, str]) -> dict[str, Any]:
+def api_doc(doc: dict[str, Any], coaches: dict[int, str]) -> CompetitionDoc:
     """Document for the web pages: `coach_ids` normalized (legacy slots read too) and
     `coaches` resolved from the coaches collection, never the stored copy. Only a deadline set by
     hand is stored: the default one (1 week before the start) follows the start date."""
-    out = {k: v for k, v in clean_doc(doc).items() if k not in LEGACY_COACH_SLOTS}
+    # The stored fields as they are (no conversion): a Firestore document, shaped as CompetitionDoc by the writers
+    out = cast(CompetitionDoc, {k: v for k, v in clean_doc(doc).items() if k not in LEGACY_COACH_SLOTS})
     out["deadline"] = str(doc.get("deadline") or "").strip() or default_deadline(str(doc.get("date_competition") or ""))
     out["coach_ids"] = coach_ids_of(doc)
     out["coaches"] = _coach_names(out["coach_ids"], coaches)
@@ -180,7 +232,7 @@ def build_comp_doc(doc: dict[str, Any] | None, comp: Competition) -> dict[str, A
         "date_fin": comp.date_fin or "",
         "deadline": (comp.deadline or "").strip(),
         "prix": float(comp.prix or 0.0),
-        "statut": comp.statut or "en_preparation",
+        "statut": comp.statut,
         "url_resultats": comp.url_resultats or "",
         "resultats_synced_at": comp.resultats_synced_at or "",
         "whatsapp_link": comp.whatsapp_link or "",
@@ -197,7 +249,7 @@ def recompute_counters(parts: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "nb_participants": len(parts),
         "nb_selectionnes": sum(1 for p in parts if p.get("selectionne")),
-        "nb_payes": sum(1 for p in parts if (p.get("statut_paiement") or "") == PAIEMENT_PAYE),
+        "nb_payes": sum(1 for p in parts if (p.get("statut_paiement") or "") == PaymentStatus.PAYE),
         "total_collecte": round(sum(float(p.get("montant_paye") or 0.0) for p in parts), 2),
     }
 

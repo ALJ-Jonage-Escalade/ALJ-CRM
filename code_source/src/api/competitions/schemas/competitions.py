@@ -8,7 +8,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from api.request_body import RequestBody
-from domain.competitions.models import STATUT_EN_PREPARATION, STATUTS_COMPETITION
+from domain.competitions.models import STATUTS_COMPETITION, CompetitionStatus
 
 _ISO_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})?$")
 
@@ -37,7 +37,7 @@ class CompetitionCreate(RequestBody):
     date_fin: str = ""
     deadline: str = ""
     prix: float = Field(0.0, ge=0)
-    statut: str = STATUT_EN_PREPARATION
+    statut: str = CompetitionStatus.EN_PREPARATION
     coach_ids: List[int] = Field(default_factory=list)
     url_resultats: str = ""  # MyCompet results page, also found by the fetch-results route
     whatsapp_link: str = ""

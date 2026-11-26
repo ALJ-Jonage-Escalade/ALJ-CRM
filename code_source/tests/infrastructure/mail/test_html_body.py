@@ -1,15 +1,8 @@
 """Tests du rendu HTML des corps d'e-mail (balises simples + liens externes)."""
-import os
 import random
 import re
-import sys
 import time
 import unittest
-
-_test_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 from infrastructure.mail.html_body import _link_html, _restore_links, build_signature_html, build_signature_plain, text_to_html
 

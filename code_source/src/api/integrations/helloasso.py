@@ -12,12 +12,11 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
-from api.competitions.schemas.views import HelloAssoSync, HelloAssoSyncStats
-from api.responses import STORAGE_ERRORS, error_responses, internal_error
-from infrastructure.firestore.client import FirestoreError
+from api.integrations.schemas import HelloAssoSync, HelloAssoSyncStats
+from api.responses import STORAGE_ERRORS, error_responses
+from domain.errors import Forbidden, UpstreamUnavailable
 from services.competitions.helloasso_items import HelloAssoItemService
-from services.competitions.helloasso_webhook import HelloAssoWebhookService, WebhookRejected
-from services.competitions.store import invalidate_cache
+from services.competitions.helloasso_webhook import HelloAssoWebhookService
 
 logger = logging.getLogger("alj")
 router = APIRouter()
@@ -42,20 +41,16 @@ def webhook_helloasso(payload: Dict[str, Any] = Body(...),  # Any: HelloAsso's n
 
     Authenticité : jeton secret dans l'URL (?token=...) et/ou relecture des articles
     auprès de l'API HelloAsso (voir HelloAssoWebhookService.verify_and_reconcile_notification).
+    A refusal answers 401 (token) or 503 (not checkable now: HelloAsso sends the notification again later). Any other
+    failure is never answered 200, so that it shows on HelloAsso's side: 503 when Firestore failed, else 500
+    (api.responses: service_error_handler, unhandled_error_middleware).
     """
     try:
         return HelloAssoWebhookService.verify_and_reconcile_notification(payload, token=token)
-    except WebhookRejected as e:
-        logger.warning("[WEBHOOK_HELLOASSO] Notification refusée (%s) : %s", e.status_code, e.message)
-        return JSONResponse({"status": "rejected", "message": e.message}, status_code=e.status_code)
-    except FirestoreError as e:
-        # Firestore unreadable (member list, competitions, settings): nothing could be matched nor
-        # recorded. An error status, not 200, so that the failure shows on HelloAsso's side.
-        return JSONResponse({"status": "error", "message": internal_error(e, "webhook_helloasso")}, status_code=503)
-    except Exception as e:  # any other failure, possibly midway: an error status too, never 200
-        return JSONResponse({"status": "error", "message": internal_error(e, "webhook_helloasso")}, status_code=500)
-    finally:
-        invalidate_cache()  # the webhook writes competition documents outside the @write services
+    except (Forbidden, UpstreamUnavailable) as rejection:
+        status_code = 401 if isinstance(rejection, Forbidden) else 503
+        logger.warning("[WEBHOOK_HELLOASSO] Notification refusée (%s) : %s", status_code, rejection.message)
+        return JSONResponse({"status": "rejected", "message": rejection.message, "code": rejection.code}, status_code=status_code)
 
 
 @router.post("/api/helloasso/sync", response_model=HelloAssoSync, responses=error_responses(400, 502, *STORAGE_ERRORS))

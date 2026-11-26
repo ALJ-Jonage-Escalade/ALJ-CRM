@@ -11,8 +11,8 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Sequence, TypedDict
 
-from domain.club_emails import DEFAULT_SENDER_EMAIL
-from domain.email_log import LoggedRecipient
+from domain.communications.club_emails import DEFAULT_SENDER_EMAIL
+from domain.communications.email_log import LoggedRecipient
 from domain.errors import InvalidRequest, UpstreamUnavailable
 from domain.members.correction_request import CORRECTION_REQUEST_TEMPLATE, PROBLEMS_VARIABLE, CorrectionRequest, correction_requests
 from infrastructure.mail.html_body import get_inline_images
@@ -57,7 +57,7 @@ def _template() -> _Template:
 def _requests(item_ids: Sequence[int], chosen_campaign: Optional[str]) -> list[CorrectionRequest]:
     """The requests of the chosen registrations, on the preview recomputed now. InvalidRequest when none has a problem."""
     chosen = set(item_ids)
-    plan = MembershipImportService.preview(chosen_campaign)
+    plan = MembershipImportService.current_plan(chosen_campaign)
     requests = correction_requests(entry for entry in plan.entries if entry.item_id in chosen)
     if not requests:
         raise InvalidRequest("Aucune des inscriptions choisies n'a d'information à corriger.", "nothing_to_request")

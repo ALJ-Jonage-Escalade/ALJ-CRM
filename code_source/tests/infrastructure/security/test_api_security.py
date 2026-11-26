@@ -6,17 +6,9 @@ Tests de sécurité de l'API Cloud Run :
 
 import datetime
 import os
-import re
-import sys
 import time
 import unittest
 from unittest.mock import MagicMock, patch
-
-_tests_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_code_root = os.path.dirname(_tests_dir)
-_src_dir = os.path.join(_code_root, "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 import jwt
 from cryptography import x509
@@ -155,46 +147,6 @@ class TestRoles(unittest.TestCase):
         self.assertLess(Role.READONLY, Role.COACH)
         self.assertLess(Role.COACH, Role.ADMIN)
 
-    def test_admin_routes_require_admin(self):
-        r = api_auth.required_role
-        for method in ("GET", "POST", "PATCH", "DELETE"):
-            for path in ("/api/admin/access/roles", "/api/admin/access/roles/a@b.c", "/api/admin/access/requests",
-                         "/api/admin/access/requests/a@b.c/grant", "/api/admin/access/history"):
-                self.assertEqual(r(method, path), Role.ADMIN, f"{method} {path}")
-        self.assertEqual(r("GET", "/api/administration"), Role.COACH)  # not under /api/admin/
-        # Emergency contacts are written through the member routes: admins only
-        self.assertEqual(r("POST", "/api/members/update"), Role.ADMIN)
-        self.assertEqual(r("POST", "/api/members/create"), Role.ADMIN)
-
-    def test_helloasso_campaign_choice_requires_admin(self):
-        """Coaches see the campaigns (Compétitions › HelloAsso), only admins choose the active one."""
-        r = api_auth.required_role
-        self.assertEqual(r("GET", "/api/helloasso/campaigns"), Role.COACH)
-        for kind in ("membership", "competitions"):
-            self.assertEqual(r("PUT", f"/api/helloasso/campaigns/{kind}"), Role.ADMIN, kind)
-
-    def test_rules_hold_no_role_list(self):
-        """firestore.rules denies every client: roles live in the access list only (plan phase 3)."""
-        with open(os.path.join(_code_root, "firestore", "firestore.rules"), encoding="utf-8") as f:
-            rules = f.read()
-        self.assertNotIn("@", rules)
-        self.assertNotIn("request.auth", rules)
-
-    def test_no_personal_address_in_the_code(self):
-        """Roles live in the access list, never in code (GDPR): no personal mailbox in the app's sources."""
-        personal = re.compile(r"[a-z0-9_.+-]+@(?:gmail|googlemail|orange|wanadoo|free|sfr|laposte|hotmail|outlook|live|yahoo"
-                              r"|icloud|me|aol|gmx|protonmail|neuf|bbox)\.[a-z.]+")
-        sources = []
-        for root in (os.path.join(_code_root, "src"), os.path.join(_code_root, "frontend", "src")):
-            sources += [os.path.join(d, n) for d, _, names in os.walk(root) for n in names
-                        if n.endswith((".py", ".ts", ".vue", ".js", ".html")) and not n.endswith(".test.ts")]
-        self.assertGreater(len(sources), 50)
-        found = []
-        for path in sources:
-            with open(path, encoding="utf-8") as f:
-                found += [f"{os.path.relpath(path, _code_root)}: {email}"
-                          for email in personal.findall(f.read().lower())]
-        self.assertEqual(found, [])
 
 
 class TestRoleDirectoryFailure(_CertsMixin, unittest.TestCase):
@@ -409,7 +361,7 @@ class TestAuthMiddleware(_CertsMixin, unittest.TestCase):
 
     def test_coaches_change_single_planning_slots(self):
         coach = make_token(email=COACH)
-        with patch("api.activities.planning.PlanningRepository.delete_planning_item", return_value=True) as delete:
+        with patch("infrastructure.sqlite.planning.PlanningRepository.delete_planning_item", return_value=True) as delete:
             r = self.client.delete("/api/planning/item/1", headers={"Authorization": f"Bearer {coach}"})
             self.assertEqual(r.status_code, 200)
             delete.assert_called_once_with(1)

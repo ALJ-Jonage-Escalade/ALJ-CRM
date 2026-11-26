@@ -3,7 +3,7 @@ import datetime
 import hashlib
 import json
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 from domain.members.sex import parse_sex
 
@@ -15,6 +15,20 @@ TRACKED_TABLES = (
     "keys", "key_assignments", "key_events",  # club keys, plans/club-keys.md
 )
 COLLECTION_PREFIX = "crm_"
+
+
+class SyncReport(TypedDict, total=False):
+    """What a synchronisation did, filled in place by build_cache, pull and flush (a key is absent until set)."""
+    full: bool  # the cache was rebuilt from Firestore
+    loaded: Dict[str, int]  # rows loaded per table by the rebuild
+    pulled: int  # documents received
+    pushed: int  # rows sent
+    deleted: int  # deletions sent
+    conflicts: int  # writes refused by Firestore (changed elsewhere), merged then sent again
+    tables: List[str]  # tables whose local changes were sent
+    renumbered: List[str]  # local rows given a new id ("users 12 -> 40")
+    errors: List[str]
+
 MOD_FIELD = "_modified_at"
 DEL_FIELD = "_deleted"
 BY_FIELD = "_modified_by"
@@ -33,7 +47,7 @@ REFERENCES = {
     "purchases": [("purchase_options", "purchase_id")],
 }
 # Fields kept on a deleted document, besides its key: a tombstone of a contact says whose it was, and nothing about the
-# contact, so scripts/migrate_emergency_contacts.py does not bring back contacts an admin has removed.
+# contact.
 TOMBSTONE_FIELDS = {"emergency_contacts": ("user_id",)}
 
 
@@ -44,8 +58,8 @@ def collection_for(table: str) -> str:
 def upgrade_legacy_fields(table: str, fields: Dict[str, Any]) -> Dict[str, Any]:
     """Fields of a document written before a column was renamed, read under the new name.
 
-    users.gender (free text) became users.sex (FFME code, plans/sex-enum.md): documents keep
-    `gender` until scripts/migrate_gender_to_sex.py has run; a value not understood reads as None."""
+    users.gender (free text) became users.sex (FFME code, plans/sex-enum.md): documents written
+    before the rename hold `gender`; a value not understood reads as None."""
     if table == "users" and "sex" not in fields and "gender" in fields:
         sex = parse_sex(fields["gender"])
         return {**fields, "sex": sex.value if sex else None}

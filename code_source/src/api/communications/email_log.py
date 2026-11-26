@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from api.competitions.schemas.email_log import RecentEmailLog
+from api.communications.schemas import RecentEmailLog
 from api.responses import STORAGE_ERRORS, error_responses
 from services.communications import email_log
 

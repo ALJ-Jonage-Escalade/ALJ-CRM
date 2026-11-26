@@ -36,7 +36,7 @@ from typing import Any, Callable, Dict, Optional
 
 from infrastructure.firestore.cloud_sync.bootstrap import build_cache, cache_is_valid
 from infrastructure.firestore.cloud_sync.cache import connect, get_state, install_tracking, pending_count
-from infrastructure.firestore.cloud_sync.common import CACHE_FORMAT
+from infrastructure.firestore.cloud_sync.common import CACHE_FORMAT, SyncReport
 from infrastructure.firestore.cloud_sync.rest_store import RestStore
 from infrastructure.firestore.cloud_sync.sync import flush, pull
 from infrastructure.firestore.competitions import member_directory
@@ -51,8 +51,8 @@ class CloudDatabase:
     """Point d'entrée : synchronisation du cache `database.db` avec Firestore."""
 
     _lock = threading.RLock()
-    _store = None
-    _last_report: Dict[str, Any] = {}
+    _store: Optional[RestStore] = None  # made at first use (store()); install() swaps it
+    _last_report: SyncReport = {}
     _last_error = ""
     _last_sync = 0.0
     _last_pull = 0.0
@@ -65,7 +65,19 @@ class CloudDatabase:
         return os.environ.get(REPLICATION_ENV, "").strip().lower() != "off"
 
     @classmethod
-    def store(cls):
+    def install(cls, store: Optional[RestStore] = None) -> None:
+        """Swaps the Firestore store (None: a RestStore is made at first use) and forgets the sync bookkeeping
+        (last report, error, sync and pull times, directory to rebuild): the state of a new process. Tests use it."""
+        with cls._lock:
+            cls._store = store
+            cls._last_report = {}
+            cls._last_error = ""
+            cls._last_sync = 0.0
+            cls._last_pull = 0.0
+            cls._projection_dirty = False
+
+    @classmethod
+    def store(cls) -> RestStore:
         if cls._store is None:
             cls._store = RestStore()
         return cls._store
@@ -76,18 +88,16 @@ class CloudDatabase:
 
     @staticmethod
     def sync_author() -> str:
-        try:
-            return f"{os.environ.get('USERNAME') or os.environ.get('USER') or '?'}@{socket.gethostname()}"
-        except Exception:
-            return "?"
+        """Who wrote a change sent to Firestore: user@host of the process."""
+        return f"{os.environ.get('USERNAME') or os.environ.get('USER') or '?'}@{socket.gethostname()}"
 
     @classmethod
-    def sync(cls, full: bool = False, progress: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
+    def sync(cls, full: bool = False, progress: Optional[Callable[[str], None]] = None) -> SyncReport:
         """Met le cache à jour : reconstruction si besoin (toujours si `full`), puis réception et envoi."""
         with cls._lock:
             path = cls.db_path()
             store = cls.store()
-            report: Dict[str, Any] = {}
+            report = SyncReport()
             try:
                 if full or not cache_is_valid(path, store.project_id):
                     if progress:
@@ -123,10 +133,10 @@ class CloudDatabase:
             return report
 
     @classmethod
-    def flush_only(cls) -> Dict[str, Any]:
+    def flush_only(cls) -> SyncReport:
         with cls._lock:
             path = cls.db_path()
-            report: Dict[str, Any] = {}
+            report = SyncReport()
             if not cache_is_valid(path, cls.store().project_id):
                 return report
             conn = connect(path)
@@ -143,7 +153,7 @@ class CloudDatabase:
             return report
 
     @classmethod
-    def _after_sync(cls, report: Dict[str, Any]):
+    def _after_sync(cls, report: SyncReport) -> None:
         if set(report.get("tables") or []) & {"users", "emergency_contacts", "orders", "purchases", "planning", "seasons"}:
             cls._projection_dirty = True
         if report.get("pushed") or report.get("deleted") or report.get("pulled"):
@@ -171,8 +181,10 @@ class CloudDatabase:
         if os.path.exists(path):
             try:
                 conn = connect(path)
-                pending = pending_count(conn)
-                conn.close()
+                try:
+                    pending = pending_count(conn)
+                finally:
+                    conn.close()
             except Exception:
                 logger.warning("Comptage des modifications en attente impossible", exc_info=True)
         return {"pending": pending, "last_error": cls._last_error, "last_sync": cls._last_sync}

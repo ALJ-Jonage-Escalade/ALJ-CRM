@@ -3,56 +3,36 @@
 from __future__ import annotations
 
 import json
-import logging
+from typing import Optional
 
-from domain.members.planning_groups import is_autonomous_type
+from domain.activities.planning_groups import is_autonomous_type
 from infrastructure.sqlite.connection import SqliteDatabase
 
-logger = logging.getLogger("alj")
+
+def _json_list(raw: Optional[str]) -> list:
+    """A list column stored as JSON; [] when empty or unreadable."""
+    if not raw:
+        return []
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
 
 
 class PlanningRepository:
     @classmethod
     def load_planning_data(cls) -> list:
         """Charge l'ensemble du planning de créneaux depuis SQLite."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute("SELECT * FROM planning ORDER BY id ASC")
-            rows = cursor.fetchall()
-            planning_list = []
-            for row in rows:
-                row_dict = dict(row)
-                
-                # Désérialiser les encadrants
-                encadrants_raw = row_dict.get("encadrants", "[]")
-                if encadrants_raw:
-                    try:
-                        encadrants = json.loads(encadrants_raw)
-                    except (json.JSONDecodeError, TypeError):
-                        encadrants = []
-                else:
-                    encadrants = []
-                row_dict["encadrants"] = encadrants
-                
-                # Désérialiser les tarifs HelloAsso mappés
-                tarifs_raw = row_dict.get("helloasso_tarifs", "[]")
-                if tarifs_raw:
-                    try:
-                        tarifs = json.loads(tarifs_raw)
-                    except (json.JSONDecodeError, TypeError):
-                        tarifs = []
-                else:
-                    tarifs = []
-                row_dict["helloasso_tarifs"] = tarifs
-                row_dict["seance_autonome"] = bool(row_dict.get("seance_autonome"))
-
-                planning_list.append(row_dict)
-
-            return planning_list
-        finally:
-            conn.close()
+        with SqliteDatabase.connect() as conn:
+            rows = conn.execute("SELECT * FROM planning ORDER BY id ASC").fetchall()
+        planning_list = []
+        for row in rows:
+            row_dict = dict(row)
+            row_dict["encadrants"] = _json_list(row_dict.get("encadrants"))
+            row_dict["helloasso_tarifs"] = _json_list(row_dict.get("helloasso_tarifs"))  # HelloAsso tariffs of the slot
+            row_dict["seance_autonome"] = bool(row_dict.get("seance_autonome"))
+            planning_list.append(row_dict)
+        return planning_list
 
     @classmethod
     def load_creneaux_groups(cls) -> list:
@@ -87,10 +67,8 @@ class PlanningRepository:
     @classmethod
     def save_planning_data(cls, planning_list: list):
         """Remplace le planning complet dans SQLite (répliqué vers Firestore comme toute écriture du cache)."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
-        try:
+        with SqliteDatabase.transaction() as conn:
+            cursor = conn.cursor()
             cursor.execute("DELETE FROM planning")
             for item in planning_list:
                 enc_json = json.dumps(item.get("encadrants", []), ensure_ascii=False)
@@ -112,21 +90,12 @@ class PlanningRepository:
                     str(item.get("naissance_max") or ""),
                     int(bool(item.get("seance_autonome")))
                 ))
-            conn.commit()
-            logger.debug("[SQLITE] Planning enregistré avec succès dans SQLite.")
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
 
     @classmethod
     def save_planning_item(cls, item: dict) -> dict:
         """Crée ou met à jour un créneau unique dans la table planning."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
-        try:
+        with SqliteDatabase.transaction() as conn:
+            cursor = conn.cursor()
             item_id = item.get("id")
             if not item_id or int(item_id) <= 0:
                 cursor.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM planning")
@@ -153,30 +122,10 @@ class PlanningRepository:
                 str(item.get("naissance_max") or "").strip(),
                 int(bool(item.get("seance_autonome")))
             ))
-            conn.commit()
-            logger.debug(f"[SQLITE] Créneau #{item_id} ({item.get('groupe')}) enregistré avec succès.")
-            return item
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        return item
 
     @classmethod
     def delete_planning_item(cls, item_id: int) -> bool:
         """Supprime un créneau par son ID."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute("DELETE FROM planning WHERE id = ?", (int(item_id),))
-            conn.commit()
-            deleted = cursor.rowcount > 0
-            if deleted:
-                logger.debug(f"[SQLITE] Créneau #{item_id} supprimé avec succès.")
-            return deleted
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        with SqliteDatabase.transaction() as conn:
+            return conn.execute("DELETE FROM planning WHERE id = ?", (int(item_id),)).rowcount > 0

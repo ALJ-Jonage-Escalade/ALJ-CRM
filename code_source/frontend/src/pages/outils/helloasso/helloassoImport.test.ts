@@ -129,6 +129,7 @@ describe("helloassoImport", () => {
     expect(searchRows(rows, "LÚNA").map((r) => r.item_id)).toEqual([2]);
     expect(searchRows(rows, "11/08/2013").map((r) => r.item_id)).toEqual([1]);
     expect(searchRows(rows, "jeune").map((r) => r.item_id)).toEqual([2]);
+    expect(searchRows(rows, "999").map((r) => r.item_id)).toEqual([2]);
   });
 
   it("names the HelloAsso statuses and the refunds", () => {

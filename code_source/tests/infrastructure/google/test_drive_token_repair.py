@@ -1,16 +1,11 @@
 """Tests de l'auto-réparation du refresh token Google (jeton enregistré périmé vs .env frais)."""
 import os
-import sys
 import unittest
 from unittest import mock
 
 # Ajustement du chemin d'import
-_test_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
-from infrastructure.google.drive import GoogleDriveClient
+from infrastructure.google.drive import GoogleAuthError, GoogleDriveClient
 from infrastructure.security.secret_store import SecretStore
 
 OLD_CREDS = ("old-client-id", "old-secret", "OLD_REVOKED_TOKEN")
@@ -100,7 +95,7 @@ class TestDriveTokenRepair(unittest.TestCase):
         with mock.patch.object(SecretStore, "get_secret", side_effect=lambda k: dict(
                 zip(("GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"), OLD_CREDS, strict=True)).get(k, "")), \
              mock.patch("infrastructure.google.drive.requests.post", side_effect=responses):
-            with self.assertRaises(Exception) as ctx:
+            with self.assertRaises(GoogleAuthError) as ctx:
                 GoogleDriveClient.get_access_token(env_paths=[self.env_path])
         self.assertIn("Échec de l'obtention du token Google", str(ctx.exception))
 

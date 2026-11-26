@@ -1,4 +1,8 @@
-"""`adherents` directory: snapshot of the members of database.db on Firestore, read through a short cache."""
+"""`adherents` directory: snapshot of the members of database.db on Firestore, read through a short cache.
+
+Vocabulary: one person is a *member* in the Python names. `adherent` remains where it is a stored or API name (the
+`adherents` collection, a participant's `adherent_id`), and `user` where it is the SQLite one (`users` table,
+`user_id`)."""
 from __future__ import annotations
 
 import json
@@ -29,7 +33,7 @@ class _DirectoryState:
     def __init__(self) -> None:
         # Any: directory documents as Firestore returns them
         self.cache: TimedCache[str, list[dict[str, Any]]] = TimedCache(_CACHE_SECONDS)
-        # Last directory read: served again for a cache time when a refresh fails (_read_adherents)
+        # Last directory read: served again for a cache time when a refresh fails (_read_members)
         self.last_read: list[dict[str, Any]] | None = None
         # The outdated directory was already sent for rewriting by this process (_heal_outdated_directory)
         self.heal_requested = False
@@ -194,12 +198,12 @@ def invalidate_cache() -> None:
     _state.last_read = None
 
 
-def adherents_raw() -> list[dict[str, Any]]:
+def member_documents() -> list[dict[str, Any]]:
     """The `adherents` directory documents, cached _CACHE_SECONDS seconds."""
-    return _state.cache.get_or_load(_CACHE_KEY, _read_adherents)
+    return _state.cache.get_or_load(_CACHE_KEY, _read_members)
 
 
-def _read_adherents() -> list[dict[str, Any]]:
+def _read_members() -> list[dict[str, Any]]:
     """Reads the directory. A failed read keeps serving the last copy; with none yet, FirestoreError is raised
     (never an empty directory: it would look like a club without members, and is not cached)."""
     try:
@@ -232,12 +236,12 @@ def directory_outdated() -> bool:
     return _state.outdated
 
 
-def adherent_map() -> dict[int, dict[str, Any]]:
+def members_by_id() -> dict[int, dict[str, Any]]:
     """{adherent id -> directory document}."""
-    return {a["id"]: a for a in adherents_raw() if a.get("id") is not None}
+    return {a["id"]: a for a in member_documents() if a.get("id") is not None}
 
 
-def _adherent_as_legacy_dict(doc: dict[str, Any]) -> dict[str, Any]:
+def _member_as_legacy_dict(doc: dict[str, Any]) -> dict[str, Any]:
     licence = str(doc.get("licence_ffme") or doc.get("num_licence") or "")
     return {
         "id": doc.get("id"),
@@ -275,8 +279,8 @@ def list_members(search: str = "", competition_only: bool = False,
     `statuses`: only the members at one of these membership statuses (« Terminé »…); None: every status."""
     query = normalize_string(search) if search else ""
     result = []
-    for doc in adherents_raw():
-        member = _adherent_as_legacy_dict(doc)
+    for doc in member_documents():
+        member = _member_as_legacy_dict(doc)
         if competition_only and "competition" not in normalize_string(member.get("tarif") or ""):
             continue
         if statuses is not None and member["statut"] not in statuses:

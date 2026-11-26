@@ -6,19 +6,13 @@ application's (frontend/).
 import json
 import os
 import shutil
-import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
-_tests_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_code_root = os.path.dirname(_tests_dir)
-_src_dir = os.path.join(_code_root, "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
 from fastapi.testclient import TestClient
 
+from paths import CODE_ROOT
 from api.web.pwa import get_manifest, get_web_version
 from domain.constants import APP_VERSION
 from server import app
@@ -44,7 +38,7 @@ class TestMobilePWA(unittest.TestCase):
 
     def test_no_hand_written_service_worker(self):
         """The service worker comes from the build (frontend/src/sw.ts): no hand-kept precache list in web/."""
-        self.assertEqual(sorted(os.listdir(os.path.join(_code_root, "web"))), ["assets", "manifest.webmanifest"])
+        self.assertEqual(sorted(os.listdir(os.path.join(CODE_ROOT, "web"))), ["assets", "manifest.webmanifest"])
 
 
 class TestBuiltServiceWorker(unittest.TestCase):

@@ -405,7 +405,7 @@ export function withDateTag(comment: string, today: Date = new Date()): string {
 
 // ---------------------------------------------------------------- E-mail and certificate
 
-/** Values of the template variables for the member, as the server fills them (domain/email_personalization.py). */
+/** Values of the template variables for the member, as the server fills them (domain/communications/email_personalization.py). */
 export function memberVariables(member: Member): Record<VariableKey, string> {
   return {
     first_name: firstNameText(member.first_name),

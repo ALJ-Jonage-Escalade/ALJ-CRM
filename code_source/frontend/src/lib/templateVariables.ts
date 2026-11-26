@@ -1,4 +1,4 @@
-/* The {…} variables of the e-mail templates, as the server handles them (domain/email_variables.py): their French
+/* The {…} variables of the e-mail templates, as the server handles them (domain/communications/email_variables.py): their French
    label, the template kinds that may use them, their demo value, and the rendering of a text with values. The previews
    render here, instantly and offline; templateVariables.golden.json holds the cases both sides must agree on. */
 import type { Schemas } from "./client";
@@ -88,7 +88,7 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }
 
-/** The text, its former spellings expanded, without the lines of an empty WhatsApp link (domain/email_variables.drop_empty_lines). */
+/** The text, its former spellings expanded, without the lines of an empty WhatsApp link (domain/communications/email_variables.drop_empty_lines). */
 function dropEmptyLines(text: string, values: VariableValues): string {
   const isDropped = (line: string): boolean =>
     [...line.matchAll(TOKEN)].some((match) => {
@@ -165,7 +165,7 @@ function textToHtml(text: string): string {
 }
 
 /** The HTML part of the e-mail for a body (without its frame and signature), as the server sends it
-    (domain/email_variables.render_html): safe to show with v-html, nothing typed or filled adds other markup. */
+    (domain/communications/email_variables.render_html): safe to show with v-html, nothing typed or filled adds other markup. */
 export function renderHtml(text: string, values: VariableValues): string {
   return renderTemplate(textToHtml(dropEmptyLines(text, values)), values, { html: true });
 }

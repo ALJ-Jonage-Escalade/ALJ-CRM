@@ -198,7 +198,7 @@ class TestTemplateRoutes(unittest.TestCase):
 
     def test_apply_template_variables_adherents_extension(self):
         """Les variables {tarif} et {season} sont correctement résolues pour les adhérents."""
-        from domain.email_personalization import apply_template_variables
+        from domain.communications.email_personalization import apply_template_variables
         member = {
             "first_name": "camille",
             "last_name": "durand",

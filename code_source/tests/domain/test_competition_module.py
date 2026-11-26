@@ -1,15 +1,8 @@
 """Tests du module de gestion des compétitions (rapprochement HelloAsso)."""
-import os
-import sys
 import unittest
 
-_test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_src_dir = os.path.join(os.path.dirname(_test_dir), "src") if os.path.basename(_test_dir) == "tests" else _test_dir
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
+from domain.helloasso_campaigns import parse_campaign_identifier
 from domain.competitions.matching import (
-    parse_campaign_identifier,
     match_items_to_participants,
     extract_competition_number,
     extract_competition_name,
@@ -348,13 +341,13 @@ class TestGroupForTarif(unittest.TestCase):
     ]
 
     def test_group_found(self):
-        from domain.members.planning_groups import group_for_tarif
+        from domain.activities.planning_groups import group_for_tarif
         self.assertEqual(group_for_tarif("Compétition U11-U13 - jeunes nés 2014-2016", self.PLANNING),
                          "Compétition - U11-U13")
         self.assertEqual(group_for_tarif("ADULTES AUTONOMES", self.PLANNING), "Autonome - adultes")
 
     def test_group_not_found_or_empty(self):
-        from domain.members.planning_groups import group_for_tarif
+        from domain.activities.planning_groups import group_for_tarif
         self.assertEqual(group_for_tarif("Tarif inconnu", self.PLANNING), "")
         self.assertEqual(group_for_tarif("", self.PLANNING), "")
         self.assertEqual(group_for_tarif("Adultes autonomes", None), "")

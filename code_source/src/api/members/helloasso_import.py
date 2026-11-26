@@ -33,14 +33,12 @@ from api.members.helloasso_import_schemas import (
 )
 from api.auth.me import author_of
 from api.responses import error_responses
-from domain.email_log import LastRequest
+from domain.communications.email_log import LastRequest
 from domain.members.import_corrections import helloasso_value
 from domain.members.member_data_rules import DataIssue, IssueField
-from domain.members.membership_import import Decision, ImportPlan, KnownMember, PlanEntry, WriteAction, season_membership
-from infrastructure.sqlite.membership_import import AppliedWrite
-from services.communications.email_log import last_correction_requests_by_item
+from domain.members.membership_import import Decision, KnownMember, PlanEntry, WriteAction, season_membership
 from services.members import correction_requests
-from services.members.helloasso_import import ImportResult
+from services.members.helloasso_import import ImportedRegistration, ImportPreview, ImportResult
 from services.members.helloasso_import import MembershipImportService as Service
 
 router = APIRouter()
@@ -78,9 +76,9 @@ def _row(entry: PlanEntry, members: dict[int, KnownMember], requests: dict[int, 
     )
 
 
-def _preview(plan: ImportPlan) -> MembershipPreview:
+def _preview(preview: ImportPreview) -> MembershipPreview:
+    plan, requests = preview.plan, preview.last_requests
     members = {member.user_id: member for member in plan.members}
-    requests = last_correction_requests_by_item()
     return MembershipPreview(
         status="success", season=plan.season, campaign=plan.campaign_slug, blocked_reason=plan.blocked_reason,
         counts=BucketCounts(**plan.counts()), rows=[_row(entry, members, requests) for entry in plan.entries],
@@ -89,21 +87,21 @@ def _preview(plan: ImportPlan) -> MembershipPreview:
     )
 
 
-@router.post("/api/helloasso/memberships/preview", response_model=MembershipPreview, responses=error_responses(400, 502))
+@router.post("/api/helloasso/memberships/preview", response_model=MembershipPreview, responses=error_responses(400, 502, 503))
 def preview_membership_import(data: Optional[MembershipPreviewRequest] = None) -> MembershipPreview:
     """Reads the membership campaign on HelloAsso and sorts its registrations for the active season. Writes nothing."""
     return _preview(Service.preview(data.campaign if data else None))
 
 
 @router.put("/api/helloasso/memberships/corrections/{item_id}/{field}", response_model=MembershipPreview,
-            responses=error_responses(400, 404, 502))
+            responses=error_responses(400, 404, 502, 503))
 def save_membership_correction(request: Request, item_id: int, field: IssueField, data: MembershipCorrectionRequest) -> MembershipPreview:
     """Saves the admin's correction of one field of a registration; answers the preview recomputed with it."""
     return _preview(Service.save_correction(item_id, field, data.value, author_of(request), data.campaign))
 
 
 @router.delete("/api/helloasso/memberships/corrections/{item_id}/{field}", response_model=MembershipPreview,
-               responses=error_responses(400, 502))
+               responses=error_responses(400, 502, 503))
 def remove_membership_correction(item_id: int, field: IssueField, campaign: Optional[str] = None) -> MembershipPreview:
     """Removes the correction of one field (HelloAsso's value applies again); answers the preview recomputed."""
     return _preview(Service.remove_correction(item_id, field, campaign))
@@ -117,32 +115,28 @@ def check_membership_value(data: MembershipValueCheckRequest) -> MembershipValue
 
 
 @router.post("/api/helloasso/memberships/correction-requests/preview", response_model=CorrectionRequestPreview,
-             responses=error_responses(400, 502))
+             responses=error_responses(400, 502, 503))
 def preview_correction_requests(data: CorrectionRequestBody) -> CorrectionRequestPreview:
     """The correction request of the first order of these registrations, as it would be sent. Sends nothing."""
     return CorrectionRequestPreview(status="success", example=CorrectionEmail(**correction_requests.example(data.item_ids, data.campaign)))
 
 
 @router.post("/api/helloasso/memberships/correction-requests", response_model=CorrectionRequestResult,
-             responses=error_responses(400, 502))
+             responses=error_responses(400, 502, 503))
 def send_correction_requests(request: Request, data: CorrectionRequestBody) -> CorrectionRequestResult:
     """Asks the families to fix their data: one e-mail per order, to the payer, recorded in the e-mail log."""
     return CorrectionRequestResult(status="success", **correction_requests.send(data.item_ids, author_of(request), data.campaign))
 
 
-def _imported(applied: AppliedWrite, plan: ImportPlan) -> ImportedMember:
-    record = next(entry.record for entry in plan.entries if entry.item_id == applied.item_id)
-    last_name, first_name = record.last_name, record.first_name
-    if applied.action == WriteAction.ASSIGN:  # the member chosen: the HelloAsso name is someone else's
-        member = next(member for member in plan.members if member.user_id == applied.user_id)
-        last_name, first_name = member.last_name, member.first_name
+def _imported(registration: ImportedRegistration) -> ImportedMember:
+    applied = registration.applied
     return ImportedMember(item_id=applied.item_id, user_id=applied.user_id, purchase_id=applied.purchase_id,
-                          last_name=last_name, first_name=first_name, tarif_name=record.tarif_name)
+                          last_name=registration.last_name, first_name=registration.first_name, tarif_name=registration.tarif_name)
 
 
 def _result(result: ImportResult) -> MembershipImportResult:
     def members(action: WriteAction) -> list[ImportedMember]:
-        return [_imported(applied, result.plan) for applied in result.applied if applied.action == action]
+        return [_imported(registration) for registration in result.imported if registration.applied.action == action]
 
     created, renewed, updated = members(WriteAction.CREATE), members(WriteAction.ATTACH), members(WriteAction.UPDATE)
     attached = members(WriteAction.ASSIGN)
@@ -155,7 +149,7 @@ def _result(result: ImportResult) -> MembershipImportResult:
     )
 
 
-@router.post("/api/helloasso/memberships/import", response_model=MembershipImportResult, responses=error_responses(400, 409, 502))
+@router.post("/api/helloasso/memberships/import", response_model=MembershipImportResult, responses=error_responses(400, 409, 502, 503))
 def import_memberships(request: Request, data: MembershipImportRequest) -> MembershipImportResult:
     """Reads HelloAsso again and applies the admin's decisions to the recomputed plan, recorded in the history.
     Sends no e-mail."""

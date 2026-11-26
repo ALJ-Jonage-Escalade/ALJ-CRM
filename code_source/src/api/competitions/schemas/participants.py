@@ -7,10 +7,10 @@ from typing import Optional
 from pydantic import Field, field_validator, model_validator
 
 from api.request_body import RequestBody
-from domain.competitions.models import PAIEMENT_ANNULE_PERDU, PAIEMENT_ANNULE_REPORTE
+from domain.competitions.models import CancelledStatus, PaymentStatus
 
 # Cancellation choice for a participant who already paid -> payment status
-CANCEL_MODES = {"perdu": PAIEMENT_ANNULE_PERDU, "reporte": PAIEMENT_ANNULE_REPORTE}
+CANCEL_MODES: dict[str, CancelledStatus] = {"perdu": PaymentStatus.ANNULE_PERDU, "reporte": PaymentStatus.ANNULE_REPORTE}
 
 
 class ParticipantAdd(RequestBody):

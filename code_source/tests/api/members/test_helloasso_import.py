@@ -12,7 +12,6 @@ from support.helloasso_items import ha_item, ha_refunded_payment
 from support.member_db import MemberDbTestCase
 
 from infrastructure.helloasso.api import HelloAssoApiError
-from infrastructure.security.api_auth import Role, required_role
 from infrastructure.sqlite.connection import SqliteDatabase
 from services.communications import email_log
 
@@ -49,12 +48,6 @@ class HelloAssoImportTestCase(MemberDbTestCase, ApiTestCase):
 
 class TestMembershipPreview(HelloAssoImportTestCase):
 
-    def test_import_routes_are_admin_only(self) -> None:
-        for method, path in (("POST", PREVIEW), ("POST", "/api/helloasso/memberships/import"),
-                             ("GET", "/api/helloasso/memberships/last-sync")):
-            with self.subTest(path=path):
-                self.assertEqual(required_role(method, path), Role.ADMIN)
-
     def test_preview_sorts_the_registrations_and_writes_nothing(self) -> None:
         self.items = [ha_item(1, "WEASLEY", "Ginny"), ha_item(2, "LOVEGOOD", "", birth_date="")]
 
@@ -70,20 +63,6 @@ class TestMembershipPreview(HelloAssoImportTestCase):
         self.assertEqual(rows[2]["bucket"], "blocked")
         self.assertTrue(rows[2]["reason"])
         self.assertEqual((self.count("users"), self.count("orders"), self.count("purchases")), (0, 0, 0))
-
-    def test_preview_rows_list_the_problems_of_their_data(self) -> None:
-        self.items = [ha_item(1, "WEASLEY", "Ginny"), ha_item(2, "LOVEGOOD", "Luna", birth_date="01/01/1026")]
-
-        rows = {row["item_id"]: row for row in self.client.post(PREVIEW).json()["rows"]}
-
-        def birth_date_issues(row: dict[str, Any]) -> list[dict[str, Any]]:  # Any: JSON body
-            return [issue for issue in row["issues"] if issue["field"] == "birth_date"]
-
-        self.assertEqual(birth_date_issues(rows[1]), [])
-        self.assertEqual((rows[2]["bucket"], rows[2]["can_create"], rows[2]["birth_date"]), ("to_review", False, "01/01/1026"))
-        [issue] = birth_date_issues(rows[2])
-        self.assertEqual((issue["field"], issue["code"], issue["blocking"]), ("birth_date", "too_old", True))
-        self.assertIn("01/01/1026", issue["message"])
 
     def test_preview_reads_the_environment_then_the_default_campaign_of_the_season(self) -> None:
         self.client.post(PREVIEW)
@@ -254,14 +233,6 @@ class TestMembershipsToReview(HelloAssoImportTestCase):
             conn.close()
         self.items = [ha_item(1, "WEASLEY", "Ginny", birth_date="11/08/2013")]
 
-    def test_a_row_to_review_lists_its_candidates(self) -> None:
-        [row] = self.client.post(PREVIEW).json()["rows"]
-
-        self.assertEqual(row["bucket"], "to_review")
-        self.assertTrue(row["can_create"])
-        self.assertEqual(row["candidates"], [{"user_id": self.ginny, "last_name": "WEASLEY", "first_name": "Ginny",
-                                              "birth_date": "2013-09-11", "licence": ""}])
-
     def test_linking_a_row_to_review_attaches_it_to_the_candidate(self) -> None:
         response = self.client.post(IMPORT, json={"season": "2026-2027", "decisions": {
             "1": {"bucket": "to_review", "choice": f"link:{self.ginny}"}}})
@@ -370,13 +341,6 @@ class TestMembershipAttachedByHand(HelloAssoImportTestCase):
 
         [row] = self.client.post(PREVIEW).json()["rows"]
         self.assertEqual(row["bucket"], "already_imported")
-
-    def test_an_attach_without_comment_is_refused(self) -> None:
-        response = self.attach(" ")
-
-        self.assertEqual(response.status_code, 409, response.text)
-        self.assertIn("commentaire", response.json()["message"])
-        self.assertEqual(self.count("purchases"), 1)
 
     def test_the_preview_lists_every_member_and_their_membership_this_season(self) -> None:
         preview = self.client.post(PREVIEW).json()

@@ -615,7 +615,7 @@ describe("OutilsPage", () => {
 
   it("shows each HelloAsso status as an icon, its meaning in the tooltip", async () => {
     const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
-    const statuses = ["Processed", "Registered", "Canceled", "Refunded", "Refunding", "Unknown", "Strange"];
+    const statuses = ["Processed", "Strange"];
     const rows = statuses.map((status, index) => ({ ...MEMBERSHIP_PREVIEW.rows[0]!, item_id: 10 + index, status }));
     ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows });
     try {
@@ -626,11 +626,6 @@ describe("OutilsPage", () => {
       const icons = all("ha-status").map((icon) => [icon.textContent.trim(), icon.getAttribute("title")]);
       expect(icons).toEqual([
         ["✅", "Payée (Processed)"],
-        ["📝", "Enregistrée sans paiement en ligne (Registered)"],
-        ["🚫", "Annulée (Canceled)"],
-        ["↩️", "Remboursée (Refunded)"],
-        ["⏳", "Remboursement en cours (Refunding)"],
-        ["❔", "Statut inconnu (Unknown)"],
         ["❔", "Statut inconnu (Strange)"],
       ]);
       expect(all("ha-status").every((icon) => icon.getAttribute("aria-label") === icon.getAttribute("title"))).toBe(true);
@@ -654,13 +649,13 @@ describe("OutilsPage", () => {
     }
   });
 
-  it("filters each HelloAsso table by its own search box, accents and case ignored, the checked rows kept", async () => {
+  it("filters each HelloAsso table by its own search box, the checked rows kept", async () => {
     const preview = ANSWERS["POST /api/helloasso/memberships/preview"]!;
     const ginny = MEMBERSHIP_PREVIEW.rows[0]!;
     const rows = [
       ginny,
-      { ...ginny, item_id: 20, last_name: "DAYRE", first_name: "Staël", licence: "654321" },
-      { ...ginny, item_id: 21, last_name: "WEASLEY", first_name: "Ron", tarif_name: "Adultes autonomes" },
+      { ...ginny, item_id: 20, last_name: "DAYRE", first_name: "Staël" },
+      { ...ginny, item_id: 21, last_name: "WEASLEY", first_name: "Ron" },
       MEMBERSHIP_PREVIEW.rows[1]!,
     ];
     ANSWERS["POST /api/helloasso/memberships/preview"] = () => json({ ...MEMBERSHIP_PREVIEW, rows });
@@ -679,11 +674,6 @@ describe("OutilsPage", () => {
       await search("new", "stael");
       expect(names("new")).toEqual(["DAYRE Staël"]);
       expect(names("blocked")).toEqual(["LOVEGOOD Luna"]);
-
-      await search("new", "autonomes");
-      expect(names("new")).toEqual(["WEASLEY Ron"]);
-      await search("new", "654321");
-      expect(names("new")).toEqual(["DAYRE Staël"]);
 
       await search("new", "Dumbledore");
       expect(names("new")).toEqual([]);

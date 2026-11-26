@@ -13,6 +13,7 @@ dependencies = [
     "pydantic==2.14.3",
     "openpyxl==3.1.5",
     "python-dotenv==1.2.4",
+    # Not imported by src/, but openpyxl needs it to embed the QR codes of the presence sheets and does not declare it
     "pillow==13.0.0",
     "lxml==6.1.3",
     "segno==1.6.6",

@@ -53,13 +53,13 @@ ALJ-CRM/                         ← racine du dépôt
 │   ├── src/
 │   │   ├── server.py            ← entrée WEB/API : assemble l'app FastAPI (middlewares, routeurs de api/), aucune route
 │   │   ├── paths.py             ← CODE_ROOT / ROOT_DIR / data_root() / template_path() (à utiliser, ne jamais recalculer)
-│   │   ├── domain/              ← Python pur : members/, competitions/ + constants, utils, validators, club_emails,
-│   │   │                          email_variables, email_personalization, errors
+│   │   ├── domain/              ← Python pur : members/, competitions/, activities/, communications/ + constants, utils,
+│   │   │                          validators, errors, helloasso_campaigns
 │   │   ├── api/                 ← routeurs FastAPI, un fichier par domaine, rangés par thème (voir §4)
 │   │   ├── services/            ← cas d'usage, rangés comme api/ : access/, activities/, communications/,
-│   │   │                          competitions/ (dont webhook HelloAsso), keys/, members/ (dont import FFME), reports/
+│   │   │                          competitions/ (dont webhook HelloAsso), integrations/, keys/, members/ (dont import FFME), reports/
 │   │   ├── infrastructure/      ← accès externes, un dossier par système : security/ (auth API, secrets),
-│   │   │                          sqlite/, firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/
+│   │   │                          sqlite/, firestore/, google/, mail/, helloasso/, mycompet/, qrcodes/, geocoding/
 │   │   ├── exports/             ← générateurs de fichiers : membership_excel (CSV FFME), competitors_excel,
 │   │   │                          competitors_pdf, presence_sheets, planning_excel, attestation (PDF), spreadsheet_safety
 │   │   ├── assets/              ← ressources lues à l'exécution : templates/ (attestation HTML, liste de présence Excel), social/
@@ -85,16 +85,20 @@ ALJ-CRM/                         ← racine du dépôt
 ### Couches (code_source/src)
 
 - **`domain/`** — règles métier en Python, sans accès au réseau ni au stockage, et sans effet à l'import.
-  Rangé en `members/` (modèles, liste web, `age_rules`, `planning_groups`), `competitions/` (modèles,
-  `matching` HelloAsso) ; à la racine `constants`, `utils`, `validators`, `errors` (erreurs métier levées par les
-  services), `club_emails` (adresses du club), `email_variables` (liste unique des variables `{…}` des modèles d'e-mails,
-  rendu), `email_personalization` (leurs valeurs pour un destinataire et une compétition).
+  Rangé en `members/` (modèles, liste web, `age_rules`, import des adhésions), `competitions/` (modèles,
+  `matching` HelloAsso, `results` MyCompet), `activities/` (`planning_groups`, `presence_rules` : groupes du planning,
+  feuilles de présence), `communications/` (`club_emails` : adresses du club ; `email_variables` : liste unique des
+  variables `{…}` des modèles d'e-mails, rendu ; `email_personalization` : leurs valeurs pour un destinataire et une
+  compétition ; `email_log` : journal des envois) ; à la racine `constants`, `utils`, `validators`, `errors` (erreurs
+  métier levées par les services), `helloasso_campaigns` (campagnes HelloAsso, format `FormType:slug`).
 - **`services/`** — cas d'usage : un routeur lit la requête, appelle une fonction de service et met en forme la
   réponse ; le service valide, orchestre les dépôts et lève `domain.errors` (traduites en statuts HTTP par
   `api/responses.py`). Exemples : `competitions/helloasso_webhook.py` (notifications HelloAsso),
   `competitions/all_paid_notification.py`, `communications/email_dispatch.py`, `members/ffme.py` (export et import
-  FFME), `activities/presence.py`. Quelques routeurs plus anciens gardent encore de la logique ; elle rejoint un
-  service quand le routeur est modifié.
+  FFME), `activities/presence.py`, `activities/planning.py`, `reports/member_map.py` (carte des adhérents),
+  `integrations/google_account.py` (connexion Google du club ; appels HTTP à Google dans
+  `infrastructure/google/oauth.py`), `integrations/helloasso_campaigns.py`, `integrations/cloud_cache.py`. Quelques
+  routeurs plus anciens gardent encore de la logique ; elle rejoint un service quand le routeur est modifié.
 - **`infrastructure/`** — adaptateurs, un sous-dossier par système externe. Les plus structurants :
   - `sqlite/schema_v2.py` : DDL SQLite, normalisations, vue plate des adhérents `v_member_flat` (une ligne par achat, recréée à chaque démarrage).
   - `sqlite/connection.py` (`SqliteDatabase` : chemin, connexion, schéma, sauvegarde) et un repository par domaine :
@@ -146,19 +150,21 @@ auth, garde du serveur local, en-têtes de sécurité) puis inclut les routeurs 
 |---|---|---|
 | `web/` | `pages`, `pwa`, `health` | page d'entrée de l'application Vue sur `/competitions`, `/index`, `/bureau`, `/bureau/{page}` (liste blanche) ; anciennes adresses redirigées (`/`, `/competitions/gestion`, `/bureau/competitions-gestion`, `/bureau/adherents-fiche`, `/annuaire/*.html`) ; `/spa/*` (compilation) et `/annuaire/assets/*` (`mount_static`) · `/sw.js` (compilé), `/manifest.webmanifest`, `/runtime-config.js`, `/api/web-version` (version de l'application) · `/health` |
 | `members/` | `members`, `seasons`, `helloasso_import` | `/api/members` (+ `/competitors`, `/update`, `/create`, `/add`) · `/api/seasons`, `/api/season-tarifs` · `/api/helloasso/memberships/` (`preview`, `import`, `last-sync`) |
-| `competitions/` | `competitions`, `participants`, `coaches`, `members`, `helloasso_items`, `results` | `/api/competitions/*`, `/api/coaches`, `/api/competition-members`, `/api/helloasso/items` · résultats MyCompet (`/api/competitions/cron/fetch-results`, `/{id}/fetch-results`, `/api/settings/competitions-results`) |
-| `communications/` | `email`, `whatsapp`, `attestations` | `/api/email-templates` (GET/POST/DELETE), `/api/email-status`, `/api/send-email` · `/api/whatsapp-template` · `/api/attestations/preview`, `/send` (PDF en mémoire, admin) |
+| `competitions/` | `competitions`, `participants`, `coaches`, `members`, `helloasso_items`, `results`, `email_log` | `/api/competitions/*`, `/api/coaches`, `/api/competition-members`, `/api/helloasso/items` · résultats MyCompet (`/api/competitions/cron/fetch-results`, `/{id}/fetch-results`, `/api/settings/competitions-results`) · `/api/competitions/{id}/email-log` (envois d'une compétition) |
+| `communications/` | `email`, `whatsapp`, `attestations`, `email_log` | `/api/email-templates` (GET/POST/DELETE), `/api/email-status`, `/api/send-email` · `/api/whatsapp-template` · `/api/attestations/preview`, `/send` (PDF en mémoire, admin) · `/api/admin/email-log` (derniers envois de l'application, admin) |
 | `activities/` | `planning`, `presence` | `/api/planning` (GET, `/item`, `/export`) · `/api/presence/config`, `/export` |
-| `reports/` | `map`, `member_stats` | `/api/reports/map-points` (points de la carte des adhérents, affichée par l'application Vue avec Leaflet) · `/api/reports/member-stats` (achats de toutes les saisons, sans nom, comptés par la page Outils › Statistiques avec Chart.js ; service `services/reports/member_stats.py`) |
+| `reports/` | `map`, `member_stats` | `/api/reports/map-points` (points de la carte des adhérents, affichée par l'application Vue avec Leaflet) · `/api/reports/member-stats` (achats de toutes les saisons, sans nom, comptés par la page Outils › Statistiques avec Chart.js) ; services `services/reports/member_map.py`, `member_stats.py` |
 | `ffme/` | `ffme` | `/api/ffme/stats`, `/export` (CSV), `/preview`, `/import` |
+| `keys/` | `keys` | `/api/keys` (clés du club, Outils › Clés : liste, création, attributions, retour, archivage, historique), `/api/key-assignments/{id}` |
 | `integrations/` | `helloasso`, `helloasso_campaigns`, `google_auth`, `cloud_db` | `/webhooks/helloasso` (GET/POST), `/api/helloasso/sync`, `/api/helloasso/campaigns` · `/api/auth/google/*` · `/api/cloud-db/status`, `/sync` |
 | `admin/` | `access` | `/api/admin/access/roles` (liste des accès, invitations), `/history` |
 | `auth/` | `me` | `/api/me` (rôle de l'utilisateur connecté, acceptation de l'invitation) |
 
 - **Cache SQLite** : les routeurs `competitions`, `participants`, `coaches`, `members` (compétitions), `helloasso_items`,
-  `results` (résultats MyCompet : l'appel de Cloud Scheduler n'attend pas une reconstruction du cache), `me`, `access`
-  et `helloasso_campaigns` ne lisent que Firestore et sautent le rafraîchissement du cache (`FIRESTORE_ONLY_PATHS`). Une route qui lit ou écrit le cache va
-  dans un autre routeur, même sous `/api/competitions` (`payments`).
+  `results` (résultats MyCompet : l'appel de Cloud Scheduler n'attend pas une reconstruction du cache), les deux
+  `email_log`, `me`, `access` et `helloasso_campaigns` ne lisent que Firestore et sautent le rafraîchissement du cache
+  (`FIRESTORE_ONLY_PATHS`). Une route qui lit ou écrit le cache va dans un autre routeur, même si son adresse commence
+  par `/api/competitions`.
 - **URL appelées de l'extérieur, à ne pas changer** : Cloud Scheduler (job `batch-resultats-competitions`,
   `POST /api/competitions/cron/fetch-results` chaque jour à 07h00, jeton OIDC — à déclarer avant `/{id}/fetch-results`), webhook
   HelloAsso, retours OAuth Google (console Google Cloud), `/health` (déploiement). `tests/test_route_inventory.py`

@@ -127,7 +127,9 @@ def test_ffme_licences_export(page, tmp_path):
     text = _saved(info.value, tmp_path).read_text(encoding="utf-8-sig")
     rows = list(csv.reader(io.StringIO(text), delimiter=";"))
     assert rows[0][:3] == ["numero de licence", "nom", "prenom"]
-    assert len([r for r in rows[1:] if r]) == stats["estimated_total"]
+    # Read again: other workers add season members meanwhile (test_adherents, test_helloasso_import)
+    stats_at_download = page.request.get("/api/ffme/stats").json()
+    assert len([r for r in rows[1:] if r]) == stats_at_download["estimated_total"]
 
     page.get_by_test_id("ffme-include-finished").uncheck()
     with page.expect_response(lambda r: "include_termine=false" in r.url and r.ok), page.expect_download():

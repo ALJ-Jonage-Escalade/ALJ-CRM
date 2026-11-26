@@ -6,19 +6,13 @@ template formulas and regular values (phones, signed numbers) stay untouched.
 
 import os
 import re
-import sys
 import tempfile
 import unittest
 
-_tests_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_code_root = os.path.dirname(_tests_dir)
-_src_dir = os.path.join(_code_root, "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
+import openpyxl
 
-import openpyxl  # noqa: E402
-
-from exports.spreadsheet_safety import (  # noqa: E402
+from paths import CODE_ROOT
+from exports.spreadsheet_safety import (
     csv_safe,
     neutralize_formulas,
     template_formulas,
@@ -58,7 +52,7 @@ class TestWorkbooks(unittest.TestCase):
         self.assertEqual(reloaded["A2"].data_type, "s")
 
     def test_presence_template_formulas_survive(self):
-        path = os.path.join(_code_root, "src", "assets", "templates", "Template Export liste adhérents à imprimer.xlsx")
+        path = os.path.join(CODE_ROOT, "src", "assets", "templates", "Template Export liste adhérents à imprimer.xlsx")
         if not os.path.exists(path):
             self.skipTest("presence template not available")
         wb = openpyxl.load_workbook(path)
@@ -81,7 +75,7 @@ class TestCsvSafe(unittest.TestCase):
 
     def test_js_rule_matches_python(self):
         """csvSafe of the web app (frontend/src/lib/csv.ts) uses the same trigger and phone patterns."""
-        with open(os.path.join(_code_root, "frontend", "src", "lib", "csv.ts"), encoding="utf-8") as f:
+        with open(os.path.join(CODE_ROOT, "frontend", "src", "lib", "csv.ts"), encoding="utf-8") as f:
             js = f.read()
         body = re.search(r"export function csvSafe\(value: string\): string \{(.*?)\n\}", js, re.S).group(1)
         self.assertIn(r"/^[=+\-@\t\r]/", body)

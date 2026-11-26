@@ -9,7 +9,7 @@ from typing import List, Optional, Sequence
 
 from infrastructure.firestore.competitions import member_directory
 from services.competitions.store import storage
-from services.documents import Doc
+from services.json_types import Doc
 
 
 class CompetitionMemberService:

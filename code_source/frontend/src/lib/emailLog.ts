@@ -1,4 +1,4 @@
-/* The e-mail log as the pages show it (server: domain/email_log.py): French names of the kinds, internal e-mails,
+/* The e-mail log as the pages show it (server: domain/communications/email_log.py): French names of the kinds, internal e-mails,
    failures and dates. Shared by the competition page and Communications › Historique des envois. */
 import type { Schemas } from "./client";
 import { formatDateTime, parseDate } from "./format";

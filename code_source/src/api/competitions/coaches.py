@@ -11,7 +11,7 @@ from api.responses import STORAGE_ERRORS, SUCCESS, error_responses, json_with_et
 from api.competitions.schemas.coaches import CoachIn
 from api.competitions.schemas.views import Coach, Done
 from services.competitions.coaches import CoachService as Service
-from services.documents import Doc
+from services.json_types import Doc
 
 router = APIRouter(prefix="/api/coaches")
 

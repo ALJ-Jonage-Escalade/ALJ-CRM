@@ -2,11 +2,12 @@
 
 from unittest.mock import patch
 
+from support.fake_firestore import FirestoreRepoTestCase
+from support.member_db import MemberDbTestCase
+
 from infrastructure.firestore.cloud_database import CloudDatabase
 from infrastructure.firestore.competitions import documents, member_directory
 from infrastructure.sqlite.connection import SqliteDatabase
-from support.fake_firestore import FirestoreRepoTestCase
-from support.member_db import MemberDbTestCase
 
 
 class TestSyncAdherentsFromMain(MemberDbTestCase, FirestoreRepoTestCase):
@@ -37,7 +38,7 @@ class TestSyncAdherentsFromMain(MemberDbTestCase, FirestoreRepoTestCase):
 
         # Idempotent: a second sync rewrites the same documents
         member_directory.rebuild_member_directory("2026-2027")
-        self.assertEqual(len(member_directory.adherents_raw()), 3)
+        self.assertEqual(len(member_directory.member_documents()), 3)
 
     def test_sync_copies_the_first_emergency_contact(self):
         conn = SqliteDatabase.get_connection()
@@ -89,7 +90,7 @@ class TestAdherents(FirestoreRepoTestCase):
 
         self.assertEqual(len(member_directory.list_members(search="dupont")), 1)
         self.assertEqual(len(member_directory.list_members(competition_only=True)), 1)
-        self.assertEqual(len(member_directory.adherents_raw()), 2)
+        self.assertEqual(len(member_directory.member_documents()), 2)
 
     def test_status_filter(self):
         self.seed_adherent(101)

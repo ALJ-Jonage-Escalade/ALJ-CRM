@@ -11,8 +11,8 @@ from typing import List, Literal, Optional
 
 from domain.constants import get_active_season, resolve_season
 from domain.errors import InvalidRequest
-from domain.members.planning_groups import autonomous_sheet_extra_tarifs, forms_autonomous_sheet, joins_autonomous_sheet
-from domain.members.presence_rules import AutonomousCounts, count_autonomous, members_with_tarifs
+from domain.activities.planning_groups import autonomous_sheet_extra_tarifs, forms_autonomous_sheet, joins_autonomous_sheet
+from domain.activities.presence_rules import AutonomousCounts, count_autonomous, members_with_tarifs
 from exports.presence_sheets import generate_presence_sheets
 from infrastructure.sqlite.members import MemberRepository
 from infrastructure.sqlite.planning import PlanningRepository

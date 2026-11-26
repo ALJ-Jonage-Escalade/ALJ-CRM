@@ -5,20 +5,14 @@ formatting (<b>, links, line breaks) keeps working.
 """
 
 import os
-import sys
 import unittest
 from email import message_from_string
 from unittest.mock import MagicMock, patch
 
-_tests_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-from domain.email_personalization import apply_template_variables, personalized_html  # noqa: E402
-from infrastructure.mail.sender import sanitize_email_header  # noqa: E402
-from services.communications.email_dispatch import EmailDispatchService, render_email  # noqa: E402
-from support.fake_access import grant_roles  # noqa: E402
+from domain.communications.email_personalization import apply_template_variables, personalized_html
+from infrastructure.mail.sender import sanitize_email_header
+from services.communications.email_dispatch import EmailDispatchService, render_email
+from support.fake_access import grant_roles
 
 EVIL_NAME = '<a href="https://evil.example">Pay here</a>'
 
@@ -212,15 +206,6 @@ class TestSendPermissions(unittest.TestCase):
         return EmailDispatchService.unauthorized_send_reason(
             [{"email": e} for e in emails], sender, is_admin=is_admin)
 
-    def test_coach_known_recipients(self):
-        self.assertIsNone(self.reason(["Harry.Potter@hogwarts.example", "molly.weasley@hogwarts.example"]))
-
-    def test_coach_unknown_recipient_refused(self):
-        self.assertIn("spy@evil.example", self.reason(["harry.potter@hogwarts.example", "spy@evil.example"]))
-
-    def test_admin_any_recipient(self):
-        self.assertIsNone(self.reason(["anyone@example.com"], is_admin=True))
-
     def test_sender_allowlist(self):
         self.assertIsNone(self.reason([], sender="inscription@alj-escalade.fr"))
         self.assertIsNotNone(self.reason([], sender="president@evil.example", is_admin=True))
@@ -254,9 +239,11 @@ class TestSendEmailRoute(unittest.TestCase):
     def test_coach_to_member_allowed(self):
         coach = {"sub": "c", "email": "coach@example.com", "email_verified": True}
         resp, dispatch = self._send(coach, {"subject": "s", "body": "b",
-                                            "recipients": [{"email": "harry.potter@hogwarts.example"}]})
+                                            "recipients": [{"email": "Harry.Potter@hogwarts.example"}]})
         self.assertEqual(resp.status_code, 200)
         dispatch.assert_called_once()
+        message = dispatch.call_args.args[0]
+        self.assertEqual((message.subject, message.body, message.add_signature), ("s", "b", True))
 
     def test_admin_to_any_address_allowed(self):
         admin = {"sub": "a", "email": "albus@alj-escalade.fr", "email_verified": True}

@@ -1,6 +1,6 @@
 """Plumbing shared by the services of the competition pages (Firestore-backed).
 
-- `storage` / `write`: decorators turning Firestore failures into domain.errors; a write
+- `storage` / `write` / `drops_cache`: decorators turning Firestore failures into domain.errors; a write
   also drops the competition list cache, since most writes change a competition document
   (participants, coach names, HelloAsso payments).
 - The competition list cache, shared by every poll of every open page.
@@ -11,29 +11,33 @@ from __future__ import annotations
 
 import functools
 import logging
+import math
 import os
 from typing import Callable, List, ParamSpec, TypeVar
 
 from infrastructure.firestore.competitions import competitions
+from infrastructure.firestore.competitions.documents import CompetitionDoc
 from infrastructure.firestore.client import FirestoreConflictError, FirestoreError
 from infrastructure.timed_cache import TimedCache
-from services.documents import Doc
 from domain.errors import Conflict, NotFound, StorageUnavailable
 
 logger = logging.getLogger("alj")
 P = ParamSpec("P")
 R = TypeVar("R")
 
-# Writes through the services drop the cache at once; writes made elsewhere (results batch,
-# webhook, other instance) show up after CACHE_SECONDS (0 in the e2e tests, whose fixtures
-# write straight to Firestore).
-CACHE_SECONDS = float(os.environ.get("ALJ_COMPETITIONS_CACHE_SECONDS", "5"))
 _CACHE_KEY = "competitions"
-_competitions_cache: TimedCache[str, List[Doc]] = TimedCache(CACHE_SECONDS)
+_competitions_cache: TimedCache[str, List[CompetitionDoc]] = TimedCache(math.inf)  # lifetime set per load
 
 
-def cached_competitions(load: Callable[[], List[Doc]]) -> List[Doc]:
-    return _competitions_cache.get_or_load(_CACHE_KEY, load)
+def _cache_seconds() -> float:
+    """Writes through the services drop the cache at once; writes made elsewhere (results batch,
+    webhook, other instance) show up after this delay (0 in the e2e tests, whose fixtures
+    write straight to Firestore)."""
+    return float(os.environ.get("ALJ_COMPETITIONS_CACHE_SECONDS", "5"))
+
+
+def cached_competitions(load: Callable[[], List[CompetitionDoc]]) -> List[CompetitionDoc]:
+    return _competitions_cache.get_or_load_expiring(_CACHE_KEY, lambda: (load(), _cache_seconds()))
 
 
 def invalidate_cache() -> None:
@@ -54,25 +58,28 @@ def storage(fn: Callable[P, R]) -> Callable[P, R]:
     return wrapper
 
 
-def write(fn: Callable[P, R]) -> Callable[P, R]:
-    """A write: Firestore failures translated, and the list cache dropped even on failure
-    (a write can fail after part of it was applied)."""
-    wrapped = storage(fn)
-
+def drops_cache(fn: Callable[P, R]) -> Callable[P, R]:
+    """Drops the list cache after the call, even on failure (a write can fail after part of it was applied).
+    For the services writing competition documents with their own error handling (webhook, results batch)."""
     @functools.wraps(fn)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         try:
-            return wrapped(*args, **kwargs)
+            return fn(*args, **kwargs)
         finally:
             invalidate_cache()
     return wrapper
+
+
+def write(fn: Callable[P, R]) -> Callable[P, R]:
+    """A write: Firestore failures translated, and the list cache dropped even on failure."""
+    return drops_cache(storage(fn))
 
 
 def competition_not_found() -> NotFound:
     return NotFound("Compétition introuvable.")
 
 
-def require_competition(competition_id: int) -> Doc:
+def require_competition(competition_id: int) -> CompetitionDoc:
     doc = competitions.get_competition_doc(competition_id)
     if doc is None:
         raise competition_not_found()

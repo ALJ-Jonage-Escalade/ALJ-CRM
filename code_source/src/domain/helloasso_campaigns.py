@@ -10,11 +10,11 @@ Input: the forms of HelloAsso's `GET /organizations/{org}/forms` (FormLightModel
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Literal, Optional, TypedDict
 
-from domain.competitions.matching import parse_campaign_identifier
-from domain.utils import normalize_string
+from domain.utils import is_helloasso_url, normalize_string
 
 CampaignKind = Literal["membership", "competitions"]
 
@@ -40,6 +40,55 @@ NOT_FOUND_WARNING = "Campagne introuvable sur HelloAsso"
 class CampaignRef(TypedDict):
     form_type: str
     slug: str
+
+
+# Motifs reconnus pour extraire le type de formulaire depuis une URL HelloAsso
+_URL_TYPE_MAP = {
+    "evenements": "Event",
+    "formulaires": None,      # type explicite dans le segment suivant
+    "adhesions": "Membership",
+    "campagnes": "Campaign",
+    "dons": "Donation",
+    "boutiques": "Shop",
+    "crowdfundings": "Crowdfunding",
+}
+
+
+def parse_campaign_identifier(ref: str) -> CampaignRef:
+    """Analyse l'identifiant / l'URL de campagne saisi par l'utilisateur.
+
+    Accepte :
+    - une URL complète (https://www.helloasso.com/associations/{org}/evenements/{slug}
+      ou .../formulaires/{FormType}/{slug}) ;
+    - un couple explicite « FormType:slug » (ex : « Event:competition-u11 ») ;
+    - un slug brut (type « Event » par défaut : les compétitions sont des événements).
+
+    Retourne {"form_type", "slug"} ou lève ValueError si non exploitable.
+    """
+    raw = str(ref or "").strip()
+    if not raw:
+        raise ValueError("Aucun identifiant de campagne HelloAsso fourni.")
+
+    if is_helloasso_url(raw):
+        path = re.split(r"associations/[^/]+/+", raw, maxsplit=1, flags=re.IGNORECASE)
+        segments = [s.strip("/ ") for s in path[-1].split("/")]
+        segments = [s for s in segments if s]
+        if len(segments) >= 2:
+            head = segments[0].lower()
+            if head == "formulaires" and len(segments) >= 3:
+                return {"form_type": segments[1].strip(), "slug": segments[2].strip()}
+            form_type = _URL_TYPE_MAP.get(head)
+            if form_type:
+                return {"form_type": form_type, "slug": segments[1].strip()}
+        raise ValueError(f"URL HelloAsso non reconnue : {raw}")
+
+    if ":" in raw:
+        ftype, _, slug = raw.partition(":")
+        ftype, slug = ftype.strip(), slug.strip()
+        if ftype and slug:
+            return {"form_type": ftype, "slug": slug}
+
+    return {"form_type": "Event", "slug": raw}
 
 
 class CampaignRow(TypedDict):

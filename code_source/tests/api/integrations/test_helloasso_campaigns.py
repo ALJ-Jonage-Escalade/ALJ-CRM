@@ -1,4 +1,4 @@
-"""Routes of src/api/integrations/helloasso_campaigns.py over the in-memory Firestore (auth off, local server)."""
+"""Routes of src/api/integrations/helloasso_campaigns.py (service: src/services/integrations/helloasso_campaigns.py) over the in-memory Firestore (auth off, local server)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from support.api_case import ApiTestCase
 
-from api.integrations import helloasso_campaigns as route
+from services.integrations import helloasso_campaigns as route
 from infrastructure.firestore.app_settings import COLLECTION, HELLOASSO_COMPETITION_CAMPAIGN, HELLOASSO_MEMBERSHIP_CAMPAIGN
 from infrastructure.firestore.app_settings import AppSettingsRepository as Settings
 from infrastructure.firestore.client import FirestoreError
@@ -91,7 +91,7 @@ class TestHelloAssoCampaigns(ApiTestCase):
 
         with patch.object(route.helloasso_api, "get_public_form", side_effect=read):
             body = self.campaigns()
-        self.assertEqual(body["warning"], route._activities_unread(1))
+        self.assertEqual(body["warning"], route.activities_unread(1))
         self.assertIsNone(body["error"])
         self.assertEqual([c["slug"] for c in body["others"]], ["soiree-club", "competitions-2026"])
 

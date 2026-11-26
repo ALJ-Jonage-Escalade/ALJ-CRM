@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from domain.members.presence_rules import (
+from domain.activities.presence_rules import (
     AutonomousCounts,
     authorized_minors,
     count_autonomous,

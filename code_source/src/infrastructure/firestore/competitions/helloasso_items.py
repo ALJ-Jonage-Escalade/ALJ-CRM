@@ -8,12 +8,7 @@ import re
 from typing import Any
 
 from domain.competitions import matching as competition_matching
-from domain.competitions.models import (
-    PAIEMENT_EN_ATTENTE,
-    PAIEMENT_NON_INVITE,
-    PAIEMENT_PAYE,
-    PAIEMENT_STATUTS_ANNULES,
-)
+from domain.competitions.models import PAIEMENT_STATUTS_ANNULES, PaymentStatus
 from infrastructure.firestore.client import FirestoreClient
 from infrastructure.firestore.competitions import documents, member_directory, participants
 
@@ -161,7 +156,7 @@ def set_item_ignored(id_item: int, ignore: bool, motif: str = "", commentaire: s
         FirestoreClient.update_fields(documents.COLLECTION_ITEMS, str(id_item), patch,
                                       expected_update_time=doc.get("_update_time"))
         return True
-    return bool(documents.with_retries(f"Article HelloAsso #{id_item}", attempt))
+    return documents.with_retries(f"Article HelloAsso #{id_item}", attempt)
 
 
 def list_item_docs() -> list[ItemDoc]:
@@ -282,7 +277,7 @@ def apply_links_to_participants() -> int:
                     continue
                 else:
                     row["selectionne"] = True
-                row["statut_paiement"] = PAIEMENT_PAYE
+                row["statut_paiement"] = PaymentStatus.PAYE
                 row["montant_paye"] = round(payment["montant"], 2)
                 row["commande_helloasso"] = ", ".join(payment["orders"])
                 row["updated_at"] = now
@@ -310,11 +305,11 @@ def refresh_helloasso_payment(competition_id: int, adherent_id: int) -> bool:
         if status in PAIEMENT_STATUTS_ANNULES:
             return False  # the coach's cancellation is never overwritten
         if linked:
-            participant.update(statut_paiement=PAIEMENT_PAYE, montant_paye=amount, commande_helloasso=orders)
+            participant.update(statut_paiement=PaymentStatus.PAYE, montant_paye=amount, commande_helloasso=orders)
             return None
-        if status != PAIEMENT_PAYE or (participant.get("commande_helloasso") or "") in ("", participants.MANUAL_PAYMENT_REF):
+        if status != PaymentStatus.PAYE or (participant.get("commande_helloasso") or "") in ("", participants.MANUAL_PAYMENT_REF):
             return False
-        participant.update(statut_paiement=PAIEMENT_EN_ATTENTE if participant.get("selectionne") else PAIEMENT_NON_INVITE,
+        participant.update(statut_paiement=PaymentStatus.EN_ATTENTE if participant.get("selectionne") else PaymentStatus.NON_INVITE,
                            montant_paye=0.0, commande_helloasso="")
         return None
     return participants.update_participant(competition_id, adherent_id, change) is not None

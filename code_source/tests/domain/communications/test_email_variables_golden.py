@@ -10,8 +10,8 @@ from typing import Any
 import pytest
 
 from api.communications.email import get_email_variables
-from domain.email_personalization import template_values
-from domain.email_variables import render_html, render_template, template_error, to_keys, to_labels
+from domain.communications.email_personalization import template_values
+from domain.communications.email_variables import render_html, render_template, template_error, to_keys, to_labels
 from infrastructure.mail.html_body import text_to_html
 from paths import CODE_ROOT
 

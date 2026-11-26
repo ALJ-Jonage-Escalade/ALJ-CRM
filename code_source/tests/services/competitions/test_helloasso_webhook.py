@@ -3,17 +3,14 @@ Tests unitaires pour le service et l'endpoint Webhook HelloAsso.
 """
 
 import os
-import sys
 import unittest
 from unittest.mock import patch, MagicMock
 
-_tests_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
 from services.competitions.helloasso_webhook import HelloAssoWebhookService
+from fastapi.testclient import TestClient
+
 from api.integrations.helloasso import webhook_helloasso
+from server import app
 
 
 class TestHelloAssoWebhookService(unittest.TestCase):
@@ -165,9 +162,10 @@ class TestHelloAssoWebhookService(unittest.TestCase):
                  patch("infrastructure.helloasso.api.credentials_configured", return_value=False), \
                  patch("infrastructure.firestore.app_settings.AppSettingsRepository.get", side_effect=failure), \
                  patch.dict(os.environ, {"ALJ_API_AUTH": "off"}):
-                resp = webhook_helloasso(payload, token=None)
+                resp = TestClient(app).post("/webhooks/helloasso", json=payload)
             self.assertEqual(resp.status_code, status)
-            self.assertNotIn(str(failure), resp.body.decode())
+            self.assertEqual(resp.json()["status"], "error")
+            self.assertNotIn(str(failure), resp.text)
 
     def test_check_and_notify_all_paid_success(self):
         """Vérifie l'envoi d'e-mail récapitulatif lorsque tous les compétiteurs ont réglé."""

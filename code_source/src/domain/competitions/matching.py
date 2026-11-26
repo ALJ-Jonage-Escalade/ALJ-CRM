@@ -15,61 +15,13 @@ Un paiement sans ce n° (champ vide ou non conforme) n'est PAS marqué « Payé 
 automatiquement : il est retourné dans `manual_review` pour correction manuelle.
 """
 import re
-from typing import Optional
+from typing import NamedTuple, Optional
 
-from domain.competitions.models import PAIEMENT_PAYE
-from domain.utils import is_helloasso_url, normalize_name, normalize_string
+from domain.competitions.models import PaymentStatus
+from domain.utils import normalize_name, normalize_string
 
 # États HelloAsso consideres comme un paiement valide
 STATUTS_PAYES = {"processed", "validated", "registered"}
-
-# Motifs reconnus pour extraire le type de formulaire depuis une URL HelloAsso
-_URL_TYPE_MAP = {
-    "evenements": "Event",
-    "formulaires": None,      # type explicite dans le segment suivant
-    "adhesions": "Membership",
-    "campagnes": "Campaign",
-    "dons": "Donation",
-    "boutiques": "Shop",
-    "crowdfundings": "Crowdfunding",
-}
-
-
-def parse_campaign_identifier(ref: str) -> dict:
-    """Analyse l'identifiant / l'URL de campagne saisi par l'utilisateur.
-
-    Accepte :
-    - une URL complète (https://www.helloasso.com/associations/{org}/evenements/{slug}
-      ou .../formulaires/{FormType}/{slug}) ;
-    - un couple explicite « FormType:slug » (ex : « Event:competition-u11 ») ;
-    - un slug brut (type « Event » par défaut : les compétitions sont des événements).
-
-    Retourne {"form_type": str, "slug": str} ou lève ValueError si non exploitable.
-    """
-    raw = str(ref or "").strip()
-    if not raw:
-        raise ValueError("Aucun identifiant de campagne HelloAsso fourni.")
-
-    if is_helloasso_url(raw):
-        path = re.split(r"associations/[^/]+/+", raw, maxsplit=1, flags=re.IGNORECASE)
-        segments = [s.strip("/ ") for s in path[-1].split("/")]
-        segments = [s for s in segments if s]
-        if len(segments) >= 2:
-            head = segments[0].lower()
-            if head == "formulaires" and len(segments) >= 3:
-                return {"form_type": segments[1].strip(), "slug": segments[2].strip()}
-            if head in _URL_TYPE_MAP and _URL_TYPE_MAP[head]:
-                return {"form_type": _URL_TYPE_MAP[head], "slug": segments[1].strip()}
-        raise ValueError(f"URL HelloAsso non reconnue : {raw}")
-
-    if ":" in raw:
-        ftype, _, slug = raw.partition(":")
-        ftype, slug = ftype.strip(), slug.strip()
-        if ftype and slug:
-            return {"form_type": ftype, "slug": slug}
-
-    return {"form_type": "Event", "slug": raw}
-
 
 def extract_licence(item: dict) -> str:
     """Extrait le numéro de licence FFME des champs personnalisés de l'item.
@@ -322,7 +274,27 @@ def _anomaly(kind: str, severite: str, titre: str, detail: str) -> dict:
     return {"type": kind, "severite": severite, "titre": titre, "detail": detail}
 
 
-def _index_participants(participants: list) -> tuple[dict[str, dict], dict[str, dict]]:
+class ItemPayment(NamedTuple):
+    """The fields of a HelloAsso item the matching reads, read once."""
+    state: str
+    amount: float
+    licence: str
+    payer: str
+    order_ref: str
+
+
+def _item_payment(item: dict) -> ItemPayment:
+    return ItemPayment(state=_item_state(item), amount=_item_amount(item), licence=extract_licence(item),
+                       payer=_item_payer_name(item), order_ref=str((item.get("order") or {}).get("id") or ""))
+
+
+class ParticipantIndex(NamedTuple):
+    """Participants by licence number and by normalised name (the first one wins)."""
+    by_licence: dict[str, dict]
+    by_name: dict[str, dict]
+
+
+def _index_participants(participants: list) -> ParticipantIndex:
     """Index des participants par licence puis par nom normalisé (premier gagnant)."""
     by_licence: dict[str, dict] = {}
     by_name: dict[str, dict] = {}
@@ -333,11 +305,12 @@ def _index_participants(participants: list) -> tuple[dict[str, dict], dict[str, 
         key = normalize_name(f"{participant.get('nom')} {participant.get('prenom')}")
         if key:
             by_name.setdefault(key, participant)
-    return by_licence, by_name
+    return ParticipantIndex(by_licence, by_name)
 
 
-def _unpaid_status_anomaly(state: str, payer: str, amount: float, order_ref: str) -> Optional[dict]:
+def _unpaid_status_anomaly(payment: ItemPayment) -> Optional[dict]:
     """Anomalie d'un article non payé (remboursé, non finalisé), None s'il est payé."""
+    payer, amount, order_ref, state = payment.payer, payment.amount, payment.order_ref, payment.state
     if state == "refunded":
         return _anomaly("remboursement", "info", "Paiement remboursé",
                         f"{payer or 'Inconnu'} ({amount:.2f} €, commande {order_ref}) est remboursé sur HelloAsso.")
@@ -348,23 +321,23 @@ def _unpaid_status_anomaly(state: str, payer: str, amount: float, order_ref: str
     return None
 
 
-def _manual_review_entry(item: dict, payer: str, amount: float, order_ref: str, licence: str, valeur_champ: str,
-                         no_competition: str, by_licence: dict[str, dict], by_name: dict[str, dict],
-                         anomalies: list) -> dict:
-    """Paiement au n° d'épreuve absent ou non conforme : ligne de correction manuelle + anomalie."""
-    participant = (by_licence.get(licence) if licence else None) or by_name.get(normalize_name(payer))
+def _manual_review_entry(item: dict, payment: ItemPayment, valeur_champ: str, no_competition: str,
+                         index: ParticipantIndex) -> tuple[dict, dict]:
+    """Paiement au n° d'épreuve absent ou non conforme : (ligne de correction manuelle, anomalie)."""
+    payer, order_ref, licence = payment.payer, payment.order_ref, payment.licence
+    participant = (index.by_licence.get(licence) if licence else None) or index.by_name.get(normalize_name(payer))
     if valeur_champ:
-        anomalies.append(_anomaly("competition_ecartee", "avertissement", "N° de compétition non conforme",
-                                  f"{payer or 'Inconnu'} (commande {order_ref}) : le champ « Compétition concernée » "
-                                  f"indique « {valeur_champ} » au lieu du n° attendu « {no_competition} » ; "
-                                  f"validation manuelle requise."))
+        anomaly = _anomaly("competition_ecartee", "avertissement", "N° de compétition non conforme",
+                           f"{payer or 'Inconnu'} (commande {order_ref}) : le champ « Compétition concernée » "
+                           f"indique « {valeur_champ} » au lieu du n° attendu « {no_competition} » ; "
+                           f"validation manuelle requise.")
     else:
-        anomalies.append(_anomaly("competition_manquante", "avertissement", "N° de compétition absent sur HelloAsso",
-                                  f"{payer or 'Inconnu'} (commande {order_ref}) : le champ « Compétition concernée » "
-                                  f"n'est pas renseigné sur HelloAsso ; validation manuelle requise."))
-    return {
+        anomaly = _anomaly("competition_manquante", "avertissement", "N° de compétition absent sur HelloAsso",
+                           f"{payer or 'Inconnu'} (commande {order_ref}) : le champ « Compétition concernée » "
+                           f"n'est pas renseigné sur HelloAsso ; validation manuelle requise.")
+    entry = {
         "payer": payer or "Inconnu",
-        "montant": amount,
+        "montant": payment.amount,
         "etat": str(item.get("state") or ""),
         "date_item": str(item.get("date") or ""),
         "order_ref": order_ref,
@@ -375,45 +348,49 @@ def _manual_review_entry(item: dict, payer: str, amount: float, order_ref: str, 
         "adherent_id": participant.get("adherent_id") if participant else None,
         "participant": f"{participant.get('nom')} {participant.get('prenom')}" if participant else "",
     }
+    return entry, anomaly
 
 
-def _find_paying_participant(licence: str, payer: str, order_ref: str, by_licence: dict[str, dict],
-                             by_name: dict[str, dict], anomalies: list) -> Optional[dict]:
-    """Participant d'un paiement : par licence, sinon par nom (avec anomalie de rapprochement)."""
+def _find_paying_participant(payment: ItemPayment, index: ParticipantIndex) -> tuple[Optional[dict], Optional[dict]]:
+    """(participant, anomalie) d'un paiement : par licence, sinon par nom (avec une anomalie de rapprochement)."""
+    payer, order_ref, licence = payment.payer, payment.order_ref, payment.licence
     if licence:
-        participant = by_licence.get(licence)
+        participant = index.by_licence.get(licence)
         if participant is not None:
-            return participant
+            return participant, None
         # Licence renseignée mais inconnue : tenter un rapprochement par nom en secours
-        participant = by_name.get(normalize_name(payer))
+        participant = index.by_name.get(normalize_name(payer))
         if participant:
-            anomalies.append(_anomaly("licence_ecartee", "avertissement", "Licence non reconnue",
-                                      f"{payer} (commande {order_ref}) : le n° de licence « {licence} » ne correspond "
-                                      f"à aucun participant ; rapproché par le nom (licence attendue : "
-                                      f"{participant.get('num_licence') or 'absente'})."))
-        return participant
-    participant = by_name.get(normalize_name(payer))
+            return participant, _anomaly(
+                "licence_ecartee", "avertissement", "Licence non reconnue",
+                f"{payer} (commande {order_ref}) : le n° de licence « {licence} » ne correspond "
+                f"à aucun participant ; rapproché par le nom (licence attendue : "
+                f"{participant.get('num_licence') or 'absente'}).")
+        return participant, None
+    participant = index.by_name.get(normalize_name(payer))
     if participant:
-        anomalies.append(_anomaly("paiement_sans_licence", "avertissement", "Paiement sans n° de licence",
-                                  f"{payer} (commande {order_ref}) : aucun champ « licence » valide sur HelloAsso ; "
-                                  f"rapproché par le nom (licence attendue : {participant.get('num_licence') or 'absente'})."))
-    return participant
+        return participant, _anomaly(
+            "paiement_sans_licence", "avertissement", "Paiement sans n° de licence",
+            f"{payer} (commande {order_ref}) : aucun champ « licence » valide sur HelloAsso ; "
+            f"rapproché par le nom (licence attendue : {participant.get('num_licence') or 'absente'}).")
+    return participant, None
 
 
-def _count_pending_and_flag_missing(participants: list, seen_participants: dict, anomalies: list) -> int:
-    """Participants sélectionnés restés sans paiement (relance) ; signale les « Payé » sans paiement HelloAsso."""
-    nb_en_attente = 0
+def _pending_count_and_missing_payments(participants: list, seen_participants: dict) -> tuple[int, list[dict]]:
+    """Participants sélectionnés restés sans paiement (relance), et une anomalie par « Payé » sans paiement HelloAsso."""
+    pending_count = 0
+    anomalies: list[dict] = []
     for participant in participants:
         if not participant.get("selectionne"):
             continue
-        if participant.get("statut_paiement") == PAIEMENT_PAYE and participant.get("adherent_id") not in seen_participants:
+        if participant.get("statut_paiement") == PaymentStatus.PAYE and participant.get("adherent_id") not in seen_participants:
             # Déjà marqué payé en base sans paiement détecté sur cette campagne : signaler
             anomalies.append(_anomaly("paiement_absent", "avertissement", "Payé en base sans paiement HelloAsso",
                                       f"{participant.get('nom')} {participant.get('prenom')} est marqué « Payé » dans "
                                       f"la base mais aucun paiement correspondant n'a été trouvé sur la campagne."))
-        elif participant.get("statut_paiement") != PAIEMENT_PAYE:
-            nb_en_attente += 1
-    return nb_en_attente
+        elif participant.get("statut_paiement") != PaymentStatus.PAYE:
+            pending_count += 1
+    return pending_count, anomalies
 
 
 def match_items_to_participants(items: list, participants: list, prix_attendu: Optional[float] = None,
@@ -441,20 +418,17 @@ def match_items_to_participants(items: list, participants: list, prix_attendu: O
     order_by_adherent = {}
     manual_review = []
     anomalies: list[dict] = []
-    by_licence, by_name = _index_participants(participants)
+    index = _index_participants(participants)
     seen_participants: dict = {}
     nb_payes = 0
 
     for item in items or []:
-        state = _item_state(item)
-        if state in ("canceled", "cancelled"):
+        if _item_state(item) in ("canceled", "cancelled"):
             continue
-        amount = _item_amount(item)
-        licence = extract_licence(item)
-        payer = _item_payer_name(item)
-        order_ref = str((item.get("order") or {}).get("id") or "")
+        payment = _item_payment(item)
+        amount, licence, payer, order_ref = payment.amount, payment.licence, payment.payer, payment.order_ref
 
-        unpaid = _unpaid_status_anomaly(state, payer, amount, order_ref)
+        unpaid = _unpaid_status_anomaly(payment)
         if unpaid is not None:
             anomalies.append(unpaid)
             continue
@@ -466,11 +440,14 @@ def match_items_to_participants(items: list, participants: list, prix_attendu: O
         # part en correction manuelle (avec la valeur saisie sur HelloAsso en aide).
         valeur_champ = extract_competition_number(item)
         if not competition_number_ok(valeur_champ, no_competition):
-            manual_review.append(_manual_review_entry(item, payer, amount, order_ref, licence, valeur_champ,
-                                                      no_competition, by_licence, by_name, anomalies))
+            entry, anomaly = _manual_review_entry(item, payment, valeur_champ, no_competition, index)
+            anomalies.append(anomaly)
+            manual_review.append(entry)
             continue
 
-        participant = _find_paying_participant(licence, payer, order_ref, by_licence, by_name, anomalies)
+        participant, match_anomaly = _find_paying_participant(payment, index)
+        if match_anomaly is not None:
+            anomalies.append(match_anomaly)
         if participant is None:
             anomalies.append(_anomaly("paiement_inconnu", "erreur", "Paiement non identifié",
                                       f"Paiement reçu ({amount:.2f} €, commande {order_ref}) pour « {payer or 'inconnu'} » "
@@ -499,7 +476,8 @@ def match_items_to_participants(items: list, participants: list, prix_attendu: O
         order_by_adherent[adherent_id] = order_ref
         updates.append((adherent_id, amount))
 
-    nb_en_attente = _count_pending_and_flag_missing(participants, seen_participants, anomalies)
+    nb_en_attente, missing_payments = _pending_count_and_missing_payments(participants, seen_participants)
+    anomalies.extend(missing_payments)
 
     return {
         "updates": updates,

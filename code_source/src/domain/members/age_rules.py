@@ -10,8 +10,11 @@ Règles métier :
   du tarif HelloAsso (ex : « jeunes nés en 2011, 2012, 2013, 2014 »).
 - Un adulte ne peut pas souscrire à un groupe enfants / collège / lycée.
 """
+from __future__ import annotations
+
 import datetime
 import re
+from typing import Any, Iterable, Mapping, Optional
 
 from domain.constants import get_active_season
 
@@ -25,6 +28,11 @@ YOUTH_KEYWORDS = ("collège", "college", "lycée", "lycee", "enfant")
 # Années plausibles uniquement (évite de capturer des horaires, montants, etc.)
 _YEAR_RE = re.compile(r"(?<!\d)(19\d{2}|20\d{2})(?!\d)")
 
+# A planning slot (row of the `planning` table, or the same dict from the API): groupe, naissance_min / naissance_max,
+# helloasso_tarifs… Any: values of a SQLite row / JSON.
+PlanningItem = Mapping[str, Any]
+BirthBounds = tuple[Optional[datetime.date], Optional[datetime.date]]
+
 _BIRTH_FORMATS = (
     "%Y-%m-%dT%H:%M:%S",
     "%Y-%m-%d",
@@ -35,7 +43,7 @@ _BIRTH_FORMATS = (
 )
 
 
-def get_season_start_date(season=None):
+def get_season_start_date(season: Optional[str] = None) -> datetime.date:
     """Retourne la date de début de la saison (01/09 de l'année de début)."""
     if not season:
         season = get_active_season()
@@ -46,19 +54,14 @@ def get_season_start_date(season=None):
     return datetime.date(start_year, SEASON_START_MONTH, SEASON_START_DAY)
 
 
-def age_at(birth_date, ref_date):
-    """Âge révolu à la date de référence (None si dates invalides)."""
+def age_at(birth_date: datetime.date | None, ref_date: datetime.date | None) -> int | None:
+    """Âge révolu à la date de référence (None si l'une des dates manque)."""
     if not birth_date or not ref_date:
         return None
-    try:
-        return ref_date.year - birth_date.year - (
-            (ref_date.month, ref_date.day) < (birth_date.month, birth_date.day)
-        )
-    except Exception:
-        return None
+    return ref_date.year - birth_date.year - ((ref_date.month, ref_date.day) < (birth_date.month, birth_date.day))
 
 
-def parse_birth_date(val):
+def parse_birth_date(val: object) -> Optional[datetime.date]:
     """Convertit une date de naissance (datetime, date, ISO, jj/mm/aaaa) en datetime.date, sinon None."""
     if val is None:
         return None
@@ -66,20 +69,20 @@ def parse_birth_date(val):
         return val.date()
     if isinstance(val, datetime.date):
         return val
-    s = str(val).strip()
-    if not s or s.lower() in ("nan", "none", "nat"):
+    text = str(val).strip()
+    if not text or text.lower() in ("nan", "none", "nat"):
         return None
-    if "T" in s:
-        s = s[:19]
+    if "T" in text:
+        text = text[:19]
     for fmt in _BIRTH_FORMATS:
         try:
-            return datetime.datetime.strptime(s, fmt).date()
+            return datetime.datetime.strptime(text, fmt).date()
         except ValueError:
             continue
     return None
 
 
-def extract_birth_years(text):
+def extract_birth_years(text: object) -> list[int]:
     """Extrait les années de naissance plausibles d'un libellé (tarif ou groupe).
 
     Gère les formulations HelloAsso : « nés en 2011, 2012, 2013, 2014 »,
@@ -96,14 +99,14 @@ def extract_birth_years(text):
     return sorted(y for y in years if y < season_start_year)
 
 
-def _parse_iso_or_none(val):
-    s = str(val or "").strip()
-    if not s:
+def _parse_iso_or_none(val: object) -> Optional[datetime.date]:
+    text = str(val or "").strip()
+    if not text:
         return None
-    return parse_birth_date(s)
+    return parse_birth_date(text)
 
 
-def get_group_birth_bounds(planning_item):
+def get_group_birth_bounds(planning_item: Optional[PlanningItem]) -> BirthBounds:
     """Bornes (min, max) en datetime.date depuis les colonnes naissance_min / naissance_max."""
     if not planning_item:
         return (None, None)
@@ -113,7 +116,7 @@ def get_group_birth_bounds(planning_item):
     )
 
 
-def bounds_from_tarif_name(tarif_name):
+def bounds_from_tarif_name(tarif_name: object) -> BirthBounds:
     """Bornes déduites des années de naissance présentes dans le libellé du tarif."""
     years = extract_birth_years(tarif_name)
     if not years:
@@ -124,7 +127,7 @@ def bounds_from_tarif_name(tarif_name):
     )
 
 
-def resolve_birth_bounds(planning_item, tarif_name):
+def resolve_birth_bounds(planning_item: Optional[PlanningItem], tarif_name: object) -> BirthBounds:
     """Bornes effectives : colonnes du créneau en priorité, sinon déduction depuis le tarif."""
     bounds = get_group_birth_bounds(planning_item)
     if bounds[0] or bounds[1]:
@@ -132,7 +135,8 @@ def resolve_birth_bounds(planning_item, tarif_name):
     return bounds_from_tarif_name(tarif_name)
 
 
-def is_youth_group(planning_item, tarif_name="", bounds=None, season_start=None):
+def is_youth_group(planning_item: Optional[PlanningItem], tarif_name: Optional[str] = "", bounds: Optional[BirthBounds] = None,
+                   season_start: Optional[datetime.date] = None) -> bool:
     """Vrai si le groupe est réservé aux jeunes (enfants / collège / lycée).
 
     Détection combinée :
@@ -149,13 +153,12 @@ def is_youth_group(planning_item, tarif_name="", bounds=None, season_start=None)
 
     if "adulte" in combined:
         return False
-    for kw in YOUTH_KEYWORDS:
-        if kw in combined:
-            return True
+    if any(keyword in combined for keyword in YOUTH_KEYWORDS):
+        return True
 
     if bounds is None:
         bounds = get_group_birth_bounds(planning_item)
-    min_bound = (bounds or (None, None))[0]
+    min_bound = bounds[0]
     if min_bound:
         oldest_age = age_at(min_bound, season_start)
         if oldest_age is not None and oldest_age < ADULT_AGE:
@@ -163,7 +166,8 @@ def is_youth_group(planning_item, tarif_name="", bounds=None, season_start=None)
     return False
 
 
-def check_age_conflict(birth_date_raw, tarif_name, planning_item=None, season=None):
+def check_age_conflict(birth_date_raw: object, tarif_name: Optional[str], planning_item: Optional[PlanningItem] = None,
+                       season: Optional[str] = None) -> list[str]:
     """Contrôle une inscription au regard des bornes de naissance du groupe.
 
     Retourne la liste des messages d'incohérence (liste vide = inscription conforme).
@@ -177,7 +181,7 @@ def check_age_conflict(birth_date_raw, tarif_name, planning_item=None, season=No
 
     season_start = get_season_start_date(season)
     bounds = resolve_birth_bounds(planning_item, tarif_name)
-    messages = []
+    messages: list[str] = []
 
     min_bound, max_bound = bounds
     if min_bound and birth < min_bound:
@@ -203,13 +207,13 @@ def check_age_conflict(birth_date_raw, tarif_name, planning_item=None, season=No
     return messages
 
 
-def find_planning_item_for_tarif(tarif_name, planning_data):
+def find_planning_item_for_tarif(tarif_name: Optional[str], planning_data: Optional[Iterable[PlanningItem]]) -> Optional[PlanningItem]:
     """Retrouve le créneau du planning associé à un tarif HelloAsso (mapping IHM)."""
     target = str(tarif_name or "").strip().lower()
     if not target or not planning_data:
         return None
     for item in planning_data:
-        for t in item.get("helloasso_tarifs", []) or []:
-            if str(t).strip().lower() == target:
+        for tarif in item.get("helloasso_tarifs", []) or []:
+            if str(tarif).strip().lower() == target:
                 return item
     return None

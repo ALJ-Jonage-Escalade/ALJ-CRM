@@ -201,9 +201,7 @@ class MembershipImportRepository:
     @classmethod
     def snapshot(cls) -> MembersSnapshot:
         """Every member and every purchase (all seasons), with the keys the import planner recognises them by."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
+        with SqliteDatabase.connect() as conn:
             members = [KnownMember(user_id=row["id"], last_name=row["last_name"] or "", first_name=row["first_name"] or "",
                                    birth_date=row["birth_date"] or "", licence=re.sub(r"\D", "", row["licence_ffme"] or ""),
                                    phone=row["phone"] or "", email=row["email_primary"] or "", email_2=row["email_secondary"] or "",
@@ -216,9 +214,7 @@ class MembershipImportRepository:
                                        helloasso_status=row["helloasso_status"], helloasso_tarif=row["helloasso_tarif"],
                                        helloasso_amount=row["helloasso_amount"])
                          for row in conn.execute(_SNAPSHOT_PURCHASES)]
-            return MembersSnapshot(members=members, purchases=purchases)
-        finally:
-            conn.close()
+        return MembersSnapshot(members=members, purchases=purchases)
 
     @classmethod
     def apply(cls, writes: list[ImportWrite], season: str, day: Optional[datetime.date] = None, author: str = "") -> list[AppliedWrite]:
@@ -227,9 +223,7 @@ class MembershipImportRepository:
         (e-mail of the admin) of a registration given by hand."""
         day = day or datetime.date.today()
         marker = import_marker(day)
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
+        with SqliteDatabase.transaction() as conn:
             cur = conn.cursor()
             now_iso = datetime.datetime.now().isoformat(timespec="seconds")
             season_id = schema_v2.resolve_season_id(cur, season)
@@ -239,24 +233,14 @@ class MembershipImportRepository:
                     _append_marker(cur, written.purchase_id, assign_note(write, day, author))
                 if written.action in _MARKED:
                     _append_marker(cur, written.purchase_id, marker)
-            conn.commit()
-            logger.info("Import HelloAsso : %d inscription(s) écrite(s) pour la saison %s", len(applied), season)
-            return applied
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        logger.info("Import HelloAsso : %d inscription(s) écrite(s) pour la saison %s", len(applied), season)
+        return applied
 
     @classmethod
     def membership(cls, purchase_id: int) -> Optional[HelloAssoMembership]:
         """The purchase and its HelloAsso item, None when there is no such purchase."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
+        with SqliteDatabase.connect() as conn:
             row = conn.execute(_MEMBERSHIP, (purchase_id,)).fetchone()
-        finally:
-            conn.close()
         if row is None:
             return None
         return HelloAssoMembership(purchase_id=row["id"], user_id=row["user_id"],
@@ -268,9 +252,7 @@ class MembershipImportRepository:
     def delete_membership(cls, purchase_id: int) -> None:
         """Deletes the purchase, its insurance options and its order when no other purchase uses it, in one
         transaction. The member is left as is."""
-        SqliteDatabase.setup_database()
-        conn = SqliteDatabase.get_connection()
-        try:
+        with SqliteDatabase.transaction() as conn:
             cur = conn.cursor()
             row = cur.execute("SELECT order_id FROM purchases WHERE id = ?", (purchase_id,)).fetchone()
             if row is None:
@@ -278,10 +260,4 @@ class MembershipImportRepository:
             cur.execute("DELETE FROM purchase_options WHERE purchase_id = ?", (purchase_id,))
             cur.execute("DELETE FROM purchases WHERE id = ?", (purchase_id,))
             cur.execute("DELETE FROM orders WHERE id = ? AND NOT EXISTS (SELECT 1 FROM purchases WHERE order_id = ?)", (row[0], row[0]))
-            conn.commit()
-            logger.info("Adhésion %d supprimée (détachée de HelloAsso)", purchase_id)
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        logger.info("Adhésion %d supprimée (détachée de HelloAsso)", purchase_id)

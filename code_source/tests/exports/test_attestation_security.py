@@ -4,18 +4,11 @@ never inject markup into the attestation HTML, and WeasyPrint must never read se
 files or the network while rendering it.
 """
 
-import os
 import re
-import sys
 import unittest
 import zlib
 
-_tests_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_src_dir = os.path.join(os.path.dirname(_tests_dir), "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-from exports.attestation import (  # noqa: E402
+from exports.attestation import (
     build_attestation,
     render_attestation_pdf,
 )

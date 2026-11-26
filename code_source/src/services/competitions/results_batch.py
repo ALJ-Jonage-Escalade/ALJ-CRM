@@ -6,35 +6,26 @@ Exécute chaque jour (par exemple à 07h00) :
 2. Tente de récupérer automatiquement les résultats officiels depuis MyCompet FFME.
 3. Rapproche et met à jour les classements des compétiteurs du club.
 4. Envoie un e-mail de notification récapitulatif avec un tableau HTML soigné
-   à l'adresse configurée (par défaut : david.lopez@alj-jonage.fr).
+   à l'adresse configurée (par défaut : domain.communications.club_emails.DEFAULT_RESULTS_NOTIFICATION_EMAIL).
 """
 
 from __future__ import annotations
 
 import datetime
-import html as html_lib
 import logging
-import os
 import re
-import sys
 import time
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypedDict
 
-logger = logging.getLogger("alj")
-
-# Injection du dossier src dans sys.path si nécessaire
-_src_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-
-from domain.utils import normalize_name
-from infrastructure.mail.sender import EmailSender, MailError
-from domain.club_emails import DEFAULT_SENDER_EMAIL
-from domain.email_log import SYSTEM_AUTHOR
+from domain.communications.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL, DEFAULT_SENDER_EMAIL
+from domain.competitions.results import ClubAthlete, apply_rankings, end_date, has_results
+from domain.communications.email_log import SYSTEM_AUTHOR
+from domain.errors import InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
 from infrastructure.firestore.app_settings import AppSettingsRepository
 from infrastructure.firestore.client import FirestoreClient, FirestoreError
 from infrastructure.firestore.competitions import competitions, documents, participants
+from infrastructure.firestore.competitions.documents import CompetitionDoc
+from infrastructure.mail.sender import EmailSender, MailError
 from infrastructure.mycompet.scraper import (
     ArchiveEntry,
     fetch_and_parse_mycompet_results,
@@ -44,10 +35,11 @@ from infrastructure.mycompet.scraper import (
     normalize_result_url,
 )
 from services.communications.email_log import SEND_FAILED, logged_recipient, record_send
-from services.competitions.store import invalidate_cache
-from domain.errors import InvalidRequest, NotFound, StorageUnavailable, UpstreamUnavailable
+from services.competitions.results_email import results_email_html, results_email_subject, results_email_text
+from services.competitions.store import drops_cache, invalidate_cache
 
-DEFAULT_NOTIFICATION_EMAIL = "david.lopez@alj-jonage.fr"
+logger = logging.getLogger("alj")
+
 SETTING_NOTIFICATION_EMAIL = "RESULTATS_NOTIFICATION_EMAIL"
 SETTING_BATCH_LAST_RUN = "RESULTATS_BATCH_LAST_RUN"
 SETTING_BATCH_LAST_STATUS = "RESULTATS_BATCH_LAST_STATUS"
@@ -64,22 +56,6 @@ FIELD_NEEDS_URL_NOTIFIED = "resultats_url_demandee_at"
 CompetitionStatus = Literal["found", "pending", "needs_url", "error"]
 
 
-class ResultsBatchError(RuntimeError):
-    """The competitions could not be read: the run did nothing (the route answers an error, not 200)."""
-
-
-class ClubAthlete(TypedDict):
-    """A club member's result, for the summary e-mail and the report."""
-    nom: str
-    prenom: str
-    num_licence: str
-    categorie: str
-    classement: str
-    total_categorie: int
-    resultat_ffme: str
-    performance: str
-
-
 class ResultsFetch(TypedDict):
     """Results fetched for one competition on a coach's request."""
     url: str
@@ -94,70 +70,20 @@ class CompetitionOutcome(TypedDict):
     url: str
 
 
-def _rank_sort_key(athlete: ClubAthlete) -> int:
-    try:
-        return int(athlete["classement"])
-    except ValueError:
-        return 9999
-
-
-def apply_rankings(participants: List[Dict[str, Any]], scraped: List[Dict[str, Any]],
-                   synced_at: str) -> List[ClubAthlete]:  # Any: Firestore participant rows and scraper rows
-    """Sets the ranking fields of the participants found in the scraped results (licence first, then name), in place.
-    Only those fields are changed. Returns the matched athletes, best ranked first."""
-    by_licence: Dict[str, Dict[str, Any]] = {}
-    by_name: Dict[str, Dict[str, Any]] = {}
-    for row in scraped:
-        licence = str(row.get("licence") or "").strip()
-        if licence:
-            by_licence[licence] = row
-        full_name = normalize_name(f"{row.get('nom') or ''} {row.get('prenom') or ''}")
-        if full_name:
-            by_name[full_name] = row
-
-    athletes: List[ClubAthlete] = []
-    for participant in participants:
-        licence = str(participant.get("num_licence") or "").strip()
-        full_name = normalize_name(f"{participant.get('nom') or ''} {participant.get('prenom') or ''}")
-        match = (by_licence.get(licence) if licence else None) or (by_name.get(full_name) if full_name else None)
-        if not match:
-            continue
-        rank = str(match.get("classement") or "").strip()
-        total = int(match.get("total_categorie") or 0)
-        suffix = f" / {total}" if total > 0 else "e"
-        participant["classement"] = rank
-        participant["total_categorie"] = total
-        participant["resultat_ffme"] = f"{rank}{suffix}" if rank else ""
-        participant["categorie_ffme"] = match.get("categorie") or ""
-        participant["performance_ffme"] = match.get("performance") or ""
-        participant["resultat_synced_at"] = synced_at
-        athletes.append(ClubAthlete(
-            nom=str(participant.get("nom") or match.get("nom") or ""),
-            prenom=str(participant.get("prenom") or match.get("prenom") or ""),
-            num_licence=licence or str(match.get("licence") or ""),
-            categorie=str(match.get("categorie") or participant.get("categorie") or ""),
-            classement=rank,
-            total_categorie=total,
-            resultat_ffme=participant["resultat_ffme"],
-            performance=str(match.get("performance") or ""),
-        ))
-    athletes.sort(key=_rank_sort_key)
-    return athletes
-
-
 class CompetitionResultsBatchService:
     """Orchestre la détection quotidienne des résultats et la notification par e-mail."""
 
     @classmethod
     def parse_notification_emails(cls, raw: str) -> List[str]:
-        """Découpe et valide une liste d'adresses e-mail séparées par des virgules, points-virgules ou espaces."""
+        """Découpe et valide une liste d'adresses e-mail séparées par des virgules, points-virgules ou espaces
+        (InvalidRequest when one is not an address, or none is given)."""
         parts = [p.strip() for p in re.split(r"[,;\s]+", str(raw or "").strip()) if p.strip()]
         if not parts:
-            raise ValueError("Adresse e-mail de notification invalide.")
+            raise InvalidRequest("Adresse e-mail de notification invalide.")
         valid: List[str] = []
         for p in parts:
             if "@" not in p or "." not in p or len(p) < 5:
-                raise ValueError("Adresse e-mail de notification invalide.")
+                raise InvalidRequest("Adresse e-mail de notification invalide.")
             valid.append(p)
         return valid
 
@@ -165,27 +91,35 @@ class CompetitionResultsBatchService:
     def get_notification_email(cls) -> str:
         """Retourne l'e-mail ou les e-mails de notification configurés, ou l'adresse par défaut."""
         try:
-            val = AppSettingsRepository.get(SETTING_NOTIFICATION_EMAIL)
-            if val:
-                emails = [e.strip() for e in re.split(r"[,;\s]+", str(val).strip()) if e.strip() and "@" in e]
-                if emails:
-                    return ", ".join(emails)
-        except Exception:
+            stored = AppSettingsRepository.get(SETTING_NOTIFICATION_EMAIL)
+        except FirestoreError:
             logger.warning("Lecture de l'e-mail de notification des résultats impossible", exc_info=True)
-        return DEFAULT_NOTIFICATION_EMAIL
+            return DEFAULT_RESULTS_NOTIFICATION_EMAIL
+        if not stored:
+            return DEFAULT_RESULTS_NOTIFICATION_EMAIL
+        try:
+            return ", ".join(cls.parse_notification_emails(str(stored)))
+        except InvalidRequest:  # saved through update_settings, which checks it: only a hand edit gets here
+            logger.warning("Réglage %s invalide (%r) : adresse par défaut utilisée", SETTING_NOTIFICATION_EMAIL, stored)
+            return DEFAULT_RESULTS_NOTIFICATION_EMAIL
 
     @classmethod
-    def set_notification_email(cls, email: str) -> bool:
-        """Enregistre une ou plusieurs adresses e-mail de notification."""
-        valid = cls.parse_notification_emails(email)
-        clean = ", ".join(valid)
+    def update_settings(cls, notification_email: str, window_days: Optional[int] = None) -> None:
+        """Saves the notification addresses and, when given, the search window. Both are checked first: InvalidRequest
+        (nothing saved) when one is invalid; StorageUnavailable when Firestore fails."""
+        emails = cls.parse_notification_emails(notification_email)
+        if window_days is not None and not 1 <= window_days <= 365:
+            raise InvalidRequest("Fenêtre de recherche invalide : entre 1 et 365 jours.")
+        cls._save_setting(SETTING_NOTIFICATION_EMAIL, ", ".join(emails))
+        if window_days is not None:
+            cls._save_setting(SETTING_BATCH_WINDOW_DAYS, str(window_days))
 
+    @staticmethod
+    def _save_setting(key: str, value: str) -> None:
         try:
-            AppSettingsRepository.save(SETTING_NOTIFICATION_EMAIL, clean)
-            return True
+            AppSettingsRepository.save(key, value)
         except FirestoreError as e:
-            logger.warning(f"[BATCH_RESULTATS] Enregistrement de l'e-mail de notification impossible : {e}")
-            return False
+            raise StorageUnavailable("Enregistrement des réglages impossible (détails dans les journaux).") from e
 
     @classmethod
     def get_batch_status(cls) -> Dict[str, Any]:
@@ -199,18 +133,6 @@ class CompetitionResultsBatchService:
             "cron_schedule": "Tous les jours à 07h00",
             "window_days": cls.get_window_days(),
         }
-
-    @classmethod
-    def set_window_days(cls, days: int) -> bool:
-        """Saves the search window (ValueError outside 1..365)."""
-        if not 1 <= int(days) <= 365:
-            raise ValueError("Fenêtre de recherche invalide : entre 1 et 365 jours.")
-        try:
-            AppSettingsRepository.save(SETTING_BATCH_WINDOW_DAYS, str(int(days)))
-            return True
-        except FirestoreError:
-            logger.warning("Enregistrement du réglage %s impossible", SETTING_BATCH_WINDOW_DAYS, exc_info=True)
-            return False
 
     @classmethod
     def get_window_days(cls) -> int:
@@ -232,55 +154,31 @@ class CompetitionResultsBatchService:
         return days
 
     @classmethod
-    def end_date(cls, comp: Dict[str, Any]) -> Optional[datetime.date]:
-        """Last day of a competition (`date_fin`, else `date_competition`), None when unknown."""
-        target = str(comp.get("date_fin") or "").strip() or str(comp.get("date_competition") or "").strip()
-        try:
-            return datetime.date.fromisoformat(target[:10]) if target else None
-        except ValueError:
-            return None
-
-    @classmethod
-    def is_competition_past(cls, comp: Dict[str, Any], today: Optional[datetime.date] = None) -> bool:
-        """Vérifie si une compétition est déjà réalisée et terminée."""
-        ended = cls.end_date(comp)
-        return ended is not None and ended <= (today or datetime.date.today())
-
-    @classmethod
-    def has_results(cls, comp: Dict[str, Any]) -> bool:
-        """Vérifie si une compétition a déjà des résultats enregistrés."""
-        # Si un horodatage de synchronisation existe et au moins un classement est présent
-        synced_at = comp.get("resultats_synced_at")
-        parts = comp.get("participants") or []
-        has_rankings = any(bool(str(p.get("classement") or "").strip() or str(p.get("resultat_ffme") or "").strip()) for p in parts)
-        return bool(synced_at and has_rankings)
-
-    @classmethod
     def list_pending_competitions(cls, force: bool = False, window_days: Optional[int] = None,
-                                  today: Optional[datetime.date] = None) -> List[Dict[str, Any]]:
+                                  today: Optional[datetime.date] = None) -> List[CompetitionDoc]:
         """Competitions ended in the last `window_days` days (None: the setting) without results, most recent first.
         `force`: every competition ended in the last FORCED_WINDOW_DAYS days (or the window, if longer), results or not.
-        ResultsBatchError when Firestore cannot be read."""
+        StorageUnavailable when Firestore cannot be read."""
         today = today or datetime.date.today()
         window = window_days if window_days is not None else cls.get_window_days()
         oldest = today - datetime.timedelta(days=max(window, FORCED_WINDOW_DAYS) if force else window)
         try:
             docs = competitions.list_competition_docs()
         except FirestoreError as e:
-            raise ResultsBatchError(f"Lecture des compétitions impossible : {e}") from e
+            raise StorageUnavailable("Lecture des compétitions impossible : le batch n'a rien fait (détails dans les journaux).") from e
 
         pending = []
         for doc in docs:
-            ended = cls.end_date(doc)
+            ended = end_date(doc)
             if doc.get("id") is None or ended is None or ended > today:
                 continue
-            if ended >= oldest and (force or not cls.has_results(doc)):
+            if ended >= oldest and (force or not has_results(doc)):
                 pending.append(doc)
-        pending.sort(key=lambda d: cls.end_date(d) or datetime.date.min, reverse=True)
+        pending.sort(key=lambda d: end_date(d) or datetime.date.min, reverse=True)
         return pending
 
     @classmethod
-    def find_result_url(cls, comp: Dict[str, Any], archive: List[ArchiveEntry]) -> Tuple[str, bool]:
+    def find_result_url(cls, comp: CompetitionDoc, archive: List[ArchiveEntry]) -> Tuple[str, bool]:
         """(URL, trusted) of a competition's results. An URL entered by hand is trusted; an archive line only when
         its date matches the competition's (a page of the same venue, an earlier season, matches the name too).
         ("", False): no line matches at all, the results are not published yet."""
@@ -295,7 +193,7 @@ class CompetitionResultsBatchService:
         return find_result_url_in_archives(archive, nom, lieu, date_debut, date_fin), False
 
     @classmethod
-    def sync_results_for_competition(cls, comp: Dict[str, Any], archive: List[ArchiveEntry],
+    def sync_results_for_competition(cls, comp: CompetitionDoc, archive: List[ArchiveEntry],
                                      club_keyword: str = "JONAGE") -> CompetitionOutcome:
         """Finds, fetches and writes the MyCompet results of one competition."""
         nom = comp.get("nom") or ""
@@ -374,214 +272,29 @@ class CompetitionResultsBatchService:
         return ResultsFetch(url=canonical_url, total_scraped=len(scraped), matched_count=matched)
 
     @classmethod
-    def build_results_email_html(cls, comp_results_list: List[Dict[str, Any]],
-                                 needs_url: Optional[List[Dict[str, Any]]] = None) -> str:
-        """Génère un e-mail HTML soigné présentant les tableaux de résultats des compétitions.
-        `needs_url`: competitions whose results page could not be confirmed (listed for a manual fetch)."""
-        esc = html_lib.escape  # names and categories come from scraped MyCompet pages
-        comp_sections = []
-
-        for item in comp_results_list:
-            nom_comp = esc(item.get("nom") or "Compétition")
-            date_comp = item.get("date") or ""
-            lieu_comp = esc(item.get("lieu") or "")
-            url = esc(item.get("url") or "")
-            athletes = item.get("athletes") or []
-
-            # Formatage de la date si possible
-            date_formatted = date_comp
-            try:
-                d = datetime.date.fromisoformat(date_comp[:10])
-                date_formatted = d.strftime("%d/%m/%Y")
-            except (ValueError, TypeError):
-                pass
-
-            meta_parts = [p for p in [date_formatted, lieu_comp] if p]
-            meta_str = " · ".join(meta_parts)
-
-            rows_html = []
-            for ath in athletes:
-                cl = str(ath.get("classement") or "").strip()
-                tot = ath.get("total_categorie")
-                badge_style = "font-weight:700;"
-                medal = ""
-                if cl == "1":
-                    medal = "🥇 "
-                    badge_style += " color:#B45309; background:#FEF3C7; padding:2px 8px; border-radius:4px;"
-                elif cl == "2":
-                    medal = "🥈 "
-                    badge_style += " color:#475569; background:#F1F5F9; padding:2px 8px; border-radius:4px;"
-                elif cl == "3":
-                    medal = "🥉 "
-                    badge_style += " color:#9A3412; background:#FFEDD5; padding:2px 8px; border-radius:4px;"
-
-                rank_display = f"{medal}{esc(cl)}e" if cl else "—"
-                if tot and tot > 0 and cl:
-                    rank_display += f" / {tot}"
-
-                perf = esc(str(ath.get("performance") or "").strip() or "—")
-                cat = esc(str(ath.get("categorie") or "").strip() or "—")
-                lic = esc(str(ath.get("num_licence") or "").strip() or "—")
-                nom_prenom = f"<b>{esc(str(ath.get('nom') or '').upper())}</b> {esc(str(ath.get('prenom') or '').title())}"
-
-                rows_html.append(f"""
-                  <tr style="border-bottom:1px solid #E2E8F0;">
-                    <td style="padding:10px 12px; font-size:13.5px; color:#1E293B;">{nom_prenom}</td>
-                    <td style="padding:10px 12px; font-size:13px; color:#475569;">{cat}</td>
-                    <td style="padding:10px 12px; font-size:13.5px; text-align:center;"><span style="{badge_style}">{rank_display}</span></td>
-                    <td style="padding:10px 12px; font-size:12.5px; color:#64748B;">{perf}</td>
-                    <td style="padding:10px 12px; font-size:12px; color:#94A3B8; font-family:monospace;">{lic}</td>
-                  </tr>
-                """)
-
-            table_body = "".join(rows_html) if rows_html else '<tr><td colspan="5" style="padding:20px; text-align:center; color:#94A3B8;">Aucun athlète classé trouvé pour le club.</td></tr>'
-
-            url_btn = f'<a href="{url}" style="display:inline-block; font-size:12px; font-weight:600; color:#2563EB; text-decoration:none; margin-top:6px;" target="_blank">🔗 Voir les résultats officiels sur MyCompet FFME ➔</a>' if url else ''
-
-            comp_sections.append(f"""
-              <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; margin-bottom:24px; overflow:hidden; box-shadow:0 1px 3px rgba(15,23,42,0.06);">
-                <div style="background:#163A5F; color:#FFFFFF; padding:14px 18px;">
-                  <h2 style="margin:0; font-size:17px; font-weight:700;">🧗 {nom_comp}</h2>
-                  {f'<div style="font-size:12.5px; color:#93C5FD; margin-top:3px;">{meta_str}</div>' if meta_str else ''}
-                </div>
-                <div style="padding:16px 18px;">
-                  <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; text-align:left;">
-                      <thead>
-                        <tr style="background:#F8FAFC; border-bottom:2px solid #CBD5E1; font-size:12px; color:#475569; text-transform:uppercase;">
-                          <th style="padding:8px 12px;">Athlète</th>
-                          <th style="padding:8px 12px;">Catégorie</th>
-                          <th style="padding:8px 12px; text-align:center;">Classement</th>
-                          <th style="padding:8px 12px;">Performance</th>
-                          <th style="padding:8px 12px;">Licence</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {table_body}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div style="margin-top:12px; text-align:right;">
-                    {url_btn}
-                  </div>
-                </div>
-              </div>
-            """)
-
-        if needs_url:
-            items_html = "".join(
-                f'<li style="margin:4px 0;"><b>{esc(c.get("nom") or "Compétition")}</b> ({esc(c.get("date") or "")}) — '
-                f'page trouvée : <a href="{esc(c.get("url") or "")}" style="color:#2563EB;">{esc(c.get("url") or "")}</a></li>'
-                for c in needs_url)
-            comp_sections.append(f"""
-              <div style="background:#FFF7ED; border:1px solid #FDBA74; border-radius:10px; margin-bottom:24px; padding:14px 18px;">
-                <h2 style="margin:0 0 6px; font-size:16px; color:#9A3412;">✍️ URL à saisir manuellement</h2>
-                <p style="margin:0 0 8px; font-size:13px; color:#7C2D12;">Une page de résultats porte un nom proche, mais sa date
-                ne correspond pas à la compétition : rien n'a été enregistré. Vérifiez la page, puis renseignez l'URL depuis
-                « Trouver les résultats » sur la fiche de la compétition.</p>
-                <ul style="margin:0; padding-left:18px; font-size:13px;">{items_html}</ul>
-              </div>
-            """)
-
-        all_sections_html = "".join(comp_sections)
-        nb_comps = len(comp_results_list)
-        plural = "s" if nb_comps > 1 else ""
-
-        intro = (f"Les résultats officiels de {nb_comps} compétition{plural} viennent d'être synchronisés depuis MyCompet."
-                 if nb_comps else "Aucun nouveau résultat, mais des compétitions attendent leur URL de résultats.")
-        html = f"""<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Résultats de Compétition — ALJ Escalade</title>
-</head>
-<body style="margin:0; padding:20px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color:#F1F5F9; color:#1E293B;">
-  <div style="max-width:720px; margin:0 auto;">
-    
-    <!-- En-tête -->
-    <div style="background:linear-gradient(135deg, #163A5F 0%, #1E40AF 100%); color:#FFFFFF; padding:22px 24px; border-radius:12px 12px 0 0; text-align:center;">
-      <div style="font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#93C5FD; margin-bottom:4px;">Amicale Laïque de Jonage · Escalade</div>
-      <h1 style="margin:0; font-size:22px; font-weight:800;">🏆 Nouveaux Résultats de Compétition FFME</h1>
-      <p style="margin:8px 0 0; font-size:14px; color:#E0E7FF;">{intro}</p>
-    </div>
-
-    <!-- Contenu principal -->
-    <div style="background:#F8FAFC; padding:24px 20px; border-left:1px solid #E2E8F0; border-right:1px solid #E2E8F0;">
-      {all_sections_html}
-    </div>
-
-    <!-- Pied de page -->
-    <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-top:none; border-radius:0 0 12px 12px; padding:16px 20px; text-align:center; font-size:12px; color:#64748B;">
-      <p style="margin:0 0 6px;">
-        🤖 <b>Notification automatique</b> envoyée par le batch quotidien ALJ Escalade (07h00).
-      </p>
-      <p style="margin:0; font-size:11.5px; color:#94A3B8;">
-        Ces résultats sont désormais enregistrés dans la base et consultables directement sur la page Compétitions du club.
-      </p>
-    </div>
-
-  </div>
-</body>
-</html>
-"""
-        return html
-
-    @classmethod
-    def send_notification_email(cls, comp_results_list: List[Dict[str, Any]], to_email: Optional[str] = None,
+    def send_notification_email(cls, found: List[Dict[str, Any]], to_email: Optional[str] = None,
                                 needs_url: Optional[List[Dict[str, Any]]] = None) -> bool:
         """Envoie l'e-mail de synthèse avec les tableaux de résultats (et les URL à saisir)."""
         needs_url = needs_url or []
-        if not comp_results_list and not needs_url:
+        if not found and not needs_url:
             return False
 
         recipient_raw = (to_email or cls.get_notification_email()).strip()
         try:
             recipients = cls.parse_notification_emails(recipient_raw)
-        except ValueError:
+        except InvalidRequest:
             logger.warning("[BATCH_RESULTATS] Adresse de notification invalide : %r", recipient_raw)
             return False
-
         recipient = ", ".join(recipients)
+        subject = results_email_subject(found, needs_url)
 
-        nb_comps = len(comp_results_list)
-        if nb_comps == 1:
-            nom_c = comp_results_list[0].get("nom") or "Compétition"
-            subject = f"🏆 Résultats officiels disponibles : {nom_c}"
-        elif nb_comps > 1:
-            subject = f"🏆 Résultats officiels disponibles pour {nb_comps} compétitions"
-        else:
-            subject = f"✍️ Résultats de compétition : {len(needs_url)} URL à saisir manuellement"
-
-        html_body = cls.build_results_email_html(comp_results_list, needs_url=needs_url)
-
-        # Corps texte brut en repli
-        lines = [
-            f"ALJ Escalade - Nouveaux résultats officiels FFME ({nb_comps} compétition(s))",
-            "=" * 50,
-            ""
-        ]
-        for c in comp_results_list:
-            lines.append(f"Compétition : {c.get('nom')} ({c.get('date', '')})")
-            if c.get("url"):
-                lines.append(f"MyCompet : {c.get('url')}")
-            lines.append("Résultats du club :")
-            for ath in (c.get("athletes") or []):
-                lines.append(f" - {ath.get('nom')} {ath.get('prenom')} ({ath.get('categorie')}) : {ath.get('resultat_ffme')} [{ath.get('performance')}]")
-            lines.append("")
-        if needs_url:
-            lines.append("URL à saisir manuellement (date de la page différente de celle de la compétition) :")
-            lines.extend(f" - {c.get('nom')} ({c.get('date', '')}) : page trouvée {c.get('url')}" for c in needs_url)
-
-        plain_body = "\n".join(lines)
-
-        competition_ids = [int(c["id"]) for c in [*comp_results_list, *needs_url] if str(c.get("id") or "").isdigit()]
+        competition_ids = [int(c["id"]) for c in [*found, *needs_url] if str(c.get("id") or "").isdigit()]
         try:
             EmailSender.send_email(
                 to_email=recipient,
                 subject=subject,
-                body=plain_body,
-                html_body=html_body,
+                body=results_email_text(found, needs_url),
+                html_body=results_email_html(found, needs_url),
                 from_email=DEFAULT_SENDER_EMAIL,
                 from_name="ALJ Escalade - Résultats Compétitions"
             )
@@ -596,7 +309,7 @@ class CompetitionResultsBatchService:
         return True
 
     @classmethod
-    def _load_archive(cls, pending: List[Dict[str, Any]]) -> List[ArchiveEntry]:
+    def _load_archive(cls, pending: List[CompetitionDoc]) -> List[ArchiveEntry]:
         """The FFME archive, read once per run, only when a competition has no results URL yet."""
         if all(str(c.get("url_resultats") or c.get("id_resultat_ffme") or "").strip() for c in pending):
             return []
@@ -607,14 +320,66 @@ class CompetitionResultsBatchService:
             return []
 
     @classmethod
-    def _mark_url_requested(cls, comp: Dict[str, Any], at: str) -> None:
+    def _mark_url_requested(cls, comp: CompetitionDoc, at: str) -> None:
         try:
             FirestoreClient.update_fields(documents.COLLECTION_COMPETITIONS,
-                                          comp.get("_doc_id") or str(comp["id"]), {FIELD_NEEDS_URL_NOTIFIED: at})
+                                          str(comp["id"]), {FIELD_NEEDS_URL_NOTIFIED: at})
         except FirestoreError:
             logger.warning("[BATCH_RESULTATS] Mémorisation de la demande d'URL impossible (#%s)", comp.get("id"), exc_info=True)
 
     @classmethod
+    def _check_competition(cls, comp: CompetitionDoc, archive: List[ArchiveEntry]) -> Dict[str, Any]:
+        """Syncs one competition's results and returns its line for the summary (with its status)."""
+        cid = str(comp.get("id"))
+        nom = comp.get("nom") or "Compétition"
+        logger.debug(f"[BATCH_RESULTATS] Recherche des résultats pour #{cid} « {nom} »...")
+
+        outcome = cls.sync_results_for_competition(comp, archive)
+        if outcome["status"] == "found":
+            logger.info(f"[BATCH_RESULTATS] {outcome['matched_count']} athlète(s) classé(s) trouvé(s) pour « {nom} » !")
+        elif outcome["status"] == "error":
+            logger.warning("[BATCH_RESULTATS] « %s » : résultats illisibles ou non enregistrés, nouvel essai au prochain passage", nom)
+        elif outcome["status"] == "pending":
+            logger.debug(f"[BATCH_RESULTATS] Aucun résultat officiel disponible pour le moment pour « {nom} ».")
+        return {
+            "id": cid,
+            "nom": nom,
+            "date": comp.get("date_competition") or "",
+            "lieu": comp.get("lieu") or "",
+            "url": outcome["url"],
+            "athletes": outcome["athletes"],
+            "status": outcome["status"],
+        }
+
+    @staticmethod
+    def _batch_status_message(details: List[Dict[str, Any]], checked: int, found_count: int, remaining: int, *,
+                              email_sent: bool, email_due: bool, notification_email: str) -> str:
+        """One-line summary of the run, saved in the settings and shown on the results page."""
+        status_msg = f"{checked} vérifiée(s), {found_count} résultat(s) trouvé(s)"
+        to_enter = sum(1 for d in details if d["status"] == "needs_url")
+        if to_enter:
+            status_msg += f", {to_enter} URL à saisir"
+        failed = sum(1 for d in details if d["status"] == "error")
+        if failed:
+            status_msg += f", {failed} en erreur"
+        if remaining:
+            status_msg += f", {remaining} reportée(s) au prochain passage"
+        if email_sent:
+            status_msg += f" (E-mail envoyé à {notification_email})"
+        elif email_due:
+            status_msg += " (Échec envoi e-mail)"
+        return status_msg
+
+    @staticmethod
+    def _save_run_status(executed_at: str, status_msg: str) -> None:
+        try:
+            AppSettingsRepository.save(SETTING_BATCH_LAST_RUN, executed_at)
+            AppSettingsRepository.save(SETTING_BATCH_LAST_STATUS, status_msg)
+        except FirestoreError:
+            logger.warning("[BATCH_RESULTATS] Enregistrement du statut du batch impossible", exc_info=True)
+
+    @classmethod
+    @drops_cache  # writes competition documents directly
     def run_daily_batch(cls, force: bool = False, to_email: Optional[str] = None, window_days: Optional[int] = None,
                         today: Optional[datetime.date] = None, time_budget_s: float = DEFAULT_TIME_BUDGET_SECONDS,
                         clock: Callable[[], float] = time.monotonic) -> Dict[str, Any]:
@@ -625,7 +390,7 @@ class CompetitionResultsBatchService:
         3. Met à jour les résultats des athlètes.
         4. Envoie l'e-mail récapitulatif si des résultats sont découverts (ou des URL à saisir, une fois).
         Stops between two competitions once `time_budget_s` is spent (`partial`: the next run goes on).
-        Raises ResultsBatchError when the competitions cannot be read.
+        Raises StorageUnavailable when the competitions cannot be read.
         """
         started = clock()
         now_iso = datetime.datetime.now().isoformat()
@@ -636,7 +401,7 @@ class CompetitionResultsBatchService:
 
         try:
             pending = cls.list_pending_competitions(force=force, window_days=window, today=today)
-        except ResultsBatchError:
+        except StorageUnavailable:
             logger.exception("[BATCH_RESULTATS] Lecture des compétitions impossible : rien n'a été fait")
             raise
         logger.info(f"[BATCH_RESULTATS] {len(pending)} compétition(s) éligible(s) sans résultats détectée(s) "
@@ -645,7 +410,7 @@ class CompetitionResultsBatchService:
         archive = cls._load_archive(pending)
         results_found_list: List[Dict[str, Any]] = []
         needs_url: List[Dict[str, Any]] = []
-        needs_url_comps: List[Dict[str, Any]] = []  # their documents, marked once the e-mail is sent
+        needs_url_comps: List[CompetitionDoc] = []  # their documents, marked once the e-mail is sent
         details: List[Dict[str, Any]] = []
         checked = 0
 
@@ -653,32 +418,13 @@ class CompetitionResultsBatchService:
             if clock() - started >= time_budget_s:
                 break
             checked += 1
-            cid = str(comp.get("id"))
-            nom = comp.get("nom") or "Compétition"
-            logger.debug(f"[BATCH_RESULTATS] Recherche des résultats pour #{cid} « {nom} »...")
-
-            outcome = cls.sync_results_for_competition(comp, archive)
-            item = {
-                "id": cid,
-                "nom": nom,
-                "date": comp.get("date_competition") or "",
-                "lieu": comp.get("lieu") or "",
-                "url": outcome["url"],
-                "athletes": outcome["athletes"],
-                "status": outcome["status"],
-            }
+            item = cls._check_competition(comp, archive)
             details.append(item)
-            if outcome["status"] == "found":
-                logger.info(f"[BATCH_RESULTATS] {outcome['matched_count']} athlète(s) classé(s) trouvé(s) pour « {nom} » !")
+            if item["status"] == "found":
                 results_found_list.append(item)
-            elif outcome["status"] == "needs_url":
-                if not comp.get(FIELD_NEEDS_URL_NOTIFIED):  # asked once, not every morning
-                    needs_url.append(item)
-                    needs_url_comps.append(comp)
-            elif outcome["status"] == "error":
-                logger.warning("[BATCH_RESULTATS] « %s » : résultats illisibles ou non enregistrés, nouvel essai au prochain passage", nom)
-            else:
-                logger.debug(f"[BATCH_RESULTATS] Aucun résultat officiel disponible pour le moment pour « {nom} ».")
+            elif item["status"] == "needs_url" and not comp.get(FIELD_NEEDS_URL_NOTIFIED):  # asked once, not every morning
+                needs_url.append(item)
+                needs_url_comps.append(comp)
 
         remaining = len(pending) - checked
         if remaining:
@@ -695,26 +441,10 @@ class CompetitionResultsBatchService:
         else:
             logger.info("[BATCH_RESULTATS] Aucun nouveau résultat à notifier aujourd'hui.")
 
-        # Enregistrement des statuts d'exécution
-        status_msg = f"{checked} vérifiée(s), {len(results_found_list)} résultat(s) trouvé(s)"
-        to_enter = sum(1 for d in details if d["status"] == "needs_url")
-        if to_enter:
-            status_msg += f", {to_enter} URL à saisir"
-        failed = sum(1 for d in details if d["status"] == "error")
-        if failed:
-            status_msg += f", {failed} en erreur"
-        if remaining:
-            status_msg += f", {remaining} reportée(s) au prochain passage"
-        if email_sent:
-            status_msg += f" (E-mail envoyé à {notification_email})"
-        elif results_found_list or needs_url:
-            status_msg += " (Échec envoi e-mail)"
-
-        try:
-            AppSettingsRepository.save(SETTING_BATCH_LAST_RUN, now_iso)
-            AppSettingsRepository.save(SETTING_BATCH_LAST_STATUS, status_msg)
-        except FirestoreError:
-            logger.warning("[BATCH_RESULTATS] Enregistrement du statut du batch impossible", exc_info=True)
+        status_msg = cls._batch_status_message(details, checked, len(results_found_list), remaining,
+                                               email_sent=email_sent, email_due=bool(results_found_list or needs_url),
+                                               notification_email=notification_email)
+        cls._save_run_status(now_iso, status_msg)
 
         return {
             "status": "success",
@@ -728,19 +458,3 @@ class CompetitionResultsBatchService:
             "notification_email": notification_email,
             "details": details
         }
-
-
-if __name__ == "__main__":
-    # Exécution directe CLI
-    import argparse
-    parser = argparse.ArgumentParser(description="Batch quotidien de récupération des résultats MyCompet FFME.")
-    parser.add_argument("--force", action="store_true", help="Forcer l'analyse même si déjà synchronisée")
-    parser.add_argument("--email", type=str, default="", help="Adresse e-mail de notification personnalisée")
-    args = parser.parse_args()
-
-    res = CompetitionResultsBatchService.run_daily_batch(force=args.force, to_email=args.email or None)
-    print("\n--- RAPPORT DU BATCH ---")
-    print(f"Date : {res['executed_at']}")
-    print(f"Compétitions analysées : {res['competitions_checked']}")
-    print(f"Résultats trouvés : {res['competitions_updated']}")
-    print(f"E-mail expédié : {'Oui' if res['email_sent'] else 'Non'}")

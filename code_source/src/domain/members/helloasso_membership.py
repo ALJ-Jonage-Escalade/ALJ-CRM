@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Mapping, Optional
 
-from domain.competitions.matching import parse_campaign_identifier
+from domain.helloasso_campaigns import parse_campaign_identifier
 from domain.members.emergency_contacts import HELLOASSO_CONTACT_FIELDS
 from domain.members.member_data_rules import IssueField, read_birth_date
 from domain.utils import is_helloasso_url, normalize_string

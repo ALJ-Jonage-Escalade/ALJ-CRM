@@ -125,3 +125,72 @@ class TestAttestationRoutes(unittest.TestCase):
         finally:
             SqliteDatabase.set_db_path(orig_db_path)
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def _seed_order(self):
+        """Order CMD-TEST-ATT of the active season: purchase 30 for Jean DUPONT, purchase 31 for his sister Lea."""
+        from infrastructure.sqlite.connection import SqliteDatabase
+        self._temp_database("attestation_fallbacks.db")
+        with SqliteDatabase.transaction() as conn:
+            conn.execute("INSERT OR REPLACE INTO seasons (id, name, is_active) VALUES (1, '2026-2027', 1)")
+            conn.executemany(
+                "INSERT INTO users (id, last_name, first_name, last_name_key, first_name_key, email_primary, birth_date)"
+                " VALUES (?, 'DUPONT', ?, 'dupont', ?, 'famille.dupont@example.com', ?)",
+                [(10, "Jean", "jean", "1990-01-01"), (11, "Lea", "lea", "2014-05-02")])
+            conn.execute("INSERT INTO orders (id, season_id, order_ref, order_date, payer_first_name, payer_last_name, payer_email)"
+                         " VALUES (20, 1, 'CMD-TEST-ATT', '2026-09-15', 'Jean', 'Dupont', 'famille.dupont@example.com')")
+            conn.executemany("INSERT INTO purchases (id, order_id, user_id, tarif_name, amount, status) VALUES (?, 20, ?, ?, ?, 'Payé')",
+                             [(30, 10, "Adulte", 180.0), (31, 11, "Enfants", 150.0)])
+
+    def _sent_dates(self):
+        from infrastructure.sqlite.connection import SqliteDatabase
+        with SqliteDatabase.connect() as conn:
+            return {row["id"]: row["email_sent_date"] for row in conn.execute("SELECT id, email_sent_date FROM purchases")}
+
+    def test_send_failure_is_logged_as_failed_and_records_no_date(self):
+        from domain.errors import UpstreamUnavailable
+        from infrastructure.mail.sender import MailError
+        from services.communications import email_log
+        from services.communications.attestations import send_attestation
+        self._seed_order()
+        with patch("infrastructure.mail.sender.EmailSender.send_email", side_effect=MailError("Gmail down")), \
+                self.assertRaises(UpstreamUnavailable):
+            send_attestation("2026-2027", 30, "famille.dupont@example.com", "admin@alj.example")
+        (entry,) = email_log.current_store().entries
+        self.assertEqual([(r["email"], r["status"]) for r in entry["recipients"]], [("famille.dupont@example.com", "failed")])
+        self.assertEqual(self._sent_dates(), {30: None, 31: None})
+
+    def test_unrecorded_sent_date_is_reported_not_raised(self):
+        import sqlite3
+
+        from infrastructure.sqlite.members import MemberRepository
+        from services.communications.attestations import send_attestation
+        self._seed_order()
+        for outcome in ({"return_value": False}, {"side_effect": sqlite3.OperationalError("database is locked")}):
+            with self.subTest(**{key: repr(value) for key, value in outcome.items()}), \
+                    patch("infrastructure.mail.sender.EmailSender.send_email", return_value=True), \
+                    patch.object(MemberRepository, "update_email_sent_date", **outcome):
+                res = send_attestation("2026-2027", 30, "famille.dupont@example.com", "admin@alj.example")
+            self.assertIsNone(res["email_sent_date"])
+            self.assertIn("La date d'envoi n'a pas pu être enregistrée", res["message"])
+
+    def test_sent_date_falls_back_to_the_order_and_name(self):
+        """A purchase id that no longer matches: the purchase of the order with the member's name gets the date."""
+        from infrastructure.sqlite.members import MemberRepository
+        self._seed_order()
+        self.assertTrue(MemberRepository.update_email_sent_date("CMD-TEST-ATT", " dupont ", "LEA", "01/10/2026", purchase_id=999))
+        self.assertEqual(self._sent_dates(), {30: None, 31: "01/10/2026"})
+
+    def test_sent_date_with_no_name_match_marks_the_whole_order(self):
+        """Current rule, pinned: when neither the purchase id nor the name matches, every purchase of the order gets
+        the date (the siblings' attestations then show as sent too)."""
+        from infrastructure.sqlite.members import MemberRepository
+        self._seed_order()
+        self.assertTrue(MemberRepository.update_email_sent_date("CMD-TEST-ATT", "GRANGER", "Hermione", "01/10/2026", purchase_id=999))
+        self.assertEqual(self._sent_dates(), {30: "01/10/2026", 31: "01/10/2026"})
+
+    def test_sent_date_without_any_match_is_false(self):
+        from infrastructure.sqlite.members import MemberRepository
+        self._seed_order()
+        self.assertFalse(MemberRepository.update_email_sent_date("CMD-UNKNOWN", "DUPONT", "Jean", "01/10/2026", purchase_id=999))
+        self.assertEqual(self._sent_dates(), {30: None, 31: None})
+

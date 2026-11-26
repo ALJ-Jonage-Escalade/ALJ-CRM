@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from unittest.mock import patch
 
 from api.competitions.schemas.results import BatchReport
+from domain.communications.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL
 from domain.errors import UpstreamUnavailable
 from infrastructure.firestore.client import FirestoreClient, FirestoreConflictError, FirestoreError
 from infrastructure.firestore.competitions import documents
@@ -50,7 +51,7 @@ class TestResultsSettingsRoute(ApiTestCase):
         self.assertEqual(self.client.get("/api/settings/competitions-results").json()["window_days"], 30)
         saved = self.client.post("/api/settings/competitions-results",
                                  json={"notification_email": "club@example.org", "window_days": 45}).json()
-        self.assertEqual((saved["window_days"], saved["saved"]), (45, True))
+        self.assertEqual(saved["window_days"], 45)
         self.assertEqual(self.client.get("/api/settings/competitions-results").json()["window_days"], 45)
         # Without window_days: unchanged
         self.client.post("/api/settings/competitions-results", json={"notification_email": "club@example.org"})
@@ -61,6 +62,14 @@ class TestResultsSettingsRoute(ApiTestCase):
             r = self.client.post("/api/settings/competitions-results",
                                  json={"notification_email": "club@example.org", "window_days": days})
             self.assertEqual(r.status_code, 400, days)
+        self.assertEqual(self.client.get("/api/settings/competitions-results").json()["notification_email"],
+                         DEFAULT_RESULTS_NOTIFICATION_EMAIL)  # checked before anything is saved
+
+    def test_firestore_failure_answers_503(self) -> None:
+        with patch("infrastructure.firestore.app_settings.AppSettingsRepository.save", side_effect=FirestoreError("down")):
+            r = self.client.post("/api/settings/competitions-results", json={"notification_email": "club@example.org"})
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["status"], "error")
 
 
 class TestFetchCompetitionResults(ApiTestCase):

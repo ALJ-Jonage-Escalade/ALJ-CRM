@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from support.api_case import ApiTestCase
 
-from domain.competitions.models import PAIEMENT_PAYE
+from domain.competitions.models import PaymentStatus
 from infrastructure.firestore.competitions import competitions, participants
 
 
@@ -75,7 +75,7 @@ class TestQueuedFlagChanges(ApiTestCase):
         self.assertTrue(self.participant(self.comp, 1)["selectionne"])
 
     def test_k4_paid_meanwhile_unselect_is_refused(self):
-        participants.update_participant(self.comp, 1, lambda row: row.update(statut_paiement=PAIEMENT_PAYE))  # webhook: also a change of the row
+        participants.update_participant(self.comp, 1, lambda row: row.update(statut_paiement=PaymentStatus.PAYE))  # webhook: also a change of the row
         r = self.queued(selectionne=False)
         self.assertEqual(r.status_code, 409)
         self.assertIn(r.json()["code"], ("changed", "already_paid"))

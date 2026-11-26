@@ -11,13 +11,20 @@ Construit une grille « Lundi → Samedi », de 9h à 22h par pas de 30 minutes 
 - hiérarchie des traits : lignes d'**heures** et cadre plus marqués (medium sombre)
   que les lignes des **demi-heures** (thin clair) ; blocs au contour médium.
 
-Logique pure et testable : parse_horaire / clean_group_label / _initiales /
-encadrants_text / assign_lanes, puis export_planning_excel (openpyxl).
+Logique pure et testable : parse_time_range / clean_group_label / _initials /
+coaches_text / assign_lanes, puis export_planning_excel (openpyxl).
 """
+from __future__ import annotations
+
 import io
 import math
 import re
-from typing import Any
+from typing import Any, Mapping, NamedTuple, Optional, Sequence, TypedDict
+
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 from domain.utils import normalize_string
 from exports.spreadsheet_safety import neutralize_formulas
@@ -37,9 +44,36 @@ TYPE_FILLS = {
 }
 DEFAULT_FILL = "EFEFEF"
 FILL_BLOC_AUTONOME = "FFD8A8"      # orange clair pastel (groupe « Autonome Bloc »)
+FIRST_GRID_ROW = 3                 # row 1: title, row 2: day headers
+
+PlanningSlot = Mapping[str, Any]  # Any: a planning row (jour, groupe, type, horaires, encadrants…)
+
+# Line weights: day separators thick black, hours and frame medium dark, half hours thin light, lanes thin
+_THIN = Side(style="thin", color="BFBFBF")
+_MEDIUM = Side(style="medium", color="404040")
+_LANE = Side(style="thin", color="595959")
+_THICK = Side(style="thick", color="000000")
+_HEADER_FILL = "D9E1F2"
+_CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
 
-def fill_for_item(item):
+class GridSlot(TypedDict):
+    """A slot placed on the grid: its minutes (clipped to the grid), label, fill colour and coaches."""
+    start: int
+    end: int
+    label: str
+    fill: str
+    encadrants: list[str]
+
+
+class DayColumns(NamedTuple):
+    """A day's slots with their lane, and its first and last grid column."""
+    assignments: list[tuple[GridSlot, int]]
+    first_column: int
+    last_column: int
+
+
+def fill_for_item(item: PlanningSlot) -> str:
     """Couleur de fond d'un créneau : priorité au nom du groupe (« Autonome Bloc »
     = orange clair pastel), sinon le type de groupe."""
     label = normalize_string(item.get("groupe") or "")
@@ -48,15 +82,15 @@ def fill_for_item(item):
     return TYPE_FILLS.get(normalize_type(item.get("type")), DEFAULT_FILL)
 
 
-def parse_horaire(horaires):
+def parse_time_range(horaires: Any) -> Optional[tuple[int, int]]:  # Any: the stored text, possibly None
     """'18:00 - 20:00', '17:00 18:00', '9h30-12h' -> (début, fin) en minutes, ou None."""
     matches = re.findall(r"(\d{1,2})\s*[:hH]\s*(\d{1,2})?", str(horaires or ""))
     values = []
-    for h, m in matches:
-        h, m = int(h), int(m or 0)
-        if h > 23 or m > 59:
+    for hours_text, minutes_text in matches:
+        hours, minutes = int(hours_text), int(minutes_text or 0)
+        if hours > 23 or minutes > 59:
             continue
-        values.append(h * 60 + m)
+        values.append(hours * 60 + minutes)
     if len(values) < 2:
         return None
     start, end = values[0], values[1]
@@ -65,32 +99,32 @@ def parse_horaire(horaires):
     return start, end
 
 
-def clean_group_label(groupe):
+def clean_group_label(groupe: Any) -> str:  # Any: the stored group name, possibly None
     """Retire le suffixe parenthésé redondant « (jour / horaire) » de fin de libellé.
 
     « Enfants 2019-2020 (Mercredi 09h30) » -> « Enfants 2019-2020 » ;
     « Perfectionnement - U11-U13(1) » est conservé (le (1) distingue deux groupes).
     """
     name = str(groupe or "").strip()
-    m = re.search(r"\(([^)]*)\)\s*$", name)
-    if m and re.search(r"(?i)(lundi|mardi|mercredi|jeudi|vendredi|samedi|\d{1,2}\s*[h:])", m.group(1)):
-        name = name[: m.start()].strip()
+    suffix = re.search(r"\(([^)]*)\)\s*$", name)
+    if suffix and re.search(r"(?i)(lundi|mardi|mercredi|jeudi|vendredi|samedi|\d{1,2}\s*[h:])", suffix.group(1)):
+        name = name[: suffix.start()].strip()
     return name
 
 
-def _initiales(nom):
+def _initials(name: str) -> str:
     """Initiales compactes d'un encadrant : « Camille DIDIER » -> « C.D. »."""
-    words = [w for w in re.split(r"[\s\-'.]+", str(nom).strip()) if w]
+    words = [w for w in re.split(r"[\s\-'.]+", str(name).strip()) if w]
     return ".".join(w[0].upper() for w in words) + "." if words else ""
 
 
-def encadrants_text(encadrants, rows_span, label):
+def coaches_text(coaches: Optional[Sequence[Any]], rows_span: int, label: str) -> str:  # Any: stored names
     """Ligne encadrants adaptée à la place du bloc (noms complets, initiales, ou rien)."""
-    encadrants = [str(e).strip() for e in (encadrants or []) if str(e).strip()]
-    if not encadrants or rows_span <= 0:
+    names = [str(coach).strip() for coach in (coaches or []) if str(coach).strip()]
+    if not names or rows_span <= 0:
         return ""
-    full = ", ".join(encadrants)
-    initials = ", ".join(_initiales(e) for e in encadrants)
+    full = ", ".join(names)
+    initials = ", ".join(_initials(name) for name in names)
     label_lines = max(1, math.ceil(len(label) / CHARS_PER_LINE))
     free = max(0, rows_span - label_lines)
     if math.ceil((len(full) + 7) / CHARS_PER_LINE) <= free:
@@ -100,191 +134,173 @@ def encadrants_text(encadrants, rows_span, label):
     return ""
 
 
-def assign_lanes(slots):
+def assign_lanes(slots: Sequence[GridSlot]) -> tuple[list[tuple[GridSlot, int]], int]:
     """Répartit les créneaux d'un jour en colonnes sans chevauchement.
 
     slots : [{start, end, …}] (minutes). Retourne ([(slot, lane)…], nb_lanes).
     """
-    lanes = []
-    out = []
-    for s in sorted(slots, key=lambda x: (x["start"], x["end"])):
-        for i, lane_end in enumerate(lanes):
-            if s["start"] >= lane_end:
-                lanes[i] = s["end"]
-                out.append((s, i))
+    lane_ends: list[int] = []
+    placed: list[tuple[GridSlot, int]] = []
+    for slot in sorted(slots, key=lambda x: (x["start"], x["end"])):
+        for lane, lane_end in enumerate(lane_ends):
+            if slot["start"] >= lane_end:
+                lane_ends[lane] = slot["end"]
+                placed.append((slot, lane))
                 break
         else:
-            lanes.append(s["end"])
-            out.append((s, len(lanes) - 1))
-    return out, len(lanes)
+            lane_ends.append(slot["end"])
+            placed.append((slot, len(lane_ends) - 1))
+    return placed, len(lane_ends)
 
 
-def normalize_type(type_value):
-    t = str(type_value or "").strip().lower()
-    return t if t in TYPE_FILLS else "cours"
+def normalize_type(type_value: Any) -> str:  # Any: the stored type, possibly None
+    """The group type when it has a colour, else « cours »."""
+    group_type = str(type_value or "").strip().lower()
+    return group_type if group_type in TYPE_FILLS else "cours"
 
 
-def export_planning_excel(planning_data, saison) -> bytes:
-    """Classeur Excel (en mémoire) du planning hebdomadaire ; ValueError sans aucun créneau plaçable sur la grille."""
-    from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-
-    # 1. Créneaux valides regroupés par jour
-    by_day: dict[str, list] = {day: [] for day in DAYS}
+def _slots_by_day(planning_data: Optional[Sequence[PlanningSlot]]) -> dict[str, list[GridSlot]]:
+    """The slots that fit on the grid (known day, readable times), by day; ValueError when there is none."""
+    by_day: dict[str, list[GridSlot]] = {day: [] for day in DAYS}
     for item in planning_data or []:
-        span = parse_horaire(item.get("horaires"))
-        jour = str(item.get("jour") or "").strip().capitalize()
-        if not span or jour not in DAYS:
+        span = parse_time_range(item.get("horaires"))
+        day = str(item.get("jour") or "").strip().capitalize()
+        if not span or day not in DAYS:
             continue
         start = max(span[0], GRID_START)
         end = min(span[1], GRID_END)
         if end <= start:
             continue
-        by_day[jour].append({
-            "start": start, "end": end,
-            "label": clean_group_label(item.get("groupe")) or str(item.get("groupe") or "Créneau"),
-            "fill": fill_for_item(item),
-            "encadrants": item.get("encadrants") or [],
-        })
+        by_day[day].append(GridSlot(
+            start=start, end=end,
+            label=clean_group_label(item.get("groupe")) or str(item.get("groupe") or "Créneau"),
+            fill=fill_for_item(item),
+            encadrants=item.get("encadrants") or [],
+        ))
     if not any(by_day.values()):
         raise ValueError("Aucun créneau exploitable dans le planning (jour + horaires requis).")
+    return by_day
 
-    # 2. Répartition en voies par jour + décalage colonnes
-    day_lanes = {}
+
+def _day_columns(by_day: dict[str, list[GridSlot]]) -> dict[str, DayColumns]:
+    """Each day's lanes (overlapping slots side by side) and columns; column 1 holds the hours."""
+    columns: dict[str, DayColumns] = {}
     offset = 0
     for day in DAYS:
-        assignments, lanes = assign_lanes(by_day[day])
-        day_lanes[day] = {"assignments": assignments, "lanes": lanes, "offset": offset}
-        offset += max(1, lanes)
-    total_lanes = offset
+        assignments, lane_count = assign_lanes(by_day[day])
+        first_column = 2 + offset
+        columns[day] = DayColumns(assignments, first_column, first_column + max(1, lane_count) - 1)
+        offset += max(1, lane_count)
+    return columns
 
-    # 3. Classeur
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Planning"
-    # Hiérarchie des traits : séparateurs de JOURS = thick noir, lignes d'HEURES et
-    # cadre = medium sombre, lignes des DEMI-HEURES = thin clair, voies = thin.
-    thin = Side(style="thin", color="BFBFBF")
-    medium = Side(style="medium", color="404040")
-    sep = Side(style="thin", color="595959")
-    thick = Side(style="thick", color="000000")
-    header_fill = PatternFill("solid", fgColor="D9E1F2")
-    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-    nb_steps = (GRID_END - GRID_START) // STEP
-    first_grid_row = 3
-    col_left, col_right = 1, 2 + total_lanes
+def _write_headers(sheet: Worksheet, saison: str, days: dict[str, DayColumns], lane_total: int) -> None:
+    """Row 1: the season over every lane; row 2: each day's name over its lanes."""
+    sheet.merge_cells(start_row=1, start_column=2, end_row=1, end_column=1 + lane_total)
+    title = sheet.cell(row=1, column=2, value=f"Saison {str(saison).replace('-', ' - ')}")
+    title.font = Font(name="Calibri", size=12, bold=True)
+    title.alignment = _CENTER
+    for column in range(2, 2 + lane_total):
+        sheet.cell(row=1, column=column).border = Border(left=_MEDIUM, right=_MEDIUM, top=_MEDIUM, bottom=_MEDIUM)
 
-    # Bornes de colonnes par jour (pour les séparateurs verticaux marqués)
-    day_cols = {}
+    header_fill = PatternFill("solid", fgColor=_HEADER_FILL)
     for day in DAYS:
-        info = day_lanes[day]
-        c_start = 2 + info["offset"]
-        c_end = c_start + max(1, info["lanes"]) - 1
-        day_cols[day] = (c_start, c_end)
-
-    # Titre (saison)
-    ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=1 + total_lanes)
-    t = ws.cell(row=1, column=2, value=f"Saison {str(saison).replace('-', ' - ')}")
-    t.font = Font(name="Calibri", size=12, bold=True)
-    t.alignment = center
-    for c in range(2, 2 + total_lanes):
-        ws.cell(row=1, column=c).border = Border(left=medium, right=medium, top=medium, bottom=medium)
-
-    # En-têtes de jours (fusionnés sur leurs voies)
-    for day in DAYS:
-        info = day_lanes[day]
-        c_start, c_end = day_cols[day]
-        if c_end > c_start:
-            ws.merge_cells(start_row=2, start_column=c_start, end_row=2, end_column=c_end)
-        h = ws.cell(row=2, column=c_start, value=day.upper())
-        h.font = Font(name="Calibri", size=10, bold=True)
-        h.alignment = center
-        h.fill = header_fill
-        for c in range(c_start, c_end + 1):
-            cell = ws.cell(row=2, column=c)
-            cell.border = Border(left=thick if c == c_start else sep,
-                                 right=thick if c == c_end else sep,
-                                 top=medium, bottom=medium)
+        first, last = days[day].first_column, days[day].last_column
+        if last > first:
+            sheet.merge_cells(start_row=2, start_column=first, end_row=2, end_column=last)
+        header = sheet.cell(row=2, column=first, value=day.upper())
+        header.font = Font(name="Calibri", size=10, bold=True)
+        header.alignment = _CENTER
+        header.fill = header_fill
+        for column in range(first, last + 1):
+            cell = sheet.cell(row=2, column=column)
+            cell.border = Border(left=_THICK if column == first else _LANE,
+                                 right=_THICK if column == last else _LANE,
+                                 top=_MEDIUM, bottom=_MEDIUM)
             cell.fill = header_fill
 
-    # Grille horaire + libellés gauche/droite
-    for i in range(nb_steps):
-        r = first_grid_row + i
-        minutes = GRID_START + i * STEP
-        ws.row_dimensions[r].height = 15
-        label = f"{minutes // 60}h" if i % 2 == 0 else ""
-        left = ws.cell(row=r, column=col_left, value=label)
-        right = ws.cell(row=r, column=col_right, value=label)
-        for cell in (left, right):
+
+def _write_grid(sheet: Worksheet, days: dict[str, DayColumns], lane_total: int) -> None:
+    """The half-hour rows: hour labels on both sides, hour lines medium, half-hour lines thin, day separators thick."""
+    step_count = (GRID_END - GRID_START) // STEP
+    day_starts = {columns.first_column for columns in days.values()}
+    day_ends = {columns.last_column for columns in days.values()}
+    for step in range(step_count):
+        row = FIRST_GRID_ROW + step
+        minutes = GRID_START + step * STEP
+        sheet.row_dimensions[row].height = 15
+        label = f"{minutes // 60}h" if step % 2 == 0 else ""
+        for column in (1, 2 + lane_total):
+            cell = sheet.cell(row=row, column=column, value=label)
             cell.font = Font(name="Calibri", size=9, bold=True)
             cell.alignment = Alignment(horizontal="center", vertical="top")
-        # Bordures de la ligne : bas médium si la ligne se termine sur une HEURE
-        # (i impair) ou si c'est la dernière ; haut médium en début de grille.
-        top = medium if i == 0 else (medium if i % 2 == 0 else thin)
-        bottom = medium if (i % 2 == 1 or i == nb_steps - 1) else thin
-        for c in range(2, 2 + total_lanes):
-            # Séparateur de jour = trait épais ; voies d'un même jour = trait fin
-            is_day_start = any(c == cs for cs, _ce in day_cols.values())
-            is_day_end = any(c == ce for _cs, ce in day_cols.values())
-            cell = ws.cell(row=r, column=c)
-            cell.border = Border(left=thick if is_day_start else sep,
-                                 right=thick if is_day_end else sep,
-                                 top=top, bottom=bottom)
+        # Medium top on an hour (and the first row), medium bottom when the row ends on an hour (or is the last)
+        top = _MEDIUM if step % 2 == 0 else _THIN
+        bottom = _MEDIUM if (step % 2 == 1 or step == step_count - 1) else _THIN
+        for column in range(2, 2 + lane_total):
+            sheet.cell(row=row, column=column).border = Border(left=_THICK if column in day_starts else _LANE,
+                                                               right=_THICK if column in day_ends else _LANE,
+                                                               top=top, bottom=bottom)
 
-    # Blocs de créneaux
+
+def _paint_slots(sheet: Worksheet, days: dict[str, DayColumns]) -> None:
+    """One merged, coloured block per slot in its lane: the group label and, when it fits, its coaches."""
     for day in DAYS:
-        info = day_lanes[day]
-        for slot, lane in info["assignments"]:
-            start_row = first_grid_row + (slot["start"] - GRID_START) // STEP
-            end_row = first_grid_row + (slot["end"] - GRID_START + STEP - 1) // STEP - 1
-            rows_span = end_row - start_row + 1
-            enc = encadrants_text(slot["encadrants"], rows_span, slot["label"])
-            text = slot["label"] + (("\n" + enc) if enc else "")
-            col = 2 + info["offset"] + lane
-            c_start, c_end = day_cols[day]
-            left_b = thick if col == c_start else medium
-            right_b = thick if col == c_end else medium
-            for r in range(start_row, end_row + 1):
-                cell = ws.cell(row=r, column=col)
-                cell.border = Border(left=left_b, right=right_b, top=medium, bottom=medium)
+        columns = days[day]
+        for slot, lane in columns.assignments:
+            start_row = FIRST_GRID_ROW + (slot["start"] - GRID_START) // STEP
+            end_row = FIRST_GRID_ROW + (slot["end"] - GRID_START + STEP - 1) // STEP - 1
+            coaches = coaches_text(slot["encadrants"], end_row - start_row + 1, slot["label"])
+            column = columns.first_column + lane
+            left = _THICK if column == columns.first_column else _MEDIUM
+            right = _THICK if column == columns.last_column else _MEDIUM
+            for row in range(start_row, end_row + 1):
+                cell = sheet.cell(row=row, column=column)
+                cell.border = Border(left=left, right=right, top=_MEDIUM, bottom=_MEDIUM)
                 cell.fill = PatternFill("solid", fgColor=slot["fill"])
-            ws.merge_cells(start_row=start_row, start_column=col, end_row=end_row, end_column=col)
-            block = ws.cell(row=start_row, column=col, value=text)
+            sheet.merge_cells(start_row=start_row, start_column=column, end_row=end_row, end_column=column)
+            block = sheet.cell(row=start_row, column=column, value=slot["label"] + (("\n" + coaches) if coaches else ""))
             block.font = Font(name="Calibri", size=8, bold=True, color="1F4E79")
-            block.alignment = center
+            block.alignment = _CENTER
 
-    # Largeurs de colonnes
-    ws.column_dimensions["A"].width = 4.5
-    last_letter_col = col_right
-    for c in range(2, 2 + total_lanes):
-        from openpyxl.utils import get_column_letter
-        ws.column_dimensions[get_column_letter(c)].width = 13.5
-    from openpyxl.utils import get_column_letter as _g
-    ws.column_dimensions[_g(last_letter_col)].width = 4.5
 
-    # Mise en page : paysage, ajusté à une page en largeur
-    ws.page_setup.orientation = "landscape"
-    ws.page_setup.fitToWidth = 1
-    ws.page_setup.fitToHeight = 0
-    ws.sheet_properties.pageSetUpPr.fitToPage = True
+def export_planning_excel(planning_data: Optional[Sequence[PlanningSlot]], saison: str) -> bytes:
+    """Classeur Excel (en mémoire) du planning hebdomadaire ; ValueError sans aucun créneau plaçable sur la grille."""
+    days = _day_columns(_slots_by_day(planning_data))
+    lane_total = days[DAYS[-1]].last_column - 1
 
-    neutralize_formulas(wb)
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Planning"
+    _write_headers(sheet, saison, days, lane_total)
+    _write_grid(sheet, days, lane_total)
+    _paint_slots(sheet, days)
+
+    # Hour columns narrow on both sides, lanes wide
+    sheet.column_dimensions["A"].width = 4.5
+    for column in range(2, 2 + lane_total):
+        sheet.column_dimensions[get_column_letter(column)].width = 13.5
+    sheet.column_dimensions[get_column_letter(2 + lane_total)].width = 4.5
+
+    # Landscape, one page wide
+    sheet.page_setup.orientation = "landscape"
+    sheet.page_setup.fitToWidth = 1
+    sheet.page_setup.fitToHeight = 0
+    sheet.sheet_properties.pageSetUpPr.fitToPage = True
+
+    neutralize_formulas(workbook)
     buffer = io.BytesIO()
-    wb.save(buffer)
+    workbook.save(buffer)
     return buffer.getvalue()
 
 
-def export_planning_list_excel(planning_data, saison) -> bytes:
+def export_planning_list_excel(planning_data: Optional[Sequence[PlanningSlot]], saison: str) -> bytes:
     """Extraction « liste » du planning : une ligne par créneau, au format de la BDD.
 
     Colonnes proches de la table `planning` : Jour, Groupe, Type, Horaires, Encadrants,
     Tarifs HelloAsso, Catégorie d'âge, bornes de naissance. Tri Lundi → Samedi puis
     heure de début ; les créneaux non exploitables horairement sont conservés (BDD).
     """
-    from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-
     headers = ["Jour", "Groupe", "Type", "Horaires", "Encadrants",
                "Tarifs HelloAsso", "Catégorie d'âge", "Naissance min", "Naissance max"]
     day_index = {day: i for i, day in enumerate(DAYS)}
@@ -292,7 +308,7 @@ def export_planning_list_excel(planning_data, saison) -> bytes:
     rows: list[dict[str, Any]] = []  # Any: the cell values and the sort key
     for item in planning_data or []:
         jour = str(item.get("jour") or "").strip()
-        span = parse_horaire(item.get("horaires"))
+        span = parse_time_range(item.get("horaires"))
         rows.append({
             "sort": (day_index.get(jour.capitalize(), len(DAYS)),
                      span[0] if span else 9999,

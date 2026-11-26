@@ -79,7 +79,7 @@ def test_cloud_db_sync_returns_counters_only(client: TestClient) -> None:
     assert resp.status_code == 500
     body = resp.json()
     assert SECRET_DETAIL not in str(body)
-    assert body["result"] == {"pulled": 3, "pushed": 1, "full": True}
+    assert body == {"status": "error", "message": "Erreur de synchronisation (1 erreur(s), détails dans les journaux)."}
 
 
 def test_cloud_db_status_hides_last_error(client: TestClient) -> None:
@@ -98,6 +98,8 @@ def test_repository_write_error_is_rolled_back_and_raised() -> None:
             pytest.raises(RuntimeError):
         MemberRepository.update_member_fields(user_id=1, fields={"phone": "0600000000"})
     conn.rollback.assert_called_once()
+    conn.commit.assert_not_called()
+    conn.close.assert_called_once()
 
 
 def test_repository_write_error_answers_generic_500(client: TestClient) -> None:
@@ -110,7 +112,7 @@ def test_repository_write_error_answers_generic_500(client: TestClient) -> None:
 def test_repository_read_error_is_not_an_empty_list(client: TestClient) -> None:
     from infrastructure.sqlite.planning import PlanningRepository
     conn = MagicMock()
-    conn.cursor.return_value.execute.side_effect = RuntimeError(SECRET_DETAIL)
+    conn.execute.side_effect = RuntimeError(SECRET_DETAIL)
     with patch.object(SqliteDatabase, "setup_database"), patch.object(SqliteDatabase, "get_connection", return_value=conn), \
             pytest.raises(RuntimeError):
         PlanningRepository.load_planning_data()

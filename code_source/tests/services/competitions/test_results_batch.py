@@ -4,23 +4,15 @@ Vérifie la détection des compétitions passées sans résultats, la configurat
 le scraping mocké, la génération de l'e-mail HTML et l'envoi de notification.
 """
 
-import os
-import sys
-import unittest
 import datetime
+import unittest
+from unittest.mock import patch
 
-# Injection du chemin src
-_tests_dir = os.path.dirname(os.path.abspath(__file__))
-_code_root = os.path.dirname(os.path.dirname(os.path.dirname(_tests_dir)))
-_src_dir = os.path.join(_code_root, "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-from services.competitions.results_batch import (
-    CompetitionResultsBatchService,
-    DEFAULT_NOTIFICATION_EMAIL,
-    apply_rankings,
-)
+from domain.communications.club_emails import DEFAULT_RESULTS_NOTIFICATION_EMAIL
+from domain.competitions.results import apply_rankings, has_results, is_competition_past
+from domain.errors import InvalidRequest
+from services.competitions.results_batch import CompetitionResultsBatchService
+from services.competitions.results_email import results_email_html
 from support.fake_firestore import use_fake_firestore
 
 
@@ -30,39 +22,32 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
         use_fake_firestore(self)  # notification e-mail setting
 
     def test_default_notification_email(self):
-        """L'adresse de notification par défaut est david.lopez@alj-jonage.fr."""
+        """Sans réglage, l'adresse de notification est celle par défaut du club."""
         email = CompetitionResultsBatchService.get_notification_email()
         self.assertIn("@", email)
-        self.assertEqual(email, DEFAULT_NOTIFICATION_EMAIL)
+        self.assertEqual(email, DEFAULT_RESULTS_NOTIFICATION_EMAIL)
 
     def test_set_and_get_custom_notification_email(self):
         """L'adresse de notification peut être mise à jour et rechargée depuis les réglages."""
         custom_email = "notif.test@alj-jonage.fr"
-        ok = CompetitionResultsBatchService.set_notification_email(custom_email)
-        self.assertTrue(ok)
+        CompetitionResultsBatchService.update_settings(custom_email)
         self.assertEqual(CompetitionResultsBatchService.get_notification_email(), custom_email)
-
-        # Nettoyage
-        CompetitionResultsBatchService.set_notification_email(DEFAULT_NOTIFICATION_EMAIL)
 
     def test_set_and_get_multiple_notification_emails(self):
         """Plusieurs adresses de notification peuvent être enregistrées et normalisées."""
         emails_input = "coach1@alj-jonage.fr, coach2@alj-jonage.fr; admin@alj-jonage.fr"
-        ok = CompetitionResultsBatchService.set_notification_email(emails_input)
-        self.assertTrue(ok)
+        CompetitionResultsBatchService.update_settings(emails_input)
         expected = "coach1@alj-jonage.fr, coach2@alj-jonage.fr, admin@alj-jonage.fr"
         self.assertEqual(CompetitionResultsBatchService.get_notification_email(), expected)
 
         parsed = CompetitionResultsBatchService.parse_notification_emails(emails_input)
         self.assertEqual(parsed, ["coach1@alj-jonage.fr", "coach2@alj-jonage.fr", "admin@alj-jonage.fr"])
 
-        # Nettoyage
-        CompetitionResultsBatchService.set_notification_email(DEFAULT_NOTIFICATION_EMAIL)
-
     def test_set_invalid_email_raises_error(self):
-        """Une adresse sans @ ou invalide lève une ValueError."""
-        with self.assertRaises(ValueError):
-            CompetitionResultsBatchService.set_notification_email("adresse_invalide")
+        """Une adresse sans @ ou invalide est refusée (InvalidRequest), rien n'est enregistré."""
+        with self.assertRaises(InvalidRequest):
+            CompetitionResultsBatchService.update_settings("adresse_invalide")
+        self.assertEqual(CompetitionResultsBatchService.get_notification_email(), DEFAULT_RESULTS_NOTIFICATION_EMAIL)
 
     def test_is_competition_past(self):
         """Vérifie le calcul de date pour déterminer si une épreuve est passée."""
@@ -70,19 +55,19 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
 
         # 1. Compétition hier -> passée
         comp_past = {"nom": "Open Passé", "date_competition": "2026-10-10"}
-        self.assertTrue(CompetitionResultsBatchService.is_competition_past(comp_past, today=today))
+        self.assertTrue(is_competition_past(comp_past, today=today))
 
         # 2. Compétition aujourd'hui -> passée / en cours
         comp_today = {"nom": "Open Aujourd'hui", "date_competition": "2026-10-14"}
-        self.assertTrue(CompetitionResultsBatchService.is_competition_past(comp_today, today=today))
+        self.assertTrue(is_competition_past(comp_today, today=today))
 
         # 3. Compétition future -> non passée
         comp_future = {"nom": "Open Futur", "date_competition": "2026-11-20"}
-        self.assertFalse(CompetitionResultsBatchService.is_competition_past(comp_future, today=today))
+        self.assertFalse(is_competition_past(comp_future, today=today))
 
         # 4. Compétition multi-jours avec date_fin dans le futur -> non passée
         comp_multi = {"nom": "Championnat", "date_competition": "2026-10-10", "date_fin": "2026-10-18"}
-        self.assertFalse(CompetitionResultsBatchService.is_competition_past(comp_multi, today=today))
+        self.assertFalse(is_competition_past(comp_multi, today=today))
 
     def test_has_results(self):
         """Vérifie la détection de présence ou d'absence de résultats."""
@@ -92,7 +77,7 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
             "participants": [{"nom": "DUPONT", "prenom": "Jean", "classement": ""}],
             "resultats_synced_at": ""
         }
-        self.assertFalse(CompetitionResultsBatchService.has_results(comp_no_res))
+        self.assertFalse(has_results(comp_no_res))
 
         # 2. Classement et synchro présents -> a des résultats
         comp_with_res = {
@@ -100,7 +85,7 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
             "participants": [{"nom": "DUPONT", "prenom": "Jean", "classement": "2"}],
             "resultats_synced_at": "2026-10-11T18:00:00"
         }
-        self.assertTrue(CompetitionResultsBatchService.has_results(comp_with_res))
+        self.assertTrue(has_results(comp_with_res))
 
     def test_build_results_email_html_structure(self):
         """Le générateur d'e-mail HTML produit un tableau structuré avec médailles et liens."""
@@ -134,7 +119,7 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
             ]
         }]
 
-        html = CompetitionResultsBatchService.build_results_email_html(comp_data)
+        html = results_email_html(comp_data, [])
         self.assertIn("Open Régional Bloc Jonage", html)
         self.assertIn("BULAND", html)
         self.assertIn("DUPONT", html)
@@ -142,6 +127,14 @@ class TestCompetitionResultsBatchService(unittest.TestCase):
         self.assertIn("🥈", html)  # Médaille d'argent 2e
         self.assertIn("https://mycompet.ffme.fr/resultat/resultat_13660", html)
         self.assertTrue("batch quotidien ALJ Escalade" in html)
+
+    def test_invalid_notification_address_sends_nothing(self):
+        """Une adresse de notification invalide n'interrompt pas le batch : pas d'envoi, False."""
+        item = {"id": "10", "nom": "Open", "date": "2026-10-10", "lieu": "", "url": "", "athletes": []}
+        with patch("services.competitions.results_batch.EmailSender.send_email") as send_email:
+            sent = CompetitionResultsBatchService.send_notification_email([item], to_email="adresse_invalide")
+        self.assertFalse(sent)
+        send_email.assert_not_called()
 
 
 def test_apply_rankings_matches_name_without_accents_or_hyphens():

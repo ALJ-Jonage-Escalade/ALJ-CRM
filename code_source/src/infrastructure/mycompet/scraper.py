@@ -4,6 +4,8 @@ import datetime
 import html
 import logging
 import re
+import secrets
+import time
 from typing import List, Optional, TypedDict
 
 import lxml.html
@@ -14,7 +16,6 @@ from domain.utils import normalize_string
 from infrastructure import runtime_env
 
 logger = logging.getLogger("alj")
-
 
 
 def normalize_result_url(url_or_id: str) -> str:
@@ -38,81 +39,82 @@ def _fetch_url(url: str) -> str:
     return base + url[len(prod):] if base != prod and url.startswith(prod) else url
 
 
-def parse_mycompet_results_html(html_text: str, club_keyword: str = "JONAGE") -> list[dict]:
-    """Parse le HTML d'une page de résultats MyCompet et extrait les résultats du club."""
+_CATEGORY_DIVS = ("preceding::div[contains(text(), 'U13') or contains(text(), 'U15') or contains(text(), 'U17') or "
+                  "contains(text(), 'U19') or contains(text(), 'Sénior') or contains(text(), 'Senior') or "
+                  "contains(text(), 'Vétéran') or contains(text(), 'Veteran')]")
+_CATEGORY = re.compile(r'(\[?[Uu]\d{2}\]?\s*(?:Femme|Homme|F|H)?|\[?(?:Sénior|Senior|Vétéran|Veteran)\]?\s*(?:Femme|Homme|F|H)?)')
+_UPPER = "translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')"
 
-    if not html_text:
+
+def _category_of(group: lxml.html.HtmlElement) -> str:
+    """Category of a results group: its header, or for a bare table the last category title above it."""
+    header = group.xpath(".//div[contains(@class, 'regroupement-header')]")
+    if header:
+        name = header[0].text_content().strip().replace("[", "").replace("]", "")
+        if name:
+            return name
+    if group.tag != "table":
+        return ""
+    titles = group.xpath(_CATEGORY_DIVS)
+    if not titles:
+        return ""
+    title = titles[-1].text_content()
+    found = _CATEGORY.search(title)
+    return found.group(1).replace("[", "").replace("]", "").strip() if found else title.strip()
+
+
+def _split_full_name(full_name: str) -> tuple[str, str]:
+    """(last name, first name): the upper-case words are the last name; else the first word is."""
+    words = full_name.split()
+    if len(words) < 2:
+        return full_name, ""
+    last_name = [word for word in words if word.isupper()]
+    first_name = [word for word in words if not word.isupper()]
+    if last_name and first_name:
+        return " ".join(last_name), " ".join(first_name)
+    return words[0], " ".join(words[1:])
+
+
+def parse_mycompet_results_html(html_text: str, club_keyword: str = "JONAGE") -> list[dict]:
+    """Parse le HTML d'une page de résultats MyCompet et extrait les résultats du club (lignes contenant
+    `club_keyword`, sans tenir compte de la casse ; aucun résultat pour un mot-clé vide)."""
+    keyword = club_keyword.upper().strip()
+    if not html_text or not keyword:
         return []
 
     doc = lxml.html.fromstring(html_text)
-    regroupements = doc.xpath("//div[contains(@class, 'regroupement')]")
-
-    # Si aucun regroupement div trouvé, chercher les tables directement
-    elements = regroupements if regroupements else doc.xpath("//table")
-    club_kw = club_keyword.upper().strip()
+    # One group per category; pages without groups: their tables
+    groups = doc.xpath("//div[contains(@class, 'regroupement')]") or doc.xpath("//table")
 
     seen: dict[str, dict] = {}
-    for elem in elements:
-        # Trouver la catégorie si présent
-        cat_name = ""
-        header_el = elem.xpath(".//div[contains(@class, 'regroupement-header')]")
-        if header_el:
-            cat_name = header_el[0].text_content().strip().replace("[", "").replace("]", "")
-        if not cat_name and elem.tag == "table":
-            # Chercher dans les balises précédentes
-            prev = elem.xpath("preceding::div[contains(text(), 'U13') or contains(text(), 'U15') or contains(text(), 'U17') or contains(text(), 'U19') or contains(text(), 'Sénior') or contains(text(), 'Senior') or contains(text(), 'Vétéran') or contains(text(), 'Veteran')]")
-            if prev:
-                cat_match = re.search(r'(\[?[Uu]\d{2}\]?\s*(?:Femme|Homme|F|H)?|\[?(?:Sénior|Senior|Vétéran|Veteran)\]?\s*(?:Femme|Homme|F|H)?)', prev[-1].text_content())
-                cat_name = cat_match.group(1).replace("[", "").replace("]", "").strip() if cat_match else prev[-1].text_content().strip()
-
-        # Calculer le nombre total de participants dans cette catégorie / épreuve
-        athlete_rows = elem.xpath(".//table//tr[.//a[contains(@href, 'palmares')]]") if elem.tag != "table" else elem.xpath(".//tr[.//a[contains(@href, 'palmares')]]")
-        total_in_cat = len(athlete_rows)
-
-        rows = elem.xpath(".//tr[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '" + club_kw + "')]")
-        for r in rows:
-            a_elem = r.xpath(".//a[contains(@href, 'palmares')]")
-            if not a_elem:
+    for group in groups:
+        category = _category_of(group)
+        athlete_rows = group.xpath(".//tr[.//a[contains(@href, 'palmares')]]" if group.tag == "table"
+                                   else ".//table//tr[.//a[contains(@href, 'palmares')]]")
+        # The keyword is an XPath variable: a quote in it cannot break the expression
+        for row in group.xpath(f".//tr[contains({_UPPER}, $keyword)]", keyword=keyword):
+            link = row.xpath(".//a[contains(@href, 'palmares')]")
+            if not link:
                 continue
-            href = a_elem[0].attrib.get('href', '')
-            lic_match = re.search(r'palmares_(\d+)', href)
-            licence = lic_match.group(1) if lic_match else ""
-
-            strong = a_elem[0].xpath(".//strong")
-            full_name = strong[0].text_content().strip() if strong else a_elem[0].text_content().split("\n")[0].strip()
-
-            parts = full_name.split()
-            if len(parts) >= 2:
-                nom_parts = [p for p in parts if p.isupper()]
-                prenom_parts = [p for p in parts if not p.isupper()]
-                if nom_parts and prenom_parts:
-                    nom = " ".join(nom_parts)
-                    prenom = " ".join(prenom_parts)
-                else:
-                    nom = parts[0]
-                    prenom = " ".join(parts[1:])
-            else:
-                nom = full_name
-                prenom = ""
-
-            cells = [c.text_content().strip() for c in r.xpath(".//td")]
-            rank_str = cells[0] if cells else ""
-            perf_str = cells[-3] if len(cells) >= 4 else ""
+            licence_match = re.search(r'palmares_(\d+)', link[0].attrib.get('href', ''))
+            licence = licence_match.group(1) if licence_match else ""
+            strong = link[0].xpath(".//strong")
+            full_name = strong[0].text_content().strip() if strong else link[0].text_content().split("\n")[0].strip()
+            last_name, first_name = _split_full_name(full_name)
+            cells = [cell.text_content().strip() for cell in row.xpath(".//td")]
 
             key = (licence or full_name).lower()
-            # Conserver la catégorie la plus précise
-            if key not in seen or (cat_name and not seen[key].get("categorie")):
+            if key not in seen or (category and not seen[key].get("categorie")):  # keep the most precise category
                 seen[key] = {
-                    "nom": nom,
-                    "prenom": prenom,
+                    "nom": last_name,
+                    "prenom": first_name,
                     "nom_complet": full_name,
                     "licence": licence,
-                    "categorie": cat_name,
-                    "classement": rank_str,
-                    "total_categorie": total_in_cat,
-                    "performance": perf_str,
+                    "categorie": category,
+                    "classement": cells[0] if cells else "",
+                    "total_categorie": len(athlete_rows),
+                    "performance": cells[-3] if len(cells) >= 4 else "",
                 }
-
     return list(seen.values())
 
 
@@ -272,21 +274,61 @@ def _parse_dates_to_iso(date_str: str) -> tuple[str | None, str | None]:
     return start, end
 
 
-def _parse_date_to_iso(date_str: str) -> str | None:
-    """Convertit une date au format JJ/MM/AAAA en AAAA-MM-JJ pour les formulaires HTML."""
-    start, _ = _parse_dates_to_iso(date_str)
-    return start
+_MYCOMPET_ENTRY_URL = "https://mycompet.ffme.fr/action/competitions"
+_ECHO_SYNC_URL = "https://mycompet.ffme.fr/app?sid=Echo.Sync"
+_ECHO_NS = "http://www.nextapp.com/products/echo/svrmsg/clientmessage.3.0"
+_ECHO_HEADERS = {
+    "Content-Type": "text/xml;charset=utf-8",
+    "Referer": "https://mycompet.ffme.fr/app",
+    "X-Requested-With": "XMLHttpRequest",
+}
+# Discipline of the details page -> competition type, by the word it contains
+_DISCIPLINE_TYPES = (("bloc", "Bloc"), ("diff", "Difficulté"), ("vitesse", "Vitesse"))
+
+
+def _echo_sync(session: requests.Session, message: str, failure: str) -> str:
+    """Posts one Echo.Sync client message and returns MyCompet's XML answer; UpstreamUnavailable(`failure`) when
+    MyCompet cannot be reached."""
+    try:
+        response = session.post(_ECHO_SYNC_URL, data=message.encode("utf-8"), headers=_ECHO_HEADERS, timeout=10)
+    except requests.RequestException as err:
+        logger.warning("MyCompet Echo.Sync : %s (%s)", failure, err)
+        raise UpstreamUnavailable(failure) from err
+    return response.text
+
+
+def _click_message(seq: int, component_id: str, typed_text: Optional[str] = None) -> str:
+    """Echo.Sync message focusing a component and triggering its action, after typing `typed_text` into it."""
+    typed = f'<p i="{component_id}" n="text">{typed_text}</p>' if typed_text is not None else ""
+    return (f'<cmsg xmlns="{_ECHO_NS}" i="{seq}">'
+            f'<dir xmlns="" proc="CFocus"><focus i="{component_id}"/></dir>'
+            f'<dir xmlns="" proc="CSync">{typed}<e t="action" i="{component_id}"/></dir></cmsg>')
+
+
+def _apply_details(pairs: dict[str, str], info: dict[str, str | None]) -> None:
+    """Fills `info` from the label -> value pairs of the competition's details page."""
+    if pairs.get("Nom", "").strip():
+        info["nom"] = pairs["Nom"].strip()
+    if "Date de la compétition" in pairs:
+        start_iso, end_iso = _parse_dates_to_iso(pairs["Date de la compétition"])
+        if start_iso:
+            info["date_competition"] = start_iso
+            info["date_fin"] = end_iso
+    venue = pairs.get("ville", "").strip() or pairs.get("Adresse", "").strip()
+    if venue:
+        info["lieu"] = venue
+    if "Discipline" in pairs:
+        discipline = pairs["Discipline"].strip()
+        info["type"] = next((kind for word, kind in _DISCIPLINE_TYPES if word in discipline.lower()), discipline)
 
 
 def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | None]:
     """Récupère les informations d'une compétition FFME sur MyCompet à partir de son numéro.
 
     Interroge le serveur MyCompet (protocole Echo.Sync) pour filtrer par numéro d'épreuve et
-    extraire le titre officiel, la discipline, les dates et le lieu.
+    extraire le titre officiel, la discipline, les dates et le lieu. The details page is optional: when it
+    cannot be read, the title found in the list is returned alone.
     """
-    import secrets
-    import time
-
     comp_id_str = str(competition_id).strip()
     if not comp_id_str.isdigit():
         raise InvalidRequest(f"Numéro de compétition FFME invalide : '{competition_id}' (chiffres uniquement).")
@@ -299,11 +341,10 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
     })
 
     try:
-        resp_entry = session.get("https://mycompet.ffme.fr/action/competitions", timeout=10)
+        resp_entry = session.get(_MYCOMPET_ENTRY_URL, timeout=10)
     except requests.RequestException as err:
         logger.warning("Échec de connexion initiale à MyCompet : %s", err)
         raise UpstreamUnavailable("Impossible de joindre le serveur MyCompet FFME.") from err
-
     if resp_entry.status_code != 200:
         raise UpstreamUnavailable(f"MyCompet a répondu avec le statut HTTP {resp_entry.status_code}.")
 
@@ -311,78 +352,31 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
     init_id = match_init.group(2) if match_init else "0"
     window_id = f"{int(time.time() * 1000):x}.{secrets.token_hex(4)}"
 
-    sync_headers = {
-        "Content-Type": "text/xml;charset=utf-8",
-        "Referer": "https://mycompet.ffme.fr/app",
-        "X-Requested-With": "XMLHttpRequest",
-    }
-
-    # 1. Message d'initialisation Echo.Sync
-    init_xml = (
-        f'<cmsg xmlns="http://www.nextapp.com/products/echo/svrmsg/clientmessage.3.0" t="init" w="{window_id}" ii="{init_id}" i="0">'
+    # Session start: the client properties a browser sends
+    _echo_sync(session, (
+        f'<cmsg xmlns="{_ECHO_NS}" t="init" w="{window_id}" ii="{init_id}" i="0">'
         '<dir xmlns="" proc="ClientProperties">'
         '<p n="screenWidth">1920</p><p n="screenHeight">1080</p><p n="screenColorDepth">24</p><p n="utcOffset">60</p>'
         '<p n="navigatorAppName">Netscape</p><p n="navigatorCookieEnabled">true</p>'
         '<p n="navigatorLanguage">fr</p><p n="navigatorPlatform">Win32</p>'
         '<p n="browserChrome">true</p><p n="browserVersionMajor">120</p><p n="engineWebKit">true</p>'
         '</dir><dir xmlns="" proc="CSync"/></cmsg>'
-    )
-    try:
-        session.post("https://mycompet.ffme.fr/app?sid=Echo.Sync", data=init_xml.encode("utf-8"), headers=sync_headers, timeout=10)
-    except requests.RequestException as err:
-        logger.warning("Échec de l'initialisation Echo.Sync MyCompet : %s", err)
-        raise UpstreamUnavailable("Erreur lors de l'initialisation de session sur MyCompet.") from err
+    ), "Erreur lors de l'initialisation de session sur MyCompet.")
 
-    # 2. Ouverture de la vue Calendrier des compétitions (composant C.34)
-    cal_xml = (
-        '<cmsg xmlns="http://www.nextapp.com/products/echo/svrmsg/clientmessage.3.0" i="1">'
-        '<dir xmlns="" proc="CFocus"><focus i="C.34"/></dir>'
-        '<dir xmlns="" proc="CSync"><e t="action" i="C.34"/></dir></cmsg>'
-    )
-    try:
-        resp_cal = session.post(
-            "https://mycompet.ffme.fr/app?sid=Echo.Sync",
-            data=cal_xml.encode("utf-8"),
-            headers=sync_headers,
-            timeout=10,
-        )
-    except requests.RequestException as err:
-        logger.warning("Échec de l'ouverture du calendrier MyCompet : %s", err)
-        raise UpstreamUnavailable("Erreur lors du chargement du calendrier MyCompet.") from err
-
-    # 3. Filtrage par numéro de compétition
-    match_id_field = re.search(r'<c i="([^"]+)" t="RTF"><s>Grid</s><p n="toolTipText">CompetitionAdm\.c\.id\.tt</p>', resp_cal.text)
+    # Competitions calendar (component C.34), then its id filter when the page shows one
     seq = 1
-    xml_table = resp_cal.text
+    xml_table = _echo_sync(session, _click_message(seq, "C.34"), "Erreur lors du chargement du calendrier MyCompet.")
+    match_id_field = re.search(r'<c i="([^"]+)" t="RTF"><s>Grid</s><p n="toolTipText">CompetitionAdm\.c\.id\.tt</p>', xml_table)
     if match_id_field:
-        field_id = match_id_field.group(1)
         seq += 1
-        filter_xml = (
-            f'<cmsg xmlns="http://www.nextapp.com/products/echo/svrmsg/clientmessage.3.0" i="{seq}">'
-            f'<dir xmlns="" proc="CFocus"><focus i="{field_id}"/></dir>'
-            f'<dir xmlns="" proc="CSync"><p i="{field_id}" n="text">{comp_id_str}</p><e t="action" i="{field_id}"/></dir></cmsg>'
-        )
-        try:
-            resp_filter = session.post(
-                "https://mycompet.ffme.fr/app?sid=Echo.Sync",
-                data=filter_xml.encode("utf-8"),
-                headers=sync_headers,
-                timeout=10,
-            )
-            xml_table = resp_filter.text
-        except requests.RequestException as err:
-            logger.warning("Échec du filtre MyCompet : %s", err)
-            raise UpstreamUnavailable("Erreur lors du filtrage sur MyCompet.") from err
+        xml_table = _echo_sync(session, _click_message(seq, match_id_field.group(1), comp_id_str),
+                               "Erreur lors du filtrage sur MyCompet.")
 
-    # 4. Détection de la ligne de résultat
+    # The competition's row: from its number to the next competition number
     match_row = re.search(rf'<p n="text">{re.escape(comp_id_str)}</p>(.*?)(?:<p n="text">\d{{5}}</p>|$)', xml_table, re.DOTALL)
-    if not match_row:
-        raise NotFound(f"Compétition n°{comp_id_str} introuvable sur MyCompet FFME.")
-
-    row_snippet = match_row.group(1)
-    match_title = re.search(r'<p n="text">([^<]+)</p>', row_snippet)
+    match_title = re.search(r'<p n="text">([^<]+)</p>', match_row.group(1)) if match_row else None
     title = html.unescape(match_title.group(1)).strip() if match_title else ""
-    if not title:
+    if not match_row or not title:
         raise NotFound(f"Compétition n°{comp_id_str} introuvable sur MyCompet FFME.")
 
     info: dict[str, str | None] = {
@@ -394,57 +388,20 @@ def scrape_competition_info_by_id(competition_id: str | int) -> dict[str, str | 
         "type": None,
     }
 
-    # 5. Clic sur le bouton DÉTAILS pour extraire toutes les caractéristiques
-    match_btn = re.search(r'<c i="([^"]+)" t="B"[^>]*>.*?<p n="text">DÉTAILS</p>', row_snippet, re.DOTALL)
+    # The row's DÉTAILS button opens the page with the dates, venue and discipline
+    match_btn = re.search(r'<c i="([^"]+)" t="B"[^>]*>.*?<p n="text">DÉTAILS</p>', match_row.group(1), re.DOTALL)
     if match_btn:
-        btn_id = match_btn.group(1)
         seq += 1
-        detail_xml = (
-            f'<cmsg xmlns="http://www.nextapp.com/products/echo/svrmsg/clientmessage.3.0" i="{seq}">'
-            f'<dir xmlns="" proc="CFocus"><focus i="{btn_id}"/></dir>'
-            f'<dir xmlns="" proc="CSync"><e t="action" i="{btn_id}"/></dir></cmsg>'
-        )
         try:
-            resp_det = session.post(
-                "https://mycompet.ffme.fr/app?sid=Echo.Sync",
-                data=detail_xml.encode("utf-8"),
-                headers=sync_headers,
-                timeout=10,
-            )
-            det_text = resp_det.text
-            pairs = {
-                html.unescape(key): html.unescape(value)
-                for key, value in re.findall(
-                    r'<p n=.text.>([^<]+?)\s*</p></c><c[^>]*><s>publicItemValue[^<]*</s><p n=.text.>([^<]+)</p>', det_text
-                )
-            }
-
-            if "Nom" in pairs and pairs["Nom"].strip():
-                info["nom"] = pairs["Nom"].strip()
-
-            if "Date de la compétition" in pairs:
-                start_iso, end_iso = _parse_dates_to_iso(pairs["Date de la compétition"])
-                if start_iso:
-                    info["date_competition"] = start_iso
-                    info["date_fin"] = end_iso
-
-            if "ville" in pairs and pairs["ville"].strip():
-                info["lieu"] = pairs["ville"].strip()
-            elif "Adresse" in pairs and pairs["Adresse"].strip():
-                info["lieu"] = pairs["Adresse"].strip()
-
-            if "Discipline" in pairs:
-                disc = pairs["Discipline"].strip()
-                disc_lower = disc.lower()
-                if "bloc" in disc_lower:
-                    info["type"] = "Bloc"
-                elif "diff" in disc_lower:
-                    info["type"] = "Difficulté"
-                elif "vitesse" in disc_lower:
-                    info["type"] = "Vitesse"
-                else:
-                    info["type"] = disc
-        except requests.RequestException:
+            details_xml = _echo_sync(session, _click_message(seq, match_btn.group(1)),
+                                     "Erreur lors de la lecture des détails sur MyCompet.")
+        except UpstreamUnavailable:
             logger.debug("Échec de la récupération des détails de la compétition %s", comp_id_str, exc_info=True)
-
+            return info
+        pairs = {
+            html.unescape(key): html.unescape(value)
+            for key, value in re.findall(
+                r'<p n=.text.>([^<]+?)\s*</p></c><c[^>]*><s>publicItemValue[^<]*</s><p n=.text.>([^<]+)</p>', details_xml)
+        }
+        _apply_details(pairs, info)
     return info

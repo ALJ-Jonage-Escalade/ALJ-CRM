@@ -15,10 +15,10 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 from fastapi.testclient import TestClient
 
+from domain.errors import StorageUnavailable
 from infrastructure.security import api_auth
 from infrastructure.security.api_auth import Role
 from server import app
-from services.competitions.results_batch import ResultsBatchError
 from support.fake_access import grant_roles
 
 CRON = "/api/competitions/cron/fetch-results"
@@ -125,7 +125,7 @@ class TestSchedulerAuth(unittest.TestCase):
         self.batch.assert_not_called()
 
     def test_unreadable_competitions_answer_503(self):
-        self.batch.side_effect = ResultsBatchError("down")
+        self.batch.side_effect = StorageUnavailable("down")
         r = self.post(oidc_token())
         self.assertEqual(r.status_code, 503)
         self.assertEqual(r.json()["status"], "error")

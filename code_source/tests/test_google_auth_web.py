@@ -1,20 +1,14 @@
 """Tests unitaires des endpoints de renouvellement et de gestion Google OAuth2 pour l'application web."""
 import os
-import sys
 import json
 import base64
 import unittest
 from unittest.mock import patch, MagicMock
 
-_tests_dir = os.path.dirname(os.path.abspath(__file__))
-_code_root = os.path.dirname(_tests_dir)
-_src_dir = os.path.join(_code_root, "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
 import requests
 from fastapi.testclient import TestClient
 from server import app
+from infrastructure.google.drive import GoogleAuthError
 from infrastructure.security.secret_store import SecretPersistenceError
 
 XSS = '"><img src=x onerror=alert(1)>'
@@ -24,7 +18,7 @@ CLIENT_SECRET = "mock_sec"
 def signed_state(**payload):
     """State as POST /api/auth/google/login makes it, signed with the mocked client secret."""
     import time
-    from api.integrations.google_auth import _sign_state
+    from services.integrations.google_account import sign_state as _sign_state
     return _sign_state({"ts": time.time(), **payload}, CLIENT_SECRET)
 
 
@@ -58,7 +52,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
                 return "test@alj-escalade.fr"
             return None
         mock_secret.side_effect = fake_secret
-        mock_get_tok.side_effect = Exception("400 - invalid_grant")
+        mock_get_tok.side_effect = GoogleAuthError("400 - invalid_grant")
 
         resp = self.client.get("/api/auth/google/status")
         self.assertEqual(resp.status_code, 200)
@@ -94,7 +88,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
     @patch("infrastructure.google.drive.GoogleDriveClient.get_client_credentials")
     def test_login_answers_google_url_with_signed_state(self, mock_creds):
         import urllib.parse
-        from api.integrations.google_auth import _read_state
+        from services.integrations.google_account import read_state as _read_state
         mock_creds.return_value = ("client_id_test.apps.googleusercontent.com", CLIENT_SECRET)
         resp = self.client.post("/api/auth/google/login", json={"return_to": "/bureau/outils"})
         self.assertEqual(resp.status_code, 200)
@@ -112,7 +106,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertEqual(self.client.post("/api/auth/google/login", json={}).status_code, 503)
 
     def test_state_signature_and_expiry(self):
-        from api.integrations.google_auth import STATE_MAX_AGE, _read_state, _sign_state
+        from services.integrations.google_account import STATE_MAX_AGE, read_state as _read_state, sign_state as _sign_state
         state = _sign_state({"ts": 1000.0, "return_to": "/bureau"}, CLIENT_SECRET)
         self.assertEqual(_read_state(state, CLIENT_SECRET, now=1000.0 + STATE_MAX_AGE)["return_to"], "/bureau")
         self.assertIsNone(_read_state(state, CLIENT_SECRET, now=1001.0 + STATE_MAX_AGE))  # expired
@@ -194,7 +188,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
                 self.assertNotIn("<img", html)
 
     def test_safe_return_to(self):
-        from api.integrations.google_auth import DEFAULT_RETURN_TO, _safe_return_to
+        from services.integrations.google_account import DEFAULT_RETURN_TO, safe_return_to as _safe_return_to
         cases = {
             "/bureau/outils": "/bureau/outils",
             None: DEFAULT_RETURN_TO,
@@ -225,7 +219,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertIn("non enregistrés", resp.text)
         self.assertNotIn("Réussie", resp.text)
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync")
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={})
     @patch("requests.post")
     @patch("requests.get")
     @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
@@ -284,7 +278,7 @@ class TestGoogleAuthWeb(unittest.TestCase):
         self.assertTrue(data["results"]["database"]["ok"])
         self.assertTrue(data["results"]["gmail"]["ok"])
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync")
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={})
     @patch("requests.post")
     @patch("requests.get")
     @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
@@ -340,7 +334,7 @@ class TestGoogleAuthCallbackFailures(unittest.TestCase):
         self.assertIn("invalid_grant &lt;b&gt;", resp.text)
         self.assertNotIn("Réussie", resp.text)
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", side_effect=ConnectionError("Firestore down"))
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"errors": ["Firestore down"]})
     @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
     @patch("requests.get", side_effect=requests.ConnectionError("userinfo down"))
     @patch("requests.post", return_value=http_response(200, {"access_token": "tok", "refresh_token": "refresh"}))
@@ -365,7 +359,7 @@ class TestGoogleAuthDiagnostic(unittest.TestCase):
         return self.client.post("/api/auth/google/test").json()
 
     def test_refused_token_skips_the_other_checks(self, mock_token, mock_get):
-        mock_token.side_effect = RuntimeError("invalid_grant")
+        mock_token.side_effect = GoogleAuthError("invalid_grant")
         data = self.results()
         self.assertEqual((data["status"], data["all_ok"]), ("error", False))
         self.assertIn("ignoré", data["results"]["gmail"]["message"])
@@ -377,19 +371,19 @@ class TestGoogleAuthDiagnostic(unittest.TestCase):
         self.assertEqual(data["status"], "warning")
         self.assertFalse(data["results"]["oauth_token"]["ok"])
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.ensure_fresh", side_effect=ConnectionError("down"))
-    def test_database_failure_is_reported(self, _fresh, _token, _get):
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"errors": ["down"]})
+    def test_database_failure_is_reported(self, _sync, _token, _get):
         replication_on(self)
         data = self.results()
         self.assertEqual(data["status"], "warning")
         self.assertFalse(data["results"]["database"]["ok"])
         self.assertTrue(data["results"]["gmail"]["ok"])
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.ensure_fresh")
-    def test_synced_database_is_ok(self, mock_fresh, _token, _get):
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"pulled": 0})
+    def test_synced_database_is_ok(self, mock_sync, _token, _get):
         replication_on(self)
         self.assertTrue(self.results()["all_ok"])
-        mock_fresh.assert_called_once_with(max_age=10)
+        mock_sync.assert_called_once_with()
 
     def test_gmail_http_and_network_failures(self, _token, mock_get):
         for answer in ({"return_value": http_response(403, text="insufficientPermissions")},
@@ -431,12 +425,13 @@ class TestGoogleTokenUpdateFailures(unittest.TestCase):
     def test_unsaved_token_is_a_503(self, _set, _post, _creds):
         self.assertEqual(self.update(user_email="club@example.org").status_code, 503)
 
-    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", side_effect=ConnectionError("down"))
+    @patch("infrastructure.firestore.cloud_database.CloudDatabase.sync", return_value={"errors": ["down"]})
     @patch("requests.post", return_value=http_response(200, {"access_token": "tok"}))
     @patch("infrastructure.security.secret_store.SecretStore.set_secrets")
     def test_saved_token_with_failed_sync_is_a_success(self, mock_set, _post, mock_sync, _creds):
         replication_on(self)
-        resp = self.update(client_id="new-cid", client_secret="new-sec", user_email="club@example.org")  # noqa: S106 - fake credential of the test
+        with self.assertLogs("alj", "WARNING"):
+            resp = self.update(client_id="new-cid", client_secret="new-sec", user_email="club@example.org")  # noqa: S106 - fake credential of the test
         self.assertEqual(resp.status_code, 200)
         mock_sync.assert_called_once()
         self.assertEqual(mock_set.call_args.args[0]["GMAIL_CLIENT_ID"], "new-cid")

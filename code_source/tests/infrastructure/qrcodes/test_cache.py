@@ -2,19 +2,14 @@
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
-_src_dir = str(Path(__file__).resolve().parents[3] / "src")
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-import paths  # noqa: E402
-from infrastructure.qrcodes import cache  # noqa: E402
-from infrastructure.qrcodes import find_group_qrcode, get_group_qrcode, qrcode_cache_dir, qrcode_filename  # noqa: E402
+import paths
+from infrastructure.qrcodes import cache
+from infrastructure.qrcodes import find_group_qrcode, get_group_qrcode, qrcode_cache_dir, qrcode_filename
 
 LINK = "https://chat.whatsapp.com/exemple"
 

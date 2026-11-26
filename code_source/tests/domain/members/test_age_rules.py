@@ -1,11 +1,6 @@
 """Tests unitaires des règles de contrôle d'âge (bornes de naissance par groupe)."""
 import datetime
 import unittest
-import sys
-import os
-
-# Ajustement du chemin d'import
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../src")))
 
 from domain.members.age_rules import (
     check_age_conflict,

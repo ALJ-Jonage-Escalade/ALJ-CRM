@@ -1,10 +1,10 @@
-"""Filling a template from a member and a competition (domain/email_personalization.py)."""
+"""Filling a template from a member and a competition (domain/communications/email_personalization.py)."""
 
 from __future__ import annotations
 
 import pytest
 
-from domain.email_personalization import apply_template_variables
+from domain.communications.email_personalization import apply_template_variables
 
 MEMBER = {"first_name": "camille", "last_name": "durand", "licence_ffme": "654321", "tarif_name": "Jeunes 2010",
           "season_name": "2026-2027", "amount": 195.5}
