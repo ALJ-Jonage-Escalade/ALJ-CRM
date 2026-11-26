@@ -20,7 +20,7 @@ describe("posterBlocks", () => {
       { nom: "SANS", prenom: "Résultat" },
     ]);
 
-    expect(blocks).toEqual([{ title: "U13 Femme", lines: [{ name: "BASSO Chloé", place: "8 / 25", podium: "" }] }]);
+    expect(blocks).toEqual([{ title: "U13 Femme", lines: [{ name: "BASSO Chloé", place: "8 / 25", color: "slate" }] }]);
   });
 
   it("merges the spellings of a MyCompet category into one block", () => {
@@ -58,10 +58,15 @@ describe("posterBlocks", () => {
     expect(block?.lines.map((line) => line.name)).toEqual(["ABRIAL Arthur", "VELEINE Gonzague", "LOMBARD Matisse"]);
   });
 
-  it("marks the podium places", () => {
-    const [block] = posterBlocks(["1", "2", "3", "4"].map((place) => climber(`C${place}`, "A", "U15 F", place)));
+  it("marks the podium places with their medal and colour, as on the competition page", () => {
+    const [block] = posterBlocks(["1", "2", "3", "4"].map((place) => climber(`C${place}`, "A", "U15 F", place, 20)));
 
-    expect(block?.lines.map((line) => line.podium)).toEqual(["gold", "silver", "bronze", ""]);
+    expect(block?.lines.map(({ place, color }) => [place, color])).toEqual([
+      ["🥇 1 / 20", "gold"],
+      ["🥈 2 / 20", "silver"],
+      ["🥉 3 / 20", "bronze"],
+      ["4 / 20", "slate"],
+    ]);
   });
 
   it("names the adult categories in full", () => {

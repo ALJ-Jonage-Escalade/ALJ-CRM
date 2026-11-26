@@ -1,12 +1,12 @@
 /* The results poster of a competition (shared as a PNG on WhatsApp): its ranked climbers in category blocks. */
-import { rankingLabel, type Participant } from "../competitions";
+import type { BadgeColor } from "../../../components/ui/palette";
+import { rankingColor, rankingText, type Participant } from "../competitions";
 
-export type Podium = "gold" | "silver" | "bronze" | "";
-
+/** A climber's line: the place as on the competition page (« 🥇 1 / 25 », « 4 / 19 ») and its badge colour. */
 export interface PosterLine {
   name: string;
   place: string;
-  podium: Podium;
+  color: BadgeColor;
 }
 
 export interface PosterBlock {
@@ -15,8 +15,6 @@ export interface PosterBlock {
 }
 
 const rankOf = (participant: Participant): number => Number.parseInt(String(participant.classement ?? "").trim(), 10);
-
-const PODIUM: readonly Podium[] = ["gold", "silver", "bronze"];
 
 /* « U13 Femme », « U13Femme », « [U13] F », « Senior H »… as MyCompet writes them (accents removed first). */
 const CATEGORY = /^(u\d{1,2}|senior|veteran)\s*(femme|homme|f|h)?$/;
@@ -71,10 +69,6 @@ export function posterBlocks(participants: readonly Participant[]): PosterBlock[
       title: category.title,
       lines: climbers
         .sort((a, b) => rankOf(a) - rankOf(b) || byName(nameOf(a), nameOf(b)))
-        .map((participant) => ({
-          name: nameOf(participant),
-          place: rankingLabel(participant),
-          podium: PODIUM[rankOf(participant) - 1] ?? "",
-        })),
+        .map((participant) => ({ name: nameOf(participant), place: rankingText(participant), color: rankingColor(participant) })),
     }));
 }
