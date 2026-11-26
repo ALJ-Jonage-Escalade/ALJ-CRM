@@ -44,7 +44,15 @@ const COMPETITIONS: Competition[] = [
     statut: "en_preparation",
     participants: [LEO, ZOE, MAX],
   },
-  { id: 9, nom: "Open passé", date_competition: "2025-01-10", statut: "close", participants: [] },
+  {
+    id: 9,
+    nom: "Open passé",
+    date_competition: "2025-01-10",
+    statut: "close",
+    participants: [
+      { adherent_id: 4, nom: "ROCHE", prenom: "Inès", classement: "2", total_categorie: 18, categorie_ffme: "U15 F", updated_at: "t4" },
+    ],
+  },
 ];
 const CONTACTS = [
   {
@@ -272,6 +280,17 @@ describe("CompetitionsPage", () => {
     }
     expect(byId("participe").text()).toBe("✅ Participe");
     expect(wrapper.text()).not.toContain("CMD-1");
+  });
+
+  it("offers every account the results poster once a competitor is ranked", async () => {
+    const { api } = fakeApi();
+    const { byId } = await render(signedIn("readonly"), api, store, "/competitions?id=10");
+    await settle();
+    expect(byId("poster-open").exists()).toBe(false); // no result yet
+
+    const { byId: byIdRanked } = await render(signedIn("readonly"), api, store, "/competitions?id=9");
+    await settle();
+    expect(byIdRanked("poster-open").exists()).toBe(true);
   });
 
   it("refuses an account without a role", async () => {

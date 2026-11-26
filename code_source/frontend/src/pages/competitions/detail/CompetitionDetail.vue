@@ -45,6 +45,8 @@ import AthleteContactDialog from "./AthleteContactDialog.vue";
 import ParticipantCard from "./ParticipantCard.vue";
 import ParticipantRow from "./ParticipantRow.vue";
 import PaymentForm from "./PaymentForm.vue";
+import { posterBlocks } from "./poster";
+import ResultsPosterDialog from "./ResultsPosterDialog.vue";
 import WithdrawForm from "./WithdrawForm.vue";
 import { competitionItself, WRITER_KEY } from "../writer";
 import { formatDateTime, formatDayText } from "../../../lib/format";
@@ -256,6 +258,10 @@ async function restore(r: Row): Promise<void> {
 
 const emailing = ref(false);
 
+// The results poster, for every account: built in the browser from the places already shown
+const posterOpen = ref(false);
+const hasRankedClimber = computed(() => posterBlocks(props.rows).length > 0);
+
 // ---------------------------------------------------------------- E-mail history
 
 const emailLog = useCompetitionEmailLog(
@@ -376,6 +382,15 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
           >
             🏆 Résultats MyCompet ↗
           </a>
+          <button
+            v-if="hasRankedClimber"
+            type="button"
+            data-testid="poster-open"
+            class="inline-flex cursor-pointer items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-700"
+            @click="posterOpen = true"
+          >
+            🖼️ Affiche des résultats
+          </button>
         </div>
       </div>
       <CompetitionActions
@@ -587,6 +602,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         @cancel="paying = null"
       />
     </UiDialog>
+    <ResultsPosterDialog v-model:open="posterOpen" :competition="c" :participants="rows" />
     <UiDialog v-model:open="emailing" :title="`✉️ E-mail aux compétiteurs : ${c.nom}`" wide data-testid="email-dialog">
       <EmailForm
         v-if="emailing"
