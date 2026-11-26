@@ -72,3 +72,14 @@ export function posterBlocks(participants: readonly Participant[]): PosterBlock[
         .map((participant) => ({ name: nameOf(participant), place: rankingText(participant), color: rankingColor(participant) })),
     }));
 }
+
+export interface PosterSummary {
+  ranked: number;
+  podiums: number;
+}
+
+/** The figures under the banner: the climbers with a place, and how many of them are on a podium (1st to 3rd). */
+export function posterSummary(blocks: readonly PosterBlock[]): PosterSummary {
+  const lines = blocks.flatMap((block) => block.lines);
+  return { ranked: lines.length, podiums: lines.filter((line) => line.color !== "slate").length };
+}

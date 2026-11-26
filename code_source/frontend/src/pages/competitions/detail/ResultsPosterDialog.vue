@@ -10,7 +10,6 @@ import { useWideLayout } from "../../../composables/media";
 import { saveFile } from "../../../lib/download";
 import type { Competition, Participant } from "../competitions";
 import ResultsPoster from "./ResultsPoster.vue";
-import { POSTER_THEME } from "./posterTheme";
 
 const props = defineProps<{ competition: Competition; participants: readonly Participant[] }>();
 const open = defineModel<boolean>("open", { required: true });
@@ -49,7 +48,7 @@ async function draw(): Promise<void> {
     return;
   }
   try {
-    const blob = await domToBlob(element, { type: "image/png", scale: 1, backgroundColor: POSTER_THEME.background });
+    const blob = await domToBlob(element, { type: "image/png", scale: 1 });
     image.value = new File([blob], fileName.value, { type: "image/png" });
     imageUrl.value = URL.createObjectURL(blob);
   } catch {

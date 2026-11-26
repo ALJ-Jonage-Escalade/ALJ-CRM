@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { posterBlocks } from "./poster";
+import { posterBlocks, posterSummary } from "./poster";
 import type { Participant } from "../competitions";
 
 const climber = (nom: string, prenom: string, categorie_ffme: string, classement: string, total_categorie = 20): Participant => ({
@@ -74,5 +74,18 @@ describe("posterBlocks", () => {
       "Sénior Homme",
       "Vétéran Femme",
     ]);
+  });
+});
+
+describe("posterSummary", () => {
+  it("counts the ranked climbers and the podium places, every category together", () => {
+    const blocks = posterBlocks([
+      climber("A", "A", "U13 F", "1"),
+      climber("B", "B", "U13 F", "5"),
+      climber("C", "C", "U15 H", "3"),
+      climber("D", "D", "U15 H", ""),
+    ]);
+
+    expect(posterSummary(blocks)).toEqual({ ranked: 3, podiums: 2 });
   });
 });
