@@ -31,7 +31,7 @@ def list_competition_docs() -> list[documents.CompetitionDoc]:
     """Competition documents as stored (participants and counters included), most
     recent first: the shape the web pages use."""
     coaches = documents.coaches_map()
-    sexes = _member_sexes()
+    sexes = member_sexes()
     docs = [_with_member_sex(documents.api_doc(doc, coaches), sexes) for doc in documents.list_comp_docs()]
     docs.sort(key=lambda doc: documents.comp_sort_key(doc.get("date_competition"), doc.get("id")), reverse=True)
     return docs
@@ -51,10 +51,10 @@ def get_competition_doc(competition_id: int) -> documents.CompetitionDoc | None:
 def competition_api_doc(doc: dict[str, Any]) -> documents.CompetitionDoc:
     """Shape of get_competition_doc for a document already read or just written (the
     participant writes return it): saves reading it again."""
-    return _with_member_sex(documents.api_doc(doc, documents.coaches_map()), _member_sexes())
+    return _with_member_sex(documents.api_doc(doc, documents.coaches_map()), member_sexes())
 
 
-def _member_sexes() -> dict[int, str | None]:
+def member_sexes() -> dict[int, str | None]:
     """{adherent id -> sex code} from the `adherents` directory: the single source of the participants'
     sex (plans/sex-enum.md D7). Empty when the directory cannot be read: the sexes show as not given."""
     try:

@@ -45,8 +45,8 @@ class TestMemberView(unittest.TestCase):
         self.assertEqual(m["sex"], Sex.MALE)
         self.assertEqual(m["status_norm"], "Validé")
         self.assertEqual(m["payer"], "Claire MARTIN")
-        self.assertEqual((m["creneau_groupe"], m["categorie"], m["creneau_details"]),
-                         ("Enfants 2015-2016", "U11", "Mercredi 14h-15h30"))
+        self.assertEqual((m["creneau_groupe"], m["creneau_details"]), ("Enfants 2015-2016", "Mercredi 14h-15h30"))
+        self.assertNotIn("categorie", m)                               # the slot label: the FFME category replaces it
         self.assertEqual(m["phone"], "")                               # None -> ""
         self.assertEqual((m["last_name"], m["first_name"]), ("MARTIN", "Léo"))
 
@@ -61,12 +61,11 @@ class TestMemberView(unittest.TestCase):
 
     def test_member_without_slot_or_birth_date(self):
         m = member_view.member_row(row(tarif_name="Inconnu", birth_date=""), {}, datetime.date(2026, 9, 1))
-        self.assertEqual((m["creneau_groupe"], m["categorie"], m["creneau_details"], m["age"]), ("", "", "", None))
+        self.assertEqual((m["creneau_groupe"], m["creneau_details"], m["age"], m["ffme_category"]), ("", "", None, ""))
 
-    def test_category_falls_back_to_type(self):
-        m = member_view.member_row(row(tarif_name="Adulte lundi"), member_view.tarif_slots(PLANNING),
-                                   datetime.date(2026, 9, 1))
-        self.assertEqual(m["categorie"], "Loisir")
+    def test_member_row_ffme_category_as_stored(self):
+        m = member_view.member_row(row(ffme_category="U13"), {}, datetime.date(2026, 9, 1))
+        self.assertEqual(m["ffme_category"], "U13")
 
     def test_build_members_sorted_and_aged_at_season_start(self):
         members = member_view.build_members(

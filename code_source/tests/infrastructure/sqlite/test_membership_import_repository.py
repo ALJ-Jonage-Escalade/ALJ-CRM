@@ -194,3 +194,47 @@ class TestMembershipImportRepository(MemberDbTestCase):
         seasons = self.rows("SELECT s.name, p.helloasso_item_id FROM purchases p JOIN orders o ON o.id = p.order_id"
                             " JOIN seasons s ON s.id = o.season_id ORDER BY s.name")
         self.assertEqual([tuple(r.values()) for r in seasons], [("2025-2026", None), (SEASON, 1)])
+
+    # FFME category (plans/ffme-categories.md): computed when a membership is created, against its season
+
+    def set_category(self, category: str) -> None:
+        conn = SqliteDatabase.get_connection()
+        try:
+            conn.execute("UPDATE users SET ffme_category = ?", (category,))
+            conn.commit()
+        finally:
+            conn.close()
+
+    def categories(self) -> list[str]:
+        return [row["ffme_category"] for row in self.rows("SELECT ffme_category FROM users ORDER BY id")]
+
+    def test_create_sets_the_ffme_category_of_the_season(self) -> None:
+        MembershipImportRepository.apply([create(record(1))], SEASON)  # born 2013: 14 in 2027
+
+        self.assertEqual(self.categories(), ["U15"])
+
+    def test_renewal_recomputes_the_ffme_category_over_a_manual_one(self) -> None:
+        self.seed("ORD-1", "Ginny", "WEASLEY", "Loisir collège", season="2025-2026")  # born 2017-03-10
+        self.set_category("SENIOR")
+        [user] = self.rows("SELECT id FROM users")
+        renewal = record(1, "Weasley", "Ginny", birth_date="2017-03-10")
+
+        MembershipImportRepository.apply(
+            [ImportWrite(PlanEntry(renewal, Bucket.RENEWAL, "renouvellement", member_id=user["id"]), WriteAction.ATTACH)], SEASON)
+
+        self.assertEqual(self.categories(), ["U11"])
+
+    def test_update_of_a_membership_keeps_the_ffme_category(self) -> None:
+        [applied] = MembershipImportRepository.apply([create(record(1))], SEASON)
+        self.set_category("U17")  # moved up by an admin
+        entry = PlanEntry(record(1, status="Refunded"), Bucket.UPDATED, "modifiée", applied.user_id, applied.purchase_id,
+                          changes=(FieldChange("status", "Processed", "Processed", "Refunded"),))
+
+        MembershipImportRepository.apply([ImportWrite(entry, WriteAction.UPDATE)], SEASON, TODAY)
+
+        self.assertEqual(self.categories(), ["U17"])
+
+    def test_manual_member_gets_the_ffme_category_of_the_season(self) -> None:
+        self.manual_member()  # born 11/08/2013
+
+        self.assertEqual(self.categories(), ["U15"])

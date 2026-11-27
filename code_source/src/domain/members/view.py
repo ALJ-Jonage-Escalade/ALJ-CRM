@@ -175,7 +175,7 @@ def member_row(row: Dict[str, Any], slots: Dict[str, Dict[str, str]],
     parsed = parse_birth_date(birth)
     age = age_at(parsed, ref_date) if parsed else None
     text = {k: row.get(k) or "" for k in (
-        "address", "zip_code", "email_primary", "email_secondary", "licence_ffme",
+        "address", "zip_code", "email_primary", "email_secondary", "licence_ffme", "ffme_category",
         "health_commitment", "photo_auth", "badge_rouge", "autonomie_bloc",
         "raw_passports",
         "raw_diplomas", "payer_email", "order_ref", "order_date", "status", "document_sante",
@@ -200,7 +200,6 @@ def member_row(row: Dict[str, Any], slots: Dict[str, Dict[str, str]],
         "amount": row.get("amount"),
         "status_norm": normalize_status(row.get("status")),
         "creneau_groupe": slot["groupe"] if slot else "",
-        "categorie": (slot["categorie_age"] or slot["type"]) if slot else "",
         "creneau_details": f"{slot['jour']} {slot['horaires']}".strip() if slot else "",
     }
 

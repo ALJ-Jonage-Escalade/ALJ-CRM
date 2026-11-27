@@ -290,6 +290,8 @@ class SqliteDatabase:
         # Document de santé FFME : information associée à une personne pour une saison
         # donnée, stockée au niveau de l'achat (purchases).
         _add_missing_column(conn, cursor, "purchases", "document_sante", "TEXT DEFAULT ''")
+        # FFME competition category (domain/members/ffme_category.py, plans/ffme-categories.md): '' = none
+        _add_missing_column(conn, cursor, "users", "ffme_category", "TEXT DEFAULT ''")
         # HelloAsso membership import (plans/helloasso-membership-import.md): the registration a purchase comes from
         # and the last values read on HelloAsso (status, amount, tariff), to tell a change on HelloAsso from a CRM edit
         for column, ddl in (("helloasso_item_id", "INTEGER"), ("helloasso_status", "TEXT"),

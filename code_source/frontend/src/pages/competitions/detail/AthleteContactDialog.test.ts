@@ -15,7 +15,9 @@ describe("AthleteContactDialog", () => {
     num_licence: "654321",
     tarif: "Compétition U18",
     group: "Compétition U18",
-    categorie_ffme: "U18",
+    section: "U17 H",
+    categorie: "U17",
+    sex: "H",
     selectionne: true,
     present: false,
     statut_paiement: "paye",
@@ -66,6 +68,7 @@ describe("AthleteContactDialog", () => {
     const dialog = document.body.querySelector("[data-testid='athlete-contact-dialog']");
     expect(dialog).not.toBeNull();
 
+    expect(dialog?.querySelector("[data-testid='athlete-category']")?.textContent).toBe("🏅 Catégorie U17 H");
     const cards = document.body.querySelectorAll("[data-testid='contact-card']");
     expect(cards).toHaveLength(3);
 

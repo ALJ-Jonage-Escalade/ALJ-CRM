@@ -215,9 +215,10 @@ class CompetitionResultsBatchService:
 
         now_iso = datetime.datetime.now().isoformat()
         athletes: List[ClubAthlete] = []
+        sexes = competitions.member_sexes()
 
         def rank(parts: List[Dict[str, Any]]) -> int:  # Any: participant rows
-            athletes[:] = apply_rankings(parts, scraped, now_iso)  # replayed on a write conflict: keep the last one
+            athletes[:] = apply_rankings(parts, scraped, now_iso, sexes)  # replayed on a write conflict: keep the last one
             return len(athletes)
 
         try:

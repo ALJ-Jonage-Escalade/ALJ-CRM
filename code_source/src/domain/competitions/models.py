@@ -197,6 +197,7 @@ class Participant:
     num_licence: str = ""
     email: str = ""
     tarif: str = ""
+    categorie: str = ""              # FFME category of the member when added (Category code, "" when none), never refreshed
     selectionne: bool = False
     present: bool = False            # pointage sur place le jour de la compétition
     statut_paiement: PaymentStatus = PaymentStatus.NON_INVITE
@@ -207,7 +208,6 @@ class Participant:
     classement: str = ""             # rang ou classement FFME (ex: "1", "4", "13")
     total_categorie: int = 0         # nombre total de compétiteurs dans la catégorie (ex: 14)
     resultat_ffme: str = ""          # libellé complet (ex: "6 / 14" ou "1er / 15")
-    categorie_ffme: str = ""         # catégorie officielle MyCompet (ex: "U13Femme")
     performance_ffme: str = ""       # points ou score MyCompet
     resultat_synced_at: str = ""
 
@@ -221,6 +221,7 @@ class Participant:
             "num_licence": self.num_licence,
             "email": self.email,
             "tarif": self.tarif,
+            "categorie": self.categorie,
             "selectionne": bool(self.selectionne),
             "present": bool(self.present),
             "statut_paiement": self.statut_paiement,
@@ -231,7 +232,6 @@ class Participant:
             "classement": self.classement,
             "total_categorie": self.total_categorie,
             "resultat_ffme": self.resultat_ffme,
-            "categorie_ffme": self.categorie_ffme,
             "performance_ffme": self.performance_ffme,
             "resultat_synced_at": self.resultat_synced_at,
         }
@@ -248,6 +248,7 @@ class Participant:
             num_licence=str(row.get("num_licence") or ""),
             email=str(row.get("email") or ""),
             tarif=str(row.get("tarif") or ""),
+            categorie=str(row.get("categorie") or ""),
             selectionne=bool(sel) and str(sel) not in ("0", "Non", "non"),
             present=bool(row.get("present")),
             statut_paiement=_stored_status(PaymentStatus, row.get("statut_paiement"), PaymentStatus.NON_INVITE),
@@ -258,7 +259,6 @@ class Participant:
             classement=str(row.get("classement") or ""),
             total_categorie=int(row.get("total_categorie") or 0),
             resultat_ffme=str(row.get("resultat_ffme") or ""),
-            categorie_ffme=str(row.get("categorie_ffme") or ""),
             performance_ffme=str(row.get("performance_ffme") or ""),
             resultat_synced_at=str(row.get("resultat_synced_at") or ""),
         )

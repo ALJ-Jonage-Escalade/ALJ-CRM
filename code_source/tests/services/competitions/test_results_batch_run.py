@@ -20,7 +20,7 @@ from support.mycompet.render import results_url
 from support.mycompet.web_stub import use_mycompet_stub
 
 TODAY = datetime.date(2026, 10, 20)
-ADA = {"adherent_id": 1, "nom": "ZORBALT", "prenom": "Quessa", "num_licence": "9980001", "selectionne": True}
+ADA = {"adherent_id": 1, "nom": "ZORBALT", "prenom": "Quessa", "num_licence": "9980001", "selectionne": True, "categorie": "U13"}
 BOB = {"adherent_id": 2, "nom": "PRIMSKAR", "prenom": "Taurin", "num_licence": "9980002", "selectionne": True}
 OTHER = {"adherent_id": 3, "nom": "FENWOLDE", "prenom": "Elstrid", "num_licence": "9980003", "selectionne": True}
 
@@ -64,6 +64,7 @@ class BatchTestCase(FirestoreRepoTestCase):
 class TestDailyBatch(BatchTestCase):
 
     def test_results_found_through_the_archive_are_written_and_mailed(self):
+        self.seed_adherent(1, nom="ZORBALT", prenom="Quessa", sex="F")
         self.competition(101, "Open de bloc de Valbrume", ended_days_ago=3)
         self.published(99101, "Open de bloc de Valbrume", ended_days_ago=3)
 
@@ -76,8 +77,8 @@ class TestDailyBatch(BatchTestCase):
         self.assertEqual(doc["url_resultats"], results_url(99101))
         self.assertTrue(doc["resultats_synced_at"])
         ada, bob, other = doc["participants"]
-        self.assertEqual((ada["classement"], ada["total_categorie"], ada["resultat_ffme"], ada["categorie_ffme"]),
-                         ("2", 8, "2 / 8", "U13Femme"))
+        self.assertEqual((ada["classement"], ada["total_categorie"], ada["resultat_ffme"]), ("2", 8, "2 / 8"))
+        self.assertNotIn("categorie_ffme", ada)  # the category is the member's (plans/ffme-categories.md D7)
         self.assertEqual(bob["classement"], "5")
         self.assertNotIn("classement", other)
         self.assertEqual({k: ada[k] for k in ADA}, ADA)  # the other fields are left alone
@@ -85,6 +86,7 @@ class TestDailyBatch(BatchTestCase):
         self.send_email.assert_called_once()
         body = self.send_email.call_args.kwargs["html_body"]
         self.assertIn("ZORBALT", body)
+        self.assertIn("U13 F", body)
         self.assertIn("Open de bloc de Valbrume", self.send_email.call_args.kwargs["subject"])
         self.assertEqual(self.web.archive_requests(), 1)
 

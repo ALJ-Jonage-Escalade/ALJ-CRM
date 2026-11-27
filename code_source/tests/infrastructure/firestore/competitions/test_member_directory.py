@@ -35,6 +35,7 @@ class TestSyncAdherentsFromMain(MemberDbTestCase, FirestoreRepoTestCase):
         self.assertEqual(dupont["creneau_groupe"], "Compétition - U13")
 
         self.assertEqual(dupont["statut"], "Validé")  # "Validated" normalized
+        self.assertEqual(dupont["ffme_category"], "U11")  # born 2017
 
         # Idempotent: a second sync rewrites the same documents
         member_directory.rebuild_member_directory("2026-2027")

@@ -1,10 +1,12 @@
 /* Competitions screen: the competitions, their participants and payment status, and what coaches change on them (the
    former pages web/competitions.html and web/bureau/competitions.html, merged). The server checks every change. */
 import type { BadgeColor } from "../../components/ui/palette";
+import { CATEGORY_ORDER, categoryAndSexLabel } from "../../lib/category";
 import type { Cell } from "../../lib/csv";
 import type { ApiRead, Schemas } from "../../lib/client";
 import { emergencyContactsOf, type EmergencyContactRow, type EmergencyContactSource } from "../../lib/emergencyContacts";
 import { formatDayText } from "../../lib/format";
+import type { Sex } from "../../lib/sex";
 import { normKey, plural } from "../../lib/text";
 import { ARCHIVED } from "../../services/competitions";
 import type { MemberStatus } from "../../services/members";
@@ -16,7 +18,7 @@ export type CompetitorContact = Schemas["CompetitorContact"];
 export type SavedCompetitorContact = Omit<CompetitorContact, "emergency_contacts"> & EmergencyContactSource;
 export type Coach = Schemas["Coach"];
 /** What the screen keeps of the member directory (GET /api/competition-members limited to COMPETITOR_STATUSES, online only): the current tariff and
-    slot group to group the participants, the names, licence and e-mail to add one or write to them. */
+    slot group (contact dialog), the names, licence and e-mail to add one or write to them. */
 export type MemberSlot = Pick<
   Schemas["CompetitionMember"],
   "id" | "nom" | "prenom" | "licence_ffme" | "email" | "email_secondaire" | "tarif" | "creneau_groupe"
@@ -245,7 +247,10 @@ export function athleteContactCards(participant: Participant, member?: MemberSlo
 /** A participant as listed: the member's current tariff and slot group, phone and emergency contacts when known, and
     the changes waiting in the outbox (shown at once, sent when the network comes back). */
 export interface Row extends Participant {
+  /** The slot group (contact dialog only), "" when not known */
   group: string;
+  /** Category and sex of the competitor (« U13 F »), NO_CATEGORY_SECTION or UNIDENTIFIED: their section of the list */
+  section: string;
   emergency: { name: string; phone: string }[];
   contacts: ContactCard[];
   /** Flags changed offline, not sent yet */
@@ -253,6 +258,26 @@ export interface Row extends Participant {
 }
 
 export const UNIDENTIFIED = "Non identifiés";
+/** Competitors without a FFME category (under 9, no birth date): after the categories, before UNIDENTIFIED. */
+export const NO_CATEGORY_SECTION = "Sans catégorie";
+
+const SEX_ORDER: readonly (Sex | null)[] = ["F", "H", null];
+
+/** Order of a competitor's section: categories youngest first, F then H then unknown sex; then NO_CATEGORY_SECTION, UNIDENTIFIED. */
+function sectionRank(row: Pick<Row, "adherent_id" | "categorie" | "sex">): number {
+  if (row.adherent_id == null) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const category = row.categorie ? CATEGORY_ORDER.indexOf(row.categorie) : -1;
+  return category < 0 ? Number.MAX_SAFE_INTEGER - 1 : category * SEX_ORDER.length + SEX_ORDER.indexOf(row.sex ?? null);
+}
+
+function sectionOf(participant: Participant): string {
+  if (participant.adherent_id == null) {
+    return UNIDENTIFIED;
+  }
+  return categoryAndSexLabel(participant.categorie, participant.sex) || NO_CATEGORY_SECTION;
+}
 
 /** Value of a flag changed offline, undefined when none waits. */
 export type PendingValue = (adherentId: number | null | undefined, flag: "selectionne" | "present") => boolean | undefined;
@@ -281,7 +306,8 @@ export function participantRows(
       tarif,
       phone: contact?.phone || p.phone || "",
       email: member?.email || member?.email_secondaire || p.email || "",
-      group: member?.creneau_groupe || contact?.creneau_groupe || tarif || UNIDENTIFIED,
+      group: member?.creneau_groupe || contact?.creneau_groupe || tarif,
+      section: sectionOf(p),
       emergency: emergencyOf(p, contact).filter((e) => e.phone),
       contacts: athleteContactCards(p, member, contact),
     };
@@ -290,15 +316,11 @@ export function participantRows(
 
 export type ParticipantFilter = "all" | "selected" | "unpaid" | "notInvited";
 
-/** Phone filter of a competitor: the slot group split by sex (« Compét. U11-U13 - F »), as girls and boys compete
-    apart; the group alone when the sex is not known. */
-export const groupAndSex = (row: Pick<Row, "group" | "sex">): string => (row.sex ? `${row.group} - ${row.sex}` : row.group);
-
-/** group: one slot group and sex only (groupAndSex, phones), every group when empty. */
-export function filterRows(rows: readonly Row[], filter: ParticipantFilter, search = "", group = ""): Row[] {
+/** section: one category and sex only (Row.section), every section when empty. */
+export function filterRows(rows: readonly Row[], filter: ParticipantFilter, search = "", section = ""): Row[] {
   const q = normKey(search);
   return rows.filter((r) => {
-    if (group && groupAndSex(r) !== group) {
+    if (section && r.section !== section) {
       return false;
     }
     if (filter === "selected" && !r.selectionne) {
@@ -319,32 +341,30 @@ export function byName(left: Pick<Participant, "nom" | "prenom">, right: Pick<Pa
   return (left.nom ?? "").localeCompare(right.nom ?? "", "fr") || (left.prenom ?? "").localeCompare(right.prenom ?? "", "fr");
 }
 
-/** By slot group (French order, « Non identifiés » last), each sorted by name. */
-export function groupRows(rows: readonly Row[]): [string, Row[]][] {
-  const groups = new Map<string, Row[]>();
-  for (const r of rows) {
-    groups.set(r.group, [...(groups.get(r.group) ?? []), r]);
+/** By section (category and sex, youngest first: sectionRank), each sorted by name. */
+export function categoryRows(rows: readonly Row[]): [string, Row[]][] {
+  const sections = new Map<string, Row[]>();
+  for (const r of [...rows].sort((a, b) => sectionRank(a) - sectionRank(b))) {
+    sections.set(r.section, [...(sections.get(r.section) ?? []), r]);
   }
-  return [...groups.entries()]
-    .sort(([a], [b]) => Number(a === UNIDENTIFIED) - Number(b === UNIDENTIFIED) || a.localeCompare(b, "fr"))
-    .map(([g, list]) => [g, list.sort(byName)]);
+  return [...sections.entries()].map(([section, list]) => [section, list.sort(byName)]);
 }
 
-/** Phones, on a competition day: one filter per slot group and sex (groupAndSex: they compete one after the other),
-    for those with at least one competitor taking part, in the order of the list (F before H, unknown sex last);
-    n: their competitors. */
-export function groupFilters(rows: readonly Row[]): { group: string; n: number }[] {
-  return groupRows(rows).flatMap(([group, list]) =>
-    (["F", "H", null] as const)
-      .map((sex) => ({ group: groupAndSex({ group, sex }), list: list.filter((r) => (r.sex ?? null) === sex) }))
-      .filter((option) => option.list.some((r) => r.selectionne))
-      .map((option) => ({ group: option.group, n: option.list.length })),
-  );
+/** The sections to pick from (phones and computers), in the order of the list; n: their competitors. */
+export function categoryFilters(rows: readonly Row[]): { section: string; n: number }[] {
+  return categoryRows(rows).map(([section, list]) => ({ section, n: list.length }));
 }
 
-export function countLine(counts: Counts, filter: ParticipantFilter, shown: number, group = ""): string {
-  if (group) {
-    return `${shown} compétiteur${plural(shown)} en « ${group} »`;
+const FILTER_SUFFIXES: Record<ParticipantFilter, string> = {
+  all: "",
+  selected: " (participe : oui)",
+  unpaid: " (paiement en attente)",
+  notInvited: " (non invités)",
+};
+
+export function countLine(counts: Counts, filter: ParticipantFilter, shown: number, section = ""): string {
+  if (section) {
+    return `${shown} compétiteur${plural(shown)} en « ${section} »${FILTER_SUFFIXES[filter]}`;
   }
   if (filter === "selected") {
     return `${counts.selected} compétiteur${plural(counts.selected)} sélectionné${plural(counts.selected)}`;
@@ -378,14 +398,14 @@ export function memberMatches(members: readonly MemberSlot[], competition: Compe
 /** The competition's participants as a spreadsheet (office export). */
 export function participantCsv(rows: readonly Row[]): Cell[][] {
   return [
-    ["Nom", "Prénom", "N° Licence", "Créneau", "Résultat FFME", "Participe", "Paiement", "Montant", "Commande", "Présent", "Téléphone"],
-    ...groupRows(rows)
+    ["Nom", "Prénom", "N° Licence", "Catégorie", "Résultat FFME", "Participe", "Paiement", "Montant", "Commande", "Présent", "Téléphone"],
+    ...categoryRows(rows)
       .flatMap(([, list]) => list)
       .map((p) => [
         p.nom,
         p.prenom,
         p.num_licence,
-        p.group === UNIDENTIFIED ? "" : p.group,
+        p.section === UNIDENTIFIED || p.section === NO_CATEGORY_SECTION ? "" : p.section,
         rankingLabel(p),
         p.selectionne ? "Oui" : "Non",
         paymentBadge(p.statut_paiement).label,

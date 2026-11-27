@@ -52,6 +52,7 @@ class ParticipantDoc(TypedDict, total=False):
     prenom: str
     num_licence: str
     tarif: str
+    categorie: str
     phone: str
     email: str
     urgence_nom: str
@@ -65,7 +66,6 @@ class ParticipantDoc(TypedDict, total=False):
     note_paiement: str
     classement: str
     total_categorie: int | str
-    categorie_ffme: str
     performance_ffme: str
     resultat_ffme: str
     resultat_synced_at: str

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Category } from "../../lib/category";
 import {
   athleteContactCards,
   coachChoices,
@@ -14,8 +15,8 @@ import {
   filterCompetitions,
   countLine,
   filterRows,
-  groupFilters,
-  groupRows,
+  categoryFilters,
+  categoryRows,
   hasPaid,
   isNotInvited,
   memberMatches,
@@ -29,6 +30,7 @@ import {
   seasons,
   sortCompetitions,
   toMemberSlots,
+  NO_CATEGORY_SECTION,
   UNIDENTIFIED,
   type Competition,
   type CompetitorContact,
@@ -190,7 +192,7 @@ describe("participants", () => {
     expect(rows.map((r) => [r.group, r.tarif])).toEqual([
       ["Compét. U18", "Compétition U18"],
       ["Compét. U14", ""],
-      [UNIDENTIFIED, ""],
+      ["", ""],
     ]);
     expect(rows[0]!.emergency).toEqual([{ name: "Copie", phone: "0600" }]); // copied when added
     expect(rows[1]!.emergency).toEqual([{ name: "Paul", phone: "06 01" }]); // the competitor's contacts
@@ -211,37 +213,52 @@ describe("participants", () => {
     expect(filterRows(rows, "selected")).toHaveLength(2);
     expect(filterRows(rows, "notInvited").map((r) => r.nom)).toEqual(["ABEL"]);
     expect(filterRows(rows, "all", "zoe").map((r) => r.nom)).toEqual(["DURAND"]);
-    expect(groupRows(rows).map(([g]) => g)).toEqual(["Compét. U14", "Compét. U18", UNIDENTIFIED]);
   });
 
-  it("filters by slot group, offering the groups where someone takes part", () => {
-    const rows = participantRows(c, members, contacts);
-    // « Non identifiés »: nobody takes part, no filter
-    expect(groupFilters(rows)).toEqual([
-      { group: "Compét. U14", n: 1 },
-      { group: "Compét. U18", n: 1 },
-    ]);
-    expect(filterRows(rows, "all", "", "Compét. U14").map((r) => r.nom)).toEqual(["DURAND"]);
-    expect(countLine(counts(rows), "all", 1, "Compét. U14")).toBe("1 compétiteur en « Compét. U14 »");
+  const climber = (adherent_id: number, categorie: Category | "", sex: "F" | "H" | null, selectionne = true) => ({
+    adherent_id,
+    nom: `N${adherent_id}`,
+    categorie,
+    sex,
+    selectionne,
+  });
+  const ladder = comp({
+    participants: [
+      climber(1, "VETERAN_1", "H"),
+      climber(2, "U13", "H"),
+      climber(3, "", "F"),
+      climber(4, "U13", "F", false),
+      climber(5, "U11", null),
+      climber(6, "SENIOR", "F"),
+      { nom: "INCONNU", selectionne: false },
+    ],
   });
 
-  it("splits a slot group by sex, girls first, unknown sex last", () => {
-    const climber = (adherent_id: number, sex: "F" | "H" | null, selectionne = true) => ({
-      adherent_id,
-      nom: `N${adherent_id}`,
-      sex,
-      selectionne,
-    });
-    const group = comp({ participants: [climber(1, "H"), climber(2, null), climber(3, "F"), climber(4, "H"), climber(5, "F", false)] });
-    const slots: MemberSlot[] = [1, 2, 3, 4, 5].map((id) => ({ id, creneau_groupe: "U11-U13" }));
-    const rows = participantRows(group, slots, []);
-    expect(groupFilters(rows)).toEqual([
-      { group: "U11-U13 - F", n: 2 },
-      { group: "U11-U13 - H", n: 2 },
-      { group: "U11-U13", n: 1 },
+  it("puts competitors in category and sex sections, youngest first, girls first, then without category and unidentified", () => {
+    const rows = participantRows(ladder, [], []);
+    expect(categoryRows(rows).map(([section, list]) => [section, list.map((r) => r.adherent_id ?? null)])).toEqual([
+      ["U11", [5]],
+      ["U13 F", [4]],
+      ["U13 H", [2]],
+      ["Sénior F", [6]],
+      ["Vétéran 1 H", [1]],
+      [NO_CATEGORY_SECTION, [3]],
+      [UNIDENTIFIED, [null]],
     ]);
-    expect(filterRows(rows, "all", "", "U11-U13 - H").map((r) => r.adherent_id)).toEqual([1, 4]);
-    expect(filterRows(rows, "all", "", "U11-U13").map((r) => r.adherent_id)).toEqual([2]);
+  });
+
+  it("offers every category and sex of the list, selected or not, and combines it with the chips", () => {
+    const rows = participantRows(ladder, [], []);
+    expect(categoryFilters(rows).slice(0, 3)).toEqual([
+      { section: "U11", n: 1 },
+      { section: "U13 F", n: 1 },
+      { section: "U13 H", n: 1 },
+    ]);
+    expect(categoryFilters(rows)).toHaveLength(7);
+    expect(filterRows(rows, "all", "", "U13 F").map((r) => r.adherent_id)).toEqual([4]);
+    expect(filterRows(rows, "selected", "", "U13 F")).toEqual([]);
+    expect(countLine(counts(rows), "all", 1, "U13 F")).toBe("1 compétiteur en « U13 F »");
+    expect(countLine(counts(rows), "selected", 0, "U13 F")).toBe("0 compétiteur en « U13 F » (participe : oui)");
   });
 
   it("tells who paid, who was never invited, and their ranking", () => {
@@ -281,13 +298,19 @@ describe("participants", () => {
     expect(competitorStatusesLabel).toBe("« Terminé »");
   });
 
+  it("exports the participants with their category", () => {
+    const rows = participantCsv(participantRows(ladder, [], []));
+    expect(rows[0]!.slice(0, 4)).toEqual(["Nom", "Prénom", "N° Licence", "Catégorie"]);
+    expect(rows.slice(1).map((r) => r[3])).toEqual(["U11", "U13 F", "U13 H", "Sénior F", "Vétéran 1 H", "", ""]);
+  });
+
   it("exports the participants", () => {
     const rows = participantCsv(participantRows(c, members, contacts));
     expect(rows[0]!.slice(0, 3)).toEqual(["Nom", "Prénom", "N° Licence"]);
     expect(rows.slice(1).map((r) => [r[0], r[4], r[5], r[6]])).toEqual([
+      ["ABEL", "", "Non", "Non invité"],
       ["DURAND", "", "Oui", "En attente"],
       ["MARTIN", "1er", "Oui", "Payé"],
-      ["ABEL", "", "Non", "Non invité"],
     ]);
   });
 

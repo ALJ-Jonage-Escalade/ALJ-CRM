@@ -13,6 +13,7 @@ import html
 import logging
 from typing import Any, Dict, List, Mapping
 
+from domain.members.ffme_category import category_label
 from exports.competitors_excel import payment_label
 
 logger = logging.getLogger("alj")
@@ -41,9 +42,9 @@ def generate_competitors_html(comp: Mapping[str, Any], participants: List[Dict[s
         bg = "#F8FAFC" if i % 2 == 1 else "#FFFFFF"
         nom = html.escape(str(p.get("nom") or "").strip().upper())
         prenom = html.escape(str(p.get("prenom") or "").strip().title())
-        cat = html.escape(str(p.get("categorie_ffme") or p.get("categorie") or "").strip())
+        cat = html.escape(category_label(p.get("categorie"), p.get("sex")))
         surclass = "Oui" if p.get("surclassement") else "Non"
-        discipline_val = html.escape(str(p.get("discipline") or p.get("creneau_groupe") or disc or "").strip())
+        discipline_val = html.escape(str(p.get("discipline") or disc or "").strip())
         statut = "Sélectionné" if p.get("selectionne") else "Non invité"
         paiement = html.escape(payment_label(p))
         dob = html.escape(str(p.get("date_naissance") or p.get("birth_date") or "").strip())

@@ -13,6 +13,8 @@ from domain.competitions.models import CompetitionStatus
 from domain.constants import resolve_season
 from domain.errors import InvalidRequest, NotFound
 from domain.members import view as member_view
+from domain.members.age_rules import parse_birth_date
+from domain.members.ffme_category import category_for
 from infrastructure.sqlite.keys import KeyRepository
 from infrastructure.sqlite.members import MemberRepository
 from infrastructure.sqlite.planning import PlanningRepository
@@ -77,6 +79,10 @@ class MemberService:
             raise InvalidRequest("Identifiant d'adhérent manquant (user_id, purchase_id ou order_ref).")
         if not fields:
             raise InvalidRequest("Aucune modification à enregistrer.")
+        if "birth_date" in fields and "ffme_category" not in fields:  # a birth date fix: the category follows it
+            season = MemberRepository.latest_season_of(user_id=user_id, purchase_id=purchase_id, order_ref=order_ref or None)
+            if season:
+                fields = {**fields, "ffme_category": category_for(parse_birth_date(fields["birth_date"]), season) or ""}
         MemberRepository.update_member_fields(user_id=user_id, fields=fields, purchase_id=purchase_id, order_ref=order_ref or None)
 
     @staticmethod

@@ -15,6 +15,8 @@ import logging
 import sqlite3
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple, Union
 
+from domain.members.age_rules import parse_birth_date
+from domain.members.ffme_category import category_for
 from domain.members.helloasso_membership import INSURANCE_OPTIONS
 from domain.members.emergency_contacts import HELLOASSO_CONTACT_FIELDS, EmergencyContact, missing_contacts
 from domain.members.purchase_priority import purchase_priority_score, status_score
@@ -46,6 +48,7 @@ CREATE TABLE IF NOT EXISTS users (
     emergency1_name TEXT, emergency1_phone TEXT,
     emergency2_name TEXT, emergency2_phone TEXT,
     licence_ffme TEXT,
+    ffme_category TEXT DEFAULT '',
     photo_auth TEXT, health_commitment TEXT,
     badge_rouge TEXT DEFAULT 'Non',
     autonomie_bloc TEXT DEFAULT 'Non',
@@ -462,7 +465,20 @@ def insert_purchase_v2(cur: sqlite3.Cursor, order_id: Optional[int], user_id: Op
           _get(rec, "is_modified") or "Non",
           clean_legacy_text(_get(rec, "commentaires_correctif")) or "",
           legacy_adherent_id, legacy_season_id, now_iso, now_iso))
-    return cur.lastrowid
+    purchase_id = cur.lastrowid
+    _write_ffme_category(cur, user_id, order_id, now_iso)
+    return purchase_id
+
+
+def _write_ffme_category(cur: sqlite3.Cursor, user_id: Optional[int], order_id: Optional[int], now_iso: str) -> None:
+    """A new membership (import, renewal, manual addition): the member's FFME category for the order's season, over
+    any earlier value (plans/ffme-categories.md D4). Updates of an existing membership never come here."""
+    row = cur.execute("SELECT u.birth_date, s.name FROM users u, orders o JOIN seasons s ON s.id = o.season_id"
+                      " WHERE u.id = ? AND o.id = ?", (user_id, order_id)).fetchone()
+    if row is None:
+        return
+    category = category_for(parse_birth_date(row[0]), row[1])
+    cur.execute("UPDATE users SET ffme_category = ?, updated_at = ? WHERE id = ?", (category or "", now_iso, user_id))
 
 
 def insert_options_v2(cur: sqlite3.Cursor, purchase_id: Optional[int], rec: MemberRecord) -> int:
@@ -551,6 +567,7 @@ SELECT
     COALESCE((SELECT ec.phone FROM emergency_contacts ec WHERE ec.user_id = u.id ORDER BY ec.position, ec.id LIMIT 1), '') AS "emergency1_phone",
     p.is_tribe AS "is_tribe",
     u.licence_ffme AS "licence_ffme",
+    u.ffme_category AS "ffme_category",
     u.photo_auth AS "photo_auth",
     u.health_commitment AS "health_commitment",
 {option_columns}

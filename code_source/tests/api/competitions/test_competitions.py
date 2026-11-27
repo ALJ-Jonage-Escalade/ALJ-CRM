@@ -37,7 +37,7 @@ class TestCompetitions(ApiTestCase):
         (part,) = listed["participants"]
         for field in CompetitionParticipant.model_fields:
             # Set by the results fetch, or by a check-in, only
-            if field not in ("classement", "total_categorie", "categorie_ffme", "resultat_ffme", "present"):
+            if field not in ("classement", "total_categorie", "resultat_ffme", "present"):
                 self.assertIn(field, part)
                 self.assertEqual(parsed["participants"][0][field], part[field], field)
         again = self.client.get("/api/competitions", headers={"If-None-Match": r.headers["etag"]})

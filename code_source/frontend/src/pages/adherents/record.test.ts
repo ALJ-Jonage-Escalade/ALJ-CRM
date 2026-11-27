@@ -45,6 +45,11 @@ describe("record", () => {
     expect(recordRows(member({ first_name: "Léa", last_name: "DUPONT", payer: "Léa DUPONT" }))).toEqual([]);
   });
 
+  it("shows the FFME category with the sex", () => {
+    const rows = recordRows(member({ ffme_category: "U15", sex: "F" }));
+    expect(rows.map((r) => `${r.label}=${r.value}`)).toEqual(["Sexe=Femme", "Catégorie FFME=U15"]);
+  });
+
   it("shows the FFME passports with their colours", () => {
     const passports = (raw: string) => recordRows(member({ raw_passports: raw })).find((r) => r.label === "Passeports FFME")?.value;
     expect(passports("Passeport Blanc, Passeport Jaune")).toBe("⚪🟡 Passeport Blanc, Passeport Jaune");
@@ -223,6 +228,19 @@ describe("edit and add", () => {
     expect(changesOf(femaleMember, { ...draftOf(femaleMember), sex: "" })).toEqual({
       fields: { sex: null },
       lines: ["Sexe : Femme ➔ Non renseigné"],
+    });
+  });
+
+  it('sends the FFME category chosen, "" to clear it', () => {
+    const cadet = member({ ffme_category: "U15" });
+    expect(changesOf(cadet, draftOf(cadet))).toEqual({ fields: {}, lines: [] });
+    expect(changesOf(cadet, { ...draftOf(cadet), ffme_category: "U17" })).toEqual({
+      fields: { ffme_category: "U17" },
+      lines: ["Catégorie FFME : U15 ➔ U17"],
+    });
+    expect(changesOf(cadet, { ...draftOf(cadet), ffme_category: "" })).toEqual({
+      fields: { ffme_category: "" },
+      lines: ["Catégorie FFME : U15 ➔ Aucune"],
     });
   });
 

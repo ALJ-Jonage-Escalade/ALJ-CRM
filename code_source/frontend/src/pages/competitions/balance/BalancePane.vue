@@ -5,6 +5,7 @@
 import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
 import UiBadge from "../../../components/ui/UiBadge.vue";
+import { categoryAndSexLabel } from "../../../lib/category";
 import type { BadgeColor } from "../../../components/ui/palette";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiCard from "../../../components/ui/UiCard.vue";
@@ -209,8 +210,8 @@ const TONE_COLOR = { ok: "green", due: "red", credit: "violet" } satisfies Recor
                     {{ l.ranking }}
                   </UiBadge>
                   <template v-else>—</template>
-                  <span v-if="l.ranking && l.participant.categorie_ffme" class="text-[10.5px] font-semibold text-slate-500">
-                    {{ l.participant.categorie_ffme }}
+                  <span v-if="l.ranking && l.participant.categorie" class="text-[10.5px] font-semibold text-slate-500">
+                    {{ categoryAndSexLabel(l.participant.categorie, l.participant.sex) }}
                   </span>
                 </span>
                 <span class="flex min-w-32 flex-col items-end">

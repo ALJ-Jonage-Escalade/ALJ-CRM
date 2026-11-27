@@ -6197,6 +6197,20 @@
         ],
         "title": "BucketCounts"
       },
+      "Category": {
+        "type": "string",
+        "enum": [
+          "U11",
+          "U13",
+          "U15",
+          "U17",
+          "U19",
+          "SENIOR",
+          "VETERAN_1",
+          "VETERAN_2"
+        ],
+        "title": "Category"
+      },
       "CloudDbStatus": {
         "properties": {
           "status": {
@@ -6669,6 +6683,19 @@
             "title": "Creneau Groupe",
             "default": ""
           },
+          "ffme_category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "string",
+                "const": ""
+              }
+            ],
+            "title": "Ffme Category",
+            "default": ""
+          },
           "sex": {
             "anyOf": [
               {
@@ -6716,6 +6743,20 @@
           "tarif": {
             "type": "string",
             "title": "Tarif",
+            "default": ""
+          },
+          "categorie": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "string",
+                "const": ""
+              }
+            ],
+            "title": "Categorie",
+            "description": "FFME category of the member when added, never refreshed",
             "default": ""
           },
           "phone": {
@@ -6788,11 +6829,6 @@
             ],
             "title": "Total Categorie",
             "default": 0
-          },
-          "categorie_ffme": {
-            "type": "string",
-            "title": "Categorie Ffme",
-            "default": ""
           },
           "resultat_ffme": {
             "type": "string",
@@ -9912,6 +9948,19 @@
             "type": "string",
             "title": "Licence Ffme"
           },
+          "ffme_category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "string",
+                "const": ""
+              }
+            ],
+            "title": "Ffme Category",
+            "description": "FFME competition category, \"\" when none"
+          },
           "emergency_contacts": {
             "items": {
               "$ref": "#/components/schemas/EmergencyContact"
@@ -10033,10 +10082,6 @@
             "type": "string",
             "title": "Creneau Groupe"
           },
-          "categorie": {
-            "type": "string",
-            "title": "Categorie"
-          },
           "creneau_details": {
             "type": "string",
             "title": "Creneau Details"
@@ -10062,6 +10107,7 @@
           "email_primary",
           "email_secondary",
           "licence_ffme",
+          "ffme_category",
           "emergency_contacts",
           "emergency1_name",
           "emergency1_phone",
@@ -10086,7 +10132,6 @@
           "email_sent_date",
           "commentaires_correctif",
           "creneau_groupe",
-          "categorie",
           "creneau_details"
         ],
         "title": "Member",
@@ -10181,6 +10226,22 @@
               }
             ],
             "description": "Sent as null to clear it"
+          },
+          "ffme_category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "string",
+                "const": ""
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ffme Category",
+            "description": "\"\" clears it; left out with a new birth_date: recomputed for the member's latest season"
           },
           "badge_rouge": {
             "anyOf": [

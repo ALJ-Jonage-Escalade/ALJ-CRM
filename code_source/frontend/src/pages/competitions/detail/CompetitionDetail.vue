@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* One competition: its details, counters and competitors by slot group (a table on wide screens, cards elsewhere). Coaches and admins change it here (plan phase
+/* One competition: its details, counters and competitors by category and sex (a table on wide screens, cards elsewhere). Coaches and admins change it here (plan phase
    11): the competition itself, its results and exports (CompetitionActions), its list (add a member, load the
    competition group, remove the ones never invited), each competitor (ParticipantCard) and an e-mail to its competitors. « Participe » and « Présent » also change offline (the outbox, sent when the network comes back). */
 import { computed, inject, ref } from "vue";
@@ -21,8 +21,8 @@ import {
   shownDiscipline,
   disciplineColor,
   filterRows,
-  groupFilters,
-  groupRows,
+  categoryFilters,
+  categoryRows,
   isArchived,
   isNotInvited,
   memberMatches,
@@ -66,26 +66,26 @@ const c = computed(() => props.competition);
 const kpis = computed(() => counts(props.rows));
 /* Wide screens: the competitors in a table, as on the former desktop page; cards elsewhere */
 const wide = useMediaQuery(XL_LAYOUT_QUERY);
-/* A computer filters on the registration (participation, payment); a phone, used on the competition day, on the slot
-   group, as the groups compete one after the other (no search: a group is a short list) */
+/* Both pick a category and sex (the competitors start one after the other); a computer also filters on the registration
+   (participation, payment) and searches (a phone: a category is a short list) */
 const computerFilters = useWideLayout();
 const filter = ref<ParticipantFilter>("all");
-const shownGroup = ref("");
-const groupOptions = computed(() => groupFilters(props.rows));
+const pickedSection = ref("");
+const sectionOptions = computed(() => categoryFilters(props.rows));
 const activeFilter = computed<ParticipantFilter>(() => (computerFilters.value ? filter.value : "all"));
-const activeGroup = computed(() =>
-  !computerFilters.value && groupOptions.value.some((g) => g.group === shownGroup.value) ? shownGroup.value : "",
+const activeSection = computed(() =>
+  sectionOptions.value.some((option) => option.section === pickedSection.value) ? pickedSection.value : "",
 );
-/* The select shows activeGroup, not shownGroup: a group gone from the list (competitor removed) shows « Tous » */
-const pickedGroup = computed({
-  get: () => activeGroup.value,
-  set: (group: string) => {
-    shownGroup.value = group;
+/* The select shows activeSection, not pickedSection: a section gone from the list (competitor removed) shows « Tous » */
+const shownSection = computed({
+  get: () => activeSection.value,
+  set: (section: string) => {
+    pickedSection.value = section;
   },
 });
 const search = ref("");
-const shown = computed(() => filterRows(props.rows, activeFilter.value, computerFilters.value ? search.value : "", activeGroup.value));
-const groups = computed(() => groupRows(shown.value));
+const shown = computed(() => filterRows(props.rows, activeFilter.value, computerFilters.value ? search.value : "", activeSection.value));
+const sections = computed(() => categoryRows(shown.value));
 const notInvited = computed(() => props.rows.filter(isNotInvited));
 const FILTERS = computed(() => [
   { id: "all" as const, label: "📋 Tous", n: kpis.value.all },
@@ -419,9 +419,16 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
             {{ f.label }} ({{ f.n }})
           </button>
         </template>
-        <select v-else v-model="pickedGroup" data-testid="group-filter" aria-label="Groupe de créneau" :class="[field, 'w-full']">
+        <select
+          v-model="shownSection"
+          data-testid="category-filter"
+          aria-label="Catégorie"
+          :class="[field, computerFilters ? 'w-44' : 'w-full']"
+        >
           <option value="">📋 Tous ({{ kpis.all }})</option>
-          <option v-for="g in groupOptions" :key="g.group" :value="g.group">{{ g.group }} ({{ g.n }})</option>
+          <option v-for="option in sectionOptions" :key="option.section" :value="option.section">
+            {{ option.section }} ({{ option.n }})
+          </option>
         </select>
         <input
           v-if="!wide && computerFilters"
@@ -433,7 +440,7 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         />
       </div>
       <p class="mb-2 text-xs text-slate-500" data-testid="participant-count">
-        {{ countLine(kpis, activeFilter, shown.length, activeGroup) }}
+        {{ countLine(kpis, activeFilter, shown.length, activeSection) }}
       </p>
 
       <!-- On a computer only: a long read, for whoever learns the tool -->
@@ -491,10 +498,10 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         </div>
       </details>
 
-      <p v-if="!groups.length" class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500">
+      <p v-if="!sections.length" class="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-500">
         {{ rows.length ? "Aucun compétiteur ne correspond au filtre." : "Aucun compétiteur inscrit." }}
       </p>
-      <div v-if="wide && groups.length" class="overflow-x-auto rounded-lg border border-slate-200">
+      <div v-if="wide && sections.length" class="overflow-x-auto rounded-lg border border-slate-200">
         <table class="w-full border-collapse text-left text-[13px]" aria-label="Compétiteurs">
           <thead class="bg-slate-50 text-[11px] font-bold whitespace-nowrap text-slate-500 uppercase">
             <tr>
@@ -508,10 +515,10 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
               <th v-if="canWrite" class="px-2.5 py-2 text-center">Action</th>
             </tr>
           </thead>
-          <tbody v-for="[group, list] in groups" :key="group" data-testid="participant-group">
+          <tbody v-for="[section, list] in sections" :key="section" data-testid="participant-group">
             <tr class="border-t border-slate-200 bg-slate-100/70">
               <th :colspan="canWrite ? 6 : 5" class="px-2.5 py-1.5 text-xs font-bold text-slate-600 uppercase">
-                {{ group }} · {{ list.length }} compétiteur{{ plural(list.length) }}
+                {{ section }} · {{ list.length }} compétiteur{{ plural(list.length) }}
               </th>
             </tr>
             <ParticipantRow
@@ -538,9 +545,9 @@ const field = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[1
         </table>
       </div>
       <template v-else>
-        <div v-for="[group, list] in groups" :key="group" class="mb-3" data-testid="participant-group">
+        <div v-for="[section, list] in sections" :key="section" class="mb-3" data-testid="participant-group">
           <h3 class="mb-1.5 text-xs font-bold text-slate-600 uppercase">
-            {{ group }} · {{ list.length }} compétiteur{{ plural(list.length) }}
+            {{ section }} · {{ list.length }} compétiteur{{ plural(list.length) }}
           </h3>
           <ul class="grid gap-2 xl:grid-cols-2">
             <ParticipantCard

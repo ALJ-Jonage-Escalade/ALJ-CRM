@@ -17,6 +17,7 @@ const LEO = {
   adherent_id: 1,
   nom: "MARTIN",
   prenom: "Léo",
+  categorie: "U17" as const,
   selectionne: true,
   statut_paiement: "paye",
   montant_paye: 12,
@@ -27,6 +28,7 @@ const ZOE = {
   adherent_id: 2,
   nom: "DURAND",
   prenom: "Zoé",
+  categorie: "U15" as const,
   sex: "F" as const,
   selectionne: true,
   statut_paiement: "en_attente",
@@ -202,7 +204,7 @@ describe("CompetitionsPage", () => {
     expect(byId("archived-list").text()).toContain("Open passé");
   });
 
-  it("shows a competition's participants by group with payment status, contacts for coaches", async () => {
+  it("shows a competition's participants by category with payment status, contacts for coaches", async () => {
     onComputer();
     const { byId, all } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
     await settle();
@@ -213,10 +215,17 @@ describe("CompetitionsPage", () => {
     ]);
     expect(byId("kpi-selected").exists()).toBe(false);
     expect(all("participant-group").map((g) => g.find("h3").text())).toEqual([
-      "Compét. U14 · 1 compétiteur",
-      "Compét. U18 · 1 compétiteur",
-      "Non identifiés · 1 compétiteur",
+      "U15 F · 1 compétiteur",
+      "U17 · 1 compétiteur",
+      "Sans catégorie · 1 compétiteur",
     ]);
+    // The same selector as on a phone, combined with the chips
+    await byId("category-filter").setValue("U15 F");
+    await byId("filter-selected").trigger("click");
+    expect(all("participant-name").map((n) => n.text())).toEqual(["DURAND Zoé"]);
+    expect(byId("participant-count").text()).toBe("1 compétiteur en « U15 F » (participe : oui)");
+    await byId("category-filter").setValue("");
+    await byId("filter-all").trigger("click");
     expect(byId("emergency-link").attributes("href")).toBe("tel:0601010101");
     await byId("filter-unpaid").trigger("click");
     expect(all("participant-name").map((n) => n.text())).toEqual(["DURAND Zoé"]);
@@ -224,19 +233,19 @@ describe("CompetitionsPage", () => {
     expect(all("participant-name").map((n) => n.text())).toEqual(["ABEL Max"]);
   });
 
-  it("filters by slot group on a phone, where a competition day goes one group after the other", async () => {
+  it("filters by category and sex on a phone, where a competition day goes one category after the other", async () => {
     const { byId, all } = await render(signedIn("coach"), fakeApi().api, store, "/competitions?id=10");
     await settle();
     expect([byId("filter-selected").exists(), byId("participant-search").exists()]).toEqual([false, false]);
     expect(
-      byId("group-filter")
+      byId("category-filter")
         .findAll("option")
         .map((o) => o.text()),
-    ).toEqual(["📋 Tous (3)", "Compét. U14 - F (1)", "Compét. U18 (1)"]);
-    await byId("group-filter").setValue("Compét. U18");
+    ).toEqual(["📋 Tous (3)", "U15 F (1)", "U17 (1)", "Sans catégorie (1)"]);
+    await byId("category-filter").setValue("U17");
     expect(all("participant-name").map((n) => n.text())).toEqual(["MARTIN Léo"]);
-    expect(byId("participant-count").text()).toBe("1 compétiteur en « Compét. U18 »");
-    await byId("group-filter").setValue("");
+    expect(byId("participant-count").text()).toBe("1 compétiteur en « U17 »");
+    await byId("category-filter").setValue("");
     expect(all("participant-name")).toHaveLength(3);
   });
 

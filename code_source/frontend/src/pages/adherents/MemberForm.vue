@@ -7,6 +7,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../components/ui/UiButton.vue";
 import UiDialogActions from "../../components/ui/UiDialogActions.vue";
 import { choicesWith, COUNTRY_CHOICES, NATIONALITY_CHOICES } from "../../lib/countries";
+import { CATEGORY_LABELS, CATEGORY_ORDER, NO_CATEGORY } from "../../lib/category";
 import { SEX_LABELS, SEX_NOT_GIVEN, type Sex } from "../../lib/sex";
 import {
   contactPhoneField,
@@ -233,6 +234,13 @@ const TEXT_FIELDS: { name: TextField; label: string; type?: string; placeholder?
         <select v-model="draft.sex" v-bind="attrs('sex')" :class="fieldClass('sex')">
           <option value="">{{ SEX_NOT_GIVEN }}</option>
           <option v-for="[value, text] in sexes" :key="value" :value="value">{{ text }}</option>
+        </select>
+      </div>
+      <div v-if="!adding">
+        <label for="member-ffme_category" :class="label">🏅 Catégorie FFME</label>
+        <select v-model="draft.ffme_category" v-bind="attrs('ffme_category')" :class="fieldClass('ffme_category')">
+          <option value="">{{ NO_CATEGORY }}</option>
+          <option v-for="category in CATEGORY_ORDER" :key="category" :value="category">{{ CATEGORY_LABELS[category] }}</option>
         </select>
       </div>
       <div>
