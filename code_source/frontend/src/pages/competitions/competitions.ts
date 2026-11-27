@@ -405,7 +405,7 @@ export function participantCsv(rows: readonly Row[]): Cell[][] {
         p.nom,
         p.prenom,
         p.num_licence,
-        p.section === UNIDENTIFIED || p.section === NO_CATEGORY_SECTION ? "" : p.section,
+        categoryAndSexLabel(p.categorie, p.sex),
         rankingLabel(p),
         p.selectionne ? "Oui" : "Non",
         paymentBadge(p.statut_paiement).label,
