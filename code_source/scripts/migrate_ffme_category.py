@@ -9,10 +9,14 @@ is the only way back once the participants' `categorie_ffme` is deleted. Delete 
 
 - `crm_users`: `ffme_category` = the category of the birth date for the season of the member's latest membership
   ("" without birth date or membership). Written like the cache sync (precondition on the version read, `_modified_at`
-  bumped so instances pull it). A member that already has the field (imported or edited since) is left alone.
+  bumped so instances pull it). A member that already has a category (imported or edited since) is left alone.
 - `competitions`: each participant row gets `categorie`, computed for the competition's own season (from its date:
   the category it was entered in), and loses the MyCompet `categorie_ffme`. Undated competition or unknown member: "".
 - `adherents` (directory): `ffme_category` set on the documents that have none.
+
+An empty value counts as missing: between the deploy and this run, the SQLite column default ('') reaches Firestore
+(a member edited, the directory rebuilt) and participants added meanwhile copy it; they are computed like the others.
+Only a value that changes something is written (an empty one stays when the computed category is empty too).
 
 Re-runnable. The report gives counts per category and the members not computed, by user id (no names).
 """
@@ -75,18 +79,25 @@ def birth_dates(store: RestStore) -> Dict[Any, Optional[datetime.date]]:
     return {u.get("id"): parse_birth_date(u.get("birth_date")) for u in _live(store, "users")}
 
 
+def _computed(birth: Optional[datetime.date], season: Optional[str]) -> str:
+    """The category code for that season, "" when none (no birth date, no season, under 9)."""
+    category = category_for(birth, season) if season else None
+    return category.value if category else ""
+
+
+def _needs_write(stored: Dict[str, Any], key: str, computed: str) -> bool:
+    """A missing key, or an empty one the computed category fills; a non-empty value is kept (set by the app since)."""
+    return key not in stored or (not stored[key] and bool(computed))
+
+
 def member_categories(store: RestStore) -> Dict[Any, str]:
     """{user id -> category}: the stored one, else the one computed for their latest season ("" when none)."""
     seasons = latest_seasons(store)
     result: Dict[Any, str] = {}
     for user in _live(store, "users"):
         user_id = user.get("id")
-        if FIELD in user:
-            result[user_id] = str(user.get(FIELD) or "")
-            continue
-        season = seasons.get(user_id)
-        category = category_for(parse_birth_date(user.get("birth_date")), season) if season else None
-        result[user_id] = category.value if category else ""
+        stored = str(user.get(FIELD) or "")
+        result[user_id] = stored or _computed(parse_birth_date(user.get("birth_date")), seasons.get(user_id))
     return result
 
 
@@ -95,18 +106,18 @@ def migrate_users(store: RestStore, apply: bool, report: Report) -> None:
     writes = []
     for doc in store.list_all(collection_for("users")):
         fields = doc["fields"]
-        if doc.get("deleted") or FIELD in fields:
-            report.users_skipped += 1
-            continue
         user_id = fields.get("id")
         birth, season = parse_birth_date(fields.get("birth_date")), seasons.get(user_id)
-        category = category_for(birth, season) if season else None
-        report.users_by_category[category.value if category else NONE] += 1
+        category = _computed(birth, season)
+        if doc.get("deleted") or not _needs_write(fields, FIELD, category):
+            report.users_skipped += 1
+            continue
+        report.users_by_category[category or NONE] += 1
         if birth is None or season is None:
             report.not_computed.append(user_id)
         writes.append({
             "collection": collection_for("users"), "doc_id": doc["id"], "by": "migration ffme_category",
-            "fields": {FIELD: category.value if category else ""}, "mask": [FIELD],
+            "fields": {FIELD: category}, "mask": [FIELD],
             "precondition": {"updateTime": doc["update_time"]} if doc.get("update_time") else {"exists": True},
         })
     if apply:
@@ -124,36 +135,40 @@ def season_of(day: str) -> Optional[str]:
     return f"{start}-{start + 1}"
 
 
-def _needs_migration(row: Dict[str, Any]) -> bool:
-    return "categorie" not in row or LEGACY in row
+def _participant_category(row: Dict[str, Any], births: Dict[Any, Optional[datetime.date]], season: Optional[str]) -> str:
+    return _computed(births.get(row.get("adherent_id")), season)
+
+
+def _needs_migration(row: Dict[str, Any], births: Dict[Any, Optional[datetime.date]], season: Optional[str]) -> bool:
+    return LEGACY in row or _needs_write(row, "categorie", _participant_category(row, births, season))
 
 
 def migrate_competitions(store: RestStore, apply: bool, report: Report) -> None:
     births = birth_dates(store)
     for doc in FirestoreClient.list_documents(documents.COLLECTION_COMPETITIONS):
         rows = doc.get("participants") or []
-        if not any(_needs_migration(row) for row in rows):
+        season = season_of(str(doc.get("date_competition") or ""))
+        pending = sum(1 for row in rows if _needs_migration(row, births, season))
+        if not pending:
             continue
         report.competitions += 1
-        report.participants += sum(1 for row in rows if _needs_migration(row))
+        report.participants += pending
         if not apply:
             continue
         if doc.get("id") is None:
             raise SystemExit(f"Compétition sans identifiant (document {doc.get('_doc_id')}) : ouvrez-la dans l'application puis relancez.")
-        season = season_of(str(doc.get("date_competition") or ""))
 
         def migrated(current: List[Dict[str, Any]], season: Optional[str] = season) -> Optional[List[Dict[str, Any]]]:
-            if not any(_needs_migration(row) for row in current):
+            if not any(_needs_migration(row, births, season) for row in current):
                 return None
             out = []
             for row in current:
-                if not _needs_migration(row):
+                if not _needs_migration(row, births, season):
                     out.append(row)
                     continue
                 kept = {k: v for k, v in row.items() if k != LEGACY}
-                if "categorie" not in kept:
-                    category = category_for(births.get(row.get("adherent_id")), season) if season else None
-                    kept["categorie"] = category.value if category else ""
+                if not kept.get("categorie"):
+                    kept["categorie"] = _participant_category(row, births, season)
                 out.append(kept)
             return out
         # Re-read and retried on a concurrent write; participant `updated_at` untouched (offline guards)
@@ -164,11 +179,12 @@ def migrate_directory(store: RestStore, apply: bool, report: Report) -> None:
     categories = member_categories(store)
     writes = []
     for doc in FirestoreClient.list_documents(documents.COLLECTION_ADHERENTS):
-        if FIELD in doc:
+        category = categories.get(doc.get("id"), "")
+        if not _needs_write(doc, FIELD, category):
             continue
         report.directory += 1
         writes.append({"path": f"{documents.COLLECTION_ADHERENTS}/{doc['_doc_id']}",
-                       "data": {FIELD: categories.get(doc.get("id"), "")}, "update_fields": [FIELD]})
+                       "data": {FIELD: category}, "update_fields": [FIELD]})
     if apply and writes:
         result = FirestoreClient.batch_upsert(writes)
         if result["errors_count"]:

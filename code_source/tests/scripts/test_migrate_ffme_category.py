@@ -94,6 +94,16 @@ class TestMigrateUsers(FirestoreRepoTestCase):
         report = self.run_users(store, apply=True)
         self.assertEqual((sum(report.users_by_category.values()), report.users_skipped, len(store.commits)), (0, 5, 1))
 
+    def test_empty_value_written_before_the_migration_is_computed(self):
+        # Pushed by the cache after the deploy (column default ''), before this run
+        store = members_store()
+        store.docs["crm_users"]["0"]["fields"]["ffme_category"] = ""  # GRANGER
+        store.docs["crm_users"]["2"]["fields"]["ffme_category"] = ""  # POTTER, no birth date: nothing to compute
+        report = self.run_users(store, apply=True)
+        self.assertEqual(categories(store), {1: "U15", 2: "U11", 3: "", 4: "SENIOR", 5: ""})
+        self.assertEqual(report.users_skipped, 2)  # POTTER and MALFOY
+        self.assertNotIn("3", {w["doc_id"] for w in store.commits[0]})
+
 
 class TestMigrateCompetitionsAndDirectory(FirestoreRepoTestCase):
     """GRANGER (born 2014) in a competition of March 2026 (season 2025-2026: U13) and of October 2026 (U15)."""
@@ -146,6 +156,27 @@ class TestMigrateCompetitionsAndDirectory(FirestoreRepoTestCase):
         migration.migrate_competitions(self.store, True, report)
         migration.migrate_directory(self.store, True, report)
         self.assertEqual((report.competitions, report.participants, report.directory), (0, 0, 0))
+
+    def test_empty_category_copied_before_the_migration_is_computed(self):
+        # After the deploy, before this run: the directory rebuilt with '' and a competitor added copies it
+        self.seed_adherent(1, nom="GRANGER", ffme_category="")
+        competition_id = competitions.save_competition(Competition(id=710, nom="Ajout après déploiement", date_competition="2026-10-10"))
+        participants.add_participant(competition_id, 1)
+        self.assertEqual(self.rows_by_name()["Ajout après déploiement"]["categorie"], "")
+        report = migration.Report()
+        migration.migrate_competitions(self.store, True, report)
+        migration.migrate_directory(self.store, True, report)
+        self.assertEqual(self.rows_by_name()["Ajout après déploiement"]["categorie"], "U15")
+        directory = {d["id"]: d for d in self.fake.list_documents(documents.COLLECTION_ADHERENTS)}
+        self.assertEqual(directory[1]["ffme_category"], "U15")
+
+    def test_empty_category_with_nothing_to_compute_is_left(self):
+        # Undated competition: the category stays empty, no write and nothing reported on a rerun
+        migration.migrate_competitions(self.store, True, migration.Report())
+        self.assertEqual(self.rows_by_name()["Sans date"]["categorie"], "")
+        report = migration.Report()
+        migration.migrate_competitions(self.store, True, report)
+        self.assertEqual(report.participants, 0)
 
 
 class TestTargetGuards(FirestoreRepoTestCase):
