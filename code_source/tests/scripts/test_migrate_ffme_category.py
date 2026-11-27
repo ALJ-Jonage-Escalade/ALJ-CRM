@@ -193,6 +193,41 @@ class TestTargetGuards(FirestoreRepoTestCase):
 
     def test_production_apply_needs_the_project_id_typed(self):
         store = members_store()
-        with patch.object(migration, "RestStore", return_value=store), patch("builtins.input", return_value="wrong"):
+        with patch.object(migration, "gcloud", side_effect=gcloud_answers()), \
+                patch.object(migration, "RestStore", return_value=store), patch("builtins.input", return_value="wrong"):
             self.assertEqual(migration.main(["--apply"]), 1)
         self.assertEqual(store.commits, [])
+
+    def test_production_uses_the_gcloud_account(self):
+        store = members_store()
+        seen: Dict[str, Any] = {}
+
+        def migrate_competitions(*_args: Any) -> None:
+            seen["client"] = (migration.FirestoreClient.get_project_id(), migration.FirestoreClient.get_access_token())
+
+        with patch.object(migration, "gcloud", side_effect=gcloud_answers()), \
+                patch.object(migration, "RestStore", return_value=store) as rest_store, \
+                patch.object(migration, "migrate_competitions", migrate_competitions):
+            self.assertEqual(migration.main([]), 0)
+        project, token_provider = rest_store.call_args.args
+        self.assertEqual((project, token_provider()), ("alj-prod", "gcloud-token"))
+        self.assertEqual(seen["client"], ("alj-prod", "gcloud-token"))
+
+    def test_project_option_overrides_the_gcloud_config(self):
+        with patch.object(migration, "gcloud", side_effect=gcloud_answers()), \
+                patch.object(migration, "RestStore", return_value=members_store()) as rest_store:
+            self.assertEqual(migration.main(["--project", "other-project"]), 0)
+        self.assertEqual(rest_store.call_args.args[0], "other-project")
+
+    def test_without_gcloud_project_nothing_runs(self):
+        with patch.object(migration, "gcloud", side_effect=gcloud_answers(project="")), \
+                patch.object(migration, "RestStore") as rest_store:
+            self.assertEqual(migration.main([]), 2)
+        rest_store.assert_not_called()
+
+
+def gcloud_answers(project: str = "alj-prod"):
+    """A fake `gcloud(*args)`: the configured project and account, and the access token."""
+    answers = {("config", "get-value", "project"): project, ("config", "get-value", "account"): "admin@example.org",
+               ("auth", "print-access-token"): "gcloud-token"}
+    return lambda *args: answers[args]

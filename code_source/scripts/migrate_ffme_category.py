@@ -5,7 +5,11 @@ is the only way back once the participants' `categorie_ffme` is deleted. Delete 
 
     uv run python scripts/migrate_ffme_category.py                 # dry run: report only, nothing written
     uv run python scripts/migrate_ffme_category.py --apply         # writes (asks to type the project id)
+    uv run python scripts/migrate_ffme_category.py --project <id>  # another project than the gcloud config's
     uv run python scripts/migrate_ffme_category.py --emulator      # same against the emulator (dev/dev.env loaded)
+
+Production access is your gcloud account (`gcloud auth login`, needs Firestore read/write on the project): the token
+of `gcloud auth print-access-token`, the project of `gcloud config get-value project` unless `--project` is given.
 
 - `crm_users`: `ffme_category` = the category of the birth date for the season of the member's latest membership
   ("" without birth date or membership). Written like the cache sync (precondition on the version read, `_modified_at`
@@ -26,10 +30,12 @@ from __future__ import annotations
 import argparse
 import datetime
 import os
+import subprocess  # noqa: S404 (gcloud, fixed arguments)
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+from unittest.mock import patch
 
 SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
 if SRC not in sys.path:
@@ -205,10 +211,38 @@ def print_report(report: Report, apply: bool) -> None:
         print("\nSimulation : rien n'a été écrit. Relancez avec --apply pour écrire.")
 
 
+def gcloud(*args: str) -> str:
+    """The output of `gcloud <args>`; SystemExit when gcloud is missing or fails (not logged in)."""
+    try:
+        # Fixed arguments, no shell; gcloud resolved through PATH as typed in a terminal
+        result = subprocess.run(["gcloud", *args], capture_output=True, text=True, check=True, timeout=60)  # noqa: S603, S607
+    except FileNotFoundError:
+        raise SystemExit("gcloud introuvable : installez le Google Cloud SDK puis lancez `gcloud auth login`.")
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(f"gcloud {' '.join(args)} a échoué (gcloud auth login ?) : {error.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def _run(store: RestStore, apply: bool, production: bool) -> int:
+    if apply and production:
+        typed = input(f"Écriture en production : tapez l'identifiant du projet ({store.project_id}) pour confirmer : ")
+        if typed.strip() != store.project_id:
+            print("Confirmation incorrecte : rien n'a été écrit.", file=sys.stderr)
+            return 1
+    report = Report()
+    # Competitions and directory first: they read the members' birth dates and categories as they are now
+    migrate_competitions(store, apply, report)
+    migrate_directory(store, apply, report)
+    migrate_users(store, apply, report)
+    print_report(report, apply)
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("--apply", action="store_true", help="write the changes (default: dry run)")
     parser.add_argument("--emulator", action="store_true", help="allow the Firestore emulator (FIRESTORE_EMULATOR_HOST)")
+    parser.add_argument("--project", help="Firestore project (default: gcloud config get-value project)")
     args = parser.parse_args(argv)
 
     emulator = runtime_env.firestore_emulator_host()
@@ -223,22 +257,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.emulator and not emulator:
         print("--emulator sans FIRESTORE_EMULATOR_HOST : chargez dev/dev.env.", file=sys.stderr)
         return 2
-    store = RestStore()
-    target = f"émulateur {emulator}" if emulator else "PRODUCTION"
-    print(f"Projet Firestore : {store.project_id} ({target})")
-    if args.apply and not emulator:
-        typed = input(f"Écriture en production : tapez l'identifiant du projet ({store.project_id}) pour confirmer : ")
-        if typed.strip() != store.project_id:
-            print("Confirmation incorrecte : rien n'a été écrit.", file=sys.stderr)
-            return 1
+    if emulator:
+        store = RestStore()
+        print(f"Projet Firestore : {store.project_id} (émulateur {emulator})")
+        return _run(store, args.apply, production=False)
 
-    report = Report()
-    # Competitions and directory first: they read the members' birth dates and categories as they are now
-    migrate_competitions(store, args.apply, report)
-    migrate_directory(store, args.apply, report)
-    migrate_users(store, args.apply, report)
-    print_report(report, args.apply)
-    return 0
+    project = args.project or gcloud("config", "get-value", "project")
+    if not project:
+        print("Aucun projet : `gcloud config set project <id>` ou --project <id>.", file=sys.stderr)
+        return 2
+    token = gcloud("auth", "print-access-token")  # valid one hour: the run takes seconds
+    print(f"Projet Firestore : {project} (PRODUCTION, compte gcloud {gcloud('config', 'get-value', 'account')})")
+    store = RestStore(project, lambda: token)
+    # The competitions and directory helpers go through FirestoreClient, which takes the app's own account otherwise
+    with patch.object(FirestoreClient, "get_project_id", return_value=project), \
+            patch.object(FirestoreClient, "get_access_token", return_value=token):
+        return _run(store, args.apply, production=True)
 
 
 if __name__ == "__main__":
