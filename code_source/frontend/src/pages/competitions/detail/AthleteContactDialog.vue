@@ -4,6 +4,7 @@ import UiBadge from "../../../components/ui/UiBadge.vue";
 import UiButton from "../../../components/ui/UiButton.vue";
 import UiDialog from "../../../components/ui/UiDialog.vue";
 import UiDialogActions from "../../../components/ui/UiDialogActions.vue";
+import { categoryAndSexLabel } from "../../../lib/category";
 import { telHref } from "../../../lib/text";
 import type { Row } from "../competitions";
 
@@ -32,9 +33,9 @@ const emit = defineEmits<{
           <span class="font-bold">🪪 {{ athlete.num_licence || "Sans licence" }}</span>
           <span>·</span>
           <span>🧗 {{ athlete.group || athlete.tarif || "Groupe non renseigné" }}</span>
-          <template v-if="athlete.categorie_ffme">
+          <template v-if="categoryAndSexLabel(athlete.categorie, athlete.sex)">
             <span>·</span>
-            <span>🏅 Catégorie {{ athlete.categorie_ffme }}</span>
+            <span data-testid="athlete-category">🏅 Catégorie {{ categoryAndSexLabel(athlete.categorie, athlete.sex) }}</span>
           </template>
         </div>
         <UiBadge v-if="athlete.statut_paiement" color="blue" variant="soft">

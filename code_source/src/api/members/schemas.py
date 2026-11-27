@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import re
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import AfterValidator, BaseModel, Field, WithJsonSchema, field_validator
 
 from api.request_body import RequestBody
 from domain.members.countries import country_names, nationality_names
+from domain.members.ffme_category import Category
 from domain.members.sex import Sex
 
 
@@ -82,6 +83,7 @@ class Member(BaseModel):
     email_primary: str
     email_secondary: str
     licence_ffme: str
+    ffme_category: Union[Category, Literal[""]] = Field(description="FFME competition category, \"\" when none")
     emergency_contacts: List[EmergencyContact] = Field(description="In order, the first one is the main one")
     emergency1_name: str = Field(description="Deprecated: first contact, for tabs of the previous build until release B")
     emergency1_phone: str = Field(description="Deprecated: first contact, for tabs of the previous build until release B")
@@ -107,7 +109,6 @@ class Member(BaseModel):
     email_sent_date: str
     commentaires_correctif: str
     creneau_groupe: str
-    categorie: str
     creneau_details: str
 
 
@@ -156,6 +157,8 @@ class MemberChanges(RequestBody):
     amount: Optional[float] = Field(default=None, ge=0)
     licence_ffme: Optional[str] = None
     sex: Optional[Sex] = Field(default=None, description="Sent as null to clear it")
+    ffme_category: Optional[Union[Category, Literal[""]]] = Field(
+        default=None, description="\"\" clears it; left out with a new birth_date: recomputed for the member's latest season")
     badge_rouge: Optional[YesNo] = None
     autonomie_bloc: Optional[YesNo] = None
     photo_auth: Optional[YesNo] = None

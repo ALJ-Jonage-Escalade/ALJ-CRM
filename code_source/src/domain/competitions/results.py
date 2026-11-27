@@ -6,6 +6,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, List, Mapping, Optional, TypedDict
 
+from domain.members.ffme_category import category_label
 from domain.utils import normalize_name
 
 
@@ -50,10 +51,11 @@ def _rank_sort_key(athlete: ClubAthlete) -> int:
         return 9999
 
 
-def apply_rankings(participants: List[Dict[str, Any]], scraped: List[Dict[str, Any]],
-                   synced_at: str) -> List[ClubAthlete]:  # Any: Firestore participant rows and scraper rows
+def apply_rankings(participants: List[Dict[str, Any]], scraped: List[Dict[str, Any]], synced_at: str,
+                   sexes: Optional[Mapping[int, Optional[str]]] = None) -> List[ClubAthlete]:  # Any: Firestore participant rows and scraper rows
     """Sets the ranking fields of the participants found in the scraped results (licence first, then name), in place.
-    Only those fields are changed. Returns the matched athletes, best ranked first."""
+    Only those fields are changed. Returns the matched athletes, best ranked first, with their own category (the one
+    copied when added) and the sex of their member (`sexes`: {adherent id -> sex code}) for the e-mail."""
     by_licence: Dict[str, Dict[str, Any]] = {}
     by_name: Dict[str, Dict[str, Any]] = {}
     for row in scraped:
@@ -77,14 +79,14 @@ def apply_rankings(participants: List[Dict[str, Any]], scraped: List[Dict[str, A
         participant["classement"] = rank
         participant["total_categorie"] = total
         participant["resultat_ffme"] = f"{rank}{suffix}" if rank else ""
-        participant["categorie_ffme"] = match.get("categorie") or ""
+        participant.pop("categorie_ffme", None)  # the MyCompet category formerly copied (plans/ffme-categories.md D7)
         participant["performance_ffme"] = match.get("performance") or ""
         participant["resultat_synced_at"] = synced_at
         athletes.append(ClubAthlete(
             nom=str(participant.get("nom") or match.get("nom") or ""),
             prenom=str(participant.get("prenom") or match.get("prenom") or ""),
             num_licence=licence or str(match.get("licence") or ""),
-            categorie=str(match.get("categorie") or participant.get("categorie") or ""),
+            categorie=category_label(participant.get("categorie"), (sexes or {}).get(participant.get("adherent_id") or 0)),
             classement=rank,
             total_categorie=total,
             resultat_ffme=participant["resultat_ffme"],

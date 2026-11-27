@@ -50,6 +50,13 @@ class TestParticipants(FirestoreRepoTestCase):
         self.assertIsNone(participants.remove_participant_doc(self.comp_id, 101))
         self.assertEqual(participants.list_participants(self.comp_id), [])
 
+    def test_new_participant_copies_the_member_s_category(self):
+        self.seed_adherent(103, nom="PETIT", ffme_category="U15")
+        participants.add_participant(self.comp_id, 103)
+        participants.load_competition_group_doc(self.comp_id)  # adds 101, without a category
+        categories = {p.adherent_id: p.categorie for p in participants.list_participants(self.comp_id)}
+        self.assertEqual(categories, {103: "U15", 101: ""})
+
     def test_set_selection_creates_missing_participant(self):
         self.assertIsNotNone(participants.set_selection_doc(self.comp_id, 102, True))
         parts = participants.list_participants(self.comp_id)

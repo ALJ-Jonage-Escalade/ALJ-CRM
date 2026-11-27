@@ -3,6 +3,7 @@
    events and rules as the card, but no « Présent » column: the « Participe » switch, then the action allowed by the payment
    (« Sur place » once checked in). */
 import UiBadge from "../../../components/ui/UiBadge.vue";
+import { categoryAndSexLabel } from "../../../lib/category";
 import { telHref } from "../../../lib/text";
 import { hasPaid, isCancelled, paymentBadge, rankingColor, rankingText, type Row } from "../competitions";
 import type { ContactState } from "./emailHistory";
@@ -66,7 +67,9 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
     <td class="px-2.5 py-2 text-center">
       <UiBadge v-if="rankingText(row)" :color="rankingColor(row)" variant="soft" data-testid="ranking">{{ rankingText(row) }}</UiBadge>
       <span v-else class="text-xs text-slate-400">—</span>
-      <span v-if="rankingText(row) && row.categorie_ffme" class="block text-[10.5px] text-slate-500">{{ row.categorie_ffme }}</span>
+      <span v-if="rankingText(row) && row.categorie" class="block text-[10.5px] text-slate-500">
+        {{ categoryAndSexLabel(row.categorie, row.sex) }}
+      </span>
     </td>
     <td class="px-2.5 py-2 text-center">
       <input

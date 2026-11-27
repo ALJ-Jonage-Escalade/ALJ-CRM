@@ -1984,6 +1984,11 @@ export interface components {
             /** Blocked */
             blocked: number;
         };
+        /**
+         * Category
+         * @enum {string}
+         */
+        Category: "U11" | "U13" | "U15" | "U17" | "U19" | "SENIOR" | "VETERAN_1" | "VETERAN_2";
         /** CloudDbStatus */
         CloudDbStatus: {
             /**
@@ -2249,6 +2254,11 @@ export interface components {
              * @default
              */
             creneau_groupe?: string;
+            /**
+             * Ffme Category
+             * @default
+             */
+            ffme_category?: components["schemas"]["Category"] | "";
             sex?: components["schemas"]["Sex"] | null;
         } & {
             [key: string]: unknown;
@@ -2280,6 +2290,12 @@ export interface components {
              * @default
              */
             tarif?: string;
+            /**
+             * Categorie
+             * @description FFME category of the member when added, never refreshed
+             * @default
+             */
+            categorie?: components["schemas"]["Category"] | "";
             /**
              * Phone
              * @default
@@ -2344,11 +2360,6 @@ export interface components {
              * @default 0
              */
             total_categorie?: number | string;
-            /**
-             * Categorie Ffme
-             * @default
-             */
-            categorie_ffme?: string;
             /**
              * Resultat Ffme
              * @default
@@ -3940,6 +3951,11 @@ export interface components {
             /** Licence Ffme */
             licence_ffme: string;
             /**
+             * Ffme Category
+             * @description FFME competition category, "" when none
+             */
+            ffme_category: components["schemas"]["Category"] | "";
+            /**
              * Emergency Contacts
              * @description In order, the first one is the main one
              */
@@ -4003,8 +4019,6 @@ export interface components {
             commentaires_correctif: string;
             /** Creneau Groupe */
             creneau_groupe: string;
-            /** Categorie */
-            categorie: string;
             /** Creneau Details */
             creneau_details: string;
         };
@@ -4027,6 +4041,11 @@ export interface components {
             licence_ffme?: string | null;
             /** @description Sent as null to clear it */
             sex?: components["schemas"]["Sex"] | null;
+            /**
+             * Ffme Category
+             * @description "" clears it; left out with a new birth_date: recomputed for the member's latest season
+             */
+            ffme_category?: components["schemas"]["Category"] | "" | null;
             /** Badge Rouge */
             badge_rouge?: ("Oui" | "Non") | null;
             /** Autonomie Bloc */

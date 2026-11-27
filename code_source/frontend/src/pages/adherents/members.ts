@@ -1,6 +1,7 @@
 /* Member list of Adhérents: slot / tariff filters, search, status, sorting and CSV export (port of the former
    web/shared/alj-filters.js and alj-members.js).
    The members come formatted by the server (GET /api/members, domain/members/view.py). */
+import { categoryLabel } from "../../lib/category";
 import type { BadgeColor } from "../../components/ui/palette";
 import { localStorageOrNone } from "../../lib/localStorage";
 import type { Cell } from "../../lib/csv";
@@ -394,7 +395,7 @@ export function csvRows(members: readonly Member[]): Cell[][] {
       formatDayText(m.birth_date),
       m.age,
       m.sex ? SEX_LABELS[m.sex] : "",
-      m.categorie,
+      categoryLabel(m.ffme_category),
       m.creneau_groupe,
       m.tarif_name,
       m.amount,

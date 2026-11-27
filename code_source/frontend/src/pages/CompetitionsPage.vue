@@ -48,7 +48,7 @@ const competitors = useSyncedResource(
 );
 // Offline the role cannot be checked: a device keeping the contacts is a coach's (they are never kept for others)
 const canWrite = computed(() => staff.value || (access.value === "offline" && competitors.data.value !== null));
-// Tariffs and slot groups to group the participants, names and e-mails to add or write to them: online only
+// Tariffs and slot groups (contact dialog), names and e-mails to add or write to them: online only
 const members = useSyncedResource("competition-members", () => (open.value && signedIn.value ? competitionMembersRead() : null), {
   offline: false,
   select: toMemberSlots,

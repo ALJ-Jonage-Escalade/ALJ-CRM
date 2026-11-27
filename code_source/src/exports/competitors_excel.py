@@ -18,6 +18,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from domain.competitions.models import LIBELLES_STATUT_PAIEMENT, PaymentStatus
+from domain.members.ffme_category import category_label
 from domain.utils import format_amount
 from exports.spreadsheet_safety import neutralize_formulas
 
@@ -86,9 +87,9 @@ def _competitor_values(participant: Mapping[str, Any], default_discipline: str) 
     return [
         str(participant.get("nom") or "").strip().upper(),
         str(participant.get("prenom") or "").strip().title(),
-        str(participant.get("categorie_ffme") or participant.get("categorie") or "").strip(),
+        category_label(participant.get("categorie"), participant.get("sex")),
         "Oui" if participant.get("surclassement") else "Non",
-        str(participant.get("discipline") or participant.get("creneau_groupe") or default_discipline or "").strip(),
+        str(participant.get("discipline") or default_discipline or "").strip(),
         "Sélectionné" if participant.get("selectionne") else "Non invité",
         payment_label(participant),
         str(participant.get("date_naissance") or participant.get("birth_date") or "").strip(),

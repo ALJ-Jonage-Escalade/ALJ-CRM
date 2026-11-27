@@ -41,3 +41,8 @@ class TestMemberRows(MemberDbTestCase):
         seasons = SeasonRepository.list_seasons()
         self.assertEqual([s["name"] for s in seasons], ["2026-2027", "2025-2026"])
         self.assertEqual([s["is_active"] for s in seasons], [True, False])
+
+    def test_rows_carry_the_ffme_category(self):
+        self.seed("1", "Léo", "MARTIN", "Loisir")  # born 2017
+        (row,) = MemberRepository.list_member_rows("2026-2027")
+        self.assertEqual(row["ffme_category"], "U11")

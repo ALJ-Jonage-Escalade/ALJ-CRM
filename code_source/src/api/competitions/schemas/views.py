@@ -11,6 +11,7 @@ from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from domain.members.ffme_category import Category
 from domain.members.sex import Sex
 
 
@@ -23,6 +24,7 @@ class CompetitionParticipant(BaseModel):
     prenom: str = ""
     num_licence: str = ""
     tarif: str = ""
+    categorie: Union[Category, Literal[""]] = Field("", description="FFME category of the member when added, never refreshed")
     phone: str = ""
     selectionne: bool = False
     statut_paiement: str = Field("", description="non_invite, en_attente, paye, annule_perdu or annule_reporte")
@@ -35,7 +37,6 @@ class CompetitionParticipant(BaseModel):
     present: bool = Field(False, description="Checked in on the day of the competition")
     classement: str = ""
     total_categorie: Union[int, str] = 0
-    categorie_ffme: str = ""
     resultat_ffme: str = ""
     sex: Optional[Sex] = Field(None, description="Read from the member (adherents directory), None when not given")
     updated_at: str = Field("", description="Sent back as unchanged_since by a change queued offline")
@@ -79,6 +80,7 @@ class CompetitionMember(BaseModel):
     statut: str = Field("", description="Membership status of the member's season purchase (« Terminé »…)")
     saison: str = ""
     creneau_groupe: str = ""
+    ffme_category: Union[Category, Literal[""]] = ""
     sex: Optional[Sex] = None
 
 

@@ -125,7 +125,7 @@ class MemberRepository:
         SELECT u.id AS user_id, p.id AS purchase_id, p.helloasso_item_id,
                u.last_name, u.first_name, u.birth_date, u.sex,
                u.address, u.zip_code, u.city, u.country, u.nationality, u.phone, u.email_primary, u.email_secondary,
-               u.licence_ffme, u.health_commitment, u.photo_auth, u.badge_rouge, u.autonomie_bloc,
+               u.licence_ffme, u.ffme_category, u.health_commitment, u.photo_auth, u.badge_rouge, u.autonomie_bloc,
                u.raw_passports, u.raw_diplomas,
                o.payer_first_name, o.payer_last_name, o.payer_email, o.order_ref, o.order_date,
                p.tarif_name, p.amount, p.status, p.document_sante, p.email_sent_date,
@@ -275,6 +275,19 @@ class MemberRepository:
         return False
 
     @classmethod
+    def latest_season_of(cls, user_id: Optional[int] = None, purchase_id: Optional[int] = None,
+                         order_ref: Optional[str] = None) -> Optional[str]:
+        """The season of the member's most recent membership (member found as by update_member_fields), None when unknown."""
+        with SqliteDatabase.connect() as conn:
+            cursor = conn.cursor()
+            resolved_uid = _resolve_user_id(cursor, user_id, purchase_id, order_ref)
+            if resolved_uid is None:
+                return None
+            row = cursor.execute("SELECT MAX(s.name) FROM purchases p JOIN orders o ON o.id = p.order_id"
+                                 " JOIN seasons s ON s.id = o.season_id WHERE p.user_id = ?", (int(resolved_uid),)).fetchone()
+        return row[0] if row and row[0] else None
+
+    @classmethod
     def update_member_fields(
         cls,
         user_id: Optional[int] = None,
@@ -297,22 +310,7 @@ class MemberRepository:
                 cursor = conn.cursor()
                 now_iso = datetime.datetime.now().isoformat(timespec="seconds")
 
-                # Résolution de user_id si absent
-                resolved_uid = user_id
-                if resolved_uid is None and purchase_id:
-                    row = cursor.execute("SELECT user_id FROM purchases WHERE id = ?", (int(purchase_id),)).fetchone()
-                    if row:
-                        resolved_uid = row["user_id"]
-
-                if resolved_uid is None and order_ref:
-                    row = cursor.execute("""
-                        SELECT p.user_id FROM purchases p
-                        JOIN orders o ON o.id = p.order_id
-                        WHERE o.order_ref = ?
-                        LIMIT 1
-                    """, (str(order_ref).strip(),)).fetchone()
-                    if row:
-                        resolved_uid = row["user_id"]
+                resolved_uid = _resolve_user_id(cursor, user_id, purchase_id, order_ref)
 
                 user_updates = _user_column_updates(fields)
                 if user_updates and resolved_uid is not None:
@@ -348,8 +346,26 @@ class MemberRepository:
 # Member fields written as trimmed text, and the yes/no fields with their default
 _USER_TEXT_FIELDS = (
     "email_primary", "email_secondary", "phone", "licence_ffme", "address", "zip_code", "city", "country", "nationality",
+    "ffme_category",
 )
 _USER_YES_NO_DEFAULTS = {"badge_rouge": "Non", "autonomie_bloc": "Non", "photo_auth": "Oui"}
+
+
+def _resolve_user_id(cursor: sqlite3.Cursor, user_id: Optional[int], purchase_id: Optional[int],
+                     order_ref: Optional[str]) -> Optional[int]:
+    """The member: user_id, else the one of the purchase, else of the order."""
+    if user_id is not None:
+        return user_id
+    if purchase_id:
+        row = cursor.execute("SELECT user_id FROM purchases WHERE id = ?", (int(purchase_id),)).fetchone()
+        if row:
+            return int(row[0])
+    if order_ref:
+        row = cursor.execute("SELECT p.user_id FROM purchases p JOIN orders o ON o.id = p.order_id WHERE o.order_ref = ? LIMIT 1",
+                             (str(order_ref).strip(),)).fetchone()
+        if row:
+            return int(row[0])
+    return None
 
 
 def _user_column_updates(fields: Dict[str, object]) -> Dict[str, Optional[str]]:

@@ -39,7 +39,6 @@ export function member(change: Partial<Member>): Member {
     "email_sent_date",
     "commentaires_correctif",
     "creneau_groupe",
-    "categorie",
     "creneau_details",
   ] as const;
   return {
@@ -47,6 +46,7 @@ export function member(change: Partial<Member>): Member {
     user_id: 1,
     purchase_id: 1,
     helloasso_item_id: null,
+    ffme_category: "",
     age: null,
     sex: null,
     amount: null,

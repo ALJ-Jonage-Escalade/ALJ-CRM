@@ -11,6 +11,7 @@ describe("ParticipantCard", () => {
     num_licence: "987654",
     tarif: "Compétition U18",
     group: "Compétition U18",
+    section: "U17 H",
     selectionne: true,
     present: false,
     statut_paiement: "paye",

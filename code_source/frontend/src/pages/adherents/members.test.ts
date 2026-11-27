@@ -157,13 +157,22 @@ describe("display", () => {
 describe("CSV export", () => {
   it("has the columns of the former page, one row per member", () => {
     const rows = csvRows([
-      member({ last_name: "DUPONT", first_name: "Léa", birth_date: "2012-05-04", age: 14, amount: 180, order_date: "2026-09-01T12:00:00" }),
+      member({
+        last_name: "DUPONT",
+        first_name: "Léa",
+        birth_date: "2012-05-04",
+        age: 14,
+        ffme_category: "U15",
+        amount: 180,
+        order_date: "2026-09-01T12:00:00",
+      }),
     ]);
     expect(rows[0]!.slice(0, 4)).toEqual(["Nom", "Prénom", "Date de naissance", "Âge"]);
     expect(rows[0]).toHaveLength(25);
     expect(rows[0]!.at(-1)).toBe("Date commande");
     expect(rows[1]!.slice(0, 4)).toEqual(["DUPONT", "Léa", "04/05/2012", 14]);
     expect(rows[1]![8]).toBe(180);
+    expect([rows[0]![5], rows[1]![5]]).toEqual(["Catégorie", "U15"]);
     expect(rows[1]![24]).toBe("01/09/2026");
     expect(csvName("2026-2027")).toBe("adherents_2026-2027.csv");
   });

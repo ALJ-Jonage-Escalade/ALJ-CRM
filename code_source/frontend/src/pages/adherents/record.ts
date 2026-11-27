@@ -1,6 +1,7 @@
 /* Member record of Adhérents: what the record shows, the edit / add form (draft, checks, changes sent), the e-mail and
    the payment certificate (texts of the former web/bureau/adherents.html). Writes and sends are for admins; the server
    checks the role and the fields again (api/members/schemas.py). */
+import { categoryLabel, NO_CATEGORY, type Category } from "../../lib/category";
 import type { EmailTemplate } from "../../services/communications";
 import type { Schemas } from "../../lib/client";
 import { looksLikeEmail } from "../../lib/email";
@@ -43,6 +44,7 @@ export function recordRows(member: Member): RecordRow[] {
     member.birth_date ? `${formatDayText(member.birth_date)}${member.age != null ? ` (${member.age} ans)` : ""}` : "",
   );
   add("⚧", "Sexe", member.sex ? SEX_LABELS[member.sex] : "");
+  add("🏅", "Catégorie FFME", categoryLabel(member.ffme_category));
   add("📍", "Adresse", join(", ", member.address, join(" ", member.zip_code, member.city)));
   add("🌍", "Pays", member.country ?? "");
   add("🪪", "Nationalité", member.nationality ?? "");
@@ -167,6 +169,8 @@ export interface MemberDraft {
   birth_date: string;
   /** Empty: not given (never guessed, the FFME export leaves a new member without it out) */
   sex: Sex | "";
+  /** Empty: none. Edit form only: a new member gets the category of the birth date (server) */
+  ffme_category: Category | "";
   /** One of STATUS_CHOICES, or the member's own status when it is none of them (kept unless changed). */
   status: string;
   amount: string;
@@ -204,6 +208,8 @@ export function draftOf(member?: Member, firstTarif = ""): MemberDraft {
     first_name: member?.first_name ?? "",
     birth_date: member?.birth_date ?? "",
     sex: member?.sex ?? "",
+    // A list saved offline before the field existed has none
+    ffme_category: member?.ffme_category ?? "",
     status: member?.status_norm || "Validé",
     amount: member ? (member.amount != null ? String(member.amount) : "") : "0.00",
     tarif_name: member ? member.tarif_name : firstTarif,
@@ -380,6 +386,11 @@ export function changesOf(member: Member, draft: MemberDraft): Changes {
   if (sexNow !== sexWas) {
     fields.sex = sexNow;
     lines.push(`Sexe : ${sexLabel(sexWas)} ➔ ${sexLabel(sexNow)}`);
+  }
+  const categoryWas = member.ffme_category ?? "";
+  if (draft.ffme_category !== categoryWas) {
+    fields.ffme_category = draft.ffme_category;
+    lines.push(`Catégorie FFME : ${categoryLabel(categoryWas) || NO_CATEGORY} ➔ ${categoryLabel(draft.ffme_category) || NO_CATEGORY}`);
   }
   const was = member.commentaires_correctif.trim();
   const now = draft.commentaires_correctif.trim();

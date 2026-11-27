@@ -18,7 +18,8 @@ class TestCompetitorsExport(unittest.TestCase):
                     "adherent_id": 1,
                     "nom": "POTTER",
                     "prenom": "Harry",
-                    "categorie_ffme": "U17",
+                    "categorie": "U17",
+                    "sex": "H",
                     "surclassement": False,
                     "discipline": "Bloc",
                     "selectionne": True,
@@ -33,7 +34,8 @@ class TestCompetitorsExport(unittest.TestCase):
                     "adherent_id": 2,
                     "nom": "GRANGER",
                     "prenom": "Hermione",
-                    "categorie_ffme": "U17",
+                    "categorie": "VETERAN_1",
+                    "sex": "F",
                     "surclassement": True,
                     "discipline": "Bloc",
                     "selectionne": True,
@@ -52,6 +54,11 @@ class TestCompetitorsExport(unittest.TestCase):
         self.assertTrue(len(data) > 0)
         # Check ZIP / XLSX magic bytes
         self.assertTrue(data.startswith(b"PK\x03\x04"))
+        import io
+
+        import openpyxl
+        cells = [c.value for row in openpyxl.load_workbook(io.BytesIO(data)).active.iter_rows() for c in row]
+        self.assertIn("U17 H", cells)
 
     def test_export_html_and_pdf(self):
         html_code = generate_competitors_html(self.comp)
@@ -59,6 +66,8 @@ class TestCompetitorsExport(unittest.TestCase):
         self.assertIn("POTTER", html_code)
         self.assertIn("GRANGER", html_code)
         self.assertIn("777888", html_code)
+        self.assertIn("U17 H", html_code)
+        self.assertIn("Vétéran 1 F", html_code)
 
         pdf_bytes = export_competitors_pdf(self.comp)
         self.assertTrue(len(pdf_bytes) > 0)

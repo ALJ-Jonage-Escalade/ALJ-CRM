@@ -91,6 +91,7 @@ def _new_participant_row(adherent_doc: dict[str, Any], selectionne: bool, statut
         "email": str(adherent_doc.get("email") or ""),
         "phone": str(adherent_doc.get("phone") or ""),
         "tarif": str(adherent_doc.get("tarif") or ""),
+        "categorie": str(adherent_doc.get("ffme_category") or ""),
         "selectionne": bool(selectionne),
         "statut_paiement": status,
         "montant_paye": 0.0,

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* A competitor of the competition (no « Présent » switch, as in the table: ParticipantRow). */
 import UiBadge from "../../../components/ui/UiBadge.vue";
+import { categoryAndSexLabel } from "../../../lib/category";
 import { telHref } from "../../../lib/text";
 import { hasPaid, isCancelled, paymentBadge, rankingColor, rankingText, type Row } from "../competitions";
 import type { ContactState } from "./emailHistory";
@@ -100,7 +101,7 @@ const action = "cursor-pointer rounded-md border bg-white px-2 py-0.5 text-[11.5
       </span>
       <UiBadge v-if="rankingText(row)" :color="rankingColor(row)" variant="soft" data-testid="ranking">
         {{ rankingText(row) }}
-        <template v-if="row.categorie_ffme">· {{ row.categorie_ffme }}</template>
+        <template v-if="row.categorie">· {{ categoryAndSexLabel(row.categorie, row.sex) }}</template>
       </UiBadge>
       <template v-if="contactsShown">
         <a v-if="row.phone" :href="telHref(row.phone)" :class="[telButton, 'border-blue-200 bg-blue-50 text-blue-700']">
