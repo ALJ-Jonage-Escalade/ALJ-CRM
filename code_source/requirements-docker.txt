@@ -12,14 +12,14 @@ brotli==1.2.1 ; platform_python_implementation == 'CPython'
     # via fonttools
 brotlicffi==1.2.1.0 ; platform_python_implementation != 'CPython'
     # via fonttools
-certifi==2026.10.23
+certifi==2026.11.20
     # via requests
 cffi==2.1.1
     # via
     #   brotlicffi
     #   cryptography
     #   weasyprint
-charset-normalizer==3.5.2
+charset-normalizer==3.5.3
     # via requests
 click==8.5.1
     # via uvicorn
@@ -62,11 +62,11 @@ pillow==13.0.0
     #   weasyprint
 pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi
-pydantic==2.14.3
+pydantic==2.14.4
     # via
     #   alj-escalade-manager
     #   fastapi
-pydantic-core==2.50.4
+pydantic-core==2.50.5
     # via pydantic
 pydyf==0.13.0
     # via weasyprint
