@@ -28,7 +28,9 @@ librt==0.17.0 ; platform_python_implementation != 'PyPy'
     # via mypy
 mypy==2.4.1
 mypy-extensions==1.2.0
-    # via mypy
+    # via
+    #   librt
+    #   mypy
 packaging==26.4
     # via pytest
 pathspec==1.1.1
