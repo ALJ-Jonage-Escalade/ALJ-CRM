@@ -10,7 +10,7 @@ dependencies = [
     # Imported directly (x509 certificates of the Firebase tokens), not only through PyJWT[crypto]
     "cryptography==50.0.2",
     # API contract models: imported directly, not only through fastapi
-    "pydantic==2.14.3",
+    "pydantic==2.14.4",
     "openpyxl==3.1.5",
     "python-dotenv==1.2.4",
     # Not imported by src/, but openpyxl needs it to embed the QR codes of the presence sheets and does not declare it
@@ -32,7 +32,7 @@ dev = [
     # splits the e2e xdist_groups across workers (shared fake HelloAsso state → flaky e2e). Lift with a fixed xdist
     "pytest==9.1.1",
     "pytest-timeout==2.4.0",
-    "ruff==0.17.5",
+    "ruff==0.17.6",
     "mypy==2.4.1",
     "httpx==0.28.1",
     # Fake data for the development environment (dev/seed)
